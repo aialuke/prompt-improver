@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/e06b100c0d2d4010abdf0713d77cb45f/artifacts
+end_time: 1751631823396
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e06b100c0d2d4010abdf0713d77cb45f
+run_name: marvelous-perch-927
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751631822065
+status: 3
+tags: []
+user_id: lukemckenzie

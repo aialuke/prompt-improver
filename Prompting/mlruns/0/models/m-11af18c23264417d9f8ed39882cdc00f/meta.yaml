@@ -1,0 +1,10 @@
+artifact_location: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/models/m-11af18c23264417d9f8ed39882cdc00f/artifacts
+creation_timestamp: 1751631258783
+experiment_id: '0'
+last_updated_timestamp: 1751631259963
+model_id: m-11af18c23264417d9f8ed39882cdc00f
+model_type: null
+name: model
+source_run_id: efa3a162b81342c9964b0626a5464368
+status: 2
+status_message: null

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/e2d3a1a91e034b8f83dc717f4fb7ceb9/artifacts
+end_time: 1751631796614
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e2d3a1a91e034b8f83dc717f4fb7ceb9
+run_name: capricious-crow-871
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751631794920
+status: 3
+tags: []
+user_id: lukemckenzie

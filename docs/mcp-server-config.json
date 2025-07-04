@@ -1,0 +1,32 @@
+{
+  "server": {
+    "name": "prompt-evaluation-server",
+    "version": "1.0.0",
+    "description": "Unified prompt evaluation server for Claude Code and Cursor IDE",
+    "transport": {
+      "type": "stdio",
+      "timeout": 30000
+    }
+  },
+  "tools": [
+    {
+      "name": "evaluate_prompt_improvement",
+      "description": "Evaluate improvements between original and improved prompts",
+      "enabled": true
+    },
+    {
+      "name": "analyze_prompt_structure",
+      "description": "Analyze the structural quality of a single prompt",
+      "enabled": true
+    }
+  ],
+  "logging": {
+    "level": "info",
+    "enabled": true
+  },
+  "evaluation": {
+    "defaultMetrics": ["clarity", "completeness", "specificity", "structure"],
+    "confidenceThreshold": 0.7,
+    "timeoutMs": 30000
+  }
+}

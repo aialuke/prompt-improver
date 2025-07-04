@@ -1,0 +1,197 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MCP IMPLEMENTATION TOOLS
+
+**CONTEXT7 IS MANDATORY FOR ALL IMPLEMENTATIONS** (unless already researched in current session)
+
+## When to Use MCP Tools:
+
+**USE MCP IMPLEMENTATION TOOLS when:**
+- Starting ANY new work (feature, component, function)
+- Making ANY decision (technology, architecture, approach)
+- Encountering ANY problem (bugs, performance, integration)
+- Working with ANY external library/framework
+- First time implementing any pattern
+- Learning/discovering new approaches
+- Debugging non-obvious issues
+
+## Complete MCP Workflow Sequence:
+
+### 1. MEMORY SEARCH (Always start here)
+```bash
+# Check for previous solutions
+mcp__memory__search_nodes("[implementation-type] patterns")
+mcp__memory__search_nodes("authentication approaches")
+mcp__memory__search_nodes("form validation solutions")
+mcp__memory__search_nodes("[current-task-type] implementations")
+
+# Search for similar problems/decisions
+mcp__memory__search_nodes("debugging [technology] issues")
+mcp__memory__search_nodes("[framework] performance optimization")
+```
+
+### 2. CONTEXT7 RESEARCH (Required for external dependencies)
+
+**ALWAYS research simplicity and alternatives first:**
+```bash
+# Research simplest approaches and alternatives
+mcp__context7__resolve-library-id("[problem-domain] simple solutions")
+mcp__context7__get-library-docs("[library]", topic="simplest implementation patterns")
+mcp__context7__get-library-docs("[library]", topic="minimal setup")
+
+# Before ANY React implementation:
+mcp__context7__get-library-docs("/react/react", topic="hooks patterns")
+mcp__context7__get-library-docs("/react/react", topic="performance optimization")
+
+# Before ANY Next.js work:
+mcp__context7__get-library-docs("/vercel/next.js", topic="app router")
+mcp__context7__get-library-docs("/vercel/next.js", topic="server actions")
+
+# Before ANY state management:
+mcp__context7__get-library-docs("/tanstack/react-query", topic="optimistic updates")
+mcp__context7__get-library-docs("/tanstack/react-query", topic="offline persistence")
+
+# Before ANY styling:
+mcp__context7__get-library-docs("/tailwindcss/tailwindcss", topic="component patterns")
+mcp__context7__get-library-docs("/tailwindcss/tailwindcss", topic="responsive design")
+
+# Before ANY database work:
+mcp__context7__get-library-docs("/prisma/prisma", topic="best practices")
+mcp__context7__get-library-docs("/prisma/prisma", topic="performance")
+
+# Before ANY form handling:
+mcp__context7__resolve-library-id("React Hook Form")
+mcp__context7__get-library-docs("[resolved-id]", topic="validation patterns")
+
+# Before ANY PWA features:
+mcp__context7__get-library-docs("/vercel/next.js", topic="PWA implementation")
+mcp__context7__get-library-docs("/vercel/next.js", topic="service worker caching")
+
+# Before ANY testing:
+mcp__context7__resolve-library-id("Vitest")
+mcp__context7__get-library-docs("[resolved-id]", topic="testing patterns")
+```
+
+### 3. SEQUENTIAL PLANNING (For ANY multi-step task)
+```bash
+# Use for ANY implementation with >2 steps
+mcp__sequential-thinking__sequentialthinking("Plan [implementation] using latest [framework] patterns")
+
+# Use for debugging complex issues
+mcp__sequential-thinking__sequentialthinking("Debug [specific-issue] systematically")
+
+# Use for comparing approaches
+mcp__sequential-thinking__sequentialthinking("Compare [option-A] vs [option-B] for [use-case]")
+
+# Use for breaking down features
+mcp__sequential-thinking__sequentialthinking("Design [feature] with [requirements]")
+```
+
+### 4. OTHER MCP TOOLS (As needed)
+```bash
+# For comprehensive search patterns
+mcp__everything__echo("Find all [pattern] usage in codebase")
+
+# For IDE integration and diagnostics
+mcp__ide__getDiagnostics() # Check for errors before implementing
+mcp__ide__executeCode("[test-snippet]") # Verify approach works
+
+# For specific tool operations
+mcp__postgres__query("[schema-validation]") # Database-related implementations
+```
+
+### 5. MEMORY STORAGE (Always finish with this)
+```bash
+# Store architectural decisions
+mcp__memory__create_entities({
+  name: "[Decision/Pattern name]",
+  entityType: "architecture" | "solution" | "pattern" | "decision",
+  observations: ["Key learning", "Why this approach", "Trade-offs considered"]
+})
+
+# Record specific learnings
+mcp__memory__add_observations("[Technology] [specific-insight] works well for [use-case]")
+
+# Store debugging solutions
+mcp__memory__create_entities({
+  name: "[Problem] solution",
+  entityType: "solution", 
+  observations: ["Root cause", "Solution applied", "Prevention strategy"]
+})
+
+# Store simplicity decisions and anti-patterns avoided
+mcp__memory__create_entities({
+  name: "[Implementation] simplicity decision",
+  entityType: "pattern",
+  observations: ["Why simple approach chosen", "Alternatives rejected", "YAGNI/KISS/DRY applied"]
+})
+```
+
+## MCP Tool Decision Matrix:
+
+**REQUIRED (must use):**
+- Memory search: For ALL tasks
+- Context7: For ANY external library/framework usage
+- Memory storage: For ALL completed work
+
+**RECOMMENDED (should use):**
+- Sequential thinking: Multi-step tasks, debugging, comparisons
+- Everything tools: Complex codebase searches
+- IDE tools: Error checking, code verification
+
+**OPTIONAL (could use):**
+- Everything tools: For simple, obvious searches
+- IDE tools: For straightforward implementations
+
+## Context7 Exceptions (Rare - Skip Only When):
+- Already researched in current session (have recent context7 results)
+- Pure internal business logic (no external dependencies)
+- Following existing plan that already used context7 research
+
+**If unsure → USE CONTEXT7 (err on the side of research)**
+
+## Required Documentation Format:
+
+**Complete MCP Workflow Documentation:**
+```
+Memory Search: "[keywords]" - Found: [results or none]
+Context7 Research:
+- Library: [specific library/framework]
+- Topic: [what I researched]  
+- Key insights: [3-5 current best practices found]
+- Applied: [which insights I'm using]
+Sequential Planning: [if used] "[planning-topic]"
+Implementation: [brief description of approach]
+Memory Storage: "[what-stored]" - [entity-type] - [key-observations]
+```
+
+**Real Example:**
+```
+Memory Search: "form validation patterns" - Found: Previous email validation in auth.ts using Yup
+Context7 Research:
+- Library: React Hook Form v7
+- Topic: validation patterns with Yup integration
+- Key insights: 
+  * Use resolver pattern for Yup integration
+  * Implement field-level validation for real-time feedback
+  * Use trigger() for manual validation
+  * Combine with TanStack Query for async validation
+- Applied: RHF + Yup resolver for consistent form validation
+Sequential Planning: "Design form validation flow with error handling and UX feedback"
+Implementation: Reusable form validation hook with Yup schemas
+Memory Storage: "React Hook Form + Yup pattern for PWA forms" - pattern - ["Consistent validation", "Good UX", "Reusable across forms"]
+```
+
+## Enforcement Checklist:
+□ Started with memory search for similar work
+□ Researched latest docs/patterns via context7 for all external dependencies  
+□ Used sequential thinking for multi-step planning
+□ Applied other MCP tools as appropriate (everything, IDE, postgres)
+□ Documented complete MCP workflow and reasoning
+□ Stored all learnings and decisions in memory for future reference
+
+**Using external library/framework without context7 research = incomplete implementation**
+**Completing work without memory storage = lost institutional knowledge**

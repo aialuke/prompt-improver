@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MCP SEARCH WORKFLOW
+
+**Integrated with MINIMAL COMPLEXITY PRINCIPLE - complete this BEFORE traditional searches:**
+
+**Required Output Format:**
+```
+[MCP Phase]: [Tool Used] → [Finding] ([Evidence Location])
+```
+
+## 1. Memory Search (Always start here)
+```bash
+# Query past decisions
+mcp__memory__search_nodes("[implementation-type] patterns")
+mcp__memory__search_nodes("authentication approaches")
+mcp__memory__search_nodes("validation patterns")
+```
+**Output format**: `Memory: [search-term] → [Found X previous solutions | No relevant history] ([entity names if found])`
+
+## 2. Context7 Research (For external dependencies)
+```bash
+# Research best practices
+mcp__context7__resolve-library-id("TanStack Query v5")
+mcp__context7__get-library-docs("/vercel/next.js", topic="server actions")
+```
+**Output format**: `Context7: [library/topic] → [3-5 key insights] ([doc sections referenced])`
+
+## 3. Integration Decision
+**Output format**: `Integration: [insights applied] → [specific search keywords for traditional search] ([rationale])`
+
+**Example:**
+```
+Memory: "form validation patterns" → Found 2 previous email validation solutions (auth-validation-2024, user-input-patterns)
+Context7: TanStack Query/optimistic updates → Key insights: useMutation onMutate, automatic rollback, error boundaries, cache invalidation ([Mutations section, Error Handling docs])
+Integration: Optimistic patterns applied → Search keywords: "useMutation", "onMutate", "optimistic" ([Because context7 shows this is current best practice])
+```
+
+## 4. Traditional Search Tools (After MCP research)
+- Then proceed with MINIMAL COMPLEXITY PRINCIPLE search patterns
+- Use MCP insights to inform search keywords and patterns

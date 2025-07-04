@@ -1,0 +1,59 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# INTEGRATION MATRIX
+
+## MCP → Traditional Rule Triggers
+
+**After MCP SEARCH WORKFLOW completes** → **ALWAYS trigger MINIMAL COMPLEXITY PRINCIPLE:**
+- Use MCP insights to refine search keywords
+- Apply context7 patterns to inform decision matrix
+- Reference memory findings in complexity evaluation
+- **Apply simplicity research to guide approach selection**
+
+**After MINIMAL COMPLEXITY searches** → **ALWAYS apply MCP IMPLEMENTATION TOOLS:**
+- Store complexity decision in memory
+- Use context7 for chosen approach implementation
+- Apply sequential thinking for multi-step execution
+- **Store simplicity decisions and anti-patterns avoided in memory**
+
+**During EVIDENCE ENUMERATION** → **ALWAYS reference MCP findings:**
+- Include MCP search results in evidence format
+- Cross-reference memory patterns with current findings
+- Validate claims against context7 best practices
+- **Include YAGNI/KISS/DRY principle validation in evidence**
+
+## Traditional → MCP Integration Triggers
+
+**CRITICAL VERIFICATION RULE findings** → **ALWAYS update MCP memory:**
+- Store verification decisions for future reference
+- Create entities for deletion patterns
+- Record rationale for preservation decisions
+
+**PRE-ACTION VERIFICATION unclear scope** → **ALWAYS use MCP sequential thinking:**
+- Break down ambiguous requests systematically
+- Reference memory for similar clarification patterns
+- Apply context7 research for domain-specific understanding
+- **Use extended thinking to find simplest interpretation of requirements**
+
+## Cross-Reference Commands
+
+**In MCP rules, always reference:**
+```bash
+# Before proceeding to traditional search:
+echo "Applying MCP insights and simplicity research to MINIMAL COMPLEXITY PRINCIPLE search patterns"
+
+# After MCP completion:
+echo "Triggering EVIDENCE ENUMERATION with MCP findings and YAGNI/KISS/DRY validation integrated"
+```
+
+**In traditional rules, always reference:**
+```bash  
+# Before code actions:
+echo "Integrating with MCP IMPLEMENTATION TOOLS workflow and simplicity principles"
+
+# After verification:
+echo "Storing results and simplicity decisions in MCP memory for institutional knowledge"
+```

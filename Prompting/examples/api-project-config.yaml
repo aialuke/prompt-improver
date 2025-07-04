@@ -1,0 +1,49 @@
+# API Project Configuration  
+# Optimized for REST APIs, GraphQL, and microservices
+
+testing:
+  defaultTestCount: 150
+  complexityDistribution:
+    simple: 0.4      # Basic CRUD operations
+    moderate: 0.4    # Authentication, validation
+    complex: 0.2     # Complex business logic, integrations
+  
+  categoryWeights:
+    missing_context: 0.35      # API context (request/response formats)
+    no_output_format: 0.30     # JSON schemas, response formats crucial
+    vague_instructions: 0.20   # Clear endpoint behavior
+    poor_structure: 0.10       # API structure patterns
+    missing_examples: 0.05     # Less critical for APIs
+
+evaluation:
+  methods: ["structural", "llm-judge", "output-quality"]
+  llmJudge:
+    model: "claude-3.5-sonnet"
+    temperature: 0.05          # Very consistent for API specs
+    batchSize: 10
+  
+  structuralWeights:
+    specificity: 0.35          # Precise API specifications
+    completeness: 0.30         # All endpoints, parameters
+    clarity: 0.20              # Clear API documentation
+    structure: 0.15            # REST/GraphQL conventions
+
+optimization:
+  autoUpdateRules: true        # Safe for API documentation
+  minConfidenceForUpdate: 0.9  # High confidence for production APIs
+  backupBeforeUpdate: true
+
+output:
+  defaultFormat: "json"        # Machine-readable for API docs
+  includeExamples: true
+  includeStatistics: true
+  reportSections:
+    - "executiveSummary"
+    - "projectAnalysis"
+    - "testResults"
+    - "ruleEffectiveness"
+
+# API-specific paths
+paths:
+  rulesFile: "./config/api-prompt-rules.json"
+  outputDir: "./api-test-results"

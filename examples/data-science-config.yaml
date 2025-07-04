@@ -1,0 +1,50 @@
+# Data Science Project Configuration
+# Optimized for ML, analytics, and data processing projects
+
+testing:
+  defaultTestCount: 80
+  complexityDistribution:
+    simple: 0.3      # Basic data operations
+    moderate: 0.4    # Feature engineering, visualization
+    complex: 0.3     # ML models, advanced analytics
+  
+  categoryWeights:
+    missing_examples: 0.35     # Examples crucial for data science
+    missing_context: 0.25      # Data context and domain knowledge
+    vague_instructions: 0.20   # Clear analytical requirements
+    poor_structure: 0.15       # Notebook/pipeline structure
+    no_output_format: 0.05     # Output format less critical
+
+evaluation:
+  methods: ["structural", "llm-judge"]
+  llmJudge:
+    model: "claude-3.5-sonnet"
+    temperature: 0.2           # Some creativity for analysis
+    batchSize: 5               # Slower for complex reasoning
+  
+  structuralWeights:
+    completeness: 0.35         # Complete data pipeline specs
+    clarity: 0.30              # Clear analytical approach
+    specificity: 0.20          # Specific metrics, algorithms
+    structure: 0.15            # Notebook organization
+
+statistics:
+  significanceLevel: 0.01      # Higher rigor for statistical work
+  confidenceLevel: 0.99
+  minimumSampleSize: 50
+
+optimization:
+  autoUpdateRules: false       # Manual review for research
+  minConfidenceForUpdate: 0.95
+  backupBeforeUpdate: true
+
+output:
+  defaultFormat: "markdown"
+  includeExamples: true
+  includeStatistics: true      # Statistical details important
+  maxExampleLength: 500        # Longer examples for context
+
+# Data science specific paths
+paths:
+  rulesFile: "./config/datascience-prompt-rules.json"
+  outputDir: "./analysis-results"

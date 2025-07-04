@@ -1,0 +1,58 @@
+{
+  "name": "universal-prompt-testing-framework",
+  "version": "1.0.0",
+  "description": "Universal prompt improvement and testing framework",
+  "type": "module",
+  "main": "improve-prompt.js",
+  "bin": {
+    "improve-prompt": "./improve-prompt.js",
+    "prompt-test-framework": "./prompt-test-framework.js"
+  },
+  "scripts": {
+    "test": "node improve-prompt.js \"Write a blog post about AI\"",
+    "test-interactive": "node improve-prompt.js --interactive",
+    "test-verbose": "node improve-prompt.js \"Analyze this data\" --verbose",
+    "install-global": "npm install -g .",
+    "test-infrastructure": "node test-infrastructure.js",
+    "framework-test": "node -e \"const framework = require('./src/index'); framework.quickTest('Create a button').then(console.log)\"",
+    "validate-phase1": "node test-infrastructure.js",
+    "validate-phase2": "node test-phase2-validation.js",
+    "validate-phase3": "node test-phase3-validation.js",
+    "test-context-analysis": "node -e \"const analyzer = require('./src/analysis/universal-context-analyzer'); new analyzer().quickAnalyze('.').then(console.log)\"",
+    "test-generation": "node -e \"const generator = require('./src/generation/intelligent-test-generator'); const g = new generator(); console.log('Stats:', g.getGenerationStats())\"",
+    "framework:analyze": "node prompt-test-framework.js analyze --verbose",
+    "framework:test": "node prompt-test-framework.js run-tests --test-count 25",
+    "framework:report": "node prompt-test-framework.js report --format markdown",
+    "framework:optimize": "node prompt-test-framework.js optimize --backup-rules",
+    "framework:help": "node prompt-test-framework.js --help",
+    "mcp:server": "node src/mcp-server/prompt-evaluation-server.js",
+    "mcp:server-dev": "node --inspect src/mcp-server/prompt-evaluation-server.js",
+    "mcp:test": "node -e \"console.log('MCP server test - implement client test')\"",
+    "mcp:validate": "node -e \"import('./src/mcp-server/prompt-evaluation-server.js').then(() => console.log('MCP server validation passed')).catch(e => {console.error('MCP server validation failed:', e.message); process.exit(1);})\""
+  },
+  "keywords": [
+    "prompt-engineering",
+    "ai",
+    "llm",
+    "claude",
+    "gpt",
+    "cli",
+    "testing",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "simple-statistics": "^7.8.8"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "local"
+  }
+}

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/d09c612b747a4d29a8325e12055ec127/artifacts
+end_time: 1751631822064
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: d09c612b747a4d29a8325e12055ec127
+run_name: indecisive-moose-41
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751631820452
+status: 3
+tags: []
+user_id: lukemckenzie

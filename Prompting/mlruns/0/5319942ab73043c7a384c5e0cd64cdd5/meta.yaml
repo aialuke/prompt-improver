@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/5319942ab73043c7a384c5e0cd64cdd5/artifacts
+end_time: 1751631708247
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 5319942ab73043c7a384c5e0cd64cdd5
+run_name: grandiose-eel-748
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751631706535
+status: 3
+tags: []
+user_id: lukemckenzie

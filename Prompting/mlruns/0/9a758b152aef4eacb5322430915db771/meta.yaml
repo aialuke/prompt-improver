@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/checklists/Prompting/mlruns/0/9a758b152aef4eacb5322430915db771/artifacts
+end_time: 1751631228617
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 9a758b152aef4eacb5322430915db771
+run_name: mysterious-rook-403
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751631226840
+status: 3
+tags: []
+user_id: lukemckenzie

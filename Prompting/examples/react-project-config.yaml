@@ -1,0 +1,50 @@
+# React Project Configuration
+# Optimized for React/Next.js applications
+
+testing:
+  defaultTestCount: 100
+  complexityDistribution:
+    simple: 0.3      # Basic component prompts
+    moderate: 0.5    # State management, hooks
+    complex: 0.2     # Complex UI patterns, performance
+  
+  categoryWeights:
+    poor_structure: 0.35      # React components need clear structure
+    missing_context: 0.25     # Component props and state context
+    vague_instructions: 0.20  # Clear component requirements
+    missing_examples: 0.15    # JSX examples helpful
+    no_output_format: 0.05    # Less critical for components
+
+evaluation:
+  methods: ["structural", "llm-judge"]
+  llmJudge:
+    model: "claude-3.5-sonnet"
+    temperature: 0.1           # Consistent code generation
+    batchSize: 8
+  
+  structuralWeights:
+    structure: 0.35            # Component structure is crucial
+    clarity: 0.25              # Clear component logic
+    specificity: 0.25          # Specific prop types, interfaces
+    completeness: 0.15         # All necessary imports, exports
+
+optimization:
+  autoUpdateRules: false       # Manual review for code rules
+  minConfidenceForUpdate: 0.85
+  backupBeforeUpdate: true
+
+output:
+  defaultFormat: "markdown"
+  includeExamples: true
+  reportSections:
+    - "executiveSummary"
+    - "projectAnalysis"
+    - "testResults"
+    - "ruleEffectiveness"
+    - "optimizationRecommendations"
+
+# React-specific paths
+paths:
+  rulesFile: "./config/react-prompt-rules.json"
+  outputDir: "./prompt-test-results"
+  backupDir: "./prompt-backups"

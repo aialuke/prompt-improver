@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# SYSTEMATIC COMPLETION PROTOCOL
+
+**Self-Contained Verification Commands:**
+
+## 1. Scope Definition Commands
+```bash
+# Define analysis scope first
+find [target-dir] -name "*.{ts,tsx,js,jsx}" | wc -l
+ls [target-dir] | grep -E "\.(component|service|util|hook)" | wc -l
+```
+
+## 2. Progress Tracking Commands  
+```bash
+# Track completion per area
+rg "TODO|FIXME|BUG" [area] --count-matches
+rg "[pattern-to-verify]" [area] --files-with-matches | wc -l  
+```
+
+## 3. Evidence Collection Commands
+```bash
+# Collect evidence as you progress
+rg "[pattern]" [area] -n | head -3  # Get examples
+rg "[pattern]" [area] --files-with-matches # Get file list
+```
+
+**Required Format Before Claiming Complete:**
+```
+Scope: [X areas defined] ([verification command used])
+Progress: [Y/X areas analyzed] ([files per area])
+Evidence: [Z findings documented] ([example locations])
+Remaining: [specific areas not yet analyzed]
+Status: [CONTINUE/COMPLETE] because [objective reason]
+```
+
+**Decision Criteria:**
+- **CONTINUE**: Any area shows 0 files analyzed OR missing evidence for claims
+- **COMPLETE**: All areas have evidence OR objective reason for exclusion
+
+**Example:**
+```
+Scope: 4 component areas defined (find src/components -type d | wc -l)
+Progress: 3/4 areas analyzed (Auth: 5 files, Forms: 3 files, Dashboard: 0 files, Utils: 7 files)  
+Evidence: 12 findings documented (src/auth/LoginForm.tsx:23, src/utils/validation.ts:45, ...)
+Remaining: Dashboard components (4 files: DashboardPage.tsx, ProgressCard.tsx, HistoryView.tsx, NotificationList.tsx)
+Status: CONTINUE because Dashboard area has 0/4 files analyzed
+```

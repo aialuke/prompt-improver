@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# CRITICAL VERIFICATION RULE - PWA ADAPTED
+
+**Before ANY code deletion based on tool outputs (ESLint, Knip, etc.):**
+
+## Required Verification Commands for React/TypeScript:
+```bash
+# Search for exact usage in TypeScript/React files
+rg "ExactItemName" . --type ts --type tsx --type js --type jsx -n
+
+# Search for import/export usage
+rg "import.*ExactItemName|export.*ExactItemName" . -n
+
+# Search for React component usage (JSX)
+rg "<ExactItemName|ExactItemName>" . --type tsx --type jsx -n
+
+# Search for type annotations and interfaces
+rg ": ExactItemName|extends ExactItemName|implements ExactItemName" . -n
+```
+
+## Verification Decision Matrix:
+- ✅ **SAFE TO REMOVE**: Zero usage found in any verification search
+- ❌ **DO NOT REMOVE**: Any usage found, even in same file as definition
+- ⚠️ **INVESTIGATE**: Usage only in comments or documentation
+- 🔄 **RE-EXPORT ONLY**: Used internally but not exported elsewhere
+
+## PWA-Specific Verification:
+- Check service worker registration: `rg "ExactItemName" public/sw.js src/sw.ts -n`
+- Check manifest references: `rg "ExactItemName" public/manifest.json -n`
+- Check offline functionality: `rg "ExactItemName" . --type ts -A5 -B5 | grep -i "offline\|cache\|sync"`
