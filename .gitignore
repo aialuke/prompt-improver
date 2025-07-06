@@ -75,3 +75,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Data directory
+data/
+*.db

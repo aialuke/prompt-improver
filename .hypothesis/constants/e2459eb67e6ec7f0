@@ -1,0 +1,4 @@
+# file: /Users/lukemckenzie/prompt-improver/src/prompt_improver/database/connection.py
+# hypothesis_version: 6.135.26
+
+['commit', 'echo', 'localhost', 'max_overflow', 'pool_pre_ping', 'pool_recycle', 'pool_reset_on_return', 'pool_size', 'pool_timeout', 'poolclass']

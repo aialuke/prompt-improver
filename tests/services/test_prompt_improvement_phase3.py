@@ -23,59 +23,21 @@ class TestPhase3MLOptimization:
         """Create PromptImprovementService instance."""
         return PromptImprovementService()
     
-    @pytest.fixture
-    def mock_db_session(self):
-        """Mock database session."""
-        session = AsyncMock()
-        session.execute = AsyncMock()
-        session.commit = AsyncMock()
-        session.rollback = AsyncMock()
-        session.add = AsyncMock()
-        return session
-    
-    @pytest.fixture
-    def mock_feedback(self):
-        """Mock user feedback for testing."""
-        feedback = MagicMock()
-        feedback.id = 123
-        feedback.session_id = "test_session_123"
-        feedback.rating = 4
-        return feedback
-    
-    @pytest.fixture
-    def mock_performance_data(self):
-        """Mock rule performance data."""
-        return [
-            MagicMock(
-                rule_id="clarity_rule",
-                improvement_score=0.8,
-                execution_time_ms=150,
-                user_satisfaction_score=0.9,
-                parameters={"weight": 1.0, "priority": 5}
-            ),
-            MagicMock(
-                rule_id="specificity_rule",
-                improvement_score=0.7,
-                execution_time_ms=200,
-                user_satisfaction_score=0.8,
-                parameters={"weight": 0.8, "priority": 4}
-            )
-        ] * 10  # 20 samples total
 
 
 class TestTriggerOptimization:
     """Test trigger_optimization method (lines 538-634)."""
     
     @pytest.mark.asyncio
-    async def test_trigger_optimization_success(self, prompt_service, mock_db_session, mock_feedback, mock_performance_data):
+    async def test_trigger_optimization_success(self, prompt_service, mock_db_session, sample_user_feedback, sample_rule_performance):
         """Test successful ML optimization trigger from feedback."""
         # Mock feedback query result
         feedback_result = MagicMock()
-        feedback_result.scalar_one_or_none.return_value = mock_feedback
+        feedback_result.scalar_one_or_none.return_value = sample_user_feedback[0]
         
         # Mock performance query result
         perf_result = MagicMock()
-        perf_result.fetchall.return_value = mock_performance_data
+        perf_result.fetchall.return_value = sample_rule_performance
         
         mock_db_session.execute.side_effect = [feedback_result, perf_result]
         
@@ -117,11 +79,11 @@ class TestTriggerOptimization:
         assert "Feedback 999 not found" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_insufficient_data(self, prompt_service, mock_db_session, mock_feedback):
+    async def test_trigger_optimization_insufficient_data(self, prompt_service, mock_db_session, sample_user_feedback):
         """Test trigger optimization with insufficient performance data."""
         # Mock feedback query result
         feedback_result = MagicMock()
-        feedback_result.scalar_one_or_none.return_value = mock_feedback
+        feedback_result.scalar_one_or_none.return_value = sample_user_feedback[0]
         
         # Mock insufficient performance data (less than 10 samples)
         perf_result = MagicMock()
@@ -135,14 +97,14 @@ class TestTriggerOptimization:
         assert "No performance data available" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_ml_failure(self, prompt_service, mock_db_session, mock_feedback, mock_performance_data):
+    async def test_trigger_optimization_ml_failure(self, prompt_service, mock_db_session, sample_user_feedback, sample_rule_performance):
         """Test trigger optimization with ML service failure."""
         # Mock successful queries
         feedback_result = MagicMock()
-        feedback_result.scalar_one_or_none.return_value = mock_feedback
+        feedback_result.scalar_one_or_none.return_value = sample_user_feedback[0]
         
         perf_result = MagicMock()
-        perf_result.fetchall.return_value = mock_performance_data
+        perf_result.fetchall.return_value = sample_rule_performance
         
         mock_db_session.execute.side_effect = [feedback_result, perf_result]
         
@@ -164,11 +126,11 @@ class TestRunMLOptimization:
     """Test run_ml_optimization method (lines 636-738)."""
     
     @pytest.mark.asyncio
-    async def test_run_ml_optimization_success(self, prompt_service, mock_db_session, mock_performance_data):
+    async def test_run_ml_optimization_success(self, prompt_service, mock_db_session, sample_rule_performance):
         """Test successful ML optimization run."""
         # Mock performance query result
         perf_result = MagicMock()
-        perf_result.fetchall.return_value = mock_performance_data
+        perf_result.fetchall.return_value = sample_rule_performance
         mock_db_session.execute.return_value = perf_result
         
         # Mock ML service success
@@ -395,11 +357,11 @@ class TestPhase3HelperMethods:
     """Test Phase 3 helper methods for ML integration."""
     
     @pytest.mark.asyncio
-    async def test_store_optimization_trigger(self, prompt_service, mock_db_session, mock_feedback):
+    async def test_store_optimization_trigger(self, prompt_service, mock_db_session, sample_user_feedback):
         """Test storing optimization trigger event."""
         # Mock feedback query
         feedback_result = MagicMock()
-        feedback_result.scalar_one_or_none.return_value = mock_feedback
+        feedback_result.scalar_one_or_none.return_value = sample_user_feedback[0]
         mock_db_session.execute.return_value = feedback_result
         
         await prompt_service._store_optimization_trigger(
@@ -407,9 +369,9 @@ class TestPhase3HelperMethods:
         )
         
         # Verify feedback was updated with ML optimization info
-        assert mock_feedback.ml_optimized == True
-        assert mock_feedback.model_id == "model_456"
-        mock_db_session.add.assert_called_with(mock_feedback)
+        assert sample_user_feedback[0].ml_optimized == True
+        assert sample_user_feedback[0].model_id == "model_456"
+        mock_db_session.add.assert_called_with(sample_user_feedback[0])
         mock_db_session.commit.assert_called()
 
     @pytest.mark.asyncio

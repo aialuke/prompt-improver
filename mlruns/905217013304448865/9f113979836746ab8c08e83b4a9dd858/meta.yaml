@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/prompt-improver/mlruns/905217013304448865/9f113979836746ab8c08e83b4a9dd858/artifacts
+end_time: 1751807967620
+entry_point_name: ''
+experiment_id: '905217013304448865'
+lifecycle_stage: active
+run_id: 9f113979836746ab8c08e83b4a9dd858
+run_name: debonair-gnat-519
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751807967264
+status: 3
+tags: []
+user_id: lukemckenzie

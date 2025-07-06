@@ -22,29 +22,6 @@ class TestMLModelService:
         with patch('prompt_improver.services.ml_integration.mlflow'):
             return MLModelService()
     
-    @pytest.fixture
-    def sample_training_data(self):
-        """Sample training data for ML optimization tests."""
-        return {
-            "features": [
-                [0.8, 150, 1.0, 5, 0.7, 1.0],  # High effectiveness, fast execution
-                [0.6, 200, 0.8, 4, 0.6, 1.0],  # Medium effectiveness
-                [0.4, 300, 0.6, 3, 0.5, 0.0],  # Low effectiveness, slow
-                [0.9, 100, 1.0, 5, 0.8, 1.0],  # Best performance
-                [0.3, 400, 0.4, 2, 0.4, 0.0],  # Poor performance
-            ] * 5,  # 25 samples total
-            "effectiveness_scores": [0.8, 0.6, 0.4, 0.9, 0.3] * 5
-        }
-    
-    @pytest.fixture
-    def mock_db_session(self):
-        """Mock database session for testing."""
-        session = AsyncMock()
-        session.execute = AsyncMock()
-        session.commit = AsyncMock()
-        session.rollback = AsyncMock()
-        session.add = AsyncMock()
-        return session
 
 
 class TestDirectPythonIntegration:
@@ -177,47 +154,12 @@ class TestEnsembleOptimization:
 class TestPatternDiscovery:
     """Test pattern discovery functionality."""
     
-    @pytest.fixture
-    def mock_performance_data(self):
-        """Mock rule performance data for pattern discovery."""
-        return [
-            MagicMock(
-                rule_id="clarity_rule",
-                improvement_score=0.8,
-                execution_time_ms=150,
-                user_satisfaction_score=0.9,
-                parameters={"weight": 1.0, "threshold": 0.7}
-            ),
-            MagicMock(
-                rule_id="specificity_rule", 
-                improvement_score=0.7,
-                execution_time_ms=200,
-                user_satisfaction_score=0.8,
-                parameters={"weight": 0.8, "threshold": 0.6}
-            ),
-            # Add more patterns
-            MagicMock(
-                rule_id="clarity_rule",
-                improvement_score=0.85,
-                execution_time_ms=140,
-                user_satisfaction_score=0.9,
-                parameters={"weight": 1.0, "threshold": 0.7}
-            ),
-            MagicMock(
-                rule_id="clarity_rule",
-                improvement_score=0.82,
-                execution_time_ms=145,
-                user_satisfaction_score=0.85,
-                parameters={"weight": 1.0, "threshold": 0.7}
-            ),
-        ] * 3  # Create enough data for pattern analysis
-    
     @pytest.mark.asyncio
-    async def test_discover_patterns_success(self, ml_service, mock_db_session, mock_performance_data):
+    async def test_discover_patterns_success(self, ml_service, mock_db_session, sample_rule_performance):
         """Test successful pattern discovery."""
         # Mock database query result
         mock_result = MagicMock()
-        mock_result.fetchall.return_value = mock_performance_data
+        mock_result.fetchall.return_value = sample_rule_performance
         mock_db_session.execute.return_value = mock_result
         
         result = await ml_service.discover_patterns(

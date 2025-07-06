@@ -1,16 +1,17 @@
 """
-Pytest configuration and shared fixtures for Phase 3 testing.
-Provides database fixtures, mock services, and testing utilities.
+Centralized pytest configuration and shared fixtures for APES system testing.
+Provides comprehensive fixture infrastructure following pytest-asyncio best practices.
 """
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+from typer.testing import CliRunner
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
-import tempfile
-import os
 from datetime import datetime, timedelta
 
 from prompt_improver.database.models import (
@@ -19,12 +20,42 @@ from prompt_improver.database.models import (
 )
 
 
+# CLI Testing Infrastructure
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def cli_runner():
+    """Session-scoped CLI runner for testing commands.
+    
+    Session scope prevents recreation overhead while maintaining isolation
+    through CliRunner's built-in isolation mechanisms.
+    """
+    return CliRunner()
+
+
+@pytest.fixture(scope="function")
+def isolated_cli_runner():
+    """Function-scoped CLI runner for tests requiring complete isolation."""
+    return CliRunner()
+
+
+# Database Testing Infrastructure  
+@pytest.fixture(scope="function")
+def mock_db_session():
+    """Mock database session with proper async patterns.
+    
+    Function-scoped to ensure test isolation and prevent state leakage.
+    """
+    session = AsyncMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.add = AsyncMock()
+    
+    # Configure common query patterns
+    session.scalar_one_or_none = AsyncMock()
+    session.fetchall = AsyncMock()
+    session.refresh = AsyncMock()
+    
+    return session
 
 
 @pytest.fixture
@@ -58,18 +89,100 @@ async def test_db_session(test_db_engine):
         yield session
 
 
+# Temporary File Infrastructure
+@pytest.fixture(scope="function")
+def test_data_dir(tmp_path):
+    """Function-scoped temporary directory for test data.
+    
+    Uses pytest's tmp_path for automatic cleanup and proper isolation.
+    """
+    data_dir = tmp_path / "test_apes_data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create standard subdirectories
+    (data_dir / "data").mkdir()
+    (data_dir / "config").mkdir() 
+    (data_dir / "logs").mkdir()
+    (data_dir / "temp").mkdir()
+    
+    return data_dir
+
+
 @pytest.fixture
-def mock_db_session():
-    """Mock database session for unit tests."""
-    session = AsyncMock(spec=AsyncSession)
-    session.execute = AsyncMock()
-    session.commit = AsyncMock()
-    session.rollback = AsyncMock()
-    session.add = AsyncMock()
-    session.refresh = AsyncMock()
-    return session
+def temp_data_dir():
+    """Create temporary directory for testing file operations."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir
 
 
+# Async Event Loop Management
+@pytest.fixture(scope="function")
+def event_loop():
+    """Provide a fresh event loop for each test function.
+    
+    Function scope ensures complete isolation between async tests.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+# Sample Data Fixtures
+@pytest.fixture(scope="session")
+def sample_training_data():
+    """Session-scoped sample data for ML testing.
+    
+    Expensive to generate, safe to reuse across tests.
+    """
+    return {
+        "features": [
+            [0.8, 150, 1.0, 5, 0.7, 1.0],  # High effectiveness
+            [0.6, 200, 0.8, 4, 0.6, 1.0],  # Medium effectiveness  
+            [0.4, 300, 0.6, 3, 0.5, 0.0],  # Low effectiveness
+            [0.9, 100, 1.0, 5, 0.8, 1.0],  # Best performance
+            [0.3, 400, 0.4, 2, 0.4, 0.0],  # Poor performance
+        ] * 5,  # 25 samples total for reliable ML testing
+        "effectiveness_scores": [0.8, 0.6, 0.4, 0.9, 0.3] * 5
+    }
+
+
+@pytest.fixture(scope="session")
+def sample_ml_training_data():
+    """Sample ML training data for testing."""
+    return {
+        "features": [
+            [0.8, 150, 1.0, 5, 0.9, 6, 0.7, 1.0, 0.1, 0.5],  # High performance
+            [0.7, 200, 0.8, 4, 0.8, 5, 0.6, 1.0, 0.2, 0.4],  # Medium performance
+            [0.6, 250, 0.6, 3, 0.7, 4, 0.5, 0.0, 0.3, 0.3],  # Lower performance
+            [0.9, 100, 1.0, 5, 0.95, 7, 0.8, 1.0, 0.05, 0.6], # Best performance
+            [0.5, 300, 0.4, 2, 0.6, 3, 0.4, 0.0, 0.4, 0.2],  # Poor performance
+        ] * 10,  # 50 samples total
+        "effectiveness_scores": [0.8, 0.7, 0.6, 0.9, 0.5] * 10
+    }
+
+
+# Configuration Override Fixture
+@pytest.fixture(scope="function")
+def test_config():
+    """Function-scoped test configuration override."""
+    return {
+        "database": {
+            "host": "localhost",
+            "database": "apes_test",
+            "user": "test_user"
+        },
+        "performance": {
+            "target_response_time_ms": 200,
+            "timeout_seconds": 5
+        },
+        "ml": {
+            "min_training_samples": 10,
+            "optimization_timeout": 60
+        }
+    }
+
+
+# Sample Model Data Fixtures
 @pytest.fixture
 def sample_rule_metadata():
     """Sample rule metadata for testing."""
@@ -201,21 +314,156 @@ def sample_improvement_sessions():
     ]
 
 
+# Service Instance Fixtures
 @pytest.fixture
-def sample_ml_training_data():
-    """Sample ML training data for testing."""
+def ml_service():
+    """Create ML service instance for testing."""
+    with patch('prompt_improver.services.ml_integration.mlflow'):
+        from prompt_improver.services.ml_integration import MLModelService
+        return MLModelService()
+
+@pytest.fixture
+def prompt_service():
+    """Create PromptImprovementService instance."""
+    from prompt_improver.services.prompt_improvement import PromptImprovementService
+    return PromptImprovementService()
+
+# LLM Transformer Service Fixtures for Unit Testing
+@pytest.fixture
+def mock_llm_transformer():
+    """Mock LLMTransformerService for unit testing rule logic.
+    
+    Provides realistic transformation responses without external dependencies.
+    Function-scoped to ensure test isolation.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    
+    service = MagicMock()
+    
+    # Mock enhance_clarity method with realistic responses
+    async def mock_enhance_clarity(prompt, vague_words, context=None):
+        enhanced_prompt = prompt
+        transformations = []
+        
+        # Simulate realistic clarity improvements
+        for word in vague_words:
+            if word.lower() == "thing":
+                enhanced_prompt = enhanced_prompt.replace(word, "specific item")
+                transformations.append({
+                    "type": "clarity_enhancement",
+                    "original_word": word,
+                    "replacement": "specific item",
+                    "reason": "Improved specificity"
+                })
+            elif word.lower() == "stuff":
+                enhanced_prompt = enhanced_prompt.replace(word, "relevant details")
+                transformations.append({
+                    "type": "clarity_enhancement", 
+                    "original_word": word,
+                    "replacement": "relevant details",
+                    "reason": "Improved specificity"
+                })
+        
+        return {
+            "enhanced_prompt": enhanced_prompt,
+            "transformations": transformations,
+            "confidence": 0.8,
+            "improvement_type": "clarity"
+        }
+    
+    # Mock enhance_specificity method with realistic responses
+    async def mock_enhance_specificity(prompt, context=None):
+        enhanced_prompt = prompt
+        transformations = []
+        
+        # Simulate specificity improvements based on prompt length and content
+        if len(prompt.split()) < 5:  # Short prompts get more enhancement
+            enhanced_prompt += "\n\nFormat: Please provide specific details and examples."
+            transformations.append({
+                "type": "format_specification",
+                "addition": "Format: Please provide specific details and examples.",
+                "reason": "Added output format requirements"
+            })
+        
+        return {
+            "enhanced_prompt": enhanced_prompt,
+            "transformations": transformations,
+            "confidence": 0.75,
+            "improvement_type": "specificity"
+        }
+    
+    service.enhance_clarity = AsyncMock(side_effect=mock_enhance_clarity)
+    service.enhance_specificity = AsyncMock(side_effect=mock_enhance_specificity)
+    
+    return service
+
+
+@pytest.fixture
+def sample_test_prompts():
+    """Sample prompts for testing rule behavior.
+    
+    Provides variety of prompt types for comprehensive rule testing.
+    """
     return {
-        "features": [
-            [0.8, 150, 1.0, 5, 0.9, 6, 0.7, 1.0, 0.1, 0.5],  # High performance
-            [0.7, 200, 0.8, 4, 0.8, 5, 0.6, 1.0, 0.2, 0.4],  # Medium performance
-            [0.6, 250, 0.6, 3, 0.7, 4, 0.5, 0.0, 0.3, 0.3],  # Lower performance
-            [0.9, 100, 1.0, 5, 0.95, 7, 0.8, 1.0, 0.05, 0.6], # Best performance
-            [0.5, 300, 0.4, 2, 0.6, 3, 0.4, 0.0, 0.4, 0.2],  # Poor performance
-        ] * 10,  # 50 samples total
-        "effectiveness_scores": [0.8, 0.7, 0.6, 0.9, 0.5] * 10
+        "vague_prompts": [
+            "fix this thing",
+            "make this stuff better", 
+            "help me with this",
+            "analyze this data"
+        ],
+        "clear_prompts": [
+            "Please rewrite the following paragraph to be suitable for a fifth-grade reading level.",
+            "Write a Python function named 'calculate_fibonacci' that takes an integer n as input.",
+            "Create a detailed project timeline for implementing user authentication."
+        ],
+        "short_prompts": [
+            "help",
+            "summarize",
+            "explain",
+            "analyze"
+        ],
+        "specific_prompts": [
+            "Write a Python function that takes a list of integers and returns the second largest value.",
+            "Create a SQL query to find all users who registered in the last 30 days.",
+            "Design a RESTful API endpoint for updating user profile information."
+        ]
     }
 
 
+@pytest.fixture
+def mock_rule_metadata_corrected():
+    """Mock rule metadata with correct field names matching database schema.
+    
+    Uses 'default_parameters' instead of 'parameters' to match RuleMetadata model.
+    """
+    from prompt_improver.database.models import RuleMetadata
+    from datetime import datetime
+    
+    return [
+        RuleMetadata(
+            rule_id="clarity_rule",
+            rule_name="Clarity Enhancement Rule",
+            rule_category="core",
+            rule_description="Improves prompt clarity by replacing vague terms",
+            enabled=True,
+            priority=5,
+            rule_version="1.0",
+            default_parameters={"vague_threshold": 0.7, "confidence_weight": 1.0}
+        ),
+        RuleMetadata(
+            rule_id="specificity_rule",
+            rule_name="Specificity Enhancement Rule",
+            rule_category="core", 
+            rule_description="Improves prompt specificity by adding constraints and examples",
+            enabled=True,
+            priority=4,
+            rule_version="1.0",
+            default_parameters={"min_length": 10, "add_format": True}
+        )
+    ]
+
+
+# Mock Service Fixtures
 @pytest.fixture
 def mock_ml_service():
     """Mock ML service for testing."""
@@ -305,13 +553,7 @@ def mock_analytics_service():
     return service
 
 
-@pytest.fixture
-def temp_data_dir():
-    """Create temporary directory for testing file operations."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield temp_dir
-
-
+# MLflow and Optuna Mock Fixtures
 @pytest.fixture
 def mock_mlflow():
     """Mock MLflow for testing ML operations."""
@@ -353,6 +595,19 @@ def mock_optuna():
         }
 
 
+# Performance Testing Utilities
+@pytest.fixture
+def performance_threshold():
+    """Performance thresholds for Phase 3 requirements."""
+    return {
+        "prediction_latency_ms": 5,  # <5ms for predictions
+        "optimization_timeout_s": 300,  # 5 minute timeout for optimization
+        "cache_hit_ratio": 0.9,  # >90% cache hit ratio target
+        "database_query_ms": 50  # <50ms for database queries
+    }
+
+
+# Async Context Manager Helper
 class AsyncContextManager:
     """Helper class for testing async context managers."""
     
@@ -372,19 +627,7 @@ def async_context_manager():
     return AsyncContextManager
 
 
-# Performance testing utilities
-@pytest.fixture
-def performance_threshold():
-    """Performance thresholds for Phase 3 requirements."""
-    return {
-        "prediction_latency_ms": 5,  # <5ms for predictions
-        "optimization_timeout_s": 300,  # 5 minute timeout for optimization
-        "cache_hit_ratio": 0.9,  # >90% cache hit ratio target
-        "database_query_ms": 50  # <50ms for database queries
-    }
-
-
-# Test data generation utilities
+# Test Data Generation Utilities
 def generate_test_features(n_samples: int = 25, n_features: int = 10):
     """Generate test feature data for ML testing."""
     import numpy as np
@@ -406,7 +649,7 @@ def test_data_generator():
     }
 
 
-# Database population utilities
+# Database Population Utilities
 async def populate_test_database(session: AsyncSession, 
                                 rule_metadata_list=None,
                                 rule_performance_list=None,
@@ -433,7 +676,7 @@ def populate_db():
     return populate_test_database
 
 
-# Async testing utilities
+# Async Testing Utilities
 def async_test(f):
     """Decorator for async test functions."""
     import functools

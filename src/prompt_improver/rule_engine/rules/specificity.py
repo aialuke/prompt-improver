@@ -101,15 +101,18 @@ class SpecificityRule(BasePromptRule):
         
         # Use LLM transformer for intelligent enhancement
         try:
-            # Run async function in sync context
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Check if we're in an async context
             try:
-                enhancement_result = loop.run_until_complete(
+                # Try to get the current event loop
+                loop = asyncio.get_running_loop()
+                # If we have a running loop, we're in async context - skip LLM for now
+                # and use fallback (proper async support would require async rule methods)
+                raise RuntimeError("In async context, use fallback")
+            except RuntimeError:
+                # No running loop, safe to create one
+                enhancement_result = asyncio.run(
                     self.llm_transformer.enhance_specificity(prompt, context)
                 )
-            finally:
-                loop.close()
             
             return TransformationResult(
                 success=True,

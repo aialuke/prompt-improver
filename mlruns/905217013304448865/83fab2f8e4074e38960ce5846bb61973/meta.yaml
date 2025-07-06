@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/prompt-improver/mlruns/905217013304448865/83fab2f8e4074e38960ce5846bb61973/artifacts
+end_time: 1751808726365
+entry_point_name: ''
+experiment_id: '905217013304448865'
+lifecycle_stage: active
+run_id: 83fab2f8e4074e38960ce5846bb61973
+run_name: treasured-lynx-49
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751808723708
+status: 3
+tags: []
+user_id: lukemckenzie

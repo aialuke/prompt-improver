@@ -29,12 +29,15 @@ dependencies = [
   "asyncpg>=0.30.0",
   "pydantic-settings>=2.10.1",
   "greenlet>=3.2.3",
+  "aiosqlite>=0.19.0",  # Required for async SQLite database testing
   "mcp>=1.10.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=7.4.0",
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.21.0",  # Essential for async test execution
+  "pytest-cov>=4.0.0",       # Coverage support for async code
   "mypy>=1.8.0",
   "ruff>=0.4.0",
   "httpx>=0.25.0", # For test client
@@ -233,8 +236,50 @@ docstring-code-format = true
 docstring-code-line-length = 72
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q"
-testpaths = [
-    "tests",
-] 
+minversion = "8.2.0"
+
+# Enhanced testing configuration with coverage and performance monitoring
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config", 
+    "--cov=src",
+    "--cov-branch",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=85",
+]
+
+testpaths = ["tests"]
+
+# Performance monitoring (requires pytest-timeout plugin)
+# timeout = 300  # 5 minute timeout for slow tests
+# timeout_method = "thread"
+
+# Enable automatic async test detection
+asyncio_mode = "auto"
+
+# Default event loop scopes for consistent behavior
+asyncio_default_fixture_loop_scope = "function" 
+asyncio_default_test_loop_scope = "function"
+
+# Enhanced test categorization
+markers = [
+    "asyncio: marks tests as async",
+    "integration: marks tests as integration tests requiring real components", 
+    "slow: marks tests as slow-running (>1 second)",
+    "performance: marks tests that validate performance requirements",
+    "unit: marks tests as pure unit tests with maximum isolation",
+]
+
+# Test filtering
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# Test discovery patterns
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"] 

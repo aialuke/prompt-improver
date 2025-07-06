@@ -18,7 +18,9 @@ from ...services.llm_transformer import LLMTransformerService
 VAGUE_WORDS = [
     "thing",
     "stuff",
-    "it",
+    "it", 
+    "this",
+    "that",
     "they",
     "something",
     "better",
@@ -93,15 +95,18 @@ class ClarityRule(BasePromptRule):
         
         # Use LLM transformer for intelligent enhancement
         try:
-            # Run async function in sync context
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Check if we're in an async context
             try:
-                enhancement_result = loop.run_until_complete(
+                # Try to get the current event loop
+                loop = asyncio.get_running_loop()
+                # If we have a running loop, we're in async context - skip LLM for now
+                # and use fallback (proper async support would require async rule methods)
+                raise RuntimeError("In async context, use fallback")
+            except RuntimeError:
+                # No running loop, safe to create one
+                enhancement_result = asyncio.run(
                     self.llm_transformer.enhance_clarity(prompt, vague_words, context)
                 )
-            finally:
-                loop.close()
             
             return TransformationResult(
                 success=True,
@@ -143,6 +148,8 @@ Focus on adding concrete details, constraints, and explicit instructions.
         # Simple replacements for common vague words
         simple_replacements = {
             "thing": "specific item",
+            "this": "the specific item",
+            "that": "the specific element", 
             "stuff": "relevant information",
             "analyze": "examine systematically",
             "summarize": "provide a concise summary"

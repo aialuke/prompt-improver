@@ -257,11 +257,15 @@ class LLMTransformerService:
         instruction_words = ["explain", "describe", "show", "demonstrate", "illustrate"]
         needs_examples = any(word in prompt_lower for word in instruction_words)
         
+        # Check for very short, vague prompts
+        is_very_short = len(prompt.split()) < 5
+        has_vague_words = any(word in prompt_lower for word in ["better", "good", "nice", "fix", "improve", "help"])
+        
         return {
-            "lacks_format_specification": not has_format and len(prompt.split()) > 10,
-            "lacks_constraints": not has_constraints and any(word in prompt_lower for word in ["list", "write", "create"]),
+            "lacks_format_specification": not has_format and (len(prompt.split()) > 10 or is_very_short),
+            "lacks_constraints": not has_constraints and (any(word in prompt_lower for word in ["list", "write", "create"]) or is_very_short),
             "has_examples": has_examples,
-            "needs_examples": needs_examples and not has_examples
+            "needs_examples": (needs_examples and not has_examples) or (is_very_short and has_vague_words)
         }
     
     def _suggest_format_specification(self, prompt: str, context: Optional[Dict]) -> Optional[str]:
@@ -276,6 +280,8 @@ class LLMTransformerService:
             return "Format: Please organize your explanation with clear headings and provide concrete examples for each main point."
         elif "compare" in prompt_lower:
             return "Format: Please structure your comparison in a clear table or side-by-side format with specific criteria."
+        elif any(word in prompt_lower for word in ["better", "improve", "fix", "help"]):
+            return "Format: Please specify what you want improved and provide clear criteria for success."
         else:
             return "Format: Please structure your response with clear sections and specific details for each point."
     
@@ -293,6 +299,12 @@ class LLMTransformerService:
         
         if "explain" in prompt_lower:
             constraints.append("Depth: Focus on practical, actionable information")
+        
+        # Add constraints for vague prompts
+        if any(word in prompt_lower for word in ["better", "improve", "fix", "help"]):
+            constraints.append("Scope: Specify exactly what needs improvement")
+            constraints.append("Context: Provide background information and current situation")
+            constraints.append("Success criteria: Define what 'better' means in measurable terms")
         
         if constraints:
             return "Constraints:\n- " + "\n- ".join(constraints)

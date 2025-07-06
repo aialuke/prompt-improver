@@ -1,0 +1,4 @@
+# file: /Users/lukemckenzie/prompt-improver/src/prompt_improver/database/config.py
+# hypothesis_version: 6.135.26
+
+[0.9, 300, 1800, 3600, 5432, '.env', 'DB_ECHO_POOL', 'DB_ECHO_SQL', 'DB_MAX_OVERFLOW', 'DB_POOL_MAX_IDLE', 'DB_POOL_MAX_LIFETIME', 'DB_POOL_MAX_SIZE', 'DB_POOL_MIN_SIZE', 'DB_POOL_RECYCLE', 'DB_POOL_SIZE', 'DB_POOL_TIMEOUT', 'DB_STATEMENT_TIMEOUT', 'POSTGRES_DATABASE', 'POSTGRES_HOST', 'POSTGRES_PASSWORD', 'POSTGRES_PORT', 'POSTGRES_USERNAME', 'apes_production', 'apes_user', 'localhost']

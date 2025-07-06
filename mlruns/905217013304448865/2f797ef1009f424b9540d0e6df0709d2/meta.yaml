@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/lukemckenzie/prompt-improver/mlruns/905217013304448865/2f797ef1009f424b9540d0e6df0709d2/artifacts
+end_time: 1751808723636
+entry_point_name: ''
+experiment_id: '905217013304448865'
+lifecycle_stage: active
+run_id: 2f797ef1009f424b9540d0e6df0709d2
+run_name: rule_optimization_20250706_233203
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751808723632
+status: 3
+tags: []
+user_id: lukemckenzie
