@@ -1,5 +1,5 @@
 adal==1.2.7
--e git+https://github.com/aialuke/prompt-improver.git@4fbe76ade8e4e249a533ff95094b00cffe9bbbba#egg=adaptive_prompt_enhancement_system
+-e git+https://github.com/aialuke/prompt-improver.git@571f6339dd0aa1affa4baa9e3b331f0a2d4eef25#egg=adaptive_prompt_enhancement_system
 aiosqlite==0.21.0
 alembic==1.16.2
 annotated-types==0.7.0
@@ -196,6 +196,7 @@ pytest==8.4.1
 pytest-asyncio==1.0.0
 pytest-benchmark==5.1.0
 pytest-cov==6.2.1
+pytest-timeout==2.4.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-multipart==0.0.20

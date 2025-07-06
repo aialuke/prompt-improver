@@ -1,0 +1,5 @@
+MLflow Model Validation:
+✓ gradientboostingclassifier_model v10: READY
+✓ logisticregression_model v10: READY
+✓ randomforestclassifier_model v10: READY
+Total models: 3

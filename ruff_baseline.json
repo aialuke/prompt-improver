@@ -8,7 +8,7 @@
   {
     "code": "BLE001",
     "name": "blind-except",
-    "count": 126,
+    "count": 128,
     "fixable": false
   },
   {
@@ -32,7 +32,7 @@
   {
     "code": "G004",
     "name": "logging-f-string",
-    "count": 63,
+    "count": 65,
     "fixable": false
   },
   {
@@ -50,7 +50,7 @@
   {
     "code": "W291",
     "name": "trailing-whitespace",
-    "count": 44,
+    "count": 46,
     "fixable": false
   },
   {
@@ -126,14 +126,14 @@
     "fixable": false
   },
   {
-    "code": "ANN204",
-    "name": "missing-return-type-special-method",
-    "count": 13,
+    "code": "ARG002",
+    "name": "unused-method-argument",
+    "count": 14,
     "fixable": false
   },
   {
-    "code": "ARG002",
-    "name": "unused-method-argument",
+    "code": "ANN204",
+    "name": "missing-return-type-special-method",
     "count": 13,
     "fixable": false
   },
@@ -202,6 +202,12 @@
     "name": "unused-async",
     "count": 4,
     "fixable": false
+  },
+  {
+    "code": "W293",
+    "name": "blank-line-with-whitespace",
+    "count": 4,
+    "fixable": true
   },
   {
     "code": "B007",

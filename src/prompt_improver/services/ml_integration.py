@@ -77,7 +77,7 @@ class MLModelService:
             # Ensure any previous runs are ended
             if mlflow.active_run():
                 mlflow.end_run()
-            
+
             with mlflow.start_run(
                 run_name=f"rule_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             ):
@@ -85,7 +85,7 @@ class MLModelService:
                     # Extract training data
                     X = np.array(training_data["features"])
                     y_continuous = np.array(training_data["effectiveness_scores"])
-                
+
                     # Convert continuous scores to binary classification (high/low effectiveness)
                     y_threshold = np.median(y_continuous)
                     y = (y_continuous >= y_threshold).astype(int)
@@ -224,7 +224,7 @@ class MLModelService:
         except Exception as e:
             logger.error(f"ML service error: {e}")
             return {
-                "status": "error", 
+                "status": "error",
                 "error": str(e),
                 "processing_time_ms": (time.time() - start_time) * 1000,
             }
@@ -292,14 +292,14 @@ class MLModelService:
             # Ensure any previous runs are ended
             if mlflow.active_run():
                 mlflow.end_run()
-                
+
             with mlflow.start_run(
                 run_name=f"ensemble_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             ):
                 try:
                     X = np.array(training_data["features"])
                     y_continuous = np.array(training_data["effectiveness_scores"])
-                    
+
                     # Convert continuous scores to binary classification
                     y_threshold = np.median(y_continuous)
                     y = (y_continuous >= y_threshold).astype(int)
@@ -424,7 +424,7 @@ class MLModelService:
             logger.error(f"Ensemble service error: {e}")
             return {
                 "status": "error",
-                "error": str(e), 
+                "error": str(e),
                 "processing_time_ms": (time.time() - start_time) * 1000,
             }
 
