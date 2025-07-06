@@ -1,0 +1,446 @@
+[
+  {
+    "code": "D415",
+    "name": "missing-terminal-punctuation",
+    "count": 260,
+    "fixable": false
+  },
+  {
+    "code": "BLE001",
+    "name": "blind-except",
+    "count": 126,
+    "fixable": false
+  },
+  {
+    "code": "PLR2004",
+    "name": "magic-value-comparison",
+    "count": 113,
+    "fixable": false
+  },
+  {
+    "code": "PLR6301",
+    "name": "no-self-use",
+    "count": 86,
+    "fixable": false
+  },
+  {
+    "code": "TID252",
+    "name": "relative-imports",
+    "count": 73,
+    "fixable": false
+  },
+  {
+    "code": "G004",
+    "name": "logging-f-string",
+    "count": 63,
+    "fixable": false
+  },
+  {
+    "code": "F401",
+    "name": "unused-import",
+    "count": 56,
+    "fixable": false
+  },
+  {
+    "code": "FBT001",
+    "name": "boolean-type-hint-positional-argument",
+    "count": 54,
+    "fixable": false
+  },
+  {
+    "code": "W291",
+    "name": "trailing-whitespace",
+    "count": 44,
+    "fixable": false
+  },
+  {
+    "code": "FBT003",
+    "name": "boolean-positional-value-in-call",
+    "count": 43,
+    "fixable": false
+  },
+  {
+    "code": "UP035",
+    "name": "deprecated-import",
+    "count": 35,
+    "fixable": false
+  },
+  {
+    "code": "ANN202",
+    "name": "missing-return-type-private-function",
+    "count": 34,
+    "fixable": false
+  },
+  {
+    "code": "B904",
+    "name": "raise-without-from-inside-except",
+    "count": 30,
+    "fixable": false
+  },
+  {
+    "code": "D205",
+    "name": "missing-blank-line-after-summary",
+    "count": 27,
+    "fixable": false
+  },
+  {
+    "code": "F821",
+    "name": "undefined-name",
+    "count": 22,
+    "fixable": false
+  },
+  {
+    "code": "PTH123",
+    "name": "builtin-open",
+    "count": 19,
+    "fixable": false
+  },
+  {
+    "code": "D107",
+    "name": "undocumented-public-init",
+    "count": 18,
+    "fixable": false
+  },
+  {
+    "code": "PLW1514",
+    "name": "unspecified-encoding",
+    "count": 16,
+    "fixable": false
+  },
+  {
+    "code": "ARG001",
+    "name": "unused-function-argument",
+    "count": 15,
+    "fixable": false
+  },
+  {
+    "code": "ASYNC230",
+    "name": "blocking-open-call-in-async-function",
+    "count": 15,
+    "fixable": false
+  },
+  {
+    "code": "F841",
+    "name": "unused-variable",
+    "count": 15,
+    "fixable": false
+  },
+  {
+    "code": "ANN204",
+    "name": "missing-return-type-special-method",
+    "count": 13,
+    "fixable": false
+  },
+  {
+    "code": "ARG002",
+    "name": "unused-method-argument",
+    "count": 13,
+    "fixable": false
+  },
+  {
+    "code": "FBT002",
+    "name": "boolean-default-value-positional-argument",
+    "count": 11,
+    "fixable": false
+  },
+  {
+    "code": "F405",
+    "name": "undefined-local-with-import-star-usage",
+    "count": 8,
+    "fixable": false
+  },
+  {
+    "code": "S603",
+    "name": "subprocess-without-shell-equals-true",
+    "count": 7,
+    "fixable": false
+  },
+  {
+    "code": "PLW0603",
+    "name": "global-statement",
+    "count": 6,
+    "fixable": false
+  },
+  {
+    "code": "PLR1702",
+    "name": "too-many-nested-blocks",
+    "count": 5,
+    "fixable": false
+  },
+  {
+    "code": "D102",
+    "name": "undocumented-public-method",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "E712",
+    "name": "true-false-comparison",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "E722",
+    "name": "bare-except",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "PERF401",
+    "name": "manual-list-comprehension",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "PLR0914",
+    "name": "too-many-locals",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "RUF029",
+    "name": "unused-async",
+    "count": 4,
+    "fixable": false
+  },
+  {
+    "code": "B007",
+    "name": "unused-loop-control-variable",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "C901",
+    "name": "complex-structure",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "RUF001",
+    "name": "ambiguous-unicode-character-string",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "RUF012",
+    "name": "mutable-class-default",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "RUF013",
+    "name": "implicit-optional",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "RUF059",
+    "name": "unused-unpacked-variable",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "S202",
+    "name": "tarfile-unsafe-members",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "S607",
+    "name": "start-process-with-partial-path",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "SIM102",
+    "name": "collapsible-if",
+    "count": 3,
+    "fixable": false
+  },
+  {
+    "code": "A002",
+    "name": "builtin-argument-shadowing",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "ANN205",
+    "name": "missing-return-type-static-method",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "D101",
+    "name": "undocumented-public-class",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "F822",
+    "name": "undefined-export",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "PLR6201",
+    "name": "literal-membership",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "PTH100",
+    "name": "os-path-abspath",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "RET504",
+    "name": "unnecessary-assign",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "RUF006",
+    "name": "asyncio-dangling-task",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "S110",
+    "name": "try-except-pass",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "S112",
+    "name": "try-except-continue",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "S404",
+    "name": "suspicious-subprocess-import",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "S608",
+    "name": "hardcoded-sql-expression",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "UP031",
+    "name": "printf-string-formatting",
+    "count": 2,
+    "fixable": false
+  },
+  {
+    "code": "ARG004",
+    "name": "unused-static-method-argument",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "ASYNC221",
+    "name": "run-process-in-async-function",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "C401",
+    "name": "unnecessary-generator-set",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "F403",
+    "name": "undefined-local-with-import-star",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "F823",
+    "name": "undefined-local",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PERF102",
+    "name": "incorrect-dict-iterator",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PLR0904",
+    "name": "too-many-public-methods",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PLR0912",
+    "name": "too-many-branches",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PLR6104",
+    "name": "non-augmented-assignment",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PTH101",
+    "name": "os-chmod",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PTH109",
+    "name": "os-getcwd",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "PTH118",
+    "name": "os-path-join",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "RUF003",
+    "name": "ambiguous-unicode-character-comment",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "RUF022",
+    "name": "unsorted-dunder-all",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "S103",
+    "name": "bad-file-permissions",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "S324",
+    "name": "hashlib-insecure-hash-function",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "SIM105",
+    "name": "suppressible-exception",
+    "count": 1,
+    "fixable": false
+  },
+  {
+    "code": "SIM108",
+    "name": "if-else-block-instead-of-if-exp",
+    "count": 1,
+    "fixable": false
+  }
+]

@@ -79,3 +79,76 @@ temp/
 # Data directory
 data/
 *.db
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Python virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing artifacts
+.tox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+
+# ML training and experiment artifacts
+mlruns/
+.mlflow/
+*.pkl
+*.joblib
+*.model
+*.h5
+*.ckpt
+*.pth
+experiments/
+models/
+checkpoints/
+wandb/
+
+# Jupyter notebook artifacts
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Database files
+*.sqlite3
+*.db
+*.db-journal
+
+# IDE and editor specific
+.spyderproject
+.spyproject
+.rope_project/
+.vscode/
+*.code-workspace

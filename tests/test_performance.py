@@ -297,5 +297,239 @@ async def main():
     return results
 
 
+@pytest.mark.benchmark
+class TestBenchmarkPerformance:
+    """pytest-benchmark integration for performance regression detection."""
+    
+    def test_benchmark_improve_prompt_sync_wrapper(self, benchmark):
+        """Benchmark improve_prompt with statistical validation."""
+        
+        def sync_improve_prompt():
+            """Synchronous wrapper for benchmarking async function."""
+            return asyncio.run(improve_prompt(
+                prompt="Test prompt for benchmarking",
+                context={"domain": "benchmark"},
+                session_id="benchmark_test"
+            ))
+        
+        # Run benchmark with statistical analysis
+        result = benchmark.pedantic(
+            sync_improve_prompt,
+            iterations=10,
+            rounds=5,
+            warmup_rounds=2
+        )
+        
+        # Validate result structure
+        assert "improved_prompt" in result
+        assert "processing_time_ms" in result
+        
+        # Performance regression detection
+        # benchmark.compare() will be used by pytest-benchmark for regression detection
+        
+    def test_benchmark_store_prompt_performance(self, benchmark):
+        """Benchmark store_prompt database operations."""
+        
+        def sync_store_prompt():
+            """Synchronous wrapper for benchmarking."""
+            return asyncio.run(store_prompt(
+                original="Benchmark original prompt",
+                enhanced="Benchmark enhanced prompt", 
+                metrics={"improvement_score": 0.8, "processing_time": 50},
+                session_id="benchmark_store_test"
+            ))
+        
+        result = benchmark.pedantic(
+            sync_store_prompt,
+            iterations=5,
+            rounds=3,
+            warmup_rounds=1
+        )
+        
+        # Validate storage result
+        assert result is not None
+        
+    def test_benchmark_rule_status_performance(self, benchmark):
+        """Benchmark rule status retrieval operations."""
+        
+        def sync_get_rule_status():
+            """Synchronous wrapper for benchmarking."""
+            return asyncio.run(get_rule_status())
+        
+        result = benchmark.pedantic(
+            sync_get_rule_status,
+            iterations=10,
+            rounds=5,
+            warmup_rounds=2
+        )
+        
+        # Validate rule status result
+        assert "rules" in result or result is not None
+
+
+@pytest.mark.performance
+class TestStatisticalPerformanceValidation:
+    """Statistical analysis of performance characteristics."""
+    
+    @pytest.mark.asyncio
+    async def test_response_time_distribution_analysis(self):
+        """Analyze response time distribution for statistical validation."""
+        
+        response_times = []
+        
+        # Collect sample data
+        for _ in range(20):
+            start_time = time.time()
+            await improve_prompt(
+                prompt="Statistical analysis test prompt",
+                context={"domain": "statistics"}, 
+                session_id="stats_test"
+            )
+            end_time = time.time()
+            response_times.append((end_time - start_time) * 1000)
+        
+        # Statistical analysis
+        mean_time = statistics.mean(response_times)
+        median_time = statistics.median(response_times)
+        std_dev = statistics.stdev(response_times) if len(response_times) > 1 else 0
+        
+        # Validate statistical properties
+        assert mean_time < 300, f"Mean response time {mean_time}ms exceeds target"
+        assert median_time < 250, f"Median response time {median_time}ms exceeds target"
+        
+        # Validate distribution characteristics
+        # Standard deviation should be reasonable (not too variable)
+        # Note: With mocked functions, CV can be higher due to timing variations
+        coefficient_of_variation = std_dev / mean_time if mean_time > 0 else 0
+        assert coefficient_of_variation < 1.0, (
+            f"High variability: CV {coefficient_of_variation:.2f} indicates inconsistent performance"
+        )
+        
+        # Check for outliers (values > 2 std devs from mean)
+        outliers = [t for t in response_times if abs(t - mean_time) > 2 * std_dev]
+        outlier_rate = len(outliers) / len(response_times)
+        assert outlier_rate <= 0.15, f"Too many outliers: {outlier_rate:.2%} of responses"
+    
+    @given(
+        prompt_length=st.integers(min_value=10, max_value=200),
+        concurrent_requests=st.integers(min_value=1, max_value=5)
+    )
+    @pytest.mark.asyncio
+    async def test_performance_scaling_properties(self, prompt_length, concurrent_requests):
+        """Property-based testing of performance scaling characteristics."""
+        
+        # Generate test prompt of specified length
+        test_prompt = " ".join(["word"] * prompt_length)
+        
+        # Measure concurrent execution time
+        start_time = time.time()
+        
+        tasks = [
+            improve_prompt(
+                prompt=test_prompt,
+                context={"domain": "scaling_test"},
+                session_id=f"scale_test_{i}"
+            )
+            for i in range(concurrent_requests)
+        ]
+        
+        results = await asyncio.gather(*tasks)
+        end_time = time.time()
+        
+        total_time_ms = (end_time - start_time) * 1000
+        avg_time_per_request = total_time_ms / concurrent_requests
+        
+        # Validate all requests succeeded
+        assert len(results) == concurrent_requests
+        assert all("improved_prompt" in result for result in results)
+        
+        # Performance scaling properties
+        # Average time per request should not grow linearly with concurrent requests
+        if concurrent_requests > 1:
+            # Concurrent processing should provide some efficiency
+            single_request_baseline = 200  # ms (estimated baseline)
+            efficiency_factor = avg_time_per_request / single_request_baseline
+            
+            # Should not be worse than 2x the baseline per request
+            assert efficiency_factor < 2.0, (
+                f"Poor scaling: {avg_time_per_request:.1f}ms per request "
+                f"with {concurrent_requests} concurrent requests"
+            )
+        
+        # Total time should be reasonable regardless of request count
+        assert total_time_ms < 1000, f"Total processing time {total_time_ms}ms too high"
+
+
+@pytest.mark.performance
+class TestPerformanceRegression:
+    """Performance regression detection and validation."""
+    
+    @pytest.mark.asyncio
+    async def test_performance_baseline_validation(self, test_config):
+        """Validate performance against established baselines."""
+        
+        target_response_time = test_config["performance"]["target_response_time_ms"]
+        
+        # Run standardized performance test
+        response_times = []
+        for i in range(10):
+            start_time = time.time()
+            result = await improve_prompt(
+                prompt=f"Baseline test prompt {i}",
+                context={"domain": "baseline"},
+                session_id=f"baseline_test_{i}"
+            )
+            end_time = time.time()
+            
+            response_time_ms = (end_time - start_time) * 1000
+            response_times.append(response_time_ms)
+            
+            # Validate individual response
+            assert "improved_prompt" in result
+        
+        # Statistical validation against baseline
+        p95_response_time = sorted(response_times)[int(0.95 * len(response_times))]
+        avg_response_time = statistics.mean(response_times)
+        
+        # Performance assertions
+        assert avg_response_time <= target_response_time, (
+            f"Average response time {avg_response_time:.1f}ms exceeds target {target_response_time}ms"
+        )
+        assert p95_response_time <= target_response_time * 1.5, (
+            f"95th percentile {p95_response_time:.1f}ms exceeds tolerance"
+        )
+    
+    @pytest.mark.asyncio
+    async def test_memory_usage_stability(self):
+        """Test that memory usage remains stable during extended operation."""
+        try:
+            import psutil
+            import os
+            
+            process = psutil.Process(os.getpid())
+            initial_memory = process.memory_info().rss
+        except ImportError:
+            pytest.skip("psutil not available - skipping memory usage test")
+        
+        # Run multiple operations to test memory stability
+        for i in range(20):
+            await improve_prompt(
+                prompt=f"Memory stability test {i}",
+                context={"domain": "memory_test"},
+                session_id=f"memory_test_{i}"
+            )
+            
+            # Check memory every 5 operations
+            if i % 5 == 0:
+                current_memory = process.memory_info().rss
+                memory_growth = current_memory - initial_memory
+                memory_growth_mb = memory_growth / (1024 * 1024)
+                
+                # Memory growth should be reasonable (< 50MB for 20 operations)
+                assert memory_growth_mb < 50, (
+                    f"Excessive memory growth: {memory_growth_mb:.1f}MB after {i+1} operations"
+                )
+
+
 if __name__ == "__main__":
     asyncio.run(main())

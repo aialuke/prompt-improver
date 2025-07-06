@@ -73,143 +73,161 @@ class MLModelService:
         """
         start_time = time.time()
 
-        with mlflow.start_run(
-            run_name=f"rule_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        ):
-            try:
-                # Extract training data
-                X = np.array(training_data["features"])
-                y = np.array(training_data["effectiveness_scores"])
+        try:
+            # Ensure any previous runs are ended
+            if mlflow.active_run():
+                mlflow.end_run()
+            
+            with mlflow.start_run(
+                run_name=f"rule_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            ):
+                try:
+                    # Extract training data
+                    X = np.array(training_data["features"])
+                    y_continuous = np.array(training_data["effectiveness_scores"])
+                
+                    # Convert continuous scores to binary classification (high/low effectiveness)
+                    y_threshold = np.median(y_continuous)
+                    y = (y_continuous >= y_threshold).astype(int)
 
-                if len(X) < 10:
-                    return {
-                        "error": f"Insufficient training data: {len(X)} samples (minimum: 10)"
-                    }
+                    if len(X) < 10:
+                        return {
+                            "error": f"Insufficient training data: {len(X)} samples (minimum: 10)"
+                        }
 
-                # Log training data characteristics
-                mlflow.log_params({
-                    "n_samples": len(X),
-                    "n_features": X.shape[1],
-                    "target_mean": float(np.mean(y)),
-                    "target_std": float(np.std(y)),
-                })
+                    # Log training data characteristics
+                    mlflow.log_params({
+                        "n_samples": len(X),
+                        "n_features": X.shape[1],
+                        "target_mean": float(np.mean(y_continuous)),
+                        "target_std": float(np.std(y_continuous)),
+                        "binary_threshold": float(y_threshold),
+                        "high_effectiveness_ratio": float(np.mean(y)),
+                    })
 
-                # Hyperparameter optimization with Optuna
-                study = optuna.create_study(direction="maximize")
+                    # Hyperparameter optimization with Optuna
+                    study = optuna.create_study(direction="maximize")
 
-                def objective(trial):
-                    # Define search space
-                    n_estimators = trial.suggest_int("n_estimators", 50, 200)
-                    max_depth = trial.suggest_int("max_depth", 3, 15)
-                    min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
+                    def objective(trial):
+                        # Define search space
+                        n_estimators = trial.suggest_int("n_estimators", 50, 200)
+                        max_depth = trial.suggest_int("max_depth", 3, 15)
+                        min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
 
-                    # Create model pipeline
-                    model = Pipeline([
+                        # Create model pipeline
+                        model = Pipeline([
+                            ("scaler", StandardScaler()),
+                            (
+                                "classifier",
+                                RandomForestClassifier(
+                                    n_estimators=n_estimators,
+                                    max_depth=max_depth,
+                                    min_samples_split=min_samples_split,
+                                    random_state=42,
+                                    n_jobs=-1,
+                                ),
+                            ),
+                        ])
+
+                        # Nested cross-validation for unbiased performance estimation
+                        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+                        scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
+
+                        return np.mean(scores)
+
+                    # Run optimization
+                    study.optimize(objective, n_trials=50, timeout=300)  # 5 minute timeout
+
+                    # Get best parameters
+                    best_params = study.best_params
+                    best_score = study.best_value
+
+                    # Train final model with best parameters
+                    final_model = Pipeline([
                         ("scaler", StandardScaler()),
                         (
                             "classifier",
                             RandomForestClassifier(
-                                n_estimators=n_estimators,
-                                max_depth=max_depth,
-                                min_samples_split=min_samples_split,
+                                n_estimators=best_params["n_estimators"],
+                                max_depth=best_params["max_depth"],
+                                min_samples_split=best_params["min_samples_split"],
                                 random_state=42,
                                 n_jobs=-1,
                             ),
                         ),
                     ])
 
-                    # Nested cross-validation for unbiased performance estimation
-                    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-                    scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
+                    final_model.fit(X, y)
 
-                    return np.mean(scores)
+                    # Generate predictions for effectiveness analysis
+                    predictions = final_model.predict_proba(X)[:, 1]
 
-                # Run optimization
-                study.optimize(objective, n_trials=50, timeout=300)  # 5 minute timeout
+                    # Calculate performance metrics
+                    accuracy = accuracy_score(y, final_model.predict(X))
+                    precision = precision_score(
+                        y, final_model.predict(X), average="weighted"
+                    )
+                    recall = recall_score(y, final_model.predict(X), average="weighted")
 
-                # Get best parameters
-                best_params = study.best_params
-                best_score = study.best_value
+                    # Generate model ID and save
+                    model_id = f"rule_optimizer_{int(time.time())}"
+                    self.models[model_id] = final_model
 
-                # Train final model with best parameters
-                final_model = Pipeline([
-                    ("scaler", StandardScaler()),
-                    (
-                        "classifier",
-                        RandomForestClassifier(
-                            n_estimators=best_params["n_estimators"],
-                            max_depth=best_params["max_depth"],
-                            min_samples_split=best_params["min_samples_split"],
-                            random_state=42,
-                            n_jobs=-1,
-                        ),
-                    ),
-                ])
+                    # Log to MLflow
+                    mlflow.log_params(best_params)
+                    mlflow.log_metrics({
+                        "best_score": best_score,
+                        "accuracy": accuracy,
+                        "precision": precision,
+                        "recall": recall,
+                        "training_time": time.time() - start_time,
+                    })
 
-                final_model.fit(X, y)
+                    # Save model to MLflow
+                    mlflow.sklearn.log_model(
+                        final_model, "model", registered_model_name="apes_rule_optimizer"
+                    )
 
-                # Generate predictions for effectiveness analysis
-                predictions = final_model.predict_proba(X)[:, 1]
+                    # Update rule parameters in database
+                    await self._update_rule_parameters(
+                        db_session, rule_ids or [], best_params, best_score, model_id
+                    )
 
-                # Calculate performance metrics
-                accuracy = accuracy_score(y, final_model.predict(X))
-                precision = precision_score(
-                    y, final_model.predict(X), average="weighted"
-                )
-                recall = recall_score(y, final_model.predict(X), average="weighted")
+                    # Store model performance metrics
+                    await self._store_model_performance(
+                        db_session, model_id, best_score, accuracy, precision, recall
+                    )
 
-                # Generate model ID and save
-                model_id = f"rule_optimizer_{int(time.time())}"
-                self.models[model_id] = final_model
+                    processing_time = time.time() - start_time
 
-                # Log to MLflow
-                mlflow.log_params(best_params)
-                mlflow.log_metrics({
-                    "best_score": best_score,
-                    "accuracy": accuracy,
-                    "precision": precision,
-                    "recall": recall,
-                    "training_time": time.time() - start_time,
-                })
+                    return {
+                        "status": "success",
+                        "model_id": model_id,
+                        "best_score": best_score,
+                        "accuracy": accuracy,
+                        "precision": precision,
+                        "recall": recall,
+                        "best_params": best_params,
+                        "training_samples": len(X),
+                        "processing_time_ms": processing_time * 1000,
+                        "mlflow_run_id": mlflow.active_run().info.run_id,
+                    }
 
-                # Save model to MLflow
-                mlflow.sklearn.log_model(
-                    final_model, "model", registered_model_name="apes_rule_optimizer"
-                )
-
-                # Update rule parameters in database
-                await self._update_rule_parameters(
-                    db_session, rule_ids or [], best_params, best_score, model_id
-                )
-
-                # Store model performance metrics
-                await self._store_model_performance(
-                    db_session, model_id, best_score, accuracy, precision, recall
-                )
-
-                processing_time = time.time() - start_time
-
-                return {
-                    "status": "success",
-                    "model_id": model_id,
-                    "best_score": best_score,
-                    "accuracy": accuracy,
-                    "precision": precision,
-                    "recall": recall,
-                    "best_params": best_params,
-                    "training_samples": len(X),
-                    "processing_time_ms": processing_time * 1000,
-                    "mlflow_run_id": mlflow.active_run().info.run_id,
-                }
-
-            except Exception as e:
-                logger.error(f"ML optimization failed: {e}")
-                mlflow.log_params({"error": str(e)})
-                return {
-                    "status": "error",
-                    "error": str(e),
-                    "processing_time_ms": (time.time() - start_time) * 1000,
-                }
+                except Exception as e:
+                    logger.error(f"ML optimization failed: {e}")
+                    mlflow.log_params({"error": str(e)})
+                    return {
+                        "status": "error",
+                        "error": str(e),
+                        "processing_time_ms": (time.time() - start_time) * 1000,
+                    }
+        except Exception as e:
+            logger.error(f"ML service error: {e}")
+            return {
+                "status": "error", 
+                "error": str(e),
+                "processing_time_ms": (time.time() - start_time) * 1000,
+            }
 
     async def predict_rule_effectiveness(
         self, model_id: str, rule_features: list[float]
@@ -270,20 +288,29 @@ class MLModelService:
         """
         start_time = time.time()
 
-        with mlflow.start_run(
-            run_name=f"ensemble_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        ):
-            try:
-                X = np.array(training_data["features"])
-                y = np.array(training_data["effectiveness_scores"])
+        try:
+            # Ensure any previous runs are ended
+            if mlflow.active_run():
+                mlflow.end_run()
+                
+            with mlflow.start_run(
+                run_name=f"ensemble_optimization_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            ):
+                try:
+                    X = np.array(training_data["features"])
+                    y_continuous = np.array(training_data["effectiveness_scores"])
+                    
+                    # Convert continuous scores to binary classification
+                    y_threshold = np.median(y_continuous)
+                    y = (y_continuous >= y_threshold).astype(int)
 
-                if len(X) < 20:
-                    return {
-                        "error": f"Insufficient data for ensemble: {len(X)} samples (minimum: 20)"
-                    }
+                    if len(X) < 20:
+                        return {
+                            "error": f"Insufficient data for ensemble: {len(X)} samples (minimum: 20)"
+                        }
 
-                # Define base estimators
-                base_estimators = [
+                    # Define base estimators
+                    base_estimators = [
                     (
                         "rf",
                         Pipeline([
@@ -311,88 +338,95 @@ class MLModelService:
                             ),
                         ]),
                     ),
-                ]
+                    ]
 
-                # Final estimator
-                final_estimator = LogisticRegression(random_state=42)
+                    # Final estimator
+                    final_estimator = LogisticRegression(random_state=42)
 
-                # Create stacking classifier
-                stacking_model = StackingClassifier(
-                    estimators=base_estimators,
-                    final_estimator=final_estimator,
-                    cv=5,
-                    n_jobs=-1,
-                )
+                    # Create stacking classifier
+                    stacking_model = StackingClassifier(
+                        estimators=base_estimators,
+                        final_estimator=final_estimator,
+                        cv=5,
+                        n_jobs=-1,
+                    )
 
-                # Train ensemble model
-                stacking_model.fit(X, y)
+                    # Train ensemble model
+                    stacking_model.fit(X, y)
 
-                # Evaluate ensemble performance
-                cv_scores = cross_val_score(
-                    stacking_model,
-                    X,
-                    y,
-                    cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42),
-                    scoring="roc_auc",
-                )
+                    # Evaluate ensemble performance
+                    cv_scores = cross_val_score(
+                        stacking_model,
+                        X,
+                        y,
+                        cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42),
+                        scoring="roc_auc",
+                    )
 
-                ensemble_score = np.mean(cv_scores)
-                ensemble_std = np.std(cv_scores)
+                    ensemble_score = np.mean(cv_scores)
+                    ensemble_std = np.std(cv_scores)
 
-                # Generate model ID and save
-                model_id = f"ensemble_optimizer_{int(time.time())}"
-                self.models[model_id] = stacking_model
+                    # Generate model ID and save
+                    model_id = f"ensemble_optimizer_{int(time.time())}"
+                    self.models[model_id] = stacking_model
 
-                # Log to MLflow
-                mlflow.log_params({
-                    "model_type": "StackingClassifier",
-                    "base_estimators": "RandomForest,GradientBoosting",
-                    "final_estimator": "LogisticRegression",
-                    "cv_folds": 5,
-                })
+                    # Log to MLflow
+                    mlflow.log_params({
+                        "model_type": "StackingClassifier",
+                        "base_estimators": "RandomForest,GradientBoosting",
+                        "final_estimator": "LogisticRegression",
+                        "cv_folds": 5,
+                    })
 
-                mlflow.log_metrics({
-                    "ensemble_score": ensemble_score,
-                    "ensemble_std": ensemble_std,
-                    "training_time": time.time() - start_time,
-                })
+                    mlflow.log_metrics({
+                        "ensemble_score": ensemble_score,
+                        "ensemble_std": ensemble_std,
+                        "training_time": time.time() - start_time,
+                    })
 
-                # Save ensemble model
-                mlflow.sklearn.log_model(
-                    stacking_model,
-                    "ensemble_model",
-                    registered_model_name="apes_ensemble_optimizer",
-                )
+                    # Save ensemble model
+                    mlflow.sklearn.log_model(
+                        stacking_model,
+                        "ensemble_model",
+                        registered_model_name="apes_ensemble_optimizer",
+                    )
 
-                # Store ensemble performance
-                await self._store_model_performance(
-                    db_session,
-                    model_id,
-                    ensemble_score,
-                    accuracy_score(y, stacking_model.predict(X)),
-                    precision_score(y, stacking_model.predict(X), average="weighted"),
-                    recall_score(y, stacking_model.predict(X), average="weighted"),
-                )
+                    # Store ensemble performance
+                    await self._store_model_performance(
+                        db_session,
+                        model_id,
+                        ensemble_score,
+                        accuracy_score(y, stacking_model.predict(X)),
+                        precision_score(y, stacking_model.predict(X), average="weighted"),
+                        recall_score(y, stacking_model.predict(X), average="weighted"),
+                    )
 
-                processing_time = time.time() - start_time
+                    processing_time = time.time() - start_time
 
-                return {
-                    "status": "success",
-                    "model_id": model_id,
-                    "ensemble_score": ensemble_score,
-                    "ensemble_std": ensemble_std,
-                    "cv_scores": cv_scores.tolist(),
-                    "processing_time_ms": processing_time * 1000,
-                    "mlflow_run_id": mlflow.active_run().info.run_id,
-                }
+                    return {
+                        "status": "success",
+                        "model_id": model_id,
+                        "ensemble_score": ensemble_score,
+                        "ensemble_std": ensemble_std,
+                        "cv_scores": cv_scores.tolist(),
+                        "processing_time_ms": processing_time * 1000,
+                        "mlflow_run_id": mlflow.active_run().info.run_id,
+                    }
 
-            except Exception as e:
-                logger.error(f"Ensemble optimization failed: {e}")
-                return {
-                    "status": "error",
-                    "error": str(e),
-                    "processing_time_ms": (time.time() - start_time) * 1000,
-                }
+                except Exception as e:
+                    logger.error(f"Ensemble optimization failed: {e}")
+                    return {
+                        "status": "error",
+                        "error": str(e),
+                        "processing_time_ms": (time.time() - start_time) * 1000,
+                    }
+        except Exception as e:
+            logger.error(f"Ensemble service error: {e}")
+            return {
+                "status": "error",
+                "error": str(e), 
+                "processing_time_ms": (time.time() - start_time) * 1000,
+            }
 
     async def discover_patterns(
         self,
@@ -419,7 +453,7 @@ class MLModelService:
                     RulePerformance.rule_id,
                     RulePerformance.improvement_score,
                     RulePerformance.execution_time_ms,
-                    RulePerformance.user_satisfaction_score,
+                    RulePerformance.confidence_level,
                     RuleMetadata.parameters,
                 )
                 .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
@@ -506,7 +540,7 @@ class MLModelService:
         try:
             # If no specific rule IDs, update all active rules
             if not rule_ids:
-                stmt = select(RuleMetadata).where(RuleMetadata.active == True)
+                stmt = select(RuleMetadata).where(RuleMetadata.enabled == True)
                 result = await db_session.execute(stmt)
                 rules = result.scalars().all()
                 rule_ids = [rule.rule_id for rule in rules]
@@ -548,13 +582,12 @@ class MLModelService:
         """Store model performance metrics in database."""
         try:
             performance_record = MLModelPerformance(
-                model_id=model_id,
-                performance_score=performance_score,
-                accuracy=accuracy,
-                precision=precision,
-                recall=recall,
+                model_version=model_id,
+                model_type="RandomForestClassifier",
+                accuracy_score=accuracy,
+                precision_score=precision,
+                recall_score=recall,
                 training_data_size=0,  # Will be updated by caller
-                created_at=datetime.utcnow(),
             )
 
             db_session.add(performance_record)

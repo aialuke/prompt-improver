@@ -66,31 +66,62 @@ def mock_db_session():
 
 @pytest.fixture
 async def test_db_engine():
-    """Create test database engine with in-memory SQLite."""
-    # Use in-memory SQLite for fast testing
+    """Create test database engine using existing PostgreSQL configuration."""
+    from prompt_improver.database.config import DatabaseConfig
+    
+    # Use existing database config but with test database name
+    config = DatabaseConfig()
+    test_db_url = f"postgresql+asyncpg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/apes_test"
+    
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:", echo=False, future=True
+        test_db_url, 
+        echo=False, 
+        future=True,
+        connect_args={
+            "server_settings": {
+                "application_name": "apes_test_suite",
+            },
+            "command_timeout": 5,  # 5 second command timeout
+        },
+        pool_timeout=5,  # 5 second pool timeout
     )
 
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-
-    yield engine
-
-    # Cleanup
-    await engine.dispose()
+    try:
+        # Create all tables with timeout
+        async with engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
+        
+        yield engine
+    except Exception as e:
+        pytest.skip(f"PostgreSQL database not available: {e}")
+    finally:
+        # Cleanup
+        try:
+            await engine.dispose()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 @pytest.fixture
 async def test_db_session(test_db_engine):
-    """Create test database session."""
+    """Create test database session with transaction rollback for isolation."""
     async_session = sessionmaker(
         test_db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
     async with async_session() as session:
-        yield session
+        # Start a transaction
+        trans = await session.begin()
+        try:
+            yield session
+        finally:
+            # Always rollback to ensure test isolation
+            try:
+                if trans.is_active:
+                    await trans.rollback()
+            except Exception:
+                # Transaction may already be closed, ignore
+                pass
 
 
 # Temporary File Infrastructure
@@ -181,47 +212,46 @@ def test_config():
 # Sample Model Data Fixtures
 @pytest.fixture
 def sample_rule_metadata():
-    """Sample rule metadata for testing."""
+    """Sample rule metadata for testing with unique IDs per test."""
+    import random
+    import uuid
+    
+    # Generate unique suffix for this test run
+    test_suffix = str(uuid.uuid4())[:8]
+    
     return [
         RuleMetadata(
-            rule_id="clarity_rule",
+            rule_id=f"clarity_rule_{test_suffix}",
             rule_name="Clarity Enhancement Rule",
             rule_category="core",
             rule_description="Improves prompt clarity",
             enabled=True,
             priority=5,
             rule_version="1.0",
-            parameters={"weight": 1.0, "threshold": 0.7},
-            effectiveness_score=0.85,
-            weight=1.0,
-            active=True,
-            updated_by="system",
-            updated_at=datetime.utcnow(),
+            default_parameters={"weight": 1.0, "threshold": 0.7},
         ),
         RuleMetadata(
-            rule_id="specificity_rule",
+            rule_id=f"specificity_rule_{test_suffix}",
             rule_name="Specificity Enhancement Rule",
             rule_category="core",
             rule_description="Improves prompt specificity",
             enabled=True,
             priority=4,
             rule_version="1.0",
-            parameters={"weight": 0.8, "threshold": 0.6},
-            effectiveness_score=0.78,
-            weight=0.8,
-            active=True,
-            updated_by="system",
-            updated_at=datetime.utcnow(),
+            default_parameters={"weight": 0.8, "threshold": 0.6},
         ),
     ]
 
 
 @pytest.fixture
-def sample_rule_performance():
-    """Sample rule performance data for testing."""
-    return [
+def sample_rule_performance(sample_rule_metadata):
+    """Sample rule performance data for testing with unique rule IDs."""
+    import uuid
+    
+    # Use the same unique rule IDs from sample_rule_metadata
+    base_data = [
         RulePerformance(
-            rule_id="clarity_rule",
+            rule_id=sample_rule_metadata[0].rule_id,  # clarity_rule with unique suffix
             rule_name="Clarity Enhancement Rule",
             improvement_score=0.8,
             confidence_level=0.9,
@@ -229,12 +259,9 @@ def sample_rule_performance():
             prompt_characteristics={"length": 50, "complexity": 0.6},
             before_metrics={"clarity": 0.5, "specificity": 0.6},
             after_metrics={"clarity": 0.8, "specificity": 0.6},
-            user_satisfaction_score=0.9,
-            session_id="test_session_1",
-            created_at=datetime.utcnow(),
         ),
         RulePerformance(
-            rule_id="specificity_rule",
+            rule_id=sample_rule_metadata[1].rule_id,  # specificity_rule with unique suffix
             rule_name="Specificity Enhancement Rule",
             improvement_score=0.7,
             confidence_level=0.8,
@@ -242,11 +269,28 @@ def sample_rule_performance():
             prompt_characteristics={"length": 45, "complexity": 0.5},
             before_metrics={"clarity": 0.7, "specificity": 0.4},
             after_metrics={"clarity": 0.7, "specificity": 0.7},
-            user_satisfaction_score=0.8,
-            session_id="test_session_2",
-            created_at=datetime.utcnow() - timedelta(hours=1),
         ),
-    ] * 15  # Create 30 total records for sufficient test data
+    ]
+    
+    # Create multiple records with unique prompt_ids
+    result = []
+    for i in range(15):  # 15 records each = 30 total
+        for base in base_data:
+            # Create new instance with unique prompt_id
+            new_record = RulePerformance(
+                rule_id=base.rule_id,
+                rule_name=base.rule_name,
+                prompt_id=uuid.uuid4(),  # Unique prompt_id for each record
+                improvement_score=base.improvement_score + (i * 0.01),  # Slight variation
+                confidence_level=base.confidence_level,
+                execution_time_ms=base.execution_time_ms + i,
+                prompt_characteristics=base.prompt_characteristics,
+                before_metrics=base.before_metrics,
+                after_metrics=base.after_metrics,
+            )
+            result.append(new_record)
+    
+    return result
 
 
 @pytest.fixture

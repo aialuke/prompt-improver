@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from prompt_improver.database import get_session
+from prompt_improver.database import sessionmanager
 from prompt_improver.installation.initializer import APESInitializer
 from prompt_improver.installation.migration import APESMigrationManager
 from prompt_improver.service.manager import APESServiceManager
@@ -166,7 +166,7 @@ def status(
     try:
         # Run async check in sync context
         async def check_db():
-            async with get_session() as session:
+            async with sessionmanager.session() as session:
                 await session.execute("SELECT 1")
                 return "connected"
 
@@ -234,7 +234,7 @@ def train(
     console.print("🧠 Starting Phase 3 ML training process...", style="green")
 
     async def run_training():
-        async with get_session() as db_session:
+        async with sessionmanager.session() as db_session:
             # Parse rule IDs if provided
             selected_rule_ids = None
             if rule_ids:
@@ -259,8 +259,8 @@ def train(
                 stats_query = text("""
                     SELECT 
                         COUNT(*) FILTER (WHERE rp.improvement_score >= 0.7) as high_quality_count,
-                        COUNT(*) FILTER (WHERE rm.active = true) as active_rules_count,
-                        COUNT(DISTINCT rp.session_id) as unique_sessions,
+                        COUNT(*) FILTER (WHERE rm.enabled = true) as active_rules_count,
+                        COUNT(DISTINCT rp.prompt_id) as unique_prompts,
                         AVG(rp.improvement_score) as avg_improvement,
                         COUNT(*) as total_performance_records
                     FROM rule_performance rp
@@ -282,13 +282,13 @@ def train(
             # Analyze ML readiness
             high_quality_count = stats[0] or 0
             active_rules = stats[1] or 0
-            unique_sessions = stats[2] or 0
+            unique_prompts = stats[2] or 0
             avg_improvement = stats[3] or 0
             total_records = stats[4] or 0
 
             # ML readiness assessment
-            ml_ready = high_quality_count >= 20 and unique_sessions >= 10
-            ensemble_ready = high_quality_count >= 50 and unique_sessions >= 20
+            ml_ready = high_quality_count >= 20 and unique_prompts >= 10
+            ensemble_ready = high_quality_count >= 50 and unique_prompts >= 20
 
             table.add_row(
                 "High Quality Samples",
@@ -301,9 +301,9 @@ def train(
                 "✅ Good" if active_rules >= 3 else "⚠️  Few",
             )
             table.add_row(
-                "Unique Sessions",
-                str(unique_sessions),
-                "✅ Diverse" if unique_sessions >= 10 else "⚠️  Limited",
+                "Unique Prompts",
+                str(unique_prompts),
+                "✅ Diverse" if unique_prompts >= 10 else "⚠️  Limited",
             )
             table.add_row(
                 "Avg Improvement",
@@ -437,7 +437,7 @@ def analytics(
         rule_effectiveness = user_satisfaction = performance_trends = True
 
     async def show_analytics():
-        async with get_session() as db_session:
+        async with sessionmanager.session() as db_session:
             if rule_effectiveness:
                 console.print(f"\n[bold]Rule Effectiveness (Last {days} days)[/bold]")
 
@@ -581,7 +581,7 @@ def doctor(
     try:
 
         async def check_db():
-            async with get_session() as session:
+            async with sessionmanager.session() as session:
                 result = await session.fetch_one("SELECT version()")
                 return result["version"]
 
@@ -1079,7 +1079,7 @@ def discover_patterns(
     console.print("🔍 Starting Pattern Discovery Analysis...", style="blue")
 
     async def run_discovery():
-        async with get_session() as db_session:
+        async with sessionmanager.session() as db_session:
             try:
                 # Run pattern discovery
                 discovery_result = await prompt_service.discover_patterns(
@@ -1175,7 +1175,7 @@ def ml_status(
     console.print("🤖 Phase 3 ML System Status", style="bold blue")
 
     async def show_status():
-        async with get_session() as db_session:
+        async with sessionmanager.session() as db_session:
             try:
                 from sqlalchemy import text
 
@@ -1296,7 +1296,7 @@ def optimize_rules(
     console.print("⚙️ Starting Rule Optimization...", style="green")
 
     async def run_optimization():
-        async with get_session() as db_session:
+        async with sessionmanager.session() as db_session:
             try:
                 if feedback_id:
                     # Optimize based on specific feedback
@@ -1874,7 +1874,7 @@ def training_history(
         async def list_training_runs():
             try:
                 # Search for training runs in the database
-                async with get_session() as session:
+                async with sessionmanager.session() as session:
                     query = """
                         SELECT t.session_id, t.created_at, t.metrics_data, t.performance_score
                         FROM training_sessions t

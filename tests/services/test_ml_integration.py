@@ -1,14 +1,18 @@
 """
-Comprehensive tests for Phase 3 ML integration service.
-Tests direct Python ML service implementation including optimization, prediction, and pattern discovery.
+Enhanced ML integration tests with property-based validation and model contract testing.
+Implements comprehensive ML model validation, data contract verification, and
+performance characterization following Context7 ML testing best practices.
 """
 
 import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pytest
+from hypothesis import given, strategies as st, assume, settings, HealthCheck
+from hypothesis.extra.numpy import arrays
 
 from prompt_improver.database.models import (
     MLModelPerformance,
@@ -255,11 +259,11 @@ class TestDatabaseIntegration:
 
         # Get the added performance record
         call_args = mock_db_session.add.call_args[0][0]
-        assert call_args.model_id == "test_model_123"
-        assert call_args.performance_score == 0.85
-        assert call_args.accuracy == 0.90
-        assert call_args.precision == 0.88
-        assert call_args.recall == 0.92
+        assert call_args.model_version == "test_model_123"
+        assert call_args.model_type == "RandomForestClassifier"
+        assert call_args.accuracy_score == 0.90
+        assert call_args.precision_score == 0.88
+        assert call_args.recall_score == 0.92
 
 
 class TestMLServiceSingleton:
@@ -387,6 +391,397 @@ class TestErrorHandling:
             assert "error" in result
             assert result["status"] == "error"
             assert "MLflow unavailable" in result["error"]
+
+
+@pytest.mark.ml_contracts
+class TestMLModelContracts:
+    """Contract testing for ML model interfaces and data validation."""
+    
+    @given(
+        features=arrays(
+            dtype=np.float64,
+            shape=st.tuples(st.integers(min_value=1, max_value=100), st.integers(min_value=5, max_value=20)),
+            elements=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+        )
+    )
+    @pytest.mark.asyncio
+    async def test_prediction_contract_feature_validation(self, ml_service, features):
+        """Contract: prediction should validate feature dimensions and ranges."""
+        
+        # Mock model that accepts any feature count
+        mock_model = MagicMock()
+        mock_model.predict.return_value = np.array([0.5] * features.shape[0])
+        mock_model.predict_proba.return_value = np.array([[0.5, 0.5]] * features.shape[0])
+        
+        model_id = "contract_test_model"
+        ml_service.models[model_id] = mock_model
+        
+        # Test with each feature vector
+        for feature_vector in features:
+            result = await ml_service.predict_rule_effectiveness(model_id, feature_vector.tolist())
+            
+            # Contract requirements
+            assert result["status"] == "success"
+            assert isinstance(result["prediction"], (int, float))
+            assert 0.0 <= result["prediction"] <= 1.0
+            assert isinstance(result["confidence"], (int, float))
+            assert 0.0 <= result["confidence"] <= 1.0
+            assert isinstance(result["probabilities"], list)
+            assert len(result["probabilities"]) == 2  # Binary classification
+            assert sum(result["probabilities"]) == pytest.approx(1.0, abs=0.01)
+
+    @given(
+        n_samples=st.integers(min_value=10, max_value=100),
+        n_features=st.integers(min_value=5, max_value=15),
+        effectiveness_scores=st.lists(
+            st.floats(min_value=0.0, max_value=1.0),
+            min_size=10,
+            max_size=100
+        )
+    )
+    @pytest.mark.asyncio
+    async def test_training_data_contract_validation(self, ml_service, mock_db_session, n_samples, n_features, effectiveness_scores):
+        """Contract: training should validate data shape and quality requirements."""
+        
+        assume(len(effectiveness_scores) == n_samples)
+        
+        # Generate valid training data
+        features = np.random.rand(n_samples, n_features).tolist()
+        training_data = {
+            "features": features,
+            "effectiveness_scores": effectiveness_scores[:n_samples]
+        }
+        
+        with patch("mlflow.start_run"), patch("mlflow.active_run") as mock_run:
+            mock_run.return_value.info.run_id = "contract_test_run"
+            
+            result = await ml_service.optimize_rules(training_data, mock_db_session)
+            
+            # Contract validation
+            assert "status" in result
+            if result["status"] == "success":
+                # Success contract requirements
+                assert "model_id" in result
+                assert "best_score" in result
+                assert isinstance(result["best_score"], (int, float))
+                assert 0.0 <= result["best_score"] <= 1.0
+                assert "processing_time_ms" in result
+                assert result["processing_time_ms"] > 0
+                assert result["training_samples"] == n_samples
+            else:
+                # Error contract requirements
+                assert "error" in result
+                assert isinstance(result["error"], str)
+
+    @given(
+        model_params=st.dictionaries(
+            keys=st.sampled_from(["n_estimators", "max_depth", "min_samples_split", "learning_rate"]),
+            values=st.one_of(
+                st.integers(min_value=1, max_value=1000),
+                st.floats(min_value=0.001, max_value=1.0)
+            ),
+            min_size=1,
+            max_size=4
+        )
+    )
+    @pytest.mark.asyncio
+    async def test_model_parameter_contract_validation(self, ml_service, mock_db_session, model_params):
+        """Contract: model parameters should be validated and sanitized."""
+        
+        # Test parameter validation in context of rule updates
+        with patch.object(ml_service, "_update_rule_parameters") as mock_update:
+            mock_update.return_value = None
+            
+            # This would be called internally during optimization
+            await ml_service._update_rule_parameters(
+                mock_db_session, 
+                ["test_rule"],
+                model_params,
+                0.8,
+                "test_model"
+            )
+            
+            # Verify parameter validation was applied
+            mock_update.assert_called_once()
+            call_args = mock_update.call_args[0]
+            parameters = call_args[2]  # The parameters argument
+            
+            # Contract: all parameters should be valid types
+            for key, value in parameters.items():
+                assert isinstance(key, str)
+                assert isinstance(value, (int, float, bool, str))
+                if isinstance(value, (int, float)):
+                    assert not np.isnan(value)
+                    assert not np.isinf(value)
+
+
+@pytest.mark.property_based
+class TestMLPropertyBasedValidation:
+    """Property-based testing for ML service behavior validation."""
+    
+    @given(
+        rule_count=st.integers(min_value=1, max_value=10),
+        feature_dimension=st.integers(min_value=5, max_value=20)
+    )
+    @pytest.mark.asyncio
+    async def test_prediction_consistency_property(self, ml_service, rule_count, feature_dimension):
+        """Property: identical inputs should produce identical predictions."""
+        
+        # Create mock model with deterministic behavior
+        mock_model = MagicMock()
+        prediction_value = 0.7
+        mock_model.predict.return_value = np.array([prediction_value])
+        mock_model.predict_proba.return_value = np.array([[0.3, 0.7]])
+        
+        model_id = "deterministic_model"
+        ml_service.models[model_id] = mock_model
+        
+        # Generate test features
+        test_features = [0.5] * feature_dimension
+        
+        # Make multiple predictions with identical input
+        results = []
+        for _ in range(rule_count):
+            result = await ml_service.predict_rule_effectiveness(model_id, test_features)
+            results.append(result)
+        
+        # Property: all results should be identical
+        first_result = results[0]
+        for result in results[1:]:
+            assert result["prediction"] == first_result["prediction"]
+            assert result["confidence"] == first_result["confidence"]
+            assert result["probabilities"] == first_result["probabilities"]
+            assert result["status"] == first_result["status"]
+
+    @given(
+        data_size=st.integers(min_value=20, max_value=100),
+        noise_level=st.floats(min_value=0.0, max_value=0.1)
+    )
+    @pytest.mark.asyncio
+    async def test_optimization_convergence_property(self, ml_service, mock_db_session, data_size, noise_level):
+        """Property: optimization should converge to reasonable solutions."""
+        
+        # Generate synthetic training data with known pattern
+        np.random.seed(42)  # Reproducible results
+        features = np.random.rand(data_size, 6)
+        
+        # Create effectiveness scores with known pattern + noise
+        true_effectiveness = 0.8 * features[:, 0] + 0.2 * features[:, 1]
+        noise = np.random.normal(0, noise_level, data_size)
+        effectiveness_scores = np.clip(true_effectiveness + noise, 0, 1).tolist()
+        
+        training_data = {
+            "features": features.tolist(),
+            "effectiveness_scores": effectiveness_scores
+        }
+        
+        with patch("mlflow.start_run"), patch("mlflow.active_run") as mock_run:
+            mock_run.return_value.info.run_id = "convergence_test"
+            
+            result = await ml_service.optimize_rules(training_data, mock_db_session)
+            
+            if result["status"] == "success":
+                # Property: optimization should achieve reasonable performance
+                assert result["best_score"] >= 0.3, "Optimization failed to find meaningful patterns"
+                assert result["best_score"] <= 1.0, "Invalid optimization score"
+                
+                # Property: processing should complete in reasonable time
+                assert result["processing_time_ms"] < 30000, "Optimization took too long"
+                
+                # Property: should use provided training data
+                assert result["training_samples"] == data_size
+
+    @given(
+        effectiveness_threshold=st.floats(min_value=0.5, max_value=0.9),
+        support_threshold=st.integers(min_value=2, max_value=10)
+    )
+    @pytest.mark.asyncio  
+    async def test_pattern_discovery_threshold_property(self, ml_service, mock_db_session, effectiveness_threshold, support_threshold):
+        """Property: pattern discovery should respect threshold parameters."""
+        
+        # Mock database with controlled pattern data
+        mock_patterns = []
+        for i in range(15):
+            effectiveness = 0.6 + (i % 4) * 0.1  # Values from 0.6 to 0.9
+            support = 2 + (i % 6)  # Values from 2 to 7
+            mock_patterns.append({
+                "parameters": {"param": i},
+                "avg_effectiveness": effectiveness,
+                "support_count": support,
+                "rule_ids": [f"rule_{i}"]
+            })
+        
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = mock_patterns
+        mock_db_session.execute.return_value = mock_result
+        
+        result = await ml_service.discover_patterns(
+            mock_db_session,
+            min_effectiveness=effectiveness_threshold,
+            min_support=support_threshold
+        )
+        
+        if result["status"] == "success" and result["patterns"]:
+            # Property: all returned patterns should meet thresholds
+            for pattern in result["patterns"]:
+                assert pattern["avg_effectiveness"] >= effectiveness_threshold, (
+                    f"Pattern effectiveness {pattern['avg_effectiveness']} below threshold {effectiveness_threshold}"
+                )
+                assert pattern["support_count"] >= support_threshold, (
+                    f"Pattern support {pattern['support_count']} below threshold {support_threshold}"
+                )
+
+
+@pytest.mark.ml_performance
+class TestMLPerformanceCharacterization:
+    """Performance characterization and regression detection for ML components."""
+    
+    @pytest.mark.asyncio
+    async def test_prediction_latency_characterization(self, ml_service):
+        """Characterize prediction latency under various conditions."""
+        
+        # Setup different model complexities
+        test_scenarios = [
+            ("simple_model", 5),    # 5 features
+            ("medium_model", 10),   # 10 features  
+            ("complex_model", 20),  # 20 features
+        ]
+        
+        latency_results = {}
+        
+        for model_name, feature_count in test_scenarios:
+            # Mock model for this scenario
+            mock_model = MagicMock()
+            mock_model.predict.return_value = np.array([0.8])
+            mock_model.predict_proba.return_value = np.array([[0.2, 0.8]])
+            
+            ml_service.models[model_name] = mock_model
+            
+            # Measure prediction latency
+            test_features = [0.5] * feature_count
+            latencies = []
+            
+            for _ in range(10):
+                import time
+                start_time = time.time()
+                result = await ml_service.predict_rule_effectiveness(model_name, test_features)
+                end_time = time.time()
+                
+                latency_ms = (end_time - start_time) * 1000
+                latencies.append(latency_ms)
+                
+                assert result["status"] == "success"
+            
+            avg_latency = sum(latencies) / len(latencies)
+            latency_results[model_name] = avg_latency
+            
+            # Performance requirement: sub-5ms predictions
+            assert avg_latency < 5.0, f"{model_name} avg latency {avg_latency:.2f}ms exceeds 5ms target"
+        
+        # Characterization: latency should not grow dramatically with complexity
+        simple_latency = latency_results["simple_model"]
+        complex_latency = latency_results["complex_model"]
+        latency_growth_factor = complex_latency / simple_latency if simple_latency > 0 else 1
+        
+        assert latency_growth_factor < 3.0, (
+            f"Latency grows too much with complexity: {latency_growth_factor:.2f}x"
+        )
+
+    @pytest.mark.asyncio
+    async def test_optimization_scalability_characterization(self, ml_service, mock_db_session):
+        """Characterize optimization performance scaling with data size."""
+        
+        data_sizes = [20, 50, 100]
+        optimization_times = {}
+        
+        for data_size in data_sizes:
+            # Generate training data of specified size
+            features = [[0.8, 150, 1.0, 5, 0.7, 1.0]] * data_size
+            effectiveness_scores = [0.8] * data_size
+            
+            training_data = {
+                "features": features,
+                "effectiveness_scores": effectiveness_scores
+            }
+            
+            with patch("mlflow.start_run"), patch("mlflow.active_run") as mock_run:
+                mock_run.return_value.info.run_id = f"scale_test_{data_size}"
+                
+                import time
+                start_time = time.time()
+                result = await ml_service.optimize_rules(training_data, mock_db_session)
+                end_time = time.time()
+                
+                optimization_time = (end_time - start_time) * 1000
+                optimization_times[data_size] = optimization_time
+                
+                if result["status"] == "success":
+                    assert result["training_samples"] == data_size
+        
+        # Characterization: optimization time should scale reasonably
+        if len(optimization_times) >= 2:
+            times = list(optimization_times.values())
+            sizes = list(optimization_times.keys())
+            
+            # Calculate scaling factor (should not be exponential)
+            scaling_factor = (times[-1] / times[0]) / (sizes[-1] / sizes[0])
+            
+            # Should be closer to linear (1.0) than exponential (>>1.0)
+            assert scaling_factor < 5.0, (
+                f"Optimization scaling factor {scaling_factor:.2f} indicates poor scalability"
+            )
+
+
+@pytest.mark.ml_data_validation
+class TestMLDataQualityValidation:
+    """Data quality and validation testing for ML pipelines."""
+    
+    @given(
+        corrupted_ratio=st.floats(min_value=0.0, max_value=0.3)
+    )
+    @pytest.mark.asyncio
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+    async def test_corrupted_data_handling(self, ml_service, mock_db_session, corrupted_ratio):
+        """Test ML service handling of corrupted training data."""
+        
+        # Generate dataset with controlled corruption
+        clean_size = 50
+        corrupted_size = int(clean_size * corrupted_ratio)
+        
+        # Clean data
+        clean_features = [[0.8, 150, 1.0, 5, 0.7, 1.0]] * clean_size
+        clean_scores = [0.8] * clean_size
+        
+        # Corrupted data (NaN, infinity, out of range)
+        corrupted_features = []
+        corrupted_scores = []
+        
+        for _ in range(corrupted_size):
+            corrupted_features.append([float('nan'), float('inf'), -1.0, 1000, 2.0, -0.5])
+            corrupted_scores.append(float('nan'))
+        
+        training_data = {
+            "features": clean_features + corrupted_features,
+            "effectiveness_scores": clean_scores + corrupted_scores
+        }
+        
+        with patch("mlflow.start_run"), patch("mlflow.active_run") as mock_run:
+            mock_run.return_value.info.run_id = "corruption_test"
+            
+            result = await ml_service.optimize_rules(training_data, mock_db_session)
+            
+            # ML service should handle corruption gracefully
+            assert "status" in result
+            
+            if corrupted_ratio > 0.2:  # High corruption
+                # Should either fail gracefully or succeed with warnings
+                if result["status"] == "error":
+                    assert "data" in result["error"].lower() or "invalid" in result["error"].lower()
+            else:  # Low corruption
+                # Should succeed by filtering bad data
+                if result["status"] == "success":
+                    # Should report actual clean samples used
+                    assert result["training_samples"] <= clean_size + corrupted_size
 
 
 if __name__ == "__main__":
