@@ -49,11 +49,19 @@ jspm_packages/
 .env.production.local
 
 # IDE and editor files
-.vscode/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-snippets
+.vscode/extensions.json
+# Keep .vscode/mcp.json for workspace-specific MCP configuration
 .idea/
 *.swp
 *.swo
 *~
+
+# MCP memory files (project-specific)
+.mcp-memory/
 
 # OS generated files
 .DS_Store

@@ -1,0 +1,31 @@
+# Rule Engine Configuration
+# -------------------------
+# This file controls which prompt improvement rules are active.
+# The rule engine will dynamically load and apply only the rules marked as 'enabled: true'.
+
+# Each key under 'rules' should correspond to a rule class name in the `src/prompt_improver/rule_engine/rules/` directory.
+
+rules:
+  # Core Rules - Fundamental improvements for clarity and structure.
+  ClarityRule:
+    enabled: true
+    priority: 1
+  StructureRule:
+    enabled: true
+    priority: 2
+  
+  # Technique Rules - Advanced prompt engineering techniques.
+  ChainOfThoughtRule:
+    enabled: true
+    priority: 10
+    params:
+      steps: 5 # Default number of reasoning steps
+      
+  FewShotLearningRule:
+    enabled: false # Disabled by default, requires example configuration
+    priority: 11
+    
+  # Learned Rules - Rules discovered and promoted by the ML optimizer.
+  LearnedRepetitionPenaltyRule:
+    enabled: false
+    priority: 100 

@@ -1,0 +1,240 @@
+[project]
+name = "adaptive-prompt-enhancement-system"
+version = "1.0.0"
+description = "Intelligent prompt optimization with ML-driven rule learning."
+requires-python = ">=3.11"
+
+dependencies = [
+  # Core ML Stack
+  "scikit-learn>=1.4.0",
+  "optuna>=3.5.0",
+  "mlflow>=2.9.0",
+  "pandas>=2.0.0",
+  "numpy>=1.24.0",
+  "scipy>=1.10.0",
+  # Feature Engineering
+  "sentence-transformers>=2.5.0",
+  "transformers>=4.30.0",
+  # Rule Engine & MCP Server
+  "mcp-context-sdk>=0.1.0", # Corrected package name
+  "fastapi>=0.110.0",
+  "pydantic>=2.5.0",
+  "pyyaml>=6.0.0",
+  "jsonschema>=4.20.0",
+  "uvicorn[standard]>=0.24.0",
+  # Performance Monitoring
+  "evidently>=0.4.0",
+  "prometheus-client>=0.19.0",
+  "sqlmodel>=0.0.24",
+  "asyncpg>=0.30.0",
+  "pydantic-settings>=2.10.1",
+  "greenlet>=3.2.3",
+  "mcp>=1.10.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4.0",
+  "mypy>=1.8.0",
+  "ruff>=0.4.0",
+  "httpx>=0.25.0", # For test client
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = true
+
+[tool.ruff]
+# Target Python 3.11+ with ML project awareness
+target-version = "py311"
+line-length = 88
+indent-width = 4
+
+# Source root for proper import resolution
+src = ["src"]
+
+# Comprehensive exclusions for ML project
+exclude = [
+    ".bzr", ".direnv", ".eggs", ".git", ".hg",
+    ".mypy_cache", ".nox", ".pants.d", ".ruff_cache",
+    ".svn", ".tox", ".venv", "__pypackages__",
+    "_build", "buck-out", "build", "dist", "node_modules", "venv",
+    
+    # ML-specific exclusions
+    "ml",                    # Legacy ML directory
+    "mlruns",               # MLflow experiments
+    "optuna_studies",       # Hyperparameter optimization
+    "*.egg-info",           # Package metadata
+    "**/__pycache__",       # Python cache
+    "**/.*_cache",          # Various cache directories
+]
+
+# Enable preview mode for latest features
+preview = true
+
+[tool.ruff.lint]
+# Curated rule selection based on official recommendations
+select = [
+    # Core Python best practices
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings  
+    "F",      # Pyflakes
+    "I",      # isort
+    
+    # Code quality & maintainability
+    "C4",     # flake8-comprehensions
+    "B",      # flake8-bugbear
+    "A",      # flake8-builtins
+    "G",      # flake8-logging-format
+    "PIE",    # flake8-pie
+    "T20",    # flake8-print
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    
+    # Security & performance
+    "S",      # bandit
+    "PERF",   # perflint
+    
+    # FastAPI & async patterns
+    "ASYNC",  # flake8-async
+    
+    # Documentation & type hints
+    "D",      # pydocstyle
+    "ANN",    # flake8-annotations
+    
+    # Import organization
+    "TCH",    # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    
+    # Error handling
+    "BLE",    # flake8-blind-except
+    "FBT",    # flake8-boolean-trap
+    "RET",    # flake8-return
+    
+    # Code complexity
+    "C90",    # mccabe
+    "PLR",    # pylint refactor
+    "PLW",    # pylint warnings
+    "PLE",    # pylint errors
+    
+    # Unused code detection
+    "F401",   # unused-import
+    "F841",   # unused-variable
+    "ARG",    # flake8-unused-arguments
+]
+
+# ML & FastAPI specific ignores
+ignore = [
+    # Line length handled by formatter
+    "E501",   # line-too-long
+    
+    # ML experiment patterns
+    "T201",   # print-found (needed for ML debugging)
+    "S101",   # assert-used (common in ML validation)
+    "PLR0913", # too-many-arguments (ML models often have many params)
+    "PLR0915", # too-many-statements (ML pipelines can be complex)
+    
+    # FastAPI patterns
+    "B008",   # do-not-use-function-calls-in-argument-defaults (FastAPI Depends)
+    
+    # Documentation (gradual adoption)
+    "D100",   # undocumented-public-module
+    "D103",   # undocumented-public-function
+    "D104",   # undocumented-public-package
+    
+    # Type annotations (gradual adoption)
+    "ANN001", # missing-type-annotation-for-function-argument
+    "ANN002", # missing-type-annotation-for-args
+    "ANN003", # missing-type-annotation-for-kwargs
+    "ANN201", # missing-return-type-annotation
+    
+    # Async patterns
+    "ASYNC109", # async-function-with-timeout (false positives)
+    
+    # Performance (carefully considered)
+    "PERF203", # try-except-in-loop (sometimes necessary in ML)
+]
+
+# File-specific rule customization
+[tool.ruff.lint.per-file-ignores]
+# Test files
+"tests/**/*.py" = [
+    "S101",   # assert-used (expected in tests)
+    "PLR2004", # magic-value-comparison (test values)
+    "ANN",    # missing-type-annotation (less critical in tests)
+    "D",      # pydocstyle (documentation less critical)
+]
+
+# Configuration files
+"**/config/*.py" = [
+    "S105",   # hardcoded-password-string (config constants)
+    "S106",   # hardcoded-password-func-arg
+]
+
+# Legacy ML bridge (transitional)
+"ml/bridge.py" = [
+    "ALL",    # Skip all rules for legacy code
+]
+
+# Main application entry points
+"src/prompt_improver/main.py" = [
+    "D100",   # Allow undocumented main module
+    "T201",   # Allow print statements for startup/shutdown logging
+]
+
+# Service files (ML debugging and error logging)
+"src/prompt_improver/services/*.py" = [
+    "T201",   # Allow print statements for debugging ML processes
+]
+
+# Database models
+"src/prompt_improver/database/*.py" = [
+    "A003",   # builtin-attribute-shadowing (SQLAlchemy patterns)
+]
+
+# MCP server
+"src/prompt_improver/mcp_server/*.py" = [
+    "ANN401", # any-type (MCP protocol flexibility)
+]
+
+[tool.ruff.lint.isort]
+# Import organization
+known-first-party = ["prompt_improver"]
+known-third-party = [
+    "fastapi", "pydantic", "sqlmodel", "asyncpg",
+    "scikit-learn", "optuna", "mlflow", "pandas", "numpy",
+    "transformers", "sentence-transformers"
+]
+combine-as-imports = true
+force-wrap-aliases = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.pydocstyle]
+# Google-style docstrings for ML projects
+convention = "google"
+
+[tool.ruff.lint.flake8-type-checking]
+# Optimize type checking imports
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlmodel.SQLModel"]
+
+[tool.ruff.lint.flake8-annotations]
+# Gradual type annotation adoption
+mypy-init-return = true
+suppress-dummy-args = true
+
+[tool.ruff.format]
+# Modern Python formatting
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 72
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+] 

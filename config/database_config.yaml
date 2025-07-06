@@ -1,0 +1,154 @@
+# APES Database Configuration
+# Configuration for PostgreSQL integration with the Adaptive Prompt Enhancement System
+
+database:
+  # Primary database configuration
+  primary:
+    host: localhost
+    port: 5432
+    database: apes_production
+    username: apes_user
+    password: apes_secure_password_2024
+    
+    # Connection pool settings
+    pool:
+      min_connections: 2
+      max_connections: 20
+      connection_timeout: 30
+      idle_timeout: 600
+      max_lifetime: 3600
+    
+    # SSL settings (for production)
+    ssl:
+      enabled: false  # Set to true in production
+      mode: prefer
+      cert_file: null
+      key_file: null
+      ca_file: null
+  
+  # Test database configuration (for development/testing)
+  test:
+    host: localhost
+    port: 5432
+    database: apes_test
+    username: apes_user
+    password: apes_secure_password_2024
+    
+    pool:
+      min_connections: 1
+      max_connections: 5
+      connection_timeout: 10
+      idle_timeout: 300
+      max_lifetime: 1800
+
+# MCP Server configuration moved to config/mcp_config.yaml to avoid duplication
+# See config/mcp_config.yaml for MCP server settings
+
+# Data retention and cleanup policies
+data_retention:
+  rule_performance:
+    keep_days: 365  # Keep rule performance data for 1 year
+    cleanup_schedule: "0 2 * * 0"  # Weekly cleanup at 2 AM Sunday
+    
+  user_feedback:
+    keep_days: 730  # Keep user feedback for 2 years
+    cleanup_schedule: "0 3 * * 0"  # Weekly cleanup at 3 AM Sunday
+    
+  ml_model_performance:
+    keep_days: 180  # Keep ML model data for 6 months
+    cleanup_schedule: "0 4 * * 0"  # Weekly cleanup at 4 AM Sunday
+    
+  improvement_sessions:
+    keep_days: 90   # Keep session data for 3 months
+    cleanup_schedule: "0 1 * * 0"  # Weekly cleanup at 1 AM Sunday
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 0 * * *"  # Daily backup at midnight
+  retention_days: 30
+  storage_path: "./database/backups"
+  compression: true
+  
+  # Backup types
+  types:
+    full:
+      enabled: true
+      schedule: "0 0 * * 0"  # Weekly full backup
+      
+    incremental:
+      enabled: false  # PostgreSQL doesn't have native incremental backups
+      
+    schema_only:
+      enabled: true
+      schedule: "0 12 * * *"  # Daily schema backup at noon
+
+# Performance monitoring
+monitoring:
+  enabled: true
+  
+  # Query performance tracking
+  query_performance:
+    slow_query_threshold: 1000  # milliseconds
+    log_slow_queries: true
+    track_query_stats: true
+    
+  # Connection monitoring
+  connection_monitoring:
+    alert_threshold: 15  # Alert when connections exceed this number
+    log_connections: true
+    
+  # Resource monitoring
+  resource_monitoring:
+    cpu_threshold: 80     # CPU usage percentage
+    memory_threshold: 80  # Memory usage percentage
+    disk_threshold: 85    # Disk usage percentage
+
+# Migration and schema management
+migrations:
+  enabled: true
+  directory: "./database/migrations"
+  auto_migrate: false  # Manual migration control
+  
+  # Schema versioning
+  versioning:
+    track_changes: true
+    backup_before_migration: true
+    rollback_enabled: true
+
+# Development and testing settings
+development:
+  # Enable detailed logging in development
+  verbose_logging: true
+  
+  # Enable query debugging
+  debug_queries: true
+  
+  # Enable performance profiling
+  profile_queries: true
+  
+  # Sample data generation
+  sample_data:
+    enabled: false
+    generate_on_startup: false
+    sample_size: 1000
+
+# Integration settings
+integrations:
+  # MLflow integration
+  mlflow:
+    sync_enabled: true
+    sync_interval: 300  # seconds
+    experiment_tracking: true
+    
+  # FastAPI integration
+  fastapi:
+    connection_middleware: true
+    request_logging: true
+    transaction_per_request: false
+    
+  # Rule engine integration
+  rule_engine:
+    cache_rule_metadata: true
+    cache_ttl: 3600  # seconds
+    preload_rules: true

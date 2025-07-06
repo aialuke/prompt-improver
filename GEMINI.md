@@ -1,8 +1,157 @@
-# CLAUDE.md
+# GEMINI.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Gemini when working with code in this repository.
+
+## Project Overview
+The Adaptive Prompt Enhancement System (APES) is an intelligent prompt optimization tool that automatically improves user prompts for AI agents through rule-based transformations enhanced by machine learning optimization. The system is currently undergoing a migration from a hybrid TypeScript/Python architecture to a pure Python implementation.
+
+### Current State
+- **Phase 1 & 2**: Foundation cleanup and Python scaffolding ✅ COMPLETED
+- **Phase 3**: Core component implementation 🔄 IN PROGRESS  
+- **Phase 4**: Testing & validation 🔄 IN PROGRESS
+- **Phase 5**: Documentation update 📋 PENDING
+
+## Development Commands
+
+### Environment Setup
+```bash
+# Create and activate Python environment (uses uv if available, else standard venv)
+./scripts/setup_development.sh
+
+# Activate environment manually
+source .venv/bin/activate
+```
+
+### Running the Application
+```bash
+# Start the FastAPI development server with auto-reload
+./scripts/run_server.sh
+# Server runs at http://127.0.0.1:8000
+# API docs available at http://127.0.0.1:8000/docs
+```
+
+### Testing and Code Quality
+```bash
+# Run full test suite with linting
+./scripts/run_tests.sh
+
+# Run tests only
+pytest tests/
+
+# Run specific test file
+pytest tests/rule_engine/test_clarity_rule.py
+
+# Run linting only
+ruff check src tests
+ruff format --check src tests
+
+# Format code
+ruff format src tests
+```
+
+### ML Model Management
+```bash
+# View MLflow UI for experiment tracking
+mlflow ui
+# Access at http://127.0.0.1:5000
+
+# Promote model to production (if needed)
+python scripts/promote_model.py
+```
+
+## Architecture Overview
+
+### Core Components
+
+1. **Rule Engine** (`src/prompt_improver/rule_engine/`)
+   - Base rule framework implementing check/apply pattern
+   - Core rules based on Anthropic best practices
+   - Technique rules for advanced prompt engineering
+   - ML-discovered rules stored dynamically
+   - Each rule inherits from `BasePromptRule` and implements:
+     - `check()`: Determines if rule applies to prompt
+     - `apply()`: Transforms the prompt
+     - `to_llm_instruction()`: Generates LLM-readable instruction
+
+2. **MCP Server** (`src/prompt_improver/mcp_server/`)
+   - FastAPI-based server implementing Model Context Protocol
+   - Currently placeholder implementation awaiting MCP SDK
+   - Will expose tools (improve_prompt) and resources (rule_status)
+   - Integrates directly with Rule Engine for prompt processing
+
+3. **ML Optimizer** (`src/prompt_improver/rule_engine/ml_optimizer/`)
+   - Rule effectiveness prediction using ensemble models
+   - Parameter optimization with Optuna
+   - New rule discovery through pattern mining
+   - Performance tracking with MLflow and Prometheus
+
+### Key Design Decisions
+
+1. **Pure Python Migration**: Eliminating Node.js/TypeScript complexity for a single-language stack
+2. **Domain-Driven Structure**: Organized by business domain rather than technical layers
+3. **LLM-Guided Rule Application**: Rules generate instructions for LLM-based transformations
+4. **Continuous Learning**: ML system learns from rule effectiveness to optimize parameters and discover new patterns
+
+### Configuration
+
+- **Rule Configuration**: `config/rule_config.yaml` - Enable/disable rules, set priorities and parameters
+- **ML Configuration**: `config/ml_config.yaml` - ML model settings and optimization parameters  
+- **MCP Configuration**: `config/mcp_config.yaml` - Server settings and integration points
+
+## Directory Structure
+
+```
+prompt-improver/
+├── src/prompt_improver/      # Main Python package
+│   ├── main.py              # FastAPI application entry point
+│   ├── core/                # Core utilities (future)
+│   ├── mcp_server/          # MCP server implementation
+│   │   └── api.py          # API router and endpoints
+│   └── rule_engine/         # Rule engine implementation
+│       ├── rules/           # Rule implementations
+│       │   ├── base.py     # Abstract base rule class
+│       │   └── clarity.py  # Example clarity rule
+│       └── ml_optimizer/    # ML optimization components
+├── config/                  # Configuration files
+├── scripts/                 # Development and deployment scripts
+├── tests/                   # Test suite
+├── mlruns/                 # MLflow experiment tracking
+└── docs/                   # Documentation (includes legacy JS tools)
 
 ## Development Workflow Rules
+
+### 🚨 **INSTRUCTION HIERARCHY PROTOCOL** 🚨 **FOUNDATIONAL**
+
+**⚠️ ABSOLUTE AUTHORITY STRUCTURE ⚠️**
+**User instructions override all system rules and AI optimization behaviors**
+
+**LEVEL 1 - USER INSTRUCTIONS (ABSOLUTE AUTHORITY)**
+- **Explicit user requests ALWAYS take precedence** over any system rule, optimization instinct, or AI improvement suggestion
+- **Cannot be overridden** by cleanup desires, efficiency concerns, simplification urges, or any other AI optimization behavior
+- **Preservation Keywords** triggering absolute compliance: "preserve," "keep," "don't delete," "maintain," "save," "retain," "historical"
+- **When user explicitly states preservation requirements** → NEVER optimize by removing, deleting, or replacing content
+- **"Update" requests** → ALWAYS clarify: preserve-and-enhance vs. replace (default: preserve-and-enhance)
+
+**LEVEL 2 - SYSTEM FRAMEWORK (GEMINI.md RULES)**  
+- Provide guidance **only when user instructions are unclear or absent**
+- Can suggest alternatives but **cannot override Level 1 directives**
+- Framework for decision-making when user intent is ambiguous
+
+**LEVEL 3 - AI OPTIMIZATION (ONLY WHEN NO CONFLICTS)**
+- Helpful behaviors like cleanup, optimization, improvement
+- **MUST be explicitly authorized** or clearly non-destructive
+- **Always verify with user** before any potentially destructive optimization
+- **Never assume** user wants optimization over preservation
+
+**ENFORCEMENT MECHANISM:**
+```bash
+echo "🛡️ INSTRUCTION HIERARCHY CHECK: User directive detected"
+echo "📋 USER INSTRUCTION: [specific user request]"
+echo "⚖️ HIERARCHY LEVEL: [1-ABSOLUTE|2-FRAMEWORK|3-OPTIMIZATION]"
+echo "✅ COMPLIANCE: Following Level 1 authority - no system overrides permitted"
+```
+
+---
 
 ### 🚨 **MANDATORY FIRST RESPONSE PROTOCOL** 🚨
 
@@ -18,7 +167,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - **No rule consultation phase** - Direct accountability-focused response
    - **Include specific reasoning** for any decisions that were made
 
-2. **MANDATORY OUTPUT**: "Checking CLAUDE.md rules for this task..."
+2. **MANDATORY OUTPUT**: "Checking GEMINI.md rules for this task..."
 
 3. **MANDATORY RULE LISTING** - Always list which specific rules apply:
    **Auto-trigger detection**:
@@ -42,6 +191,79 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    ```
 
 5. **ONLY THEN proceed with the actual work**
+
+---
+
+## Phase-Based Workflow: Context → Search → Implement → Validate
+
+### **PRE-ACTION VERIFICATION PROTOCOL** 🛡️ CRITICAL
+
+**BEFORE taking ANY action, verify understanding AND data sources:**
+
+**PHASE 1: DIAGNOSTIC SOURCE VERIFICATION**
+```bash
+# MANDATORY: Verify available diagnostic tools first
+echo "🔧 AVAILABLE TOOLS CHECK:"
+echo "- IDE Diagnostics: [AVAILABLE/UNAVAILABLE] - mcp__ide__getDiagnostics"  
+echo "- File System: [AVAILABLE/UNAVAILABLE] - Read/Grep/Glob tools"
+echo "- External APIs: [AVAILABLE/UNAVAILABLE] - Context7/Web tools"
+
+# Select most reliable data source
+echo "📊 SELECTED DATA SOURCE: [IDE diagnostics|manual file analysis|external research] because [reliability justification]"
+```
+
+**PHASE 2: UNDERSTANDING VERIFICATION**
+**Trigger verification when request contains:**
+- Vague verbs: "fix", "improve", "optimize", "enhance", "update", "refactor"
+- Undefined pronouns: "this", "that", "it" (without clear referent)
+- Scope gaps: Missing what/where/which specifics
+- Multi-step tasks (>2 distinct actions)
+- **NEW**: Analysis requests without specified methodology
+- **NEW**: Claims requiring code inspection without tool verification
+
+**Required verification:**
+```
+Understanding Check:
+- Actions required: [list each specific action]
+- Undefined terms: [list ambiguous items]
+- Missing context: [what needs clarification]
+- Data source methodology: [tool/approach selected and why]
+- Expected accuracy level: [high/medium/low based on available tools]
+Decision: [PROCEED/CLARIFY] because [specific reason + data source confidence]
+```
+
+**Enhanced Decision criteria:**
+- **PROCEED** if: All actions specific, no undefined terms, clear scope, reliable data source identified
+- **CLARIFY** if: Vague actions, undefined terms, unclear scope, OR unreliable data source
+- **REQUEST TOOLS** if: Analysis needed but diagnostic tools unavailable
+
+---
+
+**PHASE 2B: DOCUMENTATION PRESERVATION VERIFICATION** 📚 CRITICAL
+**Trigger when user requests:** "update," "modify," "change" on documentation files containing historical data
+
+**MANDATORY CLARIFICATION BEFORE ANY CHANGES:**
+```
+Documentation Update Clarification:
+- Request type: [preserve-and-enhance|replace-sections|full-replacement]
+- Preservation requirements: [maintain all historical data|keep specific sections|archive before replacing]
+- Scope specification: [current status only|add new sections|modify existing sections|full rewrite]
+- Historical value assessment: [reference material|implementation history|decision context|user explicitly values]
+- User preservation signals: [previous "keep" requests|"preserve" keywords|historical importance mentioned]
+Decision: [PRESERVE-AND-ENHANCE|REQUEST-SPECIFIC-AUTHORIZATION] because [preservation analysis + user directive compliance]
+```
+
+**DEFAULT BEHAVIOR HIERARCHY:**
+1. **PRESERVE-AND-ENHANCE** (default) - Add new content while maintaining all existing content
+2. **SECTION-SPECIFIC MODIFICATION** - Only with explicit user authorization of specific sections
+3. **FULL REPLACEMENT** - Only with explicit user confirmation and backup offer
+
+**IMPLEMENTATION PATTERN:**
+- Use clear section markers: "## CURRENT STATUS" vs "## HISTORICAL REFERENCE"
+- Add timestamps: "Updated [DATE]" for new information
+- Preserve original sections with "HISTORICAL", "REFERENCE", or "ARCHIVE" markers
+- **NEVER delete content** without explicit permission to remove specific sections
+- When in doubt → Ask for clarification rather than assume destructive intent
 
 ---
 
@@ -247,114 +469,6 @@ mcp__ide__getDiagnostics("[file_uri]")
 
 ---
 
-### **OUTPUT VALIDATION PROTOCOL** 🔬 CRITICAL
-
-**MANDATORY validation before claiming ANY implementation is complete:**
-
-**AUTOMATED GRADER FUNCTIONS:**
-```bash
-# Database connectivity grader  
-echo "🔍 DATABASE VERIFICATION:"
-echo "- Connection test: [PASS/FAIL]"
-echo "- Query execution: [<50ms/SLOW/FAIL]" 
-echo "- Realistic metrics: [VALIDATED/SUSPICIOUS/FAIL]"
-
-# Performance metrics grader
-echo "📊 METRICS SANITY CHECK:"
-echo "- Response times: [0.1ms-200ms=VALID|0.0ms=BROKEN|>1000ms=DEGRADED]"
-echo "- Memory usage: [10MB-500MB=NORMAL|<1MB=SUSPICIOUS|>1GB=EXCESSIVE]"
-echo "- Error rates: [0-5%=GOOD|>10%=UNACCEPTABLE]"
-```
-
-**METRICS VALIDATION INTEGRATION:**
-```bash
-# Use CONFIDENCE ASSESSMENT FRAMEWORK metrics validation (see section below)
-echo "📊 APPLYING METRICS VALIDATION: Using validate_metrics_claim() function"
-echo "🔍 VALIDATION RESULT: [result from CONFIDENCE ASSESSMENT FRAMEWORK]"
-echo "⚠️ INVESTIGATION REQUIRED: [if suspicious or impossible values detected]"
-
-# Cross-reference with realistic ranges defined in CONFIDENCE ASSESSMENT FRAMEWORK
-# - Response times: 0.1ms-500ms (suspicious if <1.0ms or >300ms)  
-# - Memory usage: 10MB-1000MB (suspicious if <5MB or >500MB)
-# - Database connections: 1-50 (suspicious if >20)
-```
-
-**IMPLEMENTATION VERIFICATION CHECKLIST:**
-□ **Output Sanity Check**: Do all metrics fall within realistic ranges?
-□ **Functional Verification**: Can I demonstrate the feature working end-to-end?
-□ **Integration Testing**: Do all components interact without errors?
-□ **Performance Validation**: Are claimed improvements measurable and realistic?
-□ **Regression Testing**: Does existing functionality still work?
-
-**FAILURE CRITERIA - STOP IMPLEMENTATION IF:**
-- Any metric outside realistic ranges (0.0ms response times = BROKEN)
-- Database operations that fail but are ignored
-- Error messages treated as "passing tests"
-- Performance claims that cannot be independently verified
-
-**TRIGGER CONDITIONS:**
-- Before marking any implementation as "complete"
-- When encountering unrealistic performance metrics
-- When database/external service integration is claimed functional
-- When "all tests passing" is stated without verifying test quality
-
----
-
-### **INTEGRATION TESTING PROTOCOL** 🔌 CRITICAL
-
-**MANDATORY for database, external services, and cross-component integrations:**
-
-**DATABASE INTEGRATION VERIFICATION:**
-```python
-async def verify_database_integration():
-    """Mandatory verification before claiming database functionality works"""
-    
-    # Test 1: Basic connectivity
-    try:
-        async with get_session() as session:
-            result = await session.execute("SELECT 1")
-            assert result.scalar() == 1
-        print("✅ Database connectivity: VERIFIED")
-    except Exception as e:
-        print(f"❌ Database connectivity: FAILED - {e}")
-        return False
-    
-    # Test 2: Realistic operation timing
-    start_time = time.time()
-    async with get_session() as session:
-        await session.execute("SELECT COUNT(*) FROM information_schema.tables")
-    response_time = (time.time() - start_time) * 1000
-    
-    if 1 <= response_time <= 100:
-        print(f"✅ Database performance: {response_time:.1f}ms (REALISTIC)")
-    else:
-        print(f"⚠️ Database performance: {response_time:.1f}ms (SUSPICIOUS)")
-        return False
-    
-    return True
-```
-
-**EXTERNAL SERVICE INTEGRATION CHECKLIST:**
-□ **Connection Establishment**: Service responds to basic connectivity test
-□ **Authentication**: API keys/credentials work and return expected responses
-□ **Error Handling**: Service unavailability gracefully handled
-□ **Response Validation**: Service returns data in expected format
-□ **Performance Characteristics**: Response times within acceptable ranges
-
-**CROSS-COMPONENT INTEGRATION VERIFICATION:**
-□ **Data Flow**: Information passes correctly between components
-□ **Interface Contracts**: APIs match expected signatures
-□ **State Management**: Shared state remains consistent
-□ **Error Propagation**: Failures in one component handled appropriately
-
-**FAILURE CRITERIA:**
-- Connection tests that silently fail or timeout
-- Authentication that appears to work but produces empty responses
-- Services that return test/mock data instead of real functionality
-- Integration points that work in isolation but fail when combined
-
----
-
 ### **SYSTEMATIC COMPLETION PROTOCOL** 📋
 
 **For comprehensive analysis tasks:**
@@ -377,26 +491,6 @@ Status: [CONTINUE/COMPLETE] because [objective reason + verification results]
 ### **ERROR CORRECTION PROTOCOL** 🔄 CRITICAL
 
 **MANDATORY when errors or inaccuracies are identified:**
-
-**Phase 0: Immediate Investigation** 🚨 CRITICAL
-**TRIGGER:** ANY error during implementation, test failure, import error, or unexpected behavior
-```bash
-# STOP ALL WORK - Investigate immediately
-echo "🛑 IMMEDIATE INVESTIGATION REQUIRED: [error type]"
-echo "📊 ERROR CONTEXT: [what was being attempted]"
-echo "🔍 INVESTIGATE FIRST: Root cause analysis before any fixes"
-
-# Mandatory investigation steps:
-# 1. Examine error message and stack trace completely
-# 2. Check file/method/import actually exists
-# 3. Verify expected vs actual behavior
-# 4. Test minimal reproduction case
-# 5. Check related functionality for similar issues
-
-# ONLY AFTER investigation: proceed to targeted fix
-echo "✅ INVESTIGATION COMPLETE: [root cause identified]"
-echo "🎯 TARGETED FIX: [specific solution based on investigation]"
-```
 
 **Phase 1: Error Acknowledgment**
 ```bash
@@ -493,49 +587,12 @@ CONFIDENCE ASSESSMENT:
 - **LOW**: General findings with documented limitations + basic verification
 - **INSUFFICIENT**: Must explicitly state inability to verify claim
 
-**Metrics Validation Framework** 🎯 CRITICAL
-**MANDATORY for all performance and metrics claims:**
-```python
-# Automated sanity checking for metrics claims
-REALISTIC_METRIC_RANGES = {
-    "response_time_ms": {"min": 0.1, "max": 500, "suspicious_below": 1.0, "suspicious_above": 300},
-    "memory_usage_mb": {"min": 10, "max": 1000, "suspicious_below": 5, "suspicious_above": 500},
-    "cpu_usage_percent": {"min": 0.1, "max": 100, "suspicious_below": 0.5, "suspicious_above": 90},
-    "database_connections": {"min": 1, "max": 50, "suspicious_above": 20},
-    "cache_hit_ratio": {"min": 0, "max": 100, "suspicious_below": 60},
-    "success_rate_percent": {"min": 0, "max": 100, "suspicious_below": 80}
-}
-
-def validate_metrics_claim(metric_name: str, value: float) -> str:
-    """MANDATORY validation before claiming any metric value"""
-    ranges = REALISTIC_METRIC_RANGES.get(metric_name, {})
-    
-    if value < ranges.get("min", 0):
-        return f"❌ IMPOSSIBLE: {metric_name}={value} below minimum {ranges['min']}"
-    
-    if value > ranges.get("max", float('inf')):
-        return f"❌ IMPOSSIBLE: {metric_name}={value} above maximum {ranges['max']}"
-    
-    if value < ranges.get("suspicious_below", 0):
-        return f"⚠️ SUSPICIOUS: {metric_name}={value} unexpectedly low - INVESTIGATE"
-        
-    if value > ranges.get("suspicious_above", float('inf')):
-        return f"⚠️ SUSPICIOUS: {metric_name}={value} unexpectedly high - INVESTIGATE"
-    
-    return f"✅ REALISTIC: {metric_name}={value} within expected range"
-
-# ENFORCEMENT: Check ALL metrics before claiming
-echo "📊 METRICS VALIDATION: [validation_result]"
-echo "🔍 INVESTIGATION REQUIRED: [if suspicious or impossible values detected]"
-```
-
 **Uncertainty Acknowledgment Protocol:**
 ```bash
 # When confidence is MEDIUM or below:
 echo "⚠️ UNCERTAINTY ACKNOWLEDGED: [specific limitations]"
 echo "🔍 ADDITIONAL VERIFICATION NEEDED: [what would increase confidence]"
 echo "📊 CONFIDENCE LEVEL: [level] because [specific justification]"
-echo "📈 METRICS VALIDATED: [all performance claims checked against realistic ranges]"
 ```
 
 ---
@@ -604,3 +661,82 @@ RE-VERIFICATION RESULTS:
 - **Architecture Decisions**: Multiple examples + cross-reference patterns
 
 ---
+
+## Unified Enforcement Framework
+
+### **Risk Levels & Responses**
+
+**🔴 CRITICAL RISK** (Data Safety, Security):
+- MANDATORY enforcement - STOP if violated
+- Zero tolerance for non-compliance
+
+**🟡 HIGH RISK** (Workflow Integrity, Quality):
+- REQUIRED enforcement - Flag warning if violated
+- Extra verification steps applied
+
+**🟢 MEDIUM RISK** (Best Practices, Optimization):
+- RECOMMENDED enforcement - Note for improvement
+
+### **Auto-Triggers**
+
+**Context Detection:**
+- File creation/modification → MINIMAL COMPLEXITY PRINCIPLE
+- External dependencies → MCP IMPLEMENTATION TOOLS  
+- Analysis language ("verify", "check") → EVIDENCE ENUMERATION + CONFIDENCE ASSESSMENT
+- Deletion requests → CRITICAL VERIFICATION RULE
+- Ambiguous requests → PRE-ACTION VERIFICATION
+- Error identification → ERROR CORRECTION PROTOCOL
+- Accuracy challenges → CLAIM RE-VERIFICATION PROTOCOL
+
+### **Monthly Review Protocol**
+
+**Key Metrics to Track:**
+- Rule compliance rate per session
+- Critical violations (should be zero)
+- MCP tool usage for external dependencies
+- Evidence provision for analysis claims
+- Code reuse vs new creation ratio
+
+**Simple Tracking Command:**
+```bash
+echo "📊 MONTHLY REVIEW: [Rule compliance %] - [Critical violations: X] - [Improvements needed]"
+```
+
+---
+
+## Rule Integration Notes
+
+**Workflow Triggers:**
+- PRE-ACTION VERIFICATION → clarifies scope and verifies data sources before other rules apply
+- MINIMAL COMPLEXITY → search existing before MCP IMPLEMENTATION  
+- MCP IMPLEMENTATION → use memory/context7 for informed decisions + IDE diagnostics for code analysis
+- EVIDENCE ENUMERATION → support analysis claims with citations and confidence assessment
+- CONFIDENCE ASSESSMENT → document reliability of all analytical claims
+- ERROR CORRECTION → systematic correction when errors identified
+- CLAIM RE-VERIFICATION → independent verification when accuracy challenged
+- CRITICAL VERIFICATION → prevent data loss through systematic verification
+
+**Cross-Rule Dependencies:**
+- Memory search informs complexity decisions
+- Context7 research guides implementation approach
+- Evidence requirements apply to all analytical claims with confidence levels
+- Verification protocols apply to all deletion actions
+- Error correction triggers re-verification protocols
+- Confidence assessment guides evidence quality requirements
+- IDE diagnostics enhance MCP tool selection and evidence quality
+
+---
+
+## Compliance Verification
+
+**Before claiming task complete:**
+□ Applied mandatory first response protocol
+□ Followed phase-based workflow (Context → Search → Implement → Validate)  
+□ Used appropriate verification for code changes
+□ Applied MCP tools with IDE diagnostics for code analysis
+□ Provided evidence for analytical claims with proper citations
+□ Documented confidence levels for all analytical claims
+□ Applied error correction protocol if any mistakes identified
+□ Used re-verification protocol if accuracy was challenged
+□ Stored institutional knowledge in memory
+□ Maintained simplicity principles (YAGNI/KISS/DRY)

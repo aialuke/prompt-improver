@@ -1,0 +1,29 @@
+# MCP Server Configuration
+# ----------------------
+# This file contains settings for the Model Context Protocol (MCP) server.
+
+server:
+  # The default transport mechanism for the server.
+  # 'stdio' is used for direct IDE integration.
+  # 'http' can be used for network-based access.
+  transport: "stdio"
+  
+  host: "127.0.0.1" # Only used for http transport
+  port: 8000         # Only used for http transport
+  
+  # Log level for the MCP server.
+  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  log_level: "INFO"
+
+# Configuration for MCP resources provided by this server.
+resources:
+  rule_status:
+    uri: "apes://rule-status"
+    title: "Rule System Status"
+    description: "Provides real-time status and performance metrics for the rule engine."
+
+# Configuration for MCP tools provided by this server.
+tools:
+  improve_prompt:
+    description: "Improve a prompt using research-based and learned rules."
+    # Further tool-specific parameters can be defined here if needed. 
