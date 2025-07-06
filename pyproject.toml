@@ -94,6 +94,7 @@ select = [
     "T20",    # flake8-print
     "UP",     # pyupgrade
     "SIM",    # flake8-simplify
+    "RUF",    # Ruff-specific rules
     
     # Security & performance
     "S",      # bandit
@@ -125,6 +126,11 @@ select = [
     "F401",   # unused-import
     "F841",   # unused-variable
     "ARG",    # flake8-unused-arguments
+    
+    # Additional modern practices
+    "PTH",    # flake8-use-pathlib
+    "TD",     # flake8-todos
+    "FIX",    # flake8-fixme
 ]
 
 # ML & FastAPI specific ignores
@@ -157,7 +163,30 @@ ignore = [
     
     # Performance (carefully considered)
     "PERF203", # try-except-in-loop (sometimes necessary in ML)
+    
+    # TODO/FIXME patterns (transitional)
+    "TD002",   # missing-todo-author (gradual adoption)
+    "TD003",   # missing-todo-link (gradual adoption)
+    "FIX002",  # line-contains-fixme (allow for development)
 ]
+
+# Enable auto-fixing for safe rules
+fixable = ["ALL"]
+unfixable = [
+    "F401",   # unused-import (manual review preferred)
+    "F841",   # unused-variable (manual review preferred)
+    "T20",    # print statements (manual review for ML debugging)
+]
+
+# Complexity limits
+[tool.ruff.lint.mccabe]
+max-complexity = 12  # Slightly higher for ML pipelines
+
+[tool.ruff.lint.pylint]
+max-args = 8         # Higher for ML model constructors
+max-branches = 15    # Higher for ML decision trees
+max-returns = 8      # Higher for complex ML functions
+max-statements = 60  # Higher for ML pipelines
 
 # File-specific rule customization
 [tool.ruff.lint.per-file-ignores]
@@ -167,6 +196,9 @@ ignore = [
     "PLR2004", # magic-value-comparison (test values)
     "ANN",    # missing-type-annotation (less critical in tests)
     "D",      # pydocstyle (documentation less critical)
+    "ARG",    # unused-arguments (fixtures often unused)
+    "FBT",    # boolean-trap (test flags are common)
+    "PTH",    # use-pathlib (test paths can be strings)
 ]
 
 # Configuration files
@@ -225,6 +257,18 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlmodel.SQLModel"]
 # Gradual type annotation adoption
 mypy-init-return = true
 suppress-dummy-args = true
+
+[tool.ruff.lint.flake8-bugbear]
+# Allow zip() without strict parameter for Python < 3.10 compatibility
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Ban relative imports
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-unused-arguments]
+# Ignore unused arguments in specific patterns
+ignore-variadic-names = true
 
 [tool.ruff.format]
 # Modern Python formatting

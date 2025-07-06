@@ -1,6 +1,4 @@
-"""
-MCP Server module for APES.
-"""
+"""MCP Server module for APES."""
 
 from .mcp_server import mcp
 

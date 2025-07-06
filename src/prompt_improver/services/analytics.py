@@ -1,12 +1,12 @@
-"""
-Analytics Service
+"""Analytics Service
 Provides comprehensive analytics and reporting for APES
 """
 
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import (
     RuleEffectivenessStats,
@@ -15,16 +15,12 @@ from ..database.models import (
 
 
 class AnalyticsService:
-    """
-    Service for analytics and reporting functionality
-    """
+    """Service for analytics and reporting functionality"""
 
     async def get_rule_effectiveness(
         self, days: int = 30, min_usage_count: int = 5, db_session: AsyncSession = None
-    ) -> List[RuleEffectivenessStats]:
-        """
-        Get rule effectiveness analytics for the specified time period
-        """
+    ) -> list[RuleEffectivenessStats]:
+        """Get rule effectiveness analytics for the specified time period"""
         if not db_session:
             return []
 
@@ -81,10 +77,8 @@ class AnalyticsService:
 
     async def get_user_satisfaction(
         self, days: int = 30, db_session: AsyncSession = None
-    ) -> List[UserSatisfactionStats]:
-        """
-        Get user satisfaction analytics and trends
-        """
+    ) -> list[UserSatisfactionStats]:
+        """Get user satisfaction analytics and trends"""
         if not db_session:
             return []
 
@@ -149,13 +143,11 @@ class AnalyticsService:
 
     async def get_performance_trends(
         self,
-        rule_id: Optional[str] = None,
+        rule_id: str | None = None,
         days: int = 30,
         db_session: AsyncSession = None,
-    ) -> Dict[str, Any]:
-        """
-        Get performance trends for rules over time
-        """
+    ) -> dict[str, Any]:
+        """Get performance trends for rules over time"""
         if not db_session:
             return {}
 
@@ -240,10 +232,8 @@ class AnalyticsService:
 
     async def get_prompt_type_analysis(
         self, days: int = 30, db_session: AsyncSession = None
-    ) -> Dict[str, Any]:
-        """
-        Analyze performance by prompt type
-        """
+    ) -> dict[str, Any]:
+        """Analyze performance by prompt type"""
         if not db_session:
             return {}
 
@@ -322,10 +312,8 @@ class AnalyticsService:
 
     async def get_rule_correlation_analysis(
         self, days: int = 30, db_session: AsyncSession = None
-    ) -> Dict[str, Any]:
-        """
-        Analyze correlations between rules and their effectiveness
-        """
+    ) -> dict[str, Any]:
+        """Analyze correlations between rules and their effectiveness"""
         if not db_session:
             return {}
 

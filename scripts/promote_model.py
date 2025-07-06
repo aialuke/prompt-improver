@@ -4,9 +4,7 @@ import mlflow
 
 
 def promote_model(model_name, model_version, to_stage):
-    """
-    Promote a model version to a specified stage ('Staging' or 'Production').
-    """
+    """Promote a model version to a specified stage ('Staging' or 'Production')."""
     client = mlflow.tracking.MlflowClient()
 
     # Demote any existing model in the target stage to 'Archived'

@@ -1,9 +1,8 @@
-"""
-Modern SQLAlchemy 2.0 async connection management following 2025 best practices
-"""
+"""Modern SQLAlchemy 2.0 async connection management following 2025 best practices"""
 
 import contextlib
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,
@@ -17,8 +16,7 @@ from .config import DatabaseConfig
 
 
 class DatabaseSessionManager:
-    """
-    Modern async session manager following SQLAlchemy 2.0 best practices
+    """Modern async session manager following SQLAlchemy 2.0 best practices
     Handles connection pooling and session lifecycle automatically
     """
 
@@ -96,8 +94,7 @@ engine = sessionmanager.engine
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """
-    FastAPI dependency function to get database session
+    """FastAPI dependency function to get database session
     Use with Depends(get_session) in FastAPI endpoints
     """
     async with sessionmanager.session() as session:

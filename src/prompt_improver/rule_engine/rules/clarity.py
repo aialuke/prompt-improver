@@ -1,23 +1,21 @@
-"""
-ClarityRule: A rule to improve the clarity and specificity of a prompt.
-"""
+"""ClarityRule: A rule to improve the clarity and specificity of a prompt."""
 
-import string  # Import the string module
 import asyncio
+import string  # Import the string module
 
+from ...services.llm_transformer import LLMTransformerService
 from ..base import (
     BasePromptRule,
     RuleCheckResult,
     TransformationResult,
 )
-from ...services.llm_transformer import LLMTransformerService
 
 # A simple list of vague words to check for.
 # In a real implementation, this could be more sophisticated (e.g., using a thesaurus or word embeddings).
 VAGUE_WORDS = [
     "thing",
     "stuff",
-    "it", 
+    "it",
     "this",
     "that",
     "they",
@@ -31,22 +29,19 @@ VAGUE_WORDS = [
 
 
 class ClarityRule(BasePromptRule):
-    """
-    This rule checks for and suggests improvements for vague language in a prompt.
+    """This rule checks for and suggests improvements for vague language in a prompt.
 
     It encourages specificity by:
     - Identifying generic or ambiguous words.
     - Suggesting the addition of explicit constraints, formats, or examples.
     """
-    
+
     def __init__(self):
         self.llm_transformer = LLMTransformerService()
 
     @property
     def metadata(self):
-        """
-        Provides metadata for the ClarityRule.
-        """
+        """Provides metadata for the ClarityRule."""
         return {
             "name": "ClarityRule",
             "type": "Core",
@@ -55,30 +50,28 @@ class ClarityRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """
-        Checks if the prompt contains vague words.
-        """
+        """Checks if the prompt contains vague words."""
         # Clean the prompt by removing punctuation and splitting into words
         translator = str.maketrans("", "", string.punctuation)
         cleaned_prompt = prompt.lower().translate(translator)
         prompt_words = cleaned_prompt.split()
 
         found_vague_words = [word for word in VAGUE_WORDS if word in prompt_words]
-        
+
         return RuleCheckResult(
             applies=len(found_vague_words) > 0,
             confidence=0.8 if found_vague_words else 1.0,
             metadata={
                 "vague_words": found_vague_words,
                 "total_words": len(prompt_words),
-                "vague_word_ratio": len(found_vague_words) / len(prompt_words) if prompt_words else 0
-            }
+                "vague_word_ratio": len(found_vague_words) / len(prompt_words)
+                if prompt_words
+                else 0,
+            },
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """
-        Applies LLM-based transformation to improve clarity.
-        """
+        """Applies LLM-based transformation to improve clarity."""
         # Check for vague words first
         check_result = self.check(prompt, context)
         if not check_result.applies:
@@ -88,10 +81,10 @@ class ClarityRule(BasePromptRule):
                 confidence=1.0,
                 transformations=[],
             )
-        
+
         # Extract vague words from check result
         vague_words = check_result.metadata.get("vague_words", [])
-        
+
         # Use LLM transformer for intelligent enhancement
         try:
             # Check if we're in an async context
@@ -106,32 +99,34 @@ class ClarityRule(BasePromptRule):
                 enhancement_result = asyncio.run(
                     self.llm_transformer.enhance_clarity(prompt, vague_words, context)
                 )
-            
+
             return TransformationResult(
                 success=True,
                 improved_prompt=enhancement_result["enhanced_prompt"],
                 confidence=enhancement_result["confidence"],
                 transformations=enhancement_result["transformations"],
             )
-            
+
         except Exception as e:
             # Fallback to simple improvement if LLM enhancement fails
-            fallback_improvement = self._fallback_clarity_improvement(prompt, vague_words)
+            fallback_improvement = self._fallback_clarity_improvement(
+                prompt, vague_words
+            )
             return TransformationResult(
                 success=True,
                 improved_prompt=fallback_improvement["improved_prompt"],
                 confidence=0.6,
-                transformations=[{
-                    "type": "fallback_clarity",
-                    "message": "Applied basic clarity improvements",
-                    "error": str(e)
-                }],
+                transformations=[
+                    {
+                        "type": "fallback_clarity",
+                        "message": "Applied basic clarity improvements",
+                        "error": str(e),
+                    }
+                ],
             )
 
     def to_llm_instruction(self) -> str:
-        """
-        Generates an LLM instruction for applying this rule.
-        """
+        """Generates an LLM instruction for applying this rule."""
         return """
 Review the following prompt and identify any vague or ambiguous language.
 Rewrite the prompt to be more specific, direct, and clear.
@@ -143,32 +138,36 @@ Focus on adding concrete details, constraints, and explicit instructions.
     def _fallback_clarity_improvement(self, prompt: str, vague_words: list) -> dict:
         """Fallback method for basic clarity improvements"""
         improved_prompt = prompt
-        
+
         # Simple replacements for common vague words
         simple_replacements = {
             "thing": "specific item",
             "this": "the specific item",
-            "that": "the specific element", 
+            "that": "the specific element",
             "stuff": "relevant information",
             "analyze": "examine systematically",
-            "summarize": "provide a concise summary"
+            "summarize": "provide a concise summary",
         }
-        
+
         for vague_word in vague_words:
             if vague_word in simple_replacements:
                 improved_prompt = improved_prompt.replace(
                     vague_word, simple_replacements[vague_word]
                 )
-        
+
         # If no replacements made, add guidance
         if improved_prompt == prompt:
-            guidance = f"\n\nFor clarity, consider specifying: {', '.join(vague_words[:3])}"
+            guidance = (
+                f"\n\nFor clarity, consider specifying: {', '.join(vague_words[:3])}"
+            )
             improved_prompt = prompt + guidance
-        
+
         return {
             "improved_prompt": improved_prompt,
-            "transformations": [{
-                "type": "basic_clarity_improvement",
-                "vague_words_addressed": vague_words
-            }]
+            "transformations": [
+                {
+                    "type": "basic_clarity_improvement",
+                    "vague_words_addressed": vague_words,
+                }
+            ],
         }

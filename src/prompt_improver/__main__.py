@@ -1,6 +1,4 @@
-"""
-Entry point for the APES CLI when running as a module.
-"""
+"""Entry point for the APES CLI when running as a module."""
 
 from .cli import app
 
