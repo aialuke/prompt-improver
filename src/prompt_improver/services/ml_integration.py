@@ -112,7 +112,9 @@ class MLModelService:
                         # Define search space
                         n_estimators = trial.suggest_int("n_estimators", 50, 200)
                         max_depth = trial.suggest_int("max_depth", 3, 15)
-                        min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
+                        min_samples_split = trial.suggest_int(
+                            "min_samples_split", 2, 20
+                        )
 
                         # Create model pipeline
                         model = Pipeline([
@@ -136,7 +138,9 @@ class MLModelService:
                         return np.mean(scores)
 
                     # Run optimization
-                    study.optimize(objective, n_trials=50, timeout=300)  # 5 minute timeout
+                    study.optimize(
+                        objective, n_trials=50, timeout=300
+                    )  # 5 minute timeout
 
                     # Get best parameters
                     best_params = study.best_params
@@ -185,7 +189,9 @@ class MLModelService:
 
                     # Save model to MLflow
                     mlflow.sklearn.log_model(
-                        final_model, "model", registered_model_name="apes_rule_optimizer"
+                        final_model,
+                        "model",
+                        registered_model_name="apes_rule_optimizer",
                     )
 
                     # Update rule parameters in database
@@ -311,33 +317,33 @@ class MLModelService:
 
                     # Define base estimators
                     base_estimators = [
-                    (
-                        "rf",
-                        Pipeline([
-                            ("scaler", StandardScaler()),
-                            (
-                                "classifier",
-                                RandomForestClassifier(
-                                    n_estimators=100, max_depth=10, random_state=42
+                        (
+                            "rf",
+                            Pipeline([
+                                ("scaler", StandardScaler()),
+                                (
+                                    "classifier",
+                                    RandomForestClassifier(
+                                        n_estimators=100, max_depth=10, random_state=42
+                                    ),
                                 ),
-                            ),
-                        ]),
-                    ),
-                    (
-                        "gb",
-                        Pipeline([
-                            ("scaler", StandardScaler()),
-                            (
-                                "classifier",
-                                GradientBoostingClassifier(
-                                    n_estimators=100,
-                                    learning_rate=0.1,
-                                    max_depth=6,
-                                    random_state=42,
+                            ]),
+                        ),
+                        (
+                            "gb",
+                            Pipeline([
+                                ("scaler", StandardScaler()),
+                                (
+                                    "classifier",
+                                    GradientBoostingClassifier(
+                                        n_estimators=100,
+                                        learning_rate=0.1,
+                                        max_depth=6,
+                                        random_state=42,
+                                    ),
                                 ),
-                            ),
-                        ]),
-                    ),
+                            ]),
+                        ),
                     ]
 
                     # Final estimator
@@ -397,7 +403,9 @@ class MLModelService:
                         model_id,
                         ensemble_score,
                         accuracy_score(y, stacking_model.predict(X)),
-                        precision_score(y, stacking_model.predict(X), average="weighted"),
+                        precision_score(
+                            y, stacking_model.predict(X), average="weighted"
+                        ),
                         recall_score(y, stacking_model.predict(X), average="weighted"),
                     )
 

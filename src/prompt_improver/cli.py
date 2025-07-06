@@ -158,7 +158,7 @@ def status(
             mcp_pid = int(pid_file.read_text().strip())
             os.kill(mcp_pid, 0)  # Check if process exists
             mcp_running = True
-        except:
+        except (ValueError, FileNotFoundError, ProcessLookupError, PermissionError):
             mcp_running = False
 
     # Check database
@@ -171,7 +171,8 @@ def status(
                 return "connected"
 
         db_status = asyncio.run(check_db())
-    except:
+    except (RuntimeError, ConnectionError, OSError, Exception) as e:
+        # Handle various database connection issues
         db_status = "disconnected"
 
     status_data = {
@@ -957,7 +958,8 @@ def data_stats(
                 fresh_count = fresh_result[0]["count"] if fresh_result else 0
                 fresh_status = "✅ ACTIVE" if fresh_count > 10 else "⚠️  SLOW"
                 quality_table.add_row("New Data (7d)", str(fresh_count), fresh_status)
-            except:
+            except (ConnectionError, KeyError, TypeError, ValueError) as e:
+                # Handle database connection or query processing issues
                 quality_table.add_row("New Data (7d)", "N/A", "❌ ERROR")
 
             console.print(quality_table)

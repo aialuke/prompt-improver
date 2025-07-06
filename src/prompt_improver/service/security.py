@@ -196,25 +196,25 @@ class PromptDataProtection:
                 # Get sessions with security audit data (using correct field name)
                 from sqlalchemy import text
 
+                # Use parameterized query to prevent SQL injection
                 audit_query = text(
                     """
                     SELECT 
                         COUNT(*) as total_sessions,
                         COUNT(*) FILTER (WHERE session_metadata->'security_audit'->>'redactions' != '0') as sessions_with_redactions,
                         SUM((session_metadata->'security_audit'->>'redactions')::int) FILTER (WHERE session_metadata->'security_audit'->>'redactions' IS NOT NULL) as total_redactions,
-                        COUNT(*) FILTER (WHERE started_at >= NOW() - INTERVAL '%s days') as recent_sessions,
+                        COUNT(*) FILTER (WHERE started_at >= NOW() - INTERVAL ':days days') as recent_sessions,
                         COUNT(*) FILTER (WHERE session_metadata->'security_audit'->>'security_level' = 'clean') as clean_sessions
                     FROM improvement_sessions
                     WHERE session_metadata->'security_audit' IS NOT NULL
-                    AND started_at >= NOW() - INTERVAL '%s days'
+                    AND started_at >= NOW() - INTERVAL ':days days'
                 """
-                    % (days, days)
                 )
 
-                result = await db_session.execute(audit_query)
+                result = await db_session.execute(audit_query, {"days": days})
                 audit_data = result.fetchone()
 
-                # Get redaction type breakdown
+                # Get redaction type breakdown - use parameterized query to prevent SQL injection
                 redaction_types_query = text(
                     """
                     SELECT 
@@ -222,14 +222,13 @@ class PromptDataProtection:
                         COUNT(*) as occurrence_count
                     FROM improvement_sessions
                     WHERE session_metadata->'security_audit'->'redaction_details' IS NOT NULL
-                    AND started_at >= NOW() - INTERVAL '%s days'
+                    AND started_at >= NOW() - INTERVAL ':days days'
                     GROUP BY redaction_type
                     ORDER BY occurrence_count DESC
                 """
-                    % days
                 )
 
-                result = await db_session.execute(redaction_types_query)
+                result = await db_session.execute(redaction_types_query, {"days": days})
                 redaction_types = result.fetchall()
 
                 # Calculate compliance score

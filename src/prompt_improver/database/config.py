@@ -14,10 +14,12 @@ class DatabaseConfig(BaseSettings):
         default="apes_production", validation_alias="POSTGRES_DATABASE"
     )
     postgres_username: str = Field(
-        default="apes_user", validation_alias="POSTGRES_USERNAME"
+        validation_alias="POSTGRES_USERNAME",
+        description="PostgreSQL username - must be provided via POSTGRES_USERNAME environment variable",
     )
     postgres_password: str = Field(
-        default="apes_secure_password_2024", validation_alias="POSTGRES_PASSWORD"
+        validation_alias="POSTGRES_PASSWORD",
+        description="PostgreSQL password - must be provided via POSTGRES_PASSWORD environment variable for security",
     )
 
     # Advanced connection pool settings (research-validated patterns)
