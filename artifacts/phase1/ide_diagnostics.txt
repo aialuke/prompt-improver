@@ -1,0 +1,3 @@
+IDE Diagnostics Status: MCP IDE tool not available
+Alternative: Ruff static analysis completed (293 issues identified)
+Bandit security scan completed (24 security issues found)

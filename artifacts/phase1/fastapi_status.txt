@@ -1,0 +1,1 @@
+FastAPI Smoke Test Status: FAILED - main.py not found, no FastAPI app available

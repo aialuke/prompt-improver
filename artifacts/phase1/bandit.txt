@@ -1,0 +1,336 @@
+Run started:2025-07-06 18:38:49.808438
+
+Test results:
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: src/prompt_improver/cli.py:8:0
+7	import os
+8	import subprocess
+9	import sys
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:59:22
+58	            # Start the process
+59	            process = subprocess.Popen(
+60	                [sys.executable, str(mcp_server_path)],
+61	                stdout=subprocess.PIPE if not verbose else None,
+62	                stderr=subprocess.PIPE if not verbose else None,
+63	                start_new_session=True,
+64	            )
+65	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:84:12
+83	            mcp_server_path = Path(__file__).parent / "mcp_server" / "mcp_server.py"
+84	            subprocess.run([sys.executable, str(mcp_server_path)], check=True)
+85	        except KeyboardInterrupt:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:524:12
+523	        if backup_script.exists():
+524	            subprocess.run([str(backup_script), "backup"], check=True)
+525	            console.print("✅ Backup completed successfully!", style="green")
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:577:12
+576	            console.print("  🔧 Installing missing dependencies...")
+577	            subprocess.run([sys.executable, "-m", "pip", "install", e.name], check=True)
+578	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:597:12
+596	            console.print("  🔧 Starting database...")
+597	            subprocess.run(
+598	                [
+599	                    str(
+600	                        Path(__file__).parent.parent.parent
+601	                        / "scripts"
+602	                        / "start_database.sh"
+603	                    ),
+604	                    "start",
+605	                ],
+606	                check=False,
+607	            )
+608	
+
+--------------------------------------------------
+>> Issue: [B607:start_process_with_partial_path] Starting a process with a partial executable path
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html
+   Location: src/prompt_improver/cli.py:1837:22
+1836	            # Launch MLflow UI
+1837	            process = subprocess.Popen([
+1838	                "mlflow",
+1839	                "ui",
+1840	                "--backend-store-uri",
+1841	                f"file://{mlflow_dir}",
+1842	                "--port",
+1843	                "5000",
+1844	                "--host",
+1845	                "127.0.0.1",
+1846	            ])
+1847	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:1837:22
+1836	            # Launch MLflow UI
+1837	            process = subprocess.Popen([
+1838	                "mlflow",
+1839	                "ui",
+1840	                "--backend-store-uri",
+1841	                f"file://{mlflow_dir}",
+1842	                "--port",
+1843	                "5000",
+1844	                "--host",
+1845	                "127.0.0.1",
+1846	            ])
+1847	
+
+--------------------------------------------------
+>> Issue: [B607:start_process_with_partial_path] Starting a process with a partial executable path
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html
+   Location: src/prompt_improver/cli.py:1967:22
+1966	            # Use tail -f equivalent for following logs
+1967	            process = subprocess.Popen(
+1968	                ["tail", "-f", str(log_file)],
+1969	                stdout=subprocess.PIPE,
+1970	                stderr=subprocess.PIPE,
+1971	                text=True,
+1972	            )
+1973	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/cli.py:1967:22
+1966	            # Use tail -f equivalent for following logs
+1967	            process = subprocess.Popen(
+1968	                ["tail", "-f", str(log_file)],
+1969	                stdout=subprocess.PIPE,
+1970	                stderr=subprocess.PIPE,
+1971	                text=True,
+1972	            )
+1973	
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: src/prompt_improver/installation/initializer.py:7:0
+6	import os
+7	import subprocess
+8	from datetime import datetime
+
+--------------------------------------------------
+>> Issue: [B607:start_process_with_partial_path] Starting a process with a partial executable path
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html
+   Location: src/prompt_improver/installation/initializer.py:182:21
+181	        try:
+182	            result = subprocess.run(
+183	                ["which", "psql"], check=False, capture_output=True, text=True
+184	            )
+185	            if result.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: src/prompt_improver/installation/initializer.py:182:21
+181	        try:
+182	            result = subprocess.run(
+183	                ["which", "psql"], check=False, capture_output=True, text=True
+184	            )
+185	            if result.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html
+   Location: src/prompt_improver/installation/initializer.py:244:20
+243	                        await session.execute(optimization)
+244	                    except Exception:
+245	                        # Some settings require restart, just continue
+246	                        pass
+247	
+
+--------------------------------------------------
+>> Issue: [B103:set_bad_file_permissions] Chmod setting a permissive mask 0o755 on file (mcp_server_path).
+   Severity: Medium   Confidence: High
+   CWE: CWE-732 (https://cwe.mitre.org/data/definitions/732.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b103_set_bad_file_permissions.html
+   Location: src/prompt_improver/installation/initializer.py:455:12
+454	            # Make sure it's executable
+455	            os.chmod(mcp_server_path, 0o755)
+456	            self.console.print(
+
+--------------------------------------------------
+>> Issue: [B324:hashlib] Use of weak MD5 hash for security. Consider usedforsecurity=False
+   Severity: High   Confidence: High
+   CWE: CWE-327 (https://cwe.mitre.org/data/definitions/327.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b324_hashlib.html
+   Location: src/prompt_improver/installation/migration.py:393:31
+392	                tables_str = ",".join(sorted(tables))
+393	                version_hash = hashlib.md5(tables_str.encode()).hexdigest()[:8]
+394	                return f"schema_{version_hash}"
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b202_tarfile_unsafe_members.html
+   Location: src/prompt_improver/installation/migration.py:647:16
+646	            with tarfile.open(package_path, "r:gz") as tar:
+647	                tar.extractall(temp_path)
+648	            self.console.print("  📦 Migration package extracted", style="dim")
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b202_tarfile_unsafe_members.html
+   Location: src/prompt_improver/installation/migration.py:762:16
+761	            with tarfile.open(config_backup, "r:gz") as tar:
+762	                tar.extractall(target_dir)
+763	
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b202_tarfile_unsafe_members.html
+   Location: src/prompt_improver/installation/migration.py:801:16
+800	            with tarfile.open(ml_backup, "r:gz") as tar:
+801	                tar.extractall(target_dir / "data")
+802	
+
+--------------------------------------------------
+>> Issue: [B112:try_except_continue] Try, Except, Continue detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b112_try_except_continue.html
+   Location: src/prompt_improver/rule_engine/__init__.py:95:12
+94	
+95	            except Exception:
+96	                # Skip rule if it fails - this is for test robustness
+97	                continue
+98	
+
+--------------------------------------------------
+>> Issue: [B112:try_except_continue] Try, Except, Continue detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b112_try_except_continue.html
+   Location: src/prompt_improver/service/manager.py:251:20
+250	                            return "started"
+251	                    except Exception:
+252	                        continue
+253	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b608_hardcoded_sql_expressions.html
+   Location: src/prompt_improver/service/security.py:200:20
+199	                audit_query = text(
+200	                    """
+201	                    SELECT 
+202	                        COUNT(*) as total_sessions,
+203	                        COUNT(*) FILTER (WHERE session_metadata->'security_audit'->>'redactions' != '0') as sessions_with_redactions,
+204	                        SUM((session_metadata->'security_audit'->>'redactions')::int) FILTER (WHERE session_metadata->'security_audit'->>'redactions' IS NOT NULL) as total_redactions,
+205	                        COUNT(*) FILTER (WHERE started_at >= NOW() - INTERVAL '%s days') as recent_sessions,
+206	                        COUNT(*) FILTER (WHERE session_metadata->'security_audit'->>'security_level' = 'clean') as clean_sessions
+207	                    FROM improvement_sessions
+208	                    WHERE session_metadata->'security_audit' IS NOT NULL
+209	                    AND started_at >= NOW() - INTERVAL '%s days'
+210	                """
+211	                    % (days, days)
+212	                )
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b608_hardcoded_sql_expressions.html
+   Location: src/prompt_improver/service/security.py:219:20
+218	                redaction_types_query = text(
+219	                    """
+220	                    SELECT 
+221	                        jsonb_object_keys(session_metadata->'security_audit'->'redaction_details') as redaction_type,
+222	                        COUNT(*) as occurrence_count
+223	                    FROM improvement_sessions
+224	                    WHERE session_metadata->'security_audit'->'redaction_details' IS NOT NULL
+225	                    AND started_at >= NOW() - INTERVAL '%s days'
+226	                    GROUP BY redaction_type
+227	                    ORDER BY occurrence_count DESC
+228	                """
+229	                    % days
+230	                )
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html
+   Location: src/prompt_improver/services/monitoring.py:453:8
+452	
+453	        except Exception as e:
+454	            # Don't let logging errors break monitoring
+455	            pass
+456	
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 9104
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 17
+		Medium: 3
+		High: 4
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 2
+		Medium: 0
+		High: 22
+Files skipped (0):
