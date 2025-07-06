@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, Index, CheckConstraint, text
+from sqlalchemy import Column, Index, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field
 
 
 # ===================================

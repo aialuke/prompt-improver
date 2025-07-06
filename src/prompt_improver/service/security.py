@@ -5,15 +5,13 @@ Implements Task 4: Security Framework from Phase 2.
 
 import re
 import json
-import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import logging
 
 from rich.console import Console
 
-from ..database import get_session, sessionmanager
-from ..database.models import ImprovementSession
+from ..database import sessionmanager
 from ..services.analytics import AnalyticsService
 
 
@@ -103,8 +101,6 @@ class PromptDataProtection:
             async with sessionmanager.session() as db_session:
                 
                 # Store audit info in existing improvement_sessions table
-                from sqlalchemy import update, select
-                from sqlalchemy.sql import func
                 
                 # Use raw SQL to avoid SQLAlchemy model issues
                 from sqlalchemy import text

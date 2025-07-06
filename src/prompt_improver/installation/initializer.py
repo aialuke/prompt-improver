@@ -5,10 +5,7 @@ Implements Task 1: Installation Automation from Phase 2.
 
 import asyncio
 import subprocess
-import sys
-import shutil
 import os
-import tempfile
 import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -17,7 +14,7 @@ from datetime import datetime
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
-from ..database import get_session, sessionmanager
+from ..database import get_session
 from ..database.config import DatabaseConfig
 
 

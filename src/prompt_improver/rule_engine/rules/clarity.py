@@ -7,7 +7,6 @@ import asyncio
 
 from ..base import (
     BasePromptRule,
-    LLMInstruction,
     RuleCheckResult,
     TransformationResult,
 )

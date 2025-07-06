@@ -9,16 +9,15 @@ import sys
 import json
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich import print as rprint
 
-from prompt_improver.database import get_session, sessionmanager
+from prompt_improver.database import get_session
 from prompt_improver.services.analytics import AnalyticsService
 from prompt_improver.services.prompt_improvement import PromptImprovementService
 from prompt_improver.installation.initializer import APESInitializer
@@ -760,7 +759,6 @@ def export_training_data(
     import asyncio
     import csv
     import json
-    from datetime import datetime, timedelta
     from .database.psycopg_client import get_psycopg_client
     
     async def export_data():

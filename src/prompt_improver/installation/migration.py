@@ -4,8 +4,6 @@ Implements Task 2: Backup & Migration Systems from Phase 2.
 """
 
 import asyncio
-import subprocess
-import sys
 import tarfile
 import gzip
 import json
@@ -18,7 +16,7 @@ from datetime import datetime, timedelta
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
-from ..database import get_session, sessionmanager
+from ..database import get_session
 
 
 class APESMigrationManager:

@@ -252,7 +252,6 @@ class APESServiceManager:
         
         try:
             # Import and initialize MCP server
-            from ..mcp_server.mcp_server import app as mcp_app
             
             # MCP server runs within the service process
             self.logger.info("MCP server initialized")

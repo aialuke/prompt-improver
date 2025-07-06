@@ -13,10 +13,8 @@ from rich.live import Live
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
-from rich.progress import Progress, BarColumn, TextColumn
 from rich.console import Console
 from rich.text import Text
-from rich.columns import Columns
 from rich import box
 
 from ..database import get_session

@@ -3,18 +3,16 @@ A/B Testing Framework for Phase 4 ML Enhancement & Discovery
 Advanced experimentation system for rule effectiveness validation
 """
 
-import asyncio
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 from dataclasses import dataclass
 import numpy as np
 from scipy import stats
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance, UserFeedback
+from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance
 from .analytics import AnalyticsService
 
 logger = logging.getLogger(__name__)

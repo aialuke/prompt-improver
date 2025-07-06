@@ -5,10 +5,9 @@ Modern implementation with database integration and ML optimization
 
 import time
 import uuid
-import json
 from typing import Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlmodel import select as sqlmodel_select
 
 from ..database.models import (

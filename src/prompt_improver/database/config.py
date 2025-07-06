@@ -4,7 +4,6 @@ Database configuration using Pydantic Settings following 2025 best practices
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 
 class DatabaseConfig(BaseSettings):

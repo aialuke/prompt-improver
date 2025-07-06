@@ -3,7 +3,7 @@ Modern SQLAlchemy 2.0 async connection management following 2025 best practices
 """
 
 import contextlib
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,

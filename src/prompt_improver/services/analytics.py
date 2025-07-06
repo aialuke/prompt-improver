@@ -6,12 +6,9 @@ Provides comprehensive analytics and reporting for APES
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
-from sqlmodel import select as sqlmodel_select
+from sqlalchemy import text
 
 from ..database.models import (
-    RulePerformance,
-    UserFeedback,
     RuleEffectivenessStats,
     UserSatisfactionStats,
 )

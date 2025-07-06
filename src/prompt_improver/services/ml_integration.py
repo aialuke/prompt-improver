@@ -4,11 +4,10 @@ Replaces cross-language bridge architecture with direct Python function calls.
 Performance improvement: 50-100ms → 1-5ms response times.
 """
 
-import asyncio
 import json
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 import logging
 import os
 
@@ -19,7 +18,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score
 import optuna
 import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession

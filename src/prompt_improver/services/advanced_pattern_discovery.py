@@ -3,10 +3,7 @@ Advanced Pattern Discovery Service for Phase 4 ML Enhancement & Discovery
 Modern 2025 implementation with HDBSCAN, FP-Growth, and ensemble pattern mining
 """
 
-import asyncio
-import json
 import time
-from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple, Set
 import logging
 from dataclasses import dataclass
@@ -22,9 +19,8 @@ try:
 except ImportError:
     HDBSCAN_AVAILABLE = False
 
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 
 # FP-Growth pattern mining (using apyori as fallback)
@@ -36,9 +32,9 @@ except ImportError:
     MLXTEND_AVAILABLE = False
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from ..database.models import RulePerformance, RuleMetadata, UserFeedback
+from ..database.models import RulePerformance, RuleMetadata
 
 logger = logging.getLogger(__name__)
 

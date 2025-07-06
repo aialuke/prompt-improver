@@ -5,11 +5,10 @@ Provides prompt enhancement via Model Context Protocol with stdio transport.
 
 import asyncio
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 
 from mcp.server.fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database import get_session
 from prompt_improver.services.prompt_improvement import PromptImprovementService

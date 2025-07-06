@@ -4,7 +4,6 @@ Comprehensive monitoring for Phase 2 <50ms query time and 90% cache hit ratio re
 """
 
 import asyncio
-import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass

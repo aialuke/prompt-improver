@@ -3,14 +3,11 @@ Type-safe database client using psycopg3 + Pydantic for zero serialization overh
 Research-validated patterns for high-performance database operations.
 """
 
-import asyncio
 import contextlib
 import time
-from typing import AsyncIterator, Dict, List, Optional, Type, TypeVar, Any
+from typing import Dict, List, Optional, Type, TypeVar, Any
 from datetime import datetime
-import json
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ValidationError
