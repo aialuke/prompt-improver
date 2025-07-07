@@ -152,3 +152,58 @@ wandb/
 .rope_project/
 .vscode/
 *.code-workspace
+
+# Python tool caches
+.mypy_cache/
+.ruff_cache/
+.bandit/
+.semgrep/
+
+# Local config files (often contain secrets)
+.env.local
+.env.*.local
+config/local_*.yaml
+config/local_*.yml
+
+# Backup and temporary files
+*.bak
+*.backup
+*.old
+*.save
+*.orig
+*.rej
+
+# Enhanced macOS specific
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Development artifacts
+profile_output.txt
+*.prof
+*.profile
+
+# Lock files
+Pipfile.lock
+poetry.lock
+requirements-lock.txt
+
+# Documentation build artifacts
+docs/_build/
+docs/build/
+site/
+
+# Local development databases
+*.sqlite
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Security scan outputs
+.bandit
+.safety
+security-report.*
+
+# Performance profiling
+*.perf
+.prof/

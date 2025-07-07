@@ -1,0 +1,115 @@
+repos:
+  # Ruff for linting and formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: [--fix, --exit-non-zero-on-fix, --preview]
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        types_or: [python, pyi]
+
+  # Basic pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-docstring-first
+      - id: debug-statements
+      - id: name-tests-test
+        args: [--pytest-test-first]
+
+  # MyPy type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-all]
+        args: [--ignore-missing-imports, --check-untyped-defs]
+        files: ^src/
+
+  # Security scanning with Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+  # YAML formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown, json]
+        args: [--tab-width=2]
+
+  # Git commit message validation
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: 3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # Custom MCP protocol validation hook
+  - repo: local
+    hooks:
+      - id: mcp-protocol-validation
+        name: MCP Protocol Validation
+        entry: python scripts/validate_mcp_protocol.py
+        language: system
+        files: ^src/.*mcp.*\.py$
+        pass_filenames: true
+
+  # Custom ML contract validation
+  - repo: local
+    hooks:
+      - id: ml-contract-validation
+        name: ML Contract Validation
+        entry: python scripts/validate_ml_contracts.py
+        language: system
+        files: ^src/.*(ml|prompt|evaluation).*\.py$
+        pass_filenames: true
+
+  # Performance regression detection
+  - repo: local
+    hooks:
+      - id: performance-regression-check
+        name: Performance Regression Check
+        entry: python scripts/check_performance_regression.py
+        language: system
+        files: ^src/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+
+# Global configuration
+default_language_version:
+  python: python3.11
+
+# Skip hooks for specific scenarios
+ci:
+  skip: [performance-regression-check]  # Skip in CI to avoid duplicate runs
+
+# Hook execution order
+stages:
+  - commit
+  - manual
+  - pre-push
