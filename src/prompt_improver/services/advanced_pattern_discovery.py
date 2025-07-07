@@ -12,13 +12,20 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
-# Modern clustering and pattern mining imports
+# Modern clustering and pattern mining imports with performance optimization
 try:
+    from concurrent.futures import ThreadPoolExecutor
+
     import hdbscan
 
+    # Import joblib for parallel processing optimization
+    import joblib
+
     HDBSCAN_AVAILABLE = True
+    JOBLIB_AVAILABLE = True
 except ImportError:
     HDBSCAN_AVAILABLE = False
+    JOBLIB_AVAILABLE = False
 
 from sklearn.cluster import DBSCAN
 from sklearn.metrics import calinski_harabasz_score, silhouette_score
@@ -86,6 +93,9 @@ class AdvancedPatternDiscovery:
         self.min_support = 0.1
         self.min_confidence = 0.5
         self.min_effectiveness = 0.7
+
+        # HDBSCAN Performance Optimization Settings (based on Context7 research)
+        self._configure_hdbscan_performance()
 
     async def discover_advanced_patterns(
         self,
@@ -295,12 +305,17 @@ class AdvancedPatternDiscovery:
             param_features = np.array(param_features)
             param_features_scaled = self.scaler.fit_transform(param_features)
 
-            # Apply HDBSCAN for parameter clustering
+            # Apply optimized HDBSCAN for parameter clustering
             if HDBSCAN_AVAILABLE:
+                # Optimized HDBSCAN configuration based on performance research
                 clusterer = hdbscan.HDBSCAN(
                     min_cluster_size=self.min_cluster_size,
-                    min_samples=3,
+                    min_samples=max(3, self.min_cluster_size // 3),  # Adaptive min_samples
                     metric="euclidean",
+                    algorithm="boruvka_kdtree",  # Most efficient for moderate datasets
+                    cluster_selection_method="eom",  # Excess of Mass for stability
+                    alpha=1.0,  # Conservative clustering
+                    core_dist_n_jobs=self._get_optimal_n_jobs(),  # Parallel processing
                 )
                 cluster_labels = clusterer.fit_predict(param_features_scaled)
                 outlier_scores = clusterer.outlier_scores_
@@ -443,10 +458,17 @@ class AdvancedPatternDiscovery:
             perf_features = np.array(perf_features)
             perf_features_scaled = self.scaler.fit_transform(perf_features)
 
-            # Apply clustering
+            # Apply optimized clustering for performance patterns
             if HDBSCAN_AVAILABLE:
+                # Performance-optimized HDBSCAN for larger datasets
                 clusterer = hdbscan.HDBSCAN(
-                    min_cluster_size=self.min_cluster_size, min_samples=3
+                    min_cluster_size=self.min_cluster_size,
+                    min_samples=max(3, self.min_cluster_size // 3),
+                    algorithm="boruvka_kdtree",  # Best performance for mixed data
+                    cluster_selection_method="eom",
+                    cluster_selection_epsilon=0.0,  # No epsilon filtering initially
+                    alpha=1.0,  # Conservative merging
+                    core_dist_n_jobs=self._get_optimal_n_jobs(),
                 )
                 cluster_labels = clusterer.fit_predict(perf_features_scaled)
                 outlier_scores = clusterer.outlier_scores_
@@ -1169,6 +1191,133 @@ class AdvancedPatternDiscovery:
             })
 
         return recommendations
+
+    def _configure_hdbscan_performance(self):
+        """Configure HDBSCAN performance settings based on system capabilities."""
+        try:
+            # Set optimal number of parallel jobs based on CPU count
+            import os
+            self._optimal_n_jobs = min(os.cpu_count() or 1, 4)  # Cap at 4 for stability
+
+            # Configure BLAS/LAPACK threads for NumPy optimization
+            os.environ.setdefault("OMP_NUM_THREADS", str(self._optimal_n_jobs))
+            os.environ.setdefault("OPENBLAS_NUM_THREADS", str(self._optimal_n_jobs))
+            os.environ.setdefault("MKL_NUM_THREADS", str(self._optimal_n_jobs))
+
+            logger.info(f"HDBSCAN performance configured: {self._optimal_n_jobs} parallel jobs")
+
+        except Exception as e:
+            logger.warning(f"Failed to configure HDBSCAN performance: {e}")
+            self._optimal_n_jobs = 1
+
+    def _get_optimal_n_jobs(self) -> int:
+        """Get optimal number of parallel jobs for HDBSCAN."""
+        return getattr(self, '_optimal_n_jobs', 1)
+
+    async def benchmark_clustering_performance(
+        self,
+        dataset_sizes: list[int] = None,
+        max_time: int = 45,
+        sample_size: int = 2
+    ) -> dict[str, Any]:
+        """Benchmark HDBSCAN performance on different dataset sizes.
+        
+        Based on Context7 research for performance optimization.
+        
+        Args:
+            dataset_sizes: List of dataset sizes to benchmark
+            max_time: Maximum time per benchmark (seconds)
+            sample_size: Number of samples per dataset size
+            
+        Returns:
+            Performance benchmark results
+        """
+        import time
+
+        from sklearn.datasets import make_blobs
+
+        if dataset_sizes is None:
+            dataset_sizes = [100, 500, 1000, 2000, 5000, 10000]
+
+        results = {}
+
+        for size in dataset_sizes:
+            size_results = []
+
+            for sample in range(sample_size):
+                try:
+                    # Generate synthetic data
+                    data, _ = make_blobs(
+                        n_samples=size,
+                        n_features=10,
+                        centers=5
+                    )
+
+                    # Benchmark HDBSCAN
+                    start_time = time.time()
+
+                    if HDBSCAN_AVAILABLE:
+                        clusterer = hdbscan.HDBSCAN(
+                            min_cluster_size=max(5, size // 100),
+                            algorithm="boruvka_kdtree",
+                            core_dist_n_jobs=self._get_optimal_n_jobs()
+                        )
+                        clusterer.fit(data)
+
+                    execution_time = time.time() - start_time
+
+                    if execution_time > max_time:
+                        logger.warning(f"Benchmark timeout at size {size}")
+                        break
+
+                    size_results.append(execution_time)
+
+                except Exception as e:
+                    logger.error(f"Benchmark failed for size {size}: {e}")
+
+            if size_results:
+                results[size] = {
+                    "avg_time": np.mean(size_results),
+                    "min_time": min(size_results),
+                    "max_time": max(size_results),
+                    "samples": len(size_results)
+                }
+
+        return {
+            "status": "success",
+            "algorithm": "HDBSCAN-Boruvka",
+            "parallel_jobs": self._get_optimal_n_jobs(),
+            "results": results,
+            "performance_summary": self._analyze_performance_results(results)
+        }
+
+    def _analyze_performance_results(self, results: dict) -> dict[str, Any]:
+        """Analyze performance benchmark results."""
+        if not results:
+            return {"message": "No performance data available"}
+
+        sizes = list(results.keys())
+        times = [results[size]["avg_time"] for size in sizes]
+
+        # Estimate complexity
+        if len(times) >= 3:
+            # Simple linear regression to estimate scaling
+            from scipy.stats import linregress
+            log_sizes = np.log(sizes)
+            log_times = np.log(times)
+            slope, intercept, r_value, p_value, std_err = linregress(log_sizes, log_times)
+
+            complexity_estimate = f"O(n^{slope:.2f})"
+        else:
+            complexity_estimate = "Insufficient data"
+
+        return {
+            "max_dataset_size": max(sizes),
+            "fastest_time": min(times),
+            "slowest_time": max(times),
+            "complexity_estimate": complexity_estimate,
+            "scalability_rating": "Good" if max(times) < 10 else "Moderate" if max(times) < 60 else "Poor"
+        }
 
 
 # Singleton instance for easy access

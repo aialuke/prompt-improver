@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import stats
+from sklearn.utils import resample  # For bootstrap sampling
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,17 +21,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ExperimentResult:
-    """Statistical results of A/B experiment"""
+    """Statistical results of A/B experiment with advanced statistics"""
 
     control_mean: float
     treatment_mean: float
     effect_size: float
     p_value: float
     confidence_interval: tuple[float, float]
+    bootstrap_ci: tuple[float, float]
     statistical_significance: bool
     practical_significance: bool
     sample_size_control: int
     sample_size_treatment: int
+    statistical_power: float
+    minimum_detectable_effect: float
+    bayesian_probability: float
 
 
 class ABTestingService:
@@ -181,8 +186,12 @@ class ABTestingService:
                     "effect_size": analysis_result.effect_size,
                     "p_value": analysis_result.p_value,
                     "confidence_interval": analysis_result.confidence_interval,
+                    "bootstrap_confidence_interval": analysis_result.bootstrap_ci,
                     "statistical_significance": analysis_result.statistical_significance,
                     "practical_significance": analysis_result.practical_significance,
+                    "statistical_power": analysis_result.statistical_power,
+                    "minimum_detectable_effect": analysis_result.minimum_detectable_effect,
+                    "bayesian_probability": analysis_result.bayesian_probability,
                     "sample_sizes": {
                         "control": analysis_result.sample_size_control,
                         "treatment": analysis_result.sample_size_treatment,
@@ -264,7 +273,7 @@ class ABTestingService:
             treatment_array, control_array, equal_var=False
         )
 
-        # Confidence interval for difference in means
+        # Classical confidence interval for difference in means
         diff_mean = treatment_mean - control_mean
         se_diff = np.sqrt(
             np.var(control_array, ddof=1) / len(control_array)
@@ -283,8 +292,28 @@ class ABTestingService:
 
         t_critical = stats.t.ppf(1 - self.alpha / 2, df)
         margin_of_error = t_critical * se_diff
-
         confidence_interval = (diff_mean - margin_of_error, diff_mean + margin_of_error)
+
+        # Bootstrap confidence interval for more robust estimation
+        bootstrap_ci = self._calculate_bootstrap_ci(
+            control_array, treatment_array, alpha=self.alpha
+        )
+
+        # Statistical power analysis
+        statistical_power = self._calculate_statistical_power(
+            control_array, treatment_array, effect_size
+        )
+
+        # Minimum detectable effect
+        mde = self._calculate_minimum_detectable_effect(
+            len(control_array), len(treatment_array),
+            np.var(control_array, ddof=1), np.var(treatment_array, ddof=1)
+        )
+
+        # Bayesian probability of treatment being better
+        bayesian_prob = self._calculate_bayesian_probability(
+            control_array, treatment_array
+        )
 
         # Significance assessments
         statistical_significance = p_value < self.alpha
@@ -296,10 +325,14 @@ class ABTestingService:
             effect_size=effect_size,
             p_value=p_value,
             confidence_interval=confidence_interval,
+            bootstrap_ci=bootstrap_ci,
             statistical_significance=statistical_significance,
             practical_significance=practical_significance,
             sample_size_control=len(control_array),
             sample_size_treatment=len(treatment_array),
+            statistical_power=statistical_power,
+            minimum_detectable_effect=mde,
+            bayesian_probability=bayesian_prob,
         )
 
     async def _store_experiment_results(
@@ -510,6 +543,138 @@ class ABTestingService:
             logger.error(f"Failed to stop experiment: {e}")
             await db_session.rollback()
             return {"status": "error", "error": str(e)}
+
+    def _calculate_bootstrap_ci(
+        self,
+        control_data: np.ndarray,
+        treatment_data: np.ndarray,
+        alpha: float = 0.05,
+        n_bootstrap: int = 10000
+    ) -> tuple[float, float]:
+        """Calculate bootstrap confidence interval for treatment effect."""
+        try:
+            bootstrap_diffs = []
+
+            for _ in range(n_bootstrap):
+                # Bootstrap resample both groups
+                control_sample = resample(control_data, n_samples=len(control_data))
+                treatment_sample = resample(treatment_data, n_samples=len(treatment_data))
+
+                # Calculate difference in means
+                diff = np.mean(treatment_sample) - np.mean(control_sample)
+                bootstrap_diffs.append(diff)
+
+            # Calculate percentile-based confidence interval
+            lower_percentile = (alpha / 2) * 100
+            upper_percentile = (1 - alpha / 2) * 100
+
+            ci_lower = np.percentile(bootstrap_diffs, lower_percentile)
+            ci_upper = np.percentile(bootstrap_diffs, upper_percentile)
+
+            return (ci_lower, ci_upper)
+
+        except Exception as e:
+            logger.warning(f"Bootstrap CI calculation failed: {e}")
+            return (0.0, 0.0)
+
+    def _calculate_statistical_power(
+        self,
+        control_data: np.ndarray,
+        treatment_data: np.ndarray,
+        effect_size: float
+    ) -> float:
+        """Calculate statistical power of the test."""
+        try:
+            # Use effect size and sample sizes to estimate power
+            n1, n2 = len(control_data), len(treatment_data)
+
+            # Calculate pooled standard deviation
+            pooled_std = np.sqrt(
+                ((n1 - 1) * np.var(control_data, ddof=1) +
+                 (n2 - 1) * np.var(treatment_data, ddof=1)) / (n1 + n2 - 2)
+            )
+
+            # Calculate non-centrality parameter
+            ncp = abs(effect_size) * np.sqrt(n1 * n2 / (n1 + n2))
+
+            # Degrees of freedom
+            df = n1 + n2 - 2
+
+            # Critical t-value
+            t_critical = stats.t.ppf(1 - self.alpha / 2, df)
+
+            # Power calculation using non-central t-distribution
+            power = 1 - stats.nct.cdf(t_critical, df, ncp) + stats.nct.cdf(-t_critical, df, ncp)
+
+            return min(max(power, 0.0), 1.0)  # Clamp between 0 and 1
+
+        except Exception as e:
+            logger.warning(f"Power calculation failed: {e}")
+            return 0.5  # Default moderate power estimate
+
+    def _calculate_minimum_detectable_effect(
+        self,
+        n1: int,
+        n2: int,
+        var1: float,
+        var2: float,
+        power: float = 0.8
+    ) -> float:
+        """Calculate minimum detectable effect size."""
+        try:
+            # Pooled variance
+            pooled_var = ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2)
+
+            # Standard error
+            se = np.sqrt(pooled_var * (1 / n1 + 1 / n2))
+
+            # Critical values for alpha and beta
+            t_alpha = stats.t.ppf(1 - self.alpha / 2, n1 + n2 - 2)
+            t_beta = stats.t.ppf(power, n1 + n2 - 2)
+
+            # Minimum detectable effect
+            mde = (t_alpha + t_beta) * se
+
+            return mde
+
+        except Exception as e:
+            logger.warning(f"MDE calculation failed: {e}")
+            return 0.1  # Default conservative estimate
+
+    def _calculate_bayesian_probability(
+        self,
+        control_data: np.ndarray,
+        treatment_data: np.ndarray,
+        n_simulations: int = 10000
+    ) -> float:
+        """Calculate Bayesian probability that treatment is better than control."""
+        try:
+            # Simple Bayesian approach using normal approximation
+            control_mean = np.mean(control_data)
+            control_std = np.std(control_data, ddof=1)
+            treatment_mean = np.mean(treatment_data)
+            treatment_std = np.std(treatment_data, ddof=1)
+
+            # Sample from posterior distributions (assuming uninformative priors)
+            control_samples = np.random.normal(
+                control_mean,
+                control_std / np.sqrt(len(control_data)),
+                n_simulations
+            )
+            treatment_samples = np.random.normal(
+                treatment_mean,
+                treatment_std / np.sqrt(len(treatment_data)),
+                n_simulations
+            )
+
+            # Calculate probability that treatment > control
+            prob_treatment_better = np.mean(treatment_samples > control_samples)
+
+            return prob_treatment_better
+
+        except Exception as e:
+            logger.warning(f"Bayesian probability calculation failed: {e}")
+            return 0.5  # Neutral probability
 
 
 # Singleton instance for easy access

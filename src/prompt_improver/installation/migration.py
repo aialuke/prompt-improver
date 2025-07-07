@@ -500,7 +500,7 @@ class APESMigrationManager:
         """Create final migration package with metadata and checksum"""
         # Create metadata file
         metadata_file = temp_path / "migration_metadata.json"
-        with open(metadata_file, "w") as f:
+        with open(metadata_file, "w", encoding='utf-8') as f:
             json.dump(migration_data, f, indent=2)
 
         # Create the final package
@@ -657,7 +657,7 @@ class APESMigrationManager:
             raise Exception("Migration metadata not found - package may be corrupted")
 
         try:
-            with open(metadata_file) as f:
+            with open(metadata_file, encoding='utf-8') as f:
                 metadata = json.load(f)
 
             # Basic compatibility checks

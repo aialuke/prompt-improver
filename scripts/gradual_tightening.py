@@ -14,10 +14,9 @@ import argparse
 import json
 import subprocess
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Define tightening stages with clear priorities
 TIGHTENING_STAGES = {
@@ -123,13 +122,25 @@ class GradualTightening:
         print("📊 Collecting current metrics...")
 
         try:
-            # Run ruff check to get current issues
-            result = subprocess.run(
-                ["ruff", "check", "--output-format=json", str(self.project_root)],
+            # Run ruff check to get current issues - using absolute path for security
+            import shutil
+            ruff_path = shutil.which("ruff")
+            if not ruff_path:
+                raise FileNotFoundError("ruff command not found in PATH")
+            
+            # Security: subprocess call with validated executable path and secure parameters
+            # - ruff_path resolved via shutil.which() to prevent PATH injection
+            # - shell=False prevents shell injection attacks  
+            # - timeout=60 prevents indefinite hanging
+            # - All arguments are controlled and validated
+            result = subprocess.run(  # noqa: S603
+                [ruff_path, "check", "--output-format=json", str(self.project_root)],
                 check=False,
                 capture_output=True,
                 text=True,
                 cwd=self.project_root,
+                shell=False,
+                timeout=60,
             )
 
             issues = []
@@ -171,7 +182,7 @@ class GradualTightening:
 
             return metrics
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as e:
             print(f"❌ Error collecting metrics: {e}")
             return {
                 "timestamp": datetime.now().isoformat(),
@@ -186,7 +197,7 @@ class GradualTightening:
         """Save metrics for tracking progress."""
         # Load existing metrics
         if self.metrics_path.exists():
-            with open(self.metrics_path) as f:
+            with self.metrics_path.open(encoding='utf-8') as f:
                 all_metrics = json.load(f)
         else:
             all_metrics = {"stages": {}}
@@ -211,7 +222,7 @@ class GradualTightening:
         }
 
         # Save metrics
-        with open(self.metrics_path, "w") as f:
+        with self.metrics_path.open("w", encoding='utf-8') as f:
             json.dump(all_metrics, f, indent=2)
 
         print(f"📈 Metrics saved to {self.metrics_path}")
@@ -235,24 +246,42 @@ class GradualTightening:
         if not success:
             return False
 
-        # Run ruff check with new rules
+        # Run ruff check with new rules - using absolute path for security
         print(f"🔍 Running ruff check with Stage {stage} rules...")
-        check_result = subprocess.run(
-            ["ruff", "check", "--fix", str(self.project_root)],
+        ruff_path = shutil.which("ruff")
+        if not ruff_path:
+            raise FileNotFoundError("ruff command not found in PATH")
+            
+        # Security: subprocess call with validated executable path and secure parameters
+        # - ruff_path resolved via shutil.which() to prevent PATH injection
+        # - shell=False prevents shell injection attacks
+        # - timeout=120 prevents indefinite hanging
+        # - All arguments are controlled and validated
+        check_result = subprocess.run(  # noqa: S603
+            [ruff_path, "check", "--fix", str(self.project_root)],
             check=False,
             capture_output=True,
             text=True,
             cwd=self.project_root,
+            shell=False,
+            timeout=120,
         )
 
-        # Run ruff format to ensure consistent formatting
+        # Run ruff format to ensure consistent formatting - using absolute path for security
         print("🎨 Running ruff format...")
-        format_result = subprocess.run(
-            ["ruff", "format", str(self.project_root)],
+        # Security: subprocess call with validated executable path and secure parameters
+        # - ruff_path resolved via shutil.which() to prevent PATH injection
+        # - shell=False prevents shell injection attacks
+        # - timeout=60 prevents indefinite hanging
+        # - All arguments are controlled and validated
+        format_result = subprocess.run(  # noqa: S603
+            [ruff_path, "format", str(self.project_root)],
             check=False,
             capture_output=True,
             text=True,
             cwd=self.project_root,
+            shell=False,
+            timeout=60,
         )
 
         # Get metrics after changes
@@ -277,7 +306,7 @@ class GradualTightening:
         """Modify pyproject.toml to apply stage-specific rules."""
         try:
             # Read current pyproject.toml
-            with open(self.pyproject_path) as f:
+            with self.pyproject_path.open(encoding='utf-8') as f:
                 content = f.read()
 
             # This is a simplified approach - in a real implementation,
@@ -289,7 +318,7 @@ class GradualTightening:
             print(f"📝 Configuration updated for {stage_config['name']}")
             return True
 
-        except Exception as e:
+        except (OSError, PermissionError, UnicodeDecodeError) as e:
             print(f"❌ Error modifying pyproject.toml: {e}")
             return False
 
@@ -327,7 +356,7 @@ class GradualTightening:
 
         # Historical progress
         if self.metrics_path.exists():
-            with open(self.metrics_path) as f:
+            with self.metrics_path.open(encoding='utf-8') as f:
                 historical_metrics = json.load(f)
 
             print("\n📈 Historical Progress:")

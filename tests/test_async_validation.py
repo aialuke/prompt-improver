@@ -214,7 +214,7 @@ class TestAsyncPropertyBasedTesting:
     )
     async def test_concurrent_operations_scaling(self, operation_count, delay_ms):
         """Property: concurrent operations should scale better than sequential ones."""
-        
+
         async def dummy_operation():
             await asyncio.sleep(delay_ms)
             return delay_ms
@@ -227,7 +227,7 @@ class TestAsyncPropertyBasedTesting:
         # Verify results
         assert len(results) == operation_count
         assert all(result == delay_ms for result in results)
-        
+
         # Property: concurrent execution should be faster than sequential for multiple operations
         if operation_count > 1:
             expected_sequential_time = operation_count * delay_ms * 1000
@@ -241,13 +241,13 @@ class TestAsyncPropertyBasedTesting:
     )
     async def test_async_sleep_accuracy(self, sleep_duration):
         """Property: asyncio.sleep should be reasonably accurate."""
-        
+
         start_time = asyncio.get_event_loop().time()
         await asyncio.sleep(sleep_duration)
         end_time = asyncio.get_event_loop().time()
-        
+
         actual_duration = end_time - start_time
-        
+
         # Allow 50% overhead for timing variations in tests
         assert actual_duration >= sleep_duration, "Sleep duration was less than requested"
         assert actual_duration <= sleep_duration * 1.5, (
@@ -263,19 +263,19 @@ class TestAsyncPropertyBasedTesting:
     )
     async def test_asyncio_gather_order_preservation(self, tasks):
         """Property: asyncio.gather should preserve order regardless of completion time."""
-        
+
         async def timed_operation(delay, task_id):
             await asyncio.sleep(delay)
             return task_id
 
         # Create tasks with IDs to track order
         task_coroutines = [
-            timed_operation(delay, idx) 
+            timed_operation(delay, idx)
             for idx, delay in enumerate(tasks)
         ]
-        
+
         results = await asyncio.gather(*task_coroutines)
-        
+
         # Property: results should be in same order as input regardless of timing
         expected_order = list(range(len(tasks)))
         assert results == expected_order, (
@@ -287,30 +287,30 @@ class TestAsyncPropertyBasedTesting:
     )
     async def test_event_loop_context_preservation(self, concurrent_count):
         """Property: event loop context should be preserved across concurrent operations."""
-        
+
         async def context_checker(operation_id):
             # Store loop reference at start
             loop_start = asyncio.get_running_loop()
             loop_id_start = id(loop_start)
-            
+
             # Simulate some async work
             await asyncio.sleep(0.001)
-            
+
             # Check loop is still the same
             loop_end = asyncio.get_running_loop()
             loop_id_end = id(loop_end)
-            
+
             return (operation_id, loop_id_start, loop_id_end)
 
         # Run multiple concurrent operations
         results = await asyncio.gather(*[
             context_checker(i) for i in range(concurrent_count)
         ])
-        
+
         # Property: all operations should use the same event loop
         loop_ids_start = [result[1] for result in results]
         loop_ids_end = [result[2] for result in results]
-        
+
         # All operations should use the same loop
         assert len(set(loop_ids_start)) == 1, "Operations used different event loops"
         assert len(set(loop_ids_end)) == 1, "Event loop changed during execution"

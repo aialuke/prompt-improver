@@ -7,7 +7,9 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from threading import Lock
 from typing import Any, Dict, List, Optional
 
 import mlflow
@@ -32,6 +34,177 @@ from ..database.models import MLModelPerformance, RuleMetadata, RulePerformance
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ModelCacheEntry:
+    """Model cache entry with TTL and metadata"""
+    model: Any
+    model_id: str
+    cached_at: datetime
+    last_accessed: datetime
+    access_count: int = 0
+    model_type: str = "sklearn"
+    memory_size_mb: float = 0.0
+    ttl_minutes: int = 60  # Default 1 hour TTL
+
+    def is_expired(self) -> bool:
+        """Check if cache entry is expired"""
+        return datetime.utcnow() - self.cached_at > timedelta(minutes=self.ttl_minutes)
+
+    def update_access(self):
+        """Update access tracking"""
+        self.last_accessed = datetime.utcnow()
+        self.access_count += 1
+
+
+class InMemoryModelRegistry:
+    """Thread-safe in-memory model registry with TTL and lazy loading"""
+
+    def __init__(self, max_cache_size_mb: int = 500, default_ttl_minutes: int = 60):
+        self._cache: dict[str, ModelCacheEntry] = {}
+        self._lock = Lock()
+        self.max_cache_size_mb = max_cache_size_mb
+        self.default_ttl_minutes = default_ttl_minutes
+        self._total_cache_size_mb = 0.0
+
+    def get_model(self, model_id: str) -> Any | None:
+        """Get model from cache with lazy loading"""
+        with self._lock:
+            entry = self._cache.get(model_id)
+
+            if entry is None:
+                return None
+
+            if entry.is_expired():
+                logger.info(f"Model {model_id} expired, removing from cache")
+                self._remove_entry(model_id)
+                return None
+
+            entry.update_access()
+            logger.debug(f"Model {model_id} cache hit (access #{entry.access_count})")
+            return entry.model
+
+    def add_model(self, model_id: str, model: Any, model_type: str = "sklearn",
+                  ttl_minutes: int = None) -> bool:
+        """Add model to cache with memory management"""
+        with self._lock:
+            # Estimate model memory size
+            memory_size = self._estimate_model_memory(model)
+            ttl = ttl_minutes or self.default_ttl_minutes
+
+            # Check if we need to free memory
+            if self._total_cache_size_mb + memory_size > self.max_cache_size_mb:
+                self._evict_models(memory_size)
+
+            entry = ModelCacheEntry(
+                model=model,
+                model_id=model_id,
+                cached_at=datetime.utcnow(),
+                last_accessed=datetime.utcnow(),
+                model_type=model_type,
+                memory_size_mb=memory_size,
+                ttl_minutes=ttl
+            )
+
+            self._cache[model_id] = entry
+            self._total_cache_size_mb += memory_size
+
+            logger.info(f"Cached model {model_id} ({memory_size:.1f}MB, TTL: {ttl}min)")
+            return True
+
+    def remove_model(self, model_id: str) -> bool:
+        """Remove model from cache"""
+        with self._lock:
+            return self._remove_entry(model_id)
+
+    def _remove_entry(self, model_id: str) -> bool:
+        """Internal method to remove cache entry"""
+        entry = self._cache.pop(model_id, None)
+        if entry:
+            self._total_cache_size_mb -= entry.memory_size_mb
+            logger.debug(f"Removed model {model_id} from cache")
+            return True
+        return False
+
+    def _evict_models(self, required_space_mb: float):
+        """Evict least recently used models to free space"""
+        # Sort by last accessed time (LRU)
+        sorted_entries = sorted(
+            self._cache.items(),
+            key=lambda x: x[1].last_accessed
+        )
+
+        freed_space = 0.0
+        evicted_count = 0
+
+        for model_id, entry in sorted_entries:
+            if freed_space >= required_space_mb:
+                break
+
+            freed_space += entry.memory_size_mb
+            self._remove_entry(model_id)
+            evicted_count += 1
+
+        logger.info(f"Evicted {evicted_count} models, freed {freed_space:.1f}MB")
+
+    def _estimate_model_memory(self, model: Any) -> float:
+        """Estimate model memory usage in MB"""
+        try:
+            import pickle
+            import sys
+
+            # Try to serialize and measure size
+            serialized = pickle.dumps(model)
+            size_bytes = len(serialized)
+            size_mb = size_bytes / (1024 * 1024)
+
+            return size_mb
+
+        except Exception:
+            # Fallback estimate based on model type
+            if hasattr(model, 'get_params'):
+                return 10.0  # Default sklearn model estimate
+            return 5.0  # Conservative estimate
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics"""
+        with self._lock:
+            total_models = len(self._cache)
+            expired_models = sum(1 for entry in self._cache.values() if entry.is_expired())
+
+            return {
+                "total_models": total_models,
+                "expired_models": expired_models,
+                "active_models": total_models - expired_models,
+                "total_memory_mb": self._total_cache_size_mb,
+                "max_memory_mb": self.max_cache_size_mb,
+                "memory_utilization": self._total_cache_size_mb / self.max_cache_size_mb,
+                "model_details": [
+                    {
+                        "model_id": entry.model_id,
+                        "model_type": entry.model_type,
+                        "memory_mb": entry.memory_size_mb,
+                        "access_count": entry.access_count,
+                        "cached_minutes_ago": (datetime.utcnow() - entry.cached_at).total_seconds() / 60,
+                        "expires_in_minutes": entry.ttl_minutes - (datetime.utcnow() - entry.cached_at).total_seconds() / 60,
+                        "is_expired": entry.is_expired()
+                    } for entry in self._cache.values()
+                ]
+            }
+
+    def cleanup_expired(self) -> int:
+        """Remove all expired models and return count"""
+        with self._lock:
+            expired_ids = [model_id for model_id, entry in self._cache.items() if entry.is_expired()]
+
+            for model_id in expired_ids:
+                self._remove_entry(model_id)
+
+            if expired_ids:
+                logger.info(f"Cleaned up {len(expired_ids)} expired models")
+
+            return len(expired_ids)
+
+
 class MLModelService:
     """Direct Python ML integration service replacing bridge architecture.
 
@@ -45,9 +218,18 @@ class MLModelService:
     """
 
     def __init__(self):
-        self.models: dict[str, Any] = {}  # In-memory model registry
+        # Enhanced in-memory model registry with TTL
+        self.model_registry = InMemoryModelRegistry(
+            max_cache_size_mb=500,  # 500MB cache limit
+            default_ttl_minutes=60  # 1 hour default TTL
+        )
+
+        # MLflow client for model persistence
         self.mlflow_client = mlflow.tracking.MlflowClient()
         self.scaler = StandardScaler()
+
+        # Performance optimization settings
+        self._configure_ml_performance()
 
         # MLflow setup
         mlruns_path = os.path.abspath("mlruns")
@@ -173,9 +355,14 @@ class MLModelService:
                     )
                     recall = recall_score(y, final_model.predict(X), average="weighted")
 
-                    # Generate model ID and save
+                    # Generate model ID and cache with TTL
                     model_id = f"rule_optimizer_{int(time.time())}"
-                    self.models[model_id] = final_model
+                    self.model_registry.add_model(
+                        model_id,
+                        final_model,
+                        model_type="RandomForestClassifier",
+                        ttl_minutes=120  # 2 hours for optimized models
+                    )
 
                     # Log to MLflow
                     mlflow.log_params(best_params)
@@ -251,10 +438,15 @@ class MLModelService:
         start_time = time.time()
 
         try:
-            if model_id not in self.models:
-                return {"error": f"Model {model_id} not found"}
+            # Try to get model from cache first
+            model = self.model_registry.get_model(model_id)
 
-            model = self.models[model_id]
+            if model is None:
+                # Try to load from MLflow if not in cache
+                model = await self._lazy_load_model(model_id)
+
+            if model is None:
+                return {"error": f"Model {model_id} not found in cache or MLflow"}
             features = np.array([rule_features])
 
             # Get prediction and probability
@@ -372,9 +564,14 @@ class MLModelService:
                     ensemble_score = np.mean(cv_scores)
                     ensemble_std = np.std(cv_scores)
 
-                    # Generate model ID and save
+                    # Generate model ID and cache ensemble model
                     model_id = f"ensemble_optimizer_{int(time.time())}"
-                    self.models[model_id] = stacking_model
+                    self.model_registry.add_model(
+                        model_id,
+                        stacking_model,
+                        model_type="StackingClassifier",
+                        ttl_minutes=180  # 3 hours for ensemble models
+                    )
 
                     # Log to MLflow
                     mlflow.log_params({
@@ -604,6 +801,142 @@ class MLModelService:
         except Exception as e:
             logger.error(f"Failed to store model performance: {e}")
             await db_session.rollback()
+
+    def _configure_ml_performance(self):
+        """Configure ML performance settings for scikit-learn optimization"""
+        try:
+            import os
+
+            # Optimize BLAS/LAPACK threads for NumPy operations
+            cpu_count = os.cpu_count() or 1
+            optimal_threads = min(cpu_count, 4)  # Cap at 4 for stability
+
+            os.environ.setdefault("OMP_NUM_THREADS", str(optimal_threads))
+            os.environ.setdefault("OPENBLAS_NUM_THREADS", str(optimal_threads))
+            os.environ.setdefault("MKL_NUM_THREADS", str(optimal_threads))
+            os.environ.setdefault("VECLIB_MAXIMUM_THREADS", str(optimal_threads))
+
+            # Configure scikit-learn parallel processing
+            os.environ.setdefault("SKLEARN_N_JOBS", str(optimal_threads))
+
+            logger.info(f"ML performance configured: {optimal_threads} threads")
+
+        except Exception as e:
+            logger.warning(f"Failed to configure ML performance: {e}")
+
+    async def _lazy_load_model(self, model_id: str) -> Any | None:
+        """Lazy load model from MLflow when not in cache"""
+        try:
+            logger.info(f"Lazy loading model {model_id} from MLflow")
+
+            # Search for model in MLflow registry
+            model_versions = self.mlflow_client.search_model_versions(
+                filter_string="name='apes_rule_optimizer' OR name='apes_ensemble_optimizer'"
+            )
+
+            # Find matching model by run_id or version
+            target_model = None
+            for version in model_versions:
+                if model_id in version.description or model_id in version.run_id:
+                    target_model = version
+                    break
+
+            if target_model:
+                # Load model using MLflow
+                model_uri = f"models:/{target_model.name}/{target_model.version}"
+                loaded_model = mlflow.sklearn.load_model(model_uri)
+
+                # Cache the loaded model
+                self.model_registry.add_model(
+                    model_id,
+                    loaded_model,
+                    model_type="MLflow_Loaded",
+                    ttl_minutes=90  # 1.5 hours for lazy-loaded models
+                )
+
+                logger.info(f"Successfully lazy-loaded model {model_id}")
+                return loaded_model
+
+            logger.warning(f"Model {model_id} not found in MLflow registry")
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to lazy load model {model_id}: {e}")
+            return None
+
+    async def get_model_cache_stats(self) -> dict[str, Any]:
+        """Get comprehensive model cache statistics"""
+        try:
+            # Clean up expired models first
+            cleaned_count = self.model_registry.cleanup_expired()
+
+            # Get cache statistics
+            cache_stats = self.model_registry.get_cache_stats()
+
+            # Add cleanup information
+            cache_stats["cleaned_expired_models"] = cleaned_count
+            cache_stats["cache_efficiency"] = {
+                "hit_rate_estimate": "N/A",  # Would need request tracking
+                "memory_efficiency": cache_stats["memory_utilization"],
+                "active_model_ratio": cache_stats["active_models"] / max(cache_stats["total_models"], 1)
+            }
+
+            return {
+                "status": "success",
+                "cache_stats": cache_stats,
+                "recommendations": self._generate_cache_recommendations(cache_stats)
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get cache stats: {e}")
+            return {"status": "error", "error": str(e)}
+
+    def _generate_cache_recommendations(self, stats: dict[str, Any]) -> list[str]:
+        """Generate cache optimization recommendations"""
+        recommendations = []
+
+        memory_util = stats["memory_utilization"]
+        if memory_util > 0.9:
+            recommendations.append("🔴 High memory usage - consider increasing cache size or reducing TTL")
+        elif memory_util > 0.7:
+            recommendations.append("🟡 Moderate memory usage - monitor for trends")
+        else:
+            recommendations.append("🟢 Healthy memory usage")
+
+        if stats["expired_models"] > stats["active_models"]:
+            recommendations.append("⏰ Many expired models - consider shorter TTL or more frequent cleanup")
+
+        if stats["total_models"] > 20:
+            recommendations.append("📊 Large number of cached models - consider model lifecycle management")
+
+        return recommendations
+
+    async def optimize_model_cache(self) -> dict[str, Any]:
+        """Optimize model cache by cleaning expired models and analyzing usage"""
+        try:
+            start_time = time.time()
+
+            # Clean expired models
+            cleaned_count = self.model_registry.cleanup_expired()
+
+            # Get current stats
+            stats = self.model_registry.get_cache_stats()
+
+            processing_time = (time.time() - start_time) * 1000
+
+            return {
+                "status": "success",
+                "cleaned_models": cleaned_count,
+                "active_models": stats["active_models"],
+                "memory_usage_mb": stats["total_memory_mb"],
+                "memory_utilization": stats["memory_utilization"],
+                "processing_time_ms": processing_time,
+                "recommendations": self._generate_cache_recommendations(stats)
+            }
+
+        except Exception as e:
+            logger.error(f"Cache optimization failed: {e}")
+            return {"status": "error", "error": str(e)}
 
 
 # Global service instance

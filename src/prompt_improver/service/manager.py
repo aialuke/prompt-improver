@@ -181,11 +181,11 @@ class APESServiceManager:
         sys.stdout.flush()
         sys.stderr.flush()
 
-        with open("/dev/null") as stdin:
+        with open("/dev/null", encoding='utf-8') as stdin:
             os.dup2(stdin.fileno(), sys.stdin.fileno())
-        with open("/dev/null", "w") as stdout:
+        with open("/dev/null", "w", encoding='utf-8') as stdout:
             os.dup2(stdout.fileno(), sys.stdout.fileno())
-        with open("/dev/null", "w") as stderr:
+        with open("/dev/null", "w", encoding='utf-8') as stderr:
             os.dup2(stderr.fileno(), sys.stderr.fileno())
 
         return os.getpid()
@@ -200,7 +200,7 @@ class APESServiceManager:
             "command": " ".join(sys.argv),
         }
 
-        with open(self.pid_file, "w") as f:
+        with self.pid_file.open("w", encoding='utf-8') as f:
             json.dump(pid_data, f, indent=2)
 
         self.logger.info(f"PID file written: {self.pid_file} (PID: {pid})")
@@ -479,7 +479,7 @@ class APESServiceManager:
             return {"status": "not_running", "message": "No PID file found"}
 
         try:
-            with open(self.pid_file) as f:
+            with self.pid_file.open(encoding='utf-8') as f:
                 pid_data = json.load(f)
                 pid = pid_data["pid"]
 
@@ -529,7 +529,7 @@ class APESServiceManager:
             return status
 
         try:
-            with open(self.pid_file) as f:
+            with self.pid_file.open(encoding='utf-8') as f:
                 pid_data = json.load(f)
                 pid = pid_data["pid"]
                 started_at = datetime.fromisoformat(pid_data["started_at"])

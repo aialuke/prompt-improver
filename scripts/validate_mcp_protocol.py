@@ -1,13 +1,14 @@
 # Custom MCP Protocol Validation Script
 
-import sys
 import json
+import sys
 
 # Placeholder for validating MCP protocol JSON structure
 
+
 def validate_mcp_protocol(filename):
     try:
-        with open(filename, 'r') as file:
+        with open(filename, encoding='utf-8') as file:
             data = file.read()
             # Attempt to parse JSON and check specific structure
             # Example only, modify based on actual MCP protocol structure
@@ -24,9 +25,9 @@ def validate_mcp_protocol(filename):
         print(f"❌ {filename}: MCP protocol validation failed - {e}")
         return False
 
+
 if __name__ == '__main__':
     filenames = sys.argv[1:]
     success = all(validate_mcp_protocol(filename) for filename in filenames)
     if not success:
         sys.exit(1)
-
