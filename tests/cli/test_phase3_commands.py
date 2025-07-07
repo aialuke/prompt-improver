@@ -4,12 +4,8 @@ Implements real database operations, service interactions, and authentic command
 following Context7 CLI testing best practices with strategic mocking only for external dependencies.
 """
 
-import asyncio
 import json
 import os
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,8 +15,6 @@ from hypothesis import (
     settings,
     strategies as st,
 )
-from rich.console import Console
-from typer.testing import CliRunner
 
 from prompt_improver.cli import app
 

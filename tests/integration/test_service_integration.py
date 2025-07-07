@@ -4,12 +4,11 @@ Tests service interactions and database operations with real components.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from prompt_improver.database import get_session
 
 
 @pytest.mark.asyncio

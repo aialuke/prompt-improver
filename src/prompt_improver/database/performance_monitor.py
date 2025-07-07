@@ -5,7 +5,7 @@ Comprehensive monitoring for Phase 2 <50ms query time and 90% cache hit ratio re
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .psycopg_client import TypeSafePsycopgClient, get_psycopg_client
 

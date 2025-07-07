@@ -3,7 +3,7 @@ Provides intelligent prompt enhancement using language models.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # For now, we'll use a simple rule-based approach with structured improvements
 # In production, this would integrate with actual LLM APIs like OpenAI, Anthropic, etc.

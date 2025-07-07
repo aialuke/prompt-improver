@@ -6,7 +6,7 @@ required by the RuleEngine, as specified in the project's source of truth.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, NamedTuple
+from typing import Any, NamedTuple
 
 
 class RuleCheckResult(NamedTuple):

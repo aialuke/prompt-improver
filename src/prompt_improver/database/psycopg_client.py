@@ -5,7 +5,7 @@ Research-validated patterns for high-performance database operations.
 import contextlib
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool

@@ -3,7 +3,7 @@ Combines SQLAlchemy 2.0 async with Pydantic validation
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import CheckConstraint, Column, Index

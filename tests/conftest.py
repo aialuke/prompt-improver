@@ -6,23 +6,17 @@ Provides comprehensive fixture infrastructure following pytest-asyncio best prac
 import asyncio
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel
 from typer.testing import CliRunner
 
 from prompt_improver.database.models import (
-    ABExperiment,
-    DiscoveredPattern,
     ImprovementSession,
-    MLModelPerformance,
     RuleMetadata,
     RulePerformance,
-    UserFeedback,
 )
 
 
@@ -242,7 +236,6 @@ def test_config():
 @pytest.fixture
 def sample_rule_metadata():
     """Sample rule metadata for testing with unique IDs per test."""
-    import random
     import uuid
 
     # Generate unique suffix for this test run

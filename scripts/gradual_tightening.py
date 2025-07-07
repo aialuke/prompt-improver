@@ -257,7 +257,7 @@ class GradualTightening:
         # - shell=False prevents shell injection attacks
         # - timeout=120 prevents indefinite hanging
         # - All arguments are controlled and validated
-        check_result = subprocess.run(  # noqa: S603
+        _ = subprocess.run(  # noqa: S603
             [ruff_path, "check", "--fix", str(self.project_root)],
             check=False,
             capture_output=True,
@@ -274,7 +274,7 @@ class GradualTightening:
         # - shell=False prevents shell injection attacks
         # - timeout=60 prevents indefinite hanging
         # - All arguments are controlled and validated
-        format_result = subprocess.run(  # noqa: S603
+        _ = subprocess.run(  # noqa: S603
             [ruff_path, "format", str(self.project_root)],
             check=False,
             capture_output=True,
@@ -307,7 +307,7 @@ class GradualTightening:
         try:
             # Read current pyproject.toml
             with self.pyproject_path.open(encoding='utf-8') as f:
-                content = f.read()
+                _ = f.read()
 
             # This is a simplified approach - in a real implementation,
             # you'd want to use a TOML parser to properly modify the configuration

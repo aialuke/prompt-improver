@@ -7,10 +7,10 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import mlflow
 import mlflow.sklearn
@@ -150,7 +150,6 @@ class InMemoryModelRegistry:
         """Estimate model memory usage in MB"""
         try:
             import pickle
-            import sys
 
             # Try to serialize and measure size
             serialized = pickle.dumps(model)

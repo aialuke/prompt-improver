@@ -6,17 +6,12 @@ following Context7 database testing best practices.
 
 import asyncio
 import random
-import tempfile
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from hypothesis import (
     HealthCheck,
-    assume,
     given,
     settings,
     strategies as st,
@@ -24,7 +19,6 @@ from hypothesis import (
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-from prompt_improver.database import get_session
 
 
 @pytest.mark.asyncio

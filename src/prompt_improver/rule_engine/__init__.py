@@ -4,7 +4,7 @@ Provides the main RuleEngine class for orchestrating prompt improvement rules.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .rules.clarity import ClarityRule
 from .rules.specificity import SpecificityRule

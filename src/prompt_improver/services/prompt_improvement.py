@@ -4,7 +4,7 @@ Modern implementation with database integration and ML optimization
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

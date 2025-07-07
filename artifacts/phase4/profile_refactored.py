@@ -117,7 +117,7 @@ def profile_refactored_health():
         """Simulate the refactored health check processing logic"""
         console = Console()
 
-        options = HealthCheckOptions(
+        _ = HealthCheckOptions(
             json_output=False,
             detailed=True
         )

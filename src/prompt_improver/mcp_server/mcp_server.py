@@ -4,7 +4,7 @@ Provides prompt enhancement via Model Context Protocol with stdio transport.
 
 import asyncio
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
