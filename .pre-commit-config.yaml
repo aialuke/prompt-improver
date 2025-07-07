@@ -1,15 +1,21 @@
 repos:
-  # Ruff for linting and formatting
+  # Ruff for linting and formatting (Context7 enhanced)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.10
+    rev: v0.6.0  # Updated to latest stable
     hooks:
       - id: ruff
         name: ruff check
-        args: [--fix, --exit-non-zero-on-fix, --preview]
+        args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
       - id: ruff-format
         name: ruff format
         types_or: [python, pyi]
+      # Context7 Security Focus: Separate security check
+      - id: ruff
+        name: security check (BLE001 focus)
+        args: [--select=BLE001,S, --no-fix]
+        types_or: [python, pyi]
+        pass_filenames: true
 
   # Basic pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -107,6 +113,7 @@ default_language_version:
 # Skip hooks for specific scenarios
 ci:
   skip: [performance-regression-check]  # Skip in CI to avoid duplicate runs
+  # Note: Security checks (BLE001) run in both pre-commit and CI (Context7 defense-in-depth)
 
 # Hook execution order
 stages:

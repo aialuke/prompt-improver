@@ -181,11 +181,11 @@ class APESServiceManager:
         sys.stdout.flush()
         sys.stderr.flush()
 
-        with open("/dev/null", encoding='utf-8') as stdin:
+        with open("/dev/null", encoding="utf-8") as stdin:
             os.dup2(stdin.fileno(), sys.stdin.fileno())
-        with open("/dev/null", "w", encoding='utf-8') as stdout:
+        with open("/dev/null", "w", encoding="utf-8") as stdout:
             os.dup2(stdout.fileno(), sys.stdout.fileno())
-        with open("/dev/null", "w", encoding='utf-8') as stderr:
+        with open("/dev/null", "w", encoding="utf-8") as stderr:
             os.dup2(stderr.fileno(), sys.stderr.fileno())
 
         return os.getpid()
@@ -200,7 +200,7 @@ class APESServiceManager:
             "command": " ".join(sys.argv),
         }
 
-        with self.pid_file.open("w", encoding='utf-8') as f:
+        with self.pid_file.open("w", encoding="utf-8") as f:
             json.dump(pid_data, f, indent=2)
 
         self.logger.info(f"PID file written: {self.pid_file} (PID: {pid})")
@@ -277,54 +277,41 @@ class APESServiceManager:
         asyncio.create_task(self.monitor_service_health_background())
 
     async def verify_service_health(self) -> dict[str, Any]:
-        """Verify service health and performance"""
-        health_status = {
-            "database_connection": False,
-            "mcp_response_time": None,
-            "memory_usage_mb": 0,
-            "cpu_usage_percent": 0,
-        }
-
-        # Test database connection
+        """Verify service health and performance using unified health service"""
         try:
-            async with get_session() as session:
-                start_time = asyncio.get_event_loop().time()
-                await session.execute("SELECT 1")
-                end_time = asyncio.get_event_loop().time()
-
-                health_status["database_connection"] = True
-                health_status["db_response_time"] = (end_time - start_time) * 1000
-
+            from ..services.health import get_health_service
+            
+            health_service = get_health_service()
+            health_result = await health_service.run_health_check()
+            
+            # Convert to legacy format for compatibility
+            health_status = {
+                "database_connection": health_result.checks.get("database", {}).status.value == "healthy",
+                "mcp_response_time": health_result.checks.get("mcp_server", {}).response_time_ms,
+                "memory_usage_mb": 0,
+                "cpu_usage_percent": 0,
+                "overall_status": health_result.overall_status.value
+            }
+            
+            # Extract system metrics if available
+            system_check = health_result.checks.get("system_resources")
+            if system_check and system_check.details:
+                health_status["memory_usage_mb"] = system_check.details.get("memory_usage_percent", 0) * 2.56  # Rough conversion
+                health_status["cpu_usage_percent"] = system_check.details.get("cpu_usage_percent", 0)
+            
+            return health_status
+            
         except Exception as e:
-            self.logger.error(f"Database health check failed: {e}")
-
-        # Test MCP server performance
-        try:
-            from ..mcp_server.mcp_server import improve_prompt
-
-            start_time = asyncio.get_event_loop().time()
-            await improve_prompt(
-                prompt="Health check test",
-                context={"domain": "health_check"},
-                session_id="health_check",
-            )
-            end_time = asyncio.get_event_loop().time()
-
-            health_status["mcp_response_time"] = (end_time - start_time) * 1000
-
-        except Exception as e:
-            self.logger.error(f"MCP health check failed: {e}")
-
-        # System resource usage
-        try:
-            process = psutil.Process()
-            health_status["memory_usage_mb"] = process.memory_info().rss / (1024 * 1024)
-            health_status["cpu_usage_percent"] = process.cpu_percent()
-
-        except Exception as e:
-            self.logger.error(f"Resource monitoring failed: {e}")
-
-        return health_status
+            self.logger.error(f"Health service check failed: {e}")
+            # Fallback to basic health status
+            return {
+                "database_connection": False,
+                "mcp_response_time": None, 
+                "memory_usage_mb": 0,
+                "cpu_usage_percent": 0,
+                "overall_status": "failed",
+                "error": str(e)
+            }
 
     async def optimize_performance_settings(self):
         """Optimize performance settings when degradation detected"""
@@ -344,32 +331,46 @@ class APESServiceManager:
             self.logger.error(f"Failed to apply optimizations: {e}")
 
     async def monitor_service_health_background(self, alert_threshold_ms: int = 250):
-        """Background service monitoring with alerting"""
+        """Background service monitoring with alerting using unified health service"""
         self.logger.info(
             f"Starting background health monitoring (threshold: {alert_threshold_ms}ms)"
         )
 
         while not self.shutdown_event.is_set():
             try:
-                metrics = await self.collect_performance_metrics()
-
+                from ..services.health import get_health_service
+                
+                health_service = get_health_service()
+                health_result = await health_service.run_health_check()
+                
                 # Monitor critical performance indicators
-                if metrics.get("avg_response_time", 0) > alert_threshold_ms:
+                mcp_check = health_result.checks.get("mcp_server")
+                if mcp_check and mcp_check.response_time_ms and mcp_check.response_time_ms > alert_threshold_ms:
                     await self.send_performance_alert(
-                        f"High latency detected: {metrics['avg_response_time']}ms"
+                        f"High latency detected: {mcp_check.response_time_ms}ms"
                     )
 
-                if metrics.get("database_connections", 0) > 15:  # Near pool limit
+                # Check database connections
+                db_check = health_result.checks.get("database")
+                if db_check and db_check.details and db_check.details.get("active_connections", 0) > 15:
                     await self.optimize_connection_pool()
 
-                # Check memory usage
-                if metrics.get("memory_usage_mb", 0) > 256:  # Above 256MB
-                    self.logger.warning(
-                        f"High memory usage: {metrics['memory_usage_mb']}MB"
-                    )
+                # Check system resources
+                system_check = health_result.checks.get("system_resources")
+                if system_check and system_check.details:
+                    memory_percent = system_check.details.get("memory_usage_percent", 0)
+                    if memory_percent > 80:
+                        self.logger.warning(f"High memory usage: {memory_percent:.1f}%")
 
-                # Log structured metrics for analysis
-                await self.log_performance_metrics(metrics)
+                # Log health status for structured analysis
+                self.logger.info(f"Health status: {health_result.overall_status.value}")
+                
+                # Check for any failed components
+                if health_result.failed_checks:
+                    self.logger.error(f"Failed health checks: {', '.join(health_result.failed_checks)}")
+                
+                if health_result.warning_checks:
+                    self.logger.warning(f"Warning health checks: {', '.join(health_result.warning_checks)}")
 
                 # Wait for next monitoring cycle
                 await asyncio.sleep(30)  # 30-second monitoring interval
@@ -479,7 +480,7 @@ class APESServiceManager:
             return {"status": "not_running", "message": "No PID file found"}
 
         try:
-            with self.pid_file.open(encoding='utf-8') as f:
+            with self.pid_file.open(encoding="utf-8") as f:
                 pid_data = json.load(f)
                 pid = pid_data["pid"]
 
@@ -529,7 +530,7 @@ class APESServiceManager:
             return status
 
         try:
-            with self.pid_file.open(encoding='utf-8') as f:
+            with self.pid_file.open(encoding="utf-8") as f:
                 pid_data = json.load(f)
                 pid = pid_data["pid"]
                 started_at = datetime.fromisoformat(pid_data["started_at"])

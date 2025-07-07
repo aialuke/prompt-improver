@@ -2,6 +2,7 @@
 """Baseline profiling script for Phase 4 refactoring.
 This script profiles the complex CLI functions before refactoring.
 """
+
 import cProfile
 import pstats
 import sys
@@ -18,7 +19,9 @@ def profile_logs_function():
     # Imports removed as they were unused
 
     # Create a temporary log file for testing
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False, encoding='utf-8') as f:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".log", delete=False, encoding="utf-8"
+    ) as f:
         # Write some sample log entries
         log_entries = [
             "2024-01-15 10:00:00 INFO Starting application...",
@@ -29,7 +32,7 @@ def profile_logs_function():
         ] * 100  # Create more log entries for better profiling
 
         for entry in log_entries:
-            f.write(entry + '\n')
+            f.write(entry + "\n")
 
         temp_log_file = f.name
 
@@ -40,9 +43,11 @@ def profile_logs_function():
 
         # Read and process log file (similar to logs function logic)
         log_path = Path(temp_log_file)
-        with log_path.open(encoding='utf-8') as f:
+        with log_path.open(encoding="utf-8") as f:
             all_lines = f.readlines()
-            recent_lines = all_lines[-lines_limit:] if len(all_lines) > lines_limit else all_lines
+            recent_lines = (
+                all_lines[-lines_limit:] if len(all_lines) > lines_limit else all_lines
+            )
 
             for line in recent_lines:
                 # Level filtering
@@ -80,7 +85,7 @@ def profile_logs_function():
 
     # Print stats
     stats = pstats.Stats(pr)
-    stats.sort_stats('cumulative')
+    stats.sort_stats("cumulative")
     print("=== LOGS FUNCTION BASELINE PROFILE ===")
     stats.print_stats(20)
 

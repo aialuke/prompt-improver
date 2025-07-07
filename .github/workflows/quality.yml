@@ -1,0 +1,115 @@
+name: Code Quality Analysis
+on: 
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ruff-analysis:
+    name: Ruff Quality & Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Security Violation Check
+        run: |
+          echo "## 🚨 Security Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "Checking for critical security violations..." >> $GITHUB_STEP_SUMMARY
+          
+          # Check BLE001 (blind exception handling) - Context7 priority
+          ble001_count=$(ruff check --select BLE001 . | wc -l)
+          echo "- **BLE001 (Blind Exceptions)**: $ble001_count violations" >> $GITHUB_STEP_SUMMARY
+          
+          # Fail if new BLE001 violations introduced
+          if [ "$ble001_count" -gt 147 ]; then
+            echo "❌ New security violations detected! Current: $ble001_count, Baseline: 147" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          
+          # Check other security rules
+          ruff check --select S --output-format=github .
+
+      - name: Architecture Quality Check
+        run: |
+          echo "## 🏗️ Architecture Analysis" >> $GITHUB_STEP_SUMMARY
+          
+          # Check PLR6301 (no-self-use) - Context7 architecture focus
+          plr6301_count=$(ruff check --select PLR6301 . | wc -l)
+          echo "- **PLR6301 (No Self Use)**: $plr6301_count violations" >> $GITHUB_STEP_SUMMARY
+          
+          # Track progress toward goal
+          if [ "$plr6301_count" -le 291 ]; then
+            echo "✅ Architecture violations stable or improving" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Architecture violations increased" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Overall Quality Assessment
+        run: |
+          echo "## 📊 Overall Quality Metrics" >> $GITHUB_STEP_SUMMARY
+          
+          # Get total violation count
+          total_violations=$(ruff check . | wc -l)
+          echo "- **Total Violations**: $total_violations" >> $GITHUB_STEP_SUMMARY
+          
+          # Context7 target: maintain below 1,765 (current baseline)
+          if [ "$total_violations" -le 1765 ]; then
+            echo "✅ Quality baseline maintained" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Quality regression detected!" >> $GITHUB_STEP_SUMMARY
+            echo "Current: $total_violations, Baseline: 1,765" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Detailed statistics
+          echo "### Detailed Statistics" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ruff check . --statistics >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Quality Report
+        if: always()
+        run: |
+          # Create detailed report
+          echo "# Code Quality Report - $(date)" > quality_report.md
+          echo "" >> quality_report.md
+          echo "## Violation Summary" >> quality_report.md
+          ruff check . --statistics >> quality_report.md
+          echo "" >> quality_report.md
+          echo "## Security Focus (BLE001)" >> quality_report.md
+          ruff check --select BLE001 . >> quality_report.md
+          echo "" >> quality_report.md
+          echo "## Architecture Focus (PLR6301)" >> quality_report.md
+          ruff check --select PLR6301 . | head -20 >> quality_report.md
+
+      - name: Upload Quality Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report
+          path: quality_report.md
+          retention-days: 30
+
+  pre-commit-check:
+    name: Pre-commit Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files

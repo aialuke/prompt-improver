@@ -69,4 +69,19 @@ class DatabaseConfig(BaseSettings):
         """Generate synchronous PostgreSQL connection URL for migrations"""
         return f"postgresql://{self.postgres_username}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
 
+    # Additional environment variables (allowing extra fields for flexibility)
+    external_database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
+    test_db_name: str | None = Field(default=None, validation_alias="TEST_DB_NAME")
+    test_database_url: str | None = Field(default=None, validation_alias="TEST_DATABASE_URL")
+    
+    # MCP configuration
+    mcp_postgres_enabled: bool = Field(default=True, validation_alias="MCP_POSTGRES_ENABLED")
+    mcp_postgres_connection_string: str | None = Field(default=None, validation_alias="MCP_POSTGRES_CONNECTION_STRING")
+    
+    # General application settings
+    development_mode: bool = Field(default=True, validation_alias="DEVELOPMENT_MODE")
+    log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
+    enable_performance_monitoring: bool = Field(default=True, validation_alias="ENABLE_PERFORMANCE_MONITORING")
+    slow_query_threshold: int = Field(default=1000, validation_alias="SLOW_QUERY_THRESHOLD")
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)

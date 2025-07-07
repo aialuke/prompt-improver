@@ -17,6 +17,7 @@ from prompt_improver.database.models import (
     ImprovementSession,
     RuleMetadata,
     RulePerformance,
+    UserFeedback,
 )
 
 
@@ -61,16 +62,17 @@ def mock_db_session():
 @pytest.fixture
 async def test_db_engine():
     """Create test database engine using existing PostgreSQL configuration with retry logic."""
-    from prompt_improver.database.config import DatabaseConfig
     from tests.database_helpers import (
-        wait_for_postgres_async,
+        create_test_engine_with_retry,
         ensure_test_database_exists,
-        create_test_engine_with_retry
+        wait_for_postgres_async,
     )
+
+    from prompt_improver.database.config import DatabaseConfig
 
     # Use existing database config but with test database name
     config = DatabaseConfig()
-    
+
     # First, wait for PostgreSQL to be ready
     postgres_ready = await wait_for_postgres_async(
         host=config.postgres_host,
@@ -79,27 +81,27 @@ async def test_db_engine():
         password=config.postgres_password,
         database="postgres",  # Connect to default database first
         max_retries=30,
-        retry_delay=1.0
+        retry_delay=1.0,
     )
-    
+
     if not postgres_ready:
         pytest.skip("PostgreSQL server not available after 30 attempts")
-    
+
     # Ensure test database exists
     db_exists = await ensure_test_database_exists(
         host=config.postgres_host,
         port=config.postgres_port,
         user=config.postgres_username,
         password=config.postgres_password,
-        test_db_name="apes_test"
+        test_db_name="apes_test",
     )
-    
+
     if not db_exists:
         pytest.skip("Could not create test database")
-    
+
     # Now create the engine with retry logic
     test_db_url = f"postgresql+asyncpg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/apes_test"
-    
+
     engine = await create_test_engine_with_retry(
         test_db_url,
         max_retries=3,
@@ -111,7 +113,7 @@ async def test_db_engine():
         },
         pool_timeout=10,  # Increased timeout
     )
-    
+
     if engine is None:
         pytest.skip("Could not create database engine")
 
@@ -283,7 +285,9 @@ def sample_rule_performance(sample_rule_metadata):
             after_metrics={"clarity": 0.8, "specificity": 0.6},
         ),
         RulePerformance(
-            rule_id=sample_rule_metadata[1].rule_id,  # specificity_rule with unique suffix
+            rule_id=sample_rule_metadata[
+                1
+            ].rule_id,  # specificity_rule with unique suffix
             rule_name="Specificity Enhancement Rule",
             improvement_score=0.7,
             confidence_level=0.8,
@@ -303,7 +307,8 @@ def sample_rule_performance(sample_rule_metadata):
                 rule_id=base.rule_id,
                 rule_name=base.rule_name,
                 prompt_id=uuid.uuid4(),  # Unique prompt_id for each record
-                improvement_score=base.improvement_score + (i * 0.01),  # Slight variation
+                improvement_score=base.improvement_score
+                + (i * 0.01),  # Slight variation
                 confidence_level=base.confidence_level,
                 execution_time_ms=base.execution_time_ms + i,
                 prompt_characteristics=base.prompt_characteristics,

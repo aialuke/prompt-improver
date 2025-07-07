@@ -47,7 +47,9 @@ class TestEnhancedTrainCommand:
     """Test enhanced train command with real database and service interactions."""
 
     @pytest.mark.asyncio
-    async def test_train_command_default_options(self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance):
+    async def test_train_command_default_options(
+        self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance
+    ):
         """Test train command with default options using real database."""
         # Populate database with test data
         for rule in sample_rule_metadata:
@@ -77,7 +79,9 @@ class TestEnhancedTrainCommand:
             assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_train_command_with_real_data_priority(self, cli_runner, test_db_session, sample_rule_metadata):
+    async def test_train_command_with_real_data_priority(
+        self, cli_runner, test_db_session, sample_rule_metadata
+    ):
         """Test train command with real data priority flag."""
         # Populate database with test data
         for rule in sample_rule_metadata:
@@ -102,7 +106,9 @@ class TestEnhancedTrainCommand:
             assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_train_command_verbose_mode(self, cli_runner, test_db_session, sample_rule_metadata):
+    async def test_train_command_verbose_mode(
+        self, cli_runner, test_db_session, sample_rule_metadata
+    ):
         """Test train command with verbose output."""
         # Populate database with test data
         for rule in sample_rule_metadata:
@@ -128,6 +134,7 @@ class TestEnhancedTrainCommand:
 
     def test_train_command_dry_run(self, cli_runner):
         """Test train command with dry run option."""
+
         # Mock asyncio.run to handle nested event loop issue
         def mock_asyncio_run(coro):
             return None
@@ -143,7 +150,9 @@ class TestEnhancedTrainCommand:
             assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_train_command_specific_rules(self, cli_runner, test_db_session, sample_rule_metadata):
+    async def test_train_command_specific_rules(
+        self, cli_runner, test_db_session, sample_rule_metadata
+    ):
         """Test train command with specific rule IDs."""
         # Populate database with specific test rules
         for rule in sample_rule_metadata:
@@ -170,7 +179,9 @@ class TestEnhancedTrainCommand:
             assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_train_command_with_ensemble(self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance):
+    async def test_train_command_with_ensemble(
+        self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance
+    ):
         """Test train command with ensemble optimization."""
         # Populate database with sufficient data for ensemble training
         for rule in sample_rule_metadata:
@@ -201,7 +212,9 @@ class TestDiscoverPatternsCommand:
     """Test discover_patterns command with real database operations."""
 
     @pytest.mark.asyncio
-    async def test_discover_patterns_default(self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance):
+    async def test_discover_patterns_default(
+        self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance
+    ):
         """Test discover patterns command with real database query."""
         # Populate database with test data for pattern discovery
         for rule in sample_rule_metadata:
@@ -219,7 +232,9 @@ class TestDiscoverPatternsCommand:
             assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_discover_patterns_custom_thresholds(self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance):
+    async def test_discover_patterns_custom_thresholds(
+        self, cli_runner, test_db_session, sample_rule_metadata, sample_rule_performance
+    ):
         """Test discover patterns with custom thresholds using real data."""
         # Populate database with high-quality test data
         for rule in sample_rule_metadata:
@@ -264,6 +279,7 @@ class TestMLStatusCommand:
     @pytest.mark.asyncio
     async def test_ml_status_default(self, cli_runner, test_db_session):
         """Test ML status command with default options using real database."""
+
         # Mock asyncio.run to handle nested event loop issue
         def mock_asyncio_run(coro):
             return None
@@ -290,6 +306,7 @@ class TestOptimizeRulesCommand:
     @pytest.mark.asyncio
     async def test_optimize_rules_default(self, cli_runner, test_db_session):
         """Test optimize rules command with default parameters using real database."""
+
         # Mock asyncio.run to handle nested event loop issue
         def mock_asyncio_run(coro):
             return None
@@ -305,6 +322,7 @@ class TestOptimizeRulesCommand:
     @pytest.mark.asyncio
     async def test_optimize_rules_specific_rules(self, cli_runner, test_db_session):
         """Test optimize rules for specific rule IDs using real database."""
+
         # Mock asyncio.run to handle nested event loop issue
         def mock_asyncio_run(coro):
             return None
@@ -380,6 +398,7 @@ class TestCLIAsyncFunctionality:
 
     def test_async_commands_use_asyncio_run(self, cli_runner):
         """Test that async CLI commands properly use asyncio.run following Typer best practices."""
+
         # Following Context7 best practices for Typer CLI testing with async functions
         # Mock asyncio.run to return None immediately to avoid event loop nesting
         def mock_asyncio_run(coro):
@@ -389,15 +408,21 @@ class TestCLIAsyncFunctionality:
 
         # Mock all external dependencies according to pytest-asyncio and Typer best practices
         with (
-            patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run,
+            patch(
+                "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+            ) as mock_run,
             patch("prompt_improver.cli.sessionmanager") as mock_sessionmanager,
             patch("prompt_improver.services.ml_integration.mlflow") as mock_mlflow,
             patch("prompt_improver.cli.console") as mock_console,
         ):
             # Configure minimal mocks for database session manager
             mock_session = AsyncMock()
-            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(
+                return_value=None
+            )
 
             # Configure MLflow mocks
             mock_mlflow.active_run.return_value = None
@@ -474,19 +499,26 @@ class TestCLIErrorHandlingAndLogging:
 
     def test_discover_patterns_insufficient_data_error(self, cli_runner):
         """Test discover patterns handles insufficient data error."""
+
         # Mock asyncio.run to return None immediately
         def mock_asyncio_run(coro):
             # Don't execute the coroutine, just return None
             return None
 
         with (
-            patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run,
+            patch(
+                "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+            ) as mock_run,
             patch("prompt_improver.cli.sessionmanager") as mock_sessionmanager,
         ):
             # Configure minimal mocks
             mock_session = AsyncMock()
-            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(
+                return_value=None
+            )
 
             result = cli_runner.invoke(app, ["discover-patterns"])
 
@@ -525,23 +557,33 @@ class TestCLIFileSystemIntegration:
             return None
 
         with (
-            patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run,
+            patch(
+                "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+            ) as mock_run,
             patch("prompt_improver.cli.sessionmanager") as mock_sessionmanager,
             patch("prompt_improver.services.ml_integration.mlflow") as mock_mlflow,
         ):
             # Configure mocks
             mock_session = AsyncMock()
-            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(
+                return_value=None
+            )
             mock_mlflow.active_run.return_value = None
 
             # Use actual CLI options that exist
-            result = cli_runner.invoke(app, [
-                "train",
-                "--rules", "clarity_rule,specificity_rule",
-                "--verbose",
-                "--ensemble"
-            ])
+            result = cli_runner.invoke(
+                app,
+                [
+                    "train",
+                    "--rules",
+                    "clarity_rule,specificity_rule",
+                    "--verbose",
+                    "--ensemble",
+                ],
+            )
 
             assert result.exit_code == 0
             mock_run.assert_called_once()
@@ -554,21 +596,24 @@ class TestCLIFileSystemIntegration:
             return None
 
         with (
-            patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run,
+            patch(
+                "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+            ) as mock_run,
             patch("prompt_improver.cli.sessionmanager") as mock_sessionmanager,
             patch("prompt_improver.services.ml_integration.mlflow") as mock_mlflow,
         ):
             # Configure mocks
             mock_session = AsyncMock()
-            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(
+                return_value=None
+            )
             mock_mlflow.active_run.return_value = None
 
             # Use actual CLI options
-            result = cli_runner.invoke(app, [
-                "train",
-                "--verbose"
-            ])
+            result = cli_runner.invoke(app, ["train", "--verbose"])
 
             assert result.exit_code == 0
 
@@ -580,20 +625,31 @@ class TestCLIFileSystemIntegration:
             return None
 
         with (
-            patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run,
+            patch(
+                "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+            ) as mock_run,
             patch("prompt_improver.cli.sessionmanager") as mock_sessionmanager,
         ):
             # Configure mocks
             mock_session = AsyncMock()
-            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_sessionmanager.session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_sessionmanager.session.return_value.__aexit__ = AsyncMock(
+                return_value=None
+            )
 
             # Use actual CLI options that exist
-            result = cli_runner.invoke(app, [
-                "discover-patterns",
-                "--min-effectiveness", "0.7",
-                "--min-support", "10"
-            ])
+            result = cli_runner.invoke(
+                app,
+                [
+                    "discover-patterns",
+                    "--min-effectiveness",
+                    "0.7",
+                    "--min-support",
+                    "10",
+                ],
+            )
 
             assert result.exit_code == 0
 
@@ -602,7 +658,9 @@ class TestCLIFileSystemIntegration:
         ensemble_mode=st.booleans(),
     )
     @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
-    def test_cli_options_property_validation(self, cli_runner, test_data_dir, rule_count, ensemble_mode):
+    def test_cli_options_property_validation(
+        self, cli_runner, test_data_dir, rule_count, ensemble_mode
+    ):
         """Property-based testing of CLI option combinations."""
 
         # Generate rule list
@@ -614,13 +672,15 @@ class TestCLIFileSystemIntegration:
             # Just verify it was called and return None
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             # Test with actual CLI options that exist
             cmd_args = ["train", "--verbose"]
-            
+
             if rule_list:
                 cmd_args.extend(["--rules", rule_list])
-            
+
             if ensemble_mode:
                 cmd_args.append("--ensemble")
 
@@ -642,13 +702,10 @@ class TestCLIComprehensiveErrorScenarios:
         invalid_config_file = test_data_dir / "config" / "invalid_config.json"
         invalid_config_file.parent.mkdir(exist_ok=True)
 
-        with open(invalid_config_file, 'w', encoding="utf-8") as f:
+        with open(invalid_config_file, "w", encoding="utf-8") as f:
             f.write('{"invalid": json syntax here}')  # Invalid JSON
 
-        result = cli_runner.invoke(app, [
-            "train",
-            "--config", str(invalid_config_file)
-        ])
+        result = cli_runner.invoke(app, ["train", "--config", str(invalid_config_file)])
 
         # Should handle JSON parsing error gracefully
         assert result.exit_code != 0
@@ -659,14 +716,14 @@ class TestCLIComprehensiveErrorScenarios:
 
         non_existent_file = "/non/existent/path/config.json"
 
-        result = cli_runner.invoke(app, [
-            "train",
-            "--config", non_existent_file
-        ])
+        result = cli_runner.invoke(app, ["train", "--config", non_existent_file])
 
         # Should handle missing file error gracefully
         assert result.exit_code != 0
-        assert any(word in result.output.lower() for word in ["not found", "no such file", "error"])
+        assert any(
+            word in result.output.lower()
+            for word in ["not found", "no such file", "error"]
+        )
 
     def test_train_command_permission_denied_config(self, cli_runner, test_data_dir):
         """Test train command with permission denied on config file."""
@@ -675,17 +732,14 @@ class TestCLIComprehensiveErrorScenarios:
         config_file = test_data_dir / "config" / "no_permission_config.json"
         config_file.parent.mkdir(exist_ok=True)
 
-        with open(config_file, 'w', encoding="utf-8") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump({"training": {"rules": ["test_rule"]}}, f)
 
         # Remove read permission (Unix-like systems)
         try:
             os.chmod(config_file, 0o000)
 
-            result = cli_runner.invoke(app, [
-                "train",
-                "--config", str(config_file)
-            ])
+            result = cli_runner.invoke(app, ["train", "--config", str(config_file)])
 
             # Should handle permission error gracefully
             assert result.exit_code != 0
@@ -697,7 +751,9 @@ class TestCLIComprehensiveErrorScenarios:
             except:
                 pass
 
-    def test_discover_patterns_insufficient_disk_space_simulation(self, cli_runner, test_data_dir):
+    def test_discover_patterns_insufficient_disk_space_simulation(
+        self, cli_runner, test_data_dir
+    ):
         """Test discover patterns command under simulated disk space constraints."""
 
         # Create large input file to simulate space issues
@@ -710,12 +766,15 @@ class TestCLIComprehensiveErrorScenarios:
                 "rule_id": f"rule_{i}",
                 "effectiveness": 0.5 + (i % 5) * 0.1,
                 "support": 5 + (i % 10),
-                "parameters": {"weight": 0.5 + (i % 3) * 0.2, "data": "x" * 1000}  # Large payload
+                "parameters": {
+                    "weight": 0.5 + (i % 3) * 0.2,
+                    "data": "x" * 1000,
+                },  # Large payload
             }
             for i in range(1000)  # Large dataset
         ]
 
-        with open(large_input_file, 'w', encoding="utf-8") as f:
+        with open(large_input_file, "w", encoding="utf-8") as f:
             json.dump(large_data, f)
 
         # Mock disk space error during output
@@ -723,16 +782,22 @@ class TestCLIComprehensiveErrorScenarios:
         def mock_asyncio_run(coro):
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             # Patch the actual command to raise the error
             with patch("prompt_improver.cli.discover_patterns") as mock_cmd:
                 mock_cmd.side_effect = OSError("No space left on device")
 
-                result = cli_runner.invoke(app, [
-                    "discover-patterns",
-                    "--input-file", str(large_input_file),
-                    "--export-patterns"
-                ])
+                result = cli_runner.invoke(
+                    app,
+                    [
+                        "discover-patterns",
+                        "--input-file",
+                        str(large_input_file),
+                        "--export-patterns",
+                    ],
+                )
 
                 # Should handle disk space error gracefully
                 assert result.exit_code != 0
@@ -747,31 +812,32 @@ class TestCLIComprehensiveErrorScenarios:
         corrupted_files = [
             ("model_registry.json", b"corrupted binary data \x00\x01\x02"),
             ("performance_cache.json", "incomplete json {"),
-            ("training_log.json", "")  # Empty file
+            ("training_log.json", ""),  # Empty file
         ]
 
         for filename, content in corrupted_files:
             state_file = state_dir / filename
             if isinstance(content, str):
-                with open(state_file, 'w', encoding="utf-8") as f:
+                with open(state_file, "w", encoding="utf-8") as f:
                     f.write(content)
             else:
-                with open(state_file, 'wb') as f:
+                with open(state_file, "wb") as f:
                     f.write(content)
 
         # Mock asyncio.run to handle nested event loop issue
         def mock_asyncio_run(coro):
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             # Patch the actual command to raise the error
             with patch("prompt_improver.cli.ml_status") as mock_cmd:
                 mock_cmd.side_effect = Exception("Corrupted state files detected")
 
-                result = cli_runner.invoke(app, [
-                    "ml-status",
-                    "--state-dir", str(state_dir)
-                ])
+                result = cli_runner.invoke(
+                    app, ["ml-status", "--state-dir", str(state_dir)]
+                )
 
                 # Should handle corrupted files gracefully
                 assert result.exit_code != 0
@@ -783,26 +849,35 @@ class TestCLIComprehensiveErrorScenarios:
         def mock_asyncio_run(coro):
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             # Patch the actual command to raise the timeout error
             with patch("prompt_improver.cli.optimize_rules") as mock_cmd:
                 mock_cmd.side_effect = TimeoutError("MLflow server connection timeout")
 
-                result = cli_runner.invoke(app, [
-                    "optimize-rules",
-                    "--rule", "clarity_rule",
-                    "--remote-optimization"
-                ])
+                result = cli_runner.invoke(
+                    app,
+                    [
+                        "optimize-rules",
+                        "--rule",
+                        "clarity_rule",
+                        "--remote-optimization",
+                    ],
+                )
 
                 # Should handle network timeout gracefully
                 assert result.exit_code != 0
-                assert any(word in result.output.lower() for word in ["timeout", "connection", "error"])
+                assert any(
+                    word in result.output.lower()
+                    for word in ["timeout", "connection", "error"]
+                )
 
     @given(
         command_args=st.lists(
             st.text(alphabet="abcdefghijklmnopqrstuvwxyz-_", min_size=1, max_size=20),
             min_size=1,
-            max_size=5
+            max_size=5,
         )
     )
     def test_cli_malformed_arguments_handling(self, cli_runner, command_args):
@@ -835,8 +910,9 @@ class TestCLIPerformanceCharacteristics:
         def mock_asyncio_run(coro):
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
-
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             start_time = time.time()
             result = cli_runner.invoke(app, ["train", "--dry-run"])
             end_time = time.time()
@@ -845,7 +921,9 @@ class TestCLIPerformanceCharacteristics:
 
             assert result.exit_code == 0
             # CLI command should respond quickly for dry run
-            assert execution_time_ms < 5000, f"CLI took {execution_time_ms:.1f}ms, too slow"
+            assert execution_time_ms < 5000, (
+                f"CLI took {execution_time_ms:.1f}ms, too slow"
+            )
 
     def test_large_config_file_processing(self, cli_runner, test_data_dir):
         """Test CLI performance with large configuration files."""
@@ -858,22 +936,24 @@ class TestCLIPerformanceCharacteristics:
                     f"param_{i}": {
                         "weights": [0.1 * j for j in range(100)],
                         "thresholds": [0.01 * k for k in range(50)],
-                        "metadata": {"description": "x" * 500}  # Large text
+                        "metadata": {"description": "x" * 500},  # Large text
                     }
                     for i in range(100)  # Many parameters
-                }
+                },
             }
         }
 
         large_config_file = test_data_dir / "config" / "large_config.json"
         large_config_file.parent.mkdir(exist_ok=True)
 
-        with open(large_config_file, 'w', encoding="utf-8") as f:
+        with open(large_config_file, "w", encoding="utf-8") as f:
             json.dump(large_config, f)
 
         # Verify file is actually large
         file_size_mb = large_config_file.stat().st_size / (1024 * 1024)
-        assert file_size_mb > 0.1, f"Config file should be substantial for performance testing (current: {file_size_mb:.2f}MB)"
+        assert file_size_mb > 0.1, (
+            f"Config file should be substantial for performance testing (current: {file_size_mb:.2f}MB)"
+        )
 
         import time
 
@@ -881,21 +961,20 @@ class TestCLIPerformanceCharacteristics:
         def mock_asyncio_run(coro):
             return None
 
-        with patch("prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run) as mock_run:
-
+        with patch(
+            "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
+        ) as mock_run:
             start_time = time.time()
-            result = cli_runner.invoke(app, [
-                "train",
-                "--dry-run",
-                "--verbose"
-            ])
+            result = cli_runner.invoke(app, ["train", "--dry-run", "--verbose"])
             end_time = time.time()
 
             processing_time_ms = (end_time - start_time) * 1000
 
             assert result.exit_code == 0
             # Should process large config reasonably quickly
-            assert processing_time_ms < 10000, f"Large config processing took {processing_time_ms:.1f}ms"
+            assert processing_time_ms < 10000, (
+                f"Large config processing took {processing_time_ms:.1f}ms"
+            )
 
     def test_concurrent_cli_command_execution(self, cli_runner):
         """Test performance when multiple CLI commands run concurrently."""
@@ -915,7 +994,7 @@ class TestCLIPerformanceCharacteristics:
                 return {
                     "command": " ".join(cmd_args),
                     "exit_code": result.exit_code,
-                    "execution_time_ms": (end_time - start_time) * 1000
+                    "execution_time_ms": (end_time - start_time) * 1000,
                 }
 
         # Test commands to run concurrently
@@ -923,7 +1002,7 @@ class TestCLIPerformanceCharacteristics:
             ["train", "--dry-run"],
             ["discover-patterns", "--min-effectiveness", "0.8"],
             ["ml-status"],
-            ["optimize-rules", "--rule", "clarity_rule"]
+            ["optimize-rules", "--rule", "clarity_rule"],
         ]
 
         # Run commands and measure performance
@@ -955,19 +1034,19 @@ class TestCLIEndToEndWorkflows:
             "training": {
                 "rules": ["clarity_rule", "specificity_rule"],
                 "ensemble": True,
-                "validation": {"cross_folds": 3, "test_split": 0.2}
+                "validation": {"cross_folds": 3, "test_split": 0.2},
             },
             "output": {
                 "export_model": True,
                 "export_metrics": True,
-                "results_dir": str(test_data_dir / "results")
-            }
+                "results_dir": str(test_data_dir / "results"),
+            },
         }
 
         config_file = test_data_dir / "config" / "workflow_config.json"
         config_file.parent.mkdir(exist_ok=True)
 
-        with open(config_file, 'w', encoding="utf-8") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(workflow_config, f, indent=2)
 
         # Step 2: Run training command
@@ -978,17 +1057,15 @@ class TestCLIEndToEndWorkflows:
                 "metrics": {"accuracy": 0.88, "f1": 0.85},
                 "output_files": [
                     str(test_data_dir / "results" / "model.pkl"),
-                    str(test_data_dir / "results" / "metrics.json")
-                ]
+                    str(test_data_dir / "results" / "metrics.json"),
+                ],
             }
             mock_run.return_value = mock_training_results
-            mock_run.side_effect = lambda coro: mock_training_results  # Return results and consume coroutine
+            mock_run.side_effect = (
+                lambda coro: mock_training_results
+            )  # Return results and consume coroutine
 
-            result = cli_runner.invoke(app, [
-                "train",
-                "--verbose",
-                "--ensemble"
-            ])
+            result = cli_runner.invoke(app, ["train", "--verbose", "--ensemble"])
 
             assert result.exit_code == 0
             mock_run.assert_called_once()
@@ -999,20 +1076,22 @@ class TestCLIEndToEndWorkflows:
             loaded_config = json.load(f)
             assert loaded_config == workflow_config
 
-    def test_pattern_discovery_to_optimization_workflow(self, cli_runner, test_data_dir):
+    def test_pattern_discovery_to_optimization_workflow(
+        self, cli_runner, test_data_dir
+    ):
         """Test workflow from pattern discovery to rule optimization."""
 
         # Step 1: Create performance data for pattern discovery
         performance_data = [
             {"rule_id": "clarity_rule", "effectiveness": 0.85, "support": 20},
             {"rule_id": "specificity_rule", "effectiveness": 0.78, "support": 15},
-            {"rule_id": "consistency_rule", "effectiveness": 0.72, "support": 12}
+            {"rule_id": "consistency_rule", "effectiveness": 0.72, "support": 12},
         ]
 
         input_file = test_data_dir / "data" / "workflow_performance.json"
         input_file.parent.mkdir(exist_ok=True)
 
-        with open(input_file, 'w', encoding="utf-8") as f:
+        with open(input_file, "w", encoding="utf-8") as f:
             json.dump(performance_data, f, indent=2)
 
         # Step 2: Run pattern discovery
@@ -1024,17 +1103,24 @@ class TestCLIEndToEndWorkflows:
                 "patterns_discovered": 2,
                 "patterns": [
                     {"rule_id": "clarity_rule", "effectiveness": 0.85},
-                    {"rule_id": "specificity_rule", "effectiveness": 0.78}
-                ]
+                    {"rule_id": "specificity_rule", "effectiveness": 0.78},
+                ],
             }
             mock_run.return_value = mock_patterns
-            mock_run.side_effect = lambda coro: mock_patterns  # Return patterns and consume coroutine
+            mock_run.side_effect = (
+                lambda coro: mock_patterns
+            )  # Return patterns and consume coroutine
 
-            discovery_result = cli_runner.invoke(app, [
-                "discover-patterns",
-                "--min-effectiveness", "0.75",
-                "--min-support", "5"
-            ])
+            discovery_result = cli_runner.invoke(
+                app,
+                [
+                    "discover-patterns",
+                    "--min-effectiveness",
+                    "0.75",
+                    "--min-support",
+                    "5",
+                ],
+            )
 
             assert discovery_result.exit_code == 0
 
@@ -1043,16 +1129,16 @@ class TestCLIEndToEndWorkflows:
             mock_optimization = {
                 "status": "success",
                 "optimized_rules": ["clarity_rule", "specificity_rule"],
-                "improvement": 0.12
+                "improvement": 0.12,
             }
             mock_run.return_value = mock_optimization
-            mock_run.side_effect = lambda coro: mock_optimization  # Return optimization and consume coroutine
+            mock_run.side_effect = (
+                lambda coro: mock_optimization
+            )  # Return optimization and consume coroutine
 
-            optimization_result = cli_runner.invoke(app, [
-                "optimize-rules",
-                "--rule", "clarity_rule",
-                "--ensemble"
-            ])
+            optimization_result = cli_runner.invoke(
+                app, ["optimize-rules", "--rule", "clarity_rule", "--ensemble"]
+            )
 
             assert optimization_result.exit_code == 0
 

@@ -56,8 +56,10 @@ def start(
 
             # Start the process with security validations
             if not mcp_server_path.exists():
-                raise FileNotFoundError(f"MCP server script not found: {mcp_server_path}")
-            
+                raise FileNotFoundError(
+                    f"MCP server script not found: {mcp_server_path}"
+                )
+
             # Security: subprocess call with validated executable path and secure parameters
             # - sys.executable is Python's own executable path (trusted)
             # - mcp_server_path validated as existing file before use
@@ -82,31 +84,42 @@ def start(
             )
             console.print(f"📍 PID file: {pid_file}", style="dim")
 
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             console.print(f"❌ Failed to start MCP server: {e}", style="red")
+            raise typer.Exit(1)
+        except subprocess.SubprocessError as e:
+            console.print(f"❌ Failed to start MCP server process: {e}", style="red")
             raise typer.Exit(1)
     else:
         # Run in foreground
         try:
             mcp_server_path = Path(__file__).parent / "mcp_server" / "mcp_server.py"
             if not mcp_server_path.exists():
-                raise FileNotFoundError(f"MCP server script not found: {mcp_server_path}")
-            
+                raise FileNotFoundError(
+                    f"MCP server script not found: {mcp_server_path}"
+                )
+
             # Security: subprocess call with validated executable path and secure parameters
             # - sys.executable is Python's own executable path (trusted)
             # - mcp_server_path validated as existing file before use
             # - shell=False prevents shell injection attacks
             # - timeout=300 prevents indefinite hanging
             subprocess.run(  # noqa: S603
-                [sys.executable, str(mcp_server_path)], 
-                check=True, 
+                [sys.executable, str(mcp_server_path)],
+                check=True,
                 shell=False,
-                timeout=300
+                timeout=300,
             )
         except KeyboardInterrupt:
             console.print("\n👋 MCP server stopped", style="yellow")
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             console.print(f"❌ Error running MCP server: {e}", style="red")
+            raise typer.Exit(1)
+        except subprocess.SubprocessError as e:
+            console.print(f"❌ MCP server process failed: {e}", style="red")
+            raise typer.Exit(1)
+        except subprocess.TimeoutExpired as e:
+            console.print(f"❌ MCP server startup timed out: {e}", style="red")
             raise typer.Exit(1)
 
 
@@ -156,8 +169,14 @@ def stop(
         pid_file.unlink()
         console.print("✅ MCP server stopped", style="green")
 
-    except Exception as e:
-        console.print(f"❌ Failed to stop MCP server: {e}", style="red")
+    except (ValueError, FileNotFoundError) as e:
+        console.print(f"❌ Failed to read PID file: {e}", style="red")
+        raise typer.Exit(1)
+    except (ProcessLookupError, PermissionError) as e:
+        console.print(f"❌ Failed to stop MCP server process: {e}", style="red")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(f"❌ System error stopping MCP server: {e}", style="red")
         raise typer.Exit(1)
 
 
@@ -432,8 +451,16 @@ def train(
                     console.print(f"❌ Training failed: {error_msg}", style="red")
                     raise typer.Exit(1)
 
-            except Exception as e:
-                console.print(f"❌ Training failed: {e}", style="red")
+            except (ConnectionError, OSError) as e:
+                console.print(
+                    f"❌ Database connection failed during training: {e}", style="red"
+                )
+                raise typer.Exit(1)
+            except (ValueError, TypeError) as e:
+                console.print(f"❌ Training parameter error: {e}", style="red")
+                raise typer.Exit(1)
+            except ImportError as e:
+                console.print(f"❌ ML library dependency missing: {e}", style="red")
                 raise typer.Exit(1)
 
     # Run the async function
@@ -464,7 +491,7 @@ def analytics(
                 console.print(f"\n[bold]Rule Effectiveness (Last {days} days)[/bold]")
 
                 stats = await analytics_service.get_rule_effectiveness(
-                    days=days, min_usage=1, db_session=db_session
+                    days=days, min_usage_count=1, db_session=db_session
                 )
 
                 if stats:
@@ -545,18 +572,17 @@ def backup(
         if backup_script.exists():
             # Validate backup script is safe to execute
             if not backup_script.is_file():
-                raise ValueError(f"Backup script is not a regular file: {backup_script}")
-            
+                raise ValueError(
+                    f"Backup script is not a regular file: {backup_script}"
+                )
+
             # Security: subprocess call with validated script path and secure parameters
             # - backup_script validated as existing regular file before use
             # - shell=False prevents shell injection attacks
             # - timeout=600 prevents indefinite hanging
             # - Arguments are controlled and validated
             subprocess.run(  # noqa: S603
-                [str(backup_script), "backup"], 
-                check=True, 
-                shell=False,
-                timeout=600
+                [str(backup_script), "backup"], check=True, shell=False, timeout=600
             )
             console.print("✅ Backup completed successfully!", style="green")
             console.print(f"📦 Backup file: {to}", style="dim")
@@ -611,19 +637,25 @@ def doctor(
         if fix_issues:
             console.print("  🔧 Installing missing dependencies...")
             # Validate package name to prevent injection
-            if not e.name or not e.name.replace('-', '').replace('_', '').replace('.', '').isalnum():
+            if (
+                not e.name
+                or not e.name.replace("-", "")
+                .replace("_", "")
+                .replace(".", "")
+                .isalnum()
+            ):
                 raise ValueError(f"Invalid package name for installation: {e.name}")
-            
+
             # Security: subprocess call with validated package name and secure parameters
             # - sys.executable is Python's own executable path (trusted)
             # - e.name validated to contain only alphanumeric characters
             # - shell=False prevents shell injection attacks
             # - timeout=120 prevents indefinite hanging
             subprocess.run(  # noqa: S603
-                [sys.executable, "-m", "pip", "install", e.name], 
-                check=True, 
+                [sys.executable, "-m", "pip", "install", e.name],
+                check=True,
                 shell=False,
-                timeout=120
+                timeout=120,
             )
 
     # Check 3: Database connection
@@ -639,24 +671,28 @@ def doctor(
         console.print(
             f"  ✅ PostgreSQL connected: {db_version.split(',')[0]}", style="green"
         )
-    except Exception as e:
+    except (ConnectionError, OSError) as e:
         console.print(f"  ❌ Database connection failed: {e}", style="red")
+        issues_found = True
+    except ImportError as e:
+        console.print(f"  ❌ Database dependency missing: {e}", style="red")
+        issues_found = True
+    except RuntimeError as e:
+        console.print(f"  ❌ Database runtime error: {e}", style="red")
         issues_found = True
         if fix_issues:
             console.print("  🔧 Starting database...")
             db_script = (
-                Path(__file__).parent.parent.parent
-                / "scripts"
-                / "start_database.sh"
+                Path(__file__).parent.parent.parent / "scripts" / "start_database.sh"
             )
-            
+
             # Validate database script is safe to execute
             if not db_script.exists():
                 console.print("  ❌ Database start script not found", style="red")
                 return
             if not db_script.is_file():
                 raise ValueError(f"Database script is not a regular file: {db_script}")
-            
+
             # Security: subprocess call with validated script path and secure parameters
             # - db_script validated as existing regular file before use
             # - shell=False prevents shell injection attacks
@@ -986,8 +1022,10 @@ def data_stats(
 
                 table.add_row(label, str(count), percentage)
 
-            except Exception as e:
-                table.add_row(label, "Error", f"({e})")
+            except (ConnectionError, OSError) as e:
+                table.add_row(label, "DB Error", f"({e})")
+            except (KeyError, TypeError, ValueError) as e:
+                table.add_row(label, "Data Error", f"({e})")
 
         console.print(table)
 
@@ -1121,8 +1159,14 @@ def export_training_data(
                 f"✅ Exported {len(results)} records to {filename}", style="green"
             )
 
-        except Exception as e:
-            console.print(f"❌ Export failed: {e}", style="red")
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during export: {e}", style="red"
+            )
+        except (ValueError, TypeError) as e:
+            console.print(f"❌ Data processing error during export: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(f"❌ File operation failed during export: {e}", style="red")
 
     asyncio.run(export_data())
 
@@ -1216,8 +1260,19 @@ def discover_patterns(
                         style="red",
                     )
 
-            except Exception as e:
-                console.print(f"❌ Pattern discovery failed: {e}", style="red")
+            except (ConnectionError, OSError) as e:
+                console.print(
+                    f"❌ Database connection failed during pattern discovery: {e}",
+                    style="red",
+                )
+                raise typer.Exit(1)
+            except (ValueError, TypeError) as e:
+                console.print(
+                    f"❌ Invalid parameters for pattern discovery: {e}", style="red"
+                )
+                raise typer.Exit(1)
+            except ImportError as e:
+                console.print(f"❌ ML library import failed: {e}", style="red")
                 raise typer.Exit(1)
 
     asyncio.run(run_discovery())
@@ -1337,8 +1392,14 @@ def ml_status(
                 console.print("   ✅ Optuna Optimization: Ready")
                 console.print("   ✅ Ensemble Methods: Available")
 
-            except Exception as e:
-                console.print(f"❌ Failed to get ML status: {e}", style="red")
+            except (ConnectionError, OSError) as e:
+                console.print(f"❌ Database connection failed: {e}", style="red")
+                raise typer.Exit(1)
+            except ImportError as e:
+                console.print(f"❌ ML dependency missing: {e}", style="red")
+                raise typer.Exit(1)
+            except (AttributeError, ValueError) as e:
+                console.print(f"❌ ML system configuration error: {e}", style="red")
                 raise typer.Exit(1)
 
     asyncio.run(show_status())
@@ -1401,8 +1462,17 @@ def optimize_rules(
                     )
                     console.print(f"❌ Optimization failed: {error_msg}", style="red")
 
-            except Exception as e:
-                console.print(f"❌ Rule optimization failed: {e}", style="red")
+            except (ConnectionError, OSError) as e:
+                console.print(
+                    f"❌ Database connection failed during optimization: {e}",
+                    style="red",
+                )
+                raise typer.Exit(1)
+            except (ValueError, TypeError) as e:
+                console.print(f"❌ Invalid optimization parameters: {e}", style="red")
+                raise typer.Exit(1)
+            except ImportError as e:
+                console.print(f"❌ ML optimization library missing: {e}", style="red")
                 raise typer.Exit(1)
 
     asyncio.run(run_optimization())
@@ -1456,8 +1526,18 @@ def init(
             console.print("   2. Run 'apes doctor' to verify system health")
             console.print("   3. Run 'apes status' to check service status")
 
-        except Exception as e:
-            console.print(f"❌ Initialization failed: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(
+                f"❌ File system error during initialization: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during initialization: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except ImportError as e:
+            console.print(f"❌ Required dependency missing: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_initialization())
@@ -1505,8 +1585,16 @@ def backup_create(
                         f"     • {Path(backup_file).name} ({file_size:.1f} MB)"
                     )
 
-        except Exception as e:
-            console.print(f"❌ Backup failed: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(f"❌ File system error during backup: {e}", style="red")
+            raise typer.Exit(1)
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during backup: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except subprocess.SubprocessError as e:
+            console.print(f"❌ Backup script execution failed: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_backup())
@@ -1539,8 +1627,19 @@ def migrate_export(
                     )
                 console.print(f"   Checksum: {results['checksum'][:16]}...")
 
-        except Exception as e:
-            console.print(f"❌ Migration export failed: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(
+                f"❌ File system error during migration export: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during migration export: {e}",
+                style="red",
+            )
+            raise typer.Exit(1)
+        except (ValueError, TypeError) as e:
+            console.print(f"❌ Migration data processing error: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_export())
@@ -1586,8 +1685,14 @@ def service_start(
                 )
                 raise typer.Exit(1)
 
-        except Exception as e:
-            console.print(f"❌ Service start failed: {e}", style="red")
+        except (ConnectionError, OSError) as e:
+            console.print(f"❌ Service connection failed: {e}", style="red")
+            raise typer.Exit(1)
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(f"❌ Service file system error: {e}", style="red")
+            raise typer.Exit(1)
+        except (ProcessLookupError, subprocess.SubprocessError) as e:
+            console.print(f"❌ Service process error: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_service())
@@ -1615,8 +1720,11 @@ def service_stop(
             )
             raise typer.Exit(1)
 
-    except Exception as e:
-        console.print(f"❌ Service stop failed: {e}", style="red")
+    except (ProcessLookupError, PermissionError) as e:
+        console.print(f"❌ Service process error: {e}", style="red")
+        raise typer.Exit(1)
+    except (OSError, subprocess.SubprocessError) as e:
+        console.print(f"❌ System error stopping service: {e}", style="red")
         raise typer.Exit(1)
 
 
@@ -1666,8 +1774,11 @@ def service_status(
             if status.get("error"):
                 console.print(f"   Error: {status['error']}", style="red")
 
-    except Exception as e:
-        console.print(f"❌ Failed to get service status: {e}", style="red")
+    except (ProcessLookupError, PermissionError) as e:
+        console.print(f"❌ Service status access error: {e}", style="red")
+        raise typer.Exit(1)
+    except (OSError, ValueError) as e:
+        console.print(f"❌ Service status system error: {e}", style="red")
         raise typer.Exit(1)
 
 
@@ -1694,7 +1805,7 @@ def security_audit(
                 output_file = (
                     f"security_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                 )
-                with open(output_file, "w", encoding='utf-8') as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     json.dump(report, f, indent=2)
                 console.print(f"📄 Report exported to: {output_file}", style="green")
 
@@ -1739,8 +1850,18 @@ def security_audit(
                         f"   • {pattern['type']}: {pattern['count']} occurrences"
                     )
 
-        except Exception as e:
-            console.print(f"❌ Security audit failed: {e}", style="red")
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during security audit: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(
+                f"❌ File system error during security audit: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (ValueError, TypeError, KeyError) as e:
+            console.print(f"❌ Security audit data processing error: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_audit())
@@ -1807,8 +1928,16 @@ def security_test(
                     console.print("\n📝 Sanitized prompt:")
                     console.print(sanitized_prompt, style="dim")
 
-        except Exception as e:
-            console.print(f"❌ Security test failed: {e}", style="red")
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during security test: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (ValueError, TypeError, KeyError) as e:
+            console.print(f"❌ Security test data processing error: {e}", style="red")
+            raise typer.Exit(1)
+        except ImportError as e:
+            console.print(f"❌ Security library dependency missing: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_security_test())
@@ -1866,8 +1995,19 @@ def migrate_restore(
                 )
                 raise typer.Exit(1)
 
-        except Exception as e:
-            console.print(f"❌ Migration restoration failed: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(
+                f"❌ File system error during migration restoration: {e}", style="red"
+            )
+            raise typer.Exit(1)
+        except (ConnectionError, OSError) as e:
+            console.print(
+                f"❌ Database connection failed during migration restoration: {e}",
+                style="red",
+            )
+            raise typer.Exit(1)
+        except (ValueError, TypeError) as e:
+            console.print(f"❌ Migration data processing error: {e}", style="red")
             raise typer.Exit(1)
 
     asyncio.run(run_restore())
@@ -1899,25 +2039,31 @@ def training_history(
 
             # Launch MLflow UI - using absolute path for security
             import shutil
+
             mlflow_path = shutil.which("mlflow")
             if not mlflow_path:
-                raise FileNotFoundError("MLflow not found in PATH. Please install MLflow: pip install mlflow")
-            
+                raise FileNotFoundError(
+                    "MLflow not found in PATH. Please install MLflow: pip install mlflow"
+                )
+
             # Security: subprocess call with validated executable path and secure parameters
             # - mlflow_path resolved via shutil.which() to prevent PATH injection
             # - shell=False prevents shell injection attacks
             # - Arguments are controlled and validated (localhost binding)
             # - MLflow directory path is controlled and validated
-            process = subprocess.Popen([  # noqa: S603
-                mlflow_path,
-                "ui",
-                "--backend-store-uri",
-                f"file://{mlflow_dir}",
-                "--port",
-                "5000",
-                "--host",
-                "127.0.0.1",
-            ], shell=False)
+            process = subprocess.Popen(
+                [  # noqa: S603
+                    mlflow_path,
+                    "ui",
+                    "--backend-store-uri",
+                    f"file://{mlflow_dir}",
+                    "--port",
+                    "5000",
+                    "--host",
+                    "127.0.0.1",
+                ],
+                shell=False,
+            )
 
             console.print("✅ MLflow UI launched successfully!", style="green")
             console.print("🔗 Access at: http://127.0.0.1:5000", style="blue")
@@ -1938,8 +2084,11 @@ def training_history(
             console.print("❌ MLflow not found. Please install MLflow:", style="red")
             console.print("   pip install mlflow", style="dim")
             raise typer.Exit(1)
-        except Exception as e:
-            console.print(f"❌ Failed to launch MLflow UI: {e}", style="red")
+        except (PermissionError, OSError) as e:
+            console.print(f"❌ System error launching MLflow UI: {e}", style="red")
+            raise typer.Exit(1)
+        except subprocess.SubprocessError as e:
+            console.print(f"❌ MLflow UI process error: {e}", style="red")
             raise typer.Exit(1)
 
     elif list_runs:
@@ -1982,8 +2131,11 @@ def training_history(
 
                     console.print(table)
 
-            except Exception as e:
-                console.print(f"❌ Failed to list training runs: {e}", style="red")
+            except (ConnectionError, OSError) as e:
+                console.print(f"❌ Database connection failed: {e}", style="red")
+                raise typer.Exit(1)
+            except (ValueError, TypeError, KeyError) as e:
+                console.print(f"❌ Training data processing error: {e}", style="red")
                 raise typer.Exit(1)
 
         asyncio.run(list_training_runs())
@@ -2039,10 +2191,11 @@ def logs(
         try:
             # Use tail -f equivalent for following logs - using absolute path for security
             import shutil
+
             tail_path = shutil.which("tail")
             if not tail_path:
                 raise FileNotFoundError("tail command not found in PATH")
-            
+
             # Security: subprocess call with validated executable path and secure parameters
             # - tail_path resolved via shutil.which() to prevent PATH injection
             # - shell=False prevents shell injection attacks
@@ -2090,7 +2243,7 @@ def logs(
             import time
 
             try:
-                with open(log_file, encoding='utf-8') as f:
+                with open(log_file, encoding="utf-8") as f:
                     # Go to end of file
                     f.seek(0, 2)
 
@@ -2118,15 +2271,18 @@ def logs(
             except KeyboardInterrupt:
                 console.print("\n✅ Log viewer stopped", style="green")
 
-        except Exception as e:
-            console.print(f"❌ Failed to follow logs: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(f"❌ Log file access error: {e}", style="red")
+            raise typer.Exit(1)
+        except (OSError, subprocess.SubprocessError) as e:
+            console.print(f"❌ Log following system error: {e}", style="red")
             raise typer.Exit(1)
     else:
         # Show last N lines
         console.print(f"📋 Last {lines} lines:", style="blue")
 
         try:
-            with open(log_file, encoding='utf-8') as f:
+            with open(log_file, encoding="utf-8") as f:
                 all_lines = f.readlines()
                 recent_lines = (
                     all_lines[-lines:] if len(all_lines) > lines else all_lines
@@ -2149,8 +2305,11 @@ def logs(
                     else:
                         console.print(line.rstrip())
 
-        except Exception as e:
-            console.print(f"❌ Failed to read logs: {e}", style="red")
+        except (FileNotFoundError, PermissionError) as e:
+            console.print(f"❌ Log file access error: {e}", style="red")
+            raise typer.Exit(1)
+        except (OSError, UnicodeDecodeError) as e:
+            console.print(f"❌ Log file reading error: {e}", style="red")
             raise typer.Exit(1)
 
 
@@ -2204,8 +2363,11 @@ def monitor(
 
     except KeyboardInterrupt:
         console.print("\n👋 Monitoring dashboard stopped", style="yellow")
-    except Exception as e:
-        console.print(f"❌ Error starting monitoring dashboard: {e}", style="red")
+    except ImportError as e:
+        console.print(f"❌ Monitoring dependency missing: {e}", style="red")
+        raise typer.Exit(1)
+    except (ConnectionError, OSError) as e:
+        console.print(f"❌ Monitoring system connection error: {e}", style="red")
         raise typer.Exit(1)
 
 
@@ -2220,9 +2382,9 @@ def health(
     console.print("🏥 Running APES Health Check...", style="blue")
 
     async def run_health_check():
-        from prompt_improver.services.monitoring import HealthMonitor
+        from prompt_improver.services.health import get_health_service
 
-        health_monitor = HealthMonitor()
+        health_service = get_health_service()
 
         with Progress(
             SpinnerColumn(),
@@ -2231,7 +2393,7 @@ def health(
         ) as progress:
             task = progress.add_task("Running health diagnostics...", total=None)
 
-            results = await health_monitor.run_health_check()
+            results = await health_service.get_health_summary(include_details=detailed)
 
             progress.update(task, completed=True)
 
@@ -2307,30 +2469,37 @@ def health(
                 # Show additional system information
                 console.print("\n[bold]System Resources:[/bold]")
                 system_check = checks.get("system_resources", {})
-                if system_check:
+                if system_check and "details" in system_check:
                     resource_table = Table()
                     resource_table.add_column("Resource", style="cyan")
                     resource_table.add_column("Usage", style="yellow")
-
-                    if "memory_usage_percent" in system_check:
+                    
+                    details = system_check["details"]
+                    if "memory_usage_percent" in details:
                         resource_table.add_row(
-                            "Memory", f"{system_check['memory_usage_percent']:.1f}%"
+                            "Memory", f"{details['memory_usage_percent']:.1f}%"
                         )
-                    if "cpu_usage_percent" in system_check:
+                    if "cpu_usage_percent" in details:
                         resource_table.add_row(
-                            "CPU", f"{system_check['cpu_usage_percent']:.1f}%"
+                            "CPU", f"{details['cpu_usage_percent']:.1f}%"
                         )
-                    if "disk_usage_percent" in system_check:
+                    if "disk_usage_percent" in details:
                         resource_table.add_row(
-                            "Disk", f"{system_check['disk_usage_percent']:.1f}%"
+                            "Disk", f"{details['disk_usage_percent']:.1f}%"
                         )
 
                     console.print(resource_table)
 
     try:
         asyncio.run(run_health_check())
-    except Exception as e:
-        console.print(f"❌ Health check failed: {e}", style="red")
+    except ImportError as e:
+        console.print(f"❌ Health monitoring dependency missing: {e}", style="red")
+        raise typer.Exit(1)
+    except (ConnectionError, OSError) as e:
+        console.print(f"❌ Health check system error: {e}", style="red")
+        raise typer.Exit(1)
+    except (ValueError, TypeError, KeyError) as e:
+        console.print(f"❌ Health check data processing error: {e}", style="red")
         raise typer.Exit(1)
 
 
@@ -2366,7 +2535,7 @@ def monitoring_summary(
                 # Export to file
                 import json
 
-                with open(export_file, "w", encoding='utf-8') as f:
+                with open(export_file, "w", encoding="utf-8") as f:
                     json.dump(summary, f, indent=2, default=str)
                 console.print(f"📄 Summary exported to {export_file}", style="green")
 
@@ -2439,16 +2608,28 @@ def monitoring_summary(
 
     try:
         asyncio.run(get_summary())
-    except Exception as e:
-        console.print(f"❌ Failed to generate monitoring summary: {e}", style="red")
+    except ImportError as e:
+        console.print(f"❌ Monitoring dependency missing: {e}", style="red")
+        raise typer.Exit(1)
+    except (ConnectionError, OSError) as e:
+        console.print(f"❌ Monitoring system connection error: {e}", style="red")
+        raise typer.Exit(1)
+    except (ValueError, TypeError, KeyError) as e:
+        console.print(f"❌ Monitoring data processing error: {e}", style="red")
         raise typer.Exit(1)
 
 
 @app.command()
 def update(
-    component: str = typer.Argument(help="Component to update: docs, config, dependencies, all"),
-    verify: bool = typer.Option(True, "--verify/--no-verify", help="Verify accuracy of updates"),
-    force: bool = typer.Option(False, "--force", help="Force update without confirmation"),
+    component: str = typer.Argument(
+        help="Component to update: docs, config, dependencies, all"
+    ),
+    verify: bool = typer.Option(
+        True, "--verify/--no-verify", help="Verify accuracy of updates"
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Force update without confirmation"
+    ),
 ):
     """Update system components, documentation, or configurations."""
     console.print("🔄 APES Update Manager", style="blue")
@@ -2481,12 +2662,39 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
         console.print("📊 Checking line counts...")
 
         verification_results = {
-            "MCP Server": {"claimed": 253, "actual": None, "files": ["src/prompt_improver/mcp_server"]},
-            "CLI Interface": {"claimed": 2912, "actual": None, "files": ["src/prompt_improver/cli.py", "src/prompt_improver/cli_refactored.py"]},
-            "Database Architecture": {"claimed": 1261, "actual": None, "files": ["src/prompt_improver/database"]},
-            "Analytics Service": {"claimed": 384, "actual": None, "files": ["src/prompt_improver/services/analytics.py"]},
-            "ML Service Integration": {"claimed": 563, "actual": None, "files": ["src/prompt_improver/services/ml_integration.py"]},
-            "Monitoring Service": {"claimed": 753, "actual": None, "files": ["src/prompt_improver/services/monitoring.py"]},
+            "MCP Server": {
+                "claimed": 253,
+                "actual": None,
+                "files": ["src/prompt_improver/mcp_server"],
+            },
+            "CLI Interface": {
+                "claimed": 2912,
+                "actual": None,
+                "files": [
+                    "src/prompt_improver/cli.py",
+                    "src/prompt_improver/cli_refactored.py",
+                ],
+            },
+            "Database Architecture": {
+                "claimed": 1261,
+                "actual": None,
+                "files": ["src/prompt_improver/database"],
+            },
+            "Analytics Service": {
+                "claimed": 384,
+                "actual": None,
+                "files": ["src/prompt_improver/services/analytics.py"],
+            },
+            "ML Service Integration": {
+                "claimed": 563,
+                "actual": None,
+                "files": ["src/prompt_improver/services/ml_integration.py"],
+            },
+            "Monitoring Service": {
+                "claimed": 753,
+                "actual": None,
+                "files": ["src/prompt_improver/services/monitoring.py"],
+            },
         }
 
         for component, info in verification_results.items():
@@ -2495,14 +2703,22 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                 if os.path.isfile(file_path):
                     # Use absolute path for wc command for security
                     import shutil
+
                     wc_path = shutil.which("wc")
                     if wc_path:
                         # Security: subprocess call with validated executable path and secure parameters
-                        # - wc_path resolved via shutil.which() to prevent PATH injection  
+                        # - wc_path resolved via shutil.which() to prevent PATH injection
                         # - shell=False prevents shell injection attacks
                         # - file_path validated as existing file before use
                         # - timeout=30 prevents indefinite hanging
-                        result = subprocess.run([wc_path, "-l", file_path], check=False, capture_output=True, text=True, shell=False, timeout=30)  # noqa: S603
+                        result = subprocess.run(
+                            [wc_path, "-l", file_path],
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            shell=False,
+                            timeout=30,
+                        )  # noqa: S603
                         if result.returncode == 0:
                             lines = int(result.stdout.split()[0])
                             total_lines += lines
@@ -2515,11 +2731,28 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                         # - shell=False prevents shell injection attacks
                         # - file_path validated as existing directory before use
                         # - timeout=60 prevents indefinite hanging
-                        result = subprocess.run([find_path, file_path, "-name", "*.py", "-exec", wc_path, "-l", "{}", "+"], check=False, capture_output=True, text=True, shell=False, timeout=60)  # noqa: S603
+                        result = subprocess.run(
+                            [
+                                find_path,
+                                file_path,
+                                "-name",
+                                "*.py",
+                                "-exec",
+                                wc_path,
+                                "-l",
+                                "{}",
+                                "+",
+                            ],
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            shell=False,
+                            timeout=60,
+                        )  # noqa: S603
                         if result.returncode == 0:
-                            lines = result.stdout.strip().split('\n')
+                            lines = result.stdout.strip().split("\n")
                             for line in lines:
-                                if line.strip() and not line.strip().endswith('.py'):
+                                if line.strip() and not line.strip().endswith(".py"):
                                     try:
                                         total_lines += int(line.strip().split()[0])
                                     except (ValueError, IndexError):
@@ -2540,7 +2773,9 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                 status = f"❌ MAJOR DIFF ({diff:+d})"
                 style = "red"
 
-            console.print(f"{component}: {claimed} → {actual} lines [{status}]", style=style)
+            console.print(
+                f"{component}: {claimed} → {actual} lines [{status}]", style=style
+            )
 
         # Test status verification
         console.print("\n🧪 Checking test status...")
@@ -2551,10 +2786,20 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
             # - shell=False prevents shell injection attacks
             # - timeout=30 prevents indefinite hanging
             # - Arguments are controlled and validated
-            result = subprocess.run([sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],  # noqa: S603
-                                  check=False, capture_output=True, text=True, timeout=30, shell=False)
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],  # noqa: S603
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                shell=False,
+            )
             if result.returncode == 0:
-                test_count = len([line for line in result.stdout.split('\n') if 'test' in line and '::' in line])
+                test_count = len([
+                    line
+                    for line in result.stdout.split("\n")
+                    if "test" in line and "::" in line
+                ])
                 console.print(f"Found {test_count} tests to run")
 
                 # Quick test run to check status
@@ -2564,19 +2809,30 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                 # - shell=False prevents shell injection attacks
                 # - timeout=60 prevents indefinite hanging
                 # - Arguments are controlled and validated
-                test_result = subprocess.run([sys.executable, "-m", "pytest", "tests/", "-x", "--tb=no", "-q"],  # noqa: S603
-                                           check=False, capture_output=True, text=True, timeout=60, shell=False)
+                test_result = subprocess.run(
+                    [sys.executable, "-m", "pytest", "tests/", "-x", "--tb=no", "-q"],  # noqa: S603
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    shell=False,
+                )
 
                 if "FAILED" in test_result.stdout or "ERROR" in test_result.stdout:
-                    console.print("❌ Tests have failures - documentation claims are incorrect", style="red")
+                    console.print(
+                        "❌ Tests have failures - documentation claims are incorrect",
+                        style="red",
+                    )
                 else:
                     console.print("✅ Tests are passing", style="green")
             else:
                 console.print("⚠️ Could not collect tests", style="yellow")
         except subprocess.TimeoutExpired:
             console.print("⚠️ Test verification timed out", style="yellow")
-        except Exception as e:
-            console.print(f"⚠️ Test verification failed: {e}", style="yellow")
+        except (ValueError, TypeError, IndexError) as e:
+            console.print(f"⚠️ Test data processing error: {e}", style="yellow")
+        except (OSError, subprocess.SubprocessError) as e:
+            console.print(f"⚠️ Test system error: {e}", style="yellow")
 
     if not force:
         should_update = typer.confirm("Update documentation with current findings?")
@@ -2675,8 +2931,14 @@ def alerts(
 
     try:
         asyncio.run(show_alerts())
-    except Exception as e:
-        console.print(f"❌ Failed to retrieve alerts: {e}", style="red")
+    except ImportError as e:
+        console.print(f"❌ Alert monitoring dependency missing: {e}", style="red")
+        raise typer.Exit(1)
+    except (ConnectionError, OSError) as e:
+        console.print(f"❌ Alert system connection error: {e}", style="red")
+        raise typer.Exit(1)
+    except (ValueError, TypeError, KeyError) as e:
+        console.print(f"❌ Alert data processing error: {e}", style="red")
         raise typer.Exit(1)
 
 

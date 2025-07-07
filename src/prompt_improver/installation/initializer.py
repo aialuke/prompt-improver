@@ -181,8 +181,9 @@ class APESInitializer:
         try:
             # Use shutil.which for secure path resolution
             import shutil
+
             psql_path = shutil.which("psql")
-            
+
             if not psql_path:
                 # Try common PostgreSQL installation paths
                 common_paths = [
@@ -194,14 +195,14 @@ class APESInitializer:
                     if Path(path).exists():
                         psql_path = path
                         break
-                        
+
                 if not psql_path:
                     self.console.print(
                         "⚠️  PostgreSQL not found. Please install PostgreSQL first.",
                         style="yellow",
                     )
                     return
-                    
+
             # Test PostgreSQL availability with secure subprocess call
             # Security: subprocess call with validated executable path and secure parameters
             # - psql_path resolved via shutil.which() or validated system path
@@ -209,14 +210,14 @@ class APESInitializer:
             # - timeout=10 prevents indefinite hanging
             # - Arguments are controlled and validated
             result = subprocess.run(  # noqa: S603
-                [psql_path, "--version"], 
-                check=False, 
-                capture_output=True, 
-                text=True, 
-                shell=False, 
-                timeout=10
+                [psql_path, "--version"],
+                check=False,
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=10,
             )
-            
+
             if result.returncode != 0:
                 self.console.print(
                     "⚠️  PostgreSQL found but not working correctly",
@@ -302,7 +303,7 @@ class APESInitializer:
             },
         }
 
-        with open(config_dir / "database.yaml", "w", encoding='utf-8') as f:
+        with open(config_dir / "database.yaml", "w", encoding="utf-8") as f:
             yaml.dump(db_config, f, default_flow_style=False)
 
         # MCP server configuration
@@ -321,7 +322,7 @@ class APESInitializer:
             "resources": {"rule_status": {"enabled": True, "cache_ttl": 60}},
         }
 
-        with open(config_dir / "mcp.yaml", "w", encoding='utf-8') as f:
+        with open(config_dir / "mcp.yaml", "w", encoding="utf-8") as f:
             yaml.dump(mcp_config, f, default_flow_style=False)
 
         # ML configuration
@@ -345,7 +346,7 @@ class APESInitializer:
             }
         }
 
-        with open(config_dir / "ml.yaml", "w", encoding='utf-8') as f:
+        with open(config_dir / "ml.yaml", "w", encoding="utf-8") as f:
             yaml.dump(ml_config, f, default_flow_style=False)
 
         # Service management configuration
@@ -364,7 +365,7 @@ class APESInitializer:
             },
         }
 
-        with open(config_dir / "service.yaml", "w", encoding='utf-8') as f:
+        with open(config_dir / "service.yaml", "w", encoding="utf-8") as f:
             yaml.dump(service_config, f, default_flow_style=False)
 
         self.console.print(

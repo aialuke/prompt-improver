@@ -37,7 +37,7 @@ except ImportError:
         return {
             "improved_prompt": f"Enhanced: {prompt}",
             "processing_time_ms": 100,
-            "applied_rules": [{"rule_id": "test_rule", "confidence": 0.8}]
+            "applied_rules": [{"rule_id": "test_rule", "confidence": 0.8}],
         }
 
     async def store_prompt(original, enhanced, metrics, session_id):
@@ -309,18 +309,17 @@ class TestBenchmarkPerformance:
 
         def sync_improve_prompt():
             """Synchronous wrapper for benchmarking async function."""
-            return asyncio.run(improve_prompt(
-                prompt="Test prompt for benchmarking",
-                context={"domain": "benchmark"},
-                session_id="benchmark_test"
-            ))
+            return asyncio.run(
+                improve_prompt(
+                    prompt="Test prompt for benchmarking",
+                    context={"domain": "benchmark"},
+                    session_id="benchmark_test",
+                )
+            )
 
         # Run benchmark with statistical analysis
         result = benchmark.pedantic(
-            sync_improve_prompt,
-            iterations=10,
-            rounds=5,
-            warmup_rounds=2
+            sync_improve_prompt, iterations=10, rounds=5, warmup_rounds=2
         )
 
         # Validate result structure
@@ -335,18 +334,17 @@ class TestBenchmarkPerformance:
 
         def sync_store_prompt():
             """Synchronous wrapper for benchmarking."""
-            return asyncio.run(store_prompt(
-                original="Benchmark original prompt",
-                enhanced="Benchmark enhanced prompt",
-                metrics={"improvement_score": 0.8, "processing_time": 50},
-                session_id="benchmark_store_test"
-            ))
+            return asyncio.run(
+                store_prompt(
+                    original="Benchmark original prompt",
+                    enhanced="Benchmark enhanced prompt",
+                    metrics={"improvement_score": 0.8, "processing_time": 50},
+                    session_id="benchmark_store_test",
+                )
+            )
 
         result = benchmark.pedantic(
-            sync_store_prompt,
-            iterations=5,
-            rounds=3,
-            warmup_rounds=1
+            sync_store_prompt, iterations=5, rounds=3, warmup_rounds=1
         )
 
         # Validate storage result
@@ -360,10 +358,7 @@ class TestBenchmarkPerformance:
             return asyncio.run(get_rule_status())
 
         result = benchmark.pedantic(
-            sync_get_rule_status,
-            iterations=10,
-            rounds=5,
-            warmup_rounds=2
+            sync_get_rule_status, iterations=10, rounds=5, warmup_rounds=2
         )
 
         # Validate rule status result
@@ -386,7 +381,7 @@ class TestStatisticalPerformanceValidation:
             await improve_prompt(
                 prompt="Statistical analysis test prompt",
                 context={"domain": "statistics"},
-                session_id="stats_test"
+                session_id="stats_test",
             )
             end_time = time.time()
             response_times.append((end_time - start_time) * 1000)
@@ -411,14 +406,18 @@ class TestStatisticalPerformanceValidation:
         # Check for outliers (values > 2 std devs from mean)
         outliers = [t for t in response_times if abs(t - mean_time) > 2 * std_dev]
         outlier_rate = len(outliers) / len(response_times)
-        assert outlier_rate <= 0.15, f"Too many outliers: {outlier_rate:.2%} of responses"
+        assert outlier_rate <= 0.15, (
+            f"Too many outliers: {outlier_rate:.2%} of responses"
+        )
 
     @given(
         prompt_length=st.integers(min_value=10, max_value=200),
-        concurrent_requests=st.integers(min_value=1, max_value=5)
+        concurrent_requests=st.integers(min_value=1, max_value=5),
     )
     @pytest.mark.asyncio
-    async def test_performance_scaling_properties(self, prompt_length, concurrent_requests):
+    async def test_performance_scaling_properties(
+        self, prompt_length, concurrent_requests
+    ):
         """Property-based testing of performance scaling characteristics."""
 
         # Generate test prompt of specified length
@@ -431,7 +430,7 @@ class TestStatisticalPerformanceValidation:
             improve_prompt(
                 prompt=test_prompt,
                 context={"domain": "scaling_test"},
-                session_id=f"scale_test_{i}"
+                session_id=f"scale_test_{i}",
             )
             for i in range(concurrent_requests)
         ]
@@ -480,7 +479,7 @@ class TestPerformanceRegression:
             result = await improve_prompt(
                 prompt=f"Baseline test prompt {i}",
                 context={"domain": "baseline"},
-                session_id=f"baseline_test_{i}"
+                session_id=f"baseline_test_{i}",
             )
             end_time = time.time()
 
@@ -520,7 +519,7 @@ class TestPerformanceRegression:
             await improve_prompt(
                 prompt=f"Memory stability test {i}",
                 context={"domain": "memory_test"},
-                session_id=f"memory_test_{i}"
+                session_id=f"memory_test_{i}",
             )
 
             # Check memory every 5 operations

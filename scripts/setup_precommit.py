@@ -13,14 +13,15 @@ def run_command(cmd: list, cwd: str = None) -> bool:
         # Validate command to prevent execution of untrusted input
         if not cmd or not isinstance(cmd, list):
             raise ValueError("Command must be a non-empty list")
-        
+
         # For security, resolve absolute path for the first command
         import shutil
-        if cmd[0] not in ['git', 'pre-commit']:  # Allow known safe commands
+
+        if cmd[0] not in ["git", "pre-commit"]:  # Allow known safe commands
             abs_cmd = shutil.which(cmd[0])
             if abs_cmd:
                 cmd[0] = abs_cmd
-        
+
         # Security: subprocess call with validated executable path and secure parameters
         # - Command validated as non-empty list to prevent injection
         # - Executable resolved via shutil.which() to prevent PATH injection
@@ -34,7 +35,7 @@ def run_command(cmd: list, cwd: str = None) -> bool:
             text=True,
             check=True,
             shell=False,
-            timeout=300
+            timeout=300,
         )
         return True
     except subprocess.CalledProcessError as e:
@@ -56,12 +57,12 @@ def check_prerequisites():
         return False
 
     # Check git
-    if not shutil.which('git'):
+    if not shutil.which("git"):
         print("❌ Git not found")
         return False
 
     # Check if in git repository
-    if not Path('.git').exists():
+    if not Path(".git").exists():
         print("❌ Not in a git repository")
         return False
 
@@ -74,12 +75,12 @@ def install_precommit():
     print("📦 Installing pre-commit...")
 
     # Check if pre-commit is already installed
-    if shutil.which('pre-commit'):
+    if shutil.which("pre-commit"):
         print("✅ Pre-commit already installed")
         return True
 
     # Try to install via pip
-    success = run_command([sys.executable, '-m', 'pip', 'install', 'pre-commit>=3.6.0'])
+    success = run_command([sys.executable, "-m", "pip", "install", "pre-commit>=3.6.0"])
     if success:
         print("✅ Pre-commit installed")
         return True
@@ -92,17 +93,17 @@ def install_hooks():
     """Install pre-commit hooks."""
     print("🪝 Installing pre-commit hooks...")
 
-    success = run_command(['pre-commit', 'install'])
+    success = run_command(["pre-commit", "install"])
     if not success:
         return False
 
     # Install commit-msg hook for commitizen
-    success = run_command(['pre-commit', 'install', '--hook-type', 'commit-msg'])
+    success = run_command(["pre-commit", "install", "--hook-type", "commit-msg"])
     if not success:
         print("⚠️  Failed to install commit-msg hook (optional)")
 
     # Install pre-push hook
-    success = run_command(['pre-commit', 'install', '--hook-type', 'pre-push'])
+    success = run_command(["pre-commit", "install", "--hook-type", "pre-push"])
     if not success:
         print("⚠️  Failed to install pre-push hook (optional)")
 
@@ -115,14 +116,14 @@ def setup_git_config():
     print("⚙️  Configuring git settings...")
 
     # Set up git hooks path (if needed)
-    hooks_path = Path('.git/hooks')
+    hooks_path = Path(".git/hooks")
     if hooks_path.exists():
         print("✅ Git hooks directory exists")
 
     # Configure commit template (optional)
-    template_path = Path('.gitmessage')
+    template_path = Path(".gitmessage")
     if not template_path.exists():
-        with template_path.open('w', encoding='utf-8') as f:
+        with template_path.open("w", encoding="utf-8") as f:
             f.write("""# feat: add new feature
 # fix: fix a bug
 # docs: update documentation
@@ -145,7 +146,7 @@ def setup_git_config():
 """)
 
         # Set git commit template
-        run_command(['git', 'config', 'commit.template', '.gitmessage'])
+        run_command(["git", "config", "commit.template", ".gitmessage"])
         print("✅ Git commit template configured")
 
     return True
@@ -157,7 +158,12 @@ def validate_setup():
 
     # Run pre-commit on all files (dry run)
     print("   Running pre-commit validation...")
-    success = run_command(['pre-commit', 'run', '--all-files', '--show-diff-on-failure'])
+    success = run_command([
+        "pre-commit",
+        "run",
+        "--all-files",
+        "--show-diff-on-failure",
+    ])
 
     if success:
         print("✅ Pre-commit validation passed")
@@ -281,7 +287,7 @@ SKIP_PERFORMANCE_CHECK=1 git commit -m "your message"
 - Ask team members for assistance
 """
 
-    with Path('PRECOMMIT_GUIDE.md').open('w', encoding='utf-8') as f:
+    with Path("PRECOMMIT_GUIDE.md").open("w", encoding="utf-8") as f:
         f.write(guide_content)
 
     print("✅ Contributor guide created: PRECOMMIT_GUIDE.md")
@@ -323,5 +329,5 @@ def main():
     print("\n💡 To run hooks manually: pre-commit run --all-files")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

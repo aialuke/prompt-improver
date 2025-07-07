@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 
-
 @pytest.mark.asyncio
 @pytest.mark.integration
 class TestPromptServiceIntegration:
@@ -70,7 +69,9 @@ class TestPromptServiceIntegration:
         analytics = AnalyticsService()
 
         # Test real database query for rule effectiveness
-        effectiveness = await analytics.get_rule_effectiveness(session=test_db_session)
+        effectiveness = await analytics.get_rule_effectiveness(
+            db_session=test_db_session
+        )
 
         # Validate results
         assert isinstance(effectiveness, dict)
@@ -114,7 +115,7 @@ class TestPromptServiceIntegration:
         await test_db_session.commit()
 
         # Test performance summary calculation
-        summary = await analytics.get_performance_summary(session=test_db_session)
+        summary = await analytics.get_performance_summary(db_session=test_db_session)
 
         # Validate performance metrics
         assert summary["total_sessions"] >= 1
@@ -220,8 +221,10 @@ class TestPerformanceIntegration:
         # Test query performance
         start_time = asyncio.get_event_loop().time()
 
-        summary = await analytics.get_performance_summary(session=test_db_session)
-        effectiveness = await analytics.get_rule_effectiveness(session=test_db_session)
+        summary = await analytics.get_performance_summary(db_session=test_db_session)
+        effectiveness = await analytics.get_rule_effectiveness(
+            db_session=test_db_session
+        )
 
         end_time = asyncio.get_event_loop().time()
         query_time = (end_time - start_time) * 1000
@@ -294,8 +297,9 @@ class TestErrorHandlingIntegration:
         analytics = AnalyticsService()
 
         # Test with invalid session
-        with pytest.raises(Exception):
-            await analytics.get_performance_summary(session=None)
+        result = await analytics.get_performance_summary(db_session=None)
+        # Should return default values rather than raise exception
+        assert result["total_sessions"] == 0
 
     async def test_service_error_propagation(self, test_db_session):
         """Test error propagation through service layers."""

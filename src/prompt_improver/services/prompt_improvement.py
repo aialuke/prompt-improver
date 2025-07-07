@@ -2,8 +2,10 @@
 Modern implementation with database integration and ML optimization
 """
 
+import logging
 import time
 import uuid
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -21,6 +23,8 @@ from ..database.models import (
 )
 from ..rule_engine.base import BasePromptRule
 from .ml_integration import MLModelService
+
+logger = logging.getLogger(__name__)
 
 
 class PromptImprovementService:
@@ -545,14 +549,11 @@ class PromptImprovementService:
         # Get related performance data for training
         perf_stmt = (
             select(
-                RulePerformance.rule_id,
-                RulePerformance.improvement_score,
-                RulePerformance.execution_time_ms,
-                RulePerformance.user_satisfaction_score,
-                RuleMetadata.parameters,
+                RulePerformance,
+                RuleMetadata.default_parameters,
             )
             .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
-            .where(RulePerformance.session_id == feedback.session_id)
+            .where(RulePerformance.created_at.isnot(None))  # Remove session_id filter since it may not exist
         )
 
         result = await db_session.execute(perf_stmt)
@@ -570,17 +571,19 @@ class PromptImprovementService:
 
         for row in performance_data:
             # Extract features from rule parameters and performance
-            params = row.parameters or {}
+            # row is a tuple: (RulePerformance, default_parameters)
+            rule_perf = row[0]  # RulePerformance object
+            params = row[1] or {}  # default_parameters dict
             features.append([
-                row.improvement_score or 0,
-                row.execution_time_ms or 0,
+                rule_perf.improvement_score or 0,
+                rule_perf.execution_time_ms or 0,
                 params.get("weight", 1.0),
                 params.get("priority", 5),
                 len(params),  # Number of parameters
                 1.0 if params.get("active", True) else 0.0,  # Active status
             ])
             effectiveness_scores.append(
-                row.user_satisfaction_score or (feedback.rating / 5.0)
+                rule_perf.confidence_level or (feedback.user_rating / 5.0)
             )
 
         # Run optimization if we have enough data
@@ -640,16 +643,12 @@ class PromptImprovementService:
         # Get all performance data for training
         perf_stmt = (
             select(
-                RulePerformance.rule_id,
-                RulePerformance.improvement_score,
-                RulePerformance.execution_time_ms,
-                RulePerformance.user_satisfaction_score,
-                RuleMetadata.parameters,
-                RuleMetadata.weight,
+                RulePerformance,
+                RuleMetadata.default_parameters,
                 RuleMetadata.priority,
             )
             .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
-            .where(RuleMetadata.active == True)
+            .where(RuleMetadata.enabled == True)
         )
 
         # Filter by specific rule IDs if provided
@@ -678,15 +677,19 @@ class PromptImprovementService:
         effectiveness_scores = []
 
         for row in performance_data:
-            params = row.parameters or {}
+            # Access the fields from the tuple
+            # row is a tuple: (RulePerformance, default_parameters, priority)
+            rule_perf = row[0]  # RulePerformance object
+            params = row[1] or {}  # default_parameters dict
+            priority = row[2] or 5  # priority value
 
             # Enhanced feature engineering
             features.append([
-                row.improvement_score or 0,  # Core improvement metric
-                row.execution_time_ms or 0,  # Performance metric
-                row.weight or 1.0,  # Rule weight
-                row.priority or 5,  # Rule priority
-                row.user_satisfaction_score or 0,  # User satisfaction
+                rule_perf.improvement_score or 0,  # Core improvement metric
+                rule_perf.execution_time_ms or 0,  # Performance metric
+                params.get("weight", 1.0),  # Rule weight
+                priority,  # Rule priority
+                rule_perf.confidence_level or 0,  # Confidence level
                 len(params),  # Parameter complexity
                 params.get("confidence_threshold", 0.5),  # Confidence threshold
                 1.0 if params.get("enabled", True) else 0.0,  # Enabled status
@@ -695,7 +698,7 @@ class PromptImprovementService:
             ])
 
             # Target effectiveness score (0-1 scale)
-            effectiveness = min(1.0, max(0.0, (row.improvement_score or 0) / 100.0))
+            effectiveness = min(1.0, max(0.0, (rule_perf.improvement_score or 0) / 100.0))
             effectiveness_scores.append(effectiveness)
 
         # Run ML optimization

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance
 from .analytics import AnalyticsService
+from ..utils.error_handlers import handle_database_errors
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,23 @@ class ABTestingService:
                 "message": "A/B experiment created successfully",
             }
 
+        except (OSError, IOError) as e:
+            logger.error(f"Database I/O error creating A/B experiment: {e}")
+            await db_session.rollback()
+            return {"status": "error", "error": str(e)}
+        except (ValueError, TypeError) as e:
+            logger.error(f"Data validation error creating A/B experiment: {e}")
+            await db_session.rollback()
+            return {"status": "error", "error": str(e)}
+        except KeyboardInterrupt:
+            logger.warning("A/B experiment creation cancelled by user")
+            await db_session.rollback()
+            raise
         except Exception as e:
-            logger.error(f"Failed to create A/B experiment: {e}")
+            logger.error(f"Unexpected error creating A/B experiment: {e}")
+            import logging
+
+            logging.exception("Unexpected error in create_experiment")
             await db_session.rollback()
             return {"status": "error", "error": str(e)}
 
@@ -201,10 +217,30 @@ class ABTestingService:
                 "next_actions": self._get_next_actions(analysis_result),
             }
 
+        except (OSError, IOError) as e:
+            logger.error(f"Database I/O error analyzing experiment: {e}")
+            return {"status": "error", "error": str(e)}
+        except (ValueError, TypeError) as e:
+            logger.error(f"Data validation error analyzing experiment: {e}")
+            return {"status": "error", "error": str(e)}
+        except (AttributeError, KeyError) as e:
+            logger.error(f"Data structure error analyzing experiment: {e}")
+            return {"status": "error", "error": str(e)}
+        except KeyboardInterrupt:
+            logger.warning("Experiment analysis cancelled by user")
+            raise
         except Exception as e:
-            logger.error(f"Failed to analyze experiment: {e}")
+            logger.error(f"Unexpected error analyzing experiment: {e}")
+            import logging
+
+            logging.exception("Unexpected error in analyze_experiment")
             return {"status": "error", "error": str(e)}
 
+    @handle_database_errors(
+        rollback_session=False,  # This is a read operation, no rollback needed
+        return_format="none",    # Return empty list on error instead of dict
+        operation_name="get_experiment_data"
+    )
     async def _get_experiment_data(
         self,
         rule_config: dict[str, Any],
@@ -212,37 +248,38 @@ class ABTestingService:
         target_metric: str,
         db_session: AsyncSession,
     ) -> list[float]:
-        """Get performance data for experiment group"""
-        try:
-            # Query performance data based on rule configuration
-            rule_ids = rule_config.get("rule_ids", [])
+        """Get performance data for experiment group.
+        
+        Now uses standardized error handling decorator that provides:
+        - Categorized exception handling (Database I/O, Validation, etc.)
+        - Consistent logging patterns
+        - Graceful error recovery (returns empty list on any error)
+        """
+        # Query performance data based on rule configuration
+        rule_ids = rule_config.get("rule_ids", [])
 
-            if not rule_ids:
-                return []
-
-            stmt = select(RulePerformance).where(
-                RulePerformance.rule_id.in_(rule_ids),
-                RulePerformance.created_at >= start_time,
-            )
-
-            result = await db_session.execute(stmt)
-            performance_records = result.scalars().all()
-
-            # Extract target metric values
-            metric_values = []
-            for record in performance_records:
-                if target_metric == "improvement_score":
-                    metric_values.append(record.improvement_score or 0.0)
-                elif target_metric == "execution_time_ms":
-                    metric_values.append(record.execution_time_ms or 0.0)
-                elif target_metric == "user_satisfaction_score":
-                    metric_values.append(record.user_satisfaction_score or 0.0)
-
-            return metric_values
-
-        except Exception as e:
-            logger.error(f"Failed to get experiment data: {e}")
+        if not rule_ids:
             return []
+
+        stmt = select(RulePerformance).where(
+            RulePerformance.rule_id.in_(rule_ids),
+            RulePerformance.created_at >= start_time,
+        )
+
+        result = await db_session.execute(stmt)
+        performance_records = result.scalars().all()
+
+        # Extract target metric values
+        metric_values = []
+        for record in performance_records:
+            if target_metric == "improvement_score":
+                metric_values.append(record.improvement_score or 0.0)
+            elif target_metric == "execution_time_ms":
+                metric_values.append(record.execution_time_ms or 0.0)
+            elif target_metric == "user_satisfaction_score":
+                metric_values.append(record.user_satisfaction_score or 0.0)
+
+        return metric_values
 
     def _perform_statistical_analysis(
         self, control_data: list[float], treatment_data: list[float]
@@ -306,8 +343,10 @@ class ABTestingService:
 
         # Minimum detectable effect
         mde = self._calculate_minimum_detectable_effect(
-            len(control_array), len(treatment_array),
-            np.var(control_array, ddof=1), np.var(treatment_array, ddof=1)
+            len(control_array),
+            len(treatment_array),
+            np.var(control_array, ddof=1),
+            np.var(treatment_array, ddof=1),
         )
 
         # Bayesian probability of treatment being better
@@ -375,8 +414,21 @@ class ABTestingService:
             db_session.add(experiment)
             await db_session.commit()
 
+        except (OSError, IOError) as e:
+            logger.error(f"Database I/O error storing experiment results: {e}")
+            await db_session.rollback()
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.error(f"Data processing error storing experiment results: {e}")
+            await db_session.rollback()
+        except KeyboardInterrupt:
+            logger.warning("Experiment results storage cancelled by user")
+            await db_session.rollback()
+            raise
         except Exception as e:
-            logger.error(f"Failed to store experiment results: {e}")
+            logger.error(f"Unexpected error storing experiment results: {e}")
+            import logging
+
+            logging.exception("Unexpected error in _store_experiment_results")
             await db_session.rollback()
 
     def _generate_recommendations(self, analysis_result: ExperimentResult) -> list[str]:
@@ -494,8 +546,20 @@ class ABTestingService:
                 "total_count": len(experiment_list),
             }
 
+        except (OSError, IOError) as e:
+            logger.error(f"Database I/O error listing experiments: {e}")
+            return {"status": "error", "error": str(e)}
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.error(f"Data processing error listing experiments: {e}")
+            return {"status": "error", "error": str(e)}
+        except KeyboardInterrupt:
+            logger.warning("Experiment listing cancelled by user")
+            raise
         except Exception as e:
-            logger.error(f"Failed to list experiments: {e}")
+            logger.error(f"Unexpected error listing experiments: {e}")
+            import logging
+
+            logging.exception("Unexpected error in list_experiments")
             return {"status": "error", "error": str(e)}
 
     async def stop_experiment(
@@ -539,8 +603,23 @@ class ABTestingService:
                 "stop_reason": reason,
             }
 
+        except (OSError, IOError) as e:
+            logger.error(f"Database I/O error stopping experiment: {e}")
+            await db_session.rollback()
+            return {"status": "error", "error": str(e)}
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.error(f"Data processing error stopping experiment: {e}")
+            await db_session.rollback()
+            return {"status": "error", "error": str(e)}
+        except KeyboardInterrupt:
+            logger.warning("Experiment stopping cancelled by user")
+            await db_session.rollback()
+            raise
         except Exception as e:
-            logger.error(f"Failed to stop experiment: {e}")
+            logger.error(f"Unexpected error stopping experiment: {e}")
+            import logging
+
+            logging.exception("Unexpected error in stop_experiment")
             await db_session.rollback()
             return {"status": "error", "error": str(e)}
 
@@ -549,7 +628,7 @@ class ABTestingService:
         control_data: np.ndarray,
         treatment_data: np.ndarray,
         alpha: float = 0.05,
-        n_bootstrap: int = 10000
+        n_bootstrap: int = 10000,
     ) -> tuple[float, float]:
         """Calculate bootstrap confidence interval for treatment effect."""
         try:
@@ -558,7 +637,9 @@ class ABTestingService:
             for _ in range(n_bootstrap):
                 # Bootstrap resample both groups
                 control_sample = resample(control_data, n_samples=len(control_data))
-                treatment_sample = resample(treatment_data, n_samples=len(treatment_data))
+                treatment_sample = resample(
+                    treatment_data, n_samples=len(treatment_data)
+                )
 
                 # Calculate difference in means
                 diff = np.mean(treatment_sample) - np.mean(control_sample)
@@ -573,15 +654,24 @@ class ABTestingService:
 
             return (ci_lower, ci_upper)
 
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Data validation error in bootstrap CI calculation: {e}")
+            return (0.0, 0.0)
+        except (MemoryError, OverflowError) as e:
+            logger.warning(f"Resource error in bootstrap CI calculation: {e}")
+            return (0.0, 0.0)
+        except KeyboardInterrupt:
+            logger.warning("Bootstrap CI calculation cancelled by user")
+            raise
         except Exception as e:
-            logger.warning(f"Bootstrap CI calculation failed: {e}")
+            logger.warning(f"Unexpected error in bootstrap CI calculation: {e}")
+            import logging
+
+            logging.exception("Unexpected error in _calculate_bootstrap_ci")
             return (0.0, 0.0)
 
     def _calculate_statistical_power(
-        self,
-        control_data: np.ndarray,
-        treatment_data: np.ndarray,
-        effect_size: float
+        self, control_data: np.ndarray, treatment_data: np.ndarray, effect_size: float
     ) -> float:
         """Calculate statistical power of the test."""
         try:
@@ -590,8 +680,11 @@ class ABTestingService:
 
             # Calculate pooled standard deviation
             pooled_std = np.sqrt(
-                ((n1 - 1) * np.var(control_data, ddof=1) +
-                 (n2 - 1) * np.var(treatment_data, ddof=1)) / (n1 + n2 - 2)
+                (
+                    (n1 - 1) * np.var(control_data, ddof=1)
+                    + (n2 - 1) * np.var(treatment_data, ddof=1)
+                )
+                / (n1 + n2 - 2)
             )
 
             # Calculate non-centrality parameter
@@ -604,21 +697,32 @@ class ABTestingService:
             t_critical = stats.t.ppf(1 - self.alpha / 2, df)
 
             # Power calculation using non-central t-distribution
-            power = 1 - stats.nct.cdf(t_critical, df, ncp) + stats.nct.cdf(-t_critical, df, ncp)
+            power = (
+                1
+                - stats.nct.cdf(t_critical, df, ncp)
+                + stats.nct.cdf(-t_critical, df, ncp)
+            )
 
             return min(max(power, 0.0), 1.0)  # Clamp between 0 and 1
 
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            logger.warning(f"Mathematical error in power calculation: {e}")
+            return 0.5  # Default moderate power estimate
+        except (OverflowError, FloatingPointError) as e:
+            logger.warning(f"Numerical error in power calculation: {e}")
+            return 0.5  # Default moderate power estimate
+        except KeyboardInterrupt:
+            logger.warning("Power calculation cancelled by user")
+            raise
         except Exception as e:
-            logger.warning(f"Power calculation failed: {e}")
+            logger.warning(f"Unexpected error in power calculation: {e}")
+            import logging
+
+            logging.exception("Unexpected error in _calculate_statistical_power")
             return 0.5  # Default moderate power estimate
 
     def _calculate_minimum_detectable_effect(
-        self,
-        n1: int,
-        n2: int,
-        var1: float,
-        var2: float,
-        power: float = 0.8
+        self, n1: int, n2: int, var1: float, var2: float, power: float = 0.8
     ) -> float:
         """Calculate minimum detectable effect size."""
         try:
@@ -637,15 +741,29 @@ class ABTestingService:
 
             return mde
 
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            logger.warning(f"Mathematical error in MDE calculation: {e}")
+            return 0.1  # Default conservative estimate
+        except (OverflowError, FloatingPointError) as e:
+            logger.warning(f"Numerical error in MDE calculation: {e}")
+            return 0.1  # Default conservative estimate
+        except KeyboardInterrupt:
+            logger.warning("MDE calculation cancelled by user")
+            raise
         except Exception as e:
-            logger.warning(f"MDE calculation failed: {e}")
+            logger.warning(f"Unexpected error in MDE calculation: {e}")
+            import logging
+
+            logging.exception(
+                "Unexpected error in _calculate_minimum_detectable_effect"
+            )
             return 0.1  # Default conservative estimate
 
     def _calculate_bayesian_probability(
         self,
         control_data: np.ndarray,
         treatment_data: np.ndarray,
-        n_simulations: int = 10000
+        n_simulations: int = 10000,
     ) -> float:
         """Calculate Bayesian probability that treatment is better than control."""
         try:
@@ -657,14 +775,12 @@ class ABTestingService:
 
             # Sample from posterior distributions (assuming uninformative priors)
             control_samples = np.random.normal(
-                control_mean,
-                control_std / np.sqrt(len(control_data)),
-                n_simulations
+                control_mean, control_std / np.sqrt(len(control_data)), n_simulations
             )
             treatment_samples = np.random.normal(
                 treatment_mean,
                 treatment_std / np.sqrt(len(treatment_data)),
-                n_simulations
+                n_simulations,
             )
 
             # Calculate probability that treatment > control
@@ -672,8 +788,22 @@ class ABTestingService:
 
             return prob_treatment_better
 
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            logger.warning(
+                f"Mathematical error in Bayesian probability calculation: {e}"
+            )
+            return 0.5  # Neutral probability
+        except (OverflowError, FloatingPointError) as e:
+            logger.warning(f"Numerical error in Bayesian probability calculation: {e}")
+            return 0.5  # Neutral probability
+        except KeyboardInterrupt:
+            logger.warning("Bayesian probability calculation cancelled by user")
+            raise
         except Exception as e:
-            logger.warning(f"Bayesian probability calculation failed: {e}")
+            logger.warning(f"Unexpected error in Bayesian probability calculation: {e}")
+            import logging
+
+            logging.exception("Unexpected error in _calculate_bayesian_probability")
             return 0.5  # Neutral probability
 
 

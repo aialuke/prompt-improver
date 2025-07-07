@@ -221,7 +221,9 @@ class TestAsyncPropertyBasedTesting:
 
         # Measure concurrent execution
         start_time = asyncio.get_event_loop().time()
-        results = await asyncio.gather(*[dummy_operation() for _ in range(operation_count)])
+        results = await asyncio.gather(*[
+            dummy_operation() for _ in range(operation_count)
+        ])
         concurrent_time = (asyncio.get_event_loop().time() - start_time) * 1000
 
         # Verify results
@@ -236,9 +238,7 @@ class TestAsyncPropertyBasedTesting:
                 f"Concurrent time {concurrent_time}ms not efficient vs sequential {expected_sequential_time}ms"
             )
 
-    @given(
-        sleep_duration=st.floats(min_value=0.001, max_value=0.05)
-    )
+    @given(sleep_duration=st.floats(min_value=0.001, max_value=0.05))
     async def test_async_sleep_accuracy(self, sleep_duration):
         """Property: asyncio.sleep should be reasonably accurate."""
 
@@ -249,16 +249,16 @@ class TestAsyncPropertyBasedTesting:
         actual_duration = end_time - start_time
 
         # Allow 50% overhead for timing variations in tests
-        assert actual_duration >= sleep_duration, "Sleep duration was less than requested"
+        assert actual_duration >= sleep_duration, (
+            "Sleep duration was less than requested"
+        )
         assert actual_duration <= sleep_duration * 1.5, (
             f"Sleep took {actual_duration:.4f}s, expected ~{sleep_duration:.4f}s"
         )
 
     @given(
         tasks=st.lists(
-            st.floats(min_value=0.001, max_value=0.01),
-            min_size=2,
-            max_size=8
+            st.floats(min_value=0.001, max_value=0.01), min_size=2, max_size=8
         )
     )
     async def test_asyncio_gather_order_preservation(self, tasks):
@@ -270,8 +270,7 @@ class TestAsyncPropertyBasedTesting:
 
         # Create tasks with IDs to track order
         task_coroutines = [
-            timed_operation(delay, idx)
-            for idx, delay in enumerate(tasks)
+            timed_operation(delay, idx) for idx, delay in enumerate(tasks)
         ]
 
         results = await asyncio.gather(*task_coroutines)
@@ -282,9 +281,7 @@ class TestAsyncPropertyBasedTesting:
             f"Order not preserved: got {results}, expected {expected_order}"
         )
 
-    @given(
-        concurrent_count=st.integers(min_value=2, max_value=20)
-    )
+    @given(concurrent_count=st.integers(min_value=2, max_value=20))
     async def test_event_loop_context_preservation(self, concurrent_count):
         """Property: event loop context should be preserved across concurrent operations."""
 
@@ -314,4 +311,6 @@ class TestAsyncPropertyBasedTesting:
         # All operations should use the same loop
         assert len(set(loop_ids_start)) == 1, "Operations used different event loops"
         assert len(set(loop_ids_end)) == 1, "Event loop changed during execution"
-        assert loop_ids_start[0] == loop_ids_end[0], "Event loop changed during operations"
+        assert loop_ids_start[0] == loop_ids_end[0], (
+            "Event loop changed during operations"
+        )

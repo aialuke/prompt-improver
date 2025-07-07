@@ -4,6 +4,7 @@
 import ast
 import os
 import sys
+
 # Modern Python type hints - using built-in types
 
 
@@ -15,34 +16,31 @@ class MLContractValidator(ast.NodeVisitor):
         self.warnings: list[str] = []
 
         # Required contracts for ML components
-        self.required_ml_methods = {
-            'fit', 'predict', 'score', 'transform'
-        }
+        self.required_ml_methods = {"fit", "predict", "score", "transform"}
 
         # Performance requirements
-        self.performance_keywords = {
-            'response_time', 'timeout', 'cache', 'async'
-        }
+        self.performance_keywords = {"response_time", "timeout", "cache", "async"}
 
         # ML monitoring keywords
-        self.monitoring_keywords = {
-            'drift', 'metrics', 'performance', 'logging'
-        }
+        self.monitoring_keywords = {"drift", "metrics", "performance", "logging"}
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Validate ML-related classes."""
         class_name = node.name.lower()
 
         # Check ML model classes
-        if any(keyword in class_name for keyword in ['model', 'estimator', 'classifier', 'regressor']):
+        if any(
+            keyword in class_name
+            for keyword in ["model", "estimator", "classifier", "regressor"]
+        ):
             self._validate_ml_model_class(node)
 
         # Check evaluation classes
-        if any(keyword in class_name for keyword in ['evaluator', 'judge', 'analyzer']):
+        if any(keyword in class_name for keyword in ["evaluator", "judge", "analyzer"]):
             self._validate_evaluation_class(node)
 
         # Check monitoring classes
-        if any(keyword in class_name for keyword in ['monitor', 'tracker', 'logger']):
+        if any(keyword in class_name for keyword in ["monitor", "tracker", "logger"]):
             self._validate_monitoring_class(node)
 
         self.generic_visit(node)
@@ -54,11 +52,11 @@ class MLContractValidator(ast.NodeVisitor):
         # Check async functions for timeout handling
         if node.decorator_list:
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Name) and decorator.id == 'asyncio':
+                if isinstance(decorator, ast.Name) and decorator.id == "asyncio":
                     self._validate_async_function(node)
 
         # Check performance-critical functions
-        if any(keyword in func_name for keyword in ['evaluate', 'improve', 'analyze']):
+        if any(keyword in func_name for keyword in ["evaluate", "improve", "analyze"]):
             self._validate_performance_function(node)
 
         self.generic_visit(node)
@@ -89,13 +87,13 @@ class MLContractValidator(ast.NodeVisitor):
         class_source = ast.dump(node).lower()
 
         # Check for response time handling
-        if 'response_time' not in class_source and 'timeout' not in class_source:
+        if "response_time" not in class_source and "timeout" not in class_source:
             self.warnings.append(
                 f"Evaluation class '{node.name}' should handle response time requirements"
             )
 
         # Check for fallback mechanisms
-        if 'fallback' not in class_source and 'backup' not in class_source:
+        if "fallback" not in class_source and "backup" not in class_source:
             self.warnings.append(
                 f"Evaluation class '{node.name}' should implement fallback mechanisms"
             )
@@ -105,7 +103,7 @@ class MLContractValidator(ast.NodeVisitor):
         class_source = ast.dump(node).lower()
 
         # Check for prometheus metrics
-        if 'prometheus' not in class_source and 'metrics' not in class_source:
+        if "prometheus" not in class_source and "metrics" not in class_source:
             self.warnings.append(
                 f"Monitoring class '{node.name}' should integrate with Prometheus metrics"
             )
@@ -115,7 +113,7 @@ class MLContractValidator(ast.NodeVisitor):
         func_source = ast.dump(node).lower()
 
         # Check for timeout handling
-        if 'timeout' not in func_source and 'asyncio.wait_for' not in func_source:
+        if "timeout" not in func_source and "asyncio.wait_for" not in func_source:
             self.warnings.append(
                 f"Async function '{node.name}' should implement timeout handling"
             )
@@ -127,7 +125,7 @@ class MLContractValidator(ast.NodeVisitor):
         # Check for performance monitoring
         has_timing = any(
             keyword in func_source
-            for keyword in ['time', 'duration', 'performance', 'metrics']
+            for keyword in ["time", "duration", "performance", "metrics"]
         )
         if not has_timing:
             self.warnings.append(
@@ -138,7 +136,7 @@ class MLContractValidator(ast.NodeVisitor):
 def validate_file(filepath: str) -> bool:
     """Validate a single Python file for ML contracts."""
     try:
-        with open(filepath, encoding='utf-8') as f:
+        with open(filepath, encoding="utf-8") as f:
             content = f.read()
 
         # Parse the AST
@@ -169,8 +167,23 @@ def validate_file(filepath: str) -> bool:
     except SyntaxError as e:
         print(f"❌ {filepath}: Syntax error - {e}")
         return False
+    except (OSError, IOError) as e:
+        print(f"❌ {filepath}: File I/O error - {e}")
+        return False
+    except (UnicodeDecodeError, ValueError) as e:
+        print(f"❌ {filepath}: File encoding/content error - {e}")
+        return False
+    except RecursionError as e:
+        print(f"❌ {filepath}: AST parsing recursion error (file too complex) - {e}")
+        return False
+    except KeyboardInterrupt:
+        print("\n⚠️ Validation cancelled by user")
+        raise
     except Exception as e:
-        print(f"❌ {filepath}: Validation error - {e}")
+        print(f"❌ {filepath}: Unexpected validation error - {e}")
+        import logging
+
+        logging.exception(f"Unexpected error validating {filepath}")
         return False
 
 
@@ -189,7 +202,7 @@ def main():
             all_success = False
             continue
 
-        if not filepath.endswith('.py'):
+        if not filepath.endswith(".py"):
             continue  # Skip non-Python files
 
         success = validate_file(filepath)
@@ -202,5 +215,5 @@ def main():
         print("\n✅ All ML contracts validated successfully")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

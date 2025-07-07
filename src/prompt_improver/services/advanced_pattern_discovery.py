@@ -310,7 +310,9 @@ class AdvancedPatternDiscovery:
                 # Optimized HDBSCAN configuration based on performance research
                 clusterer = hdbscan.HDBSCAN(
                     min_cluster_size=self.min_cluster_size,
-                    min_samples=max(3, self.min_cluster_size // 3),  # Adaptive min_samples
+                    min_samples=max(
+                        3, self.min_cluster_size // 3
+                    ),  # Adaptive min_samples
                     metric="euclidean",
                     algorithm="boruvka_kdtree",  # Most efficient for moderate datasets
                     cluster_selection_method="eom",  # Excess of Mass for stability
@@ -1197,6 +1199,7 @@ class AdvancedPatternDiscovery:
         try:
             # Set optimal number of parallel jobs based on CPU count
             import os
+
             self._optimal_n_jobs = min(os.cpu_count() or 1, 4)  # Cap at 4 for stability
 
             # Configure BLAS/LAPACK threads for NumPy optimization
@@ -1204,7 +1207,9 @@ class AdvancedPatternDiscovery:
             os.environ.setdefault("OPENBLAS_NUM_THREADS", str(self._optimal_n_jobs))
             os.environ.setdefault("MKL_NUM_THREADS", str(self._optimal_n_jobs))
 
-            logger.info(f"HDBSCAN performance configured: {self._optimal_n_jobs} parallel jobs")
+            logger.info(
+                f"HDBSCAN performance configured: {self._optimal_n_jobs} parallel jobs"
+            )
 
         except Exception as e:
             logger.warning(f"Failed to configure HDBSCAN performance: {e}")
@@ -1212,23 +1217,20 @@ class AdvancedPatternDiscovery:
 
     def _get_optimal_n_jobs(self) -> int:
         """Get optimal number of parallel jobs for HDBSCAN."""
-        return getattr(self, '_optimal_n_jobs', 1)
+        return getattr(self, "_optimal_n_jobs", 1)
 
     async def benchmark_clustering_performance(
-        self,
-        dataset_sizes: list[int] = None,
-        max_time: int = 45,
-        sample_size: int = 2
+        self, dataset_sizes: list[int] = None, max_time: int = 45, sample_size: int = 2
     ) -> dict[str, Any]:
         """Benchmark HDBSCAN performance on different dataset sizes.
-        
+
         Based on Context7 research for performance optimization.
-        
+
         Args:
             dataset_sizes: List of dataset sizes to benchmark
             max_time: Maximum time per benchmark (seconds)
             sample_size: Number of samples per dataset size
-            
+
         Returns:
             Performance benchmark results
         """
@@ -1247,11 +1249,7 @@ class AdvancedPatternDiscovery:
             for sample in range(sample_size):
                 try:
                     # Generate synthetic data
-                    data, _ = make_blobs(
-                        n_samples=size,
-                        n_features=10,
-                        centers=5
-                    )
+                    data, _ = make_blobs(n_samples=size, n_features=10, centers=5)
 
                     # Benchmark HDBSCAN
                     start_time = time.time()
@@ -1260,7 +1258,7 @@ class AdvancedPatternDiscovery:
                         clusterer = hdbscan.HDBSCAN(
                             min_cluster_size=max(5, size // 100),
                             algorithm="boruvka_kdtree",
-                            core_dist_n_jobs=self._get_optimal_n_jobs()
+                            core_dist_n_jobs=self._get_optimal_n_jobs(),
                         )
                         clusterer.fit(data)
 
@@ -1280,7 +1278,7 @@ class AdvancedPatternDiscovery:
                     "avg_time": np.mean(size_results),
                     "min_time": min(size_results),
                     "max_time": max(size_results),
-                    "samples": len(size_results)
+                    "samples": len(size_results),
                 }
 
         return {
@@ -1288,7 +1286,7 @@ class AdvancedPatternDiscovery:
             "algorithm": "HDBSCAN-Boruvka",
             "parallel_jobs": self._get_optimal_n_jobs(),
             "results": results,
-            "performance_summary": self._analyze_performance_results(results)
+            "performance_summary": self._analyze_performance_results(results),
         }
 
     def _analyze_performance_results(self, results: dict) -> dict[str, Any]:
@@ -1303,9 +1301,12 @@ class AdvancedPatternDiscovery:
         if len(times) >= 3:
             # Simple linear regression to estimate scaling
             from scipy.stats import linregress
+
             log_sizes = np.log(sizes)
             log_times = np.log(times)
-            slope, intercept, r_value, p_value, std_err = linregress(log_sizes, log_times)
+            slope, intercept, r_value, p_value, std_err = linregress(
+                log_sizes, log_times
+            )
 
             complexity_estimate = f"O(n^{slope:.2f})"
         else:
@@ -1316,7 +1317,11 @@ class AdvancedPatternDiscovery:
             "fastest_time": min(times),
             "slowest_time": max(times),
             "complexity_estimate": complexity_estimate,
-            "scalability_rating": "Good" if max(times) < 10 else "Moderate" if max(times) < 60 else "Poor"
+            "scalability_rating": "Good"
+            if max(times) < 10
+            else "Moderate"
+            if max(times) < 60
+            else "Poor",
         }
 
 

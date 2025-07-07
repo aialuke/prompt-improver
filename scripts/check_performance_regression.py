@@ -23,7 +23,7 @@ class PerformanceRegessionChecker:
             return None
 
         try:
-            with self.baseline_file.open(encoding='utf-8') as f:
+            with self.baseline_file.open(encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
             print(f"⚠️  Failed to load baseline: {e}")
@@ -32,7 +32,7 @@ class PerformanceRegessionChecker:
     def save_baseline(self, metrics: dict[str, Any]) -> None:
         """Save performance baseline to file."""
         try:
-            with self.baseline_file.open('w', encoding='utf-8') as f:
+            with self.baseline_file.open("w", encoding="utf-8") as f:
                 json.dump(metrics, f, indent=2)
         except (OSError, PermissionError, UnicodeEncodeError) as e:
             print(f"⚠️  Failed to save baseline: {e}")
@@ -45,9 +45,10 @@ class PerformanceRegessionChecker:
         start_time = time.time()
         try:
             from src.prompt_improver.mcp_server import mcp_server
-            metrics['import_time'] = time.time() - start_time
+
+            metrics["import_time"] = time.time() - start_time
         except (ImportError, AttributeError, OSError):
-            metrics['import_time'] = float('inf')
+            metrics["import_time"] = float("inf")
 
         # Test 2: MCP server startup simulation
         start_time = time.time()
@@ -55,22 +56,24 @@ class PerformanceRegessionChecker:
             # Simulate server initialization (don't actually start)
             # This would measure initialization time
             time.sleep(0.01)  # Simulate initialization work
-            metrics['startup_time'] = time.time() - start_time
+            metrics["startup_time"] = time.time() - start_time
         except (OSError, RuntimeError):
-            metrics['startup_time'] = float('inf')
+            metrics["startup_time"] = float("inf")
 
         # Test 3: Database connection simulation
         start_time = time.time()
         try:
             # Simulate database connection time
             time.sleep(0.005)  # Simulate DB connection
-            metrics['db_connection_time'] = time.time() - start_time
+            metrics["db_connection_time"] = time.time() - start_time
         except (OSError, RuntimeError):
-            metrics['db_connection_time'] = float('inf')
+            metrics["db_connection_time"] = float("inf")
 
         return metrics
 
-    def check_regression(self, current: dict[str, float], baseline: dict[str, float]) -> bool:
+    def check_regression(
+        self, current: dict[str, float], baseline: dict[str, float]
+    ) -> bool:
         """Check if current metrics show regression compared to baseline."""
         regressions = []
 
@@ -87,17 +90,19 @@ class PerformanceRegessionChecker:
 
             if change_ratio > self.threshold_degradation:
                 regressions.append({
-                    'metric': metric,
-                    'baseline': baseline_value,
-                    'current': current_value,
-                    'degradation': f"{change_ratio * 100:.1f}%"
+                    "metric": metric,
+                    "baseline": baseline_value,
+                    "current": current_value,
+                    "degradation": f"{change_ratio * 100:.1f}%",
                 })
 
         if regressions:
             print("❌ Performance regressions detected:")
             for reg in regressions:
-                print(f"   {reg['metric']}: {reg['baseline']:.3f}s → {reg['current']:.3f}s "
-                     f"({reg['degradation']} degradation)")
+                print(
+                    f"   {reg['metric']}: {reg['baseline']:.3f}s → {reg['current']:.3f}s "
+                    f"({reg['degradation']} degradation)"
+                )
             return False
 
         return True
@@ -135,12 +140,12 @@ class PerformanceRegessionChecker:
 def main():
     """Main performance check script."""
     # Skip check if explicitly disabled
-    if os.environ.get('SKIP_PERFORMANCE_CHECK', '').lower() in ('1', 'true', 'yes'):
+    if os.environ.get("SKIP_PERFORMANCE_CHECK", "").lower() in ("1", "true", "yes"):
         print("⏭️  Performance check skipped (SKIP_PERFORMANCE_CHECK set)")
         return
 
     # Skip check in CI environment (to avoid duplication)
-    if os.environ.get('CI', '').lower() in ('1', 'true'):
+    if os.environ.get("CI", "").lower() in ("1", "true"):
         print("⏭️  Performance check skipped in CI environment")
         return
 
@@ -149,7 +154,9 @@ def main():
         success = checker.run_check()
 
         if not success:
-            print("\n💡 To bypass this check (not recommended), set SKIP_PERFORMANCE_CHECK=1")
+            print(
+                "\n💡 To bypass this check (not recommended), set SKIP_PERFORMANCE_CHECK=1"
+            )
             sys.exit(1)
 
     except (OSError, RuntimeError, ValueError) as e:
@@ -158,5 +165,5 @@ def main():
         # Don't fail the commit on check errors, just warn
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

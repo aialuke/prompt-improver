@@ -168,7 +168,7 @@ async def get_rule_status() -> dict[str, Any]:
         async with get_session() as db_session:
             # Get rule effectiveness stats
             rule_stats = await analytics_service.get_rule_effectiveness(
-                days=7, min_usage=10, db_session=db_session
+                days=7, min_usage_count=10, db_session=db_session
             )
 
             # Get active rules metadata

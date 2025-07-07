@@ -143,6 +143,8 @@ class UserFeedbackBase(SQLModel):
     )
     user_notes: str | None = Field(default=None)
     session_id: str | None = Field(default=None, max_length=100, index=True)
+    ml_optimized: bool = Field(default=False)
+    model_id: str | None = Field(default=None, max_length=100)
 
 
 class UserFeedback(UserFeedbackBase, table=True):

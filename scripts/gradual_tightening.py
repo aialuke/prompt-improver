@@ -124,13 +124,14 @@ class GradualTightening:
         try:
             # Run ruff check to get current issues - using absolute path for security
             import shutil
+
             ruff_path = shutil.which("ruff")
             if not ruff_path:
                 raise FileNotFoundError("ruff command not found in PATH")
-            
+
             # Security: subprocess call with validated executable path and secure parameters
             # - ruff_path resolved via shutil.which() to prevent PATH injection
-            # - shell=False prevents shell injection attacks  
+            # - shell=False prevents shell injection attacks
             # - timeout=60 prevents indefinite hanging
             # - All arguments are controlled and validated
             result = subprocess.run(  # noqa: S603
@@ -197,7 +198,7 @@ class GradualTightening:
         """Save metrics for tracking progress."""
         # Load existing metrics
         if self.metrics_path.exists():
-            with self.metrics_path.open(encoding='utf-8') as f:
+            with self.metrics_path.open(encoding="utf-8") as f:
                 all_metrics = json.load(f)
         else:
             all_metrics = {"stages": {}}
@@ -222,7 +223,7 @@ class GradualTightening:
         }
 
         # Save metrics
-        with self.metrics_path.open("w", encoding='utf-8') as f:
+        with self.metrics_path.open("w", encoding="utf-8") as f:
             json.dump(all_metrics, f, indent=2)
 
         print(f"📈 Metrics saved to {self.metrics_path}")
@@ -251,7 +252,7 @@ class GradualTightening:
         ruff_path = shutil.which("ruff")
         if not ruff_path:
             raise FileNotFoundError("ruff command not found in PATH")
-            
+
         # Security: subprocess call with validated executable path and secure parameters
         # - ruff_path resolved via shutil.which() to prevent PATH injection
         # - shell=False prevents shell injection attacks
@@ -306,7 +307,7 @@ class GradualTightening:
         """Modify pyproject.toml to apply stage-specific rules."""
         try:
             # Read current pyproject.toml
-            with self.pyproject_path.open(encoding='utf-8') as f:
+            with self.pyproject_path.open(encoding="utf-8") as f:
                 _ = f.read()
 
             # This is a simplified approach - in a real implementation,
@@ -356,7 +357,7 @@ class GradualTightening:
 
         # Historical progress
         if self.metrics_path.exists():
-            with self.metrics_path.open(encoding='utf-8') as f:
+            with self.metrics_path.open(encoding="utf-8") as f:
                 historical_metrics = json.load(f)
 
             print("\n📈 Historical Progress:")

@@ -3,6 +3,7 @@
 Phase 4 Regression Tests for Complex CLI Functions.
 These tests ensure that refactored functions maintain the same behavior.
 """
+
 import asyncio
 import json
 import tempfile
@@ -22,7 +23,9 @@ class TestLogsRegression:
         """Set up test environment before each test."""
         self.runner = CliRunner()
         self.temp_dir = tempfile.mkdtemp()
-        self.log_dir = Path(self.temp_dir) / ".local" / "share" / "apes" / "data" / "logs"
+        self.log_dir = (
+            Path(self.temp_dir) / ".local" / "share" / "apes" / "data" / "logs"
+        )
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Create sample log file
@@ -35,14 +38,14 @@ class TestLogsRegression:
             "2024-01-15 10:00:04 INFO Request processed successfully",
         ] * 20  # Create 100 log entries
 
-        with open(self.log_file, 'w', encoding="utf-8") as f:
+        with open(self.log_file, "w", encoding="utf-8") as f:
             for log in sample_logs:
-                f.write(log + '\n')
+                f.write(log + "\n")
 
     def test_logs_basic_functionality(self):
         """Test basic logs command without follow mode."""
-        with patch('pathlib.Path.home', return_value=Path(self.temp_dir)):
-            result = self.runner.invoke(app, ['logs', '--lines', '10'])
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--lines", "10"])
 
             # Should find and display logs
             assert result.exit_code == 0
@@ -50,51 +53,55 @@ class TestLogsRegression:
 
     def test_logs_level_filtering(self):
         """Test log level filtering functionality."""
-        with patch('pathlib.Path.home', return_value=Path(self.temp_dir)):
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
             # Test INFO level filtering
-            result = self.runner.invoke(app, ['logs', '--level', 'INFO', '--lines', '50'])
+            result = self.runner.invoke(
+                app, ["logs", "--level", "INFO", "--lines", "50"]
+            )
             assert result.exit_code == 0
 
             # Test ERROR level filtering
-            result = self.runner.invoke(app, ['logs', '--level', 'ERROR', '--lines', '50'])
+            result = self.runner.invoke(
+                app, ["logs", "--level", "ERROR", "--lines", "50"]
+            )
             assert result.exit_code == 0
 
     def test_logs_component_filtering(self):
         """Test component-specific log filtering."""
         # Create component-specific log file
         component_log = self.log_dir / "mcp.log"
-        with open(component_log, 'w', encoding="utf-8") as f:
+        with open(component_log, "w", encoding="utf-8") as f:
             f.write("2024-01-15 10:00:00 INFO MCP service started\n")
 
-        with patch('pathlib.Path.home', return_value=Path(self.temp_dir)):
-            result = self.runner.invoke(app, ['logs', '--component', 'mcp'])
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--component", "mcp"])
             assert result.exit_code == 0
             assert "Viewing logs:" in result.stdout
 
     def test_logs_nonexistent_directory(self):
         """Test behavior when log directory doesn't exist."""
-        with patch('pathlib.Path.home', return_value=Path("/nonexistent")):
-            result = self.runner.invoke(app, ['logs'])
+        with patch("pathlib.Path.home", return_value=Path("/nonexistent")):
+            result = self.runner.invoke(app, ["logs"])
             assert result.exit_code == 1
             assert "Log directory not found" in result.stdout
 
     def test_logs_nonexistent_component(self):
         """Test behavior when component log file doesn't exist."""
-        with patch('pathlib.Path.home', return_value=Path(self.temp_dir)):
-            result = self.runner.invoke(app, ['logs', '--component', 'nonexistent'])
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--component", "nonexistent"])
             assert result.exit_code == 1
             assert "Log file not found" in result.stdout
             assert "Available log files:" in result.stdout
 
     def test_logs_lines_parameter(self):
         """Test lines parameter functionality."""
-        with patch('pathlib.Path.home', return_value=Path(self.temp_dir)):
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
             # Test with small number of lines
-            result = self.runner.invoke(app, ['logs', '--lines', '5'])
+            result = self.runner.invoke(app, ["logs", "--lines", "5"])
             assert result.exit_code == 0
 
             # Test with large number of lines (more than available)
-            result = self.runner.invoke(app, ['logs', '--lines', '1000'])
+            result = self.runner.invoke(app, ["logs", "--lines", "1000"])
             assert result.exit_code == 0
 
 
@@ -109,40 +116,52 @@ class TestHealthRegression:
     async def test_health_basic_functionality(self):
         """Test basic health check functionality."""
         # Mock the health monitor to avoid actual system checks
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_health_results = {
                 "overall_status": "healthy",
                 "checks": {
-                    "database": {"status": "healthy", "response_time_ms": 50.0, "message": "Connected"},
-                    "mcp": {"status": "healthy", "response_time_ms": 25.0, "message": "Running"},
-                    "system_resources": {"status": "healthy", "memory_usage_percent": 45.0, "cpu_usage_percent": 30.0}
+                    "database": {
+                        "status": "healthy",
+                        "response_time_ms": 50.0,
+                        "message": "Connected",
+                    },
+                    "mcp": {
+                        "status": "healthy",
+                        "response_time_ms": 25.0,
+                        "message": "Running",
+                    },
+                    "system_resources": {
+                        "status": "healthy",
+                        "memory_usage_percent": 45.0,
+                        "cpu_usage_percent": 30.0,
+                    },
                 },
                 "warning_checks": [],
-                "failed_checks": []
+                "failed_checks": [],
             }
             mock_run.return_value = mock_health_results
 
-            result = self.runner.invoke(app, ['health'])
+            result = self.runner.invoke(app, ["health"])
             assert result.exit_code == 0
             assert "Running APES Health Check" in result.stdout
 
     def test_health_json_output(self):
         """Test health check with JSON output format."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_health_results = {
                 "overall_status": "healthy",
                 "checks": {},
                 "warning_checks": [],
-                "failed_checks": []
+                "failed_checks": [],
             }
             mock_run.return_value = mock_health_results
 
-            result = self.runner.invoke(app, ['health', '--json'])
+            result = self.runner.invoke(app, ["health", "--json"])
             assert result.exit_code == 0
 
     def test_health_detailed_mode(self):
         """Test health check with detailed diagnostics."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_health_results = {
                 "overall_status": "warning",
                 "checks": {
@@ -150,21 +169,24 @@ class TestHealthRegression:
                         "status": "warning",
                         "memory_usage_percent": 85.0,
                         "cpu_usage_percent": 75.0,
-                        "disk_usage_percent": 60.0
+                        "disk_usage_percent": 60.0,
                     }
                 },
                 "warning_checks": ["system_resources"],
-                "failed_checks": []
+                "failed_checks": [],
             }
             mock_run.return_value = mock_health_results
 
-            result = self.runner.invoke(app, ['health', '--detailed'])
+            result = self.runner.invoke(app, ["health", "--detailed"])
             assert result.exit_code == 0
 
     def test_health_error_handling(self):
         """Test health check error handling."""
-        with patch('prompt_improver.cli.asyncio.run', side_effect=Exception("Health check failed")):
-            result = self.runner.invoke(app, ['health'])
+        with patch(
+            "prompt_improver.cli.asyncio.run",
+            side_effect=Exception("Health check failed"),
+        ):
+            result = self.runner.invoke(app, ["health"])
             assert result.exit_code == 1
             assert "Health check failed" in result.stdout
 
@@ -178,104 +200,107 @@ class TestAlertsRegression:
 
     def test_alerts_basic_functionality(self):
         """Test basic alerts command functionality."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_summary = {
                 "alert_summary": {
                     "total_alerts": 5,
                     "critical_alerts": 2,
                     "warning_alerts": 3,
-                    "most_common_alert": "High Memory Usage"
+                    "most_common_alert": "High Memory Usage",
                 },
                 "current_performance": {
                     "avg_response_time_ms": 150.0,
                     "memory_usage_mb": 180.0,
-                    "database_connections": 10
+                    "database_connections": 10,
                 },
-                "health_status": "warning"
+                "health_status": "warning",
             }
             mock_run.return_value = mock_summary
 
-            result = self.runner.invoke(app, ['alerts'])
+            result = self.runner.invoke(app, ["alerts"])
             assert result.exit_code == 0
             assert "APES Alert Status" in result.stdout
 
     def test_alerts_severity_filtering(self):
         """Test alerts with severity filtering."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_summary = {
                 "alert_summary": {
                     "total_alerts": 3,
                     "critical_alerts": 1,
                     "warning_alerts": 2,
-                    "most_common_alert": "Database Connection Issue"
+                    "most_common_alert": "Database Connection Issue",
                 },
                 "current_performance": {},
-                "health_status": "critical"
+                "health_status": "critical",
             }
             mock_run.return_value = mock_summary
 
             # Test critical severity filter
-            result = self.runner.invoke(app, ['alerts', '--severity', 'critical'])
+            result = self.runner.invoke(app, ["alerts", "--severity", "critical"])
             assert result.exit_code == 0
 
             # Test warning severity filter
-            result = self.runner.invoke(app, ['alerts', '--severity', 'warning'])
+            result = self.runner.invoke(app, ["alerts", "--severity", "warning"])
             assert result.exit_code == 0
 
     def test_alerts_time_period(self):
         """Test alerts with different time periods."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_summary = {
                 "alert_summary": {"total_alerts": 0},
                 "current_performance": {},
-                "health_status": "healthy"
+                "health_status": "healthy",
             }
             mock_run.return_value = mock_summary
 
             # Test with custom hours parameter
-            result = self.runner.invoke(app, ['alerts', '--hours', '48'])
+            result = self.runner.invoke(app, ["alerts", "--hours", "48"])
             assert result.exit_code == 0
 
     def test_alerts_no_alerts_found(self):
         """Test alerts command when no alerts are found."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_summary = {
                 "alert_summary": {"total_alerts": 0},
                 "current_performance": {},
-                "health_status": "healthy"
+                "health_status": "healthy",
             }
             mock_run.return_value = mock_summary
 
-            result = self.runner.invoke(app, ['alerts'])
+            result = self.runner.invoke(app, ["alerts"])
             assert result.exit_code == 0
             assert "No alerts found" in result.stdout
 
     def test_alerts_recommendations(self):
         """Test alerts command shows recommendations for unhealthy systems."""
-        with patch('prompt_improver.cli.asyncio.run') as mock_run:
+        with patch("prompt_improver.cli.asyncio.run") as mock_run:
             mock_summary = {
                 "alert_summary": {
                     "total_alerts": 1,
                     "critical_alerts": 1,
-                    "warning_alerts": 0
+                    "warning_alerts": 0,
                 },
                 "current_performance": {
                     "avg_response_time_ms": 250.0,  # > 200
-                    "memory_usage_mb": 220.0,       # > 200
-                    "database_connections": 18      # > 15
+                    "memory_usage_mb": 220.0,  # > 200
+                    "database_connections": 18,  # > 15
                 },
-                "health_status": "critical"
+                "health_status": "critical",
             }
             mock_run.return_value = mock_summary
 
-            result = self.runner.invoke(app, ['alerts'])
+            result = self.runner.invoke(app, ["alerts"])
             assert result.exit_code == 0
             assert "Recommendations:" in result.stdout
 
     def test_alerts_error_handling(self):
         """Test alerts command error handling."""
-        with patch('prompt_improver.cli.asyncio.run', side_effect=Exception("Monitoring service unavailable")):
-            result = self.runner.invoke(app, ['alerts'])
+        with patch(
+            "prompt_improver.cli.asyncio.run",
+            side_effect=Exception("Monitoring service unavailable"),
+        ):
+            result = self.runner.invoke(app, ["alerts"])
             assert result.exit_code == 1
             assert "Failed to retrieve alerts" in result.stdout
 

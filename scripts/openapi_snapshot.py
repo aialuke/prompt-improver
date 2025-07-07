@@ -26,6 +26,7 @@ from pydantic import (
 # Define the request models directly to avoid import issues
 class PromptEnhancementRequest(BaseModel):
     """Request model for prompt enhancement."""
+
     prompt: str = Field(..., description="The prompt to enhance")
     context: dict[str, Any] | None = Field(
         default=None, description="Additional context for enhancement"
@@ -35,6 +36,7 @@ class PromptEnhancementRequest(BaseModel):
 
 class PromptStorageRequest(BaseModel):
     """Request model for storing prompt data."""
+
     original: str = Field(..., description="The original prompt")
     enhanced: str = Field(..., description="The enhanced prompt")
     metrics: dict[str, Any] = Field(..., description="Success metrics")
@@ -124,6 +126,7 @@ def generate_mcp_schema() -> dict[str, Any]:
 
     # Add timestamp
     from datetime import datetime
+
     schema["meta"]["generated_at"] = datetime.now().isoformat()
 
     return schema
@@ -150,7 +153,7 @@ def load_schema(schema_file: Path) -> dict[str, Any]:
 
 def compare_schemas(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> bool:
     """Compare two schemas and report differences.
-    
+
     Returns True if schemas are compatible, False if breaking changes detected.
     """
     print("\n📊 Schema Comparison Results:")
@@ -186,11 +189,15 @@ def compare_schemas(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> b
         removed_required = old_required - new_required
 
         if added_required:
-            print(f"🚨 BREAKING: {model_name} - Added required fields: {', '.join(added_required)}")
+            print(
+                f"🚨 BREAKING: {model_name} - Added required fields: {', '.join(added_required)}"
+            )
             compatible = False
 
         if removed_required:
-            print(f"✅ {model_name} - Removed required fields: {', '.join(removed_required)}")
+            print(
+                f"✅ {model_name} - Removed required fields: {', '.join(removed_required)}"
+            )
 
         # Check field types
         old_props = old_model.get("properties", {})
@@ -201,7 +208,9 @@ def compare_schemas(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> b
             new_type = new_props[field_name].get("type")
 
             if old_type != new_type:
-                print(f"⚠️  {model_name}.{field_name} - Type changed: {old_type} → {new_type}")
+                print(
+                    f"⚠️  {model_name}.{field_name} - Type changed: {old_type} → {new_type}"
+                )
                 # Type changes are potentially breaking but context-dependent
 
     # Compare tools
@@ -283,8 +292,25 @@ def main():
 
         return 0
 
+    except (OSError, IOError) as e:
+        print(f"\n💥 File I/O Error: {e}")
+        return 1
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"\n💥 JSON/Data Error: {e}")
+        return 1
+    except (ImportError, AttributeError) as e:
+        print(f"\n💥 Module/Import Error: {e}")
+        return 1
+    except KeyboardInterrupt:
+        print("\n⚠️ Operation cancelled by user")
+        raise
+    except SystemExit:
+        raise
     except Exception as e:
-        print(f"\n💥 Error: {e}")
+        print(f"\n💥 Unexpected Error: {e}")
+        import logging
+
+        logging.exception("Unexpected error in main()")
         return 1
 
 

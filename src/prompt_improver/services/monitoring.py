@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy import text
+
 from rich import box
 from rich.console import Console
 from rich.layout import Layout
@@ -16,9 +18,10 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from ..database import get_session
+from ..database import sessionmanager
 from ..database.models import RulePerformance
 from ..services.analytics import AnalyticsService
+from ..utils.error_handlers import handle_database_errors, handle_common_errors
 
 
 @dataclass
@@ -307,6 +310,12 @@ class RealTimeMonitor:
 
         return Panel(controls, border_style="dim")
 
+    @handle_database_errors(
+        rollback_session=False, 
+        return_format="none", 
+        operation_name="collect_system_metrics",
+        retry_count=1
+    )
     async def collect_system_metrics(self) -> dict[str, Any]:
         """Collect real-time system metrics"""
         metrics = {
@@ -317,26 +326,20 @@ class RealTimeMonitor:
             "cpu_usage_percent": 0,
         }
 
-        try:
-            async with get_session() as session:
-                # Test database response time
-                start_time = time.time()
-                await session.execute("SELECT 1")
-                end_time = time.time()
-                metrics["avg_response_time_ms"] = (end_time - start_time) * 1000
+        async with sessionmanager.session() as session:
+            # Test database response time
+            start_time = time.time()
+            await session.execute(text("SELECT 1"))
+            end_time = time.time()
+            metrics["avg_response_time_ms"] = (end_time - start_time) * 1000
 
-                # Get active database connections
-                result = await session.execute(
-                    "SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"
-                )
-                metrics["database_connections"] = result.scalar() or 0
+            # Get active database connections
+            result = await session.execute(
+                text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+            )
+            metrics["database_connections"] = result.scalar() or 0
 
-        except Exception as e:
-            # Database unreachable
-            metrics["avg_response_time_ms"] = 999
-            metrics["database_connections"] = 0
-
-        # Get system resource usage (mock for now, would use psutil in production)
+        # Get system resource usage (with fallback for missing psutil)
         try:
             import psutil
 
@@ -424,35 +427,36 @@ class RealTimeMonitor:
         for alert in new_alerts:
             await self.log_alert(alert)
 
+    @handle_database_errors(
+        rollback_session=True, 
+        return_format="none", 
+        operation_name="log_alert",
+        retry_count=1
+    )
     async def log_alert(self, alert: PerformanceAlert):
         """Log alert to database for historical analysis"""
-        try:
-            async with get_session() as session:
-                # Store alert in rule performance table as monitoring entry
-                perf_metric = RulePerformance(
-                    rule_id="monitoring_alert",
-                    rule_name=f"{alert.alert_type}_alert",
-                    improvement_score=0.0,  # Alert indicates a problem
-                    confidence_level=1.0,
-                    execution_time_ms=int(alert.current_value)
-                    if alert.metric_name == "response_time"
-                    else None,
-                    rule_parameters={
-                        "alert_type": alert.alert_type,
-                        "severity": alert.severity,
-                        "threshold": alert.threshold_value,
-                    },
-                    before_metrics={"current_value": alert.current_value},
-                    after_metrics={"threshold": alert.threshold_value},
-                    prompt_characteristics={"monitoring": True},
-                )
+        async with sessionmanager.session() as session:
+            # Store alert in rule performance table as monitoring entry
+            perf_metric = RulePerformance(
+                rule_id="monitoring_alert",
+                rule_name=f"{alert.alert_type}_alert",
+                improvement_score=0.0,  # Alert indicates a problem
+                confidence_level=1.0,
+                execution_time_ms=int(alert.current_value)
+                if alert.metric_name == "response_time"
+                else None,
+                rule_parameters={
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "threshold": alert.threshold_value,
+                },
+                before_metrics={"current_value": alert.current_value},
+                after_metrics={"threshold": alert.threshold_value},
+                prompt_characteristics={"monitoring": True},
+            )
 
-                session.add(perf_metric)
-                await session.commit()
-
-        except Exception as e:
-            # Don't let logging errors break monitoring
-            pass
+            session.add(perf_metric)
+            await session.commit()
 
     def stop_monitoring(self):
         """Stop the monitoring dashboard"""
@@ -588,41 +592,39 @@ class HealthMonitor:
 
         return health_results
 
+    @handle_database_errors(
+        rollback_session=False, 
+        return_format="dict", 
+        operation_name="check_database_health",
+        retry_count=1
+    )
     async def _check_database_health(self) -> dict[str, Any]:
         """Check database connectivity and performance"""
-        try:
-            start_time = time.time()
-            async with get_session() as session:
-                await session.execute("SELECT 1")
-                response_time = (time.time() - start_time) * 1000
+        start_time = time.time()
+        async with sessionmanager.session() as session:
+            await session.execute(text("SELECT 1"))
+            response_time = (time.time() - start_time) * 1000
 
-                # Check for long-running queries
-                result = await session.execute("""
-                    SELECT count(*) 
-                    FROM pg_stat_activity 
-                    WHERE state = 'active' 
-                    AND query_start < NOW() - INTERVAL '30 seconds'
-                """)
-                long_queries = result.scalar() or 0
+            # Check for long-running queries
+            result = await session.execute(text("""
+                SELECT count(*) 
+                FROM pg_stat_activity 
+                WHERE state = 'active' 
+                AND query_start < NOW() - INTERVAL '30 seconds'
+            """))
+            long_queries = result.scalar() or 0
 
-                status = "healthy"
-                if response_time > 100:
-                    status = "warning"
-                if response_time > 500 or long_queries > 0:
-                    status = "failed"
+            status = "healthy"
+            if response_time > 100:
+                status = "warning"
+            if response_time > 500 or long_queries > 0:
+                status = "failed"
 
-                return {
-                    "status": status,
-                    "response_time_ms": response_time,
-                    "long_running_queries": long_queries,
-                    "message": f"Database responding in {response_time:.1f}ms",
-                }
-
-        except Exception as e:
             return {
-                "status": "failed",
-                "error": str(e),
-                "message": "Database connection failed",
+                "status": status,
+                "response_time_ms": response_time,
+                "long_running_queries": long_queries,
+                "message": f"Database responding in {response_time:.1f}ms",
             }
 
     async def _check_mcp_performance(self) -> dict[str, Any]:

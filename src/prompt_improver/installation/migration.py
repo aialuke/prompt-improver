@@ -136,9 +136,19 @@ class APESMigrationManager:
 
             self.console.print(f"  📦 Database backup: {output_path.name}", style="dim")
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  Database backup failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  Database backup file system error: {e}", style="yellow"
+            )
             # Create empty file to maintain backup structure
+            output_path.touch()
+        except (OSError, subprocess.SubprocessError) as e:
+            self.console.print(
+                f"  ⚠️  Database backup system error: {e}", style="yellow"
+            )
+            output_path.touch()
+        except asyncio.TimeoutError as e:
+            self.console.print(f"  ⚠️  Database backup timed out: {e}", style="yellow")
             output_path.touch()
 
     async def backup_configurations(self, output_path: Path):
@@ -158,8 +168,15 @@ class APESMigrationManager:
                 f"  📝 Configuration backup: {output_path.name}", style="dim"
             )
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  Configuration backup failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  Configuration backup file system error: {e}", style="yellow"
+            )
+            output_path.touch()
+        except (OSError, tarfile.TarError) as e:
+            self.console.print(
+                f"  ⚠️  Configuration backup archive error: {e}", style="yellow"
+            )
             output_path.touch()
 
     async def backup_ml_artifacts(self, output_path: Path):
@@ -179,8 +196,15 @@ class APESMigrationManager:
                 f"  🤖 ML artifacts backup: {output_path.name}", style="dim"
             )
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  ML artifacts backup failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  ML artifacts backup file system error: {e}", style="yellow"
+            )
+            output_path.touch()
+        except (OSError, tarfile.TarError) as e:
+            self.console.print(
+                f"  ⚠️  ML artifacts backup archive error: {e}", style="yellow"
+            )
             output_path.touch()
 
     async def backup_user_prompts(self, output_path: Path):
@@ -217,8 +241,21 @@ class APESMigrationManager:
                     f"  💭 User prompts backup: {len(prompts)} entries", style="dim"
                 )
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  User prompts backup failed: {e}", style="yellow")
+        except (ConnectionError, OSError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts backup database connection error: {e}",
+                style="yellow",
+            )
+            output_path.touch()
+        except (ValueError, TypeError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts backup data processing error: {e}", style="yellow"
+            )
+            output_path.touch()
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts backup file system error: {e}", style="yellow"
+            )
             output_path.touch()
 
     async def verify_backup_integrity(self, backup_files: list[str]) -> bool:
@@ -250,8 +287,20 @@ class APESMigrationManager:
 
             return True
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  Integrity check failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  Integrity check file access error: {e}", style="yellow"
+            )
+            return False
+        except (gzip.BadGzipFile, tarfile.TarError) as e:
+            self.console.print(
+                f"  ⚠️  Integrity check archive corruption: {e}", style="yellow"
+            )
+            return False
+        except (OSError, UnicodeDecodeError) as e:
+            self.console.print(
+                f"  ⚠️  Integrity check file reading error: {e}", style="yellow"
+            )
             return False
 
     async def cleanup_old_backups(self, retention_days: int):
@@ -393,7 +442,9 @@ class APESMigrationManager:
                 version_hash = hashlib.md5(tables_str.encode()).hexdigest()[:8]
                 return f"schema_{version_hash}"
 
-        except Exception:
+        except (ConnectionError, OSError) as e:
+            return "unknown"
+        except (ValueError, TypeError) as e:
             return "unknown"
 
     async def export_database_with_integrity_check(self, temp_path: Path) -> Path:
@@ -423,8 +474,18 @@ class APESMigrationManager:
             with gzip.open(db_file, "wb") as f:
                 f.write(stdout)
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  Database export failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  Database export file system error: {e}", style="yellow"
+            )
+            db_file.touch()
+        except (OSError, subprocess.SubprocessError) as e:
+            self.console.print(
+                f"  ⚠️  Database export system error: {e}", style="yellow"
+            )
+            db_file.touch()
+        except asyncio.TimeoutError as e:
+            self.console.print(f"  ⚠️  Database export timed out: {e}", style="yellow")
             db_file.touch()
 
         return db_file
@@ -438,8 +499,15 @@ class APESMigrationManager:
             try:
                 with tarfile.open(config_file, "w:gz") as tar:
                     tar.add(config_dir, arcname="config")
-            except Exception as e:
-                self.console.print(f"  ⚠️  Config export failed: {e}", style="yellow")
+            except (FileNotFoundError, PermissionError) as e:
+                self.console.print(
+                    f"  ⚠️  Config export file system error: {e}", style="yellow"
+                )
+                config_file.touch()
+            except (OSError, tarfile.TarError) as e:
+                self.console.print(
+                    f"  ⚠️  Config export archive error: {e}", style="yellow"
+                )
                 config_file.touch()
         else:
             config_file.touch()
@@ -455,8 +523,13 @@ class APESMigrationManager:
             try:
                 with tarfile.open(ml_file, "w:gz") as tar:
                     tar.add(ml_dir, arcname="ml-models")
-            except Exception as e:
-                self.console.print(f"  ⚠️  ML export failed: {e}", style="yellow")
+            except (FileNotFoundError, PermissionError) as e:
+                self.console.print(
+                    f"  ⚠️  ML export file system error: {e}", style="yellow"
+                )
+                ml_file.touch()
+            except (OSError, tarfile.TarError) as e:
+                self.console.print(f"  ⚠️  ML export archive error: {e}", style="yellow")
                 ml_file.touch()
         else:
             ml_file.touch()
@@ -488,8 +561,21 @@ class APESMigrationManager:
                         }
                         f.write(json.dumps(prompt_data) + "\n")
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  User prompts export failed: {e}", style="yellow")
+        except (ConnectionError, OSError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts export database connection error: {e}",
+                style="yellow",
+            )
+            prompts_file.touch()
+        except (ValueError, TypeError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts export data processing error: {e}", style="yellow"
+            )
+            prompts_file.touch()
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts export file system error: {e}", style="yellow"
+            )
             prompts_file.touch()
 
         return prompts_file
@@ -500,7 +586,7 @@ class APESMigrationManager:
         """Create final migration package with metadata and checksum"""
         # Create metadata file
         metadata_file = temp_path / "migration_metadata.json"
-        with open(metadata_file, "w", encoding='utf-8') as f:
+        with open(metadata_file, "w", encoding="utf-8") as f:
             json.dump(migration_data, f, indent=2)
 
         # Create the final package
@@ -533,7 +619,9 @@ class APESMigrationManager:
                     SELECT COUNT(*) FROM training_prompts WHERE data_source = 'real'
                 """)
                 return result.scalar() or 0
-        except Exception:
+        except (ConnectionError, OSError):
+            return 0
+        except (ValueError, TypeError):
             return 0
 
     async def restore_from_migration_package(
@@ -633,10 +721,25 @@ class APESMigrationManager:
                             verification_results["warnings"]
                         )
 
-            except Exception as e:
+            except (FileNotFoundError, PermissionError) as e:
                 restore_results["status"] = "error"
                 restore_results["error"] = str(e)
-                self.console.print(f"❌ Migration restoration failed: {e}", style="red")
+                self.console.print(
+                    f"❌ Migration restoration file system error: {e}", style="red"
+                )
+            except (tarfile.TarError, gzip.BadGzipFile) as e:
+                restore_results["status"] = "error"
+                restore_results["error"] = str(e)
+                self.console.print(
+                    f"❌ Migration restoration archive corruption: {e}", style="red"
+                )
+            except (ConnectionError, OSError) as e:
+                restore_results["status"] = "error"
+                restore_results["error"] = str(e)
+                self.console.print(
+                    f"❌ Migration restoration database connection error: {e}",
+                    style="red",
+                )
 
         return restore_results
 
@@ -646,8 +749,16 @@ class APESMigrationManager:
             with tarfile.open(package_path, "r:gz") as tar:
                 tar.extractall(temp_path)
             self.console.print("  📦 Migration package extracted", style="dim")
-        except Exception as e:
-            raise Exception(f"Failed to extract migration package: {e}")
+        except (FileNotFoundError, PermissionError) as e:
+            raise Exception(
+                f"Failed to extract migration package - file system error: {e}"
+            )
+        except (tarfile.TarError, gzip.BadGzipFile) as e:
+            raise Exception(
+                f"Failed to extract migration package - archive corruption: {e}"
+            )
+        except OSError as e:
+            raise Exception(f"Failed to extract migration package - system error: {e}")
 
     async def verify_migration_metadata(self, temp_path: Path) -> dict[str, Any]:
         """Verify migration metadata and compatibility"""
@@ -657,7 +768,7 @@ class APESMigrationManager:
             raise Exception("Migration metadata not found - package may be corrupted")
 
         try:
-            with open(metadata_file, encoding='utf-8') as f:
+            with open(metadata_file, encoding="utf-8") as f:
                 metadata = json.load(f)
 
             # Basic compatibility checks
@@ -670,8 +781,16 @@ class APESMigrationManager:
             self.console.print("  ✅ Migration metadata verified", style="dim")
             return metadata
 
-        except Exception as e:
-            raise Exception(f"Failed to verify migration metadata: {e}")
+        except (FileNotFoundError, PermissionError) as e:
+            raise Exception(
+                f"Failed to verify migration metadata - file access error: {e}"
+            )
+        except (json.JSONDecodeError, ValueError) as e:
+            raise Exception(f"Failed to verify migration metadata - invalid JSON: {e}")
+        except (OSError, UnicodeDecodeError) as e:
+            raise Exception(
+                f"Failed to verify migration metadata - file reading error: {e}"
+            )
 
     async def restore_database_from_backup(
         self, temp_path: Path, force: bool = False
@@ -734,8 +853,21 @@ class APESMigrationManager:
             )
             return record_count
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  Database restore failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  Database restore file system error: {e}", style="yellow"
+            )
+            return 0
+        except (OSError, subprocess.SubprocessError) as e:
+            self.console.print(
+                f"  ⚠️  Database restore system error: {e}", style="yellow"
+            )
+            return 0
+        except (ConnectionError, gzip.BadGzipFile) as e:
+            self.console.print(f"  ⚠️  Database restore data error: {e}", style="yellow")
+            return 0
+        except asyncio.TimeoutError as e:
+            self.console.print(f"  ⚠️  Database restore timed out: {e}", style="yellow")
             return 0
 
     async def restore_configurations(
@@ -771,9 +903,14 @@ class APESMigrationManager:
             )
             return file_count
 
-        except Exception as e:
+        except (FileNotFoundError, PermissionError) as e:
             self.console.print(
-                f"  ⚠️  Configuration restore failed: {e}", style="yellow"
+                f"  ⚠️  Configuration restore file system error: {e}", style="yellow"
+            )
+            return 0
+        except (OSError, tarfile.TarError) as e:
+            self.console.print(
+                f"  ⚠️  Configuration restore archive error: {e}", style="yellow"
             )
             return 0
 
@@ -810,8 +947,15 @@ class APESMigrationManager:
             )
             return artifact_count
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  ML artifacts restore failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  ML artifacts restore file system error: {e}", style="yellow"
+            )
+            return 0
+        except (OSError, tarfile.TarError) as e:
+            self.console.print(
+                f"  ⚠️  ML artifacts restore archive error: {e}", style="yellow"
+            )
             return 0
 
     async def restore_user_prompts(self, temp_path: Path, force: bool = False) -> int:
@@ -854,9 +998,16 @@ class APESMigrationManager:
 
                             restored_count += 1
 
-                        except Exception as e:
+                        except (json.JSONDecodeError, KeyError, ValueError) as e:
                             self.console.print(
-                                f"  ⚠️  Failed to restore prompt: {e}", style="dim"
+                                f"  ⚠️  Failed to restore prompt - data error: {e}",
+                                style="dim",
+                            )
+                            continue
+                        except (ConnectionError, OSError) as e:
+                            self.console.print(
+                                f"  ⚠️  Failed to restore prompt - database error: {e}",
+                                style="dim",
                             )
                             continue
 
@@ -865,8 +1016,21 @@ class APESMigrationManager:
             )
             return restored_count
 
-        except Exception as e:
-            self.console.print(f"  ⚠️  User prompts restore failed: {e}", style="yellow")
+        except (FileNotFoundError, PermissionError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts restore file system error: {e}", style="yellow"
+            )
+            return 0
+        except (ConnectionError, OSError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts restore database connection error: {e}",
+                style="yellow",
+            )
+            return 0
+        except (gzip.BadGzipFile, UnicodeDecodeError) as e:
+            self.console.print(
+                f"  ⚠️  User prompts restore data corruption: {e}", style="yellow"
+            )
             return 0
 
     async def verify_restoration_integrity(
@@ -899,7 +1063,15 @@ class APESMigrationManager:
 
             return verification_results
 
-        except Exception as e:
+        except (ConnectionError, OSError) as e:
             verification_results["integrity_verified"] = False
-            verification_results["warnings"].append(f"Verification failed: {e}")
+            verification_results["warnings"].append(
+                f"Verification failed - connection error: {e}"
+            )
+            return verification_results
+        except (ValueError, TypeError) as e:
+            verification_results["integrity_verified"] = False
+            verification_results["warnings"].append(
+                f"Verification failed - data error: {e}"
+            )
             return verification_results

@@ -28,8 +28,11 @@ class TestInMemoryModelCache:
 
     @given(
         st.text(min_size=5, max_size=20),
-        st.dictionaries(keys=st.text(min_size=1, max_size=5), values=st.floats(min_value=0.0, max_value=1.0)),
-        st.integers(min_value=50, max_value=500)  # Model size in MB
+        st.dictionaries(
+            keys=st.text(min_size=1, max_size=5),
+            values=st.floats(min_value=0.0, max_value=1.0),
+        ),
+        st.integers(min_value=50, max_value=500),  # Model size in MB
     )
     @settings(max_examples=10)
     def test_cache_registry_operations(self, model_id, model_data, model_size):
@@ -69,16 +72,20 @@ class TestInMemoryModelCache:
         # Assume models have varied sizes. Prepare registry and fill it up.
         for idx, (model_id, mock_model) in enumerate(mock_models.items()):
             model_size_mb = ((idx % 5) + 1) * 10  # sizes: 10MB, 20MB, ..., 50MB
-            with patch.object(model_registry, '_estimate_model_memory', return_value=model_size_mb):
+            with patch.object(
+                model_registry, "_estimate_model_memory", return_value=model_size_mb
+            ):
                 model_registry.add_model(model_id, mock_model)
 
         # Add a large model that forces eviction
         large_model = MagicMock()
-        with patch.object(model_registry, '_estimate_model_memory', return_value=300):
+        with patch.object(model_registry, "_estimate_model_memory", return_value=300):
             model_registry.add_model("large_model", large_model)
 
         # Verify higher idx models remain in cache and lower ones might be evicted due to LRU
-        surviving_ids = [model_id for idx, model_id in enumerate(mock_models.keys()) if idx >= 5]
+        surviving_ids = [
+            model_id for idx, model_id in enumerate(mock_models.keys()) if idx >= 5
+        ]
         assert surviving_ids
         assert model_registry.get_model("large_model") is not None
 
@@ -139,7 +146,11 @@ class TestAdditionalCacheScenarios:
         cache_stats = model_registry.get_cache_stats()
         assert cache_stats["active_models"] == 1
 
-    @given(model_sizes=st.lists(st.integers(min_value=10, max_value=50), min_size=3, max_size=8))
+    @given(
+        model_sizes=st.lists(
+            st.integers(min_value=10, max_value=50), min_size=3, max_size=8
+        )
+    )
     @settings(max_examples=20)
     def test_varying_model_sizes_eviction(self, model_sizes):
         """Test eviction logic with varying model sizes using property-based testing."""
@@ -151,12 +162,14 @@ class TestAdditionalCacheScenarios:
         for i, size in enumerate(model_sizes):
             mock_model = MagicMock()
             model_id = f"model_{i}"
-            with patch.object(model_registry, '_estimate_model_memory', return_value=size):
+            with patch.object(
+                model_registry, "_estimate_model_memory", return_value=size
+            ):
                 model_registry.add_model(model_id, mock_model)
 
         # Force more additions to trigger eviction
         new_model = MagicMock()
-        with patch.object(model_registry, '_estimate_model_memory', return_value=100):
+        with patch.object(model_registry, "_estimate_model_memory", return_value=100):
             model_registry.add_model("evict_test", new_model)
 
         # Verify eviction occurred
