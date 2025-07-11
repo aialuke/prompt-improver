@@ -94,8 +94,10 @@ engine = sessionmanager.engine
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency function to get database session
-    Use with Depends(get_session) in FastAPI endpoints
+    """Database session factory for async operations
+    
+    Provides async database sessions with automatic commit/rollback.
+    Use in async context managers or with dependency injection patterns.
     """
     async with sessionmanager.session() as session:
         yield session

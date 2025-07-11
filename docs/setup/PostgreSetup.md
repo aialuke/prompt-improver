@@ -8,18 +8,18 @@ This document outlines the complete PostgreSQL integration strategy for the APES
 ## Current APES Architecture Analysis
 
 **Existing Components:**
-- **FastAPI Server** (`src/prompt_improver/main.py`) - Web API and orchestration
+- **MCP Server** (`src/prompt_improver/mcp_server/mcp_server.py`) - Model Context Protocol implementation
 - **Rule Engine** (`src/prompt_improver/rule_engine/`) - Core rule processing
 - **ML Optimizer** (`src/prompt_improver/rule_engine/ml_optimizer/`) - Machine learning optimization
-- **MCP Server** (`src/prompt_improver/mcp_server/api.py`) - Model Context Protocol integration
+- **CLI Interface** (`src/prompt_improver/cli.py`) - Command-line interface
 - **MLflow Integration** - Current experiment tracking
 - **Configuration Management** - YAML-based rule and ML configs
 
 **Current Data Flow:**
 ```
-User Input → FastAPI → Rule Engine → ML Optimizer → MLflow
-                                   ↓
-                              Rule Application
+User Input → MCP Server → Rule Engine → ML Optimizer → MLflow
+                                     ↓
+                                Rule Application
 ```
 
 **Identified Limitations:**
@@ -727,42 +727,24 @@ class EnhancedMLOptimizer:
         return self._consolidate_patterns(patterns)
 ```
 
-#### 2.4 FastAPI Integration
+#### 2.4 CLI and MCP Integration
 
-**Update FastAPI to Use Database:**
+**Update CLI to Use Database:**
 
 ```python
-# src/prompt_improver/main.py (enhanced)
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+# src/prompt_improver/cli.py (enhanced)
 from .database import HybridDatabaseClient, DatabaseConfig
 from .rule_engine.enhanced_rule_engine import EnhancedRuleEngine
 from .rule_engine.ml_optimizer.enhanced_optimizer import EnhancedMLOptimizer
 import uuid
 from typing import Optional
-from pydantic import BaseModel
+import typer
+from rich.console import Console
 
-# Request/Response models
-class PromptImprovementRequest(BaseModel):
-    prompt: str
-    user_context: Optional[dict] = None
-    session_id: Optional[str] = None
+console = Console()
+app = typer.Typer()
 
-class UserFeedbackRequest(BaseModel):
-    session_id: str
-    rating: int  # 1-5 scale
-    feedback_text: Optional[str] = None
-    improvement_areas: Optional[list] = None
-
-class PromptImprovementResponse(BaseModel):
-    original_prompt: str
-    improved_prompt: str
-    applied_rules: list
-    processing_time_ms: int
-    session_id: str
-    improvement_summary: dict
-
-# Initialize app and database
-app = FastAPI(title="APES - Adaptive Prompt Enhancement System")
+# Initialize database client
 db_config = DatabaseConfig()
 db_client = HybridDatabaseClient(
     connection_string=db_config.postgres_url,
@@ -771,98 +753,73 @@ db_client = HybridDatabaseClient(
 rule_engine = EnhancedRuleEngine(db_client)
 ml_optimizer = EnhancedMLOptimizer(db_client)
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connections"""
-    await db_client.initialize()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up database connections"""
-    if db_client.direct_client.pool:
-        await db_client.direct_client.pool.close()
-
-@app.post("/improve-prompt", response_model=PromptImprovementResponse)
-async def improve_prompt(request: PromptImprovementRequest):
+@app.command()
+async def improve_prompt(
+    prompt: str,
+    session_id: Optional[str] = None
+):
     """
     Improve a prompt using data-driven rule selection
     """
     try:
+        # Initialize database connection
+        await db_client.initialize()
+        
         # Generate session ID if not provided
-        session_id = request.session_id or str(uuid.uuid4())
+        if not session_id:
+            session_id = str(uuid.uuid4())
         
         # Improve prompt using enhanced rule engine
         result = await rule_engine.improve_prompt(
-            prompt=request.prompt,
-            user_context=request.user_context,
+            prompt=prompt,
             session_id=session_id
         )
         
-        return PromptImprovementResponse(**result)
+        console.print(f"\n[green]Improved Prompt:[/green]")
+        console.print(result['improved_prompt'])
+        console.print(f"\n[blue]Applied Rules:[/blue] {', '.join(result['applied_rules'])}")
+        console.print(f"[blue]Processing Time:[/blue] {result['processing_time_ms']}ms")
+        console.print(f"[blue]Session ID:[/blue] {result['session_id']}")
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        console.print(f"[red]Error:[/red] {str(e)}")
 
-@app.post("/user-feedback")
-async def submit_user_feedback(
-    request: UserFeedbackRequest,
-    background_tasks: BackgroundTasks
+@app.command()
+async def analytics(
+    days: int = 30
 ):
-    """
-    Submit user feedback for continuous learning
-    """
-    try:
-        # Store feedback in database
-        background_tasks.add_task(
-            _store_user_feedback,
-            request.session_id,
-            request.rating,
-            request.feedback_text,
-            request.improvement_areas
-        )
-        
-        return {"status": "feedback_received", "session_id": request.session_id}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/analytics/rule-effectiveness")
-async def get_rule_effectiveness(days: int = 30):
     """
     Get rule effectiveness analytics
     """
     try:
+        await db_client.initialize()
         analytics = await ml_optimizer.analyze_rule_effectiveness(days=days)
-        return analytics
+        
+        console.print(f"\n[green]Rule Effectiveness Analytics (Last {days} days):[/green]")
+        for rule_id, metrics in analytics.items():
+            console.print(f"  {rule_id}: {metrics['avg_improvement']:.2f} avg improvement")
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        console.print(f"[red]Error:[/red] {str(e)}")
 
-@app.post("/ml/optimize-rules")
-async def optimize_rules(background_tasks: BackgroundTasks):
+@app.command()
+async def optimize_rules():
     """
     Trigger ML optimization of rule parameters
     """
     try:
-        background_tasks.add_task(_run_ml_optimization)
-        return {"status": "optimization_started"}
+        await db_client.initialize()
+        console.print("[yellow]Starting ML optimization...[/yellow]")
+        
+        # Discover new patterns
+        patterns = await ml_optimizer.discover_rule_patterns()
+        
+        console.print(f"[green]Discovered {len(patterns)} new patterns[/green]")
+        for pattern in patterns:
+            console.print(f"  - {pattern['pattern_name']}: {pattern['effectiveness_score']:.2f}")
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def _store_user_feedback(
-    session_id: str,
-    rating: int,
-    feedback_text: Optional[str],
-    improvement_areas: Optional[list]
-):
-    """Background task to store user feedback"""
-    # Implementation would retrieve session data and store feedback
-    # This is a simplified version
-    pass
-
-async def _run_ml_optimization():
-    """Background task for ML optimization"""
-    # Discover new patterns
-    patterns = await ml_optimizer.discover_rule_patterns()
+        console.print(f"[red]Error:[/red] {str(e)}")
     
     # Optimize existing rules
     rule_ids = ['clarity_rule', 'specificity_rule']  # Get from config
@@ -978,9 +935,9 @@ async def call_tool(name: str, arguments: dict):
 - **Day 4-5:** Integrate with MLflow and add pattern discovery
 - **Day 6-7:** Testing and validation
 
-### Week 4: FastAPI and MCP Integration
-- **Day 1-3:** Update FastAPI with database integration
-- **Day 4-5:** Implement enhanced MCP server
+### Week 4: CLI and MCP Integration
+- **Day 1-3:** Update CLI with enhanced database analytics
+- **Day 4-5:** Implement enhanced MCP server capabilities
 - **Day 6-7:** End-to-end testing and documentation
 
 ### Week 5: Production Deployment

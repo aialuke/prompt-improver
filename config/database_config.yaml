@@ -141,10 +141,10 @@ integrations:
     sync_interval: 300  # seconds
     experiment_tracking: true
     
-  # FastAPI integration
-  fastapi:
-    connection_middleware: true
-    request_logging: true
+  # MCP integration
+  mcp:
+    stdio_transport: true
+    connection_logging: true
     transaction_per_request: false
     
   # Rule engine integration

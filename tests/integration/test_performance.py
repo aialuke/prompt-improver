@@ -412,13 +412,13 @@ class TestStatisticalPerformanceValidation:
 
     @given(
         prompt_length=st.integers(min_value=10, max_value=200),
-        concurrent_requests=st.integers(min_value=1, max_value=5),
+        concurrent_operations=st.integers(min_value=1, max_value=5),
     )
     @pytest.mark.asyncio
     async def test_performance_scaling_properties(
-        self, prompt_length, concurrent_requests
+        self, prompt_length, concurrent_operations
     ):
-        """Property-based testing of performance scaling characteristics."""
+        """Property-based testing of performance scaling characteristics for async function calls."""
 
         # Generate test prompt of specified length
         test_prompt = " ".join(["word"] * prompt_length)
@@ -432,30 +432,30 @@ class TestStatisticalPerformanceValidation:
                 context={"domain": "scaling_test"},
                 session_id=f"scale_test_{i}",
             )
-            for i in range(concurrent_requests)
+            for i in range(concurrent_operations)
         ]
 
         results = await asyncio.gather(*tasks)
         end_time = time.time()
 
         total_time_ms = (end_time - start_time) * 1000
-        avg_time_per_request = total_time_ms / concurrent_requests
+        avg_time_per_operation = total_time_ms / concurrent_operations
 
-        # Validate all requests succeeded
-        assert len(results) == concurrent_requests
+        # Validate all operations succeeded
+        assert len(results) == concurrent_operations
         assert all("improved_prompt" in result for result in results)
 
         # Performance scaling properties
-        # Average time per request should not grow linearly with concurrent requests
-        if concurrent_requests > 1:
+        # Average time per operation should not grow linearly with concurrent operations
+        if concurrent_operations > 1:
             # Concurrent processing should provide some efficiency
-            single_request_baseline = 200  # ms (estimated baseline)
-            efficiency_factor = avg_time_per_request / single_request_baseline
+            single_operation_baseline = 200  # ms (estimated baseline)
+            efficiency_factor = avg_time_per_operation / single_operation_baseline
 
-            # Should not be worse than 2x the baseline per request
+            # Should not be worse than 2x the baseline per operation
             assert efficiency_factor < 2.0, (
-                f"Poor scaling: {avg_time_per_request:.1f}ms per request "
-                f"with {concurrent_requests} concurrent requests"
+                f"Poor scaling: {avg_time_per_operation:.1f}ms per operation "
+                f"with {concurrent_operations} concurrent operations"
             )
 
         # Total time should be reasonable regardless of request count

@@ -2,11 +2,16 @@
 """
 Phase 4 Regression Tests for Complex CLI Functions.
 These tests ensure that refactored functions maintain the same behavior.
+Enhanced with comprehensive stdio testing following pytest best practices.
 """
 
 import asyncio
 import json
+import os
+import sys
 import tempfile
+import time
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -103,6 +108,170 @@ class TestLogsRegression:
             # Test with large number of lines (more than available)
             result = self.runner.invoke(app, ["logs", "--lines", "1000"])
             assert result.exit_code == 0
+
+    # =========================
+    # Enhanced stdio Testing
+    # =========================
+
+    def test_logs_stdio_comprehensive(self, capsys):
+        """Test logs command with comprehensive stdio handling."""
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Test with real stdio capture
+            result = self.runner.invoke(app, ["logs", "--lines", "10"])
+            
+            # Capture any additional stdio output
+            captured = capsys.readouterr()
+            
+            # Verify CLI runner output
+            assert result.exit_code == 0
+            assert "Viewing logs:" in result.stdout
+            
+            # Verify no stderr leakage
+            assert captured.err == ""
+
+    def test_logs_with_system_output(self, capfd):
+        """Test logs with system-level output capture."""
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Test with file descriptor level capture for system calls
+            result = self.runner.invoke(app, ["logs", "--lines", "10"])
+            captured = capfd.readouterr()
+            
+            assert result.exit_code == 0
+            # Verify system-level output handling
+            assert "Viewing logs:" in result.stdout
+
+    def test_logs_large_output_streaming(self, capsys):
+        """Test logs command with large output streams."""
+        # Create large log file
+        large_logs = ["2024-01-15 10:00:00 INFO Large log entry"] * 1000
+        with open(self.log_file, "w", encoding="utf-8") as f:
+            for log in large_logs:
+                f.write(log + "\n")
+        
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--lines", "100"])
+            
+            # Test streaming behavior
+            assert result.exit_code == 0
+            assert "Viewing logs:" in result.stdout
+            # Verify reasonable output size
+            assert len(result.stdout.split('\n')) <= 105  # lines + headers
+
+    def test_logs_with_interactive_input(self, monkeypatch):
+        """Test logs command with simulated interactive input."""
+        # Simulate user input for follow mode
+        monkeypatch.setattr('sys.stdin', StringIO('q\n'))
+        
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Test without follow mode first (safer)
+            result = self.runner.invoke(app, ["logs", "--lines", "10"])
+            
+            # Should handle interactive scenarios gracefully
+            assert result.exit_code == 0
+
+    def test_logs_binary_output_handling(self, capsys):
+        """Test logs with binary output handling."""
+        # Create log with mixed binary content
+        with open(self.log_file, "wb") as f:
+            f.write(b"2024-01-15 10:00:00 INFO Binary log entry\n")
+            f.write(b"\x00\x01\x02 Non-UTF8 content\n")
+            f.write(b"2024-01-15 10:00:01 INFO Normal log entry\n")
+        
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--lines", "10"])
+            
+            # Should handle binary content gracefully
+            assert result.exit_code == 0
+            # Should contain readable content
+            assert "Binary log entry" in result.stdout or "Normal log entry" in result.stdout
+
+    @pytest.mark.parametrize("line_count", [10, 100, 500])
+    def test_logs_performance_with_output_capture(self, line_count, capsys):
+        """Test logs performance with various output sizes."""
+        # Create logs of varying sizes
+        logs = [f"2024-01-15 10:00:00 INFO Log entry {i}" for i in range(line_count)]
+        with open(self.log_file, "w", encoding="utf-8") as f:
+            for log in logs:
+                f.write(log + "\n")
+        
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            start_time = time.time()
+            result = self.runner.invoke(app, ["logs", "--lines", str(min(line_count, 100))])
+            end_time = time.time()
+            
+            # Performance assertions
+            assert result.exit_code == 0
+            assert (end_time - start_time) < 5.0  # Should complete within 5 seconds
+            
+            # Verify output completeness
+            assert "Viewing logs:" in result.stdout
+            # Should have reasonable amount of content
+            output_lines = result.stdout.count('\n')
+            assert output_lines >= 5  # At least some content
+
+    def test_logs_with_output_redirection(self, tmp_path, capsys):
+        """Test logs command with output redirection simulation."""
+        output_file = tmp_path / "logs_output.txt"
+        
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Simulate output redirection by capturing and writing
+            with capsys.disabled():
+                result = self.runner.invoke(app, ["logs", "--lines", "10"])
+                
+                # Write to file as if redirected
+                output_file.write_text(result.stdout)
+            
+            # Verify redirection worked
+            assert result.exit_code == 0
+            assert output_file.exists()
+            content = output_file.read_text()
+            assert "Viewing logs:" in content
+
+    def test_logs_stderr_handling(self, capsys):
+        """Test logs command stderr handling."""
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Test error condition that might produce stderr
+            result = self.runner.invoke(app, ["logs", "--component", "nonexistent"])
+            captured = capsys.readouterr()
+            
+            # Should handle errors gracefully
+            assert result.exit_code == 1
+            assert "Log file not found" in result.stdout
+            # Verify stderr handling
+            assert captured.err == ""  # No stderr leakage
+
+    def test_logs_output_formatting(self, capsys):
+        """Test logs output formatting and structure."""
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            result = self.runner.invoke(app, ["logs", "--lines", "5"])
+            
+            assert result.exit_code == 0
+            
+            # Verify output structure
+            output_lines = result.stdout.split('\n')
+            # Should have header and content
+            assert len(output_lines) >= 2
+            
+            # Check for expected formatting patterns
+            assert any("Viewing logs:" in line for line in output_lines)
+
+    def test_logs_concurrent_output(self, capsys):
+        """Test logs command with concurrent stdout/stderr scenarios."""
+        with patch("pathlib.Path.home", return_value=Path(self.temp_dir)):
+            # Test multiple rapid invocations
+            results = []
+            for i in range(3):
+                result = self.runner.invoke(app, ["logs", "--lines", "5"])
+                results.append(result)
+            
+            # All should succeed
+            for result in results:
+                assert result.exit_code == 0
+                assert "Viewing logs:" in result.stdout
+            
+            # Verify no output interference
+            captured = capsys.readouterr()
+            assert captured.err == ""
 
 
 class TestHealthRegression:

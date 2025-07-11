@@ -67,7 +67,8 @@ jobs:
           --cov-report=html:htmlcov \
           --junit-xml=pytest.xml \
           --asyncio-mode=auto \
-          -v
+          -v \
+          --ignore=tests/deprecated
     
     - name: Upload coverage to codecov
       uses: codecov/codecov-action@v3

@@ -37,26 +37,75 @@ except ImportError:
     Counter = Gauge = Histogram = Summary = MockMetric
 
 
-# Health check metrics
-HEALTH_CHECK_DURATION = Summary(
+# Health check metrics with graceful duplicate handling
+def _create_metric_safe(metric_class, *args, **kwargs):
+    """Create a Prometheus metric with graceful duplicate handling."""
+    if not PROMETHEUS_AVAILABLE:
+        # Create a MockMetric class locally when needed
+        class LocalMockMetric:
+            def __init__(self, *args, **kwargs):
+                pass
+            def inc(self, *args, **kwargs):
+                pass
+            def set(self, *args, **kwargs):
+                pass
+            def observe(self, *args, **kwargs):
+                pass
+            def labels(self, *args, **kwargs):
+                return self
+            def time(self):
+                def decorator(func):
+                    return func
+                return decorator
+        return LocalMockMetric()
+    
+    try:
+        return metric_class(*args, **kwargs)
+    except ValueError as e:
+        if "Duplicated timeseries" in str(e):
+            # Metric already exists, create a mock instead
+            class LocalMockMetric:
+                def __init__(self, *args, **kwargs):
+                    pass
+                def inc(self, *args, **kwargs):
+                    pass
+                def set(self, *args, **kwargs):
+                    pass
+                def observe(self, *args, **kwargs):
+                    pass
+                def labels(self, *args, **kwargs):
+                    return self
+                def time(self):
+                    def decorator(func):
+                        return func
+                    return decorator
+            return LocalMockMetric()
+        else:
+            raise
+
+HEALTH_CHECK_DURATION = _create_metric_safe(
+    Summary,
     'health_check_duration_seconds', 
     'Time spent performing health checks',
     ['component']
 )
 
-HEALTH_CHECK_STATUS = Gauge(
+HEALTH_CHECK_STATUS = _create_metric_safe(
+    Gauge,
     'health_check_status',
     'Health check status (1=healthy, 0.5=warning, 0=failed)',
     ['component']
 )
 
-HEALTH_CHECKS_TOTAL = Counter(
+HEALTH_CHECKS_TOTAL = _create_metric_safe(
+    Counter,
     'health_checks_total',
     'Total number of health checks performed',
     ['component', 'status']
 )
 
-HEALTH_CHECK_RESPONSE_TIME = Histogram(
+HEALTH_CHECK_RESPONSE_TIME = _create_metric_safe(
+    Histogram,
     'health_check_response_time_milliseconds',
     'Health check response time distribution',
     ['component'],

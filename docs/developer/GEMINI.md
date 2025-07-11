@@ -24,10 +24,10 @@ source .venv/bin/activate
 
 ### Running the Application
 ```bash
-# Start the FastAPI development server with auto-reload
-./scripts/run_server.sh
-# Server runs at http://127.0.0.1:8000
-# API docs available at http://127.0.0.1:8000/docs
+# Start the MCP server for development
+python -m prompt_improver.mcp_server.mcp_server
+# Server uses stdio transport for MCP protocol
+# Test with: echo '{"method": "tools/list"}' | python -m prompt_improver.mcp_server.mcp_server
 ```
 
 ### Testing and Code Quality
@@ -74,9 +74,9 @@ python scripts/promote_model.py
      - `to_llm_instruction()`: Generates LLM-readable instruction
 
 2. **MCP Server** (`src/prompt_improver/mcp_server/`)
-   - FastAPI-based server implementing Model Context Protocol
-   - Currently placeholder implementation awaiting MCP SDK
-   - Will expose tools (improve_prompt) and resources (rule_status)
+   - FastMCP-based server implementing Model Context Protocol
+   - Pure stdio transport for Claude Code integration
+   - Exposes tools (improve_prompt, store_prompt) and resources (rule_status)
    - Integrates directly with Rule Engine for prompt processing
 
 3. **ML Optimizer** (`src/prompt_improver/rule_engine/ml_optimizer/`)
@@ -103,7 +103,7 @@ python scripts/promote_model.py
 ```
 prompt-improver/
 ├── src/prompt_improver/      # Main Python package
-│   ├── main.py              # FastAPI application entry point
+│   ├── main.py              # Application entry point (deprecated)
 │   ├── core/                # Core utilities (future)
 │   ├── mcp_server/          # MCP server implementation
 │   │   └── api.py          # API router and endpoints

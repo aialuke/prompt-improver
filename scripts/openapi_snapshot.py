@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""OpenAPI Schema Snapshot Tool for APES MCP Server.
+"""MCP Schema Snapshot Tool for APES MCP Server.
 
-Generates and compares OpenAPI-compatible schemas for MCP server models
-to verify that typing changes don't break the API contract.
+Generates and compares MCP-compatible schemas for MCP server models
+to verify that typing changes don't break the MCP protocol contract.
 """
 
 import argparse
@@ -239,7 +239,7 @@ def compare_schemas(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> b
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Generate and compare OpenAPI schemas for APES MCP server"
+        description="Generate and compare MCP schemas for APES MCP server"
     )
     parser.add_argument(
         "--output",

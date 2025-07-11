@@ -45,15 +45,15 @@ grep -Hn "TODO\|FIXME\|⚠️\|PENDING\|HACK\|BUG\|XXX" . --include="*.py" --inc
 
 #### C. TEST-RELATED TODOs (Test Infrastructure ✅)
 
-1. **tests/test_phase2_implementation.py** - Lines 144, 192, 221:
+1. **tests/integration/test_implementation.py** - Lines 144, 192, 221:
    - Test verification messages and conditional checks
    - All test logic is implemented and functional
 
-2. **tests/test_performance.py** - Lines 224, 244:
+2. **tests/integration/test_performance.py** - Lines 224, 244:
    - Performance validation messages ("TODO" in warning text)
    - Test implementation is complete and working
 
-3. **tests/services/test_prompt_improvement_phase3.py** - Line 3:
+3. **tests/integration/services/test_prompt_improvement.py** - Line 3:
    - Comment referencing "3 TODO methods" that were completed for Phase 3
    - All referenced methods are now implemented
 

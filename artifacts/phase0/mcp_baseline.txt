@@ -1,2 +1,0 @@
-✓ MCP server import successful
-✗ MCP server health check failed: 'FastMCP' object has no attribute 'get_tools'

@@ -1,6 +1,0 @@
-<unknown>:165: SyntaxWarning: invalid escape sequence '\S'
-<unknown>:166: SyntaxWarning: invalid escape sequence '\['
-<unknown>:207: SyntaxWarning: invalid escape sequence '\['
-<unknown>:456: SyntaxWarning: invalid escape sequence '\S'
-./.venv/lib/python3.13/site-packages/sympy/polys/numberfields/resolvent_lookup.py: "pyflakes[F]" failed during execution due to RecursionError('maximum recursion depth exceeded')
-Run flake8 with greater verbosity to see more details

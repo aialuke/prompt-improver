@@ -9,22 +9,24 @@ The APES (Adaptive Prompt Enhancement System) test suite provides comprehensive 
 ### Directory Structure
 ```
 tests/
-├── unit/                 # Pure unit tests with maximum mocking
+├── unit/                 # Pure unit tests with real data and behavior
 ├── integration/          # Tests with real component interactions  
-├── cli/                  # Command-line interface tests
-├── services/             # Service layer tests (mix of unit/integration)
-├── rule_engine/          # Rule engine specific tests
+│   ├── cli/             # Command-line interface tests
+│   ├── services/        # Service layer integration tests
+│   ├── rule_engine/     # Rule engine integration tests
+│   └── *.py             # General integration tests
+├── regression/           # Regression tests to prevent regressions
+├── deprecated/           # Legacy/migration tests (temporary)
 ├── conftest.py           # Centralized fixtures and configuration
-├── test_async_validation.py  # Async infrastructure validation
 └── README.md            # This documentation
 ```
 
 ### Test Categories
 
 #### Unit Tests (`unit/`)
-- **Purpose**: Fast, isolated tests with maximum mocking
+- **Purpose**: Fast, isolated tests with real data and behavior
 - **Scope**: Individual functions, classes, and methods
-- **Dependencies**: Minimal external dependencies, heavy mocking
+- **Dependencies**: Real text processing logic, minimal external dependencies
 - **Speed**: < 100ms per test
 - **Markers**: `@pytest.mark.unit`
 
@@ -35,26 +37,40 @@ tests/
 - **Speed**: < 5 seconds per test
 - **Markers**: `@pytest.mark.integration`
 
-#### CLI Tests (`cli/`)
-- **Purpose**: Command-line interface functionality
+#### CLI Integration Tests (`integration/cli/`)
+- **Purpose**: Command-line interface functionality with real services
 - **Scope**: All CLI commands, argument parsing, output formatting
-- **Dependencies**: Mocked external services, real CLI framework
+- **Dependencies**: Real database connections, minimal service mocking
 - **Speed**: < 1 second per test
-- **Markers**: Inherit from component being tested
+- **Markers**: `@pytest.mark.integration`
 
-#### Service Tests (`services/`)
-- **Purpose**: Service layer business logic
+#### Service Integration Tests (`integration/services/`)
+- **Purpose**: Service layer business logic with real dependencies
 - **Scope**: PromptImprovementService, AnalyticsService, MLModelService
-- **Dependencies**: Mix of mocked and real dependencies based on test type
+- **Dependencies**: Real database sessions, actual ML model interactions
 - **Speed**: < 2 seconds per test
-- **Markers**: `@pytest.mark.unit` or `@pytest.mark.integration`
+- **Markers**: `@pytest.mark.integration`
 
-#### Rule Engine Tests (`rule_engine/`)
-- **Purpose**: Rule application and effectiveness
+#### Rule Engine Integration Tests (`integration/rule_engine/`)
+- **Purpose**: Rule application with real text processing
 - **Scope**: Individual rules, rule combinations, rule metadata
-- **Dependencies**: Minimal mocking, focus on rule logic
+- **Dependencies**: Real rule logic, actual text transformations
 - **Speed**: < 500ms per test
-- **Markers**: `@pytest.mark.unit`
+- **Markers**: `@pytest.mark.integration`
+
+#### Regression Tests (`regression/`)
+- **Purpose**: Prevent regressions in critical functionality
+- **Scope**: Critical user workflows, known bug scenarios
+- **Dependencies**: Mix of real and mocked dependencies
+- **Speed**: < 2 seconds per test
+- **Markers**: `@pytest.mark.regression`
+
+#### Deprecated Tests (`deprecated/`)
+- **Purpose**: Legacy and migration tests (temporary)
+- **Scope**: Historical test implementations, migration validation
+- **Dependencies**: Various (being phased out)
+- **Speed**: Variable
+- **Markers**: `@pytest.mark.deprecated`
 
 ## Running Tests
 
@@ -81,13 +97,16 @@ pytest tests/unit/ -v
 pytest tests/integration/ -v
 
 # CLI functionality tests
-pytest tests/cli/ -v
+pytest tests/integration/cli/ -v
 
 # Service layer tests
-pytest tests/services/ -v
+pytest tests/integration/services/ -v
 
 # Rule engine tests
-pytest tests/rule_engine/ -v
+pytest tests/integration/rule_engine/ -v
+
+# Regression tests
+pytest tests/regression/ -v
 
 # Skip slow tests (> 1 second)
 pytest -m "not slow" -v
@@ -97,6 +116,9 @@ pytest -m performance -v
 
 # Async tests only
 pytest -m asyncio -v
+
+# Exclude deprecated tests (default in CI)
+pytest --ignore=tests/deprecated/ -v
 ```
 
 ### Coverage Analysis

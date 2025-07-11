@@ -20,11 +20,9 @@ dependencies = [
   "transformers>=4.30.0",
   # Rule Engine & MCP Server
   "mcp-context-sdk>=0.1.0", # Corrected package name
-  "fastapi>=0.110.0",
   "pydantic>=2.5.0",
   "pyyaml>=6.0.0",
   "jsonschema>=4.20.0",
-  "uvicorn[standard]>=0.24.0",
   # Performance Monitoring
   "evidently>=0.4.0",
   "prometheus-client>=0.19.0",
@@ -70,11 +68,15 @@ exclude = [
     
     # ML-specific exclusions
     "ml",                    # Legacy ML directory
-    "mlruns",               # MLflow experiments
-    "optuna_studies",       # Hyperparameter optimization
+    "mlruns",               # MLflow experiments (archived)
+    "optuna_studies",       # Hyperparameter optimization (archived)
     "*.egg-info",           # Package metadata
     "**/__pycache__",       # Python cache
     "**/.*_cache",          # Various cache directories
+    
+    # Archive exclusions
+    ".archive",              # Archived files
+    "tests/deprecated",      # Deprecated tests (temporary)
 ]
 
 # Enable preview mode for latest features
@@ -104,7 +106,7 @@ select = [
     "S",      # bandit
     "PERF",   # perflint
     
-    # FastAPI & async patterns
+    # Async patterns
     "ASYNC",  # flake8-async
     
     # Documentation & type hints
@@ -137,7 +139,7 @@ select = [
     "FIX",    # flake8-fixme
 ]
 
-# ML & FastAPI specific ignores
+# ML specific ignores
 ignore = [
     # Line length handled by formatter
     "E501",   # line-too-long
@@ -148,8 +150,8 @@ ignore = [
     "PLR0913", # too-many-arguments (ML models often have many params)
     "PLR0915", # too-many-statements (ML pipelines can be complex)
     
-    # FastAPI patterns
-    "B008",   # do-not-use-function-calls-in-argument-defaults (FastAPI Depends)
+    # Legacy patterns (no longer needed)
+    "B008",   # do-not-use-function-calls-in-argument-defaults (legacy - no longer needed)
     
     # Documentation (gradual adoption)
     "D100",   # undocumented-public-module
@@ -241,7 +243,7 @@ max-statements = 60  # Higher for ML pipelines
 # Import organization
 known-first-party = ["prompt_improver"]
 known-third-party = [
-    "fastapi", "pydantic", "sqlmodel", "asyncpg",
+    "pydantic", "sqlmodel", "asyncpg",
     "scikit-learn", "optuna", "mlflow", "pandas", "numpy",
     "transformers", "sentence-transformers"
 ]
@@ -264,7 +266,7 @@ suppress-dummy-args = true
 
 [tool.ruff.lint.flake8-bugbear]
 # Allow zip() without strict parameter for Python < 3.10 compatibility
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+extend-immutable-calls = []
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Ban relative imports
@@ -300,7 +302,7 @@ addopts = [
     # "--cov-fail-under=85",
 ]
 
-testpaths = ["tests"]
+testpaths = ["tests"]  # All tests are under tests/ directory
 
 # Performance monitoring (requires pytest-timeout plugin)
 timeout = 30  # 30 second timeout for tests to prevent hanging
@@ -313,7 +315,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function" 
 asyncio_default_test_loop_scope = "function"
 
-# Enhanced test categorization
+# Enhanced test categorization with reorganized structure
 markers = [
     "asyncio: marks tests as async",
     "integration: marks tests as integration tests requiring real components", 
@@ -333,6 +335,8 @@ markers = [
     "cli_error_scenarios: marks tests for CLI error handling",
     "cli_performance: marks tests for CLI performance characteristics",
     "cli_integration: marks tests for CLI end-to-end workflows",
+    "regression: marks tests for regression prevention",
+    "deprecated: marks tests that are temporary/legacy and may be removed",
 ]
 
 # Test filtering

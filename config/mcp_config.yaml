@@ -3,14 +3,10 @@
 # This file contains settings for the Model Context Protocol (MCP) server.
 
 server:
-  # The default transport mechanism for the server.
-  # 'stdio' is used for direct IDE integration.
-  # 'http' can be used for network-based access.
+  # Transport mechanism for the server.
+  # 'stdio' transport for direct IDE integration.
   transport: "stdio"
-  
-  host: "127.0.0.1" # Only used for http transport
-  port: 8000         # Only used for http transport
-  
+
   # Log level for the MCP server.
   # Options: "DEBUG", "INFO", "WARNING", "ERROR"
   log_level: "INFO"
