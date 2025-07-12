@@ -1,0 +1,130 @@
+{
+  "test_prompts": [
+    {
+      "id": "clarity_test_1",
+      "original": "Make this thing better",
+      "expected_issues": ["vague_language", "unclear_requirements"],
+      "category": "clarity",
+      "description": "Extremely vague prompt testing clarity rule effectiveness"
+    },
+    {
+      "id": "clarity_test_2", 
+      "original": "Analyze this stuff and tell me what you think",
+      "expected_issues": ["vague_language", "unclear_deliverable"],
+      "category": "clarity",
+      "description": "Multiple vague terms requiring clarity improvement"
+    },
+    {
+      "id": "clarity_test_3",
+      "original": "Write a comprehensive analysis of the quarterly financial performance metrics for a Fortune 500 technology company, including revenue growth trends, profit margins, and market share comparisons with detailed explanations of methodologies used in the analysis.",
+      "expected_issues": [],
+      "category": "clarity",
+      "description": "Already clear prompt - should not be changed significantly"
+    },
+    {
+      "id": "specificity_test_1",
+      "original": "Write a summary",
+      "expected_issues": ["lacks_constraints", "no_format_specified"],
+      "category": "specificity",
+      "description": "Very short prompt lacking specificity"
+    },
+    {
+      "id": "specificity_test_2",
+      "original": "Create a report on AI",
+      "expected_issues": ["lacks_constraints", "no_scope_defined"],
+      "category": "specificity",
+      "description": "Generic request without specific requirements"
+    },
+    {
+      "id": "specificity_test_3",
+      "original": "Generate a 500-word technical report on machine learning applications in healthcare, formatted as a structured document with abstract, introduction, three main sections, and conclusion. Include at least 5 recent research citations and focus on diagnostic imaging applications.",
+      "expected_issues": [],
+      "category": "specificity",
+      "description": "Already specific prompt - should not require major changes"
+    },
+    {
+      "id": "combined_test_1",
+      "original": "Help me with something",
+      "expected_issues": ["vague_language", "lacks_constraints", "no_scope_defined"],
+      "category": "combined",
+      "description": "Extremely poor prompt requiring both clarity and specificity improvements"
+    },
+    {
+      "id": "combined_test_2",
+      "original": "Improve this code",
+      "expected_issues": ["vague_language", "lacks_constraints"],
+      "category": "combined",
+      "description": "Vague request without context or specific requirements"
+    },
+    {
+      "id": "edge_case_1",
+      "original": "",
+      "expected_issues": ["empty_prompt"],
+      "category": "edge_case",
+      "description": "Empty prompt edge case"
+    },
+    {
+      "id": "edge_case_2",
+      "original": "a",
+      "expected_issues": ["extremely_short"],
+      "category": "edge_case",
+      "description": "Single character prompt"
+    },
+    {
+      "id": "edge_case_3",
+      "original": "Create a comprehensive, detailed, extensive, thorough, complete, in-depth, exhaustive, meticulous, systematic, and methodical analysis of the various different types of multiple diverse categories of numerous distinct kinds of several various forms of different approaches to implementing machine learning algorithms in healthcare applications, specifically focusing on diagnostic imaging, predictive analytics, personalized medicine, drug discovery, clinical decision support systems, and electronic health record optimization, while considering the ethical implications, regulatory compliance requirements, data privacy concerns, security protocols, integration challenges, scalability issues, performance metrics, validation methodologies, and cost-effectiveness analyses across multiple healthcare institutions and diverse patient populations.",
+      "expected_issues": ["overly_verbose", "redundant_language"],
+      "category": "edge_case",
+      "description": "Extremely verbose prompt with redundant language"
+    },
+    {
+      "id": "performance_test_1",
+      "original": "Analyze the performance metrics of distributed systems architecture patterns including microservices, service mesh, event-driven architecture, and serverless computing frameworks with focus on scalability, reliability, and maintainability aspects",
+      "expected_issues": ["lacks_output_format"],
+      "category": "performance",
+      "description": "Technical prompt for performance testing"
+    },
+    {
+      "id": "performance_test_2",
+      "original": "Develop a machine learning model for predicting customer churn in telecommunications industry using supervised learning algorithms with emphasis on feature engineering and model interpretability",
+      "expected_issues": ["lacks_constraints"],
+      "category": "performance", 
+      "description": "ML prompt for performance testing"
+    },
+    {
+      "id": "quality_baseline_1",
+      "original": "Write a 300-word blog post about sustainable energy solutions for small businesses, formatted in markdown with headers, bullet points, and include practical actionable recommendations with estimated costs and ROI timeframes.",
+      "expected_issues": [],
+      "category": "quality_baseline",
+      "description": "Well-structured prompt that should maintain quality"
+    },
+    {
+      "id": "quality_baseline_2",
+      "original": "Create a Python function that implements binary search algorithm with the following requirements: takes a sorted list and target value as parameters, returns the index if found or -1 if not found, includes docstring with examples, and has O(log n) time complexity.",
+      "expected_issues": [],
+      "category": "quality_baseline",
+      "description": "Clear technical prompt with specific requirements"
+    }
+  ],
+  "test_metadata": {
+    "total_prompts": 16,
+    "categories": {
+      "clarity": 3,
+      "specificity": 3,
+      "combined": 2,
+      "edge_case": 3,
+      "performance": 2,
+      "quality_baseline": 2
+    },
+    "expected_performance": {
+      "clarity_rule_success_rate": 0.75,
+      "specificity_rule_success_rate": 0.75,
+      "combined_improvement_rate": 0.80,
+      "edge_case_handling_rate": 0.60,
+      "performance_threshold_ms": 100
+    },
+    "version": "1.0.0",
+    "created_date": "2024-01-15",
+    "description": "Comprehensive test fixture for rule effectiveness analysis"
+  }
+}

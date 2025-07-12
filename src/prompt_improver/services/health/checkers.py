@@ -3,9 +3,29 @@ PHASE 3: Health Check Consolidation - Component Checkers
 """
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+import asyncio
+from datetime import datetime
 
 from .base import HealthChecker, HealthResult, HealthStatus
+
+# Graceful imports for various services
+try:
+    from .background_manager import get_background_task_manager
+    BACKGROUND_MANAGER_AVAILABLE = True
+except Exception:
+    BACKGROUND_MANAGER_AVAILABLE = False
+    get_background_task_manager = None
+
+try:
+    from ...optimization.batch_processor import BatchProcessor
+    BATCH_PROCESSOR_AVAILABLE = True
+except Exception as e:
+    BATCH_PROCESSOR_AVAILABLE = False
+    BatchProcessor = None
+    print(f"BatchProcessor import failed: {e}")
+
+QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE or BATCH_PROCESSOR_AVAILABLE
 
 # Graceful database import handling
 try:
@@ -214,6 +234,219 @@ class MLServiceHealthChecker(HealthChecker):
             )
 
 
+class QueueHealthChecker(HealthChecker):
+    """Queue systems health checker for monitoring queue metrics"""
+    
+    def __init__(self, batch_processor: Optional[BatchProcessor] = None):
+        super().__init__("queue")
+        self.batch_processor = batch_processor
+        
+    async def check(self) -> HealthResult:
+        """Check queue health including length, retry backlog, and latency"""
+        if not QUEUE_SERVICES_AVAILABLE:
+            return HealthResult(
+                status=HealthStatus.WARNING,
+                component=self.name,
+                message="Queue services not configured",
+                error="Queue or background services not available"
+            )
+        
+        try:
+            start_time = time.time()
+            metrics = await self._collect_queue_metrics()
+            status = self._evaluate_queue_health(metrics)
+            response_time = (time.time() - start_time) * 1000
+            
+            return HealthResult(
+                status=status,
+                component=self.name,
+                response_time_ms=response_time,
+                message=self._get_status_message(status, metrics),
+                details=metrics,
+                timestamp=datetime.now()
+            )
+            
+        except Exception as e:
+            response_time = (time.time() - start_time) * 1000
+            return HealthResult(
+                status=HealthStatus.FAILED,
+                component=self.name,
+                error=str(e),
+                message=f"Queue health check failed: {str(e)}",
+                response_time_ms=response_time,
+                timestamp=datetime.now()
+            )
+    
+    async def _collect_queue_metrics(self) -> Dict[str, Any]:
+        """Collect comprehensive queue metrics"""
+        metrics = {}
+        
+        # Get batch processor metrics
+        if self.batch_processor:
+            metrics.update(await self._get_batch_processor_metrics())
+        
+        # Get background task manager metrics
+        metrics.update(await self._get_background_task_metrics())
+        
+        # Calculate derived metrics
+        metrics.update(self._calculate_derived_metrics(metrics))
+        
+        return metrics
+    
+    async def _get_batch_processor_metrics(self) -> Dict[str, Any]:
+        """Get metrics from batch processor"""
+        try:
+            processor_metrics = {}
+            
+            # Queue size metrics
+            processor_metrics["training_queue_size"] = self.batch_processor.get_queue_size()
+            processor_metrics["priority_queue_enabled"] = self.batch_processor.config.enable_priority_queue
+            processor_metrics["max_queue_size"] = self.batch_processor.config.max_queue_size
+            
+            # Configuration metrics
+            processor_metrics["batch_size"] = self.batch_processor.config.batch_size
+            processor_metrics["concurrency"] = self.batch_processor.config.concurrency
+            processor_metrics["max_attempts"] = self.batch_processor.config.max_attempts
+            
+            # Processing state
+            processor_metrics["processing"] = self.batch_processor.processing
+            
+            # Performance metrics (if available)
+            if hasattr(self.batch_processor, 'metrics') and self.batch_processor.metrics:
+                batch_metrics = self.batch_processor.metrics
+                processor_metrics["processed_count"] = batch_metrics.get("processed", 0)
+                processor_metrics["failed_count"] = batch_metrics.get("failed", 0)
+                processor_metrics["retry_count"] = batch_metrics.get("retries", 0)
+                
+                # Calculate success rate
+                total = batch_metrics.get("processed", 0) + batch_metrics.get("failed", 0)
+                if total > 0:
+                    processor_metrics["success_rate"] = batch_metrics.get("processed", 0) / total
+                else:
+                    processor_metrics["success_rate"] = 1.0
+                    
+                # Calculate uptime
+                if "start_time" in batch_metrics:
+                    processor_metrics["uptime_seconds"] = time.time() - batch_metrics["start_time"]
+            
+            return processor_metrics
+            
+        except Exception as e:
+            return {"batch_processor_error": str(e)}
+    
+    async def _get_background_task_metrics(self) -> Dict[str, Any]:
+        """Get metrics from background task manager"""
+        try:
+            task_manager = get_background_task_manager()
+            
+            background_metrics = {}
+            background_metrics["background_queue_size"] = task_manager.get_queue_size()
+            background_metrics["running_tasks"] = len(task_manager.get_running_tasks())
+            background_metrics["max_concurrent_tasks"] = task_manager.max_concurrent_tasks
+            
+            # Task count by status
+            task_counts = task_manager.get_task_count()
+            background_metrics["task_counts"] = task_counts
+            
+            # Calculate queue utilization
+            if task_manager.max_concurrent_tasks > 0:
+                utilization = len(task_manager.get_running_tasks()) / task_manager.max_concurrent_tasks
+                background_metrics["task_utilization"] = utilization
+            else:
+                background_metrics["task_utilization"] = 0.0
+            
+            return background_metrics
+            
+        except Exception as e:
+            return {"background_task_error": str(e)}
+    
+    def _calculate_derived_metrics(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate derived metrics from collected data"""
+        derived = {}
+        
+        # Total queue backlog
+        training_queue = metrics.get("training_queue_size", 0)
+        background_queue = metrics.get("background_queue_size", 0)
+        derived["total_queue_backlog"] = training_queue + background_queue
+        
+        # Queue capacity utilization
+        max_queue_size = metrics.get("max_queue_size", 1000)
+        if max_queue_size > 0:
+            derived["queue_capacity_utilization"] = training_queue / max_queue_size
+        else:
+            derived["queue_capacity_utilization"] = 0.0
+        
+        # Retry backlog ratio
+        retry_count = metrics.get("retry_count", 0)
+        processed_count = metrics.get("processed_count", 0)
+        total_processed = retry_count + processed_count
+        if total_processed > 0:
+            derived["retry_backlog_ratio"] = retry_count / total_processed
+        else:
+            derived["retry_backlog_ratio"] = 0.0
+        
+        # Average latency estimation (based on processing metrics)
+        if "uptime_seconds" in metrics and processed_count > 0:
+            derived["avg_processing_latency_ms"] = (metrics["uptime_seconds"] / processed_count) * 1000
+        else:
+            derived["avg_processing_latency_ms"] = 0.0
+        
+        # Throughput (items per second)
+        if "uptime_seconds" in metrics and metrics["uptime_seconds"] > 0:
+            derived["throughput_per_second"] = processed_count / metrics["uptime_seconds"]
+        else:
+            derived["throughput_per_second"] = 0.0
+        
+        return derived
+    
+    def _evaluate_queue_health(self, metrics: Dict[str, Any]) -> HealthStatus:
+        """Evaluate overall queue health based on metrics"""
+        # Check for critical issues
+        if "batch_processor_error" in metrics or "background_task_error" in metrics:
+            return HealthStatus.FAILED
+        
+        # Check queue capacity
+        capacity_utilization = metrics.get("queue_capacity_utilization", 0.0)
+        if capacity_utilization >= 0.95:  # 95% capacity
+            return HealthStatus.FAILED
+        elif capacity_utilization >= 0.80:  # 80% capacity
+            return HealthStatus.WARNING
+        
+        # Check retry backlog
+        retry_ratio = metrics.get("retry_backlog_ratio", 0.0)
+        if retry_ratio >= 0.5:  # 50% retry rate
+            return HealthStatus.FAILED
+        elif retry_ratio >= 0.2:  # 20% retry rate
+            return HealthStatus.WARNING
+        
+        # Check success rate
+        success_rate = metrics.get("success_rate", 1.0)
+        if success_rate < 0.8:  # Less than 80% success
+            return HealthStatus.FAILED
+        elif success_rate < 0.95:  # Less than 95% success
+            return HealthStatus.WARNING
+        
+        # Check task utilization
+        task_utilization = metrics.get("task_utilization", 0.0)
+        if task_utilization >= 0.95:  # 95% task utilization
+            return HealthStatus.WARNING
+        
+        return HealthStatus.HEALTHY
+    
+    def _get_status_message(self, status: HealthStatus, metrics: Dict[str, Any]) -> str:
+        """Get human-readable status message"""
+        total_backlog = metrics.get("total_queue_backlog", 0)
+        capacity_util = metrics.get("queue_capacity_utilization", 0.0)
+        success_rate = metrics.get("success_rate", 1.0)
+        
+        if status == HealthStatus.HEALTHY:
+            return f"Queue healthy - {total_backlog} items queued, {capacity_util:.1%} capacity, {success_rate:.1%} success"
+        elif status == HealthStatus.WARNING:
+            return f"Queue warning - {total_backlog} items queued, {capacity_util:.1%} capacity, {success_rate:.1%} success"
+        else:
+            return f"Queue failed - {total_backlog} items queued, {capacity_util:.1%} capacity, {success_rate:.1%} success"
+
+
 class SystemResourcesHealthChecker(HealthChecker):
     """System resource usage health checker"""
     
@@ -236,6 +469,9 @@ class SystemResourcesHealthChecker(HealthChecker):
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=1)
             
+            # Event loop detection and latency benchmarking
+            loop_info = await self._check_event_loop_performance()
+            
             status = HealthStatus.HEALTHY
             warnings = []
             
@@ -251,7 +487,15 @@ class SystemResourcesHealthChecker(HealthChecker):
                 status = HealthStatus.WARNING
                 warnings.append(f"High CPU usage: {cpu_percent:.1f}%")
             
+            # Check event loop latency
+            if loop_info.get("avg_latency_ms", 0) > 10:
+                status = HealthStatus.WARNING
+                warnings.append(f"High event loop latency: {loop_info['avg_latency_ms']:.2f}ms")
+            
             message = f"System resources: CPU {cpu_percent:.1f}%, Memory {memory_usage_percent:.1f}%, Disk {disk_usage_percent:.1f}%"
+            if loop_info.get("uvloop_enabled"):
+                message += f" - uvloop: {loop_info['loop_type']}"
+            
             if warnings:
                 message += f" - Warnings: {', '.join(warnings)}"
             
@@ -263,7 +507,8 @@ class SystemResourcesHealthChecker(HealthChecker):
                     "memory_usage_percent": memory_usage_percent,
                     "disk_usage_percent": disk_usage_percent,
                     "cpu_usage_percent": cpu_percent,
-                    "warnings": warnings
+                    "warnings": warnings,
+                    "event_loop": loop_info
                 }
             )
             
@@ -280,3 +525,86 @@ class SystemResourcesHealthChecker(HealthChecker):
                 error=str(e),
                 message="System resource check failed"
             )
+    
+    async def _check_event_loop_performance(self) -> Dict[str, Any]:
+        """Check event loop type and performance metrics using event loop manager."""
+        try:
+            from prompt_improver.utils.event_loop_manager import get_event_loop_manager
+            
+            # Get event loop manager and run performance check
+            manager = get_event_loop_manager()
+            
+            # Get loop information
+            loop_info = manager.get_loop_info()
+            
+            # Run latency benchmark
+            latency_metrics = await manager.benchmark_loop_latency(samples=10)
+            
+            # Combine information
+            return {
+                **loop_info,
+                **latency_metrics,
+                "enhanced_monitoring": True,
+            }
+            
+        except ImportError:
+            # Fallback to original implementation if event loop manager not available
+            return await self._fallback_event_loop_check()
+        except Exception as e:
+            return {
+                "loop_type": "unknown",
+                "uvloop_enabled": False,
+                "avg_ms": 0,
+                "min_ms": 0,
+                "max_ms": 0,
+                "samples": 0,
+                "error": str(e),
+                "enhanced_monitoring": False,
+            }
+    
+    async def _fallback_event_loop_check(self) -> Dict[str, Any]:
+        """Fallback event loop check using original implementation."""
+        try:
+            # Get current event loop
+            loop = asyncio.get_running_loop()
+            
+            # Detect event loop type
+            loop_type = type(loop).__name__
+            uvloop_enabled = "uvloop" in loop_type.lower()
+            
+            # Benchmark event loop latency
+            latencies = []
+            
+            for _ in range(10):
+                start = time.perf_counter()
+                await asyncio.sleep(0)  # Yield control to event loop
+                end = time.perf_counter()
+                latency_ms = (end - start) * 1000
+                latencies.append(latency_ms)
+            
+            # Calculate statistics
+            avg_latency = sum(latencies) / len(latencies)
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            
+            return {
+                "loop_type": loop_type,
+                "uvloop_enabled": uvloop_enabled,
+                "avg_ms": avg_latency,  # Updated to match new format
+                "min_ms": min_latency,  # Updated to match new format
+                "max_ms": max_latency,  # Updated to match new format
+                "samples": len(latencies),  # Updated to match new format
+                "enhanced_monitoring": False,
+            }
+            
+        except Exception as e:
+            return {
+                "loop_type": "unknown",
+                "uvloop_enabled": False,
+                "avg_ms": 0,
+                "min_ms": 0,
+                "max_ms": 0,
+                "samples": 0,
+                "error": str(e),
+                "enhanced_monitoring": False,
+            }

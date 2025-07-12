@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Lock
 from typing import Any
+import glob
+import asyncio
+from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
@@ -962,6 +965,100 @@ class MLModelService:
         except Exception as e:
             logger.error(f"Cache optimization failed: {e}")
             return {"status": "error", "error": str(e)}
+
+    async def send_training_batch(self, batch: list[dict]) -> dict[str, Any]:
+        """Send training batch to local ML stub storage.
+        
+        Args:
+            batch: List of training records to persist
+            
+        Returns:
+            Status of the batch write operation
+        """
+        try:
+            start_time = time.time()
+            
+            # Create ml_stub/batches directory if it doesn't exist
+            stub_dir = Path("ml_stub/batches")
+            stub_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate timestamp-based filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            batch_filename = f"training_batch_{timestamp}.jsonl"
+            batch_path = stub_dir / batch_filename
+            
+            # Write batch to JSONL file
+            with open(batch_path, 'w') as f:
+                for record in batch:
+                    f.write(json.dumps(record) + "\n")
+            
+            processing_time = (time.time() - start_time) * 1000
+            
+            logger.info(f"Saved training batch to {batch_path} ({len(batch)} records)")
+            
+            return {
+                "status": "success",
+                "batch_file": str(batch_path),
+                "record_count": len(batch),
+                "processing_time_ms": processing_time
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to save training batch: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "processing_time_ms": (time.time() - start_time) * 1000
+            }
+    
+    async def fetch_latest_model(self) -> dict[str, Any]:
+        """Fetch the latest model from ML stub storage.
+        
+        Returns:
+            Information about the latest model file
+        """
+        try:
+            start_time = time.time()
+            
+            # Look for model files in ml_stub directory
+            model_pattern = "ml_stub/model_v*.bin"
+            model_files = glob.glob(model_pattern)
+            
+            if not model_files:
+                return {
+                    "status": "no_models",
+                    "message": "No model files found in ml_stub directory",
+                    "processing_time_ms": (time.time() - start_time) * 1000
+                }
+            
+            # Sort by modification time to get the latest
+            latest_model = max(model_files, key=os.path.getmtime)
+            model_stats = os.stat(latest_model)
+            
+            processing_time = (time.time() - start_time) * 1000
+            
+            # Extract version from filename
+            model_filename = os.path.basename(latest_model)
+            version = model_filename.replace("model_v", "").replace(".bin", "")
+            
+            logger.info(f"Found latest model: {latest_model}")
+            
+            return {
+                "status": "success",
+                "model_path": latest_model,
+                "model_version": version,
+                "file_size_bytes": model_stats.st_size,
+                "last_modified": datetime.fromtimestamp(model_stats.st_mtime).isoformat(),
+                "processing_time_ms": processing_time
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch latest model: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "processing_time_ms": (time.time() - start_time) * 1000
+            }
 
 
 # Global service instance

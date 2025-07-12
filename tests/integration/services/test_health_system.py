@@ -6,7 +6,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.prompt_improver.services.health import (
+from prompt_improver.services.health import (
     HealthChecker,
     HealthResult,
     HealthStatus,
@@ -247,7 +247,7 @@ class TestPrometheusIntegration:
     @pytest.mark.asyncio
     async def test_metrics_instrumentation(self):
         """Test that metrics are recorded during health checks"""
-        from src.prompt_improver.services.health.metrics import (
+        from prompt_improver.services.health.metrics import (
             HEALTH_CHECK_STATUS,
             HEALTH_CHECKS_TOTAL,
             reset_health_metrics
@@ -271,13 +271,13 @@ class TestPrometheusIntegration:
 class TestIndividualCheckers:
     """Test individual health checker implementations"""
     
-    @patch('src.prompt_improver.services.health.checkers.get_session')
+    @patch('prompt_improver.services.health.checkers.get_session')
     async def test_database_health_checker(self, mock_get_session):
         """Test database health checker"""
         # Mock successful database connection
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar.return_value = 5  # Active connections
+        mock_result.scalar.side_effect = [0, 5]  # Correct mock: 0 long queries, 5 active connections
         mock_session.execute.return_value = mock_result
         mock_get_session.return_value.__aenter__.return_value = mock_session
         
@@ -289,7 +289,7 @@ class TestIndividualCheckers:
         assert result.response_time_ms is not None
         assert "responding in" in result.message
     
-    @patch('src.prompt_improver.services.health.checkers.get_session')
+    @patch('prompt_improver.services.health.checkers.get_session')
     async def test_database_health_checker_failure(self, mock_get_session):
         """Test database health checker with connection failure"""
         # Mock database connection failure
@@ -303,7 +303,7 @@ class TestIndividualCheckers:
         assert result.error == "Connection refused"
         assert "Database connection failed" in result.message
     
-    @patch('src.prompt_improver.services.health.checkers.improve_prompt')
+    @patch('prompt_improver.mcp_server.mcp_server.improve_prompt')
     async def test_mcp_server_health_checker(self, mock_improve_prompt):
         """Test MCP server health checker"""
         # Mock successful MCP call
@@ -316,7 +316,7 @@ class TestIndividualCheckers:
         assert result.component == "mcp_server"
         assert result.response_time_ms is not None
     
-    @patch('src.prompt_improver.services.health.checkers.improve_prompt')
+    @patch('prompt_improver.mcp_server.mcp_server.improve_prompt')
     async def test_mcp_server_health_checker_failure(self, mock_improve_prompt):
         """Test MCP server health checker with failure"""
         # Mock MCP call failure
@@ -370,32 +370,29 @@ class TestIndividualCheckers:
 class TestIntegration:
     """Integration tests for the complete health check system"""
     
-    @patch.multiple(
-        'src.prompt_improver.services.health.checkers',
-        get_session=AsyncMock(),
-        improve_prompt=AsyncMock(),
-        AnalyticsService=MagicMock(),
-        get_ml_service=AsyncMock(),
-    )
+    @patch('prompt_improver.services.health.checkers.get_session')
+    @patch('prompt_improver.mcp_server.mcp_server.improve_prompt')
+    @patch('prompt_improver.services.analytics.AnalyticsService')
+    @patch('prompt_improver.services.ml_integration.get_ml_service')
     @patch('psutil.virtual_memory')
     @patch('psutil.disk_usage')
     @patch('psutil.cpu_percent')
-    async def test_full_health_check_integration(self, mock_cpu, mock_disk, mock_memory, **mocks):
+    async def test_full_health_check_integration(self, mock_cpu, mock_disk, mock_memory, mock_get_ml_service, mock_analytics_service, mock_improve_prompt, mock_get_session):
         """Test full health check system integration"""
         # Setup mocks for successful health checks
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar.return_value = 3
+        mock_result.scalar.side_effect = [0, 3]  # 0 long queries, 3 active connections
         mock_session.execute.return_value = mock_result
-        mocks['get_session'].return_value.__aenter__.return_value = mock_session
+        mock_get_session.return_value.__aenter__.return_value = mock_session
         
-        mocks['improve_prompt'].return_value = {"result": "success"}
+        mock_improve_prompt.return_value = {"result": "success"}
         
-        mock_analytics = MagicMock()
+        mock_analytics = AsyncMock()
         mock_analytics.get_performance_trends.return_value = {"trends": []}
-        mocks['AnalyticsService'].return_value = mock_analytics
+        mock_analytics_service.return_value = mock_analytics
         
-        mocks['get_ml_service'].return_value = MagicMock()
+        mock_get_ml_service.return_value = MagicMock()
         
         mock_memory.return_value.percent = 45.0
         mock_disk.return_value.percent = 55.0
@@ -411,6 +408,11 @@ class TestIntegration:
         
         # Test health summary
         summary = await service.get_health_summary(include_details=True)
+        print(f"\nDEBUG: Summary = {summary}")
+        print(f"DEBUG: Overall status = {summary.get('overall_status')}")
+        print(f"DEBUG: Result overall status = {result.overall_status}")
+        print(f"DEBUG: Result checks = {[(name, check.status) for name, check in result.checks.items()]}")
+        print(f"DEBUG: Result failed checks = {result.failed_checks}")
         assert summary["overall_status"] == "healthy"
         assert len(summary["checks"]) == 5
 

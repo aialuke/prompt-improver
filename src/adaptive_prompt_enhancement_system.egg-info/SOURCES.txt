@@ -43,7 +43,3 @@ src/prompt_improver/utils/__init__.py
 src/prompt_improver/utils/error_handlers.py
 src/prompt_improver/utils/health_checks.py
 src/prompt_improver/utils/subprocess_security.py
-tests/test_async_validation.py
-tests/test_logs_refactor.py
-tests/test_performance.py
-tests/test_phase2_implementation.py

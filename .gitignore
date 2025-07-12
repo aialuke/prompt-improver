@@ -207,3 +207,7 @@ security-report.*
 # Performance profiling
 *.perf
 .prof/
+
+# ML training data (prevent tracking of large or sensitive batches)
+ml_stub/batches/
+ml_stub/*.jsonl

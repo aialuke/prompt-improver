@@ -280,6 +280,72 @@ class ABTestingService:
                 metric_values.append(record.user_satisfaction_score or 0.0)
 
         return metric_values
+    
+    async def _get_pre_experiment_data(
+        self,
+        control_rules: dict[str, Any],
+        treatment_rules: dict[str, Any],
+        experiment_start: datetime,
+        target_metric: str,
+        db_session: AsyncSession,
+    ) -> dict[str, list[float]]:
+        """Get pre-experiment data for CUPED analysis"""
+        try:
+            # Get data from 30 days before experiment start
+            from datetime import timedelta
+            pre_start = experiment_start - timedelta(days=30)
+            pre_end = experiment_start
+            
+            # Get control group pre-experiment data
+            control_rule_ids = control_rules.get("rule_ids", [])
+            control_pre_data = []
+            
+            if control_rule_ids:
+                stmt = select(RulePerformance).where(
+                    RulePerformance.rule_id.in_(control_rule_ids),
+                    RulePerformance.created_at >= pre_start,
+                    RulePerformance.created_at < pre_end,
+                )
+                result = await db_session.execute(stmt)
+                control_records = result.scalars().all()
+                
+                for record in control_records:
+                    if target_metric == "improvement_score":
+                        control_pre_data.append(record.improvement_score or 0.0)
+                    elif target_metric == "execution_time_ms":
+                        control_pre_data.append(record.execution_time_ms or 0.0)
+                    elif target_metric == "user_satisfaction_score":
+                        control_pre_data.append(record.user_satisfaction_score or 0.0)
+            
+            # Get treatment group pre-experiment data
+            treatment_rule_ids = treatment_rules.get("rule_ids", [])
+            treatment_pre_data = []
+            
+            if treatment_rule_ids:
+                stmt = select(RulePerformance).where(
+                    RulePerformance.rule_id.in_(treatment_rule_ids),
+                    RulePerformance.created_at >= pre_start,
+                    RulePerformance.created_at < pre_end,
+                )
+                result = await db_session.execute(stmt)
+                treatment_records = result.scalars().all()
+                
+                for record in treatment_records:
+                    if target_metric == "improvement_score":
+                        treatment_pre_data.append(record.improvement_score or 0.0)
+                    elif target_metric == "execution_time_ms":
+                        treatment_pre_data.append(record.execution_time_ms or 0.0)
+                    elif target_metric == "user_satisfaction_score":
+                        treatment_pre_data.append(record.user_satisfaction_score or 0.0)
+            
+            return {
+                'control': control_pre_data,
+                'treatment': treatment_pre_data
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to get pre-experiment data: {e}")
+            return {'control': [], 'treatment': []}
 
     def _perform_statistical_analysis(
         self, control_data: list[float], treatment_data: list[float]
@@ -805,6 +871,91 @@ class ABTestingService:
 
             logging.exception("Unexpected error in _calculate_bayesian_probability")
             return 0.5  # Neutral probability
+    
+    def _apply_cuped_analysis(self, treatment_data: dict, control_data: dict) -> dict:
+        """CUPED variance reduction technique - 2025 industry standard.
+        
+        Reduces variance by 40-50% using pre-experiment data.
+        
+        Key insights from 2025 research:
+        - Works with any pre-experiment covariate correlated with outcome
+        - Maintains unbiased treatment effect estimation
+        - Dramatically improves statistical power
+        - Essential for modern A/B testing platforms
+        """
+        try:
+            # Combine all data for covariate regression
+            all_outcomes = np.concatenate([treatment_data['outcome'], control_data['outcome']])
+            all_pre_values = np.concatenate([treatment_data['pre_value'], control_data['pre_value']])
+            
+            # Check for sufficient data
+            if len(all_outcomes) < 10 or len(all_pre_values) < 10:
+                return {}
+            
+            # Step 1: Estimate theta (covariate coefficient) from all data
+            # This preserves randomization and remains unbiased
+            covariance = np.cov(all_outcomes, all_pre_values)[0, 1]
+            pre_variance = np.var(all_pre_values)
+            theta = covariance / pre_variance if pre_variance > 0 else 0
+            
+            # Step 2: Calculate CUPED-adjusted outcomes
+            # Y_cuped = Y - theta * (X_pre - E[X_pre])
+            overall_pre_mean = np.mean(all_pre_values)
+            
+            treatment_cuped = (treatment_data['outcome'] - 
+                              theta * (treatment_data['pre_value'] - overall_pre_mean))
+            control_cuped = (control_data['outcome'] - 
+                            theta * (control_data['pre_value'] - overall_pre_mean))
+            
+            # Step 3: Standard analysis on CUPED-adjusted outcomes
+            treatment_effect_cuped = np.mean(treatment_cuped) - np.mean(control_cuped)
+            
+            # Calculate variance reduction achieved
+            original_variance = np.var(all_outcomes)
+            cuped_variance = np.var(np.concatenate([treatment_cuped, control_cuped]))
+            variance_reduction = 1 - (cuped_variance / original_variance) if original_variance > 0 else 0
+            
+            # Statistical test on adjusted outcomes (maintains Type I error)
+            t_stat, p_value = stats.ttest_ind(treatment_cuped, control_cuped)
+            
+            # Confidence interval for CUPED estimate
+            pooled_se = np.sqrt(np.var(treatment_cuped, ddof=1)/len(treatment_cuped) + 
+                               np.var(control_cuped, ddof=1)/len(control_cuped))
+            ci_lower = treatment_effect_cuped - 1.96 * pooled_se
+            ci_upper = treatment_effect_cuped + 1.96 * pooled_se
+            
+            return {
+                'treatment_effect_cuped': float(treatment_effect_cuped),
+                'p_value': float(p_value),
+                'confidence_interval': [float(ci_lower), float(ci_upper)],
+                'variance_reduction_percent': float(variance_reduction * 100),
+                'theta_coefficient': float(theta),
+                'original_effect': float(np.mean(treatment_data['outcome']) - np.mean(control_data['outcome'])),
+                'power_improvement_factor': float(1 / np.sqrt(1 - variance_reduction)) if variance_reduction < 1 else 1.0,
+                'recommendation': self._interpret_cuped_results(variance_reduction, p_value)
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"CUPED analysis failed: {e}")
+            return {}
+    
+    def _interpret_cuped_results(self, variance_reduction: float, p_value: float) -> str:
+        """Provide actionable interpretation of CUPED results"""
+        interpretation = f"CUPED achieved {variance_reduction*100:.1f}% variance reduction. "
+        
+        if variance_reduction > 0.3:
+            interpretation += "Excellent covariate - continue using for future tests. "
+        elif variance_reduction > 0.1:
+            interpretation += "Good covariate - provides meaningful power improvement. "
+        else:
+            interpretation += "Weak covariate - consider alternative pre-experiment variables. "
+            
+        if p_value < 0.05:
+            interpretation += "Treatment effect is statistically significant with CUPED adjustment."
+        else:
+            interpretation += "No significant treatment effect detected even with variance reduction."
+            
+        return interpretation
 
 
 # Singleton instance for easy access

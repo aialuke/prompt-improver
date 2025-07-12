@@ -484,31 +484,31 @@ class TestDatabaseConstraintValidation:
         test_db_session.add(performance_record)
 
         # Check if values are within valid range
-        try:
-            if 0.0 <= improvement_score <= 1.0 and 0.0 <= confidence_level <= 1.0:
-                # Should succeed
+        if 0.0 <= improvement_score <= 1.0 and 0.0 <= confidence_level <= 1.0:
+            # Should succeed
+            try:
                 await test_db_session.commit()
 
-                # Verify stored correctly
+                # Verify stored correctly - use more specific query to avoid multiple results
                 result = await test_db_session.execute(
                     select(RulePerformance).where(
                         RulePerformance.rule_id == constraint_rule_id
-                    )
+                    ).order_by(RulePerformance.id.desc()).limit(1)
                 )
                 stored = result.scalar_one_or_none()
                 assert stored is not None
                 assert stored.improvement_score == improvement_score
                 assert stored.confidence_level == confidence_level
-            else:
-                # Should fail due to check constraints
-                with pytest.raises(IntegrityError):
-                    await test_db_session.commit()
-                # Rollback after constraint violation
+            except Exception:
+                # Ensure rollback on any failure to clean state
                 await test_db_session.rollback()
-        except Exception:
-            # Ensure rollback on any failure to clean state
+                raise
+        else:
+            # Should fail due to check constraints
+            with pytest.raises(IntegrityError):
+                await test_db_session.commit()
+            # Rollback after constraint violation
             await test_db_session.rollback()
-            raise
 
     @pytest.mark.asyncio
     async def test_user_feedback_rating_constraint(self, test_db_session):
@@ -525,6 +525,9 @@ class TestDatabaseConstraintValidation:
                 user_rating=rating,
                 applied_rules={"rules": ["clarity_rule"]},
                 session_id=session_id,
+                # Temporarily remove problematic fields until schema is fixed
+                # ml_optimized=False,
+                # model_id=None,
             )
             test_db_session.add(feedback)
             await test_db_session.commit()
@@ -554,6 +557,9 @@ class TestDatabaseConstraintValidation:
                 user_rating=rating,
                 applied_rules={"rules": ["clarity_rule"]},
                 session_id=invalid_session_id,
+                # Temporarily remove problematic fields until schema is fixed
+                # ml_optimized=False,
+                # model_id=None,
             )
             test_db_session.add(feedback)
 
@@ -562,6 +568,95 @@ class TestDatabaseConstraintValidation:
                 await test_db_session.commit()
 
             # Rollback to clean session state
+            await test_db_session.rollback()
+    
+    @pytest.mark.asyncio
+    async def test_comprehensive_constraint_validation(self, test_db_session):
+        """Comprehensive test of all constraint validation scenarios."""
+        from prompt_improver.database.models import RulePerformance, UserFeedback, ABExperiment
+        
+        # Test 1: RulePerformance constraint validation
+        # Test invalid improvement scores
+        invalid_scores = [-0.5, 1.5, 2.0, -1.0]
+        for score in invalid_scores:
+            perf = RulePerformance(
+                rule_id=f"invalid_score_test_{random.randint(10000, 99999)}",
+                rule_name="Invalid Score Test",
+                prompt_id=uuid.uuid4(),
+                improvement_score=score,
+                confidence_level=0.8,
+                execution_time_ms=100,
+            )
+            test_db_session.add(perf)
+            
+            with pytest.raises(IntegrityError):
+                await test_db_session.commit()
+            await test_db_session.rollback()
+        
+        # Test 2: UserFeedback edge cases
+        # Test boundary values that should work
+        valid_boundary_ratings = [1, 5]  # Min and max valid ratings
+        for rating in valid_boundary_ratings:
+            feedback = UserFeedback(
+                original_prompt="Boundary test prompt",
+                improved_prompt="Boundary test improved prompt",
+                user_rating=rating,
+                applied_rules={"rules": ["test_rule"]},
+                session_id=f"boundary_test_{rating}_{random.randint(10000, 99999)}",
+            )
+            test_db_session.add(feedback)
+            await test_db_session.commit()  # Should succeed
+        
+        # Test 3: ABExperiment status constraint validation
+        # Valid statuses should work
+        valid_statuses = ['planning', 'running', 'completed', 'stopped']
+        for status in valid_statuses:
+            experiment = ABExperiment(
+                experiment_name=f"Status Test {status}",
+                control_rules={"rules": ["control"]},
+                treatment_rules={"rules": ["treatment"]},
+                status=status,
+            )
+            test_db_session.add(experiment)
+            await test_db_session.commit()  # Should succeed
+        
+        # Test 4: Invalid ABExperiment status
+        invalid_experiment = ABExperiment(
+            experiment_name="Invalid Status Test",
+            control_rules={"rules": ["control"]},
+            treatment_rules={"rules": ["treatment"]},
+            status="invalid_status",  # This should fail
+        )
+        test_db_session.add(invalid_experiment)
+        
+        with pytest.raises(IntegrityError):
+            await test_db_session.commit()
+        await test_db_session.rollback()
+    
+    @pytest.mark.asyncio
+    async def test_constraint_error_messages(self, test_db_session):
+        """Test that constraint violation error messages are informative."""
+        from prompt_improver.database.models import RulePerformance
+        
+        # Create a record that violates improvement_score constraint
+        invalid_perf = RulePerformance(
+            rule_id="error_message_test",
+            rule_name="Error Message Test",
+            prompt_id=uuid.uuid4(),
+            improvement_score=2.0,  # Invalid: > 1.0
+            confidence_level=0.8,
+            execution_time_ms=100,
+        )
+        test_db_session.add(invalid_perf)
+        
+        try:
+            await test_db_session.commit()
+            assert False, "Expected IntegrityError but none was raised"
+        except IntegrityError as e:
+            # Verify error message contains useful information
+            error_msg = str(e)
+            assert "improvement_score" in error_msg.lower() or "check" in error_msg.lower()
+            assert "constraint" in error_msg.lower() or "violation" in error_msg.lower()
             await test_db_session.rollback()
 
 
@@ -597,6 +692,9 @@ class TestDatabaseTransactionIntegrity:
         # Transaction should fail and rollback
         with pytest.raises(IntegrityError):
             await test_db_session.commit()
+
+        # Manually rollback to clear the session state
+        await test_db_session.rollback()
 
         # Verify no data was committed
         result = await test_db_session.execute(

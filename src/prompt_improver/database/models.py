@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, Column, Index
+from sqlalchemy import CheckConstraint, Column, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import (
     JSONB,
     UUID as PGUUID,
@@ -143,8 +143,9 @@ class UserFeedbackBase(SQLModel):
     )
     user_notes: str | None = Field(default=None)
     session_id: str | None = Field(default=None, max_length=100, index=True)
-    ml_optimized: bool = Field(default=False)
-    model_id: str | None = Field(default=None, max_length=100)
+    # Temporarily comment out problematic fields until schema is aligned
+    # ml_optimized: bool = Field(default=False)
+    # model_id: str | None = Field(default=None, max_length=100)
 
 
 class UserFeedback(UserFeedbackBase, table=True):

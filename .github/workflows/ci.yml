@@ -17,6 +17,21 @@ jobs:
       matrix:
         python-version: ['3.11', '3.12']
     
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        options: >
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -44,6 +59,8 @@ jobs:
         pip install -e ".[dev]"
         # Install additional dev tools
         pip install prometheus-client>=0.19.0
+        # Install pytest-xdist for parallel testing
+        pip install pytest-xdist
     
     - name: Ruff check with preview features
       run: |
@@ -57,8 +74,19 @@ jobs:
       run: mypy src/
       continue-on-error: true  # Type checking improvements are ongoing
     
+    - name: Run database migrations
+      run: |
+        # Set up database connection for migrations
+        export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_db"
+        # Run migrations if needed
+        python -m alembic upgrade head || echo "No migrations to run"
+    
     - name: Run pytest with coverage
       run: |
+        # Set PYTHONPATH for proper imports
+        export PYTHONPATH=src
+        # Set DATABASE_URL for integration tests
+        export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_db"
         pytest tests/ \
           --cov=src \
           --cov-branch \
@@ -67,8 +95,41 @@ jobs:
           --cov-report=html:htmlcov \
           --junit-xml=pytest.xml \
           --asyncio-mode=auto \
+          -n auto \
+          --failed-first \
           -v \
-          --ignore=tests/deprecated
+          --ignore=tests/deprecated \
+          --cov-fail-under=90
+    
+    - name: Check coverage threshold
+      run: |
+        # Extract coverage percentage from XML report
+        COVERAGE_PERCENT=$(python -c "
+        import xml.etree.ElementTree as ET
+        try:
+            tree = ET.parse('coverage.xml')
+            root = tree.getroot()
+            coverage = root.attrib.get('line-rate', '0')
+            percentage = float(coverage) * 100
+            print(f'{percentage:.1f}')
+        except Exception as e:
+            print('0.0')  # Default to 0 if parsing fails
+        ")
+        
+        echo "Coverage: ${COVERAGE_PERCENT}%"
+        echo "COVERAGE_PERCENT=${COVERAGE_PERCENT}" >> $GITHUB_ENV
+        
+        # Check if coverage meets threshold
+        python -c "
+        import sys
+        coverage = float('${COVERAGE_PERCENT}')
+        threshold = 90.0
+        if coverage < threshold:
+            print(f'❌ Coverage {coverage:.1f}% below threshold {threshold}%')
+            sys.exit(1)
+        else:
+            print(f'✅ Coverage {coverage:.1f}% meets threshold {threshold}%')
+        "
     
     - name: Upload coverage to codecov
       uses: codecov/codecov-action@v3

@@ -32,6 +32,8 @@ dependencies = [
   "greenlet>=3.2.3",
   "aiosqlite>=0.19.0",  # Required for async SQLite database testing
   "mcp>=1.10.1",
+  "psutil>=5.8.0",  # Required for system resource monitoring in health checks
+  "uvloop>=0.17.0",  # High-performance event loop for asyncio
 ]
 
 [project.optional-dependencies]

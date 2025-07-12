@@ -15,6 +15,13 @@ from .checkers import (
     MLServiceHealthChecker,
     SystemResourcesHealthChecker
 )
+
+# Lazy import to avoid circular dependency
+try:
+    from .checkers import QueueHealthChecker
+except ImportError:
+    # Use lazy import to avoid circular dependency issues
+    QueueHealthChecker = None
 from .metrics import instrument_health_check
 
 
@@ -31,6 +38,14 @@ class HealthService:
                 MLServiceHealthChecker(),
                 SystemResourcesHealthChecker()
             ]
+            
+            # Add QueueHealthChecker if available (avoid circular import)
+            if QueueHealthChecker is not None:
+                try:
+                    self.checkers.append(QueueHealthChecker())
+                except Exception as e:
+                    # Log the error but continue without queue health checker
+                    print(f"Warning: Could not initialize QueueHealthChecker: {e}")
         else:
             self.checkers = checkers
         
@@ -188,6 +203,26 @@ class HealthService:
         self.checkers.remove(checker)
         del self.checker_map[component_name]
         return True
+    
+    def ensure_queue_checker(self) -> bool:
+        """Ensure queue health checker is available, add it if not present.
+        
+        Returns:
+            True if queue checker is available, False otherwise
+        """
+        # Check if queue checker already exists
+        if "queue" in self.checker_map:
+            return True
+            
+        # Try to dynamically import and add queue checker
+        try:
+            from .checkers import QueueHealthChecker
+            queue_checker = QueueHealthChecker()
+            self.add_checker(queue_checker)
+            return True
+        except Exception as e:
+            print(f"Warning: Could not add QueueHealthChecker: {e}")
+            return False
 
 
 # Global health service instance

@@ -4,6 +4,20 @@ PHASE 3: Health Check Consolidation - Metrics Integration
 
 from functools import wraps
 from typing import Callable, Any
+import time
+
+
+class _Timer:
+    """Context manager for timing code execution"""
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end = time.time()
+        self.duration = self.end - self.start
+        return False  # Don't suppress exceptions
+
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, Summary
@@ -30,9 +44,7 @@ except ImportError:
             return self
         
         def time(self):
-            def decorator(func):
-                return func
-            return decorator
+            return _Timer()
     
     Counter = Gauge = Histogram = Summary = MockMetric
 
@@ -54,9 +66,7 @@ def _create_metric_safe(metric_class, *args, **kwargs):
             def labels(self, *args, **kwargs):
                 return self
             def time(self):
-                def decorator(func):
-                    return func
-                return decorator
+                return _Timer()
         return LocalMockMetric()
     
     try:
@@ -76,9 +86,7 @@ def _create_metric_safe(metric_class, *args, **kwargs):
                 def labels(self, *args, **kwargs):
                     return self
                 def time(self):
-                    def decorator(func):
-                        return func
-                    return decorator
+                    return _Timer()
             return LocalMockMetric()
         else:
             raise

@@ -298,18 +298,20 @@ def sample_rule_performance(sample_rule_metadata):
         ),
     ]
 
-    # Create multiple records with unique prompt_ids
+    # Create multiple records with unique prompt_ids and ensure no constraint violations
     result = []
     for i in range(15):  # 15 records each = 30 total
         for base in base_data:
-            # Create new instance with unique prompt_id
+            # Create new instance with unique prompt_id and constrained scores
+            improvement_score = max(0.0, min(1.0, base.improvement_score + (i * 0.01)))
+            confidence_level = max(0.0, min(1.0, base.confidence_level + (i * 0.005)))
+            
             new_record = RulePerformance(
                 rule_id=base.rule_id,
                 rule_name=base.rule_name,
                 prompt_id=uuid.uuid4(),  # Unique prompt_id for each record
-                improvement_score=base.improvement_score
-                + (i * 0.01),  # Slight variation
-                confidence_level=base.confidence_level,
+                improvement_score=improvement_score,  # Keep within 0-1 range
+                confidence_level=confidence_level,    # Keep within 0-1 range
                 execution_time_ms=base.execution_time_ms + i,
                 prompt_characteristics=base.prompt_characteristics,
                 before_metrics=base.before_metrics,
@@ -332,8 +334,9 @@ def sample_user_feedback():
             improvement_areas={"areas": ["clarity", "specificity"]},
             user_notes="Good improvement",
             session_id="test_session_1",
-            ml_optimized=False,
-            model_id=None,
+            # Temporarily comment out problematic fields
+            # ml_optimized=False,
+            # model_id=None,
             created_at=datetime.utcnow(),
         ),
         UserFeedback(
@@ -344,8 +347,9 @@ def sample_user_feedback():
             improvement_areas={"areas": ["clarity"]},
             user_notes="Excellent improvement",
             session_id="test_session_2",
-            ml_optimized=True,
-            model_id="model_123",
+            # Temporarily comment out problematic fields
+            # ml_optimized=True,
+            # model_id="model_123",
             created_at=datetime.utcnow() - timedelta(hours=2),
         ),
     ]

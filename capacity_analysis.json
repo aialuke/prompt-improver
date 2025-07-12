@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-07-12T13:42:21.999324",
+  "capacity_analysis": {
+    "hourly_throughput": 6923,
+    "daily_throughput": 166153,
+    "weekly_throughput": 1163076,
+    "bottleneck": "ML_INFERENCE",
+    "efficiency": "100.0%",
+    "recommendations": [
+      "Current efficiency: 100.0%. Target: >80%"
+    ]
+  },
+  "sample_size_analysis": {
+    "effect_size_0.05": {
+      "required_sample_size": 14442,
+      "test_duration_days": 3,
+      "achieved_power": 0.8,
+      "confidence_interval": [
+        0.017381467648996667,
+        0.08261853235100333
+      ],
+      "group_sequential_inflation": 1.15
+    },
+    "effect_size_0.1": {
+      "required_sample_size": 3610,
+      "test_duration_days": 3,
+      "achieved_power": 0.8,
+      "confidence_interval": [
+        0.034758417652151416,
+        0.16524158234784858
+      ],
+      "group_sequential_inflation": 1.15
+    },
+    "effect_size_0.15": {
+      "required_sample_size": 1605,
+      "test_duration_days": 3,
+      "achieved_power": 0.8,
+      "confidence_interval": [
+        0.05215456501120068,
+        0.2478454349887993
+      ],
+      "group_sequential_inflation": 1.15
+    },
+    "effect_size_0.2": {
+      "required_sample_size": 902,
+      "test_duration_days": 3,
+      "achieved_power": 0.8,
+      "confidence_interval": [
+        0.06948067535773209,
+        0.33051932464226796
+      ],
+      "group_sequential_inflation": 1.15
+    },
+    "effect_size_0.3": {
+      "required_sample_size": 401,
+      "test_duration_days": 3,
+      "achieved_power": 0.8,
+      "confidence_interval": [
+        0.10424813863242813,
+        0.4957518613675719
+      ],
+      "group_sequential_inflation": 1.15
+    }
+  },
+  "configuration": {
+    "batch_size": 10,
+    "max_concurrent_tests": 5,
+    "timeout_hours": 1.0,
+    "significance_level": 0.05,
+    "power_threshold": 0.8
+  }
+}
