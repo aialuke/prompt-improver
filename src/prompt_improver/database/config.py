@@ -14,12 +14,14 @@ class DatabaseConfig(BaseSettings):
         default="apes_production", validation_alias="POSTGRES_DATABASE"
     )
     postgres_username: str = Field(
+        default="postgres",
         validation_alias="POSTGRES_USERNAME",
-        description="PostgreSQL username - must be provided via POSTGRES_USERNAME environment variable",
+        description="PostgreSQL username - defaults to 'postgres' for development",
     )
     postgres_password: str = Field(
+        default="password",
         validation_alias="POSTGRES_PASSWORD",
-        description="PostgreSQL password - must be provided via POSTGRES_PASSWORD environment variable for security",
+        description="PostgreSQL password - defaults to 'password' for development",
     )
 
     # Advanced connection pool settings (research-validated patterns)
@@ -61,8 +63,8 @@ class DatabaseConfig(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Generate PostgreSQL connection URL"""
-        return f"postgresql+asyncpg://{self.postgres_username}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
+        """Generate PostgreSQL connection URL using psycopg3 async driver"""
+        return f"postgresql+psycopg://{self.postgres_username}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
 
     @property
     def database_url_sync(self) -> str:
@@ -85,3 +87,8 @@ class DatabaseConfig(BaseSettings):
     slow_query_threshold: int = Field(default=1000, validation_alias="SLOW_QUERY_THRESHOLD")
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+
+
+def get_database_config() -> DatabaseConfig:
+    """Get database configuration instance."""
+    return DatabaseConfig()

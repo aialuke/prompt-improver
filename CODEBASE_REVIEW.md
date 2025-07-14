@@ -21,9 +21,7 @@ The following files were found in `docs/` with their last git modification dates
 - docs/developer/api_cleanup.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/developer/testingprompt.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/ml-tracking/PROGRESS_TRACKING_DASHBOARD.md: No git history
-- docs/archive/closure/CHANGELOG.md: Fri Jul 11 13:46:12 2025 +1000
-- docs/archive/closure/PROJECT_CLOSURE.md: Fri Jul 11 13:46:12 2025 +1000
-- docs/archive/closure/AUDIT_REPORT.md: Fri Jul 11 13:46:12 2025 +1000
+
 - docs/archive/README.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/archive/refactoring/refactoring_summary.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/archive/baselines/README.md: Fri Jul 11 13:46:12 2025 +1000
@@ -40,7 +38,6 @@ The following files were found in `docs/` with their last git modification dates
 - docs/user/MCP_SETUP.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/user/configuration.md: Fri Jul 11 13:46:12 2025 +1000
 - docs/user/INSTALLATION.md: Fri Jul 11 13:46:12 2025 +1000
-- docs/ARCHIVE_DISCOVERY_MAJOR_UPDATE.md: No git history
 - docs/README.md: Sat Jul 5 01:56:43 2025 +1000
 - docs/ml-components/01-statistical-analyzer.md: No git history
 - docs/ml-components/03-context-specific-learning.md: No git history
@@ -69,7 +66,7 @@ The following files were found in `docs/` with their last git modification dates
 - **ML Components**: docs/ml-components/* (8 files)
 - **ML Strategy/Deployment**: docs/ml-strategy/* (2), docs/ml-deployment/* (1), docs/ml-implementation/* (1), docs/ml-infrastructure/* (1), docs/ml-migration/* (1), docs/ml-tracking/* (1), docs/ml-data/* (1)
 - **Architecture/Reports**: docs/architecture/* (1), docs/reports/* (3), docs/project_overview.md, docs/roadmap2.0.md, docs/startup-orchestration.md
-- **Archive/Verification**: docs/archive/* (6), docs/VERIFICATION_REPORT.md, docs/ML_IMPLEMENTATION_VERIFICATION_SUMMARY.md, docs/test_failures_summary.md, docs/ARCHIVE_DISCOVERY_MAJOR_UPDATE.md
+- **Archive/Verification**: docs/archive/* (6), docs/ML_IMPLEMENTATION_VERIFICATION_SUMMARY.md, docs/test_failures_summary.md
 
 ### Code Analysis
 Main modules, classes, and functions identified in src/prompt_improver/ via semantic search:
@@ -86,7 +83,6 @@ Dependencies and relationships: Services integrate with ML, database, and rules.
 
 ### Cross-Reference Analysis
 - Documentation mentions components like MLModelService, which exists in code (verified via grep in src/prompt_improver/services/ml_integration.py:224).
-- Some docs (e.g., mcp-diagnostics-extension in project_layout) refer to subproject not central to main prompt-improver.
 - Discrepancies: project_overview.md claims specific line counts (e.g., CLI 3,045 lines) that don't match actual (2,946 lines per wc).
 - Duplicate topics: Multiple README.md files covering similar setup info.
 - References to non-existent features: Some ML components documented but not fully implemented per ML_IMPLEMENTATION_VERIFICATION_SUMMARY.md.
@@ -115,10 +111,7 @@ For each potential issue, performed multi-source verification:
    - Impact: High, core overview inaccurate.
    - Recommendation: Update with verified metrics.
 
-5. **mcp-diagnostics-extension/docs/**: Docs for subproject, mentions VS Code specific classes not in main src/.
-   - Verification: Classes like DiagnosticsWatcher not in main prompt-improver src/.
-   - Impact: Low if subproject active, but potentially redundant.
-   - Recommendation: If subproject deprecated, archive.
+
 
 ### Impact Assessment
 - No compliance/legal docs identified for preservation.

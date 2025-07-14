@@ -135,7 +135,15 @@ class TestTriggerOptimization:
         feedback_result.scalar_one_or_none.return_value = sample_user_feedback[0]
 
         perf_result = MagicMock()
-        perf_result.fetchall.return_value = sample_rule_performance
+        # Create proper Row-like objects that match the database query structure
+        # Query: select(RulePerformance, RuleMetadata.default_parameters)
+        mock_rows = []
+        for rule_perf in sample_rule_performance:
+            mock_row = MagicMock()
+            mock_row.RulePerformance = rule_perf
+            mock_row.default_parameters = {"weight": 1.0, "threshold": 0.7}
+            mock_rows.append(mock_row)
+        perf_result.fetchall.return_value = mock_rows
 
         mock_db_session.execute.side_effect = [feedback_result, perf_result]
 
@@ -166,7 +174,16 @@ class TestRunMLOptimization:
         """Test successful ML optimization run."""
         # Mock performance query result
         perf_result = MagicMock()
-        perf_result.fetchall.return_value = sample_rule_performance
+        # Create proper Row-like objects that match the database query structure
+        # Query: select(RulePerformance, RuleMetadata.default_parameters, RuleMetadata.priority)
+        mock_rows = []
+        for rule_perf in sample_rule_performance:
+            mock_row = MagicMock()
+            mock_row.RulePerformance = rule_perf
+            mock_row.default_parameters = {"weight": 1.0, "threshold": 0.7}
+            mock_row.priority = 5
+            mock_rows.append(mock_row)
+        perf_result.fetchall.return_value = mock_rows
         mock_db_session.execute.return_value = perf_result
 
         # Mock ML service success

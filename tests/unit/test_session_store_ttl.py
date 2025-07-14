@@ -375,10 +375,11 @@ class TestSessionStoreTTL:
 class SessionStoreStateMachine(RuleBasedStateMachine):
     """Stateful testing for SessionStore using Hypothesis."""
     
+    keys = Bundle('keys')
+    
     def __init__(self):
         super().__init__()
         self.store = SessionStore(maxsize=50, ttl=60)
-        self.keys = Bundle('keys')
         self.stored_keys = set()
     
     @rule(target=keys, key=st.text(min_size=1, max_size=20))

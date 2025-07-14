@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time A/B Testing Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .metric-card {
+            @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+        }
+        .alert-critical {
+            @apply bg-red-100 border-red-400 text-red-700;
+        }
+        .alert-warning {
+            @apply bg-yellow-100 border-yellow-400 text-yellow-700;
+        }
+        .alert-info {
+            @apply bg-blue-100 border-blue-400 text-blue-700;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-running { background-color: #10b981; }
+        .status-stopped { background-color: #ef4444; }
+        .status-pending { background-color: #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900">A/B Testing Dashboard</h1>
+                        <span class="ml-4 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                            <span class="status-indicator status-running"></span>
+                            <span id="connection-status">Connected</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <select id="experiment-selector" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Experiment...</option>
+                        </select>
+                        <button id="refresh-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Alerts Section -->
+            <div id="alerts-container" class="mb-8 hidden">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Active Alerts</h2>
+                <div id="alerts-list" class="space-y-3"></div>
+            </div>
+
+            <!-- Experiment Overview -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Status Card -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Experiment Status</p>
+                            <p id="experiment-status" class="text-2xl font-bold text-gray-900">-</p>
+                        </div>
+                        <div class="p-3 bg-indigo-100 rounded-full">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div id="progress-bar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="progress-text" class="text-sm text-gray-600 mt-2">0% Complete</p>
+                    </div>
+                </div>
+
+                <!-- Sample Sizes Card -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Sample Sizes</p>
+                            <p id="total-sample-size" class="text-2xl font-bold text-gray-900">0</p>
+                        </div>
+                        <div class="p-3 bg-green-100 rounded-full">
+                            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex justify-between mt-4 text-sm">
+                        <span class="text-gray-600">Control: <span id="control-size" class="font-medium">0</span></span>
+                        <span class="text-gray-600">Treatment: <span id="treatment-size" class="font-medium">0</span></span>
+                    </div>
+                </div>
+
+                <!-- Statistical Significance Card -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Statistical Significance</p>
+                            <p id="p-value" class="text-2xl font-bold text-gray-900">-</p>
+                        </div>
+                        <div id="significance-icon" class="p-3 bg-gray-100 rounded-full">
+                            <svg class="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="significance-status" class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                            Not Significant
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Effect Size Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Effect Size Over Time</h3>
+                    <canvas id="effect-size-chart" height="200"></canvas>
+                </div>
+
+                <!-- Confidence Interval Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Confidence Interval</h3>
+                    <canvas id="confidence-interval-chart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Detailed Metrics Table -->
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Detailed Metrics</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Control</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Treatment</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Difference</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">95% CI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metrics-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Early Stopping Section -->
+            <div id="early-stopping-section" class="metric-card mt-8 hidden">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Early Stopping Analysis</h3>
+                <div id="early-stopping-content"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript for Real-time Functionality -->
+    <script src="dashboard.js"></script>
+</body>
+</html>

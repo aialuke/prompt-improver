@@ -382,7 +382,9 @@ class TestIntegration:
         # Setup mocks for successful health checks
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar.side_effect = [0, 3]  # 0 long queries, 3 active connections
+        # Provide enough mock data for multiple health check calls
+        # Each database check needs 2 values: long queries count, active connections count
+        mock_result.scalar.side_effect = [0, 3, 0, 3, 0, 3, 0, 3]  # Multiple calls worth of data
         mock_session.execute.return_value = mock_result
         mock_get_session.return_value.__aenter__.return_value = mock_session
         
@@ -403,7 +405,8 @@ class TestIntegration:
         result = await service.run_health_check()
         
         assert result.overall_status == HealthStatus.HEALTHY
-        assert len(result.checks) == 5
+        # Health service includes 5 default checkers + QueueHealthChecker (6 total)
+        assert len(result.checks) == 6
         assert all(check.status != HealthStatus.FAILED for check in result.checks.values())
         
         # Test health summary
@@ -414,7 +417,7 @@ class TestIntegration:
         print(f"DEBUG: Result checks = {[(name, check.status) for name, check in result.checks.items()]}")
         print(f"DEBUG: Result failed checks = {result.failed_checks}")
         assert summary["overall_status"] == "healthy"
-        assert len(summary["checks"]) == 5
+        assert len(summary["checks"]) == 6
 
 
 if __name__ == "__main__":

@@ -150,19 +150,23 @@ class TestCausalDiscovery:
     @pytest.mark.asyncio
     async def test_pc_algorithm_application(self, insight_engine_causal, causal_performance_data):
         """Test PC algorithm for causal structure learning."""
+        # Skip test if causal-learn is not working due to compatibility issues
+        try:
+            from causallearn.search.ConstraintBased.PC import pc
+            causal_learn_available = True
+        except (ImportError, ModuleNotFoundError):
+            pytest.skip("causal-learn not available due to compatibility issues")
+            
         with patch('prompt_improver.learning.insight_engine.CAUSAL_DISCOVERY_AVAILABLE', True):
-            with patch('pgmpy.estimators.PC') as mock_pc, patch('networkx.DiGraph') as mock_digraph:
-                # Setup PC algorithm mock
-                mock_pc_instance = MagicMock()
-                mock_skeleton = MagicMock()
-                mock_separating_sets = {}
-                mock_dag = MagicMock()
-                mock_dag.edges.return_value = [("rule_avg_score", "context_avg_score"), 
-                                              ("context_avg_score", "system_overall_score")]
-                
-                mock_pc_instance.build_skeleton.return_value = (mock_skeleton, mock_separating_sets)
-                mock_pc_instance.skeleton_to_pdag.return_value = mock_dag
-                mock_pc.return_value = mock_pc_instance
+            with patch('causallearn.search.ConstraintBased.PC.pc') as mock_pc, patch('networkx.DiGraph') as mock_digraph:
+                # Setup PC algorithm mock for causal-learn
+                mock_cg = MagicMock()
+                mock_cg.G.graph = np.array([
+                    [0, 1, 0],  # rule_avg_score -> context_avg_score
+                    [-1, 0, 1], # context_avg_score -> system_overall_score
+                    [0, -1, 0]  # system_overall_score
+                ])
+                mock_pc.return_value = mock_cg
                 
                 # Setup NetworkX mock
                 mock_graph = MagicMock()
@@ -175,10 +179,10 @@ class TestCausalDiscovery:
                 
                 # Verify PC algorithm was called
                 if mock_pc.called:
-                    # Verify correct significance level
-                    call_args = mock_pc_instance.build_skeleton.call_args
-                    if call_args and "significance_level" in call_args[1]:
-                        assert call_args[1]["significance_level"] == insight_engine_causal.config.causal_significance_level
+                    # Verify correct significance level (alpha parameter)
+                    call_args = mock_pc.call_args
+                    if call_args and len(call_args[1]) > 0 and "alpha" in call_args[1]:
+                        assert call_args[1]["alpha"] == insight_engine_causal.config.causal_significance_level
 
     @pytest.mark.asyncio
     async def test_causal_data_preparation(self, insight_engine_causal, causal_performance_data):
@@ -518,8 +522,15 @@ class TestCausalDiscoveryErrorHandling:
     @pytest.mark.asyncio
     async def test_pc_algorithm_failure(self, insight_engine_causal, causal_performance_data):
         """Test handling of PC algorithm failures."""
+        # Skip test if causal-learn is not working due to compatibility issues
+        try:
+            from causallearn.search.ConstraintBased.PC import pc
+            causal_learn_available = True
+        except (ImportError, ModuleNotFoundError):
+            pytest.skip("causal-learn not available due to compatibility issues")
+            
         with patch('prompt_improver.learning.insight_engine.CAUSAL_DISCOVERY_AVAILABLE', True):
-            with patch('pgmpy.estimators.PC') as mock_pc:
+            with patch('causallearn.search.ConstraintBased.PC.pc') as mock_pc:
                 # Simulate PC algorithm failure
                 mock_pc.side_effect = Exception("PC algorithm failed")
                 

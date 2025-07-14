@@ -11,6 +11,9 @@ Requires-Dist: numpy>=1.24.0
 Requires-Dist: scipy>=1.10.0
 Requires-Dist: hdbscan>=0.8.29
 Requires-Dist: mlxtend>=0.23.0
+Requires-Dist: opacus>=1.4.0
+Requires-Dist: cryptography>=41.0.0
+Requires-Dist: adversarial-robustness-toolbox>=1.15.0
 Requires-Dist: sentence-transformers>=2.5.0
 Requires-Dist: transformers>=4.30.0
 Requires-Dist: mcp-context-sdk>=0.1.0
@@ -26,6 +29,7 @@ Requires-Dist: greenlet>=3.2.3
 Requires-Dist: aiosqlite>=0.19.0
 Requires-Dist: mcp>=1.10.1
 Requires-Dist: psutil>=5.8.0
+Requires-Dist: uvloop>=0.17.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.2.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"

@@ -12,7 +12,6 @@
 5. **Import Dependencies** - Missing package dependencies
 
 ### 1.2 Tools Used
-- **MCP IDE Diagnostics**: `getProblems()` - No issues detected in current workspace
 - **Python Syntax Check**: `python -m py_compile` - All target files compile successfully
 - **PyTest Test Suite**: Full test execution with detailed error reporting
 - **Manual Code Analysis**: Targeted searches for specific error patterns
@@ -82,7 +81,7 @@ sqlalchemy.exc.InvalidRequestError: Table 'rule_performance' is already defined 
 - **HDBSCAN and UMAP** - Line 30
 - **Opacus** (differential privacy) - Line 40
 - **Adversarial Robustness Toolbox** - Line 47
-- **Causal discovery libraries** (networkx, pgmpy) - Line 28
+- **Causal discovery libraries** (networkx, causal-learn) - Line 28
 
 #### 2.3.2 Deprecation Warnings
 - **Pydantic class-based config** - Use ConfigDict instead

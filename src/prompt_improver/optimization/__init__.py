@@ -9,12 +9,11 @@ for systematic improvement of prompt analysis rules, including:
 - Deployment decision support
 """
 
-from .advanced_ab_testing import AdvancedABTestingFramework
 from .rule_optimizer import RuleOptimizer
 from .optimization_validator import OptimizationValidator
+# Note: early_stopping and advanced_ab_testing should be imported directly to avoid circular imports
 
 __all__ = [
-    "AdvancedABTestingFramework",
-    "RuleOptimizer",
+    "RuleOptimizer", 
     "OptimizationValidator",
 ]

@@ -626,7 +626,7 @@ class TestMultiObjectiveErrorHandling:
         rule_id = "rule_gp_fail"
         
         with patch('prompt_improver.optimization.rule_optimizer.GAUSSIAN_PROCESS_AVAILABLE', True):
-            with patch('sklearn.gaussian_process.GaussianProcessRegressor') as mock_gpr:
+            with patch('prompt_improver.optimization.rule_optimizer.GaussianProcessRegressor') as mock_gpr:
                 
                 # Simulate GP failure
                 mock_gpr.side_effect = Exception("GP fitting failed")

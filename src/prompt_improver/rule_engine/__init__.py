@@ -1,13 +1,15 @@
-"""Rule Engine Module
-
-Provides the main RuleEngine class for orchestrating prompt improvement rules.
-"""
+"""Rule engine module for prompt improvement."""
 
 from dataclasses import dataclass
 from typing import Any
 
+from .base import BasePromptRule
 from .rules.clarity import ClarityRule
 from .rules.specificity import SpecificityRule
+from .rules.chain_of_thought import ChainOfThoughtRule
+from .rules.few_shot_examples import FewShotExampleRule
+from .rules.role_based_prompting import RoleBasedPromptingRule
+from .rules.xml_structure_enhancement import XMLStructureRule
 
 
 @dataclass
@@ -110,8 +112,12 @@ class RuleEngine:
 # Re-export main classes for convenience
 __all__ = [
     "AppliedRuleResult",
+    "ChainOfThoughtRule",
     "ClarityRule",
+    "FewShotExampleRule", 
+    "RoleBasedPromptingRule",
     "RuleEngine",
     "RuleEngineResult",
     "SpecificityRule",
+    "XMLStructureRule",
 ]

@@ -38,7 +38,7 @@ except ImportError:
     warnings.warn("Prometheus client not available. Install with: pip install prometheus-client")
 
 try:
-    import adversarial_robustness_toolbox as art
+    import art
     from art.attacks.evasion import FastGradientMethod
     from art.estimators.classification import SklearnClassifier
     ART_AVAILABLE = True

@@ -4,7 +4,7 @@ Provides prompt enhancement via Model Context Protocol with stdio transport.
 
 import asyncio
 import time
-from typing import Any
+from typing import Any, Optional
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
@@ -90,7 +90,7 @@ async def improve_prompt(
         default=None, description="Additional context"
     ),
     session_id: str | None = Field(default=None, description="Session ID for tracking"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Enhance a prompt using ML-optimized rules.
 
@@ -184,7 +184,7 @@ async def store_prompt(
     enhanced: str = Field(..., description="The enhanced prompt"),
     metrics: dict[str, Any] = Field(..., description="Success metrics"),
     session_id: str | None = Field(default=None, description="Session ID"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Store prompt interaction data for ML training.
 
@@ -224,7 +224,7 @@ async def store_prompt(
 @mcp.tool()
 async def get_session(
     session_id: str = Field(..., description="Session ID to retrieve"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Get session data by ID.
     
@@ -257,7 +257,7 @@ async def get_session(
 async def set_session(
     session_id: str = Field(..., description="Session ID to set"),
     data: dict[str, Any] = Field(..., description="Session data to store"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Set session data by ID.
     
@@ -286,7 +286,7 @@ async def set_session(
 @mcp.tool()
 async def touch_session(
     session_id: str = Field(..., description="Session ID to touch"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Touch session to extend its TTL.
     
@@ -318,7 +318,7 @@ async def touch_session(
 @mcp.tool()
 async def delete_session(
     session_id: str = Field(..., description="Session ID to delete"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Delete session by ID.
     
@@ -602,7 +602,7 @@ async def initialize_event_loop_optimization():
 async def benchmark_event_loop(
     operation_type: str = Field(default="sleep_yield", description="Type of benchmark operation"),
     samples: int = Field(default=100, description="Number of samples to collect"),
-    ctx: Context = None,
+    ctx: Optional[Context] = None,
 ) -> dict[str, Any]:
     """Run event loop benchmark to measure performance.
     

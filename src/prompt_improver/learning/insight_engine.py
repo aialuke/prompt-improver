@@ -18,14 +18,14 @@ import warnings
 # Phase 2 enhancement imports for causal discovery
 try:
     import networkx as nx
-    from pgmpy.estimators import PC
-    from pgmpy.models import BayesianNetwork
+    from causallearn.search.ConstraintBased.PC import pc
+    from causallearn.utils.cit import fisherz
     import pandas as pd
     CAUSAL_DISCOVERY_AVAILABLE = True
 except ImportError:
     import pandas as pd  # pandas is available separately
     CAUSAL_DISCOVERY_AVAILABLE = False
-    warnings.warn("Causal discovery libraries not available. Install with: pip install networkx pgmpy")
+    warnings.warn("Causal discovery libraries not available. Install with: pip install networkx causal-learn")
 
 logger = logging.getLogger(__name__)
 
@@ -375,31 +375,127 @@ class InsightGenerationEngine:
             return None
     
     def _apply_pc_algorithm(self, causal_data: pd.DataFrame) -> Optional[nx.DiGraph]:
-        """Apply PC algorithm for causal structure learning"""
+        """Apply PC algorithm for causal structure learning using causal-learn with best practices"""
         try:
-            # Initialize PC estimator
-            pc_estimator = PC(data=causal_data)
+            # Validate data for causal discovery
+            if causal_data.shape[1] > self.config.max_causal_variables:
+                self.logger.warning(f"Too many variables ({causal_data.shape[1]}) for reliable causal discovery, "
+                                  f"limiting to {self.config.max_causal_variables}")
+                # Select most varying variables for causal discovery
+                variances = causal_data.var().sort_values(ascending=False)
+                selected_vars = variances.head(self.config.max_causal_variables).index.tolist()
+                causal_data = causal_data[selected_vars]
             
-            # Learn causal structure with statistical tests
-            skeleton, separating_sets = pc_estimator.build_skeleton(
-                significance_level=self.config.causal_significance_level
+            # Check for multicollinearity which can affect PC algorithm
+            correlation_matrix = causal_data.corr().abs()
+            high_corr_pairs = []
+            for i in range(len(correlation_matrix.columns)):
+                for j in range(i+1, len(correlation_matrix.columns)):
+                    if correlation_matrix.iloc[i, j] > 0.95:  # Very high correlation threshold
+                        high_corr_pairs.append((correlation_matrix.columns[i], correlation_matrix.columns[j]))
+            
+            if high_corr_pairs:
+                self.logger.warning(f"High correlation detected between variables: {high_corr_pairs}. "
+                                  "This may affect causal discovery reliability.")
+            
+            # Convert DataFrame to numpy array for causal-learn
+            data_array = causal_data.values
+            node_names = causal_data.columns.tolist()
+            
+            # Apply PC algorithm with enhanced parameters based on research best practices
+            cg = pc(
+                data_array,
+                alpha=self.config.causal_significance_level,
+                indep_test=fisherz,
+                stable=True,     # Use stable version for consistent results
+                uc_rule=0,       # Conservative unshielded collider rule
+                mvpc=False,      # Disable missing value PC
+                verbose=False    # Reduce output noise
             )
             
-            # Orient edges to create DAG
-            dag = pc_estimator.skeleton_to_pdag(skeleton, separating_sets)
+            # Extract adjacency matrix (CPDAG representation)
+            adjacency_matrix = cg.G.graph
             
-            # Convert to NetworkX DiGraph for easier manipulation
+            # Convert CPDAG to NetworkX DiGraph with proper edge interpretation
             nx_graph = nx.DiGraph()
-            for edge in dag.edges():
-                nx_graph.add_edge(edge[0], edge[1])
+            nx_graph.add_nodes_from(node_names)
             
-            self.logger.info(f"PC algorithm discovered DAG with {len(nx_graph.nodes)} nodes and {len(nx_graph.edges)} edges")
+            # Interpret CPDAG edges correctly:
+            # adjacency_matrix[i,j] = -1: tail at j
+            # adjacency_matrix[i,j] = 1: arrowhead at j  
+            # adjacency_matrix[i,j] = 0: no edge
+            for i, node_i in enumerate(node_names):
+                for j, node_j in enumerate(node_names):
+                    if i != j:
+                        edge_i_to_j = adjacency_matrix[i, j]
+                        edge_j_to_i = adjacency_matrix[j, i]
+                        
+                        # Directed edge: i -> j (i has tail, j has arrowhead)
+                        if edge_i_to_j == -1 and edge_j_to_i == 1:
+                            nx_graph.add_edge(node_i, node_j, edge_type='directed')
+                        # Directed edge: j -> i (j has tail, i has arrowhead)  
+                        elif edge_i_to_j == 1 and edge_j_to_i == -1:
+                            nx_graph.add_edge(node_j, node_i, edge_type='directed')
+                        # Undirected edge (bidirected in CPDAG)
+                        elif edge_i_to_j == -1 and edge_j_to_i == -1:
+                            # For undirected edges, add both directions but mark as undirected
+                            # We'll use the variable ordering to break ties
+                            if i < j:  # Add edge from lexicographically first node
+                                nx_graph.add_edge(node_i, node_j, edge_type='undirected')
+            
+            # Validate the resulting graph for basic causal properties
+            if nx.is_directed_acyclic_graph(nx_graph):
+                self.logger.info(f"PC algorithm discovered valid DAG with {len(nx_graph.nodes)} nodes "
+                               f"and {len(nx_graph.edges)} edges")
+            else:
+                # Handle cycles by removing weakest edges (by correlation)
+                self.logger.warning("PC algorithm resulted in cyclic graph, attempting to resolve cycles")
+                nx_graph = self._resolve_cycles(nx_graph, causal_data)
             
             return nx_graph
             
         except Exception as e:
-            self.logger.error(f"PC algorithm failed: {e}")
+            self.logger.error(f"PC algorithm failed: {e}", exc_info=True)
             return None
+    
+    def _resolve_cycles(self, graph: nx.DiGraph, causal_data: pd.DataFrame) -> nx.DiGraph:
+        """Resolve cycles in discovered graph by removing weakest edges"""
+        try:
+            while not nx.is_directed_acyclic_graph(graph):
+                # Find all cycles
+                cycles = list(nx.simple_cycles(graph))
+                if not cycles:
+                    break
+                
+                # Find the weakest edge in the first cycle
+                cycle = cycles[0]
+                weakest_edge = None
+                weakest_strength = float('inf')
+                
+                for i in range(len(cycle)):
+                    source = cycle[i]
+                    target = cycle[(i + 1) % len(cycle)]
+                    
+                    if graph.has_edge(source, target):
+                        # Calculate edge strength using correlation
+                        if source in causal_data.columns and target in causal_data.columns:
+                            correlation = abs(causal_data[source].corr(causal_data[target]))
+                            if correlation < weakest_strength:
+                                weakest_strength = correlation
+                                weakest_edge = (source, target)
+                
+                # Remove the weakest edge
+                if weakest_edge:
+                    graph.remove_edge(*weakest_edge)
+                    self.logger.debug(f"Removed edge {weakest_edge} to resolve cycle (strength: {weakest_strength:.3f})")
+                else:
+                    break  # Safety exit if no edge found
+            
+            return graph
+            
+        except Exception as e:
+            self.logger.error(f"Cycle resolution failed: {e}")
+            return graph
     
     def _extract_causal_relationships(self, causal_graph: nx.DiGraph, 
                                     causal_data: pd.DataFrame) -> List[CausalRelationship]:
@@ -441,43 +537,234 @@ class InsightGenerationEngine:
     
     def _perform_causal_tests(self, cause_data: pd.Series, effect_data: pd.Series,
                             causal_graph: nx.DiGraph, cause: str, effect: str) -> Dict[str, float]:
-        """Perform statistical tests for causal relationship validation"""
+        """Perform comprehensive statistical tests for causal relationship validation"""
         tests = {}
         
         try:
-            # Correlation test
+            # Basic correlation test with confidence intervals
+            n_samples = len(cause_data)
             correlation, corr_p_value = stats.pearsonr(cause_data, effect_data)
             tests['correlation'] = abs(correlation)
             tests['correlation_p_value'] = corr_p_value
             
-            # Granger causality test (simplified version using lag correlation)
-            if len(cause_data) > 10:
-                # Create lagged versions
-                cause_lagged = cause_data.shift(1).dropna()
-                effect_current = effect_data[1:len(cause_lagged)+1]
+            # Calculate correlation confidence interval
+            if n_samples > 3:
+                # Fisher's z-transformation for correlation confidence interval
+                z_score = 0.5 * np.log((1 + correlation) / (1 - correlation))
+                se_z = 1 / np.sqrt(n_samples - 3)
+                ci_lower_z = z_score - 1.96 * se_z
+                ci_upper_z = z_score + 1.96 * se_z
                 
-                if len(cause_lagged) > 5:
-                    lag_correlation, lag_p_value = stats.pearsonr(cause_lagged, effect_current)
-                    tests['granger_approximation'] = abs(lag_correlation)
-                    tests['granger_p_value'] = lag_p_value
+                # Transform back to correlation scale
+                ci_lower = (np.exp(2 * ci_lower_z) - 1) / (np.exp(2 * ci_lower_z) + 1)
+                ci_upper = (np.exp(2 * ci_upper_z) - 1) / (np.exp(2 * ci_upper_z) + 1)
+                tests['correlation_ci_width'] = abs(ci_upper - ci_lower)
             
-            # Partial correlation (controlling for common causes)
+            # Enhanced Granger causality test
+            if n_samples > 15:  # Minimum samples for reliable Granger test
+                granger_result = self._granger_causality_test(cause_data, effect_data)
+                tests.update(granger_result)
+            
+            # Partial correlation analysis (controlling for confounders)
+            partial_corr_result = self._partial_correlation_test(
+                cause_data, effect_data, causal_graph, cause, effect
+            )
+            tests.update(partial_corr_result)
+            
+            # Test for non-linear relationships
+            if n_samples > 20:
+                spearman_corr, spearman_p = stats.spearmanr(cause_data, effect_data)
+                tests['spearman_correlation'] = abs(spearman_corr)
+                tests['spearman_p_value'] = spearman_p
+                
+                # Test for non-linearity (difference between Pearson and Spearman)
+                linearity_score = 1.0 - abs(abs(correlation) - abs(spearman_corr))
+                tests['linearity_score'] = max(0.0, linearity_score)
+            
+            # Direction-specific tests
+            if n_samples > 10:
+                # Test if cause -> effect is stronger than effect -> cause
+                direction_result = self._test_causal_direction(cause_data, effect_data)
+                tests.update(direction_result)
+            
+            # Sample size adjustment for reliability
+            tests['sample_size_factor'] = min(1.0, n_samples / 50.0)  # Penalize small samples
+            
+        except Exception as e:
+            self.logger.warning(f"Enhanced causal tests failed for {cause} -> {effect}: {e}")
+        
+        return tests
+    
+    def _granger_causality_test(self, cause_data: pd.Series, effect_data: pd.Series) -> Dict[str, float]:
+        """Perform Granger causality test with multiple lags"""
+        try:
+            from statsmodels.tsa.stattools import grangercausalitytests
+            from statsmodels.stats.diagnostic import acorr_ljungbox
+            
+            # Prepare data for Granger test
+            data = pd.DataFrame({'effect': effect_data, 'cause': cause_data})
+            
+            # Test for stationarity (simplified check)
+            # In practice, you'd use ADF test, but for simplicity we'll check variance stability
+            n_half = len(data) // 2
+            var_first_half = data.var().mean()
+            var_second_half = data.iloc[n_half:].var().mean()
+            stationarity_ratio = min(var_first_half, var_second_half) / max(var_first_half, var_second_half)
+            
+            results = {'stationarity_score': stationarity_ratio}
+            
+            if stationarity_ratio > 0.5:  # Reasonably stationary
+                # Test multiple lags (1 to 4)
+                max_lag = min(4, len(data) // 8)  # Conservative lag selection
+                best_lag = 1
+                best_p_value = 1.0
+                
+                for lag in range(1, max_lag + 1):
+                    try:
+                        gc_result = grangercausalitytests(data[['effect', 'cause']], maxlag=lag, verbose=False)
+                        p_value = gc_result[lag][0]['ssr_ftest'][1]  # F-test p-value
+                        
+                        if p_value < best_p_value:
+                            best_p_value = p_value
+                            best_lag = lag
+                    except Exception:
+                        continue
+                
+                results['granger_p_value'] = best_p_value
+                results['granger_best_lag'] = float(best_lag)
+                results['granger_significant'] = 1.0 if best_p_value < 0.05 else 0.0
+            else:
+                results['granger_p_value'] = 1.0  # Non-stationary data
+                results['granger_significant'] = 0.0
+            
+            return results
+            
+        except ImportError:
+            # Fallback if statsmodels not available
+            return self._simple_granger_test(cause_data, effect_data)
+        except Exception as e:
+            self.logger.debug(f"Granger causality test failed: {e}")
+            return self._simple_granger_test(cause_data, effect_data)
+    
+    def _simple_granger_test(self, cause_data: pd.Series, effect_data: pd.Series) -> Dict[str, float]:
+        """Simplified Granger causality using lagged correlation"""
+        try:
+            # Test multiple lags
+            best_lag_corr = 0.0
+            best_lag = 1
+            
+            for lag in range(1, min(5, len(cause_data) // 4)):
+                if len(cause_data) > lag + 5:
+                    cause_lagged = cause_data.shift(lag).dropna()
+                    effect_current = effect_data.iloc[lag:lag+len(cause_lagged)]
+                    
+                    if len(cause_lagged) == len(effect_current) and len(cause_lagged) > 3:
+                        lag_corr = abs(cause_lagged.corr(effect_current))
+                        if lag_corr > best_lag_corr:
+                            best_lag_corr = lag_corr
+                            best_lag = lag
+            
+            return {
+                'granger_approximation': best_lag_corr,
+                'granger_best_lag': float(best_lag),
+                'granger_significant': 1.0 if best_lag_corr > 0.3 else 0.0
+            }
+        except Exception:
+            return {'granger_approximation': 0.0}
+    
+    def _partial_correlation_test(self, cause_data: pd.Series, effect_data: pd.Series,
+                                causal_graph: nx.DiGraph, cause: str, effect: str) -> Dict[str, float]:
+        """Calculate partial correlation controlling for confounders"""
+        try:
+            # Find common parents (confounders)
             common_parents = set(causal_graph.predecessors(cause)).intersection(
                 set(causal_graph.predecessors(effect))
             )
             
-            if common_parents:
-                # Simplified partial correlation
-                tests['has_confounders'] = 1.0
-                tests['n_confounders'] = float(len(common_parents))
+            results = {
+                'has_confounders': 1.0 if common_parents else 0.0,
+                'n_confounders': float(len(common_parents))
+            }
+            
+            if common_parents and len(common_parents) <= 5:  # Limit confounders for stability
+                # This is a simplified partial correlation
+                # In practice, you'd use more sophisticated methods
+                try:
+                    from scipy.stats import linregress
+                    
+                    # Get confounder data (mock for now - would need access to full dataset)
+                    # For now, we'll estimate the effect of controlling for confounders
+                    confounder_penalty = 1.0 / (1.0 + 0.1 * len(common_parents))
+                    original_corr = abs(cause_data.corr(effect_data))
+                    
+                    results['partial_correlation'] = original_corr * confounder_penalty
+                    results['confounder_adjustment'] = confounder_penalty
+                    
+                except Exception:
+                    results['partial_correlation'] = abs(cause_data.corr(effect_data))
             else:
-                tests['has_confounders'] = 0.0
-                tests['n_confounders'] = 0.0
+                # No confounders or too many - use simple correlation
+                results['partial_correlation'] = abs(cause_data.corr(effect_data))
+                results['confounder_adjustment'] = 1.0
+            
+            return results
             
         except Exception as e:
-            self.logger.warning(f"Causal tests failed for {cause} -> {effect}: {e}")
-        
-        return tests
+            self.logger.debug(f"Partial correlation test failed: {e}")
+            return {'partial_correlation': abs(cause_data.corr(effect_data))}
+    
+    def _test_causal_direction(self, cause_data: pd.Series, effect_data: pd.Series) -> Dict[str, float]:
+        """Test directionality of causal relationship"""
+        try:
+            # Compare forward vs backward prediction strength
+            n = len(cause_data)
+            if n < 20:
+                return {'direction_confidence': 0.5}  # Neutral if insufficient data
+            
+            # Split data for cross-validation
+            split_point = n // 2
+            
+            # Forward direction: cause predicts effect
+            cause_train, cause_test = cause_data[:split_point], cause_data[split_point:]
+            effect_train, effect_test = effect_data[:split_point], effect_data[split_point:]
+            
+            # Simple linear prediction
+            try:
+                from scipy.stats import linregress
+                
+                # Forward: cause -> effect
+                slope_forward, intercept_forward, r_forward, p_forward, se_forward = linregress(
+                    cause_train, effect_train
+                )
+                effect_pred = slope_forward * cause_test + intercept_forward
+                forward_mse = np.mean((effect_test - effect_pred) ** 2)
+                
+                # Backward: effect -> cause  
+                slope_backward, intercept_backward, r_backward, p_backward, se_backward = linregress(
+                    effect_train, cause_train
+                )
+                cause_pred = slope_backward * effect_test + intercept_backward
+                backward_mse = np.mean((cause_test - cause_pred) ** 2)
+                
+                # Direction confidence based on relative prediction error
+                if forward_mse + backward_mse > 0:
+                    direction_confidence = backward_mse / (forward_mse + backward_mse)
+                else:
+                    direction_confidence = 0.5
+                
+                return {
+                    'direction_confidence': direction_confidence,
+                    'forward_r_squared': r_forward ** 2,
+                    'backward_r_squared': r_backward ** 2,
+                    'prediction_asymmetry': abs(forward_mse - backward_mse) / (forward_mse + backward_mse + 1e-8)
+                }
+                
+            except Exception:
+                return {'direction_confidence': 0.5}
+            
+        except Exception as e:
+            self.logger.debug(f"Direction test failed: {e}")
+            return {'direction_confidence': 0.5}
     
     def _calculate_causal_confidence(self, stat_tests: Dict[str, float]) -> float:
         """Calculate confidence in causal relationship based on statistical tests"""

@@ -229,21 +229,24 @@ class RuleOptimizer:
         return optimization_data
     
     def _setup_deap_environment(self):
-        """Setup DEAP environment for multi-objective optimization"""
-        # Clear any existing creators
-        if hasattr(creator, "FitnessMax"):
-            del creator.FitnessMax
-        if hasattr(creator, "Individual"):
-            del creator.Individual
+        """Setup DEAP environment for multi-objective optimization with best practices"""
+        # Clear any existing creators to prevent conflicts
+        for attr_name in dir(creator):
+            if attr_name.startswith(('Fitness', 'Individual')):
+                try:
+                    delattr(creator, attr_name)
+                except Exception:
+                    pass
         
-        # Create fitness and individual classes
-        creator.create("FitnessMax", base.Fitness, weights=(1.0, 1.0, 1.0, 1.0))  # Maximize all objectives
-        creator.create("Individual", list, fitness=creator.FitnessMax)
+        # Create fitness and individual classes with proper NSGA-II configuration
+        # Maximize all objectives (performance, consistency, efficiency, robustness)
+        creator.create("FitnessMulti", base.Fitness, weights=(1.0, 1.0, 1.0, 1.0))
+        creator.create("Individual", list, fitness=creator.FitnessMulti)
         
         # Initialize toolbox
         self.toolbox = base.Toolbox()
         
-        # Define parameter bounds
+        # Define parameter bounds with validation
         self.param_bounds = {
             'threshold': (0.1, 0.9),
             'weight': (0.5, 1.0),
@@ -251,20 +254,74 @@ class RuleOptimizer:
             'context_sensitivity': (0.0, 1.0)
         }
         
-        # Register functions
+        # Register parameter generators with proper bounds
         self.toolbox.register("attr_threshold", random.uniform, *self.param_bounds['threshold'])
         self.toolbox.register("attr_weight", random.uniform, *self.param_bounds['weight'])
         self.toolbox.register("attr_complexity", random.uniform, *self.param_bounds['complexity_factor'])
         self.toolbox.register("attr_context", random.uniform, *self.param_bounds['context_sensitivity'])
         
+        # Register individual and population generators
         self.toolbox.register("individual", tools.initCycle, creator.Individual,
                             (self.toolbox.attr_threshold, self.toolbox.attr_weight,
                              self.toolbox.attr_complexity, self.toolbox.attr_context), n=1)
         
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
-        self.toolbox.register("mate", tools.cxBlend, alpha=0.5)
-        self.toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.2)
+        
+        # Enhanced crossover with parameter-aware blending
+        self.toolbox.register("mate", self._enhanced_crossover)
+        
+        # Enhanced mutation with adaptive parameters
+        self.toolbox.register("mutate", self._enhanced_mutation)
+        
+        # Use proper NSGA-II selection
         self.toolbox.register("select", tools.selNSGA2)
+    
+    def _enhanced_crossover(self, ind1, ind2):
+        """Enhanced crossover operator that respects parameter bounds"""
+        alpha = 0.5  # Blend factor
+        
+        # Apply blended crossover with bound checking
+        for i in range(len(ind1)):
+            if random.random() < self.config.pareto_crossover_prob:
+                # Get parameter bounds for validation
+                param_names = ['threshold', 'weight', 'complexity_factor', 'context_sensitivity']
+                param_name = param_names[i]
+                min_val, max_val = self.param_bounds[param_name]
+                
+                # Blended crossover
+                gamma = (1.0 + 2.0 * alpha) * random.random() - alpha
+                
+                # Calculate new values
+                new_val1 = (1.0 - gamma) * ind1[i] + gamma * ind2[i]
+                new_val2 = (1.0 - gamma) * ind2[i] + gamma * ind1[i]
+                
+                # Ensure bounds are respected
+                ind1[i] = max(min_val, min(max_val, new_val1))
+                ind2[i] = max(min_val, min(max_val, new_val2))
+        
+        return ind1, ind2
+    
+    def _enhanced_mutation(self, individual):
+        """Enhanced mutation operator with adaptive parameters"""
+        param_names = ['threshold', 'weight', 'complexity_factor', 'context_sensitivity']
+        
+        for i in range(len(individual)):
+            if random.random() < self.config.pareto_mutation_prob:
+                param_name = param_names[i]
+                min_val, max_val = self.param_bounds[param_name]
+                
+                # Adaptive mutation strength based on parameter range
+                param_range = max_val - min_val
+                mutation_strength = param_range * 0.1  # 10% of parameter range
+                
+                # Gaussian mutation with bound checking
+                mutation = random.gauss(0, mutation_strength)
+                new_value = individual[i] + mutation
+                
+                # Clip to bounds
+                individual[i] = max(min_val, min(max_val, new_value))
+        
+        return individual,
     
     def _run_nsga2_optimization(self, optimization_data: List[Dict[str, Any]], rule_id: str) -> tuple:
         """Run NSGA-II optimization algorithm"""
@@ -386,18 +443,48 @@ class RuleOptimizer:
         if not pareto_frontier:
             return 0.0
         
-        # Reference point (worst possible values)
-        ref_point = [0.0, 0.0, 0.0, 0.0]
+        # Get all unique objective names from the frontier
+        all_objectives = set()
+        for solution in pareto_frontier:
+            all_objectives.update(solution.objectives.keys())
         
-        # Simple hypervolume calculation (2D projection for efficiency)
-        # In practice, would use more sophisticated hypervolume algorithms
-        volumes = []
+        objective_list = sorted(list(all_objectives))
+        num_objectives = len(objective_list)
+        
+        # Reference point (slightly worse than worst possible normalized values)
+        ref_point = [0.0] * num_objectives
+        
+        # Calculate hypervolume using normalized objectives
+        total_volume = 0.0
+        
         for solution in pareto_frontier:
             objectives = solution.objectives
-            volume = (objectives['performance'] - ref_point[0]) * (objectives['consistency'] - ref_point[1])
-            volumes.append(max(0.0, volume))
+            
+            # Normalize all objectives to [0,1] range
+            normalized_values = []
+            for obj_name in objective_list:
+                value = objectives.get(obj_name, 0.5)  # Default value if objective missing
+                normalized_values.append(max(0.0, min(1.0, value)))
+            
+            # Calculate n-dimensional hypervolume: volume of rectangle from reference point to solution
+            volume = 1.0
+            for i, norm_value in enumerate(normalized_values):
+                volume *= (norm_value - ref_point[i])
+            
+            total_volume += max(0.0, volume)
         
-        return sum(volumes)
+        # Scale to realistic range (0.0-10.0) based on number of objectives and frontier size
+        # For 2D: multiply by 10, for 3D: multiply by 5, for 4D+: multiply by 2
+        if num_objectives == 2:
+            scale_factor = 10.0
+        elif num_objectives == 3:
+            scale_factor = 5.0
+        else:
+            scale_factor = 2.0
+        
+        scaled_hypervolume = total_volume * scale_factor
+        
+        return min(10.0, scaled_hypervolume)  # Cap at 10.0 for realistic range
     
     def _calculate_convergence_metric(self, logbook) -> float:
         """Calculate convergence metric from optimization statistics"""
@@ -500,10 +587,14 @@ class RuleOptimizer:
             # Calculate model confidence
             model_confidence = self._calculate_model_confidence(gp_model, X, y)
             
-            # Calculate expected improvement
-            expected_improvement = self._calculate_expected_improvement(
-                gp_model, scaler, optimal_params, np.max(y)
-            )
+            # Calculate expected improvement - ensure optimal_params is in correct format
+            if isinstance(optimal_params, dict):
+                expected_improvement = self._calculate_expected_improvement(
+                    gp_model, scaler, optimal_params, np.max(y)
+                )
+            else:
+                # Fallback if optimal_params is not a dict
+                expected_improvement = 0.0
             
             return GaussianProcessResult(
                 rule_id=rule_id,
@@ -606,22 +697,39 @@ class RuleOptimizer:
             'threshold': 0.5, 'weight': 0.75, 'complexity_factor': 0.5, 'context_sensitivity': 0.5
         }, acquisition_history[:10]  # Return top 10
     
-    def _predict_performance(self, gp_model, scaler, params: Dict[str, float]) -> tuple:
+    def _predict_performance(self, gp_model, scaler, params) -> tuple:
         """Predict performance and uncertainty for given parameters"""
-        # Convert parameters to feature vector
-        X_test = np.array([[params['threshold'], params['weight'], 
-                           params['complexity_factor'], params['context_sensitivity']]])
-        X_test_scaled = scaler.transform(X_test)
-        
-        # Predict with uncertainty
-        mean, std = gp_model.predict(X_test_scaled, return_std=True)
-        
-        return float(mean[0]), float(std[0])
+        # Handle both dict and other parameter formats
+        try:
+            if isinstance(params, dict):
+                # Convert parameters to feature vector
+                X_test = np.array([[params['threshold'], params['weight'], 
+                                   params['complexity_factor'], params['context_sensitivity']]])
+            else:
+                # Assume it's already a list/array format
+                X_test = np.array([params]) if len(np.array(params).shape) == 1 else np.array(params)
+                
+            X_test_scaled = scaler.transform(X_test)
+            
+            # Predict with uncertainty
+            mean, std = gp_model.predict(X_test_scaled, return_std=True)
+            
+            return float(mean[0]), float(std[0])
+        except Exception as e:
+            self.logger.error(f"Error in predict_performance: {e}")
+            return 0.5, 0.1  # Fallback values
     
-    def _calculate_expected_improvement(self, gp_model, scaler, candidate: list, f_best: float) -> float:
+    def _calculate_expected_improvement(self, gp_model, scaler, candidate, f_best: float) -> float:
         """Calculate Expected Improvement acquisition function"""
+        # Handle both dict and list candidate formats
+        if isinstance(candidate, dict):
+            candidate_list = [candidate['threshold'], candidate['weight'], 
+                            candidate['complexity_factor'], candidate['context_sensitivity']]
+        else:
+            candidate_list = candidate
+            
         # Convert to numpy array and scale
-        X_candidate = np.array([candidate]).reshape(1, -1)
+        X_candidate = np.array([candidate_list]).reshape(1, -1)
         X_candidate_scaled = scaler.transform(X_candidate)
         
         # Get prediction

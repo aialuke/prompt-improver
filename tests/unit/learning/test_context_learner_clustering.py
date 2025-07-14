@@ -288,7 +288,7 @@ class TestAdvancedClustering:
             use_advanced_clustering=False,
             min_sample_size=10
         )
-        engine = ContextSpecificLearningEngine(config=config)
+        engine = ContextSpecificLearner(config=config)
         
         data = [
             {
@@ -321,17 +321,24 @@ class TestAdvancedClustering:
         config = ContextConfig(
             use_advanced_clustering=True,
             umap_n_components=n_components,
+            umap_n_neighbors=15,  # Default from config
             min_sample_size=10
         )
-        engine = ContextSpecificLearningEngine(config=config)
+        engine = ContextSpecificLearner(config=config)
         
         data, _ = high_dimensional_data
         
         with patch('prompt_improver.learning.context_learner.ADVANCED_CLUSTERING_AVAILABLE', True):
             with patch('umap.UMAP') as mock_umap:
                 mock_reducer = MagicMock()
-                # Return appropriate dimensions
-                mock_reducer.fit_transform.return_value = np.random.random((len(data), n_components))
+                # Calculate expected adjusted n_components based on implementation logic
+                n_samples = len(data)
+                n_features = len(data[0]['features']) if data and 'features' in data[0] else 20  # fallback
+                adjusted_n_neighbors = min(config.umap_n_neighbors, max(2, n_samples // 3))
+                expected_n_components = min(n_components, n_features, adjusted_n_neighbors - 1)
+                
+                # Return appropriate dimensions using expected value
+                mock_reducer.fit_transform.return_value = np.random.random((len(data), expected_n_components))
                 mock_umap.return_value = mock_reducer
                 
                 context_data = {
@@ -345,10 +352,15 @@ class TestAdvancedClustering:
                 
                 result = await engine.analyze_context_effectiveness(context_data)
                 
-                # Verify UMAP was called with correct n_components
+                # Verify UMAP was called with intelligently adjusted n_components
                 mock_umap.assert_called_once()
                 call_kwargs = mock_umap.call_args[1]
-                assert call_kwargs["n_components"] == n_components
+                assert call_kwargs["n_components"] == expected_n_components
+                
+                # Verify the adjusted value is sensible
+                assert call_kwargs["n_components"] <= n_components  # Should not exceed requested
+                assert call_kwargs["n_components"] >= 2  # Should be at least 2
+                assert call_kwargs["n_components"] <= n_features  # Should not exceed feature count
 
     @pytest.mark.asyncio
     async def test_clustering_quality_threshold(self):
@@ -358,7 +370,7 @@ class TestAdvancedClustering:
             clustering_quality_threshold=0.8,  # High threshold
             min_sample_size=10
         )
-        engine = ContextSpecificLearningEngine(config=config)
+        engine = ContextSpecificLearner(config=config)
         
         test_data = [{"features": [0.5] * 5, "score": 0.7}] * 20
         
@@ -452,7 +464,7 @@ class TestClusteringErrorHandling:
         config = ContextConfig(use_advanced_clustering=True)
         
         with patch('prompt_improver.learning.context_learner.ADVANCED_CLUSTERING_AVAILABLE', False):
-            engine = ContextSpecificLearningEngine(config=config)
+            engine = ContextSpecificLearner(config=config)
             
             test_data = [{"features": [0.5, 0.6], "score": 0.8}] * 15
             
@@ -482,7 +494,7 @@ class TestClusteringErrorHandling:
             hdbscan_min_samples=1,
             umap_n_components=1  # Minimal dimensionality
         )
-        engine = ContextSpecificLearningEngine(config=config)
+        engine = ContextSpecificLearner(config=config)
         
         test_data = [{"features": [0.5, 0.6, 0.7], "score": 0.8}] * 10
         

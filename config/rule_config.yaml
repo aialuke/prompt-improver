@@ -1,31 +1,244 @@
-# Rule Engine Configuration
-# -------------------------
-# This file controls which prompt improvement rules are active.
-# The rule engine will dynamically load and apply only the rules marked as 'enabled: true'.
+# Prompt Engineering Rule Configuration
+# Based on Research Synthesis from Anthropic, OpenAI, and Advanced Techniques
+# Last Updated: 2025-01-12
 
-# Each key under 'rules' should correspond to a rule class name in the `src/prompt_improver/rule_engine/rules/` directory.
+metadata:
+  version: "1.0.0"
+  description: "Research-validated prompt engineering rules for APES system"
+  research_sources:
+    - "Anthropic Claude Documentation"
+    - "OpenAI Best Practices"
+    - "AWS Prompt Engineering Guide"
+    - "PromptHub Research"
+    - "Academic CoT Papers"
+  total_rules: 6
 
+# Research-Validated Rule Configurations
 rules:
-  # Core Rules - Fundamental improvements for clarity and structure.
-  ClarityRule:
-    enabled: true
-    priority: 1
-  StructureRule:
-    enabled: true
-    priority: 2
-  
-  # Technique Rules - Advanced prompt engineering techniques.
-  ChainOfThoughtRule:
+  clarity_enhancement:
+    name: "Clarity Enhancement Rule"
+    category: "fundamental"
+    description: "Improves prompt clarity using research-validated patterns from Anthropic and OpenAI documentation"
     enabled: true
     priority: 10
+    research_foundation:
+      - "Anthropic XML structure optimization"
+      - "OpenAI specificity patterns"
+      - "AWS success criteria guidelines"
     params:
-      steps: 5 # Default number of reasoning steps
-      
-  FewShotLearningRule:
-    enabled: false # Disabled by default, requires example configuration
-    priority: 11
+      min_clarity_score: 0.7
+      sentence_complexity_threshold: 20
+      use_structured_xml: true
+      apply_specificity_patterns: true
+      add_success_criteria: true
+      context_placement_priority: "before_examples"
+      vague_word_detection: true
+      measurable_outcome_enforcement: true
+    constraints:
+      min_clarity_score:
+        min: 0.0
+        max: 1.0
+        description: "Minimum clarity score threshold (0-1)"
+      sentence_complexity_threshold:
+        min: 10
+        max: 50
+        description: "Maximum sentence complexity allowed"
+    effectiveness_metrics:
+      - "clarity_score_improvement"
+      - "vague_language_reduction"
+      - "specific_outcome_presence"
+
+  chain_of_thought:
+    name: "Chain of Thought Reasoning Rule"
+    category: "reasoning"
+    description: "Implements step-by-step reasoning patterns based on CoT research across multiple LLM providers"
+    enabled: true
+    priority: 8
+    research_foundation:
+      - "OpenAI Chain-of-Thought research"
+      - "Zero-shot CoT techniques"
+      - "NeurIPS CoT papers"
+      - "Structured thinking patterns"
+    params:
+      enable_step_by_step: true
+      use_thinking_tags: true
+      min_reasoning_steps: 3
+      encourage_explicit_reasoning: true
+      zero_shot_trigger: "Let's think step by step"
+      use_structured_response: true
+      reasoning_quality_check: true
+      logical_flow_validation: true
+    constraints:
+      min_reasoning_steps:
+        min: 1
+        max: 10
+        description: "Minimum number of reasoning steps required"
+    effectiveness_metrics:
+      - "reasoning_step_count"
+      - "logical_coherence_score"
+      - "step_by_step_clarity"
+
+  few_shot_examples:
+    name: "Few-Shot Example Integration Rule"
+    category: "examples"
+    description: "Incorporates 2-5 optimal examples based on research from PromptHub and OpenAI documentation"
+    enabled: true
+    priority: 7
+    research_foundation:
+      - "Brown et al. (2020) few-shot learning"
+      - "PromptHub example optimization"
+      - "IBM research on example diversity"
+      - "Recency bias studies"
+    params:
+      optimal_example_count: 3
+      require_diverse_examples: true
+      include_negative_examples: true
+      use_xml_delimiters: true
+      example_placement: "after_context"
+      recency_bias_optimization: true
+      domain_specific_examples: true
+      format_consistency_check: true
+    constraints:
+      optimal_example_count:
+        min: 2
+        max: 5
+        description: "Research-optimized example count (2-5 optimal)"
+    effectiveness_metrics:
+      - "example_diversity_score"
+      - "format_consistency"
+      - "task_completion_improvement"
+
+  role_based_prompting:
+    name: "Expert Role Assignment Rule"
+    category: "context"
+    description: "Assigns appropriate expert personas based on Anthropic best practices for role-based prompting"
+    enabled: true
+    priority: 6
+    research_foundation:
+      - "Anthropic role-based prompting"
+      - "Expert persona research"
+      - "Domain-specific expertise studies"
+    params:
+      auto_detect_domain: true
+      use_system_prompts: true
+      maintain_persona_consistency: true
+      expertise_depth: "senior_level"
+      include_credentials: true
+      domain_knowledge_depth: "expert"
+      persona_voice_consistency: true
+    constraints:
+      expertise_depth:
+        values: ["junior", "mid_level", "senior_level", "expert"]
+        description: "Level of expertise to assign to persona"
+    effectiveness_metrics:
+      - "domain_accuracy_score"
+      - "persona_consistency"
+      - "expert_knowledge_application"
+
+  xml_structure_enhancement:
+    name: "XML Structure Enhancement Rule"
+    category: "structure"
+    description: "Implements XML tagging patterns recommended by Anthropic for Claude optimization"
+    enabled: true
+    priority: 5
+    research_foundation:
+      - "Anthropic XML optimization guide"
+      - "Claude-specific structuring patterns"
+      - "Structured prompt organization"
+    params:
+      use_context_tags: true
+      use_instruction_tags: true
+      use_example_tags: true
+      use_thinking_tags: true
+      use_response_tags: true
+      nested_structure_allowed: true
+      attribute_usage: "minimal"
+      tag_hierarchy_enforcement: true
+    constraints:
+      attribute_usage:
+        values: ["none", "minimal", "moderate", "extensive"]
+        description: "Level of XML attribute usage"
+    effectiveness_metrics:
+      - "structure_clarity_score"
+      - "xml_validity"
+      - "parsing_efficiency"
+
+  specificity_enhancement:
+    name: "Specificity and Detail Rule"
+    category: "fundamental"
+    description: "Reduces vague language and increases prompt specificity using multi-source research patterns"
+    enabled: true
+    priority: 9
+    research_foundation:
+      - "Multi-source specificity research"
+      - "Vague language detection studies"
+      - "Measurable outcome frameworks"
+    params:
+      vague_language_threshold: 0.3
+      require_specific_outcomes: true
+      include_success_criteria: true
+      enforce_measurable_goals: true
+      specificity_patterns: 
+        - "who_what_when_where"
+        - "concrete_examples"
+        - "quantifiable_metrics"
+      avoid_hedge_words: true
+      concrete_noun_preference: true
+      action_verb_specificity: true
+    constraints:
+      vague_language_threshold:
+        min: 0.0
+        max: 1.0
+        description: "Maximum allowed vague language ratio"
+    effectiveness_metrics:
+      - "specificity_score"
+      - "vague_language_ratio"
+      - "measurable_goal_presence"
+
+# Global Configuration
+global_settings:
+  rule_application_order: "priority_desc"
+  parallel_rule_processing: true
+  cache_rule_results: true
+  cache_ttl_seconds: 300
+  performance_monitoring: true
+  ml_optimization_enabled: true
+  ab_testing_enabled: true
+
+# Integration Settings
+integration:
+  database:
+    auto_sync: true
+    conflict_resolution: "database_wins"
+    backup_before_sync: true
+  
+  ml_optimization:
+    parameter_tuning_enabled: true
+    optimization_frequency: "weekly"
+    performance_threshold: 0.8
     
-  # Learned Rules - Rules discovered and promoted by the ML optimizer.
-  LearnedRepetitionPenaltyRule:
-    enabled: false
-    priority: 100 
+  monitoring:
+    track_rule_effectiveness: true
+    track_parameter_impact: true
+    track_user_satisfaction: true
+    
+# Performance Baselines (Research-Based)
+performance_baselines:
+  clarity_enhancement:
+    expected_improvement: 0.25
+    min_confidence: 0.8
+  chain_of_thought:
+    expected_improvement: 0.30
+    min_confidence: 0.85
+  few_shot_examples:
+    expected_improvement: 0.20
+    min_confidence: 0.75
+  role_based_prompting:
+    expected_improvement: 0.15
+    min_confidence: 0.70
+  xml_structure_enhancement:
+    expected_improvement: 0.10
+    min_confidence: 0.80
+  specificity_enhancement:
+    expected_improvement: 0.35
+    min_confidence: 0.90 

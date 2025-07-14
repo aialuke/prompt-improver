@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typer.testing import CliRunner
 
 from prompt_improver.database.models import (
@@ -100,7 +99,7 @@ async def test_db_engine():
         pytest.skip("Could not create test database")
 
     # Now create the engine with retry logic
-    test_db_url = f"postgresql+asyncpg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/apes_test"
+    test_db_url = f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/apes_test"
 
     engine = await create_test_engine_with_retry(
         test_db_url,
@@ -130,8 +129,8 @@ async def test_db_engine():
 @pytest.fixture
 async def test_db_session(test_db_engine):
     """Create test database session with transaction rollback for isolation."""
-    async_session = sessionmaker(
-        test_db_engine, class_=AsyncSession, expire_on_commit=False
+    async_session = async_sessionmaker(
+        bind=test_db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
     async with async_session() as session:
@@ -245,23 +244,23 @@ def sample_rule_metadata():
 
     return [
         RuleMetadata(
+            id=1,
             rule_id=f"clarity_rule_{test_suffix}",
             rule_name="Clarity Enhancement Rule",
-            rule_category="core",
-            rule_description="Improves prompt clarity",
-            enabled=True,
+            category="core",
+            description="Improves prompt clarity",
+            is_enabled=True,
             priority=5,
-            rule_version="1.0",
             default_parameters={"weight": 1.0, "threshold": 0.7},
         ),
         RuleMetadata(
+            id=2,
             rule_id=f"specificity_rule_{test_suffix}",
             rule_name="Specificity Enhancement Rule",
-            rule_category="core",
-            rule_description="Improves prompt specificity",
-            enabled=True,
+            category="core",
+            description="Improves prompt specificity",
+            is_enabled=True,
             priority=4,
-            rule_version="1.0",
             default_parameters={"weight": 0.8, "threshold": 0.6},
         ),
     ]
@@ -275,47 +274,43 @@ def sample_rule_performance(sample_rule_metadata):
     # Use the same unique rule IDs from sample_rule_metadata
     base_data = [
         RulePerformance(
+            id=1,
+            session_id="test_session_1",
             rule_id=sample_rule_metadata[0].rule_id,  # clarity_rule with unique suffix
-            rule_name="Clarity Enhancement Rule",
             improvement_score=0.8,
             confidence_level=0.9,
             execution_time_ms=150,
-            prompt_characteristics={"length": 50, "complexity": 0.6},
-            before_metrics={"clarity": 0.5, "specificity": 0.6},
-            after_metrics={"clarity": 0.8, "specificity": 0.6},
+            parameters_used={"weight": 1.0, "threshold": 0.7},
         ),
         RulePerformance(
+            id=2,
+            session_id="test_session_2",
             rule_id=sample_rule_metadata[
                 1
             ].rule_id,  # specificity_rule with unique suffix
-            rule_name="Specificity Enhancement Rule",
             improvement_score=0.7,
             confidence_level=0.8,
             execution_time_ms=200,
-            prompt_characteristics={"length": 45, "complexity": 0.5},
-            before_metrics={"clarity": 0.7, "specificity": 0.4},
-            after_metrics={"clarity": 0.7, "specificity": 0.7},
+            parameters_used={"weight": 0.8, "threshold": 0.6},
         ),
     ]
 
-    # Create multiple records with unique prompt_ids and ensure no constraint violations
+    # Create multiple records with unique IDs and ensure no constraint violations
     result = []
     for i in range(15):  # 15 records each = 30 total
-        for base in base_data:
-            # Create new instance with unique prompt_id and constrained scores
+        for j, base in enumerate(base_data):
+            # Create new instance with unique ID and constrained scores
             improvement_score = max(0.0, min(1.0, base.improvement_score + (i * 0.01)))
             confidence_level = max(0.0, min(1.0, base.confidence_level + (i * 0.005)))
             
             new_record = RulePerformance(
+                id=i * len(base_data) + j + 1,  # Unique ID for each record
+                session_id=f"test_session_{i}_{j}",
                 rule_id=base.rule_id,
-                rule_name=base.rule_name,
-                prompt_id=uuid.uuid4(),  # Unique prompt_id for each record
                 improvement_score=improvement_score,  # Keep within 0-1 range
                 confidence_level=confidence_level,    # Keep within 0-1 range
                 execution_time_ms=base.execution_time_ms + i,
-                prompt_characteristics=base.prompt_characteristics,
-                before_metrics=base.before_metrics,
-                after_metrics=base.after_metrics,
+                parameters_used=base.parameters_used,
             )
             result.append(new_record)
 
@@ -327,29 +322,25 @@ def sample_user_feedback():
     """Sample user feedback for testing."""
     return [
         UserFeedback(
-            original_prompt="Make this better",
-            improved_prompt="Please improve the clarity and specificity of this document",
-            user_rating=4,
-            applied_rules={"rules": ["clarity_rule"]},
-            improvement_areas={"areas": ["clarity", "specificity"]},
-            user_notes="Good improvement",
+            id=1,
             session_id="test_session_1",
-            # Temporarily comment out problematic fields
-            # ml_optimized=False,
-            # model_id=None,
+            rating=4,
+            feedback_text="Good improvement",
+            improvement_areas=["clarity", "specificity"],
+            is_processed=False,
+            ml_optimized=False,
+            model_id=None,
             created_at=datetime.utcnow(),
         ),
         UserFeedback(
-            original_prompt="Help me with this task",
-            improved_prompt="Please provide step-by-step guidance for completing this specific task",
-            user_rating=5,
-            applied_rules={"rules": ["clarity_rule", "specificity_rule"]},
-            improvement_areas={"areas": ["clarity"]},
-            user_notes="Excellent improvement",
+            id=2,
             session_id="test_session_2",
-            # Temporarily comment out problematic fields
-            # ml_optimized=True,
-            # model_id="model_123",
+            rating=5,
+            feedback_text="Excellent improvement",
+            improvement_areas=["clarity"],
+            is_processed=True,
+            ml_optimized=True,
+            model_id="model_123",
             created_at=datetime.utcnow() - timedelta(hours=2),
         ),
     ]
@@ -360,26 +351,23 @@ def sample_improvement_sessions():
     """Sample improvement sessions for testing."""
     return [
         ImprovementSession(
+            id=1,
             session_id="test_session_1",
             original_prompt="Make this better",
             final_prompt="Please improve the clarity and specificity of this document",
-            rules_applied=[{"rule_id": "clarity_rule", "confidence": 0.9}],
-            iteration_count=1,
-            session_metadata={"user_context": "document_improvement"},
-            status="completed",
+            rules_applied=["clarity_rule"],
+            user_context={"context": "document_improvement"},
+            improvement_metrics={"clarity": 0.8, "specificity": 0.7},
             created_at=datetime.utcnow(),
         ),
         ImprovementSession(
+            id=2,
             session_id="test_session_2",
             original_prompt="Help me with this task",
             final_prompt="Please provide step-by-step guidance for completing this specific task",
-            rules_applied=[
-                {"rule_id": "clarity_rule", "confidence": 0.8},
-                {"rule_id": "specificity_rule", "confidence": 0.9},
-            ],
-            iteration_count=2,
-            session_metadata={"user_context": "task_guidance"},
-            status="completed",
+            rules_applied=["clarity_rule", "specificity_rule"],
+            user_context={"context": "task_guidance"},
+            improvement_metrics={"clarity": 0.9, "specificity": 0.8},
             created_at=datetime.utcnow() - timedelta(hours=1),
         ),
     ]
@@ -514,23 +502,23 @@ def mock_rule_metadata_corrected():
 
     return [
         RuleMetadata(
+            id=1,
             rule_id="clarity_rule",
             rule_name="Clarity Enhancement Rule",
-            rule_category="core",
-            rule_description="Improves prompt clarity by replacing vague terms",
-            enabled=True,
+            category="core",
+            description="Improves prompt clarity by replacing vague terms",
+            is_enabled=True,
             priority=5,
-            rule_version="1.0",
             default_parameters={"vague_threshold": 0.7, "confidence_weight": 1.0},
         ),
         RuleMetadata(
+            id=2,
             rule_id="specificity_rule",
             rule_name="Specificity Enhancement Rule",
-            rule_category="core",
-            rule_description="Improves prompt specificity by adding constraints and examples",
-            enabled=True,
+            category="core",
+            description="Improves prompt specificity by adding constraints and examples",
+            is_enabled=True,
             priority=4,
-            rule_version="1.0",
             default_parameters={"min_length": 10, "add_format": True},
         ),
     ]

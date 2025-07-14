@@ -7,7 +7,7 @@ opportunities for more effective rule application.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from datetime import datetime
 from collections import defaultdict
 import hashlib
@@ -46,6 +46,34 @@ try:
 except ImportError:
     CRYPTO_AVAILABLE = False
     warnings.warn("Cryptography not available for secure storage. Install with: pip install cryptography")
+
+# Linguistic analysis integration
+try:
+    from ..analysis.linguistic_analyzer import (
+        LinguisticAnalyzer, LinguisticConfig, get_lightweight_config,
+        get_ultra_lightweight_config, get_memory_optimized_config
+    )
+    LINGUISTIC_ANALYSIS_AVAILABLE = True
+except ImportError:
+    LINGUISTIC_ANALYSIS_AVAILABLE = False
+    warnings.warn("LinguisticAnalyzer not available. Linguistic features will be disabled.")
+
+# Domain-specific feature extraction integration
+try:
+    from ..analysis.domain_feature_extractor import DomainFeatureExtractor, DomainFeatures
+    from ..analysis.domain_detector import PromptDomain
+    DOMAIN_ANALYSIS_AVAILABLE = True
+except ImportError:
+    DOMAIN_ANALYSIS_AVAILABLE = False
+    warnings.warn("Domain feature extraction not available. Domain-specific features will be disabled.")
+
+# Context-aware feature weighting integration
+try:
+    from .context_aware_weighter import ContextAwareFeatureWeighter, WeightingConfig, WeightingStrategy
+    CONTEXT_WEIGHTING_AVAILABLE = True
+except ImportError:
+    CONTEXT_WEIGHTING_AVAILABLE = False
+    warnings.warn("Context-aware feature weighting not available. Feature weighting will be disabled.")
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +124,41 @@ class ContextConfig:
     hdbscan_min_cluster_size: int = 5
     hdbscan_min_samples: int = 3
     clustering_quality_threshold: float = 0.5
+    
+    # Linguistic Analysis Integration
+    enable_linguistic_features: bool = True
+    linguistic_feature_weight: float = 0.3  # Weight for linguistic features vs traditional features
+    cache_linguistic_analysis: bool = True  # Cache results for performance
+    
+    # Domain-Specific Feature Extraction
+    enable_domain_features: bool = True
+    domain_feature_weight: float = 0.4  # Weight for domain-specific features
+    cache_domain_analysis: bool = True  # Cache domain analysis results
+    adaptive_domain_weighting: bool = True  # Adjust weights based on domain confidence
+    
+    # Context-Aware Feature Weighting
+    enable_context_aware_weighting: bool = True
+    weighting_strategy: str = "adaptive"  # static, adaptive, dynamic, hybrid
+    confidence_boost_factor: float = 0.3
+    min_weight_threshold: float = 0.1
+    max_weight_threshold: float = 2.0
+    secondary_domain_weight_factor: float = 0.6
+    normalize_feature_weights: bool = True
+    
+    # Memory and Performance Optimization
+    use_lightweight_models: bool = False  # Use lightweight models for testing
+    use_ultra_lightweight_models: bool = False  # Use ultra-lightweight models for extreme memory constraints
+    enable_model_quantization: bool = True  # Enable model quantization
+    enable_4bit_quantization: bool = False  # Enable aggressive 4-bit quantization
+    max_memory_threshold_mb: int = 200  # Maximum memory threshold
+    force_cpu_only: bool = False  # Force CPU-only processing
+    
+    def __post_init__(self):
+        """Validate configuration parameters"""
+        if self.differential_privacy_epsilon < 0:
+            raise ValueError("Differential privacy epsilon must be non-negative")
+        if self.privacy_preserving and self.differential_privacy_epsilon == 0:
+            raise ValueError("Epsilon cannot be zero when privacy is enabled")
 
 
 @dataclass
@@ -176,6 +239,76 @@ class ContextSpecificLearner:
         else:
             self.context_vectorizer = None
         
+        # Initialize linguistic analyzer for advanced features
+        self.linguistic_analyzer = None
+        self.linguistic_cache = {}  # Cache for linguistic analysis results
+        if self.config.enable_linguistic_features and LINGUISTIC_ANALYSIS_AVAILABLE:
+            try:
+                # Configure linguistic analyzer for performance in ML pipeline
+                linguistic_config = LinguisticConfig(
+                    max_workers=2,  # Conservative for ML pipeline
+                    enable_caching=self.config.cache_linguistic_analysis,
+                    cache_size=1000,  # Reasonable cache for ML pipeline
+                    timeout_seconds=15,  # Faster timeout for ML processing
+                    # Memory optimization settings
+                    use_lightweight_models=self.config.use_lightweight_models,
+                    use_ultra_lightweight_models=self.config.use_ultra_lightweight_models,
+                    enable_model_quantization=self.config.enable_model_quantization,
+                    enable_4bit_quantization=self.config.enable_4bit_quantization,
+                    max_memory_threshold_mb=self.config.max_memory_threshold_mb,
+                    force_cpu_only=self.config.force_cpu_only,
+                    # Auto-download NLTK resources
+                    auto_download_nltk=True,
+                    nltk_fallback_enabled=True
+                )
+                self.linguistic_analyzer = LinguisticAnalyzer(linguistic_config)
+                self.logger.info("Linguistic analysis enabled for ML feature extraction with optimized configuration")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize linguistic analyzer: {e}")
+                self.config.enable_linguistic_features = False
+        elif self.config.enable_linguistic_features:
+            self.logger.warning("Linguistic features requested but LinguisticAnalyzer not available")
+            self.config.enable_linguistic_features = False
+        
+        # Initialize domain feature extractor for domain-specific analysis
+        self.domain_feature_extractor = None
+        self.domain_cache = {}  # Cache for domain analysis results
+        if self.config.enable_domain_features and DOMAIN_ANALYSIS_AVAILABLE:
+            try:
+                # Configure domain feature extractor with spaCy if available
+                enable_spacy = True  # Default to enabling spaCy for better analysis
+                self.domain_feature_extractor = DomainFeatureExtractor(enable_spacy=enable_spacy)
+                self.logger.info("Domain-specific feature extraction enabled for ML pipeline")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize domain feature extractor: {e}")
+                self.config.enable_domain_features = False
+        elif self.config.enable_domain_features:
+            self.logger.warning("Domain features requested but DomainFeatureExtractor not available")
+            self.config.enable_domain_features = False
+        
+        # Initialize context-aware feature weighter for adaptive feature importance
+        self.context_aware_weighter = None
+        if self.config.enable_context_aware_weighting and CONTEXT_WEIGHTING_AVAILABLE:
+            try:
+                # Create weighting configuration from context config
+                weighting_config = WeightingConfig(
+                    enable_context_aware_weighting=self.config.enable_context_aware_weighting,
+                    weighting_strategy=WeightingStrategy(self.config.weighting_strategy),
+                    confidence_boost_factor=self.config.confidence_boost_factor,
+                    min_weight_threshold=self.config.min_weight_threshold,
+                    max_weight_threshold=self.config.max_weight_threshold,
+                    secondary_domain_weight_factor=self.config.secondary_domain_weight_factor,
+                    normalize_weights=self.config.normalize_feature_weights
+                )
+                self.context_aware_weighter = ContextAwareFeatureWeighter(weighting_config)
+                self.logger.info("Context-aware feature weighting enabled for ML pipeline")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize context-aware feature weighter: {e}")
+                self.config.enable_context_aware_weighting = False
+        elif self.config.enable_context_aware_weighting:
+            self.logger.warning("Context-aware weighting requested but ContextAwareFeatureWeighter not available")
+            self.config.enable_context_aware_weighting = False
+        
         # Phase 2 enhancements - Advanced clustering components
         self.umap_reducer = None
         self.hdbscan_clusterer = None
@@ -190,30 +323,53 @@ class ContextSpecificLearner:
         if self.config.privacy_preserving:
             self._initialize_privacy_components()
     
-    async def analyze_context_effectiveness(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def analyze_context_effectiveness(self, results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze context effectiveness across test results
         
         Args:
-            results: Test results with context information
+            results: Context-grouped data with historical_data fields
+                    Format: {"context_name": {"historical_data": [...], "sample_size": N, ...}}
             
         Returns:
             Context-specific learning analysis
         """
-        self.logger.info(f"Starting context effectiveness analysis with {len(results)} results")
+        # Convert context-grouped data to flat results list for internal processing
+        flat_results = []
+        for context_key, context_data in results.items():
+            if 'historical_data' in context_data:
+                historical_data = context_data['historical_data']
+                if isinstance(historical_data, list):
+                    flat_results.extend(historical_data)
+        
+        self.logger.info(f"Starting context effectiveness analysis with {len(flat_results)} results from {len(results)} contexts")
         
         # Phase 2 enhancement: Apply advanced clustering if enabled
-        if self.config.use_advanced_clustering:
-            clustering_result = self._perform_advanced_clustering(results)
+        clustering_result = None
+        if self.config.use_advanced_clustering and flat_results:
+            clustering_result = self._perform_advanced_clustering(flat_results)
             if clustering_result.get("status") == "success":
                 context_groups = clustering_result["clusters"]
                 self.logger.info(f"Advanced clustering identified {clustering_result['n_clusters']} context groups with quality {clustering_result['quality_score']:.3f}")
             else:
-                # Fallback to traditional context grouping
-                context_groups = self._group_results_by_context(results)
-                self.logger.info(f"Fallback: Identified {len(context_groups)} context groups")
+                # Fallback to using pre-grouped data if available
+                if all('historical_data' in context_data for context_data in results.values()):
+                    context_groups = {}
+                    for context_key, context_data in results.items():
+                        context_groups[context_key] = context_data.get('historical_data', [])
+                    self.logger.info(f"Advanced clustering failed, using pre-grouped data: {len(context_groups)} context groups")
+                else:
+                    # Fallback to traditional context grouping
+                    context_groups = self._group_results_by_context(flat_results)
+                    self.logger.info(f"Fallback: Identified {len(context_groups)} context groups")
+        elif all('historical_data' in context_data for context_data in results.values()):
+            # Use pre-grouped data when advanced clustering is disabled
+            context_groups = {}
+            for context_key, context_data in results.items():
+                context_groups[context_key] = context_data.get('historical_data', [])
+            self.logger.info(f"Using pre-grouped data: {len(context_groups)} context groups")
         else:
             # Traditional context grouping
-            context_groups = self._group_results_by_context(results)
+            context_groups = self._group_results_by_context(flat_results)
             self.logger.info(f"Identified {len(context_groups)} context groups")
         
         # Analyze each context group
@@ -237,12 +393,12 @@ class ContextSpecificLearner:
         if self.config.enable_in_context_learning:
             # Extract context data and user preferences for ICL
             context_data = []
-            for result in results[:20]:  # Sample for ICL analysis
+            for result in flat_results[:20]:  # Sample for ICL analysis
                 if 'context' in result:
                     context_data.append(result['context'])
             
             user_preferences = {}  # Could be populated from user settings
-            task_examples = results[:50]  # Sample task examples
+            task_examples = flat_results[:50]  # Sample task examples
             
             icl_result = self._implement_in_context_learning(
                 context_data, user_preferences, task_examples
@@ -255,9 +411,6 @@ class ContextSpecificLearner:
             "context_specific_patterns": cross_context_analysis["context_specific_patterns"],
             "specialization_opportunities": [op.__dict__ for op in specialization_opportunities],
             "learning_recommendations": [rec.__dict__ for rec in learning_recommendations],
-            # Phase 2 enhancements
-            "in_context_learning": icl_result,
-            "advanced_clustering": clustering_result if 'clustering_result' in locals() else None,
             "clustering_quality_score": self.clustering_quality_score,
             "metadata": {
                 "total_contexts": len(context_insights),
@@ -273,6 +426,14 @@ class ContextSpecificLearner:
                 }
             }
         }
+        
+        # Only add in-context learning result if ICL is enabled
+        if icl_result is not None:
+            analysis_result["in_context_learning"] = icl_result
+        
+        # Add advanced clustering result only if clustering was performed
+        if clustering_result is not None:
+            analysis_result["advanced_clustering"] = clustering_result
         
         self.logger.info(
             f"Context analysis completed: {len(context_insights)} contexts, "
@@ -749,18 +910,121 @@ class ContextSpecificLearner:
         )
         
         # Privacy-preserving adaptation with differential privacy
+        privacy_metrics = None
         if self.config.privacy_preserving:
+            original_count = len(demonstrations)
             demonstrations = self._apply_differential_privacy(
                 demonstrations, self.config.differential_privacy_epsilon
             )
+            privacy_metrics = {
+                "epsilon_spent": self.config.differential_privacy_epsilon,
+                "noise_added": True,
+                "original_demonstrations": original_count,
+                "protected_demonstrations": len(demonstrations),
+                "privacy_method": "differential_privacy"
+            }
         
-        return {
+        # Generate personalization improvements based on bandit recommendations
+        personalization_improvements = self._generate_personalization_improvements(
+            bandit_recommendations, demonstrations, user_preferences
+        )
+        
+        # Generate context-specific recommendations
+        context_specific_recommendations = self._generate_context_recommendations(
+            context_data, demonstrations
+        )
+        
+        result = {
             "status": "success",
             "demonstrations": demonstrations,
             "bandit_recommendations": bandit_recommendations,
             "privacy_applied": self.config.privacy_preserving,
-            "demonstration_count": len(demonstrations)
+            "demonstration_count": len(demonstrations),
+            "personalization_improvements": personalization_improvements,
+            "context_specific_recommendations": context_specific_recommendations
         }
+        
+        if privacy_metrics:
+            result["privacy_metrics"] = privacy_metrics
+            
+        return result
+    
+    def _generate_personalization_improvements(self, bandit_recommendations: Dict[str, Any], 
+                                             demonstrations: List[Dict[str, Any]], 
+                                             user_preferences: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate personalization improvements based on contextual bandit analysis"""
+        improvements = {
+            "adaptive_strategies": [],
+            "user_specific_patterns": {},
+            "confidence_score": 0.0,
+            "exploration_benefits": []
+        }
+        
+        if not bandit_recommendations or not bandit_recommendations.get("recommendations"):
+            return improvements
+        
+        # Extract top recommendations
+        top_recs = bandit_recommendations["recommendations"][:3]
+        
+        # Generate adaptive strategies
+        for i, rec in enumerate(top_recs):
+            strategy = {
+                "strategy_id": f"adaptive_{i}",
+                "expected_reward": rec.get("expected_reward", 0.5),
+                "confidence": rec.get("confidence", 0.5),
+                "description": f"Personalized approach based on demonstration {rec.get('demonstration_index', i)}"
+            }
+            improvements["adaptive_strategies"].append(strategy)
+        
+        # User-specific patterns
+        if user_preferences:
+            improvements["user_specific_patterns"] = {
+                "preference_alignment": min(1.0, len(user_preferences) / 5.0),
+                "personalization_depth": "medium" if len(demonstrations) > 3 else "low",
+                "adaptation_potential": bandit_recommendations.get("exploration_score", 0.5)
+            }
+        
+        # Overall confidence
+        if top_recs:
+            improvements["confidence_score"] = np.mean([rec.get("confidence", 0.5) for rec in top_recs])
+        
+        # Exploration benefits
+        exploration_score = bandit_recommendations.get("exploration_score", 0.0)
+        if exploration_score > 0.3:
+            improvements["exploration_benefits"].append("High exploration potential identified")
+        if len(top_recs) > 1:
+            improvements["exploration_benefits"].append("Multiple promising approaches available")
+        
+        return improvements
+    
+    def _generate_context_recommendations(self, context_data: List[Dict[str, Any]], 
+                                        demonstrations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate context-specific recommendations"""
+        recommendations = []
+        
+        if not context_data or not demonstrations:
+            return recommendations
+        
+        # Extract unique contexts
+        contexts = set()
+        for ctx in context_data:
+            if isinstance(ctx, dict) and 'context' in ctx:
+                contexts.add(ctx['context'])
+            elif isinstance(ctx, str):
+                contexts.add(ctx)
+        
+        # Generate recommendations for each context
+        for context in list(contexts)[:3]:  # Limit to top 3 contexts
+            rec = {
+                "context": context,
+                "recommendation_type": "optimization",
+                "priority": "medium",
+                "description": f"Optimize prompts for {context} context",
+                "estimated_impact": min(0.8, 0.5 + len(demonstrations) * 0.1)
+            }
+            recommendations.append(rec)
+        
+        return recommendations
     
     def _select_contextual_demonstrations(self, context_data: List[Dict[str, Any]], 
                                         task_examples: List[Dict[str, Any]], 
@@ -771,15 +1035,31 @@ class ContextSpecificLearner:
         
         # Extract context features for similarity computation
         context_texts = []
+        target_contexts = set()
         for ctx in context_data:
             text_features = []
-            if 'projectType' in ctx:
-                text_features.append(f"project_{ctx['projectType']}")
-            if 'domain' in ctx:
-                text_features.append(f"domain_{ctx['domain']}")
-            if 'complexity' in ctx:
-                text_features.append(f"complexity_{ctx['complexity']}")
+            # Handle both dict and string context formats
+            if isinstance(ctx, dict):
+                if 'context' in ctx:
+                    target_contexts.add(ctx['context'])
+                    text_features.append(ctx['context'])
+                if 'projectType' in ctx:
+                    text_features.append(f"project_{ctx['projectType']}")
+                if 'domain' in ctx:
+                    text_features.append(f"domain_{ctx['domain']}")
+                if 'complexity' in ctx:
+                    text_features.append(f"complexity_{ctx['complexity']}")
+            elif isinstance(ctx, str):
+                target_contexts.add(ctx)
+                text_features.append(ctx)
             context_texts.append(" ".join(text_features))
+        
+        # First filter by exact context match if we have target contexts
+        if target_contexts:
+            filtered_examples = [ex for ex in task_examples 
+                               if ex.get('context') in target_contexts]
+            if filtered_examples:
+                task_examples = filtered_examples
         
         if not context_texts:
             return task_examples[:self.config.icl_demonstrations]
@@ -827,7 +1107,14 @@ class ContextSpecificLearner:
                                context_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Apply Thompson Sampling for exploration-exploitation balance"""
         if not demonstrations:
-            return {"recommendations": [], "exploration_score": 0.0}
+            return {
+                "recommendations": [], 
+                "exploration_score": 0.0,
+                "selected_action": 0,
+                "confidence_interval": {"lower": 0.0, "upper": 1.0},
+                "exploration_bonus": 1.0,
+                "method": "random_fallback"
+            }
         
         # Thompson Sampling implementation for contextual bandits
         # This is a simplified version - in production, you'd use a more sophisticated approach
@@ -865,19 +1152,80 @@ class ContextSpecificLearner:
         
         exploration_score = np.mean([rec["exploration_value"] for rec in recommendations])
         
+        # Select best action and compute confidence interval
+        if recommendations:
+            best_rec = recommendations[0]
+            best_index = best_rec["demonstration_index"]
+            confidence = best_rec["confidence"]
+            
+            # Compute confidence interval
+            margin = 0.1 * (1 - confidence)  # Larger margin for lower confidence
+            lower_bound = max(0.0, best_rec["expected_reward"] - margin)
+            upper_bound = min(1.0, best_rec["expected_reward"] + margin)
+            
+            selected_action = best_index
+            confidence_interval = {"lower": lower_bound, "upper": upper_bound}
+            exploration_bonus = best_rec["exploration_value"]
+        else:
+            selected_action = 0
+            confidence_interval = {"lower": 0.0, "upper": 1.0}
+            exploration_bonus = 1.0
+        
         return {
             "recommendations": recommendations,
             "exploration_score": exploration_score,
-            "method": "thompson_sampling"
+            "method": "thompson_sampling",
+            "selected_action": selected_action,
+            "confidence_interval": confidence_interval,
+            "exploration_bonus": exploration_bonus
         }
     
-    def _apply_differential_privacy(self, demonstrations: List[Dict[str, Any]], 
-                                  epsilon: float) -> List[Dict[str, Any]]:
-        """Apply differential privacy to protect user data"""
+    def _apply_differential_privacy(self, data, epsilon: float = None) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """Apply differential privacy using Laplace mechanism
+        
+        Args:
+            data: Either List[Dict] (demonstrations) or List[float] (scores)
+            epsilon: Privacy parameter (uses config default if None)
+            
+        Returns:
+            For List[Dict]: Modified demonstrations (backward compatibility)
+            For List[float]: Dict with privacy metrics (test interface)
+        """
+        if epsilon is None:
+            epsilon = getattr(self.config, 'differential_privacy_epsilon', 1.0)
+            
+        # Handle disabled privacy
+        if not getattr(self.config, 'privacy_preserving', True):
+            if isinstance(data, list) and data and isinstance(data[0], (int, float)):
+                return {
+                    "noisy_scores": data,
+                    "privacy_budget_used": 0.0,
+                    "privacy_guarantee": "disabled"
+                }
+            return data
+            
+        # Handle score list (test interface) - follows PyDP/diffprivlib patterns
+        if isinstance(data, list) and data and isinstance(data[0], (int, float)):
+            noisy_scores = []
+            for score in data:
+                # Apply Laplace noise (standard DP mechanism)
+                noise = np.random.laplace(0, 1.0 / epsilon)
+                noisy_score = np.clip(float(score) + noise, 0.0, 1.0)
+                noisy_scores.append(noisy_score)
+            
+            self.logger.info(f"Applied differential privacy to {len(data)} scores with epsilon={epsilon}")
+            return {
+                "noisy_scores": noisy_scores,
+                "privacy_budget_used": epsilon,
+                "privacy_guarantee": f"({epsilon})-differential-privacy"
+            }
+        
+        # Handle demonstration objects (backward compatibility)
+        demonstrations = data if isinstance(data, list) else []
         if not demonstrations:
             return demonstrations
         
-        # Apply Laplace noise to sensitive numerical values
+        # Apply Laplace noise to sensitive numerical values in demonstrations
         for demo in demonstrations:
             if 'overallScore' in demo:
                 noise = np.random.laplace(0, 1.0 / epsilon)
@@ -886,8 +1234,13 @@ class ContextSpecificLearner:
             if 'improvementScore' in demo:
                 noise = np.random.laplace(0, 1.0 / epsilon)
                 demo['improvementScore'] = np.clip(demo['improvementScore'] + noise, 0, 1)
+                
+            # Also handle score field if present
+            if 'score' in demo and isinstance(demo['score'], (int, float)):
+                noise = np.random.laplace(0, 1.0 / epsilon)
+                demo['score'] = np.clip(demo['score'] + noise, 0, 1)
         
-        self.logger.info(f"Applied differential privacy with epsilon={epsilon}")
+        self.logger.info(f"Applied differential privacy to {len(demonstrations)} demonstrations with epsilon={epsilon}")
         return demonstrations
     
     # ==================== PHASE 3 ENHANCEMENTS ====================
@@ -1227,31 +1580,70 @@ class ContextSpecificLearner:
         # Extract features for clustering
         features = self._extract_clustering_features(results)
         if features is None or len(features) < self.config.min_sample_size:
+            self.logger.warning(f"Insufficient data for clustering: {len(features) if features is not None else 0} samples")
             return {"status": "insufficient_data", "clusters": {}}
         
         try:
-            # Step 1: UMAP dimensionality reduction
+            # Validate and adjust UMAP parameters based on dataset size
+            n_samples, n_features = features.shape
+            
+            # Best practice: Ensure n_neighbors >= n_components and reasonable for dataset size
+            adjusted_n_neighbors = min(self.config.umap_n_neighbors, max(2, n_samples // 3))
+            adjusted_n_components = min(self.config.umap_n_components, n_features, adjusted_n_neighbors - 1)
+            
+            # Ensure min_dist is appropriate for the data scale
+            adjusted_min_dist = max(0.0, min(self.config.umap_min_dist, 0.99))
+            
+            self.logger.info(f"UMAP parameters: n_components={adjusted_n_components}, n_neighbors={adjusted_n_neighbors}, min_dist={adjusted_min_dist}")
+            
+            # Step 1: UMAP dimensionality reduction with validated parameters
             self.umap_reducer = umap.UMAP(
-                n_components=self.config.umap_n_components,
-                n_neighbors=self.config.umap_n_neighbors,
-                min_dist=self.config.umap_min_dist,
-                random_state=42
+                n_components=adjusted_n_components,
+                n_neighbors=adjusted_n_neighbors,
+                min_dist=adjusted_min_dist,
+                metric='euclidean',  # Consistent with HDBSCAN
+                random_state=42,
+                verbose=False  # Reduce noise in logs
             )
             
             reduced_features = self.umap_reducer.fit_transform(features)
             
-            # Step 2: HDBSCAN clustering
+            # Validate HDBSCAN parameters based on dataset size
+            # Best practice: min_cluster_size should be reasonable relative to dataset
+            adjusted_min_cluster_size = min(self.config.hdbscan_min_cluster_size, max(2, n_samples // 10))
+            adjusted_min_samples = min(self.config.hdbscan_min_samples, adjusted_min_cluster_size)
+            
+            self.logger.info(f"HDBSCAN parameters: min_cluster_size={adjusted_min_cluster_size}, min_samples={adjusted_min_samples}")
+            
+            # Step 2: HDBSCAN clustering with validated parameters
             self.hdbscan_clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=self.config.hdbscan_min_cluster_size,
-                min_samples=self.config.hdbscan_min_samples,
-                metric='euclidean'
+                min_cluster_size=adjusted_min_cluster_size,
+                min_samples=adjusted_min_samples,
+                metric='euclidean',
+                cluster_selection_method='eom',  # Excess of Mass method
+                algorithm='best',  # Auto-select best algorithm
+                leaf_size=40,  # Balanced performance
+                core_dist_n_jobs=1  # Consistent execution
             )
             
             cluster_labels = self.hdbscan_clusterer.fit_predict(reduced_features)
             
-            # Step 3: Quality assessment
+            # Enhanced quality assessment with multiple metrics
             quality_score = self._assess_clustering_quality(reduced_features, cluster_labels)
+            noise_ratio = np.sum(cluster_labels == -1) / len(cluster_labels)
+            n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+            
             self.clustering_quality_score = quality_score
+            
+            # Additional quality checks based on research best practices
+            if n_clusters == 0:
+                self.logger.warning("HDBSCAN found no clusters, falling back to K-means")
+                return self._fallback_to_kmeans(results)
+            
+            if noise_ratio > 0.5:  # More than 50% noise points
+                self.logger.warning(f"High noise ratio ({noise_ratio:.2f}), clustering may be poor quality")
+                if quality_score < self.config.clustering_quality_threshold * 0.8:  # More lenient threshold
+                    return self._fallback_to_kmeans(results)
             
             # Group results by clusters
             clusters = self._group_by_clusters(results, cluster_labels)
@@ -1259,26 +1651,44 @@ class ContextSpecificLearner:
             clustering_result = {
                 "status": "success",
                 "method": "umap_hdbscan",
-                "n_clusters": len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0),
-                "n_noise_points": np.sum(cluster_labels == -1),
+                "n_clusters": n_clusters,
+                "n_noise_points": int(np.sum(cluster_labels == -1)),
+                "noise_ratio": noise_ratio,
                 "quality_score": quality_score,
                 "clusters": clusters,
-                "reduced_dimensions": reduced_features.shape[1]
+                "reduced_dimensions": reduced_features.shape[1],
+                "cluster_sizes": [np.sum(cluster_labels == i) for i in range(n_clusters)],
+                "parameters": {
+                    "umap_n_components": adjusted_n_components,
+                    "umap_n_neighbors": adjusted_n_neighbors,
+                    "umap_min_dist": adjusted_min_dist,
+                    "hdbscan_min_cluster_size": adjusted_min_cluster_size,
+                    "hdbscan_min_samples": adjusted_min_samples
+                }
             }
             
             if quality_score < self.config.clustering_quality_threshold:
                 self.logger.warning(f"Clustering quality {quality_score:.3f} below threshold {self.config.clustering_quality_threshold}")
                 return self._fallback_to_kmeans(results)
             
-            self.logger.info(f"Advanced clustering completed: {clustering_result['n_clusters']} clusters, quality={quality_score:.3f}")
+            self.logger.info(f"Advanced clustering completed: {n_clusters} clusters, "
+                           f"quality={quality_score:.3f}, noise_ratio={noise_ratio:.3f}")
             return clustering_result
             
         except Exception as e:
-            self.logger.error(f"Advanced clustering failed: {e}")
+            self.logger.error(f"Advanced clustering failed: {e}", exc_info=True)
             return self._fallback_to_kmeans(results)
     
     def _extract_clustering_features(self, results: List[Dict[str, Any]]) -> Optional[np.ndarray]:
-        """Extract numerical features for clustering"""
+        """Extract numerical features for clustering with enhanced linguistic and domain-specific analysis
+        
+        Feature vector composition:
+        - Performance metrics: 5 features
+        - Linguistic features: 10 features (when enabled)
+        - Domain-specific features: 15 features (when enabled)
+        - Context features: ~16 features (project type, team size, complexity, etc.)
+        Total: ~46 features when all enhancements are enabled
+        """
         if not results:
             return None
         
@@ -1286,77 +1696,496 @@ class ContextSpecificLearner:
         for result in results:
             feature_vector = []
             
-            # Performance metrics
+            # Performance metrics (5 features)
             feature_vector.append(result.get('overallScore', 0.5))
             feature_vector.append(result.get('clarity', 0.5))
             feature_vector.append(result.get('completeness', 0.5))
             feature_vector.append(result.get('actionability', 0.5))
             feature_vector.append(result.get('effectiveness', 0.5))
             
+            # Extract linguistic features if enabled (10 additional features)
+            if self.config.enable_linguistic_features and self.linguistic_analyzer:
+                linguistic_features = self._extract_linguistic_features(result)
+                feature_vector.extend(linguistic_features)
+            else:
+                # Add placeholder zeros for linguistic features to maintain consistent vector size
+                feature_vector.extend([0.0] * 10)
+            
+            # Extract domain-specific features if enabled (15 additional features)
+            if self.config.enable_domain_features and self.domain_feature_extractor:
+                domain_features = self._extract_domain_features(result)
+                feature_vector.extend(domain_features)
+            else:
+                # Add placeholder zeros for domain features to maintain consistent vector size
+                feature_vector.extend([0.0] * 15)
+            
             # Context features (encoded)
             context = result.get('context', {})
             
             # Project type encoding
             project_types = ['web', 'mobile', 'desktop', 'api', 'ml', 'data', 'other']
-            project_type = context.get('projectType', 'other').lower()
+            
+            # Handle both string and dict context formats
+            if isinstance(context, str):
+                # Map string context to project type categories
+                context_str = context.lower()
+                if any(term in context_str for term in ['technical', 'documentation', 'api', 'code']):
+                    project_type = 'api'
+                elif any(term in context_str for term in ['creative', 'writing', 'content']):
+                    project_type = 'web'
+                elif any(term in context_str for term in ['business', 'communication', 'meeting']):
+                    project_type = 'other'
+                else:
+                    project_type = 'other'
+            else:
+                # Dictionary context format
+                project_type = context.get('projectType', 'other').lower()
             project_encoding = [1.0 if pt == project_type else 0.0 for pt in project_types]
             feature_vector.extend(project_encoding)
             
             # Domain encoding  
             domains = ['finance', 'healthcare', 'education', 'ecommerce', 'gaming', 'social', 'other']
-            domain = context.get('domain', 'other').lower()
+            if isinstance(context, str):
+                # Default domain mapping for string contexts
+                context_str = context.lower()
+                if any(term in context_str for term in ['business', 'finance', 'meeting']):
+                    domain = 'finance'
+                elif any(term in context_str for term in ['education', 'learning', 'documentation']):
+                    domain = 'education'
+                else:
+                    domain = 'other'
+            else:
+                domain = context.get('domain', 'other').lower()
             domain_encoding = [1.0 if d == domain else 0.0 for d in domains]
             feature_vector.extend(domain_encoding)
             
             # Complexity encoding
             complexity_map = {'low': 0.25, 'medium': 0.5, 'high': 0.75, 'very_high': 1.0}
-            complexity = complexity_map.get(context.get('complexity', 'medium'), 0.5)
+            if isinstance(context, str):
+                # Default complexity for string contexts
+                if any(term in context_str for term in ['technical', 'documentation']):
+                    complexity = 0.75  # high
+                elif any(term in context_str for term in ['creative', 'writing']):
+                    complexity = 0.5   # medium
+                else:
+                    complexity = 0.5   # medium
+            else:
+                complexity = complexity_map.get(context.get('complexity', 'medium'), 0.5)
             feature_vector.append(complexity)
             
             # Team size (normalized)
-            team_size = context.get('teamSize', 5)
-            if isinstance(team_size, str):
-                team_size = {'small': 3, 'medium': 8, 'large': 15}.get(team_size.lower(), 8)
+            if isinstance(context, str):
+                team_size = 5  # Default team size for string contexts
+            else:
+                team_size = context.get('teamSize', 5)
+                if isinstance(team_size, str):
+                    team_size = {'small': 3, 'medium': 8, 'large': 15}.get(team_size.lower(), 8)
             feature_vector.append(min(team_size / 20.0, 1.0))  # Normalize to [0,1]
+            
+            # Apply context-aware feature weighting if enabled
+            if (self.config.enable_context_aware_weighting and 
+                self.context_aware_weighter and 
+                self.config.enable_domain_features and 
+                self.domain_feature_extractor):
+                
+                try:
+                    # Get prompt text for domain analysis
+                    prompt_text = result.get('originalPrompt', '') or result.get('prompt', '')
+                    if prompt_text and isinstance(prompt_text, str):
+                        # Extract domain features for weighting calculation
+                        domain_features = self.domain_feature_extractor.extract_domain_features(prompt_text)
+                        
+                        # Create feature names list (matching the order of feature_vector)
+                        feature_names = self._get_feature_names()
+                        
+                        # Calculate context-aware weights
+                        weights = self.context_aware_weighter.calculate_feature_weights(
+                            domain_features, 
+                            tuple(feature_names)
+                        )
+                        
+                        # Apply weights to feature vector
+                        if len(weights) == len(feature_vector):
+                            feature_vector = [f * w for f, w in zip(feature_vector, weights)]
+                        else:
+                            # Fallback: pad or trim weights to match feature vector size
+                            if len(weights) < len(feature_vector):
+                                weights = np.pad(weights, (0, len(feature_vector) - len(weights)), constant_values=1.0)
+                            else:
+                                weights = weights[:len(feature_vector)]
+                            feature_vector = [f * w for f, w in zip(feature_vector, weights)]
+                        
+                        self.logger.debug(f"Applied context-aware weighting for {domain_features.domain.value} domain")
+                
+                except Exception as e:
+                    self.logger.warning(f"Context-aware weighting failed, using unweighted features: {e}")
             
             features.append(feature_vector)
         
         return np.array(features)
     
+    def _get_feature_names(self) -> List[str]:
+        """Get the names of features in the order they appear in the feature vector."""
+        feature_names = []
+        
+        # Performance metrics (5 features)
+        feature_names.extend([
+            'overall_score', 'clarity', 'completeness', 'actionability', 'effectiveness'
+        ])
+        
+        # Linguistic features (10 features)
+        if self.config.enable_linguistic_features:
+            feature_names.extend([
+                'linguistic_readability', 'linguistic_lexical_diversity', 'linguistic_entity_density',
+                'linguistic_syntactic_complexity', 'linguistic_sentence_structure',
+                'linguistic_technical_ratio', 'linguistic_avg_sentence_length',
+                'linguistic_instruction_clarity', 'linguistic_has_examples', 'linguistic_overall_quality'
+            ])
+        else:
+            feature_names.extend([f'linguistic_placeholder_{i}' for i in range(10)])
+        
+        # Domain-specific features (15 features)
+        if self.config.enable_domain_features:
+            feature_names.extend([
+                'domain_confidence', 'domain_complexity', 'domain_specificity',
+                'technical_domain_indicator', 'creative_domain_indicator', 'academic_domain_indicator', 'business_domain_indicator',
+                'technical_feature_density', 'creative_feature_density', 'academic_feature_density',
+                'conversational_politeness', 'urgency_indicator', 'question_density',
+                'instruction_clarity', 'domain_hybrid_indicator'
+            ])
+        else:
+            feature_names.extend([f'domain_placeholder_{i}' for i in range(15)])
+        
+        # Context features
+        project_types = ['web', 'mobile', 'desktop', 'api', 'ml', 'data', 'other']
+        feature_names.extend([f'project_type_{pt}' for pt in project_types])
+        
+        domains = ['finance', 'healthcare', 'education', 'ecommerce', 'gaming', 'social', 'other']
+        feature_names.extend([f'domain_{d}' for d in domains])
+        
+        feature_names.extend(['complexity', 'team_size'])
+        
+        return feature_names
+    
+    def _extract_linguistic_features(self, result: Dict[str, Any]) -> List[float]:
+        """Extract linguistic features from prompt text for ML analysis
+        
+        Returns 10 normalized linguistic features:
+        1. Readability score (0-1)
+        2. Lexical diversity (0-1) 
+        3. Entity density (0-1)
+        4. Syntactic complexity (0-1)
+        5. Sentence structure quality (0-1)
+        6. Technical term ratio (0-1)
+        7. Average sentence length (normalized)
+        8. Instruction clarity (0-1)
+        9. Has examples (0/1)
+        10. Overall linguistic quality (0-1)
+        """
+        # Get the prompt text for analysis
+        prompt_text = result.get('originalPrompt', '') or result.get('prompt', '')
+        if not prompt_text or not isinstance(prompt_text, str):
+            # Return default feature vector if no text
+            return [0.5] * 10
+        
+        # Create deterministic cache key including config for consistency
+        cache_content = f"{prompt_text}|weight:{self.config.linguistic_feature_weight}"
+        cache_key = hashlib.md5(cache_content.encode()).hexdigest()
+        
+        if self.config.cache_linguistic_analysis and cache_key in self.linguistic_cache:
+            return self.linguistic_cache[cache_key]
+        
+        try:
+            # Set random seed before analysis for deterministic results
+            import random
+            import numpy as np
+            random.seed(42)
+            np.random.seed(42)
+            
+            # Perform linguistic analysis
+            linguistic_features = self.linguistic_analyzer.analyze(prompt_text)
+            
+            # Extract and normalize features
+            features = []
+            
+            # 1. Readability score (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.readability_score)))
+            
+            # 2. Lexical diversity (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.lexical_diversity)))
+            
+            # 3. Entity density (normalize by text length)
+            entity_density = len(linguistic_features.entities) / max(len(prompt_text.split()), 1)
+            features.append(min(1.0, entity_density))
+            
+            # 4. Syntactic complexity (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.syntactic_complexity)))
+            
+            # 5. Sentence structure quality (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.sentence_structure_quality)))
+            
+            # 6. Technical term ratio
+            technical_ratio = len(linguistic_features.technical_terms) / max(len(prompt_text.split()), 1)
+            features.append(min(1.0, technical_ratio))
+            
+            # 7. Average sentence length (normalize by dividing by 50 - typical max)
+            avg_sent_length = min(1.0, linguistic_features.avg_sentence_length / 50.0)
+            features.append(avg_sent_length)
+            
+            # 8. Instruction clarity (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.instruction_clarity_score)))
+            
+            # 9. Has examples (binary feature)
+            features.append(1.0 if linguistic_features.has_examples else 0.0)
+            
+            # 10. Overall linguistic quality (already 0-1)
+            features.append(min(1.0, max(0.0, linguistic_features.overall_linguistic_quality)))
+            
+            # Cache the result for future use
+            if self.config.cache_linguistic_analysis:
+                self.linguistic_cache[cache_key] = features
+            
+            # Apply linguistic feature weight for balanced integration
+            weight = self.config.linguistic_feature_weight
+            weighted_features = [f * weight + (1 - weight) * 0.5 for f in features]
+            
+            return weighted_features
+            
+        except Exception as e:
+            # Log error and return neutral features if analysis fails
+            self.logger.warning(f"Linguistic feature extraction failed: {e}")
+            return [0.5] * 10
+    
+    def _extract_domain_features(self, result: Dict[str, Any]) -> List[float]:
+        """Extract domain-specific features from prompt text for ML analysis
+        
+        Returns 15 normalized domain-specific features:
+        1. Domain confidence (0-1)
+        2. Domain complexity score (0-1)
+        3. Domain specificity score (0-1)
+        4. Technical domain indicator (0/1)
+        5. Creative domain indicator (0/1)
+        6. Academic domain indicator (0/1)
+        7. Business domain indicator (0/1)
+        8. Technical feature density (0-1)
+        9. Creative feature density (0-1)
+        10. Academic feature density (0-1)
+        11. Conversational politeness score (0-1)
+        12. Urgency indicator (0/1)
+        13. Question density (0-1)
+        14. Instruction clarity (0-1)
+        15. Domain hybrid indicator (0/1)
+        """
+        # Get the prompt text for analysis
+        prompt_text = result.get('originalPrompt', '') or result.get('prompt', '')
+        if not prompt_text or not isinstance(prompt_text, str):
+            # Return default feature vector if no text
+            return [0.5] * 15
+        
+        # Create deterministic cache key including config for consistency
+        cache_content = f"{prompt_text}|domain_weight:{self.config.domain_feature_weight}"
+        cache_key = hashlib.md5(cache_content.encode()).hexdigest()
+        
+        if self.config.cache_domain_analysis and cache_key in self.domain_cache:
+            return self.domain_cache[cache_key]
+        
+        try:
+            # Set random seed before analysis for deterministic results
+            import random
+            import numpy as np
+            random.seed(42)
+            np.random.seed(42)
+            
+            # Perform domain-specific feature extraction
+            domain_features = self.domain_feature_extractor.extract_domain_features(prompt_text)
+            
+            # Extract and normalize features
+            features = []
+            
+            # 1. Domain confidence (already 0-1)
+            features.append(min(1.0, max(0.0, domain_features.confidence)))
+            
+            # 2. Domain complexity score (already 0-1)
+            features.append(min(1.0, max(0.0, domain_features.complexity_score)))
+            
+            # 3. Domain specificity score (already 0-1)
+            features.append(min(1.0, max(0.0, domain_features.specificity_score)))
+            
+            # 4-7. Domain type indicators (binary features)
+            from ..analysis.domain_detector import PromptDomain
+            
+            # Technical domains
+            technical_domains = {
+                PromptDomain.SOFTWARE_DEVELOPMENT, PromptDomain.DATA_SCIENCE,
+                PromptDomain.AI_ML, PromptDomain.WEB_DEVELOPMENT,
+                PromptDomain.SYSTEM_ADMIN, PromptDomain.API_DOCUMENTATION
+            }
+            features.append(1.0 if domain_features.domain in technical_domains else 0.0)
+            
+            # Creative domains
+            creative_domains = {
+                PromptDomain.CREATIVE_WRITING, PromptDomain.CONTENT_CREATION,
+                PromptDomain.MARKETING, PromptDomain.STORYTELLING
+            }
+            features.append(1.0 if domain_features.domain in creative_domains else 0.0)
+            
+            # Academic domains
+            academic_domains = {
+                PromptDomain.RESEARCH, PromptDomain.EDUCATION,
+                PromptDomain.ACADEMIC_WRITING, PromptDomain.SCIENTIFIC
+            }
+            features.append(1.0 if domain_features.domain in academic_domains else 0.0)
+            
+            # Business domains
+            business_domains = {
+                PromptDomain.BUSINESS_ANALYSIS, PromptDomain.PROJECT_MANAGEMENT,
+                PromptDomain.CUSTOMER_SERVICE, PromptDomain.SALES
+            }
+            features.append(1.0 if domain_features.domain in business_domains else 0.0)
+            
+            # 8-10. Feature density scores (normalize by feature vector length)
+            if len(domain_features.feature_vector) > 0:
+                # Technical feature density (count of non-zero technical features)
+                tech_features = [f for f in domain_features.technical_features.values() if isinstance(f, (int, float))]
+                tech_density = sum(1 for f in tech_features if f > 0) / max(len(tech_features), 1) if tech_features else 0.0
+                features.append(min(1.0, tech_density))
+                
+                # Creative feature density
+                creative_features = [f for f in domain_features.creative_features.values() if isinstance(f, (int, float))]
+                creative_density = sum(1 for f in creative_features if f > 0) / max(len(creative_features), 1) if creative_features else 0.0
+                features.append(min(1.0, creative_density))
+                
+                # Academic feature density
+                academic_features = [f for f in domain_features.academic_features.values() if isinstance(f, (int, float))]
+                academic_density = sum(1 for f in academic_features if f > 0) / max(len(academic_features), 1) if academic_features else 0.0
+                features.append(min(1.0, academic_density))
+            else:
+                features.extend([0.0, 0.0, 0.0])
+            
+            # 11-15. Conversational and structural features
+            conv_features = domain_features.conversational_features
+            
+            # 11. Conversational politeness (based on polite requests)
+            politeness_score = min(1.0, conv_features.get('has_polite_requests', 0))
+            features.append(politeness_score)
+            
+            # 12. Urgency indicator (binary)
+            features.append(1.0 if conv_features.get('has_urgency', False) else 0.0)
+            
+            # 13. Question density (normalize by text length)
+            question_count = conv_features.get('question_count', 0)
+            word_count = len(prompt_text.split())
+            question_density = min(1.0, question_count / max(word_count, 1) * 10)  # Scale up for visibility
+            features.append(question_density)
+            
+            # 14. Instruction clarity (based on instruction indicators)
+            instruction_count = conv_features.get('instruction_indicators', 0)
+            instruction_clarity = min(1.0, instruction_count / max(word_count, 1) * 20)  # Scale up for visibility
+            features.append(instruction_clarity)
+            
+            # 15. Domain hybrid indicator (based on multiple strong domain signals)
+            hybrid_indicator = 1.0 if getattr(domain_features, 'hybrid_domain', False) else 0.0
+            features.append(hybrid_indicator)
+            
+            # Cache the result for future use
+            if self.config.cache_domain_analysis:
+                self.domain_cache[cache_key] = features
+            
+            # Apply domain feature weight with adaptive weighting based on confidence
+            base_weight = self.config.domain_feature_weight
+            if self.config.adaptive_domain_weighting:
+                # Adjust weight based on domain confidence
+                confidence_boost = domain_features.confidence * 0.2  # Up to 20% boost
+                adjusted_weight = min(1.0, base_weight + confidence_boost)
+            else:
+                adjusted_weight = base_weight
+            
+            # Apply weighting for balanced integration
+            weighted_features = [f * adjusted_weight + (1 - adjusted_weight) * 0.5 for f in features]
+            
+            return weighted_features
+            
+        except Exception as e:
+            # Log error and return neutral features if analysis fails
+            self.logger.warning(f"Domain feature extraction failed: {e}")
+            return [0.5] * 15
+    
     def _assess_clustering_quality(self, features: np.ndarray, labels: np.ndarray) -> float:
-        """Assess clustering quality using multiple metrics"""
-        from sklearn.metrics import silhouette_score, calinski_harabasz_score
+        """Assess clustering quality using multiple metrics with enhanced validation"""
+        from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
         
         unique_labels = set(labels)
-        if len(unique_labels) <= 1 or (len(unique_labels) == 2 and -1 in unique_labels):
+        n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+        
+        # Handle edge cases
+        if n_clusters <= 1:
             return 0.0  # No meaningful clusters
         
         # Filter out noise points for quality assessment
         mask = labels != -1
+        noise_points = int(np.sum(~mask))
+        
         if np.sum(mask) < 2:
-            return 0.0
+            return 0.0  # Not enough non-noise points
         
         filtered_features = features[mask]
         filtered_labels = labels[mask]
         
         if len(set(filtered_labels)) <= 1:
-            return 0.0
+            return 0.0  # Only one cluster remains
         
         try:
             # Silhouette score (higher is better, range [-1, 1])
-            silhouette = silhouette_score(filtered_features, filtered_labels)
+            silhouette = silhouette_score(filtered_features, filtered_labels, metric='euclidean')
             
             # Calinski-Harabasz score (higher is better, unbounded)
             calinski = calinski_harabasz_score(filtered_features, filtered_labels)
             
-            # Normalize and combine scores
-            silhouette_normalized = (silhouette + 1) / 2  # Convert to [0, 1]
-            calinski_normalized = min(calinski / 100.0, 1.0)  # Rough normalization
+            # Davies-Bouldin score (lower is better, unbounded, minimum 0)
+            davies_bouldin = davies_bouldin_score(filtered_features, filtered_labels)
             
-            # Weighted combination
-            quality_score = 0.6 * silhouette_normalized + 0.4 * calinski_normalized
+            # Normalize scores to [0, 1] range
+            silhouette_normalized = (silhouette + 1) / 2  # Convert from [-1, 1] to [0, 1]
             
-            return quality_score
+            # More robust Calinski-Harabasz normalization
+            # Use sigmoid-like transformation to handle unbounded nature
+            calinski_normalized = calinski / (calinski + 100.0)  # Asymptotic to 1
+            
+            # Davies-Bouldin normalization (invert since lower is better)
+            # Use exponential decay transformation
+            davies_bouldin_normalized = np.exp(-davies_bouldin / 2.0)
+            
+            # Noise penalty: penalize high noise ratios
+            noise_ratio = float(noise_points) / len(labels)
+            noise_penalty = max(0.0, 1.0 - 2.0 * noise_ratio)  # Linear penalty, 0 at 50% noise
+            
+            # Cluster balance penalty: penalize highly imbalanced clusters
+            cluster_sizes = np.bincount(filtered_labels)
+            if len(cluster_sizes) > 0:
+                cluster_balance = float(np.std(cluster_sizes)) / (float(np.mean(cluster_sizes)) + 1e-8)
+                balance_penalty = max(0.1, 1.0 - cluster_balance / 3.0)  # Normalize by reasonable imbalance
+            else:
+                balance_penalty = 0.1  # Default penalty if no clusters
+            
+            # Weighted combination with research-validated weights
+            quality_score = (
+                0.40 * float(silhouette_normalized) +      # Primary metric for cluster separation
+                0.25 * float(calinski_normalized) +        # Secondary metric for cluster compactness
+                0.20 * float(davies_bouldin_normalized) +  # Tertiary metric for cluster quality
+                0.10 * float(noise_penalty) +              # Penalty for excessive noise
+                0.05 * float(balance_penalty)              # Penalty for cluster imbalance
+            )
+            
+            # Log detailed metrics for debugging
+            self.logger.debug(f"Clustering quality metrics: "
+                            f"silhouette={silhouette:.3f}, "
+                            f"calinski={calinski:.1f}, "
+                            f"davies_bouldin={davies_bouldin:.3f}, "
+                            f"noise_ratio={noise_ratio:.3f}, "
+                            f"cluster_balance={cluster_balance:.3f}, "
+                            f"final_score={quality_score:.3f}")
+            
+            return float(max(0.0, min(1.0, quality_score)))  # Ensure [0, 1] range
             
         except Exception as e:
             self.logger.warning(f"Error assessing clustering quality: {e}")

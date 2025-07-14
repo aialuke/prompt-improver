@@ -4,603 +4,259 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Workflow Rules
 
-### 🚨 **MANDATORY FIRST RESPONSE PROTOCOL** 🚨
+#### **RULE 0: MANDATORY FIRST RESPONSE PROTOCOL**
+```
+<first_response>
+NON-NEGOTIABLE - Follow for EVERY user request:
 
-**⚠️ NON-NEGOTIABLE ⚠️ - Follow for EVERY user request:**
+1. <question_detection>
+   Scan for ANY patterns:
+   - Direct questions: "?", "Why did you", "How did you", "What made you"
+   - Challenge patterns: "you didn't", "you ignored", "you missed"
+   - Clarification demands: "explain why", "tell me why", "clarify your decision"
+   - Instruction challenges: "I asked you to", "I told you to", "I explicitly said"
+   - Confusion indicators: "you were supposed to", "the instruction was"
+   
+   If ANY detected → Answer the direct question FIRST with complete honesty before any other work
+</question_detection>
 
-1. **ENHANCED QUESTION DETECTION** - Scan for ANY of these patterns:
-   **Direct Questions:** "?", "Why did you", "How did you", "What made you", "why", "how", "what"
-   **Challenge Patterns:** "you didn't", "you ignored", "you missed", "you deleted", "you removed"
-   **Clarification Demands:** "explain why", "tell me why", "clarify your decision"
-   **Instruction Challenges:** "I asked you to", "I told you to", "I explicitly said"
-   **Confusion Indicators:** "you were supposed to", "the instruction was", "I don't understand why"
-   - **If ANY pattern detected** → Answer the direct question FIRST with complete honesty before any other work
-   - **No rule consultation phase** - Direct accountability-focused response
-   - **Include specific reasoning** for any decisions that were made
+2. <mandatory_output>Always state: "Checking CLAUDE.md rules for this task..."</mandatory_output>
 
-2. **MANDATORY OUTPUT**: "Checking CLAUDE.md rules for this task..."
-
-3. **MANDATORY RULE LISTING** - Always list which specific rules apply:
-   **Auto-trigger detection**:
-   - User preservation directives → "Applying: INSTRUCTION HIERARCHY PROTOCOL (Level 1 Authority)"
-   - Documentation update requests → "Applying: PRE-ACTION VERIFICATION + DOCUMENTATION PRESERVATION"
-   - Creating/modifying code → "Applying: MINIMAL COMPLEXITY PRINCIPLE"
-   - Code deletion requested → "Applying: CRITICAL VERIFICATION RULE"  
-   - External libraries mentioned → "Applying: MCP IMPLEMENTATION TOOLS"
-   - Analysis requests ("verify", "check", "analyze") → "Applying: EVIDENCE ENUMERATION + CONFIDENCE ASSESSMENT"
-   - Ambiguous requests → "Applying: PRE-ACTION VERIFICATION"
+3. <rule_listing>
+   Always list which specific rules apply:
+   - User preservation directives → "Applying: INSTRUCTION HIERARCHY PROTOCOL"
+   - Creating/modifying code → "Applying: PRE-ACTION VERIFICATION + MINIMAL COMPLEXITY"
+   - Code deletion → "Applying: CRITICAL VERIFICATION RULE"
+   - Analysis requests → "Applying: SYSTEMATIC ANALYSIS PROTOCOL"
+   - External libraries → "Applying: MCP RESEARCH WORKFLOW"
    - Multi-step tasks → "Applying: SYSTEMATIC COMPLETION PROTOCOL"
-   - Error identification/correction → "Applying: ERROR CORRECTION PROTOCOL"
-   - User challenges accuracy → "Applying: CLAIM RE-VERIFICATION PROTOCOL"
    - Simple informational → "No specific rules apply to this informational request"
+</rule_listing>
 
-4. **MANDATORY COMPLIANCE CHECK**:
-   ```bash
-   echo "🔍 AUTOMATED COMPLIANCE CHECK: Protocol adherence verified"
-   echo "✅ RULE TRIGGER: [Specific rule] activated"
-   echo "📊 COMPLIANCE STATUS: Following required protocol steps"
-   ```
+4. <compliance_check>
+   Automated verification:
+   - Protocol adherence verified
+   - Rule trigger activated
+   - Compliance status confirmed
+</compliance_check>
 
-5. **ONLY THEN proceed with the actual work**
-
----
-
-### **MINIMAL COMPLEXITY PRINCIPLE** 🔍 CRITICAL
-
-**Before creating ANY new code, think hard about simplicity:**
-
-**Apply core principles:**
-- **YAGNI**: Implement ONLY what is immediately necessary
-- **KISS**: Choose the most straightforward approach available  
-- **DRY**: Use existing libraries rather than reimplementing functionality
-
-**MANDATORY SEARCH PROTOCOL:**
-```bash
-# 1. Direct name search
-rg "exact_function_name|exact_component_name" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
-
-# 2. Pattern/keyword search
-rg "validate.*email|email.*validation" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
-
-# 3. Import/export search
-rg "import.*{similar}|export.*{similar}" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
-
-# 4. If unclear, use Task tool for comprehensive search
-```
-
-**Decision Matrix:**
-- **EXTEND existing code** when: ≤3 new parameters, ≤50 lines, maintains single responsibility
-- **CREATE new code** when: Different domain/responsibility, would break existing contracts
-- **REFACTOR FIRST** when: Existing code unclear, would violate SOLID principles
-
-**ERROR RESOLUTION HIERARCHY** (when fixing build/type errors):
-1. **Security & Safety** - Never compromise
-2. **Code Correctness** - Proper structure and logic
-3. **Type Safety** - Maintain proper TypeScript typing
-4. **Code Quality** - Readable, maintainable code
-5. **Test Passing** - Only after above are satisfied
-
-**❌ Never use quick fixes:** Remove imports, add @ts-ignore, use any type, delete code
-**✅ Always use proper fixes:** Import types correctly, fix type mismatches, maintain explicit typing
-
----
-
-### **CRITICAL VERIFICATION RULE** 🛑 CRITICAL
-
-**⚠️ WARNING: CODE DELETION CAN CAUSE DATA LOSS ⚠️**
-
-**MANDATORY verification before ANY code deletion:**
-
-```bash
-# Search for exact usage
-rg "ExactItemName" . --type ts --type tsx --type js --type jsx -n
-
-# Search for import/export usage
-rg "import.*ExactItemName|export.*ExactItemName" . -n
-
-# Search for React component usage (JSX)
-rg "<ExactItemName|ExactItemName>" . --type tsx --type jsx -n
-
-# Search for type annotations
-rg ": ExactItemName|extends ExactItemName" . -n
-```
-
-**Decision Matrix:**
-- ✅ **SAFE TO REMOVE**: Zero usage found in verification searches
-- ❌ **DO NOT REMOVE**: Any usage found, even in same file
-- ⚠️ **INVESTIGATE**: Usage only in comments or documentation
-
----
-
-### **MCP IMPLEMENTATION TOOLS** 🔧 CRITICAL
-
-**MANDATORY for external dependencies, complex implementations, AND code analysis:**
-
-**Complete MCP Workflow:**
-
-**0. IDE Diagnostic Integration (MANDATORY for code analysis)**
-```bash
-# ALWAYS check IDE diagnostics first for code analysis tasks
-mcp__ide__getDiagnostics() # Get all diagnostics
-mcp__ide__getDiagnostics("[specific_file_uri]") # Get file-specific diagnostics
-
-# Use IDE diagnostics for:
-# - Code quality analysis
-# - Error detection
-# - Unused variable identification  
-# - Type checking issues
-# - Syntax problems
-```
-
-**Tool Selection Decision Matrix:**
-- **IDE Diagnostics FIRST** for: Code analysis, error detection, syntax validation
-- **Manual File Analysis** when: IDE diagnostics unavailable or insufficient  
-- **Context7 Research** for: External library/framework implementation
-- **Sequential Thinking** for: Complex multi-step problem solving
-
-**1. Context7 Research (MANDATORY for new implementations)**
-```bash
-# REQUIRED: Always research before writing code if not done in current planning
-mcp__context7__resolve-library-id("[library/framework/tool-name]")
-mcp__context7__get-library-docs("[resolved-id]" topic="[specific-implementation]")
-```
-**Required when:** Any new code, libraries, frameworks, or implementation patterns not researched in current session
-
-**2. Memory Search (Always start here after Context7)**
-```bash
-mcp__memory__search_nodes("[implementation-type] patterns")
-mcp__memory__search_nodes("[current-task-type] solutions")
-```
-
-**3. Additional Context7 Research (If needed for external dependencies)**
-```bash
-mcp__context7__resolve-library-id("[library-name]")
-mcp__context7__get-library-docs("[resolved-id]", topic="[specific-topic]")
-```
-
-**4. Sequential Planning (For multi-step tasks)**
-```bash
-mcp__sequential-thinking__sequentialthinking("Plan [implementation] using [approach]")
-```
-
-**5. Memory Storage (Always finish with this)**
-```bash
-mcp__memory__create_entities({
-  name: "[Decision/Pattern name]",
-  entityType: "architecture|solution|pattern|decision",
-  observations: ["Key learning", "Why this approach", "Trade-offs considered"]
-})
-```
-
-**Enhanced Documentation Format:**
-```
-Tool Selection: [IDE diagnostics|manual analysis|context7] because [reliability/availability reason]
-IDE Diagnostics: [X issues found] → [specific file:line references]
-Context7 Research: [library/topic] → [3-5 key insights applied to implementation]
-Memory Search: "[keywords]" - Found: [results or none]
-Implementation: [brief description of approach using research]
-Memory Storage: "[what-stored]" - [entity-type] - [key-observations]
-```
-
-**Fallback Strategy:**
-```bash
-# If IDE diagnostics fail:
-echo "⚠️ IDE DIAGNOSTICS UNAVAILABLE - Using manual analysis"
-echo "📋 FALLBACK: Manual file inspection + ripgrep searches"
-echo "🔍 ACCURACY: Medium (manual) vs High (IDE diagnostics)"
+5. ONLY THEN proceed with actual work
+</first_response>
 ```
 
 ---
 
-### **EVIDENCE ENUMERATION REQUIREMENT** 📊 CRITICAL
-
-**For analysis requests (verify, check, analyze, review):**
-
-**MANDATORY VERIFICATION BEFORE CLAIMS:**
-```bash
-# 1. ALWAYS verify data sources first
-echo "🔍 DATA SOURCE VERIFICATION: Using [diagnostic tool|manual analysis|file inspection]"
-
-# 2. Execute verification commands
-[specific verification commands based on analysis type]
-
-# 3. Document methodology used
-echo "📊 METHODOLOGY: [systematic search|IDE diagnostics|cross-reference verification]"
+#### **RULE 1: SYSTEMATIC ANALYSIS PROTOCOL**
 ```
+<analysis>
+When user requests: verify, check, analyze, review, evaluate, assess, think, or "think hard"
 
-**Required format for ALL claims with MANDATORY CITATIONS:**
-```
-[Finding]: [Evidence] ([Scope]) 
-📍 Source: <cite file="[file_path]" line="[line_number]">[specific_quote_or_finding]</cite>
-```
+Required workflow:
+1. <evidence>Provide file:line citations for ALL claims</evidence>
+2. <confidence>State HIGH/MEDIUM/LOW with specific justification</confidence>
+3. <scope>Report "X/Y files examined" with methodology used</scope>
+4. <completion>Continue until all areas show evidence OR systematic identification of what requires clarification</completion>
 
-**ENHANCED EXAMPLES:**
-❌ "Services have duplications"
-❌ "Found 3 duplicate functions" (insufficient evidence)
-✅ "Found 3 duplicate validateEmail() functions: 
-📍 Source: <cite file="src/utils/validation.ts" line="15">function validateEmail(email)</cite>
-📍 Source: <cite file="src/auth/helper.ts" line="42">function validateEmail(input)</cite>  
-📍 Source: <cite file="src/forms/validator.ts" line="28">const validateEmail = (addr)</cite>
-(Scope: searched 15 TypeScript files via `find src -name "*.ts" | wc -l`)"
+Format: [Finding]: [Evidence] ([Scope]) 📍 Source: file:line
 
-**MANDATORY SELF-VERIFICATION PROTOCOL:**
-Before finalizing ANY analysis:
-1. **Review each claim** - Can I cite specific evidence?
-2. **Verify methodology** - Did I use the most reliable data source available?
-3. **Check completeness** - Did I miss any counter-evidence?
-4. **Document confidence** - What's my confidence level and why?
-
-**If ANY claim lacks specific citable evidence → RETRACT and mark with [INSUFFICIENT_EVIDENCE]**
-
-**Verification commands:**
-```bash
-# For finding examples with line numbers
-rg "pattern" . --type ts -n | head -5
-
-# For counting scope with methodology documentation
-find src -name "*.ts" | wc -l
-rg "pattern" . --type ts --files-with-matches | wc -l
-
-# For IDE diagnostic verification (when available)
-mcp__ide__getDiagnostics("[file_uri]")
+Parallel execution: Invoke all relevant tools simultaneously rather than sequentially for maximum efficiency.
+</analysis>
 ```
 
 ---
 
-### **OUTPUT VALIDATION PROTOCOL** 🔬 CRITICAL
-
-**MANDATORY validation before claiming ANY implementation is complete:**
-
-**AUTOMATED GRADER FUNCTIONS:**
-```bash
-# Database connectivity grader  
-echo "🔍 DATABASE VERIFICATION:"
-echo "- Connection test: [PASS/FAIL]"
-echo "- Query execution: [<50ms/SLOW/FAIL]" 
-echo "- Realistic metrics: [VALIDATED/SUSPICIOUS/FAIL]"
-
-# Performance metrics grader
-echo "📊 METRICS SANITY CHECK:"
-echo "- Response times: [0.1ms-200ms=VALID|0.0ms=BROKEN|>1000ms=DEGRADED]"
-echo "- Memory usage: [10MB-500MB=NORMAL|<1MB=SUSPICIOUS|>1GB=EXCESSIVE]"
-echo "- Error rates: [0-5%=GOOD|>10%=UNACCEPTABLE]"
+#### **RULE 2: PRE-ACTION VERIFICATION & MINIMAL COMPLEXITY**
 ```
+<verification>
+Before ANY action, think hard about simplicity:
 
-**METRICS VALIDATION INTEGRATION:**
-```bash
-# Use CONFIDENCE ASSESSMENT FRAMEWORK metrics validation (see section below)
-echo "📊 APPLYING METRICS VALIDATION: Using validate_metrics_claim() function"
-echo "🔍 VALIDATION RESULT: [result from CONFIDENCE ASSESSMENT FRAMEWORK]"
-echo "⚠️ INVESTIGATION REQUIRED: [if suspicious or impossible values detected]"
+<complexity_assessment>
+Apply core principles:
+- YAGNI: Implement ONLY what is immediately necessary
+- KISS: Choose the most straightforward approach available
+- DRY: Use existing libraries rather than reimplementing functionality
+</complexity_assessment>
 
-# Cross-reference with realistic ranges defined in CONFIDENCE ASSESSMENT FRAMEWORK
-# - Response times: 0.1ms-500ms (suspicious if <1.0ms or >300ms)  
-# - Memory usage: 10MB-1000MB (suspicious if <5MB or >500MB)
-# - Database connections: 1-50 (suspicious if >20)
-```
+<search_protocol>
+MANDATORY 4-step search before creating new code:
+1. Direct name search: rg "exact_function_name|exact_component_name" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
+2. Pattern/keyword search: rg "validate.*email|email.*validation" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
+3. Import/export search: rg "import.*{similar}|export.*{similar}" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
+4. If unclear: Use comprehensive search tools for complete analysis
+</search_protocol>
 
-**IMPLEMENTATION VERIFICATION CHECKLIST:**
-□ **Output Sanity Check**: Do all metrics fall within realistic ranges?
-□ **Functional Verification**: Can I demonstrate the feature working end-to-end?
-□ **Integration Testing**: Do all components interact without errors?
-□ **Performance Validation**: Are claimed improvements measurable and realistic?
-□ **Regression Testing**: Does existing functionality still work?
+<decision_matrix>
+EXTEND existing code when:
+- ≤3 new parameters, ≤50 lines, maintains single responsibility
+- Same domain/responsibility, preserves existing contracts
+- Code is clear and follows SOLID principles
 
-**FAILURE CRITERIA - STOP IMPLEMENTATION IF:**
-- Any metric outside realistic ranges (0.0ms response times = BROKEN)
-- Database operations that fail but are ignored
-- Error messages treated as "passing tests"
-- Performance claims that cannot be independently verified
+CREATE new code when:
+- Different domain/responsibility, would break existing contracts
+- Extension would violate single responsibility principle
+- Existing code unclear or poorly structured
 
-**TRIGGER CONDITIONS:**
-- Before marking any implementation as "complete"
-- When encountering unrealistic performance metrics
-- When database/external service integration is claimed functional
-- When "all tests passing" is stated without verifying test quality
+REFACTOR FIRST when:
+- Existing code unclear, would violate SOLID principles
+- Extension would create technical debt
+- Current implementation not the simplest possible
+</decision_matrix>
 
----
+<deletion_verification>
+For DELETING code - verify zero usage:
+- rg "ExactItemName" . --type ts --type tsx --type js --type jsx -n
+- rg "import.*ExactItemName|export.*ExactItemName" . -n
+- rg "<ExactItemName|ExactItemName>" . --type tsx --type jsx -n
+- rg ": ExactItemName|extends ExactItemName" . -n
+Decision: Zero usage = safe removal
+</deletion_verification>
 
-### **INTEGRATION TESTING PROTOCOL** 🔌 CRITICAL
+<error_hierarchy>
+When fixing build/type errors, prioritize:
+1. Security & Safety - Never compromise
+2. Code Correctness - Proper structure and logic
+3. Type Safety - Maintain proper TypeScript typing
+4. Code Quality - Readable, maintainable code
+5. Test Passing - Only after above are satisfied
 
-**MANDATORY for database, external services, and cross-component integrations:**
+❌ Never use quick fixes: Remove imports, add @ts-ignore, use any type, delete code
+✅ Always use proper fixes: Import types correctly, fix type mismatches, maintain explicit typing
+</error_hierarchy>
 
-**DATABASE INTEGRATION VERIFICATION:**
-```python
-async def verify_database_integration():
-    """Mandatory verification before claiming database functionality works"""
-    
-    # Test 1: Basic connectivity
-    try:
-        async with get_session() as session:
-            result = await session.execute("SELECT 1")
-            assert result.scalar() == 1
-        print("✅ Database connectivity: VERIFIED")
-    except Exception as e:
-        print(f"❌ Database connectivity: FAILED - {e}")
-        return False
-    
-    # Test 2: Realistic operation timing
-    start_time = time.time()
-    async with get_session() as session:
-        await session.execute("SELECT COUNT(*) FROM information_schema.tables")
-    response_time = (time.time() - start_time) * 1000
-    
-    if 1 <= response_time <= 100:
-        print(f"✅ Database performance: {response_time:.1f}ms (REALISTIC)")
-    else:
-        print(f"⚠️ Database performance: {response_time:.1f}ms (SUSPICIOUS)")
-        return False
-    
-    return True
-```
-
-**EXTERNAL SERVICE INTEGRATION CHECKLIST:**
-□ **Connection Establishment**: Service responds to basic connectivity test
-□ **Authentication**: API keys/credentials work and return expected responses
-□ **Error Handling**: Service unavailability gracefully handled
-□ **Response Validation**: Service returns data in expected format
-□ **Performance Characteristics**: Response times within acceptable ranges
-
-**CROSS-COMPONENT INTEGRATION VERIFICATION:**
-□ **Data Flow**: Information passes correctly between components
-□ **Interface Contracts**: APIs match expected signatures
-□ **State Management**: Shared state remains consistent
-□ **Error Propagation**: Failures in one component handled appropriately
-
-**FAILURE CRITERIA:**
-- Connection tests that silently fail or timeout
-- Authentication that appears to work but produces empty responses
-- Services that return test/mock data instead of real functionality
-- Integration points that work in isolation but fail when combined
-
----
-
-### **SYSTEMATIC COMPLETION PROTOCOL** 📋
-
-**For comprehensive analysis tasks:**
-
-**Progress tracking format:**
-```
-Scope: [X areas defined] ([verification command used])
-Progress: [Y/X areas analyzed] ([files per area])
-Evidence: [Z findings documented] ([example locations])
-Verification: [Implementation matches specification] ([specific checks performed])
-Status: [CONTINUE/COMPLETE] because [objective reason + verification results]
-```
-
-**Enhanced Decision Criteria:**
-- **CONTINUE**: Any area shows 0 files analyzed OR missing evidence OR verification gaps
-- **COMPLETE**: All areas have evidence AND verification confirms specification compliance OR objective reason for exclusion
-
----
-
-### **ERROR CORRECTION PROTOCOL** 🔄 CRITICAL
-
-**MANDATORY when errors or inaccuracies are identified:**
-
-**Phase 0: Immediate Investigation** 🚨 CRITICAL
-**TRIGGER:** ANY error during implementation, test failure, import error, or unexpected behavior
-```bash
-# STOP ALL WORK - Investigate immediately
-echo "🛑 IMMEDIATE INVESTIGATION REQUIRED: [error type]"
-echo "📊 ERROR CONTEXT: [what was being attempted]"
-echo "🔍 INVESTIGATE FIRST: Root cause analysis before any fixes"
-
-# Mandatory investigation steps:
-# 1. Examine error message and stack trace completely
-# 2. Check file/method/import actually exists
-# 3. Verify expected vs actual behavior
-# 4. Test minimal reproduction case
-# 5. Check related functionality for similar issues
-
-# ONLY AFTER investigation: proceed to targeted fix
-echo "✅ INVESTIGATION COMPLETE: [root cause identified]"
-echo "🎯 TARGETED FIX: [specific solution based on investigation]"
-```
-
-**Phase 1: Error Acknowledgment**
-```bash
-echo "🚨 ERROR DETECTED: [specific error identified]"
-echo "📍 LOCATION: [where error occurred - file, line, or analysis section]"
-echo "🔍 ROOT CAUSE: [why error occurred - method, assumption, or data issue]"
-```
-
-**Phase 2: Systematic Re-verification**
-```
-MANDATORY RE-VERIFICATION CHECKLIST:
-□ Re-examine original data sources with different method
-□ Cross-reference against additional sources when available  
-□ Verify methodology used was appropriate for the task
-□ Check for confirmation bias in original analysis
-□ Document what was missed or misinterpreted
-□ Identify any related claims that may also be incorrect
-```
-
-**Phase 3: Correction Documentation**
-```
-ERROR CORRECTION REPORT:
-- Original Claim: [exact original statement]
-- Error Type: [methodology|data|interpretation|scope]
-- Corrected Finding: [new accurate finding with evidence]
-- Methodology Change: [what approach was used for correction]
-- Related Impact: [other claims that needed review/correction]
-- Prevention: [how to avoid this error type in future]
-```
-
-**Phase 4: Update Documentation**
-```bash
-# Update any documentation that contained the error
-echo "📝 UPDATING: [specific files/reports updated]"
-echo "✅ VERIFIED: All related claims checked and corrected"
-echo "🔒 LOCKED: Final verification complete"
-```
-
-**Trigger Conditions:**
-- User explicitly identifies an error ("you were wrong", "that's incorrect")
-- Self-detection during verification process
-- Contradiction found between sources
-- Follow-up analysis reveals initial error
-
----
-
-### **CONFIDENCE ASSESSMENT FRAMEWORK** 🎯 CRITICAL
-
-**MANDATORY confidence level documentation for all analytical claims:**
-
-**Confidence Level Definitions:**
-```
-🟢 HIGH CONFIDENCE (90-100%):
-- IDE diagnostics used + manual verification
-- Multiple reliable sources confirm finding
-- Systematic methodology applied
-- Evidence directly supports claim
-- Format: "HIGH confidence: [finding] based on [specific evidence]"
-
-🟡 MEDIUM CONFIDENCE (70-89%):
-- Manual analysis with systematic approach
-- Single reliable source or partial verification
-- Some assumptions made but documented
-- Evidence mostly supports claim
-- Format: "MEDIUM confidence: [finding] based on [evidence + limitations]"
-
-🔴 LOW CONFIDENCE (50-69%):
-- Limited data sources available
-- Methodology constraints acknowledged
-- Significant assumptions made
-- Evidence partially supports claim
-- Format: "LOW confidence: [finding] - [specific limitations noted]"
-
-⚫ INSUFFICIENT (0-49%):
-- Inadequate evidence to make claim
-- Unreliable or unclear data sources
-- Must use: "[INSUFFICIENT_EVIDENCE] - cannot determine [finding]"
-```
-
-**Mandatory Confidence Documentation:**
-```
-CONFIDENCE ASSESSMENT:
-- Evidence Quality: [high|medium|low] - [reason]
-- Methodology Used: [systematic|limited|assumption-based]
-- Data Source Reliability: [IDE|manual|external] - [reliability justification] 
-- Verification Level: [cross-checked|single-source|unverified]
-- Overall Confidence: [HIGH|MEDIUM|LOW|INSUFFICIENT] ([percentage])
-- Limitations: [specific factors affecting confidence]
-```
-
-**Evidence Quality Requirements by Confidence Level:**
-- **HIGH**: Direct citations with file:line references + systematic verification
-- **MEDIUM**: Specific examples with file references + structured analysis  
-- **LOW**: General findings with documented limitations + basic verification
-- **INSUFFICIENT**: Must explicitly state inability to verify claim
-
-**Metrics Validation Framework** 🎯 CRITICAL
-**MANDATORY for all performance and metrics claims:**
-```python
-# Automated sanity checking for metrics claims
-REALISTIC_METRIC_RANGES = {
-    "response_time_ms": {"min": 0.1, "max": 500, "suspicious_below": 1.0, "suspicious_above": 300},
-    "memory_usage_mb": {"min": 10, "max": 1000, "suspicious_below": 5, "suspicious_above": 500},
-    "cpu_usage_percent": {"min": 0.1, "max": 100, "suspicious_below": 0.5, "suspicious_above": 90},
-    "database_connections": {"min": 1, "max": 50, "suspicious_above": 20},
-    "cache_hit_ratio": {"min": 0, "max": 100, "suspicious_below": 60},
-    "success_rate_percent": {"min": 0, "max": 100, "suspicious_below": 80}
-}
-
-def validate_metrics_claim(metric_name: str, value: float) -> str:
-    """MANDATORY validation before claiming any metric value"""
-    ranges = REALISTIC_METRIC_RANGES.get(metric_name, {})
-    
-    if value < ranges.get("min", 0):
-        return f"❌ IMPOSSIBLE: {metric_name}={value} below minimum {ranges['min']}"
-    
-    if value > ranges.get("max", float('inf')):
-        return f"❌ IMPOSSIBLE: {metric_name}={value} above maximum {ranges['max']}"
-    
-    if value < ranges.get("suspicious_below", 0):
-        return f"⚠️ SUSPICIOUS: {metric_name}={value} unexpectedly low - INVESTIGATE"
-        
-    if value > ranges.get("suspicious_above", float('inf')):
-        return f"⚠️ SUSPICIOUS: {metric_name}={value} unexpectedly high - INVESTIGATE"
-    
-    return f"✅ REALISTIC: {metric_name}={value} within expected range"
-
-# ENFORCEMENT: Check ALL metrics before claiming
-echo "📊 METRICS VALIDATION: [validation_result]"
-echo "🔍 INVESTIGATION REQUIRED: [if suspicious or impossible values detected]"
-```
-
-**Uncertainty Acknowledgment Protocol:**
-```bash
-# When confidence is MEDIUM or below:
-echo "⚠️ UNCERTAINTY ACKNOWLEDGED: [specific limitations]"
-echo "🔍 ADDITIONAL VERIFICATION NEEDED: [what would increase confidence]"
-echo "📊 CONFIDENCE LEVEL: [level] because [specific justification]"
-echo "📈 METRICS VALIDATED: [all performance claims checked against realistic ranges]"
+Platform-agnostic: Use universal tools (rg, find, grep) for all environments
+</verification>
 ```
 
 ---
 
-### **CLAIM RE-VERIFICATION PROTOCOL** 🔍 CRITICAL
+### Rule 3: MCP RESEARCH WORKFLOW
+*Streamlined MCP Implementation Tools with Web Research*
 
-**MANDATORY when accuracy is questioned or systematic re-examination needed:**
-
-**Trigger Conditions:**
-- User challenges accuracy ("are you sure?", "verify this", "double-check")
-- Contradictory evidence emerges
-- High-stakes claims requiring validation
-- Previous errors detected in same analysis
-
-**Systematic Re-verification Process:**
-
-**Phase 1: Original Claim Analysis**
-```
-ORIGINAL CLAIM REVIEW:
-- Exact Claim: [copy original statement verbatim]
-- Evidence Used: [list all evidence cited originally]
-- Methodology: [describe approach used]
-- Confidence Level: [what was claimed originally]
-- Assumptions Made: [identify any assumptions]
+```xml
+<research>
+  <memory>search previous solutions first</memory>
+  <context7>mandatory for external dependencies and best practices</context7>
+  <firecrawl>web research, documentation scraping, real-time information</firecrawl>
+  <sequential>multi-step planning for complex tasks</sequential>
+  <parallel>invoke all relevant tools simultaneously</parallel>
+  <store>document decisions and patterns</store>
+  <thinking>use thinking blocks for complex reasoning</thinking>
+  <fallback>manual analysis when MCP unavailable</fallback>
+</research>
 ```
 
-**Phase 2: Independent Re-examination** 
-```bash
-# Use different methodology than original
-echo "🔄 RE-VERIFICATION METHOD: [different approach from original]"
+---
 
-# Example approaches:
-# - If used manual analysis → try IDE diagnostics
-# - If used single file → expand to cross-file search  
-# - If used grep → try AST-based analysis
-# - If used assumptions → seek direct verification
+#### **RULE 4: IMPLEMENTATION VALIDATION**
+```
+<validation>
+Validation levels (apply in order):
+
+<basic>
+- Syntax correctness
+- Import statements
+- Type safety
+- Basic functionality
+</basic>
+
+<integration>
+- Database connections
+- External services
+- Cross-component compatibility
+- API contract adherence
+</integration>
+
+<performance>
+- Response time: 0.1-500ms expected
+- Memory usage: 10-1000MB typical
+- Validate metrics before claiming results
+- Use realistic test scenarios
+</performance>
+
+Always validate claims with concrete evidence before marking complete.
+</validation>
 ```
 
-**Phase 3: Cross-Reference Verification**
-```bash
-# Search for counter-evidence
-rg "[contradiction_patterns]" . --type [relevant_types] -n
+---
 
-# Check multiple sources
-echo "📚 SOURCES CHECKED:"
-echo "- [source 1]: [finding]"
-echo "- [source 2]: [finding]"  
-echo "- [source 3]: [finding]"
+#### **RULE 5: ERROR CORRECTION**
+```
+<error_handling>
+When errors occur:
+
+<immediate>
+- Investigate root cause before applying fixes
+- Document: error type, location, specific cause
+- Avoid quick fixes that mask underlying issues
+</immediate>
+
+<correction>
+- Re-examine with different methodology
+- Update documentation and related claims
+- Verify fix doesn't introduce new issues
+- Test edge cases and error scenarios
+</correction>
+
+Error hierarchy: Security → Correctness → Type Safety → Code Quality → Test Passing
+</error_handling>
 ```
 
-**Phase 4: Verification Results**
+---
+
+#### **RULE 6: CONTINUOUS IMPROVEMENT**
 ```
-RE-VERIFICATION RESULTS:
-- Original Claim Status: [CONFIRMED|MODIFIED|CONTRADICTED|INSUFFICIENT_EVIDENCE]
-- New Evidence Found: [list any new evidence]
-- Contradictory Evidence: [list any conflicts]
-- Methodology Comparison: [original vs re-verification approach]
-- Final Determination: [corrected claim with confidence level]
-- Documentation Updates: [what needs to be corrected]
+<improvement>
+Modernization patterns:
+- JavaScript: var→const/let, .then()→async/await
+- Python: %formatting→f-strings, os.path→pathlib
+- TypeScript: any→specific types, manual loops→built-in methods
+
+Process:
+1. Research latest practices via Context7
+2. Recommend forward path, not backward compatibility
+3. Provide clear migration strategies
+4. Document rationale for modernization choices
+
+Focus on: Performance, maintainability, readability, current best practices
+</improvement>
 ```
 
-**Multiple Source Verification Requirements:**
-- **Critical Claims**: Minimum 2 independent verification methods
-- **Code Analysis**: IDE diagnostics + manual inspection when available
-- **External Dependencies**: Documentation + community sources + testing
-- **Architecture Decisions**: Multiple examples + cross-reference patterns
+---
 
+### **RULE PRECEDENCE HIERARCHY**
+
+When rules conflict, follow this order:
+0. **Mandatory First Response Protocol** (governs all interactions)
+1. **Error Correction** (safety first)
+2. **Pre-Action Verification** (prevent issues)
+3. **Systematic Analysis** (gather evidence)
+4. **Implementation Validation** (ensure quality)
+5. **MCP Research** (informed decisions)
+6. **Continuous Improvement** (optimize over time)
+
+### **PARALLEL EXECUTION INSTRUCTION**
+
+**Critical for Claude-4 Sonnet optimization:**
+```
+For maximum efficiency, whenever you perform multiple operations, invoke all relevant tools simultaneously rather than sequentially. This applies to:
+- Reading multiple files
+- Running multiple searches
+- Gathering different types of evidence
+- Performing independent validations
+
+Default to parallel execution unless output of one tool is required for input of another.
+```
+
+### **EXTENDED THINKING MODE**
+
+**For complex multi-step tasks:**
+```
+Use <thinking> tags for complex reasoning, planning, and analysis:
+- After tool use for reflection
+- Before making decisions
+- When breaking down complex problems
+- For step-by-step reasoning
+
+This enables more deliberate and structured problem-solving.
+```
 ---
