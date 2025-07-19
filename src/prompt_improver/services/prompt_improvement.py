@@ -1242,86 +1242,68 @@ class PromptImprovementService:
     async def run_ml_optimization(
         self, rule_ids: list[str] | None, db_session: AsyncSession
     ):
-        """Run ML optimization for specified rules"""
+        """Run ML optimization for specified rules with automatic real+synthetic data"""
         from .ml_integration import get_ml_service
+        from ..learning.training_data_loader import TrainingDataLoader
 
-        # Get all performance data for training
-        perf_stmt = (
-            select(
-                RulePerformance, RuleMetadata.default_parameters, RuleMetadata.priority
-            )
-            .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
-            .where(RuleMetadata.enabled == True)
+        # Use the new unified training data loader
+        data_loader = TrainingDataLoader(
+            real_data_priority=True,  # Prioritize real data
+            min_samples=20,
+            lookback_days=30,
+            synthetic_ratio=0.3,  # Allow up to 30% synthetic data
         )
-
-        # Filter by specific rule IDs if provided
-        if rule_ids:
-            perf_stmt = perf_stmt.where(RulePerformance.rule_id.in_(rule_ids))
-
-        # Only include recent data (last 30 days) for relevance
-        recent_date = aware_utc_now() - timedelta(days=30)
-        perf_stmt = perf_stmt.where(RulePerformance.created_at >= recent_date)
-
-        result = await db_session.execute(perf_stmt)
-        performance_data = result.fetchall()
-
-        if len(performance_data) < 20:
+        
+        # Load training data automatically combining real and synthetic
+        training_data = await data_loader.load_training_data(
+            db_session=db_session,
+            rule_ids=rule_ids
+        )
+        
+        # Check if we have sufficient data
+        if not training_data["validation"]["is_valid"]:
             logger.warning(
-                f"Insufficient data for ML optimization: {len(performance_data)} samples (minimum: 20)"
+                f"Insufficient training data: {training_data['metadata']['total_samples']} samples "
+                f"({training_data['metadata']['real_samples']} real, "
+                f"{training_data['metadata']['synthetic_samples']} synthetic)"
             )
             return {
                 "status": "insufficient_data",
-                "message": f"Need at least 20 samples for optimization, found {len(performance_data)}",
-                "samples_found": len(performance_data),
+                "message": f"Need at least 20 samples for optimization",
+                "samples_found": training_data['metadata']['total_samples'],
+                "real_samples": training_data['metadata']['real_samples'],
+                "synthetic_samples": training_data['metadata']['synthetic_samples'],
+                "warnings": training_data["validation"]["warnings"],
             }
 
-        # Prepare training data with enhanced features
-        features = []
-        effectiveness_scores = []
-
-        for row in performance_data:
-            # Access the fields from the Row object
-            # row is a Row object with named access
-            rule_perf = row.RulePerformance  # RulePerformance object
-            params = row.default_parameters or {}  # default_parameters dict
-            priority = row.priority or 5  # priority value
-
-            # Enhanced feature engineering
-            features.append([
-                rule_perf.improvement_score or 0,  # Core improvement metric
-                rule_perf.execution_time_ms or 0,  # Performance metric
-                params.get("weight", 1.0),  # Rule weight
-                priority,  # Rule priority
-                rule_perf.confidence_level or 0,  # Confidence level
-                len(params),  # Parameter complexity
-                params.get("confidence_threshold", 0.5),  # Confidence threshold
-                1.0 if params.get("enabled", True) else 0.0,  # Enabled status
-                params.get("min_length", 0) / 100.0,  # Normalized min length
-                params.get("max_length", 1000) / 1000.0,  # Normalized max length
-            ])
-
-            # Target effectiveness score (0-1 scale)
-            effectiveness = min(
-                1.0, max(0.0, (rule_perf.improvement_score or 0) / 100.0)
-            )
-            effectiveness_scores.append(effectiveness)
+        # Extract features and labels from the unified training data
+        features = training_data["features"]
+        effectiveness_scores = training_data["labels"]
+        
+        logger.info(
+            f"Using {len(features)} training samples for ML optimization: "
+            f"{training_data['metadata']['real_samples']} real, "
+            f"{training_data['metadata']['synthetic_samples']} synthetic "
+            f"(ratio: {training_data['metadata']['synthetic_ratio']:.1%} synthetic)"
+        )
 
         # Run ML optimization
         ml_service = await get_ml_service()
-        training_data = {
+        ml_training_data = {
             "features": features,
             "effectiveness_scores": effectiveness_scores,
+            "metadata": training_data["metadata"],
         }
 
         optimization_result = await ml_service.optimize_rules(
-            training_data, db_session, rule_ids=rule_ids
+            ml_training_data, db_session, rule_ids=rule_ids
         )
 
         if optimization_result.get("status") == "success":
             # Also try ensemble optimization if we have enough data
             if len(features) >= 50:
                 ensemble_result = await ml_service.optimize_ensemble_rules(
-                    training_data, db_session
+                    ml_training_data, db_session
                 )
 
                 if ensemble_result.get("status") == "success":

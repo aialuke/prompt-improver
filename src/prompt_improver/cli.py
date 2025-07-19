@@ -318,7 +318,9 @@ def train(
 
                 # Get comprehensive training data statistics
                 from sqlalchemy import text
+                from prompt_improver.learning.training_data_loader import get_training_data_stats
 
+                # Get real data stats from rule_performance
                 stats_query = text("""
                     SELECT 
                         COUNT(*) FILTER (WHERE rp.improvement_score >= 0.7) as high_quality_count,
@@ -333,6 +335,9 @@ def train(
 
                 result = await db_session.execute(stats_query)
                 stats = result.fetchone()
+                
+                # Get training data composition stats
+                training_stats = await get_training_data_stats(db_session)
 
                 progress.update(task, completed=True)
 
@@ -385,6 +390,36 @@ def train(
             )
 
             console.print(table)
+            
+            # Show training data composition
+            comp_table = Table(title="Training Data Composition (Auto-Combined)")
+            comp_table.add_column("Data Source", style="cyan")
+            comp_table.add_column("Samples", justify="right", style="green")
+            comp_table.add_column("Percentage", justify="right", style="yellow")
+            
+            real_samples = training_stats["real_data"]["total_samples"]
+            synthetic_samples = training_stats["synthetic_data"]["total_samples"]
+            total_samples = training_stats["combined"]["total_samples"]
+            
+            comp_table.add_row(
+                "Real Data (Prioritized)",
+                str(real_samples),
+                f"{training_stats['combined']['real_ratio']:.1%}"
+            )
+            comp_table.add_row(
+                "Synthetic Data (Auto-Added)",
+                str(synthetic_samples),
+                f"{1 - training_stats['combined']['real_ratio']:.1%}"
+            )
+            comp_table.add_row(
+                "Total Available",
+                str(total_samples),
+                "100.0%",
+                style="bold"
+            )
+            
+            console.print("\n")
+            console.print(comp_table)
 
             if dry_run:
                 console.print(
