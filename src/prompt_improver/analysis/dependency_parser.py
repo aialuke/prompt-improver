@@ -6,12 +6,10 @@ and syntactic quality of prompts.
 """
 
 import logging
-import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
-import nltk
 from nltk import pos_tag, sent_tokenize, word_tokenize
 from nltk.chunk import RegexpParser
 from nltk.tree import Tree
