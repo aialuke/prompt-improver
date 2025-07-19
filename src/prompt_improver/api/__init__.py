@@ -1,9 +1,9 @@
-"""
-API Module for Prompt Improver
+"""API Module for Prompt Improver
 Provides REST and WebSocket API endpoints for the application
 """
 
 from fastapi import APIRouter
+
 from .apriori_endpoints import apriori_router
 from .real_time_endpoints import real_time_router
 

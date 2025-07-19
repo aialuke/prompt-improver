@@ -5,12 +5,14 @@ logging, and error handling based on the best patterns from cli.py.
 """
 
 import logging
+import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ class SecureSubprocessManager:
         self.default_timeout = default_timeout
         self.enable_audit_logging = enable_audit_logging
 
-    def _validate_executable_path(self, executable: Union[str, Path]) -> str:
+    def _validate_executable_path(self, executable: str | Path) -> str:
         """Validate and resolve executable path securely.
 
         Args:
@@ -69,7 +71,7 @@ class SecureSubprocessManager:
 
         return str(executable_path.resolve())
 
-    def _validate_arguments(self, args: List[str]) -> List[str]:
+    def _validate_arguments(self, args: list[str]) -> list[str]:
         """Validate subprocess arguments for security.
 
         Args:
@@ -92,7 +94,7 @@ class SecureSubprocessManager:
 
         return [str(arg) for arg in args]
 
-    def _log_subprocess_call(self, args: List[str], operation: str) -> None:
+    def _log_subprocess_call(self, args: list[str], operation: str) -> None:
         """Log subprocess call for audit trail.
 
         Args:
@@ -114,13 +116,13 @@ class SecureSubprocessManager:
 
     def run_secure(
         self,
-        args: List[Union[str, Path]],
+        args: list[str | Path],
         operation: str,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
         check: bool = True,
         capture_output: bool = False,
         text: bool = True,
-        cwd: Optional[Union[str, Path]] = None,
+        cwd: str | Path | None = None,
         **kwargs,
     ) -> subprocess.CompletedProcess:
         """Execute subprocess with comprehensive security validation.
@@ -204,7 +206,7 @@ class SecureSubprocessManager:
 
     def popen_secure(
         self,
-        args: List[Union[str, Path]],
+        args: list[str | Path],
         operation: str,
         stdout: Any = None,
         stderr: Any = None,
@@ -280,7 +282,7 @@ _default_manager = SecureSubprocessManager()
 
 def secure_subprocess(
     operation: str,
-    timeout: Optional[int] = None,
+    timeout: int | None = None,
     capture_output: bool = False,
     check: bool = True,
 ):
@@ -322,3 +324,28 @@ def secure_subprocess(
         return wrapper
 
     return decorator
+
+
+def ensure_running(pid: int) -> bool:
+    """Centralized function to validate if a background process is running.
+    
+    This function consolidates PID validation logic used across the codebase
+    to avoid duplication. It handles both psutil-based and OS-based checks.
+    
+    Args:
+        pid: Process ID to check
+        
+    Returns:
+        True if process is running, False otherwise
+    """
+    try:
+        # Try psutil first if available
+        try:
+            import psutil
+            return psutil.pid_exists(pid)
+        except ImportError:
+            # Fallback to OS-based check
+            os.kill(pid, 0)  # Signal 0 checks if process exists
+            return True
+    except (ProcessLookupError, PermissionError, OSError):
+        return False

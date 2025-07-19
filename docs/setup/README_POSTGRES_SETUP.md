@@ -59,7 +59,7 @@ Convenient commands for database management:
 
 **For your Python code:**
 ```python
-DATABASE_URL = "postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
+DATABASE_URL = "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
 ```
 
 **For MCP Server configuration:**

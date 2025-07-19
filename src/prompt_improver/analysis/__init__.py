@@ -1,5 +1,4 @@
-"""
-Linguistic analysis module for prompt quality assessment.
+"""Linguistic analysis module for prompt quality assessment.
 
 This module provides advanced linguistic analysis capabilities including:
 - Named Entity Recognition (NER) for domain-specific terms
@@ -9,12 +8,8 @@ This module provides advanced linguistic analysis capabilities including:
 - Prompt component segmentation
 """
 
+from .dependency_parser import DependencyParser
 from .linguistic_analyzer import LinguisticAnalyzer
 from .ner_extractor import NERExtractor
-from .dependency_parser import DependencyParser
 
-__all__ = [
-    "LinguisticAnalyzer",
-    "NERExtractor", 
-    "DependencyParser"
-] 
+__all__ = ["DependencyParser", "LinguisticAnalyzer", "NERExtractor"]

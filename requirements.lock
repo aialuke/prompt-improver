@@ -1,6 +1,5 @@
-adal==1.2.7
+# adal==1.2.7  # REMOVED: Azure AD library not used
 -e git+https://github.com/aialuke/prompt-improver.git@571f6339dd0aa1affa4baa9e3b331f0a2d4eef25#egg=adaptive_prompt_enhancement_system
-aiosqlite==0.21.0
 alembic==1.16.2
 annotated-types==0.7.0
 anyio==4.9.0
@@ -10,25 +9,25 @@ astroid==3.3.10
 asyncpg==0.30.0
 attrs==25.3.0
 Authlib==1.6.0
-azure-common==1.1.28
-azure-core==1.35.0
-azure-graphrbac==0.61.2
-azure-mgmt-authorization==4.0.0
-azure-mgmt-containerregistry==13.0.0
-azure-mgmt-core==1.6.0
-azure-mgmt-keyvault==11.0.0
-azure-mgmt-network==29.0.0
-azure-mgmt-resource==24.0.0
-azure-mgmt-storage==23.0.0
-azureml-core==1.60.0.post1
+# azure-common==1.1.28  # REMOVED: Azure packages not used
+# azure-core==1.35.0
+# azure-graphrbac==0.61.2
+# azure-mgmt-authorization==4.0.0
+# azure-mgmt-containerregistry==13.0.0
+# azure-mgmt-core==1.6.0
+# azure-mgmt-keyvault==11.0.0
+# azure-mgmt-network==29.0.0
+# azure-mgmt-resource==24.0.0
+# azure-mgmt-storage==23.0.0
+# azureml-core==1.60.0.post1
 backoff==2.2.1
 backports.tempfile==1.0
 backports.weakref==1.0.post1
 bcrypt==4.3.0
 blinker==1.9.0
 boolean.py==5.0
-boto3==1.39.3
-botocore==1.39.3
+# boto3==1.39.3  # REMOVED: AWS packages not used
+# botocore==1.39.3
 CacheControl==0.14.3
 cachetools==5.5.2
 certifi==2025.6.15
@@ -52,7 +51,7 @@ distlib==0.3.9
 distro==1.9.0
 dnspython==2.7.0
 docker==7.1.0
-docopt==0.6.2
+# docopt==0.6.2  # REMOVED: CLI library not used
 durationpy==0.10
 dynaconf==3.2.11
 email_validator==2.2.0
@@ -67,13 +66,13 @@ fonttools==4.58.5
 fsspec==2025.5.1
 gitdb==4.0.12
 GitPython==3.1.44
-google-api-core==2.25.1
-google-auth==2.40.3
-google-cloud-core==2.4.3
-google-cloud-storage==3.1.1
-google-crc32c==1.7.1
-google-resumable-media==2.7.2
-googleapis-common-protos==1.70.0
+# google-api-core==2.25.1  # REMOVED: Google Cloud packages not used
+# google-auth==2.40.3
+# google-cloud-core==2.4.3
+# google-cloud-storage==3.1.1
+# google-crc32c==1.7.1
+# google-resumable-media==2.7.2
+# googleapis-common-protos==1.70.0
 graphene==3.4.3
 graphql-core==3.2.6
 graphql-relay==3.2.0
@@ -108,13 +107,13 @@ jsonpickle==4.1.1
 jsonschema==4.24.0
 jsonschema-specifications==2025.4.1
 kiwisolver==1.4.8
-knack==0.12.0
+# knack==0.12.0  # REMOVED: Azure CLI library not used
 kubernetes==33.1.0
 license-expression==30.4.3
 litestar==2.16.0
 litestar-htmx==0.5.0
 Mako==1.3.10
-mando==0.7.1
+# mando==0.7.1  # REMOVED: Command-line argument parser not used
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 matplotlib==3.10.3
@@ -158,9 +157,9 @@ pillow==11.3.0
 pip-api==0.0.34
 pip-check-reqs==2.5.5
 pip-requirements-parser==32.0.1
-pip_audit==2.9.0
-pipdeptree==2.26.1
-pipreqs==0.4.13
+# pip_audit==2.9.0  # REMOVED: Dependency auditing tool not used
+# pipdeptree==2.26.1  # REMOVED: Dependency tree visualization tool not used
+# pipreqs==0.4.13  # REMOVED: Requirements generator tool not used
 pkginfo==1.12.1.2
 platformdirs==4.3.8
 plotly==5.24.1
@@ -203,7 +202,7 @@ python-multipart==0.0.20
 pytz==2025.2
 PyYAML==6.0.2
 qdrant-client==1.14.3
-radon==6.0.1
+# radon==6.0.1  # REMOVED: Code complexity analyzer not used
 referencing==0.36.2
 regex==2024.11.6
 requests==2.32.4
@@ -261,5 +260,5 @@ websocket-client==1.8.0
 websockets==15.0.1
 Werkzeug==3.1.3
 wheel==0.45.1
-yarg==0.1.10
+# yarg==0.1.10  # REMOVED: Command-line argument parser not used
 zipp==3.23.0

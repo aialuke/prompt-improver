@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document outlines the findings from the recent test run in the `prompt-improver` project. The test execution revealed several critical issues and areas that need addressing to ensure tests pass successfully.
+This document outlines the findings from the recent test run in the `APES` project. The test execution revealed several critical issues and areas that need addressing to ensure tests pass successfully.
 
 ## Test Results Summary
 
@@ -24,7 +24,7 @@ This document outlines the findings from the recent test run in the `prompt-impr
 ### 2. Missing Dependencies
 
 - **psutil Module**: Required for system resource health checks is not installed.
-- **Missing Attributes**: 
+- **Missing Attributes**:
   - `improve_prompt` attribute is missing in health checkers module.
 
 ### 3. Prometheus Metrics Context Manager Issues

@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: apes_secure_password_2024
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
-      - "5432:5432"
+      - "5432:5432" # Direct port mapping since no Homebrew PostgreSQL conflict
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql

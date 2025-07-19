@@ -21,7 +21,7 @@ def validate_mcp_protocol(filename):
             print(f"✅ {filename}: MCP protocol valid")
             return True
 
-    except (OSError, IOError) as e:
+    except OSError as e:
         print(f"❌ {filename}: File I/O error - {e}")
         return False
     except json.JSONDecodeError as e:

@@ -1,0 +1,89 @@
+{
+  "timestamp": "2025-07-18T22:16:00.274057",
+  "docker_status": {
+    "docker_daemon": true,
+    "postgres_container": true,
+    "container_details": "NAMES           STATUS                 PORTS\napes_postgres   Up 2 hours (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp",
+    "status": "\u2705 HEALTHY"
+  },
+  "container_status": {
+    "postgres_ready": true,
+    "database_accessible": true,
+    "postgres_version": "version                                                           \n-----------------------------------------------------------------------------------------------------------------------------\n PostgreSQL 15.13 (Debian 15.13-1.pgdg120+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit\n(1 row)",
+    "user_permissions": "current_user | session_user \n--------------+--------------\n apes_user    | apes_user\n(1 row)",
+    "status": "\u2705 HEALTHY"
+  },
+  "connection_tests": {
+    "asyncpg": {
+      "success": true,
+      "status": "\u2705 CONNECTED"
+    },
+    "sqlalchemy": {
+      "success": false,
+      "error": "Not an executable object: 'SELECT 1'",
+      "status": "\u274c FAILED"
+    },
+    "docker_exec": {
+      "success": true,
+      "status": "\u2705 CONNECTED"
+    }
+  },
+  "credential_validation": {
+    "expected_config": {
+      "host": "localhost",
+      "port": 5432,
+      "user": "apes_user",
+      "password": "apes_secure_password_2024",
+      "database": "apes_production"
+    },
+    "current_config": {
+      "host": "localhost",
+      "port": 5432,
+      "user": "apes_user",
+      "password": "apes_secure_password_2024",
+      "database": "apes_production"
+    },
+    "mismatches": [],
+    "status": "\u2705 VALID"
+  },
+  "database_inventory": {
+    "total_databases": 16,
+    "production_databases": [
+      "apes_production",
+      "apes_test",
+      "postgres",
+      "template0",
+      "template1"
+    ],
+    "test_databases": [
+      "apes_test_036ac9b7",
+      "apes_test_099afacd",
+      "apes_test_13dad769",
+      "apes_test_1b618028",
+      "apes_test_349f0f77",
+      "apes_test_4b9f481b",
+      "apes_test_4ebe9ba3",
+      "apes_test_5a1b7dfb",
+      "apes_test_a5af15ff",
+      "apes_test_b9cf1ea4",
+      "apes_test_debug_001"
+    ],
+    "test_db_count": 11,
+    "status": "\u2705 HEALTHY"
+  },
+  "cleanup_verification": {
+    "create_capability": true,
+    "drop_capability": true,
+    "status": "\u2705 WORKING"
+  },
+  "performance_check": {
+    "connection_time_ms": 5.99,
+    "query_time_ms": 0.27,
+    "resource_usage": "CPU %     MEM USAGE / LIMIT\n0.05%     101.8MiB / 3.828GiB",
+    "status": "\u2705 GOOD"
+  },
+  "recommendations": [
+    "\ud83d\udd0c Check SQLAlchemy connection - may need connection string fix",
+    "\ud83e\uddf9 Clean up old test databases to improve performance"
+  ]
+}

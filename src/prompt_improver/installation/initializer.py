@@ -18,8 +18,8 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
+from sqlalchemy import func, select
 
-from sqlalchemy import select, func
 from ..database import get_session
 from ..database.config import DatabaseConfig
 
@@ -108,7 +108,8 @@ class APESInitializer:
 
                 # Step 6: Seed baseline rules from configuration
                 progress.update(
-                    main_task, description="Seeding baseline prompt engineering rules..."
+                    main_task,
+                    description="Seeding baseline prompt engineering rules...",
                 )
                 await self.seed_baseline_rules()
                 initialization_results["steps_completed"].append("baseline_rules")
@@ -249,8 +250,12 @@ class APESInitializer:
         try:
             config = DatabaseConfig()
             # Try to connect to check if database exists
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                await session.execute("SELECT 1")
+                await scalar(session, text("SELECT 1"))
                 self.console.print(
                     "  ✅ Connected to existing PostgreSQL database", style="dim"
                 )
@@ -298,7 +303,7 @@ class APESInitializer:
         # Database configuration
         db_config = {
             "database": {
-                "url": "${DATABASE_URL:-postgresql://localhost:5432/apes_db}",
+                "url": "${DATABASE_URL:-postgresql+psycopg://localhost:5432/apes_db}",
                 "pool_size": 10,
                 "max_overflow": 20,
                 "pool_timeout": 30,
@@ -424,118 +429,155 @@ class APESInitializer:
     async def seed_baseline_rules(self):
         """Load rule configurations from YAML into database"""
         config_file = self.data_dir / "config" / "rule_config.yaml"
-        
+
         if not config_file.exists():
-            self.console.print("⚠️ Rule configuration file not found, using defaults", style="yellow")
+            self.console.print(
+                "⚠️ Rule configuration file not found, using defaults", style="yellow"
+            )
             return
-        
+
         try:
             async with get_session() as session:
                 # Load YAML configuration
-                with open(config_file, 'r') as f:
+                with open(config_file) as f:
                     config = yaml.safe_load(f)
-                
+
                 # Import the model
-                from ..database.models import RuleMetadata
                 import json
-                
+
+                from ..database.models import RuleMetadata
+
                 rules_seeded = 0
                 rules_updated = 0
-                
-                for rule_id, rule_config in config.get('rules', {}).items():
+
+                for rule_id, rule_config in config.get("rules", {}).items():
                     # Check if rule already exists
                     query = select(RuleMetadata).where(RuleMetadata.rule_id == rule_id)
                     result = await session.execute(query)
                     existing = result.scalar_one_or_none()
-                    
+
                     if existing:
                         # Update existing rule
-                        existing.enabled = rule_config.get('enabled', True)
-                        existing.priority = rule_config.get('priority', 100)
-                        existing.rule_name = rule_config.get('name', rule_id.replace('_', ' ').title())
-                        existing.rule_category = rule_config.get('category', 'custom')
-                        existing.rule_description = rule_config.get('description', '')
-                        
-                        if 'params' in rule_config:
-                            existing.default_parameters = json.dumps(rule_config['params'])
-                        if 'constraints' in rule_config:
-                            existing.parameter_constraints = json.dumps(rule_config['constraints'])
-                            
+                        existing.enabled = rule_config.get("enabled", True)
+                        existing.priority = rule_config.get("priority", 100)
+                        existing.rule_name = rule_config.get(
+                            "name", rule_id.replace("_", " ").title()
+                        )
+                        existing.rule_category = rule_config.get("category", "custom")
+                        existing.rule_description = rule_config.get("description", "")
+
+                        if "params" in rule_config:
+                            existing.default_parameters = json.dumps(
+                                rule_config["params"]
+                            )
+                        if "constraints" in rule_config:
+                            existing.parameter_constraints = json.dumps(
+                                rule_config["constraints"]
+                            )
+
                         rules_updated += 1
                     else:
                         # Create new rule
                         new_rule = RuleMetadata(
                             rule_id=rule_id,
-                            rule_name=rule_config.get('name', rule_id.replace('_', ' ').title()),
-                            rule_category=rule_config.get('category', 'custom'),
-                            rule_description=rule_config.get('description', ''),
-                            enabled=rule_config.get('enabled', True),
-                            priority=rule_config.get('priority', 100),
-                            rule_version='1.0.0',
-                            default_parameters=json.dumps(rule_config.get('params', {})),
-                            parameter_constraints=json.dumps(rule_config.get('constraints', {}))
+                            rule_name=rule_config.get(
+                                "name", rule_id.replace("_", " ").title()
+                            ),
+                            rule_category=rule_config.get("category", "custom"),
+                            rule_description=rule_config.get("description", ""),
+                            enabled=rule_config.get("enabled", True),
+                            priority=rule_config.get("priority", 100),
+                            rule_version="1.0.0",
+                            default_parameters=json.dumps(
+                                rule_config.get("params", {})
+                            ),
+                            parameter_constraints=json.dumps(
+                                rule_config.get("constraints", {})
+                            ),
                         )
                         session.add(new_rule)
                         rules_seeded += 1
-                
+
                 await session.commit()
-                
+
                 self.console.print(
-                    f"  📋 Rule configurations loaded successfully: {rules_seeded} new, {rules_updated} updated", 
-                    style="dim"
+                    f"  📋 Rule configurations loaded successfully: {rules_seeded} new, {rules_updated} updated",
+                    style="dim",
                 )
-                
+
         except Exception as e:
-            self.console.print(f"  ❌ Failed to load rule configurations: {e}", style="red")
+            self.console.print(
+                f"  ❌ Failed to load rule configurations: {e}", style="red"
+            )
             raise
 
     async def generate_initial_training_data(self):
         """Bootstrap with enhanced synthetic training data using research-driven generator"""
-        
         try:
             async with get_session() as session:
                 # Check if synthetic data already exists
                 from ..database.models import TrainingPrompt
-                
+
                 query = select(func.count(TrainingPrompt.id)).where(
-                    TrainingPrompt.data_source == 'synthetic'
+                    TrainingPrompt.data_source == "synthetic"
                 )
                 result = await session.execute(query)
                 existing_count = result.scalar()
-                
+
                 if existing_count >= 100:  # Already have sufficient synthetic data
-                    self.console.print(f"Found {existing_count} existing synthetic samples, skipping generation", style="dim")
-                    return
-                
-                self.console.print("Generating enhanced synthetic training data using ProductionSyntheticDataGenerator", style="dim")
-                
+                    self.console.print(
+                        f"Found {existing_count} existing synthetic samples, skipping generation",
+                        style="dim",
+                    )
+                    return None
+
+                self.console.print(
+                    "Generating enhanced synthetic training data using ProductionSyntheticDataGenerator",
+                    style="dim",
+                )
+
                 # Import and initialize the advanced generator
                 from .synthetic_data_generator import ProductionSyntheticDataGenerator
-                
+
                 # Generate 1000+ high-quality synthetic samples
                 generator = ProductionSyntheticDataGenerator(
-                    target_samples=1000,
-                    random_state=42
+                    target_samples=1000, random_state=42
                 )
-                
+
                 # Generate comprehensive training data
                 training_data = await generator.generate_comprehensive_training_data()
-                
+
                 # Save to database
                 saved_count = await generator.save_to_database(training_data, session)
-                
+
                 # Generate and log summary
                 summary = generator.get_generation_summary(training_data)
-                self.console.print(f"Enhanced synthetic data generation complete:", style="dim")
-                self.console.print(f"  - Total samples generated: {summary['generation_summary']['total_samples']}", style="dim")
-                self.console.print(f"  - Quality score: {summary['generation_summary']['quality_score']}", style="dim")
-                self.console.print(f"  - Domains covered: {summary['generation_summary']['domains_covered']}", style="dim")
-                self.console.print(f"  - ML requirements met: {summary['quality_analysis']['ml_requirements_met']}", style="dim")
-                
+                self.console.print(
+                    "Enhanced synthetic data generation complete:", style="dim"
+                )
+                self.console.print(
+                    f"  - Total samples generated: {summary['generation_summary']['total_samples']}",
+                    style="dim",
+                )
+                self.console.print(
+                    f"  - Quality score: {summary['generation_summary']['quality_score']}",
+                    style="dim",
+                )
+                self.console.print(
+                    f"  - Domains covered: {summary['generation_summary']['domains_covered']}",
+                    style="dim",
+                )
+                self.console.print(
+                    f"  - ML requirements met: {summary['quality_analysis']['ml_requirements_met']}",
+                    style="dim",
+                )
+
                 return saved_count
-                
+
         except Exception as e:
-            self.console.print(f"  ⚠️  Enhanced synthetic data generation warning: {e}", style="yellow")
+            self.console.print(
+                f"  ⚠️  Enhanced synthetic data generation warning: {e}", style="yellow"
+            )
 
     async def setup_mcp_server(self):
         """Configure MCP server for stdio transport"""
@@ -565,8 +607,12 @@ class APESInitializer:
 
         # Test database connection
         try:
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                await session.execute("SELECT 1")
+                await scalar(session, text("SELECT 1"))
                 health_results["database_connection"] = True
                 self.console.print("  ✅ Database connection verified", style="dim")
         except Exception as e:

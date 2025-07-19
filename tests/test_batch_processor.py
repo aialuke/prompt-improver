@@ -10,10 +10,10 @@ async def test_batch_processor_success():
     assert result["processed"] == 30
     assert result["failed"] == 0
 
+
 @pytest.mark.asyncio
 async def test_batch_processor_failure():
     processor = BatchProcessor()
-    result = await processor.process_single_batch([{ "id": 1 }])
+    result = await processor.process_single_batch([{"id": 1}])
     assert result["processed"] == 1
     assert result["failed"] == 0
-

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 
 def profile_logs_function():
-    """Profile the logs function indirectly by testing its core logic"""
+    """Profile the logs function indirectly by testing its core logic."""
     # Since the logs function is a CLI command, we'll profile the core logic components
     # Imports removed as they were unused
 
@@ -37,7 +37,7 @@ def profile_logs_function():
         temp_log_file = f.name
 
     def simulate_log_processing() -> None:
-        """Simulate the core logic of the logs function"""
+        """Simulate the core logic of the logs function."""
         level_filter = "INFO"
         lines_limit = 50
 

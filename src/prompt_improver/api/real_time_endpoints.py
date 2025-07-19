@@ -1,13 +1,19 @@
-"""
-Real-time API Endpoints for A/B Testing Analytics
+"""Real-time API Endpoints for A/B Testing Analytics
 Provides WebSocket and REST endpoints for live experiment monitoring
 """
 
 import logging
-from typing import Dict, Any, Optional, List, Annotated
 from datetime import datetime
+from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -15,31 +21,35 @@ from sqlmodel import select
 # Make Redis import optional with proper error handling
 try:
     import redis.asyncio as redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
     redis = None
 
 from ..database import DBSession, get_async_session_factory
-from ..services.real_time_analytics import get_real_time_analytics_service, RealTimeAnalyticsService
-from ..utils.websocket_manager import connection_manager, setup_redis_connection
-from ..utils.error_handlers import handle_database_errors
 from ..database.models import ABExperiment
+from ..services.real_time_analytics import (
+    RealTimeAnalyticsService,
+    get_real_time_analytics_service,
+)
+from ..utils.error_handlers import handle_database_errors
+from ..utils.websocket_manager import connection_manager, setup_redis_connection
 
 logger = logging.getLogger(__name__)
 
 # Create router for real-time endpoints
-real_time_router = APIRouter(prefix="/api/v1/experiments/real-time", tags=["real-time-analytics"])
+real_time_router = APIRouter(
+    prefix="/api/v1/experiments/real-time", tags=["real-time-analytics"]
+)
 
 
 @real_time_router.websocket("/live/{experiment_id}")
 async def websocket_experiment_endpoint(
-    websocket: WebSocket,
-    experiment_id: str,
-    user_id: Optional[str] = None
+    websocket: WebSocket, experiment_id: str, user_id: str | None = None
 ):
     """WebSocket endpoint for real-time experiment monitoring
-    
+
     Args:
         websocket: WebSocket connection
         experiment_id: UUID of experiment to monitor
@@ -48,40 +58,42 @@ async def websocket_experiment_endpoint(
     try:
         # Accept WebSocket connection
         await connection_manager.connect(websocket, experiment_id, user_id)
-        
+
         # Send welcome message
-        await connection_manager.send_to_connection(websocket, {
-            "type": "welcome",
-            "message": f"Connected to real-time monitoring for experiment {experiment_id}",
-            "experiment_id": experiment_id
-        })
-        
+        await connection_manager.send_to_connection(
+            websocket,
+            {
+                "type": "welcome",
+                "message": f"Connected to real-time monitoring for experiment {experiment_id}",
+                "experiment_id": experiment_id,
+            },
+        )
+
         # Keep connection alive and handle incoming messages
         while True:
             try:
                 # Wait for client messages
                 data = await websocket.receive_text()
-                
+
                 # Parse and handle client messages
                 try:
                     import json
+
                     message = json.loads(data)
                     await handle_websocket_message(websocket, experiment_id, message)
                 except json.JSONDecodeError:
-                    await connection_manager.send_to_connection(websocket, {
-                        "type": "error",
-                        "message": "Invalid JSON format"
-                    })
-                    
+                    await connection_manager.send_to_connection(
+                        websocket, {"type": "error", "message": "Invalid JSON format"}
+                    )
+
             except WebSocketDisconnect:
                 break
             except Exception as e:
                 logger.error(f"Error in WebSocket loop: {e}")
-                await connection_manager.send_to_connection(websocket, {
-                    "type": "error",
-                    "message": "Internal server error"
-                })
-                
+                await connection_manager.send_to_connection(
+                    websocket, {"type": "error", "message": "Internal server error"}
+                )
+
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
     finally:
@@ -89,78 +101,83 @@ async def websocket_experiment_endpoint(
         await connection_manager.disconnect(websocket)
 
 
-async def handle_websocket_message(websocket: WebSocket, experiment_id: str, message: Dict[str, Any]):
+async def handle_websocket_message(
+    websocket: WebSocket, experiment_id: str, message: dict[str, Any]
+):
     """Handle incoming WebSocket messages from clients"""
     try:
         message_type = message.get("type")
-        
+
         if message_type == "ping":
             # Respond to ping with pong
-            await connection_manager.send_to_connection(websocket, {
-                "type": "pong",
-                "timestamp": datetime.utcnow().isoformat()
-            })
-            
+            await connection_manager.send_to_connection(
+                websocket, {"type": "pong", "timestamp": datetime.utcnow().isoformat()}
+            )
+
         elif message_type == "request_metrics":
-                # Send current metrics using proper async session pattern
-                async_session_factory = get_async_session_factory()
-                async with async_session_factory() as db_session:
-                    analytics_service = await get_real_time_analytics_service(db_session)
-                    metrics = await analytics_service.get_real_time_metrics(experiment_id)
-                
-                if metrics:
-                    await connection_manager.send_to_connection(websocket, {
+            # Send current metrics using proper async session pattern
+            async_session_factory = get_async_session_factory()
+            async with async_session_factory() as db_session:
+                analytics_service = await get_real_time_analytics_service(db_session)
+                metrics = await analytics_service.get_real_time_metrics(experiment_id)
+
+            if metrics:
+                await connection_manager.send_to_connection(
+                    websocket,
+                    {
                         "type": "metrics_update",
                         "experiment_id": experiment_id,
                         "metrics": metrics.__dict__,
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
-                else:
-                    await connection_manager.send_to_connection(websocket, {
-                        "type": "error",
-                        "message": "Failed to retrieve metrics"
-                    })
-                    
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
+                )
+            else:
+                await connection_manager.send_to_connection(
+                    websocket,
+                    {"type": "error", "message": "Failed to retrieve metrics"},
+                )
+
         elif message_type == "subscribe_alerts":
             # Client wants to subscribe to alerts (already subscribed by default)
-            await connection_manager.send_to_connection(websocket, {
-                "type": "subscription_confirmed",
-                "message": "Subscribed to alerts",
-                "subscriptions": ["metrics", "alerts"]
-            })
-            
+            await connection_manager.send_to_connection(
+                websocket,
+                {
+                    "type": "subscription_confirmed",
+                    "message": "Subscribed to alerts",
+                    "subscriptions": ["metrics", "alerts"],
+                },
+            )
+
         else:
-            await connection_manager.send_to_connection(websocket, {
-                "type": "error",
-                "message": f"Unknown message type: {message_type}"
-            })
-            
+            await connection_manager.send_to_connection(
+                websocket,
+                {"type": "error", "message": f"Unknown message type: {message_type}"},
+            )
+
     except Exception as e:
         logger.error(f"Error handling WebSocket message: {e}")
-        await connection_manager.send_to_connection(websocket, {
-            "type": "error",
-            "message": "Failed to process message"
-        })
+        await connection_manager.send_to_connection(
+            websocket, {"type": "error", "message": "Failed to process message"}
+        )
 
 
 @real_time_router.get("/experiments/{experiment_id}/metrics")
 async def get_experiment_metrics(
-    experiment_id: str,
-    db_session: DBSession
+    experiment_id: str, db_session: DBSession
 ) -> JSONResponse:
     """Get current real-time metrics for an experiment
-    
+
     Args:
         experiment_id: UUID of experiment
         db_session: Database session
-        
+
     Returns:
         JSON response with current metrics
     """
     try:
         analytics_service = await get_real_time_analytics_service(db_session)
         metrics = await analytics_service.get_real_time_metrics(experiment_id)
-        
+
         if metrics:
             return JSONResponse({
                 "status": "success",
@@ -171,65 +188,62 @@ async def get_experiment_metrics(
                     "sample_sizes": {
                         "control": metrics.control_sample_size,
                         "treatment": metrics.treatment_sample_size,
-                        "total": metrics.total_sample_size
+                        "total": metrics.total_sample_size,
                     },
                     "means": {
                         "control": metrics.control_mean,
-                        "treatment": metrics.treatment_mean
+                        "treatment": metrics.treatment_mean,
                     },
                     "statistical_analysis": {
                         "effect_size": metrics.effect_size,
                         "p_value": metrics.p_value,
                         "confidence_interval": [
                             metrics.confidence_interval_lower,
-                            metrics.confidence_interval_upper
+                            metrics.confidence_interval_upper,
                         ],
                         "statistical_significance": metrics.statistical_significance,
-                        "statistical_power": metrics.statistical_power
+                        "statistical_power": metrics.statistical_power,
                     },
                     "progress": {
                         "completion_percentage": metrics.completion_percentage,
-                        "estimated_days_remaining": metrics.estimated_days_remaining
+                        "estimated_days_remaining": metrics.estimated_days_remaining,
                     },
                     "quality": {
                         "balance_ratio": metrics.balance_ratio,
-                        "data_quality_score": metrics.data_quality_score
+                        "data_quality_score": metrics.data_quality_score,
                     },
                     "early_stopping": {
                         "recommendation": metrics.early_stopping_recommendation,
-                        "confidence": metrics.early_stopping_confidence
-                    }
-                }
+                        "confidence": metrics.early_stopping_confidence,
+                    },
+                },
             })
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or insufficient data"
-            )
-            
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Experiment not found or insufficient data",
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting experiment metrics: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve experiment metrics"
+            detail="Failed to retrieve experiment metrics",
         )
 
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/start")
 async def start_monitoring(
-    experiment_id: str,
-    db_session: DBSession,
-    update_interval: int = 30
+    experiment_id: str, db_session: DBSession, update_interval: int = 30
 ) -> JSONResponse:
     """Start real-time monitoring for an experiment
-    
+
     Args:
         experiment_id: UUID of experiment
         update_interval: Update interval in seconds (default: 30)
         db_session: Database session
-        
+
     Returns:
         JSON response confirming monitoring started
     """
@@ -238,113 +252,106 @@ async def start_monitoring(
         success = await analytics_service.start_experiment_monitoring(
             experiment_id, update_interval
         )
-        
+
         if success:
             return JSONResponse({
                 "status": "success",
                 "message": f"Started monitoring for experiment {experiment_id}",
                 "experiment_id": experiment_id,
-                "update_interval": update_interval
+                "update_interval": update_interval,
             })
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to start monitoring (experiment may not exist or not be running)"
-            )
-            
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to start monitoring (experiment may not exist or not be running)",
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error starting monitoring: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to start experiment monitoring"
+            detail="Failed to start experiment monitoring",
         )
 
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/stop")
-async def stop_monitoring(
-    experiment_id: str,
-    db_session: DBSession
-) -> JSONResponse:
+async def stop_monitoring(experiment_id: str, db_session: DBSession) -> JSONResponse:
     """Stop real-time monitoring for an experiment
-    
+
     Args:
         experiment_id: UUID of experiment
         db_session: Database session
-        
+
     Returns:
         JSON response confirming monitoring stopped
     """
     try:
         analytics_service = await get_real_time_analytics_service(db_session)
         success = await analytics_service.stop_experiment_monitoring(experiment_id)
-        
+
         return JSONResponse({
             "status": "success" if success else "warning",
             "message": f"Stopped monitoring for experiment {experiment_id}",
-            "experiment_id": experiment_id
+            "experiment_id": experiment_id,
         })
-        
+
     except Exception as e:
         logger.error(f"Error stopping monitoring: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to stop experiment monitoring"
+            detail="Failed to stop experiment monitoring",
         )
 
 
 @real_time_router.get("/monitoring/active")
-async def get_active_monitoring(
-    db_session: DBSession
-) -> JSONResponse:
+async def get_active_monitoring(db_session: DBSession) -> JSONResponse:
     """Get list of experiments currently being monitored
-    
+
     Args:
         db_session: Database session
-        
+
     Returns:
         JSON response with list of active experiments
     """
     try:
         analytics_service = await get_real_time_analytics_service(db_session)
         active_experiments = await analytics_service.get_active_experiments()
-        
+
         # Get connection counts
         connection_info = []
         for experiment_id in active_experiments:
             connection_count = connection_manager.get_connection_count(experiment_id)
             connection_info.append({
                 "experiment_id": experiment_id,
-                "active_connections": connection_count
+                "active_connections": connection_count,
             })
-        
+
         return JSONResponse({
             "status": "success",
             "active_experiments": len(active_experiments),
             "total_connections": connection_manager.get_connection_count(),
-            "experiments": connection_info
+            "experiments": connection_info,
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting active monitoring: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve active monitoring information"
+            detail="Failed to retrieve active monitoring information",
         )
 
 
 @real_time_router.get("/dashboard/config/{experiment_id}")
 async def get_dashboard_config(
-    experiment_id: str,
-    db_session: DBSession
+    experiment_id: str, db_session: DBSession
 ) -> JSONResponse:
     """Get dashboard configuration for an experiment
-    
+
     Args:
         experiment_id: UUID of experiment
         db_session: Database session
-        
+
     Returns:
         JSON response with dashboard configuration
     """
@@ -353,19 +360,20 @@ async def get_dashboard_config(
         stmt = select(ABExperiment).where(ABExperiment.experiment_id == experiment_id)
         result = await db_session.execute(stmt)
         experiment = result.scalar_one_or_none()
-        
+
         if not experiment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
             )
-        
+
         # Build dashboard configuration
         config = {
             "experiment_id": experiment_id,
             "experiment_name": experiment.experiment_name,
             "status": experiment.status,
-            "started_at": experiment.started_at.isoformat() if experiment.started_at else None,
+            "started_at": experiment.started_at.isoformat()
+            if experiment.started_at
+            else None,
             "target_metric": experiment.target_metric,
             "sample_size_per_group": experiment.sample_size_per_group,
             "significance_level": 0.05,  # Default or from experiment config
@@ -377,33 +385,30 @@ async def get_dashboard_config(
                 "chart_types": ["line", "bar", "confidence_interval"],
                 "metrics_to_display": [
                     "sample_sizes",
-                    "conversion_rates", 
+                    "conversion_rates",
                     "effect_size",
                     "p_value",
                     "confidence_interval",
-                    "statistical_power"
-                ]
+                    "statistical_power",
+                ],
             },
             "websocket_url": f"/api/v1/experiments/real-time/live/{experiment_id}",
             "api_endpoints": {
                 "metrics": f"/api/v1/experiments/real-time/experiments/{experiment_id}/metrics",
                 "start_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/start",
-                "stop_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/stop"
-            }
+                "stop_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/stop",
+            },
         }
-        
-        return JSONResponse({
-            "status": "success",
-            "config": config
-        })
-        
+
+        return JSONResponse({"status": "success", "config": config})
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting dashboard config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve dashboard configuration"
+            detail="Failed to retrieve dashboard configuration",
         )
 
 
@@ -414,7 +419,7 @@ async def health_check() -> JSONResponse:
         # Check WebSocket manager
         active_experiments = connection_manager.get_active_experiments()
         total_connections = connection_manager.get_connection_count()
-        
+
         # Check Redis connection if available
         redis_status = "not_configured"
         if REDIS_AVAILABLE and connection_manager.redis_client:
@@ -425,7 +430,7 @@ async def health_check() -> JSONResponse:
                 redis_status = "disconnected"
         elif not REDIS_AVAILABLE:
             redis_status = "not_installed"
-        
+
         return JSONResponse({
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
@@ -433,15 +438,12 @@ async def health_check() -> JSONResponse:
                 "websocket_manager": {
                     "status": "active",
                     "active_experiments": len(active_experiments),
-                    "total_connections": total_connections
+                    "total_connections": total_connections,
                 },
-                "redis": {
-                    "status": redis_status,
-                    "available": REDIS_AVAILABLE
-                }
-            }
+                "redis": {"status": redis_status, "available": REDIS_AVAILABLE},
+            },
         })
-        
+
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return JSONResponse(
@@ -449,8 +451,8 @@ async def health_check() -> JSONResponse:
             content={
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            }
+                "timestamp": datetime.utcnow().isoformat(),
+            },
         )
 
 
@@ -462,7 +464,9 @@ async def setup_real_time_system(redis_url: str = "redis://localhost:6379"):
             await setup_redis_connection(redis_url)
             logger.info("Real-time system setup completed with Redis")
         else:
-            logger.warning("Real-time system setup completed without Redis (not installed)")
+            logger.warning(
+                "Real-time system setup completed without Redis (not installed)"
+            )
     except Exception as e:
         logger.error(f"Failed to setup real-time system: {e}")
 
@@ -477,4 +481,4 @@ async def cleanup_real_time_system():
 
 
 # Export the router
-__all__ = ["real_time_router", "setup_real_time_system", "cleanup_real_time_system"]
+__all__ = ["cleanup_real_time_system", "real_time_router", "setup_real_time_system"]

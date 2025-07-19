@@ -26,7 +26,7 @@ Database mocks, while seemingly convenient, introduce significant issues:
    - Actual error conditions and edge cases
    - Transaction isolation problems
    - Connection pooling issues
-4. **Behavioral Differences**: SQLite vs PostgreSQL differences mask production issues
+4. **Behavioral Differences**: Mock vs PostgreSQL differences mask production issues
 
 ### Industry Consensus Against Mocks
 
@@ -346,7 +346,7 @@ tests/integration/test_psycopg_real_error_behavior.py
 ### Don'ts
 
 ❌ **Don't mock database operations** - use real databases
-❌ **Don't use SQLite** as a PostgreSQL substitute in tests
+❌ **Don't use SQLite** as a PostgreSQL substitute in tests (use PostgreSQL containers instead)
 ❌ **Don't skip cleanup** - ensure containers are properly managed
 ❌ **Don't test only happy paths** - trigger real error scenarios
 ❌ **Don't ignore performance** - validate real-world timings

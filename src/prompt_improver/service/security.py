@@ -10,7 +10,7 @@ from typing import Any
 
 from rich.console import Console
 
-from ..database import sessionmanager
+from ..database import get_sessionmanager
 from ..services.analytics import AnalyticsService
 
 
@@ -104,7 +104,7 @@ class PromptDataProtection:
         """Audit log redactions using existing database structure"""
         try:
             # Use existing database connection from Phase 1
-            async with sessionmanager.session() as db_session:
+            async with get_sessionmanager().session() as db_session:
                 # Store audit info in existing improvement_sessions table
 
                 # Use raw SQL to avoid SQLAlchemy model issues
@@ -192,7 +192,7 @@ class PromptDataProtection:
             analytics = AnalyticsService()
 
             # Get basic analytics data using correct session manager
-            async with sessionmanager.session() as db_session:
+            async with get_sessionmanager().session() as db_session:
                 # Get sessions with security audit data (using correct field name)
                 from sqlalchemy import text
 

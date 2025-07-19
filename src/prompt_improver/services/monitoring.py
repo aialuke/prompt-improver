@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import text
-
 from rich import box
 from rich.console import Console
 from rich.layout import Layout
@@ -17,11 +15,12 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from sqlalchemy import text
 
-from ..database import sessionmanager
+from ..database import get_sessionmanager
 from ..database.models import RulePerformance
 from ..services.analytics import AnalyticsService
-from ..utils.error_handlers import handle_database_errors, handle_common_errors
+from ..utils.error_handlers import handle_common_errors, handle_database_errors
 
 
 @dataclass
@@ -311,10 +310,10 @@ class RealTimeMonitor:
         return Panel(controls, border_style="dim")
 
     @handle_database_errors(
-        rollback_session=False, 
-        return_format="none", 
+        rollback_session=False,
+        return_format="none",
         operation_name="collect_system_metrics",
-        retry_count=1
+        retry_count=1,
     )
     async def collect_system_metrics(self) -> dict[str, Any]:
         """Collect real-time system metrics"""
@@ -326,7 +325,7 @@ class RealTimeMonitor:
             "cpu_usage_percent": 0,
         }
 
-        async with sessionmanager.session() as session:
+        async with get_sessionmanager().session() as session:
             # Test database response time
             start_time = time.time()
             await session.execute(text("SELECT 1"))
@@ -428,14 +427,14 @@ class RealTimeMonitor:
             await self.log_alert(alert)
 
     @handle_database_errors(
-        rollback_session=True, 
-        return_format="none", 
+        rollback_session=True,
+        return_format="none",
         operation_name="log_alert",
-        retry_count=1
+        retry_count=1,
     )
     async def log_alert(self, alert: PerformanceAlert):
         """Log alert to database for historical analysis"""
-        async with sessionmanager.session() as session:
+        async with get_sessionmanager().session() as session:
             # Store alert in rule performance table as monitoring entry
             perf_metric = RulePerformance(
                 rule_id="monitoring_alert",
@@ -593,25 +592,27 @@ class HealthMonitor:
         return health_results
 
     @handle_database_errors(
-        rollback_session=False, 
-        return_format="dict", 
+        rollback_session=False,
+        return_format="dict",
         operation_name="check_database_health",
-        retry_count=1
+        retry_count=1,
     )
     async def _check_database_health(self) -> dict[str, Any]:
         """Check database connectivity and performance"""
         start_time = time.time()
-        async with sessionmanager.session() as session:
+        async with get_sessionmanager().session() as session:
             await session.execute(text("SELECT 1"))
             response_time = (time.time() - start_time) * 1000
 
             # Check for long-running queries
-            result = await session.execute(text("""
+            result = await session.execute(
+                text("""
                 SELECT count(*) 
                 FROM pg_stat_activity 
                 WHERE state = 'active' 
                 AND query_start < NOW() - INTERVAL '30 seconds'
-            """))
+            """)
+            )
             long_queries = result.scalar() or 0
 
             status = "healthy"

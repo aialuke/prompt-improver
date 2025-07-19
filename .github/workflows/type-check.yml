@@ -1,0 +1,108 @@
+name: Strict Type Checking
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  mypy-strict-check:
+    name: MyPy Strict Type Checking
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          .venv
+        key: ${{ runner.os }}-python-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-python-${{ matrix.python-version }}-
+    
+    - name: Install dependencies with type stubs
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        # Ensure SQLAlchemy stubs are installed
+        pip install sqlalchemy2-stubs types-redis types-cachetools
+    
+    - name: Run MyPy with strict checking
+      run: |
+        echo "Running MyPy with strict mode configuration..."
+        mypy src/ --show-error-codes --show-error-context --pretty
+      continue-on-error: false  # Fail the job to reproduce errors
+    
+    - name: Create error summary
+      if: failure()
+      run: |
+        echo "## 🔍 MyPy Strict Mode Error Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "This job intentionally fails to demonstrate the type errors that need to be addressed." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Configuration Applied:" >> $GITHUB_STEP_SUMMARY
+        echo "- MyPy strict mode enabled" >> $GITHUB_STEP_SUMMARY
+        echo "- SQLAlchemy plugin configured" >> $GITHUB_STEP_SUMMARY
+        echo "- Required type stubs installed:" >> $GITHUB_STEP_SUMMARY
+        echo "  - sqlalchemy2-stubs" >> $GITHUB_STEP_SUMMARY
+        echo "  - types-redis" >> $GITHUB_STEP_SUMMARY
+        echo "  - types-cachetools" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Review the type errors in the job output above" >> $GITHUB_STEP_SUMMARY
+        echo "2. Fix type annotations incrementally" >> $GITHUB_STEP_SUMMARY
+        echo "3. Add proper type ignores where necessary" >> $GITHUB_STEP_SUMMARY
+        echo "4. Update this CI job to pass once errors are resolved" >> $GITHUB_STEP_SUMMARY
+
+  pytest-quick:
+    name: Quick Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Run pytest in quiet mode
+      run: |
+        export PYTHONPATH=src
+        pytest -q tests/ --asyncio-mode=auto
+      continue-on-error: false
+    
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "## 🧪 Quick Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ $? -eq 0 ]; then
+          echo "✅ All tests passed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Some tests failed - check output above" >> $GITHUB_STEP_SUMMARY
+        fi

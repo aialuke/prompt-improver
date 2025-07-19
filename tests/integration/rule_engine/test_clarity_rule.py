@@ -49,5 +49,5 @@ def test_clarity_rule_metadata():
     """
     rule = ClarityRule()
     metadata = rule.metadata
-    assert metadata["name"] == "ClarityRule"
-    assert metadata["type"] == "Core"
+    assert metadata["name"] == "Clarity Enhancement Rule"
+    assert metadata["type"] == "Fundamental"

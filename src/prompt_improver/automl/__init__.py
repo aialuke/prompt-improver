@@ -1,5 +1,4 @@
-"""
-AutoML Module for Prompt Improver System
+"""AutoML Module for Prompt Improver System
 Implements 2025 best practices for automated machine learning
 
 This module provides:
@@ -16,20 +15,20 @@ Architecture follows 2025 AutoML patterns:
 - Multi-objective Pareto optimization
 """
 
-from .orchestrator import AutoMLOrchestrator
 from .callbacks import (
     AutoMLCallback,
-    RealTimeAnalyticsCallback,
     ExperimentCallback,
-    ModelSelectionCallback
+    ModelSelectionCallback,
+    RealTimeAnalyticsCallback,
 )
+from .orchestrator import AutoMLOrchestrator
 
 __all__ = [
+    "AutoMLCallback",
     "AutoMLOrchestrator",
-    "AutoMLCallback", 
-    "RealTimeAnalyticsCallback",
     "ExperimentCallback",
-    "ModelSelectionCallback"
+    "ModelSelectionCallback",
+    "RealTimeAnalyticsCallback",
 ]
 
 # Version following semantic versioning

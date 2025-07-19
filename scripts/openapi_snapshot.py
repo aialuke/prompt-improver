@@ -292,7 +292,7 @@ def main():
 
         return 0
 
-    except (OSError, IOError) as e:
+    except OSError as e:
         print(f"\n💥 File I/O Error: {e}")
         return 1
     except (json.JSONDecodeError, ValueError) as e:

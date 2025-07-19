@@ -167,7 +167,7 @@ def validate_file(filepath: str) -> bool:
     except SyntaxError as e:
         print(f"❌ {filepath}: Syntax error - {e}")
         return False
-    except (OSError, IOError) as e:
+    except OSError as e:
         print(f"❌ {filepath}: File I/O error - {e}")
         return False
     except (UnicodeDecodeError, ValueError) as e:

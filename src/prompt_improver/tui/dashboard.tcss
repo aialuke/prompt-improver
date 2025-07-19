@@ -1,0 +1,225 @@
+/* APES Dashboard CSS Styles */
+
+/* Global styles */
+Screen {
+    overflow: auto;
+    background: $background;
+}
+
+Header {
+    dock: top;
+    background: $primary;
+    color: $text;
+    height: 3;
+    content-align: center middle;
+}
+
+Footer {
+    dock: bottom;
+    background: $primary;
+    color: $text;
+    height: 1;
+}
+
+/* Main container */
+#main-container {
+    height: 100%;
+    margin: 1;
+}
+
+#main-tabs {
+    height: 100%;
+}
+
+/* Overview layout */
+#overview-layout {
+    height: 100%;
+    layout: horizontal;
+}
+
+#left-panel {
+    width: 50%;
+    height: 100%;
+    layout: vertical;
+}
+
+#right-panel {
+    width: 50%;
+    height: 100%;
+    layout: vertical;
+}
+
+/* Widget styles */
+#system-overview {
+    height: 50%;
+    border: round $primary;
+    padding: 1;
+    margin: 1;
+}
+
+#service-control {
+    height: 50%;
+    border: round $secondary;
+    padding: 1;
+    margin: 1;
+}
+
+#performance-metrics {
+    height: 50%;
+    border: round $accent;
+    padding: 1;
+    margin: 1;
+}
+
+#automl-status {
+    height: 50%;
+    border: round $success;
+    padding: 1;
+    margin: 1;
+}
+
+#ab-testing {
+    height: 100%;
+    border: round $warning;
+    padding: 1;
+    margin: 1;
+}
+
+#system-health-detail {
+    height: 100%;
+    border: round $primary;
+    padding: 1;
+    margin: 1;
+}
+
+/* Service control buttons */
+#service-control-buttons {
+    layout: horizontal;
+    height: 3;
+    margin: 1 0;
+}
+
+#service-control-buttons Button {
+    margin: 0 1;
+    height: 100%;
+}
+
+/* Content areas */
+#system-overview-content,
+#automl-status-content,
+#ab-testing-content,
+#performance-metrics-content,
+#service-control-content {
+    height: 100%;
+    overflow: auto;
+}
+
+/* Button styles */
+Button {
+    min-width: 12;
+    height: 3;
+    margin: 0 1;
+}
+
+Button:hover {
+    background: $primary-lighten-2;
+}
+
+Button:focus {
+    text-style: bold;
+}
+
+/* Success variant */
+Button.success {
+    background: $success;
+    color: $text;
+}
+
+Button.success:hover {
+    background: $success-lighten-1;
+}
+
+/* Error variant */
+Button.error {
+    background: $error;
+    color: $text;
+}
+
+Button.error:hover {
+    background: $error-lighten-1;
+}
+
+/* Primary variant */
+Button.primary {
+    background: $primary;
+    color: $text;
+}
+
+Button.primary:hover {
+    background: $primary-lighten-1;
+}
+
+/* Tab styles */
+TabbedContent {
+    height: 100%;
+}
+
+TabPane {
+    height: 100%;
+    padding: 1;
+}
+
+/* Scrollable content */
+.scrollable {
+    overflow: auto;
+    height: 100%;
+}
+
+/* Status indicators */
+.status-online {
+    color: $success;
+}
+
+.status-warning {
+    color: $warning;
+}
+
+.status-error {
+    color: $error;
+}
+
+.status-offline {
+    color: $error;
+}
+
+/* Metric colors */
+.metric-good {
+    color: $success;
+}
+
+.metric-warning {
+    color: $warning;
+}
+
+.metric-critical {
+    color: $error;
+}
+
+/* Animation for updates */
+.updating {
+    text-style: italic;
+    color: $accent;
+}
+
+/* Responsive design */
+@media (max-width: 80) {
+    #overview-layout {
+        layout: vertical;
+    }
+    
+    #left-panel,
+    #right-panel {
+        width: 100%;
+        height: 50%;
+    }
+}

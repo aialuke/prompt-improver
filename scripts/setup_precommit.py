@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-commit Setup Script for All Contributors"""
+"""Pre-commit Setup Script for All Contributors."""
 
 import shutil
 import subprocess
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def run_command(cmd: list, cwd: str = None) -> bool:
+def run_command(cmd: list, cwd: str | None = None) -> bool:
     """Run a command and return success status."""
     try:
         # Validate command to prevent execution of untrusted input
@@ -17,7 +17,7 @@ def run_command(cmd: list, cwd: str = None) -> bool:
         # For security, resolve absolute path for the first command
         import shutil
 
-        if cmd[0] not in ["git", "pre-commit"]:  # Allow known safe commands
+        if cmd[0] not in {"git", "pre-commit"}:
             abs_cmd = shutil.which(cmd[0])
             if abs_cmd:
                 cmd[0] = abs_cmd

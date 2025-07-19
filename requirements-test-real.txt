@@ -17,7 +17,7 @@ docker>=7.0.0
 
 # Additional testing utilities
 pytest-xdist>=3.3.0  # Parallel test execution
-pytest-mock>=3.11.0  # If needed for non-database mocks only
+# pytest-mock>=3.11.0  # REMOVED: Not used - project uses unittest.mock exclusively
 pytest-cov>=4.1.0   # Coverage reporting
 pytest-benchmark>=4.0.0  # Performance benchmarking
 

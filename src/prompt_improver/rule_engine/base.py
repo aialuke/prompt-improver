@@ -48,7 +48,7 @@ class BasePromptRule(ABC):
     }
 
     @abstractmethod
-    def check(self, prompt: str, context: dict[str, Any] = None) -> RuleCheckResult:
+    def check(self, prompt: str, context: dict[str, Any] | None = None) -> RuleCheckResult:
         """Analyze the prompt and determine if the rule should be applied.
 
         Args:
@@ -61,7 +61,7 @@ class BasePromptRule(ABC):
 
     @abstractmethod
     def apply(
-        self, prompt: str, context: dict[str, Any] = None
+        self, prompt: str, context: dict[str, Any] | None = None
     ) -> TransformationResult:
         """Apply the rule's transformation to the prompt.
 

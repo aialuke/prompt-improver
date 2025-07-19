@@ -4,6 +4,7 @@ Enhanced with Apriori Algorithm integration for association rule discovery
 """
 
 import logging
+import threading
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -44,9 +45,10 @@ except ImportError:
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database.models import RuleMetadata, RulePerformance
 from ..database.connection import DatabaseManager
+from ..database.models import RuleMetadata, RulePerformance
 from ..services.apriori_analyzer import AprioriAnalyzer, AprioriConfig
+from ..utils.redis_cache import cached
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,7 @@ class FrequentPattern:
 @dataclass
 class AprioriPattern:
     """Association pattern from Apriori algorithm"""
-    
+
     antecedents: list[str]
     consequents: list[str]
     support: float
@@ -107,6 +109,12 @@ class AdvancedPatternDiscovery:
     """
 
     def __init__(self, db_manager: DatabaseManager | None = None):
+        """Initialize AdvancedPatternDiscovery with lazy initialization support.
+        
+        Args:
+            db_manager: Optional DatabaseManager instance for dependency injection.
+                       If None, will be created lazily when first needed.
+        """
         self.scaler = StandardScaler()
         self.min_cluster_size = 5
         self.min_support = 0.1
@@ -115,29 +123,86 @@ class AdvancedPatternDiscovery:
 
         # HDBSCAN Performance Optimization Settings (based on Context7 research)
         self._configure_hdbscan_performance()
-        
-        # Initialize Apriori analyzer for association rule mining
-        if db_manager:
-            self.apriori_analyzer = AprioriAnalyzer(
-                db_manager=db_manager,
-                config=AprioriConfig(
-                    min_support=0.08,  # Slightly lower for more patterns
-                    min_confidence=0.6,
-                    min_lift=1.2,
-                    max_itemset_length=4,
-                    verbose=True
-                )
-            )
-        else:
-            self.apriori_analyzer = None
-            logger.warning("AprioriAnalyzer not initialized - database manager required")
 
+        # Lazy initialization attributes
+        self._db_manager = db_manager
+        self._apriori_analyzer = None
+        self._db_manager_lock = threading.Lock()
+        self._apriori_analyzer_lock = threading.Lock()
+        
+        logger.info("AdvancedPatternDiscovery initialized with lazy loading strategy")
+
+    @property
+    def db_manager(self) -> DatabaseManager | None:
+        """Get DatabaseManager instance with lazy initialization."""
+        if self._db_manager is None:
+            with self._db_manager_lock:
+                if self._db_manager is None:
+                    try:
+                        self._db_manager = DatabaseManager()
+                        logger.info("DatabaseManager created via lazy initialization")
+                    except Exception as e:
+                        logger.error(f"Failed to create DatabaseManager: {e}")
+                        return None
+        return self._db_manager
+    
+    @property
+    def apriori_analyzer(self) -> AprioriAnalyzer | None:
+        """Get AprioriAnalyzer instance with lazy initialization."""
+        if self._apriori_analyzer is None:
+            with self._apriori_analyzer_lock:
+                if self._apriori_analyzer is None:
+                    db_mgr = self.db_manager
+                    if db_mgr is not None:
+                        try:
+                            self._apriori_analyzer = AprioriAnalyzer(
+                                db_manager=db_mgr,
+                                config=AprioriConfig(
+                                    min_support=0.08,  # Slightly lower for more patterns
+                                    min_confidence=0.6,
+                                    min_lift=1.2,
+                                    max_itemset_length=4,
+                                    verbose=True,
+                                ),
+                            )
+                            logger.info("AprioriAnalyzer created via lazy initialization")
+                        except Exception as e:
+                            logger.error(f"Failed to create AprioriAnalyzer: {e}")
+                            return None
+                    else:
+                        logger.warning("Cannot create AprioriAnalyzer - DatabaseManager not available")
+                        return None
+        return self._apriori_analyzer
+    
+    def _ensure_database_connection(self) -> bool:
+        """Ensure database connection is available with enhanced error handling."""
+        try:
+            if self.db_manager is None:
+                logger.error("DatabaseManager not available - ensure database configuration is correct")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Database connection check failed: {e}")
+            return False
+    
+    def _ensure_apriori_analyzer(self) -> bool:
+        """Ensure AprioriAnalyzer is available with enhanced error handling."""
+        try:
+            if self.apriori_analyzer is None:
+                logger.error("AprioriAnalyzer not available - database connection required")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"AprioriAnalyzer check failed: {e}")
+            return False
+
+    @cached(ttl=3600, key_func=lambda *a, **kw: f"pattern_discovery:{kw.get('min_effectiveness', 0.7)}:{kw.get('min_support', 5)}:{':'.join(kw.get('pattern_types', ['all']))}:{kw.get('use_ensemble', True)}:{kw.get('include_apriori', True)}")
     async def discover_advanced_patterns(
         self,
         db_session: AsyncSession,
         min_effectiveness: float = 0.7,
         min_support: int = 5,
-        pattern_types: Optional[list[str]] = None,
+        pattern_types: list[str] | None = None,
         use_ensemble: bool = True,
         include_apriori: bool = True,
     ) -> dict[str, Any]:
@@ -169,7 +234,9 @@ class AdvancedPatternDiscovery:
         )
 
         # Get performance data
-        performance_data = await self._get_performance_data(db_session, min_effectiveness)
+        performance_data = await self._get_performance_data(
+            db_session, min_effectiveness
+        )
 
         if len(performance_data) < min_support:
             logger.warning(
@@ -178,33 +245,50 @@ class AdvancedPatternDiscovery:
             return {"error": "Insufficient data", "data_points": len(performance_data)}
 
         # Discover patterns by type
-        results: dict[str, Any] = {"discovery_metadata": {"start_time": start_time, "data_points": len(performance_data)}}
+        results: dict[str, Any] = {
+            "discovery_metadata": {
+                "start_time": start_time,
+                "data_points": len(performance_data),
+            }
+        }
 
         # Execute pattern discovery in parallel where possible
         discovery_tasks = []
 
         if "parameter" in pattern_types:
-            results["parameter_patterns"] = await self._discover_parameter_patterns(performance_data)
+            results["parameter_patterns"] = await self._discover_parameter_patterns(
+                performance_data
+            )
 
         if "sequence" in pattern_types:
-            results["sequence_patterns"] = await self._discover_sequence_patterns(performance_data)
+            results["sequence_patterns"] = await self._discover_sequence_patterns(
+                performance_data
+            )
 
         if "performance" in pattern_types:
-            results["performance_patterns"] = await self._discover_performance_patterns(performance_data)
+            results["performance_patterns"] = await self._discover_performance_patterns(
+                performance_data
+            )
 
         if "semantic" in pattern_types:
-            results["semantic_patterns"] = await self._discover_semantic_patterns(performance_data)
+            results["semantic_patterns"] = await self._discover_semantic_patterns(
+                performance_data
+            )
 
         # NEW: Apriori Association Rule Discovery
         if "apriori" in pattern_types and self.apriori_analyzer:
-            results["apriori_patterns"] = await self._discover_apriori_patterns(performance_data)
+            results["apriori_patterns"] = await self._discover_apriori_patterns(
+                performance_data
+            )
 
         # Ensemble validation combining traditional ML with Apriori insights
         if use_ensemble:
             results["ensemble_analysis"] = self._analyze_pattern_ensemble(results)
 
         # Enhanced statistical validation including Apriori metrics
-        results["statistical_validation"] = self._validate_patterns_statistically(results)
+        results["statistical_validation"] = self._validate_patterns_statistically(
+            results
+        )
 
         # Generate comprehensive recommendations including Apriori business insights
         recommendations = self._generate_pattern_recommendations(results)
@@ -250,7 +334,9 @@ class AdvancedPatternDiscovery:
                 LIMIT 1000
             """)
 
-            result = await db_session.execute(query, {"min_effectiveness": min_effectiveness})
+            result = await db_session.execute(
+                query, {"min_effectiveness": min_effectiveness}
+            )
             rows = result.fetchall()
 
             performance_data = []
@@ -259,15 +345,18 @@ class AdvancedPatternDiscovery:
                 data_point = {
                     "rule_id": row.rule_id,
                     "rule_name": row.rule_id,  # Use rule_id as name since rule_name doesn't exist
-                    "rule_category": row.category or "general",  # Use category not rule_category
+                    "rule_category": row.category
+                    or "general",  # Use category not rule_category
                     "improvement_score": row.improvement_score or 0.0,
                     "execution_time_ms": row.execution_time_ms or 0,
                     "user_satisfaction": 0.8,  # Default since user_satisfaction_score doesn't exist
                     "confidence_level": row.confidence_level or 0.0,
                     "weight": 1.0,  # Default since weight doesn't exist
                     "priority": row.priority or 5,
-                    "parameters": row.parameters_used or {},  # Use parameters_used not rule_parameters
-                    "metadata_params": row.rule_metadata_params or {},  # Use default_parameters
+                    "parameters": row.parameters_used
+                    or {},  # Use parameters_used not rule_parameters
+                    "metadata_params": row.rule_metadata_params
+                    or {},  # Use default_parameters
                     "before_metrics": {},  # Default since before_metrics doesn't exist
                     "after_metrics": {},  # Default since after_metrics doesn't exist
                     "prompt_characteristics": {},  # Default since prompt_characteristics doesn't exist
@@ -403,10 +492,10 @@ class AdvancedPatternDiscovery:
             # Apply Transaction Encoder with proper pandas compatibility
             te = TransactionEncoder()
             te_data = te.fit(transactions).transform(transactions)
-            
+
             # Handle mlxtend-pandas compatibility with proper type checking
             try:
-                if hasattr(te, 'columns_') and te.columns_ is not None:
+                if hasattr(te, "columns_") and te.columns_ is not None:
                     # Proper type handling for pandas DataFrame creation
                     column_names = [str(col) for col in te.columns_]
                     # Create DataFrame with explicit column specification - use Any to handle type checker limitations
@@ -427,11 +516,11 @@ class AdvancedPatternDiscovery:
                 frequent_itemsets = fpgrowth(
                     df, min_support=self.min_support, use_colnames=True
                 )
-                
+
                 # Ensure we have a proper DataFrame for type safety
                 if not isinstance(frequent_itemsets, pd.DataFrame):
                     frequent_itemsets = pd.DataFrame()
-                    
+
             except Exception:
                 frequent_itemsets = pd.DataFrame()  # Empty fallback
 
@@ -445,7 +534,10 @@ class AdvancedPatternDiscovery:
             # Generate association rules with defensive handling
             try:
                 # Ensure we have a proper DataFrame before processing
-                if isinstance(frequent_itemsets, pd.DataFrame) and not frequent_itemsets.empty:
+                if (
+                    isinstance(frequent_itemsets, pd.DataFrame)
+                    and not frequent_itemsets.empty
+                ):
                     rules = association_rules(
                         frequent_itemsets,
                         metric="confidence",
@@ -453,7 +545,7 @@ class AdvancedPatternDiscovery:
                     )
                 else:
                     rules = pd.DataFrame()
-                    
+
             except (ValueError, TypeError, AttributeError):
                 rules = pd.DataFrame()  # Empty rules if generation fails
 
@@ -1263,7 +1355,10 @@ class AdvancedPatternDiscovery:
         return getattr(self, "_optimal_n_jobs", 1)
 
     async def benchmark_clustering_performance(
-        self, dataset_sizes: Optional[list[int]] = None, max_time: int = 45, sample_size: int = 2
+        self,
+        dataset_sizes: list[int] | None = None,
+        max_time: int = 45,
+        sample_size: int = 2,
     ) -> dict[str, Any]:
         """Benchmark HDBSCAN performance on different dataset sizes.
 
@@ -1371,41 +1466,39 @@ class AdvancedPatternDiscovery:
     async def _discover_apriori_patterns(
         self, performance_data: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """
-        Discover association patterns using Apriori algorithm.
-        
+        """Discover association patterns using Apriori algorithm.
+
         This method converts performance data into transactions and mines
         association rules to discover relationships between:
         - Rule combinations and their effectiveness
         - Prompt characteristics and success patterns
         - Performance indicators and user satisfaction
-        
+
         Args:
             performance_data: Rule performance data
-            
+
         Returns:
             Dictionary with Apriori analysis results and business insights
         """
         logger.info("Starting Apriori pattern discovery")
-        
-        if not self.apriori_analyzer:
+
+        if not self._ensure_apriori_analyzer():
             logger.warning("AprioriAnalyzer not available - skipping Apriori analysis")
             return {"error": "AprioriAnalyzer not initialized"}
-        
+
         try:
             # Perform comprehensive Apriori analysis
             apriori_results = self.apriori_analyzer.analyze_patterns(
-                window_days=30,
-                save_to_database=True
+                window_days=30, save_to_database=True
             )
-            
+
             if "error" in apriori_results:
                 logger.warning(f"Apriori analysis error: {apriori_results['error']}")
                 return apriori_results
-            
+
             # Convert results to standardized pattern format
             apriori_patterns = []
-            
+
             # Process top association rules
             for rule in apriori_results.get("top_rules", []):
                 pattern = AprioriPattern(
@@ -1417,100 +1510,117 @@ class AdvancedPatternDiscovery:
                     conviction=rule.get("conviction", 0),
                     rule_strength=rule["rule_strength"],
                     business_insight=self._generate_business_insight(rule),
-                    pattern_category=self._categorize_apriori_pattern(rule)
+                    pattern_category=self._categorize_apriori_pattern(rule),
                 )
                 apriori_patterns.append(pattern)
-            
+
             # Analyze performance data for additional context
             performance_context = self._analyze_apriori_performance_context(
                 performance_data, apriori_results
             )
-            
+
             return {
-                "patterns": [self._apriori_pattern_to_dict(p) for p in apriori_patterns],
+                "patterns": [
+                    self._apriori_pattern_to_dict(p) for p in apriori_patterns
+                ],
                 "transaction_count": apriori_results.get("transaction_count", 0),
-                "frequent_itemsets_count": apriori_results.get("frequent_itemsets_count", 0),
-                "association_rules_count": apriori_results.get("association_rules_count", 0),
+                "frequent_itemsets_count": apriori_results.get(
+                    "frequent_itemsets_count", 0
+                ),
+                "association_rules_count": apriori_results.get(
+                    "association_rules_count", 0
+                ),
                 "top_itemsets": apriori_results.get("top_itemsets", []),
                 "pattern_insights": apriori_results.get("pattern_insights", {}),
                 "performance_context": performance_context,
                 "config": apriori_results.get("config", {}),
                 "discovery_type": "apriori_association_rules",
                 "algorithm": "mlxtend_apriori",
-                "timestamp": apriori_results.get("timestamp")
+                "timestamp": apriori_results.get("timestamp"),
             }
-            
+
         except Exception as e:
             logger.error(f"Error in Apriori pattern discovery: {e}")
-            return {"error": f"Apriori analysis failed: {str(e)}"}
-    
+            return {"error": f"Apriori analysis failed: {e!s}"}
+
     def _generate_business_insight(self, rule: dict[str, Any]) -> str:
         """Generate human-readable business insight from association rule."""
         antecedents = rule["antecedents"]
         consequents = rule["consequents"]
         confidence = rule["confidence"]
         lift = rule["lift"]
-        
+
         # Analyze rule components for insight generation
         rule_insights = []
-        
+
         # Check for rule combination patterns
         rules_in_antecedent = [item for item in antecedents if item.startswith("rule_")]
         rules_in_consequent = [item for item in consequents if item.startswith("rule_")]
-        
+
         # Fix any() function calls - check string content directly
         consequents_str = str(consequents)
-        if rules_in_antecedent and ("performance_high" in consequents_str or "quality_high" in consequents_str):
+        if rules_in_antecedent and (
+            "performance_high" in consequents_str or "quality_high" in consequents_str
+        ):
             rule_names = [r.replace("rule_", "") for r in rules_in_antecedent]
             insight = f"Applying {', '.join(rule_names)} leads to high performance with {confidence:.1%} confidence"
             rule_insights.append(insight)
-        
+
         # Check for prompt characteristic patterns
         antecedents_str = str(antecedents)
         if "domain_" in antecedents_str and "quality_" in consequents_str:
-            insight = f"Specific prompt domains show quality improvements (lift: {lift:.2f}x)"
+            insight = (
+                f"Specific prompt domains show quality improvements (lift: {lift:.2f}x)"
+            )
             rule_insights.append(insight)
-        
+
         # Check for user satisfaction patterns
         if "feedback_positive" in consequents_str:
             insight = f"These patterns lead to positive user feedback with {confidence:.1%} certainty"
             rule_insights.append(insight)
-        
-        return "; ".join(rule_insights) if rule_insights else f"Pattern shows {lift:.2f}x lift with {confidence:.1%} confidence"
-    
+
+        return (
+            "; ".join(rule_insights)
+            if rule_insights
+            else f"Pattern shows {lift:.2f}x lift with {confidence:.1%} confidence"
+        )
+
     def _categorize_apriori_pattern(self, rule: dict[str, Any]) -> str:
         """Categorize Apriori patterns for better organization."""
         antecedents = str(rule["antecedents"])
         consequents = str(rule["consequents"])
-        
+
         if "rule_" in antecedents and "performance_" in consequents:
             return "rule_performance"
-        elif "domain_" in antecedents and "quality_" in consequents:
+        if "domain_" in antecedents and "quality_" in consequents:
             return "domain_quality"
-        elif "complexity_" in antecedents:
+        if "complexity_" in antecedents:
             return "complexity_patterns"
-        elif "feedback_" in consequents:
+        if "feedback_" in consequents:
             return "user_satisfaction"
-        elif "length_" in antecedents:
+        if "length_" in antecedents:
             return "prompt_structure"
-        else:
-            return "general_association"
-    
+        return "general_association"
+
     def _analyze_apriori_performance_context(
         self, performance_data: list[dict[str, Any]], apriori_results: dict[str, Any]
     ) -> dict[str, Any]:
         """Analyze how Apriori patterns relate to performance data."""
         context = {
             "performance_data_points": len(performance_data),
-            "average_effectiveness": np.mean([d.get("effectiveness", 0) for d in performance_data]),
-            "rule_coverage": self._calculate_rule_coverage(performance_data, apriori_results),
+            "average_effectiveness": np.mean([
+                d.get("effectiveness", 0) for d in performance_data
+            ]),
+            "rule_coverage": self._calculate_rule_coverage(
+                performance_data, apriori_results
+            ),
             "pattern_validation": self._validate_apriori_against_performance(
                 performance_data, apriori_results
-            )
+            ),
         }
-        
+
         return context
-    
+
     def _calculate_rule_coverage(
         self, performance_data: list[dict[str, Any]], apriori_results: dict[str, Any]
     ) -> dict[str, float]:
@@ -1518,17 +1628,19 @@ class AdvancedPatternDiscovery:
         total_sessions = len(performance_data)
         if total_sessions == 0:
             return {"coverage": 0.0}
-        
+
         # Extract rules from performance data
         rules_in_performance = set()
         for data_point in performance_data:
             rule_name = data_point.get("rule_name")
             if rule_name:
                 rules_in_performance.add(f"rule_{rule_name}")
-        
+
         # Extract rules from Apriori patterns
         rules_in_apriori = set()
-        for pattern in apriori_results.get("pattern_insights", {}).get("rule_performance_patterns", []):
+        for pattern in apriori_results.get("pattern_insights", {}).get(
+            "rule_performance_patterns", []
+        ):
             if "Rule " in pattern:
                 # Extract rule name from pattern text
                 rule_start = pattern.find("Rule ") + 5
@@ -1536,20 +1648,22 @@ class AdvancedPatternDiscovery:
                 if rule_end > rule_start:
                     rule_name = pattern[rule_start:rule_end]
                     rules_in_apriori.add(f"rule_{rule_name}")
-        
+
         # Calculate coverage
         if rules_in_performance:
-            coverage = len(rules_in_apriori.intersection(rules_in_performance)) / len(rules_in_performance)
+            coverage = len(rules_in_apriori.intersection(rules_in_performance)) / len(
+                rules_in_performance
+            )
         else:
             coverage = 0.0
-        
+
         return {
             "coverage": coverage,
             "rules_in_performance": len(rules_in_performance),
             "rules_in_apriori": len(rules_in_apriori),
-            "overlap": len(rules_in_apriori.intersection(rules_in_performance))
+            "overlap": len(rules_in_apriori.intersection(rules_in_performance)),
         }
-    
+
     def _validate_apriori_against_performance(
         self, performance_data: list[dict[str, Any]], apriori_results: dict[str, Any]
     ) -> dict[str, Any]:
@@ -1557,28 +1671,33 @@ class AdvancedPatternDiscovery:
         validation_results = {
             "pattern_accuracy": 0.0,
             "prediction_confidence": 0.0,
-            "business_value_score": 0.0
+            "business_value_score": 0.0,
         }
-        
+
         # Extract high-confidence patterns for validation
         high_conf_patterns = []
         for rule in apriori_results.get("top_rules", []):
             if rule["confidence"] >= 0.7 and rule["lift"] >= 1.5:
                 high_conf_patterns.append(rule)
-        
+
         if high_conf_patterns:
             # Calculate average confidence and lift for validation
             avg_confidence = np.mean([p["confidence"] for p in high_conf_patterns])
             avg_lift = np.mean([p["lift"] for p in high_conf_patterns])
-            
+
             # Fix dict.update() and min() type issues
             validation_results["pattern_accuracy"] = float(avg_confidence)
-            validation_results["prediction_confidence"] = float(min(float(avg_confidence * avg_lift / 2), 1.0))
-            validation_results["business_value_score"] = float(len(high_conf_patterns) / max(len(apriori_results.get("top_rules", [])), 1))
+            validation_results["prediction_confidence"] = float(
+                min(float(avg_confidence * avg_lift / 2), 1.0)
+            )
+            validation_results["business_value_score"] = float(
+                len(high_conf_patterns)
+                / max(len(apriori_results.get("top_rules", [])), 1)
+            )
             validation_results["high_confidence_patterns"] = len(high_conf_patterns)
-        
+
         return validation_results
-    
+
     def _apriori_pattern_to_dict(self, pattern: AprioriPattern) -> dict[str, Any]:
         """Convert AprioriPattern dataclass to dictionary."""
         return {
@@ -1591,75 +1710,76 @@ class AdvancedPatternDiscovery:
             "rule_strength": pattern.rule_strength,
             "business_insight": pattern.business_insight,
             "pattern_category": pattern.pattern_category,
-            "type": "apriori_association_rule"
+            "type": "apriori_association_rule",
         }
 
     async def get_contextualized_patterns(
-        self, 
+        self,
         context_items: list[str],
         db_session: AsyncSession,
-        min_confidence: float = 0.6
+        min_confidence: float = 0.6,
     ) -> dict[str, Any]:
-        """
-        Get patterns relevant to a specific context using Apriori analysis.
-        
+        """Get patterns relevant to a specific context using Apriori analysis.
+
         This method leverages association rules to find patterns relevant
         to the current prompt improvement context.
-        
+
         Args:
             context_items: Items representing current context (rules, characteristics)
             db_session: Database session
             min_confidence: Minimum confidence for returned patterns
-            
+
         Returns:
             Dictionary with contextualized patterns and recommendations
         """
-        if not self.apriori_analyzer:
+        if not self._ensure_apriori_analyzer():
             logger.warning("AprioriAnalyzer not available for contextualized patterns")
             return {"error": "AprioriAnalyzer not initialized"}
-        
+
         try:
             # Get relevant association rules
             relevant_rules = self.apriori_analyzer.get_rules_for_context(
                 context_items, min_confidence
             )
-            
+
             # Get performance data for additional context
             performance_data = await self._get_performance_data(db_session, 0.5)
-            
+
             # Generate contextualized recommendations
             recommendations = self._generate_contextualized_recommendations(
                 relevant_rules, context_items, performance_data
             )
-            
+
             return {
                 "context_items": context_items,
                 "relevant_rules": relevant_rules,
                 "recommendations": recommendations,
                 "rule_count": len(relevant_rules),
-                "context_coverage": self._calculate_context_coverage(relevant_rules, context_items),
-                "timestamp": time.time()
+                "context_coverage": self._calculate_context_coverage(
+                    relevant_rules, context_items
+                ),
+                "timestamp": time.time(),
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting contextualized patterns: {e}")
-            return {"error": f"Contextualized pattern analysis failed: {str(e)}"}
-    
+            return {"error": f"Contextualized pattern analysis failed: {e!s}"}
+
     def _generate_contextualized_recommendations(
-        self, 
-        relevant_rules: list[dict[str, Any]], 
+        self,
+        relevant_rules: list[dict[str, Any]],
         context_items: list[str],
-        performance_data: list[dict[str, Any]]
+        performance_data: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Generate recommendations based on context and association rules."""
         recommendations = []
-        
+
         for rule in relevant_rules:
             # Analyze rule for actionable recommendations
             consequents = rule["consequents"]
             confidence = rule["confidence"]
             lift = rule["lift"]
-            
+
             # Generate specific recommendations
             if any("quality_high" in consequent for consequent in consequents):
                 recommendations.append({
@@ -1667,37 +1787,39 @@ class AdvancedPatternDiscovery:
                     "action": f"Apply pattern {rule['antecedents']} for quality improvement",
                     "confidence": confidence,
                     "expected_lift": lift,
-                    "priority": "high" if confidence > 0.8 else "medium"
+                    "priority": "high" if confidence > 0.8 else "medium",
                 })
-            
+
             if any("performance_high" in consequent for consequent in consequents):
                 recommendations.append({
                     "type": "performance_optimization",
                     "action": f"Use combination {rule['antecedents']} for performance gains",
                     "confidence": confidence,
                     "expected_lift": lift,
-                    "priority": "high" if lift > 2.0 else "medium"
+                    "priority": "high" if lift > 2.0 else "medium",
                 })
-        
+
         # Sort by confidence and lift
-        recommendations.sort(key=lambda x: (x["confidence"], x["expected_lift"]), reverse=True)
-        
+        recommendations.sort(
+            key=lambda x: (x["confidence"], x["expected_lift"]), reverse=True
+        )
+
         return recommendations[:10]  # Return top 10 recommendations
-    
+
     def _calculate_context_coverage(
         self, relevant_rules: list[dict[str, Any]], context_items: list[str]
     ) -> float:
         """Calculate how well the rules cover the provided context."""
         if not relevant_rules or not context_items:
             return 0.0
-        
+
         context_set = set(context_items)
         covered_items = set()
-        
+
         for rule in relevant_rules:
             antecedents = set(rule["antecedents"])
             covered_items.update(antecedents.intersection(context_set))
-        
+
         return len(covered_items) / len(context_set) if context_items else 0.0
 
 
@@ -1705,9 +1827,17 @@ class AdvancedPatternDiscovery:
 _advanced_pattern_discovery = None
 
 
-async def get_advanced_pattern_discovery() -> AdvancedPatternDiscovery:
-    """Get singleton AdvancedPatternDiscovery instance"""
+async def get_advanced_pattern_discovery(db_manager: DatabaseManager | None = None) -> AdvancedPatternDiscovery:
+    """Get singleton AdvancedPatternDiscovery instance with lazy initialization support.
+    
+    Args:
+        db_manager: Optional DatabaseManager instance for dependency injection.
+                   If None, will be created lazily when first needed.
+    
+    Returns:
+        AdvancedPatternDiscovery instance with proper dependency injection
+    """
     global _advanced_pattern_discovery
     if _advanced_pattern_discovery is None:
-        _advanced_pattern_discovery = AdvancedPatternDiscovery()
+        _advanced_pattern_discovery = AdvancedPatternDiscovery(db_manager=db_manager)
     return _advanced_pattern_discovery

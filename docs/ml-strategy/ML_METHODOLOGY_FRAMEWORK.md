@@ -15,6 +15,7 @@ This framework establishes production-grade methodology from machine learning be
 ### 🔬 **Scientific Approach (Following ML Best Practices)**
 
 #### Core Principles
+
 - **Evaluation Infrastructure First**: Build measurement tools before algorithm changes
 - **Statistical Rigor**: Cross-validation, bootstrap confidence intervals, sequential testing
 - **Error Analysis**: Bottom-up examination of actual failure modes vs top-down assumptions
@@ -22,6 +23,7 @@ This framework establishes production-grade methodology from machine learning be
 - **Continuous Monitoring**: Real-time performance tracking with drift detection
 
 #### Implementation Philosophy
+
 1. **Measurement Before Optimization**: No algorithmic changes without robust evaluation infrastructure
 2. **Statistical Significance**: All claims must be backed by rigorous statistical testing
 3. **Real-World Validation**: Simulation results must be validated against real performance
@@ -30,6 +32,7 @@ This framework establishes production-grade methodology from machine learning be
 ### 📊 **Validation Standards (scikit-learn methodology)**
 
 #### Statistical Requirements
+
 - All improvements must show **p < 0.05 statistical significance**
 - **Bootstrap confidence intervals** for all performance metrics (minimum 1000 iterations)
 - **Cross-validation** with stratified sampling across domains (minimum 5-fold)
@@ -37,6 +40,7 @@ This framework establishes production-grade methodology from machine learning be
 - **Power analysis** to determine required sample sizes (minimum 80% power)
 
 #### Quality Gates
+
 1. **Significance Testing**: Paired t-tests for before/after comparisons
 2. **Effect Size**: Cohen's d calculation with practical significance thresholds
 3. **Confidence Intervals**: Bootstrap CIs for all reported metrics
@@ -46,11 +50,13 @@ This framework establishes production-grade methodology from machine learning be
 ### 🎯 **Research Integration Standards**
 
 #### Context7 Research Application
+
 - **scikit-learn Best Practices**: Statistical validation, cross-validation methodology
 - **MLflow Production Patterns**: Experiment tracking, model management, deployment pipelines
 - **Statsig A/B Testing**: Sequential testing, statistical power analysis, bias correction
 
 #### Academic Rigor
+
 - **Pre-registered Hypotheses**: All tests defined before data collection
 - **Reproducible Research**: Version control for data, code, and experiments
 - **Peer Review Process**: Internal validation of methodology and results
@@ -59,24 +65,28 @@ This framework establishes production-grade methodology from machine learning be
 ## Implementation Workflow
 
 ### Phase 0: Infrastructure Foundation
+
 1. **Statistical Validation Framework**: Implement testing infrastructure
 2. **Data Collection Pipeline**: Systematic data gathering with quality controls
 3. **Evaluation Metrics**: Define measurement standards and baselines
 4. **Monitoring Infrastructure**: Real-time performance tracking
 
 ### Phase 1: Statistical Foundation
+
 1. **Baseline Measurement**: Establish statistically valid performance baseline
 2. **Error Analysis**: Systematic investigation of failure modes
 3. **Hypothesis Formation**: Data-driven hypothesis generation
 4. **Test Design**: Power analysis and experimental design
 
 ### Phase 2: Data-Driven Enhancement
+
 1. **Expert Dataset Collection**: High-quality labeled data with inter-rater reliability
 2. **Feature Engineering**: Domain-specific feature extraction
 3. **Model Development**: Systematic algorithm development with validation
 4. **Performance Validation**: Statistical testing of improvements
 
 ### Phase 3: Production Deployment
+
 1. **A/B Testing Framework**: Statistical testing in production environment
 2. **Monitoring Integration**: Real-time performance tracking
 3. **Rollback Mechanisms**: Automated quality gates and safety measures
@@ -85,6 +95,7 @@ This framework establishes production-grade methodology from machine learning be
 ## Quality Assurance Framework
 
 ### Statistical Validation Checklist
+
 - [ ] Pre-registered hypothesis defined
 - [ ] Adequate sample size calculated (power analysis)
 - [ ] Cross-validation implemented
@@ -95,6 +106,7 @@ This framework establishes production-grade methodology from machine learning be
 - [ ] Results independently validated
 
 ### Research Standards Compliance
+
 - [ ] Methodology documented and reproducible
 - [ ] Data collection process standardized
 - [ ] Code version controlled and tested
@@ -104,6 +116,7 @@ This framework establishes production-grade methodology from machine learning be
 ## Success Metrics
 
 ### Performance Targets
+
 - **Statistical Significance**: p < 0.05 for all improvements
 - **Effect Size**: Cohen's d > 0.3 (medium effect size minimum)
 - **Confidence Level**: 95% confidence intervals for all metrics
@@ -111,6 +124,7 @@ This framework establishes production-grade methodology from machine learning be
 - **Real-World Validation**: Production performance matches experimental results
 
 ### Quality Indicators
+
 - **Reproducibility**: Results replicable by independent teams
 - **Robustness**: Performance consistent across different domains
 - **Scalability**: Methods scale to larger datasets and real-time constraints
@@ -119,11 +133,13 @@ This framework establishes production-grade methodology from machine learning be
 ---
 
 **Related Documents:**
+
 - [Performance Baseline Analysis](../ml-strategy/PERFORMANCE_BASELINE_ANALYSIS.md)
 - [Statistical Validation Framework](../ml-infrastructure/STATISTICAL_VALIDATION_FRAMEWORK.md)
-- [Algorithm Enhancement Phases](../ml-implementation/ALGORITHM_ENHANCEMENT_PHASES.md)
+- [Complete APES System Workflow](../../PROMPT_IMPROVER_COMPLETE_WORKFLOW.md)
 
 **Next Steps:**
+
 1. Review and validate methodology with team
 2. Implement statistical validation framework
 3. Establish baseline performance measurement

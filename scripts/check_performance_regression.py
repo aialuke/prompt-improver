@@ -17,7 +17,7 @@ class PerformanceRegessionChecker:
         self.threshold_degradation = 0.2  # 20% degradation threshold
         self.timeout_seconds = 30
 
-    def load_baseline(self) -> Optional[dict[str, Any]]:
+    def load_baseline(self) -> dict[str, Any] | None:
         """Load performance baseline from file."""
         if not self.baseline_file.exists():
             return None

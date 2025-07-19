@@ -3,28 +3,41 @@ Research-validated patterns for high-performance database operations.
 Enhanced with 2025 error handling best practices.
 """
 
+import asyncio
 import contextlib
+import logging
 import os
 import socket
 import time
-import asyncio
-import logging
 from datetime import datetime
-from typing import Any, TypeVar, Optional
+from typing import Any, Optional, TypeVar
 
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
+import psycopg
+from psycopg import (
+    errors as psycopg_errors,
+    sql,
+)
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
-from psycopg import errors as psycopg_errors
-from psycopg import sql
-import psycopg
 from pydantic import BaseModel, ValidationError
 
 from .config import DatabaseConfig
 from .error_handling import (
-    ErrorContext, RetryConfig, CircuitBreakerConfig, CircuitBreaker,
-    RetryManager, ErrorMetrics, DatabaseErrorClassifier, ErrorCategory,
-    ErrorSeverity, enhance_error_context, default_retry_config,
-    default_circuit_breaker_config, global_error_metrics
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    DatabaseErrorClassifier,
+    ErrorCategory,
+    ErrorContext,
+    ErrorMetrics,
+    ErrorSeverity,
+    RetryConfig,
+    RetryManager,
+    default_circuit_breaker_config,
+    default_retry_config,
+    enhance_error_context,
+    global_error_metrics,
 )
 
 T = TypeVar("T", bound=BaseModel)
@@ -49,7 +62,7 @@ class QueryMetrics:
             self.slow_queries.append({
                 "query": query[:100] + "..." if len(query) > 100 else query,
                 "duration_ms": duration_ms,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": aware_utc_now().isoformat(),
                 "params_count": len(params) if params else 0,
             })
 
@@ -81,22 +94,24 @@ class TypeSafePsycopgClient:
     """
 
     def __init__(
-        self, 
+        self,
         config: DatabaseConfig | None = None,
         retry_config: RetryConfig | None = None,
         circuit_breaker_config: CircuitBreakerConfig | None = None,
-        enable_error_metrics: bool = True
+        enable_error_metrics: bool = True,
     ):
         self.config = config or DatabaseConfig()
         self.metrics = QueryMetrics()
-        
+
         # 2025 Enhancement: Advanced error handling
         self.retry_config = retry_config or default_retry_config
         self.retry_manager = RetryManager(self.retry_config)
-        
-        self.circuit_breaker_config = circuit_breaker_config or default_circuit_breaker_config
+
+        self.circuit_breaker_config = (
+            circuit_breaker_config or default_circuit_breaker_config
+        )
         self.circuit_breaker = CircuitBreaker(self.circuit_breaker_config)
-        
+
         self.error_metrics = ErrorMetrics() if enable_error_metrics else None
         self._connection_id = f"psycopg-{id(self)}"
 
@@ -105,7 +120,7 @@ class TypeSafePsycopgClient:
         pid = os.getpid()
         app_name = f"prompt-improver-{hostname}-{pid}"
 
-        # Build connection string with 2025 optimizations
+        # Build connection string with 2025 optimizations (psycopg3 format)
         self.conninfo = (
             f"postgresql://{self.config.postgres_username}:{self.config.postgres_password}@"
             f"{self.config.postgres_host}:{self.config.postgres_port}/{self.config.postgres_database}"
@@ -116,7 +131,6 @@ class TypeSafePsycopgClient:
             "row_factory": dict_row,  # Return dict rows for Pydantic mapping
             "prepare_threshold": 5,  # Prepare frequently used queries
             "autocommit": False,  # Explicit transaction control
-
             # 2025 Connection Optimizations
             "application_name": app_name,  # For monitoring and logging
             "connect_timeout": 10,  # Connection timeout
@@ -159,7 +173,7 @@ class TypeSafePsycopgClient:
 
     @contextlib.asynccontextmanager
     async def connection(self):
-        """Get a connection from the pool"""
+        """Get a connection from the pool with enhanced monitoring"""
         async with self.pool.connection() as conn:
             yield conn
 
@@ -167,7 +181,7 @@ class TypeSafePsycopgClient:
         self, model_class: type[T], query: str, params: dict[str, Any] | None = None
     ) -> list[T]:
         """Execute query and return typed Pydantic models with enhanced error handling.
-        
+
         Features:
         - Zero serialization overhead with direct row mapping
         - Automatic retry for transient errors
@@ -178,36 +192,40 @@ class TypeSafePsycopgClient:
             operation="fetch_models",
             query=query,
             params=params,
-            connection_id=self._connection_id
+            connection_id=self._connection_id,
         )
-        
+
         async def _execute_operation():
             start_time = time.perf_counter()
-            
+
             try:
                 async with self.connection() as conn, conn.cursor() as cur:
-                    await cur.execute(query, params or {})  # type: ignore[arg-type]
+                    await cur.execute(query, params or {})
                     rows = await cur.fetchall()
 
                     # Direct Pydantic model creation from dict rows
                     models = []
                     validation_errors = 0
-                    
+
                     for row in rows:
                         try:
                             models.append(model_class.model_validate(row))
                         except ValidationError as e:
                             validation_errors += 1
-                            logger.warning(f"Validation error for {model_class.__name__}: {e}")
+                            logger.warning(
+                                f"Validation error for {model_class.__name__}: {e}"
+                            )
                             continue
 
                     # Record performance metrics
                     duration_ms = (time.perf_counter() - start_time) * 1000
                     context.duration_ms = duration_ms
                     self.metrics.record_query(query, duration_ms, params)
-                    
+
                     if validation_errors > 0:
-                        logger.info(f"Completed fetch_models with {validation_errors} validation errors")
+                        logger.info(
+                            f"Completed fetch_models with {validation_errors} validation errors"
+                        )
 
                     return models
 
@@ -215,11 +233,11 @@ class TypeSafePsycopgClient:
                 duration_ms = (time.perf_counter() - start_time) * 1000
                 context.duration_ms = duration_ms
                 self.metrics.record_query(query, duration_ms, params)
-                
+
                 # Record error in metrics
                 if self.error_metrics:
                     self.error_metrics.record_error(context, e)
-                    
+
                 # Classify and log error
                 category, severity = DatabaseErrorClassifier.classify_error(e)
                 logger.error(
@@ -227,7 +245,7 @@ class TypeSafePsycopgClient:
                     f"Category: {category.value}, Severity: {severity.value} - "
                     f"Duration: {duration_ms:.2f}ms"
                 )
-                
+
                 raise
 
         # Apply retry logic for enhanced reliability
@@ -309,16 +327,16 @@ class TypeSafePsycopgClient:
         model_class: type[T],
         query: str,
         params: dict[str, Any] | None = None,
-        prepared: bool = True
+        prepared: bool = True,
     ) -> list[T]:
         """2025 Enhancement: Execute query with server-side binding optimization.
-        
+
         Args:
             model_class: Pydantic model class for type safety
             query: SQL query string
             params: Query parameters
             prepared: Whether to use prepared statements (default: True)
-        
+
         Returns:
             List of typed Pydantic models
         """
@@ -341,7 +359,9 @@ class TypeSafePsycopgClient:
                     try:
                         models.append(model_class.model_validate(row))
                     except ValidationError as e:
-                        print(f"Server-side validation error for {model_class.__name__}: {e}")
+                        print(
+                            f"Server-side validation error for {model_class.__name__}: {e}"
+                        )
                         continue
 
                 # Record performance metrics
@@ -356,18 +376,15 @@ class TypeSafePsycopgClient:
             raise
 
     async def execute_batch_server_side(
-        self,
-        query: str,
-        params_list: list[dict[str, Any]],
-        prepared: bool = True
+        self, query: str, params_list: list[dict[str, Any]], prepared: bool = True
     ) -> int:
         """2025 Enhancement: Execute batch operations with server-side binding.
-        
+
         Args:
             query: SQL query string
             params_list: List of parameter dictionaries
             prepared: Whether to use prepared statements (default: True)
-        
+
         Returns:
             Total number of affected rows
         """
@@ -387,7 +404,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[BATCH-SERVER-SIDE] {query}",
                     duration_ms,
-                    {"batch_size": len(params_list)}
+                    {"batch_size": len(params_list)},
                 )
 
                 return total_affected
@@ -397,7 +414,7 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[BATCH-SERVER-SIDE] {query}",
                 duration_ms,
-                {"batch_size": len(params_list)}
+                {"batch_size": len(params_list)},
             )
             raise
 
@@ -406,16 +423,16 @@ class TypeSafePsycopgClient:
         model_class: type[T],
         query: str,
         params: dict[str, Any] | None = None,
-        prepared: bool = True
+        prepared: bool = True,
     ) -> T | None:
         """2025 Enhancement: Fetch single model with server-side binding.
-        
+
         Args:
             model_class: Pydantic model class for type safety
             query: SQL query string
             params: Query parameters
             prepared: Whether to use prepared statements (default: True)
-        
+
         Returns:
             Single typed Pydantic model or None
         """
@@ -448,18 +465,15 @@ class TypeSafePsycopgClient:
             raise
 
     async def execute_server_side(
-        self,
-        query: str,
-        params: dict[str, Any] | None = None,
-        prepared: bool = True
+        self, query: str, params: dict[str, Any] | None = None, prepared: bool = True
     ) -> int:
         """2025 Enhancement: Execute non-SELECT query with server-side binding.
-        
+
         Args:
             query: SQL query string
             params: Query parameters
             prepared: Whether to use prepared statements (default: True)
-        
+
         Returns:
             Number of affected rows
         """
@@ -484,18 +498,17 @@ class TypeSafePsycopgClient:
             raise
 
     async def execute_pipeline_batch(
-        self,
-        queries: list[tuple[str, dict[str, Any] | None]]
+        self, queries: list[tuple[str, dict[str, Any] | None]]
     ) -> list[int]:
         """2025 Enhancement: Execute multiple queries using pipeline mode.
-        
+
         Pipeline mode allows multiple small queries to be sent to the server
         in a single round-trip, significantly improving performance for
         batch operations.
-        
+
         Args:
             queries: List of (query, params) tuples
-        
+
         Returns:
             List of row counts for each query
         """
@@ -509,7 +522,9 @@ class TypeSafePsycopgClient:
 
                     # Queue all queries in the pipeline
                     for query, params in queries:
-                        cur = conn.cursor()  # Use connection cursor within pipeline context
+                        cur = (
+                            conn.cursor()
+                        )  # Use connection cursor within pipeline context
                         cursors.append(cur)
                         await cur.execute(query, params or {})  # type: ignore[arg-type]
 
@@ -525,7 +540,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[PIPELINE] {len(queries)} queries",
                     duration_ms,
-                    {"pipeline_size": len(queries)}
+                    {"pipeline_size": len(queries)},
                 )
 
                 return results
@@ -535,21 +550,19 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[PIPELINE] {len(queries)} queries",
                 duration_ms,
-                {"pipeline_size": len(queries)}
+                {"pipeline_size": len(queries)},
             )
             raise
 
     async def fetch_pipeline_batch(
-        self,
-        model_class: type[T],
-        queries: list[tuple[str, dict[str, Any] | None]]
+        self, model_class: type[T], queries: list[tuple[str, dict[str, Any] | None]]
     ) -> list[list[T]]:
         """2025 Enhancement: Fetch multiple result sets using pipeline mode.
-        
+
         Args:
             model_class: Pydantic model class for type safety
             queries: List of (query, params) tuples
-        
+
         Returns:
             List of result lists, one for each query
         """
@@ -563,7 +576,9 @@ class TypeSafePsycopgClient:
 
                     # Queue all queries in the pipeline
                     for query, params in queries:
-                        cur = conn.cursor()  # Use connection cursor within pipeline context
+                        cur = (
+                            conn.cursor()
+                        )  # Use connection cursor within pipeline context
                         cursors.append(cur)
                         await cur.execute(query, params or {})  # type: ignore[arg-type]
 
@@ -578,7 +593,9 @@ class TypeSafePsycopgClient:
                             try:
                                 models.append(model_class.model_validate(row))
                             except ValidationError as e:
-                                print(f"Pipeline validation error for {model_class.__name__}: {e}")
+                                print(
+                                    f"Pipeline validation error for {model_class.__name__}: {e}"
+                                )
                                 continue
                         results.append(models)
 
@@ -587,7 +604,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[PIPELINE] {len(queries)} fetch queries",
                     duration_ms,
-                    {"pipeline_size": len(queries)}
+                    {"pipeline_size": len(queries)},
                 )
 
                 return results
@@ -597,23 +614,22 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[PIPELINE] {len(queries)} fetch queries",
                 duration_ms,
-                {"pipeline_size": len(queries)}
+                {"pipeline_size": len(queries)},
             )
             raise
 
     async def execute_mixed_pipeline(
-        self,
-        operations: list[dict[str, Any]]
+        self, operations: list[dict[str, Any]]
     ) -> list[Any]:
         """2025 Enhancement: Execute mixed operations (SELECT/INSERT/UPDATE/DELETE) in pipeline.
-        
+
         Args:
             operations: List of operation dictionaries with keys:
                 - type: 'select' | 'execute'
                 - query: SQL query string
                 - params: Query parameters (optional)
                 - model_class: Pydantic model class (for select operations)
-        
+
         Returns:
             List of results (models for select, row counts for execute)
         """
@@ -627,7 +643,9 @@ class TypeSafePsycopgClient:
 
                     # Queue all operations in the pipeline
                     for op in operations:
-                        cur = conn.cursor()  # Use connection cursor within pipeline context
+                        cur = (
+                            conn.cursor()
+                        )  # Use connection cursor within pipeline context
                         cursors.append((cur, op))
                         await cur.execute(op["query"], op.get("params") or {})  # type: ignore[arg-type]
 
@@ -644,7 +662,9 @@ class TypeSafePsycopgClient:
                                 try:
                                     models.append(model_class.model_validate(row))
                                 except ValidationError as e:
-                                    print(f"Mixed pipeline validation error for {model_class.__name__}: {e}")
+                                    print(
+                                        f"Mixed pipeline validation error for {model_class.__name__}: {e}"
+                                    )
                                     continue
                             results.append(models)
                         else:  # execute operation
@@ -655,7 +675,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[MIXED-PIPELINE] {len(operations)} operations",
                     duration_ms,
-                    {"pipeline_size": len(operations)}
+                    {"pipeline_size": len(operations)},
                 )
 
                 return results
@@ -665,7 +685,7 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[MIXED-PIPELINE] {len(operations)} operations",
                 duration_ms,
-                {"pipeline_size": len(operations)}
+                {"pipeline_size": len(operations)},
             )
             raise
 
@@ -676,13 +696,13 @@ class TypeSafePsycopgClient:
         columns: list[str] | None = None,
         format: str = "csv",
         delimiter: str = ",",
-        header: bool = False
+        header: bool = False,
     ) -> int:
         """2025 Enhancement: Bulk insert data using COPY FROM operation.
-        
+
         COPY FROM is the fastest way to insert large amounts of data into PostgreSQL.
         Can be 10-100x faster than individual INSERT statements.
-        
+
         Args:
             table_name: Target table name
             data_iterable: List of dictionaries containing row data
@@ -690,7 +710,7 @@ class TypeSafePsycopgClient:
             format: COPY format ('csv', 'text', 'binary')
             delimiter: Field delimiter for CSV format
             header: Whether to include header row
-        
+
         Returns:
             Number of rows inserted
         """
@@ -704,7 +724,9 @@ class TypeSafePsycopgClient:
 
                 # Ensure columns is not None for type safety
                 if not columns:
-                    raise ValueError("No columns specified and no data provided to infer columns")
+                    raise ValueError(
+                        "No columns specified and no data provided to infer columns"
+                    )
 
                 # Build COPY command
                 columns_str = ", ".join(columns)
@@ -742,7 +764,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[COPY-FROM] {table_name}",
                     duration_ms,
-                    {"row_count": row_count, "format": format}
+                    {"row_count": row_count, "format": format},
                 )
 
                 return row_count
@@ -752,7 +774,7 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[COPY-FROM] {table_name}",
                 duration_ms,
-                {"row_count": len(data_iterable), "format": format}
+                {"row_count": len(data_iterable), "format": format},
             )
             raise
 
@@ -764,12 +786,12 @@ class TypeSafePsycopgClient:
         where_clause: str | None = None,
         format: str = "csv",
         delimiter: str = ",",
-        header: bool = True
+        header: bool = True,
     ) -> int:
         """2025 Enhancement: Bulk export data using COPY TO operation.
-        
+
         COPY TO is the fastest way to export large amounts of data from PostgreSQL.
-        
+
         Args:
             table_name: Source table name
             file_path: Target file path
@@ -778,7 +800,7 @@ class TypeSafePsycopgClient:
             format: COPY format ('csv', 'text', 'binary')
             delimiter: Field delimiter for CSV format
             header: Whether to include header row
-        
+
         Returns:
             Number of rows exported
         """
@@ -804,21 +826,21 @@ class TypeSafePsycopgClient:
 
                 # Execute COPY TO
                 row_count = 0
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     async with cur.copy(copy_sql) as copy:  # type: ignore[arg-type]
                         async for data in copy:
                             # Proper binary data handling for 2025
-                            content = bytes(data).decode('utf-8')
+                            content = bytes(data).decode("utf-8")
                             f.write(content)
                             # Count rows (approximation for CSV)
-                            row_count += content.count('\n')
+                            row_count += content.count("\n")
 
                 # Record performance metrics
                 duration_ms = (time.perf_counter() - start_time) * 1000
                 self.metrics.record_query(
                     f"[COPY-TO] {table_name}",
                     duration_ms,
-                    {"row_count": row_count, "format": format, "file_path": file_path}
+                    {"row_count": row_count, "format": format, "file_path": file_path},
                 )
 
                 return row_count
@@ -828,7 +850,7 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[COPY-TO] {table_name}",
                 duration_ms,
-                {"format": format, "file_path": file_path}
+                {"format": format, "file_path": file_path},
             )
             raise
 
@@ -840,10 +862,10 @@ class TypeSafePsycopgClient:
         format: str = "csv",
         delimiter: str = ",",
         header: bool = True,
-        skip_errors: bool = False
+        skip_errors: bool = False,
     ) -> int:
         """2025 Enhancement: Bulk import data from file using COPY FROM operation.
-        
+
         Args:
             table_name: Target table name
             file_path: Source file path
@@ -852,7 +874,7 @@ class TypeSafePsycopgClient:
             delimiter: Field delimiter for CSV format
             header: Whether file has header row
             skip_errors: Whether to skip rows with errors
-        
+
         Returns:
             Number of rows imported
         """
@@ -876,12 +898,12 @@ class TypeSafePsycopgClient:
 
                 # Execute COPY FROM
                 row_count = 0
-                with open(file_path, encoding='utf-8') as f:
+                with open(file_path, encoding="utf-8") as f:
                     async with cur.copy(copy_sql) as copy:  # type: ignore[arg-type]
                         content = f.read()
                         await copy.write(content)
                         # Count rows (approximation for CSV)
-                        row_count = content.count('\n')
+                        row_count = content.count("\n")
                         if header and row_count > 0:
                             row_count -= 1  # Subtract header row
 
@@ -890,7 +912,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[COPY-FROM-FILE] {table_name}",
                     duration_ms,
-                    {"row_count": row_count, "format": format, "file_path": file_path}
+                    {"row_count": row_count, "format": format, "file_path": file_path},
                 )
 
                 return row_count
@@ -900,7 +922,7 @@ class TypeSafePsycopgClient:
             self.metrics.record_query(
                 f"[COPY-FROM-FILE] {table_name}",
                 duration_ms,
-                {"format": format, "file_path": file_path}
+                {"format": format, "file_path": file_path},
             )
             raise
 
@@ -910,17 +932,17 @@ class TypeSafePsycopgClient:
         target_table: str,
         columns: list[str] | None = None,
         where_clause: str | None = None,
-        transform_query: str | None = None
+        transform_query: str | None = None,
     ) -> int:
         """2025 Enhancement: Bulk copy data between tables using optimized COPY operations.
-        
+
         Args:
             source_table: Source table name
             target_table: Target table name
             columns: List of column names (optional)
             where_clause: WHERE clause for source filtering (optional)
             transform_query: Custom SELECT query for data transformation (optional)
-        
+
         Returns:
             Number of rows copied
         """
@@ -947,11 +969,17 @@ class TypeSafePsycopgClient:
                     temp_table = f"temp_copy_{int(time.time() * 1000)}"
 
                     # Copy from source to temp table
-                    copy_out_sql = f"COPY ({source_query}) TO STDOUT WITH (FORMAT BINARY)"
+                    copy_out_sql = (
+                        f"COPY ({source_query}) TO STDOUT WITH (FORMAT BINARY)"
+                    )
                     copy_in_sql = f"COPY {target_table}{target_columns} FROM STDIN WITH (FORMAT BINARY)"
 
-                    cur1 = conn.cursor()  # Use connection cursor within pipeline context
-                    cur2 = conn.cursor()  # Use connection cursor within pipeline context
+                    cur1 = (
+                        conn.cursor()
+                    )  # Use connection cursor within pipeline context
+                    cur2 = (
+                        conn.cursor()
+                    )  # Use connection cursor within pipeline context
 
                     # Execute copy operations
                     row_count = 0
@@ -968,7 +996,7 @@ class TypeSafePsycopgClient:
                 self.metrics.record_query(
                     f"[COPY-BETWEEN] {source_table} -> {target_table}",
                     duration_ms,
-                    {"row_count": row_count}
+                    {"row_count": row_count},
                 )
 
                 return row_count
@@ -976,9 +1004,7 @@ class TypeSafePsycopgClient:
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
             self.metrics.record_query(
-                f"[COPY-BETWEEN] {source_table} -> {target_table}",
-                duration_ms,
-                {}
+                f"[COPY-BETWEEN] {source_table} -> {target_table}", duration_ms, {}
             )
             raise
 
@@ -1034,11 +1060,17 @@ class TypeSafePsycopgClient:
                 "requests_num": stats["requests_num"],
                 "usage_ms": stats["usage_ms"],
                 "connections_num": stats["connections_num"],
-                "pool_health": "HEALTHY" if stats["pool_available"] > 0 else "EXHAUSTED",
+                "pool_health": "HEALTHY"
+                if stats["pool_available"] > 0
+                else "EXHAUSTED",
                 "pool_utilization": round(
-                    (stats["pool_size"] - stats["pool_available"]) /
-                    stats["pool_size"] * 100, 2
-                ) if stats["pool_size"] > 0 else 0,
+                    (stats["pool_size"] - stats["pool_available"])
+                    / stats["pool_size"]
+                    * 100,
+                    2,
+                )
+                if stats["pool_size"] > 0
+                else 0,
             }
         except Exception as e:
             return {
@@ -1076,7 +1108,7 @@ class TypeSafePsycopgClient:
                         "pool_timeout": self.config.pool_timeout,
                         "pool_max_lifetime": self.config.pool_max_lifetime,
                         "pool_max_idle": self.config.pool_max_idle,
-                    }
+                    },
                 }
         except Exception as e:
             return {
@@ -1090,60 +1122,63 @@ class TypeSafePsycopgClient:
         self.metrics = QueryMetrics()
         if self.error_metrics:
             self.error_metrics = ErrorMetrics()
-    
+
     def get_error_metrics_summary(self) -> dict[str, Any]:
         """Get comprehensive error metrics summary."""
         if not self.error_metrics:
             return {"error": "Error metrics not enabled"}
-        
+
         return self.error_metrics.get_metrics_summary()
-    
+
     def get_circuit_breaker_status(self) -> dict[str, Any]:
         """Get current circuit breaker status."""
         return {
             "state": self.circuit_breaker.state.value,
             "failure_count": self.circuit_breaker.failure_count,
             "success_count": self.circuit_breaker.success_count,
-            "last_failure": self.circuit_breaker.last_failure_time.isoformat() if self.circuit_breaker.last_failure_time else None,
+            "last_failure": self.circuit_breaker.last_failure_time.isoformat()
+            if self.circuit_breaker.last_failure_time
+            else None,
             "config": {
                 "failure_threshold": self.circuit_breaker.config.failure_threshold,
                 "recovery_timeout_seconds": self.circuit_breaker.config.recovery_timeout_seconds,
                 "success_threshold": self.circuit_breaker.config.success_threshold,
-                "enabled": self.circuit_breaker.config.enabled
-            }
+                "enabled": self.circuit_breaker.config.enabled,
+            },
         }
-    
+
     async def test_connection_with_retry(self) -> dict[str, Any]:
         """Test database connection with retry logic and error classification."""
         context = ErrorContext(
-            operation="test_connection",
-            connection_id=self._connection_id
+            operation="test_connection", connection_id=self._connection_id
         )
-        
+
         async def _test_operation():
             start_time = time.perf_counter()
             try:
                 async with self.connection() as conn:
                     async with conn.cursor() as cur:
-                        await cur.execute("SELECT 1 as test, current_timestamp as timestamp")
+                        await cur.execute(
+                            "SELECT 1 as test, current_timestamp as timestamp"
+                        )
                         result = await cur.fetchone()
-                        
+
                 duration_ms = (time.perf_counter() - start_time) * 1000
-                
+
                 return {
                     "status": "SUCCESS",
                     "result": dict(result) if result else None,
                     "response_time_ms": round(duration_ms, 2),
-                    "retry_count": context.retry_count
+                    "retry_count": context.retry_count,
                 }
-                
+
             except Exception as e:
                 duration_ms = (time.perf_counter() - start_time) * 1000
                 category, severity = DatabaseErrorClassifier.classify_error(e)
-                
+
                 if self.error_metrics:
                     self.error_metrics.record_error(context, e)
-                
+
                 return {
                     "status": "FAILED",
                     "error": str(e),
@@ -1152,9 +1187,9 @@ class TypeSafePsycopgClient:
                     "error_severity": severity.value,
                     "is_retryable": DatabaseErrorClassifier.is_retryable(e),
                     "response_time_ms": round(duration_ms, 2),
-                    "retry_count": context.retry_count
+                    "retry_count": context.retry_count,
                 }
-        
+
         try:
             return await self.retry_manager.retry_async(_test_operation, context)
         except Exception as e:
@@ -1167,22 +1202,26 @@ class TypeSafePsycopgClient:
                 "error_category": category.value,
                 "error_severity": severity.value,
                 "retry_count": context.retry_count,
-                "max_retries": self.retry_config.max_attempts
+                "max_retries": self.retry_config.max_attempts,
             }
 
     async def health_check(self) -> dict[str, Any]:
         """2025 Enhancement: Comprehensive health check with enhanced error classification"""
         health_status = {
             "overall_health": "UNKNOWN",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": aware_utc_now().isoformat(),
             "checks": {},
-            "error_metrics": self.get_error_metrics_summary() if self.error_metrics else None,
+            "error_metrics": self.get_error_metrics_summary()
+            if self.error_metrics
+            else None,
             "circuit_breaker_status": {
                 "state": self.circuit_breaker.state.value,
                 "failure_count": self.circuit_breaker.failure_count,
                 "success_count": self.circuit_breaker.success_count,
-                "last_failure": self.circuit_breaker.last_failure_time.isoformat() if self.circuit_breaker.last_failure_time else None
-            }
+                "last_failure": self.circuit_breaker.last_failure_time.isoformat()
+                if self.circuit_breaker.last_failure_time
+                else None,
+            },
         }
 
         try:
@@ -1194,10 +1233,12 @@ class TypeSafePsycopgClient:
                         await cur.execute("SELECT 1")
                         result = await cur.fetchone()
                         response_time_ms = (time.perf_counter() - start_time) * 1000
-                        
+
                         health_status["checks"]["connection"] = {
-                            "status": "HEALTHY" if result and result[0] == 1 else "UNHEALTHY",
-                            "response_time_ms": round(response_time_ms, 2)
+                            "status": "HEALTHY"
+                            if result and result[0] == 1
+                            else "UNHEALTHY",
+                            "response_time_ms": round(response_time_ms, 2),
                         }
             except Exception as e:
                 # Classify the connection error
@@ -1207,7 +1248,7 @@ class TypeSafePsycopgClient:
                     "error": str(e),
                     "error_category": category.value,
                     "error_severity": severity.value,
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
                 }
 
             # 2. Pool health check
@@ -1216,7 +1257,7 @@ class TypeSafePsycopgClient:
                 "status": pool_stats.get("pool_health", "UNKNOWN"),
                 "utilization": pool_stats.get("pool_utilization", 0),
                 "available_connections": pool_stats.get("pool_available", 0),
-                "total_connections": pool_stats.get("pool_size", 0)
+                "total_connections": pool_stats.get("pool_size", 0),
             }
 
             # 3. Performance health check
@@ -1225,7 +1266,7 @@ class TypeSafePsycopgClient:
                 "status": perf_stats.get("performance_status", "UNKNOWN"),
                 "avg_query_time_ms": perf_stats.get("avg_query_time_ms", 0),
                 "cache_hit_ratio": perf_stats.get("cache_hit_ratio", 0),
-                "slow_queries": perf_stats.get("slow_query_count", 0)
+                "slow_queries": perf_stats.get("slow_query_count", 0),
             }
 
             # 4. Server health check
@@ -1245,21 +1286,30 @@ class TypeSafePsycopgClient:
                         "database_size_bytes": server_info.get("db_size", 0),
                         "active_connections": server_info.get("active_connections", 0),
                         "idle_connections": server_info.get("idle_connections", 0),
-                        "blocked_queries": server_info.get("blocked_queries", 0)
+                        "blocked_queries": server_info.get("blocked_queries", 0),
                     }
             except Exception as e:
                 health_status["checks"]["server"] = {
                     "status": "UNHEALTHY",
-                    "error": str(e)
+                    "error": str(e),
                 }
 
             # 5. Determine overall health
-            connection_healthy = health_status["checks"]["connection"]["status"] == "HEALTHY"
+            connection_healthy = (
+                health_status["checks"]["connection"]["status"] == "HEALTHY"
+            )
             pool_healthy = health_status["checks"]["pool"]["status"] == "HEALTHY"
-            performance_good = health_status["checks"]["performance"]["status"] == "GOOD"
+            performance_good = (
+                health_status["checks"]["performance"]["status"] == "GOOD"
+            )
             server_healthy = health_status["checks"]["server"]["status"] == "HEALTHY"
 
-            if connection_healthy and pool_healthy and performance_good and server_healthy:
+            if (
+                connection_healthy
+                and pool_healthy
+                and performance_good
+                and server_healthy
+            ):
                 health_status["overall_health"] = "HEALTHY"
             elif connection_healthy and pool_healthy:
                 health_status["overall_health"] = "DEGRADED"
@@ -1323,21 +1373,29 @@ class TypeSafePsycopgClient:
             total_cache_hits = db_info.get("total_cache_hits", 0)
             total_disk_reads = db_info.get("total_disk_reads", 0)
             total_reads = total_cache_hits + total_disk_reads
-            overall_cache_hit_ratio = (total_cache_hits / total_reads) if total_reads > 0 else 0
+            overall_cache_hit_ratio = (
+                (total_cache_hits / total_reads) if total_reads > 0 else 0
+            )
 
             total_commits = db_info.get("total_commits", 0)
             total_rollbacks = db_info.get("total_rollbacks", 0)
             total_transactions = total_commits + total_rollbacks
-            commit_ratio = (total_commits / total_transactions) if total_transactions > 0 else 0
+            commit_ratio = (
+                (total_commits / total_transactions) if total_transactions > 0 else 0
+            )
 
             return {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": aware_utc_now().isoformat(),
                 "client_metrics": {
                     "total_queries": self.metrics.total_queries,
                     "avg_query_time_ms": round(self.metrics.avg_query_time, 2),
-                    "queries_under_50ms_percent": round(self.metrics.queries_under_50ms, 1),
+                    "queries_under_50ms_percent": round(
+                        self.metrics.queries_under_50ms, 1
+                    ),
                     "slow_queries": len(self.metrics.slow_queries),
-                    "recent_slow_queries": self.metrics.slow_queries[-5:] if self.metrics.slow_queries else []
+                    "recent_slow_queries": self.metrics.slow_queries[-5:]
+                    if self.metrics.slow_queries
+                    else [],
                 },
                 "pool_metrics": pool_stats,
                 "connection_metrics": connection_info,
@@ -1350,7 +1408,9 @@ class TypeSafePsycopgClient:
                     "idle_in_transaction": db_info.get("idle_in_transaction", 0),
                     "blocked_queries": db_info.get("blocked_queries", 0),
                     "granted_locks": db_info.get("granted_locks", 0),
-                    "replication_lag_seconds": db_info.get("replication_lag_seconds", 0)
+                    "replication_lag_seconds": db_info.get(
+                        "replication_lag_seconds", 0
+                    ),
                 },
                 "performance_metrics": {
                     "cache_hit_ratio": round(overall_cache_hit_ratio, 3),
@@ -1360,23 +1420,23 @@ class TypeSafePsycopgClient:
                     "rows_fetched": db_info.get("total_rows_fetched", 0),
                     "commit_ratio": round(commit_ratio, 3),
                     "total_commits": total_commits,
-                    "total_rollbacks": total_rollbacks
+                    "total_rollbacks": total_rollbacks,
                 },
                 "targets": {
                     "target_query_time_ms": self.config.target_query_time_ms,
-                    "target_cache_hit_ratio": self.config.target_cache_hit_ratio
-                }
+                    "target_cache_hit_ratio": self.config.target_cache_hit_ratio,
+                },
             }
 
         except Exception as e:
             return {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": aware_utc_now().isoformat(),
                 "error": str(e),
                 "client_metrics": {
                     "total_queries": self.metrics.total_queries,
                     "avg_query_time_ms": round(self.metrics.avg_query_time, 2),
-                    "slow_queries": len(self.metrics.slow_queries)
-                }
+                    "slow_queries": len(self.metrics.slow_queries),
+                },
             }
 
     async def get_alerts(self) -> list[dict[str, Any]]:
@@ -1396,7 +1456,7 @@ class TypeSafePsycopgClient:
                     "message": f"Average query time ({avg_query_time}ms) exceeds target ({self.config.target_query_time_ms}ms)",
                     "metric": "avg_query_time_ms",
                     "value": avg_query_time,
-                    "threshold": self.config.target_query_time_ms
+                    "threshold": self.config.target_query_time_ms,
                 })
 
             # Check cache hit ratio
@@ -1408,7 +1468,7 @@ class TypeSafePsycopgClient:
                     "message": f"Cache hit ratio ({cache_hit_ratio:.1%}) below target ({self.config.target_cache_hit_ratio:.1%})",
                     "metric": "cache_hit_ratio",
                     "value": cache_hit_ratio,
-                    "threshold": self.config.target_cache_hit_ratio
+                    "threshold": self.config.target_cache_hit_ratio,
                 })
 
             # Check pool utilization
@@ -1420,7 +1480,7 @@ class TypeSafePsycopgClient:
                     "message": f"Connection pool utilization high ({pool_utilization}%)",
                     "metric": "pool_utilization",
                     "value": pool_utilization,
-                    "threshold": 80
+                    "threshold": 80,
                 })
 
             # Check blocked queries
@@ -1432,7 +1492,7 @@ class TypeSafePsycopgClient:
                     "message": f"{blocked_queries} blocked queries detected",
                     "metric": "blocked_queries",
                     "value": blocked_queries,
-                    "threshold": 0
+                    "threshold": 0,
                 })
 
             # Check slow queries
@@ -1444,11 +1504,13 @@ class TypeSafePsycopgClient:
                     "message": f"{slow_query_count} slow queries detected",
                     "metric": "slow_queries",
                     "value": slow_query_count,
-                    "threshold": 10
+                    "threshold": 10,
                 })
 
             # Check replication lag
-            replication_lag = detailed_metrics["database_metrics"]["replication_lag_seconds"]
+            replication_lag = detailed_metrics["database_metrics"][
+                "replication_lag_seconds"
+            ]
             if replication_lag > 5:
                 alerts.append({
                     "level": "WARNING" if replication_lag < 30 else "CRITICAL",
@@ -1456,19 +1518,21 @@ class TypeSafePsycopgClient:
                     "message": f"Replication lag high ({replication_lag:.1f}s)",
                     "metric": "replication_lag_seconds",
                     "value": replication_lag,
-                    "threshold": 5
+                    "threshold": 5,
                 })
 
             return alerts
 
         except Exception as e:
-            return [{
-                "level": "ERROR",
-                "type": "MONITORING",
-                "message": f"Failed to generate alerts: {e!s}",
-                "metric": "monitoring_error",
-                "value": str(e)
-            }]
+            return [
+                {
+                    "level": "ERROR",
+                    "type": "MONITORING",
+                    "message": f"Failed to generate alerts: {e!s}",
+                    "metric": "monitoring_error",
+                    "value": str(e),
+                }
+            ]
 
 
 # Global client instance

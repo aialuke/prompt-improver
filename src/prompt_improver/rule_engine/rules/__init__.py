@@ -9,7 +9,7 @@ from .xml_structure_enhancement import XMLStructureRule
 
 __all__ = [
     "ChainOfThoughtRule",
-    "ClarityRule", 
+    "ClarityRule",
     "FewShotExampleRule",
     "RoleBasedPromptingRule",
     "SpecificityRule",

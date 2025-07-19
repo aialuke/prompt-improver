@@ -2,19 +2,23 @@
 Modern implementation with database integration and ML optimization
 """
 
+import json
 import logging
 import time
 import uuid
-import json
-import yaml
 from datetime import datetime, timedelta
-from typing import Any, Optional, Dict
 from pathlib import Path
+from typing import Any, Dict, Optional
 
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select as sqlmodel_select
 
+from ..automl.orchestrator import AutoMLConfig, AutoMLMode, AutoMLOrchestrator
+from ..database import get_session_context
 from ..database.models import (
     ImprovementSession,
     ImprovementSessionCreate,
@@ -24,17 +28,16 @@ from ..database.models import (
     UserFeedback,
     UserFeedbackCreate,
 )
-from ..rule_engine.base import BasePromptRule
-from .ml_integration import MLModelService
-from .ab_testing import ABTestingService
 from ..optimization.multi_armed_bandit import (
-    MultiarmedBanditFramework,
-    BanditConfig,
     BanditAlgorithm,
+    BanditConfig,
+    MultiarmedBanditFramework,
     create_rule_optimization_bandit,
-    intelligent_rule_selection
+    intelligent_rule_selection,
 )
-from ..automl.orchestrator import AutoMLOrchestrator, AutoMLConfig, AutoMLMode
+from ..rule_engine.base import BasePromptRule
+from .ab_testing import ABTestingService
+from .ml_integration import MLModelService
 
 logger = logging.getLogger(__name__)
 
@@ -44,22 +47,24 @@ class PromptImprovementService:
     Following 2025 best practices for async operations
     """
 
-    def __init__(self, enable_bandit_optimization: bool = True, enable_automl: bool = True):
+    def __init__(
+        self, enable_bandit_optimization: bool = True, enable_automl: bool = True
+    ):
         self.rules = {}
         self.rule_cache = {}
         self.cache_ttl = 300  # 5 minutes
         self.ml_service = MLModelService()
-        
+
         # Multi-armed bandit for intelligent rule selection
         self.enable_bandit_optimization = enable_bandit_optimization
-        self.bandit_framework: Optional[MultiarmedBanditFramework] = None
-        self.bandit_experiment_id: Optional[str] = None
-        self.ab_testing_service: Optional[ABTestingService] = None
-        
+        self.bandit_framework: MultiarmedBanditFramework | None = None
+        self.bandit_experiment_id: str | None = None
+        self.ab_testing_service: ABTestingService | None = None
+
         # AutoML orchestration following 2025 best practices
         self.enable_automl = enable_automl
-        self.automl_orchestrator: Optional[AutoMLOrchestrator] = None
-        
+        self.automl_orchestrator: AutoMLOrchestrator | None = None
+
         if enable_bandit_optimization:
             # Initialize bandit framework for rule optimization
             bandit_config = BanditConfig(
@@ -72,7 +77,7 @@ class PromptImprovementService:
                 min_samples_per_arm=10,
                 warmup_trials=50,
                 enable_regret_tracking=True,
-                confidence_level=0.95
+                confidence_level=0.95,
             )
             self.bandit_framework = MultiarmedBanditFramework(bandit_config)
             self.ab_testing_service = ABTestingService(enable_bandits=True)
@@ -81,14 +86,14 @@ class PromptImprovementService:
         """Initialize AutoML orchestrator with existing components"""
         if not self.enable_automl:
             return
-        
+
         try:
             # Import here to avoid circular dependencies
-            from ..services.real_time_analytics import RealTimeAnalyticsService
             from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
-            from ..utils.model_manager import ModelManager
             from ..optimization.rule_optimizer import RuleOptimizer
-            
+            from ..services.real_time_analytics import RealTimeAnalyticsService
+            from ..utils.model_manager import ModelManager
+
             # Initialize AutoML configuration following 2025 best practices
             automl_config = AutoMLConfig(
                 study_name="prompt_improver_automl_v2",
@@ -98,15 +103,15 @@ class PromptImprovementService:
                 enable_artifact_storage=True,
                 enable_drift_detection=True,
                 n_trials=50,  # Moderate for production use
-                timeout=1800  # 30 minutes
+                timeout=1800,  # 30 minutes
             )
-            
+
             # Initialize supporting services
             analytics_service = RealTimeAnalyticsService()
             experiment_orchestrator = ExperimentOrchestrator()
             model_manager = ModelManager()
             rule_optimizer = RuleOptimizer()
-            
+
             # Create AutoML orchestrator with integrated components
             self.automl_orchestrator = AutoMLOrchestrator(
                 config=automl_config,
@@ -114,24 +119,32 @@ class PromptImprovementService:
                 rule_optimizer=rule_optimizer,
                 experiment_orchestrator=experiment_orchestrator,
                 analytics_service=analytics_service,
-                model_manager=model_manager
+                model_manager=model_manager,
             )
-            
-            logger.info("AutoML orchestrator initialized with 2025 integration patterns")
-            
+
+            logger.info(
+                "AutoML orchestrator initialized with 2025 integration patterns"
+            )
+
         except Exception as e:
             logger.error(f"Failed to initialize AutoML orchestrator: {e}")
             self.automl_orchestrator = None
 
-    async def _load_rules_from_database(self, db_session: AsyncSession) -> dict[str, BasePromptRule]:
+    async def _load_rules_from_database(
+        self, db_session: AsyncSession
+    ) -> dict[str, BasePromptRule]:
         """Load and instantiate rules from database configuration"""
         try:
             # Get enabled rules from database
-            query = select(RuleMetadata).where(RuleMetadata.is_enabled == True).order_by(RuleMetadata.priority.desc())
-            
+            query = (
+                select(RuleMetadata)
+                .where(RuleMetadata.enabled == True)
+                .order_by(RuleMetadata.priority.desc())
+            )
+
             result = await db_session.execute(query)
             rule_configs = result.scalars().all()
-            
+
             rules = {}
             for config in rule_configs:
                 # Dynamic rule instantiation based on rule_id
@@ -139,11 +152,11 @@ class PromptImprovementService:
                 if rule_class:
                     rule_instance = rule_class()
                     # Set basic attributes if they exist
-                    if hasattr(rule_instance, 'rule_id'):
+                    if hasattr(rule_instance, "rule_id"):
                         rule_instance.rule_id = config.rule_id
-                    if hasattr(rule_instance, 'priority'):
+                    if hasattr(rule_instance, "priority"):
                         rule_instance.priority = config.priority
-                    
+
                     # Apply database-stored parameters
                     if config.default_parameters:
                         # Handle both string and dict types for compatibility
@@ -151,87 +164,93 @@ class PromptImprovementService:
                             params = json.loads(config.default_parameters)
                         else:
                             params = config.default_parameters
-                        
-                        if hasattr(rule_instance, 'configure'):
+
+                        if hasattr(rule_instance, "configure"):
                             rule_instance.configure(params)
-                    
+
                     rules[config.rule_id] = rule_instance
-            
+
             return rules
-            
+
         except Exception as e:
             logger.error(f"Failed to load rules from database: {e}")
             return self._get_fallback_rules()
-    
+
     def _get_rule_class(self, rule_id: str) -> type[BasePromptRule] | None:
         """Map rule_id to actual rule class"""
         rule_mapping = {
-            'clarity_enhancement': self._import_clarity_rule,
-            'chain_of_thought': self._import_chain_of_thought_rule,
-            'few_shot_examples': self._import_few_shot_rule,
-            'role_based_prompting': self._import_role_based_rule,
-            'xml_structure_enhancement': self._import_xml_structure_rule,
-            'specificity_enhancement': self._import_specificity_rule,
+            "clarity_enhancement": self._import_clarity_rule,
+            "chain_of_thought": self._import_chain_of_thought_rule,
+            "few_shot_examples": self._import_few_shot_rule,
+            "role_based_prompting": self._import_role_based_rule,
+            "xml_structure_enhancement": self._import_xml_structure_rule,
+            "specificity_enhancement": self._import_specificity_rule,
         }
         import_func = rule_mapping.get(rule_id)
         if import_func:
             return import_func()
         return None
-    
+
     def _import_clarity_rule(self):
         """Import clarity rule class"""
         try:
             from ..rule_engine.rules.clarity import ClarityRule
+
             return ClarityRule
         except ImportError:
             logger.warning("ClarityRule not found, using base rule")
             return BasePromptRule
-    
+
     def _import_chain_of_thought_rule(self):
         """Import chain of thought rule class"""
         try:
             from ..rule_engine.rules.chain_of_thought import ChainOfThoughtRule
+
             return ChainOfThoughtRule
         except ImportError:
             logger.warning("ChainOfThoughtRule not found, using base rule")
             return BasePromptRule
-    
+
     def _import_few_shot_rule(self):
         """Import few shot example rule class"""
         try:
             from ..rule_engine.rules.few_shot_examples import FewShotExampleRule
+
             return FewShotExampleRule
         except ImportError:
             logger.warning("FewShotExampleRule not found, using base rule")
             return BasePromptRule
-    
+
     def _import_role_based_rule(self):
         """Import role based prompting rule class"""
         try:
             from ..rule_engine.rules.role_based_prompting import RoleBasedPromptingRule
+
             return RoleBasedPromptingRule
         except ImportError:
             logger.warning("RoleBasedPromptingRule not found, using base rule")
             return BasePromptRule
-    
+
     def _import_xml_structure_rule(self):
         """Import XML structure rule class"""
         try:
             from ..rule_engine.rules.xml_structure_enhancement import XMLStructureRule
+
             return XMLStructureRule
         except ImportError:
             logger.warning("XMLStructureRule not found, using base rule")
             return BasePromptRule
-    
+
     def _import_specificity_rule(self):
         """Import specificity rule class"""
         try:
             from ..rule_engine.rules.specificity import SpecificityRule
+
             return SpecificityRule
         except ImportError:
             logger.warning("SpecificityRule not found, using base rule")
             return BasePromptRule
-    
+
     def _get_fallback_rules(self) -> dict[str, BasePromptRule]:
         """Fallback rules when database loading fails"""
         try:
@@ -246,23 +265,37 @@ class PromptImprovementService:
             # Ultimate fallback - empty rule set
             rules = {}
         return rules
-    
-    async def get_active_rules(self, db_session: AsyncSession) -> dict[str, BasePromptRule]:
+
+    async def get_active_rules(
+        self, db_session: AsyncSession | None = None
+    ) -> dict[str, BasePromptRule]:
         """Get active rules with caching"""
         cache_key = "active_rules"
-        
+
         # Check cache
         if cache_key in self.rule_cache:
             cached_rules, timestamp = self.rule_cache[cache_key]
             if time.time() - timestamp < self.cache_ttl:
                 return cached_rules
-        
-        # Load from database
-        rules = await self._load_rules_from_database(db_session)
-        
+
+        # Load from database using provided session or create new one
+        if db_session:
+            rules = await self._load_rules_from_database(db_session)
+        else:
+            async with get_session_context() as session:
+                rules = await self._load_rules_from_database(session)
+
         # Cache results
         self.rule_cache[cache_key] = (rules, time.time())
         return rules
+
+    async def get_active_rules_standalone(self) -> dict[str, BasePromptRule]:
+        """Get active rules without requiring external database session
+        
+        This method creates its own database session following 2025 best practices.
+        Useful for initialization and testing scenarios.
+        """
+        return await self.get_active_rules()
 
     async def improve_prompt(
         self,
@@ -270,7 +303,7 @@ class PromptImprovementService:
         user_context: dict[str, Any] | None = None,
         session_id: str | None = None,
         preferred_rules: list[str] | None = None,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """Improve a prompt using data-driven rule selection"""
         start_time = time.time()
@@ -380,35 +413,36 @@ class PromptImprovementService:
         self,
         prompt_characteristics: dict[str, Any],
         preferred_rules: list[str] | None = None,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
         limit: int = 5,
     ) -> list[dict[str, Any]]:
         """Get optimal rules using multi-armed bandit optimization"""
-        
         # Initialize bandit experiment if not already done
         if self.enable_bandit_optimization and self.bandit_experiment_id is None:
             await self._initialize_bandit_experiment(db_session)
-        
+
         # Use bandit for intelligent rule selection if enabled
         if self.enable_bandit_optimization and self.bandit_experiment_id:
             return await self._get_bandit_optimized_rules(
                 prompt_characteristics, preferred_rules, db_session, limit
             )
-        
+
         # Fallback to traditional rule selection
         return await self._get_traditional_optimal_rules(
             prompt_characteristics, preferred_rules, db_session, limit
         )
 
-    async def _initialize_bandit_experiment(self, db_session: Optional[AsyncSession] = None) -> None:
+    async def _initialize_bandit_experiment(
+        self, db_session: AsyncSession | None = None
+    ) -> None:
         """Initialize bandit experiment for rule optimization"""
         if not self.enable_bandit_optimization or self.bandit_framework is None:
             return
-            
+
         try:
             # Get all available rules from database
             if db_session:
-                query = select(RuleMetadata).where(RuleMetadata.is_enabled == True)
+                query = select(RuleMetadata).where(RuleMetadata.enabled == True)
                 result = await db_session.execute(query)
                 rules_metadata = result.scalars().all()
                 available_rules = [rule.rule_id for rule in rules_metadata]
@@ -416,25 +450,31 @@ class PromptImprovementService:
                 # Fallback to default rules
                 available_rules = [
                     "clarity_enhancement",
-                    "specificity_enhancement", 
+                    "specificity_enhancement",
                     "chain_of_thought",
                     "few_shot_examples",
                     "role_based_prompting",
-                    "xml_structure_enhancement"
+                    "xml_structure_enhancement",
                 ]
-            
+
             if len(available_rules) >= 2:
                 # Create bandit experiment for rule selection
-                self.bandit_experiment_id = await self.bandit_framework.create_experiment(
-                    experiment_name="rule_optimization",
-                    arms=available_rules,
-                    algorithm=BanditAlgorithm.THOMPSON_SAMPLING
+                self.bandit_experiment_id = (
+                    await self.bandit_framework.create_experiment(
+                        experiment_name="rule_optimization",
+                        arms=available_rules,
+                        algorithm=BanditAlgorithm.THOMPSON_SAMPLING,
+                    )
                 )
-                
-                logger.info(f"Initialized bandit experiment for {len(available_rules)} rules")
+
+                logger.info(
+                    f"Initialized bandit experiment for {len(available_rules)} rules"
+                )
             else:
-                logger.warning("Insufficient rules for bandit optimization, using traditional selection")
-                
+                logger.warning(
+                    "Insufficient rules for bandit optimization, using traditional selection"
+                )
+
         except Exception as e:
             logger.error(f"Failed to initialize bandit experiment: {e}")
             self.enable_bandit_optimization = False
@@ -443,40 +483,43 @@ class PromptImprovementService:
         self,
         prompt_characteristics: dict[str, Any],
         preferred_rules: list[str] | None = None,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
         limit: int = 5,
     ) -> list[dict[str, Any]]:
         """Get rules using multi-armed bandit optimization"""
-        if not self.enable_bandit_optimization or self.bandit_framework is None or self.bandit_experiment_id is None:
+        if (
+            not self.enable_bandit_optimization
+            or self.bandit_framework is None
+            or self.bandit_experiment_id is None
+        ):
             return await self._get_traditional_optimal_rules(
                 prompt_characteristics, preferred_rules, db_session, limit
             )
-            
+
         try:
             # Prepare context for contextual bandit
             context = self._prepare_bandit_context(prompt_characteristics)
-            
+
             # Select rules using bandit algorithm
             selected_rules = []
             rule_confidence_map = {}
-            
+
             # Select up to 'limit' rules, avoiding duplicates
             for _ in range(min(limit, 10)):  # Max 10 iterations to avoid infinite loop
                 # Select arm using bandit
                 arm_result = await self.bandit_framework.select_arm(
-                    self.bandit_experiment_id, 
-                    context
+                    self.bandit_experiment_id, context
                 )
-                
+
                 rule_id = arm_result.arm_id
                 if rule_id not in rule_confidence_map:
                     rule_confidence_map[rule_id] = arm_result.confidence
                     selected_rules.append(rule_id)
-                
+
                 # Stop if we have enough unique rules
                 if len(selected_rules) >= limit:
                     break
-            
+
             # Get rule metadata and create results
             optimal_rules = []
             if db_session:
@@ -484,15 +527,15 @@ class PromptImprovementService:
                     query = select(RuleMetadata).where(RuleMetadata.rule_id == rule_id)
                     result = await db_session.execute(query)
                     rule_metadata = result.scalar_one_or_none()
-                    
+
                     if rule_metadata:
                         optimal_rules.append({
                             "rule_id": rule_metadata.rule_id,
                             "rule_name": rule_metadata.rule_name,
                             "priority": rule_metadata.priority,
-                            "enabled": rule_metadata.is_enabled,
+                            "enabled": rule_metadata.enabled,
                             "bandit_confidence": rule_confidence_map[rule_id],
-                            "selection_method": "bandit"
+                            "selection_method": "bandit",
                         })
             else:
                 # Fallback without database
@@ -502,9 +545,9 @@ class PromptImprovementService:
                     "chain_of_thought": "Chain of Thought Rule",
                     "few_shot_examples": "Few Shot Examples Rule",
                     "role_based_prompting": "Role-Based Prompting Rule",
-                    "xml_structure_enhancement": "XML Structure Enhancement Rule"
+                    "xml_structure_enhancement": "XML Structure Enhancement Rule",
                 }
-                
+
                 for rule_id in selected_rules:
                     optimal_rules.append({
                         "rule_id": rule_id,
@@ -512,47 +555,54 @@ class PromptImprovementService:
                         "priority": 1.0,
                         "enabled": True,
                         "bandit_confidence": rule_confidence_map[rule_id],
-                        "selection_method": "bandit"
+                        "selection_method": "bandit",
                     })
-            
+
             # Honor preferred rules if specified
             if preferred_rules:
                 # Ensure preferred rules are included, even if bandit didn't select them
                 preferred_set = set(preferred_rules)
                 selected_set = set(rule["rule_id"] for rule in optimal_rules)
-                
+
                 for preferred_rule in preferred_rules:
-                    if preferred_rule not in selected_set and len(optimal_rules) < limit:
+                    if (
+                        preferred_rule not in selected_set
+                        and len(optimal_rules) < limit
+                    ):
                         # Add preferred rule that wasn't selected by bandit
                         if db_session:
-                            query = select(RuleMetadata).where(RuleMetadata.rule_id == preferred_rule)
+                            query = select(RuleMetadata).where(
+                                RuleMetadata.rule_id == preferred_rule
+                            )
                             result = await db_session.execute(query)
                             rule_metadata = result.scalar_one_or_none()
-                            
+
                             if rule_metadata:
                                 optimal_rules.append({
                                     "rule_id": rule_metadata.rule_id,
                                     "rule_name": rule_metadata.rule_name,
                                     "priority": rule_metadata.priority,
-                                    "enabled": rule_metadata.is_enabled,
+                                    "enabled": rule_metadata.enabled,
                                     "bandit_confidence": 0.5,  # Default confidence for preferred rules
-                                    "selection_method": "preferred"
+                                    "selection_method": "preferred",
                                 })
-                
+
                 # Sort to prioritize preferred rules
                 optimal_rules.sort(
                     key=lambda x: (
                         x["rule_id"] in preferred_set,
                         x.get("bandit_confidence", 0),
-                        x.get("priority", 0)
+                        x.get("priority", 0),
                     ),
-                    reverse=True
+                    reverse=True,
                 )
-            
-            logger.debug(f"Bandit selected {len(optimal_rules)} rules with confidences: {[(r['rule_id'], r.get('bandit_confidence', 0)) for r in optimal_rules]}")
-            
+
+            logger.debug(
+                f"Bandit selected {len(optimal_rules)} rules with confidences: {[(r['rule_id'], r.get('bandit_confidence', 0)) for r in optimal_rules]}"
+            )
+
             return optimal_rules[:limit]
-            
+
         except Exception as e:
             logger.error(f"Error in bandit rule selection: {e}")
             # Fallback to traditional method
@@ -564,22 +614,30 @@ class PromptImprovementService:
         self,
         prompt_characteristics: dict[str, Any],
         preferred_rules: list[str] | None = None,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
         limit: int = 5,
     ) -> list[dict[str, Any]]:
         """Get optimal rules using traditional database-based selection"""
         if not db_session:
             # Fallback to default rules if no database session
             return [
-                {"rule_id": "clarity_enhancement", "rule_name": "Clarity Enhancement Rule", "selection_method": "default"},
-                {"rule_id": "specificity_enhancement", "rule_name": "Specificity Enhancement Rule", "selection_method": "default"},
+                {
+                    "rule_id": "clarity_enhancement",
+                    "rule_name": "Clarity Enhancement Rule",
+                    "selection_method": "default",
+                },
+                {
+                    "rule_id": "specificity_enhancement",
+                    "rule_name": "Specificity Enhancement Rule",
+                    "selection_method": "default",
+                },
             ]
 
         try:
             # Query for high-performing rules
             query = (
                 select(RuleMetadata)
-                .where(RuleMetadata.is_enabled == True)
+                .where(RuleMetadata.enabled == True)
                 .order_by(RuleMetadata.priority.desc())
                 .limit(limit)
             )
@@ -594,8 +652,8 @@ class PromptImprovementService:
                     "rule_id": rule.rule_id,
                     "rule_name": rule.rule_name,
                     "priority": rule.priority,
-                    "enabled": rule.is_enabled,
-                    "selection_method": "traditional"
+                    "enabled": rule.enabled,
+                    "selection_method": "traditional",
                 })
 
             # If preferred rules are specified, prioritize them
@@ -607,36 +665,50 @@ class PromptImprovementService:
                 )
 
             return optimal_rules
-        
+
         except Exception as e:
             logger.error(f"Error in traditional rule selection: {e}")
             return []
 
-    def _prepare_bandit_context(self, prompt_characteristics: dict[str, Any]) -> dict[str, Any]:
+    def _prepare_bandit_context(
+        self, prompt_characteristics: dict[str, Any]
+    ) -> dict[str, Any]:
         """Prepare context for contextual bandit from prompt characteristics"""
         context = {}
-        
+
         # Extract numeric features for bandit context
         if "length" in prompt_characteristics:
-            context["prompt_length"] = min(1.0, prompt_characteristics["length"] / 1000.0)  # Normalize to 0-1
-        
+            context["prompt_length"] = min(
+                1.0, prompt_characteristics["length"] / 1000.0
+            )  # Normalize to 0-1
+
         if "complexity" in prompt_characteristics:
             complexity_map = {"low": 0.1, "medium": 0.5, "high": 0.9}
-            context["complexity"] = complexity_map.get(prompt_characteristics["complexity"], 0.5)
-        
+            context["complexity"] = complexity_map.get(
+                prompt_characteristics["complexity"], 0.5
+            )
+
         if "readability_score" in prompt_characteristics:
-            context["readability"] = min(1.0, max(0.0, prompt_characteristics["readability_score"] / 100.0))
-        
+            context["readability"] = min(
+                1.0, max(0.0, prompt_characteristics["readability_score"] / 100.0)
+            )
+
         if "sentiment" in prompt_characteristics:
             # Convert sentiment to numeric value
             sentiment_map = {"negative": 0.0, "neutral": 0.5, "positive": 1.0}
-            context["sentiment"] = sentiment_map.get(prompt_characteristics["sentiment"], 0.5)
-        
+            context["sentiment"] = sentiment_map.get(
+                prompt_characteristics["sentiment"], 0.5
+            )
+
         # Boolean features
-        context["has_examples"] = float(prompt_characteristics.get("has_examples", False))
-        context["has_instructions"] = float(prompt_characteristics.get("has_instructions", False))
+        context["has_examples"] = float(
+            prompt_characteristics.get("has_examples", False)
+        )
+        context["has_instructions"] = float(
+            prompt_characteristics.get("has_instructions", False)
+        )
         context["has_context"] = float(prompt_characteristics.get("has_context", False))
-        
+
         # Domain features (simple mapping)
         domain = prompt_characteristics.get("domain", "general")
         domain_features = {
@@ -644,97 +716,121 @@ class PromptImprovementService:
             "creative": 0.7,
             "analytical": 0.8,
             "conversational": 0.3,
-            "general": 0.5
+            "general": 0.5,
         }
         context["domain_score"] = domain_features.get(domain, 0.5)
-        
+
         return context
 
     async def update_bandit_rewards(
         self,
         applied_rules: list[dict[str, Any]],
-        db_session: Optional[AsyncSession] = None
+        db_session: AsyncSession | None = None,
     ) -> None:
         """Update bandit with rewards from rule application results"""
-        if not self.enable_bandit_optimization or self.bandit_framework is None or not self.bandit_experiment_id:
+        if (
+            not self.enable_bandit_optimization
+            or self.bandit_framework is None
+            or not self.bandit_experiment_id
+        ):
             return
-        
+
         try:
             for rule_info in applied_rules:
                 rule_id = rule_info.get("rule_id")
                 improvement_score = rule_info.get("improvement_score", 0.0)
                 confidence = rule_info.get("confidence", 0.0)
-                
+
                 if rule_id and improvement_score is not None:
                     # Normalize improvement score to 0-1 range for bandit
                     # Typical improvement scores might range from -0.5 to 1.0
-                    normalized_reward = max(0.0, min(1.0, (improvement_score + 0.5) / 1.5))
-                    
+                    normalized_reward = max(
+                        0.0, min(1.0, (improvement_score + 0.5) / 1.5)
+                    )
+
                     # Weight by confidence if available
                     if confidence > 0:
                         weighted_reward = normalized_reward * confidence
                     else:
                         weighted_reward = normalized_reward * 0.8  # Default confidence
-                    
+
                     # Update bandit with reward - create proper ArmResult
                     from ..optimization.multi_armed_bandit import ArmResult
+
                     arm_result = ArmResult(
                         arm_id=rule_id,
                         reward=weighted_reward,
                         context=None,
-                        metadata={'improvement_score': improvement_score, 'confidence': confidence}
+                        metadata={
+                            "improvement_score": improvement_score,
+                            "confidence": confidence,
+                        },
                     )
-                    
+
                     await self.bandit_framework.update_reward(
-                        self.bandit_experiment_id,
-                        arm_result,
-                        weighted_reward
+                        self.bandit_experiment_id, arm_result, weighted_reward
                     )
-                    
-                    logger.debug(f"Updated bandit reward for {rule_id}: {weighted_reward:.3f} (from improvement: {improvement_score:.3f})")
-        
+
+                    logger.debug(
+                        f"Updated bandit reward for {rule_id}: {weighted_reward:.3f} (from improvement: {improvement_score:.3f})"
+                    )
+
         except Exception as e:
             logger.error(f"Error updating bandit rewards: {e}")
 
     async def get_bandit_performance_summary(self) -> dict[str, Any]:
         """Get performance summary of the bandit optimization"""
-        if not self.enable_bandit_optimization or self.bandit_framework is None or not self.bandit_experiment_id:
+        if (
+            not self.enable_bandit_optimization
+            or self.bandit_framework is None
+            or not self.bandit_experiment_id
+        ):
             return {"status": "disabled", "message": "Bandit optimization not enabled"}
-        
+
         try:
-            summary = self.bandit_framework.get_experiment_summary(self.bandit_experiment_id)
-            
+            summary = self.bandit_framework.get_experiment_summary(
+                self.bandit_experiment_id
+            )
+
             # Add interpretation
             total_trials = summary.get("total_trials", 0)
             best_arm = summary.get("best_arm", "unknown")
             average_reward = summary.get("average_reward", 0.0)
-            
+
             interpretation = []
-            
+
             if total_trials < 50:
-                interpretation.append("Bandit is in exploration phase - collecting data on rule performance")
+                interpretation.append(
+                    "Bandit is in exploration phase - collecting data on rule performance"
+                )
             elif total_trials < 200:
-                interpretation.append("Bandit is learning rule preferences - some patterns emerging")
+                interpretation.append(
+                    "Bandit is learning rule preferences - some patterns emerging"
+                )
             else:
-                interpretation.append(f"Bandit has converged - {best_arm} is the preferred rule")
-            
+                interpretation.append(
+                    f"Bandit has converged - {best_arm} is the preferred rule"
+                )
+
             if average_reward > 0.7:
                 interpretation.append("High average reward - rules are performing well")
             elif average_reward > 0.5:
-                interpretation.append("Moderate average reward - some room for improvement")
+                interpretation.append(
+                    "Moderate average reward - some room for improvement"
+                )
             else:
                 interpretation.append("Low average reward - may need rule tuning")
-            
+
             return {
                 "status": "active",
                 "summary": summary,
                 "interpretation": interpretation,
                 "recommendations": [
                     f"Continue using {best_arm} for similar prompts",
-                    "Monitor performance trends for optimization opportunities"
-                ]
+                    "Monitor performance trends for optimization opportunities",
+                ],
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting bandit performance: {e}")
             return {"status": "error", "error": str(e)}
@@ -931,8 +1027,12 @@ class PromptImprovementService:
         """Store improvement session in database"""
         try:
             # Extract rule IDs from rules_applied for the model
-            rule_ids = [rule.get("rule_id", "unknown") for rule in rules_applied] if rules_applied else None
-            
+            rule_ids = (
+                [rule.get("rule_id", "unknown") for rule in rules_applied]
+                if rules_applied
+                else None
+            )
+
             session_data = ImprovementSessionCreate(
                 session_id=session_id,
                 original_prompt=original_prompt,
@@ -941,7 +1041,7 @@ class PromptImprovementService:
                 user_context=user_context,
             )
 
-            db_session.add(ImprovementSession(**session_data.dict()))
+            db_session.add(ImprovementSession(**session_data.model_dump()))
             await db_session.commit()
 
         except Exception as e:
@@ -1011,7 +1111,7 @@ class PromptImprovementService:
             raise
 
     async def get_rules_metadata(
-        self, enabled_only: bool = True, db_session: Optional[AsyncSession] = None
+        self, enabled_only: bool = True, db_session: AsyncSession | None = None
     ) -> list[dict[str, Any]]:
         """Get rules metadata"""
         if not db_session:
@@ -1020,7 +1120,7 @@ class PromptImprovementService:
         try:
             query = select(RuleMetadata)
             if enabled_only:
-                query = query.where(RuleMetadata.is_enabled == True)
+                query = query.where(RuleMetadata.enabled == True)
 
             result = await db_session.execute(query)
             rules = result.scalars().all()
@@ -1031,7 +1131,7 @@ class PromptImprovementService:
                     "rule_name": rule.rule_name,
                     "rule_category": rule.category,
                     "rule_description": rule.description,
-                    "enabled": rule.is_enabled,
+                    "enabled": rule.enabled,
                     "priority": rule.priority,
                 }
                 for rule in rules
@@ -1055,9 +1155,11 @@ class PromptImprovementService:
             return {"status": "error", "message": f"Feedback {feedback_id} not found"}
 
         # Get related performance data for training
-        perf_stmt = select(RulePerformance, RuleMetadata.default_parameters).join(
-            RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id
-        ).where(RulePerformance.created_at.isnot(None))  # Remove session_id filter since it may not exist
+        perf_stmt = (
+            select(RulePerformance, RuleMetadata.default_parameters)
+            .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
+            .where(RulePerformance.created_at.isnot(None))
+        )  # Remove session_id filter since it may not exist
 
         result = await db_session.execute(perf_stmt)
         performance_data = result.fetchall()
@@ -1144,16 +1246,20 @@ class PromptImprovementService:
         from .ml_integration import get_ml_service
 
         # Get all performance data for training
-        perf_stmt = select(RulePerformance, RuleMetadata.default_parameters, RuleMetadata.priority).join(
-            RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id
-        ).where(RuleMetadata.is_enabled == True)
+        perf_stmt = (
+            select(
+                RulePerformance, RuleMetadata.default_parameters, RuleMetadata.priority
+            )
+            .join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id)
+            .where(RuleMetadata.enabled == True)
+        )
 
         # Filter by specific rule IDs if provided
         if rule_ids:
             perf_stmt = perf_stmt.where(RulePerformance.rule_id.in_(rule_ids))
 
         # Only include recent data (last 30 days) for relevance
-        recent_date = datetime.utcnow() - timedelta(days=30)
+        recent_date = aware_utc_now() - timedelta(days=30)
         perf_stmt = perf_stmt.where(RulePerformance.created_at >= recent_date)
 
         result = await db_session.execute(perf_stmt)
@@ -1195,7 +1301,9 @@ class PromptImprovementService:
             ])
 
             # Target effectiveness score (0-1 scale)
-            effectiveness = min(1.0, max(0.0, (rule_perf.improvement_score or 0) / 100.0))
+            effectiveness = min(
+                1.0, max(0.0, (rule_perf.improvement_score or 0) / 100.0)
+            )
             effectiveness_scores.append(effectiveness)
 
         # Run ML optimization
@@ -1326,7 +1434,7 @@ class PromptImprovementService:
                 precision=optimization_result.get("precision", 0),
                 recall=optimization_result.get("recall", 0),
                 training_samples=training_samples,
-                created_at=datetime.utcnow(),
+                created_at=aware_utc_now(),
             )
 
             db_session.add(performance_record)
@@ -1362,7 +1470,7 @@ class PromptImprovementService:
                         control_rules={"baseline": "current_rules"},
                         treatment_rules={"optimized": pattern.get("parameters", {})},
                         status="running",
-                        started_at=datetime.utcnow(),
+                        started_at=aware_utc_now(),
                     )
 
                     db_session.add(experiment)
@@ -1380,8 +1488,10 @@ class PromptImprovementService:
         try:
             # Note: DiscoveredPattern model doesn't exist in current schema
             # This is a placeholder for future implementation
-            logger.info(f"Pattern discovery completed with {discovery_result.get('patterns_discovered', 0)} patterns")
-            
+            logger.info(
+                f"Pattern discovery completed with {discovery_result.get('patterns_discovered', 0)} patterns"
+            )
+
         except Exception as e:
             logger.error(f"Failed to store pattern discovery results: {e}")
             await db_session.rollback()
@@ -1389,33 +1499,32 @@ class PromptImprovementService:
     async def start_automl_optimization(
         self,
         optimization_target: str = "rule_effectiveness",
-        experiment_config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Start AutoML optimization integrating Optuna with existing A/B testing
-        
+        experiment_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Start AutoML optimization integrating Optuna with existing A/B testing
+
         Args:
             optimization_target: What to optimize ('rule_effectiveness', 'user_satisfaction', etc.)
             experiment_config: Configuration for A/B testing integration
-            
+
         Returns:
             Dictionary with optimization results and metadata
         """
         if not self.automl_orchestrator:
             return {
                 "error": "AutoML orchestrator not initialized",
-                "suggestion": "Call initialize_automl() first"
+                "suggestion": "Call initialize_automl() first",
             }
-        
+
         try:
             logger.info(f"Starting AutoML optimization for {optimization_target}")
-            
+
             # Use the orchestrator to start optimization
             result = await self.automl_orchestrator.start_optimization(
                 optimization_target=optimization_target,
-                experiment_config=experiment_config or {}
+                experiment_config=experiment_config or {},
             )
-            
+
             # If optimization succeeded, create A/B test for best configuration
             if result.get("status") == "completed" and result.get("best_params"):
                 if self.ab_testing_service:
@@ -1424,29 +1533,33 @@ class PromptImprovementService:
                         "experiment_name": f"automl_validation_{optimization_target}",
                         "treatment_config": result["best_params"],
                         "sample_size": 200,
-                        "confidence_level": 0.95
+                        "confidence_level": 0.95,
                     }
-                    
-                    ab_result = await self.ab_testing_service.create_experiment(**ab_config)
+
+                    ab_result = await self.ab_testing_service.create_experiment(
+                        **ab_config
+                    )
                     result["ab_test_id"] = ab_result.get("experiment_id")
-                    logger.info(f"Created A/B test {ab_result.get('experiment_id')} for AutoML validation")
-            
+                    logger.info(
+                        f"Created A/B test {ab_result.get('experiment_id')} for AutoML validation"
+                    )
+
             return result
-            
+
         except Exception as e:
             logger.error(f"AutoML optimization failed: {e}")
             return {"error": str(e), "optimization_target": optimization_target}
 
-    async def get_automl_status(self) -> Dict[str, Any]:
+    async def get_automl_status(self) -> dict[str, Any]:
         """Get current AutoML optimization status"""
         if not self.automl_orchestrator:
             return {"status": "not_initialized"}
-        
+
         return await self.automl_orchestrator.get_optimization_status()
 
-    async def stop_automl_optimization(self) -> Dict[str, Any]:
+    async def stop_automl_optimization(self) -> dict[str, Any]:
         """Stop current AutoML optimization"""
         if not self.automl_orchestrator:
             return {"status": "not_initialized"}
-        
+
         return await self.automl_orchestrator.stop_optimization()

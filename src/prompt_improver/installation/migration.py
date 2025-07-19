@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -147,7 +149,7 @@ class APESMigrationManager:
                 f"  ⚠️  Database backup system error: {e}", style="yellow"
             )
             output_path.touch()
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             self.console.print(f"  ⚠️  Database backup timed out: {e}", style="yellow")
             output_path.touch()
 
@@ -210,16 +212,18 @@ class APESMigrationManager:
     async def backup_user_prompts(self, output_path: Path):
         """Backup user prompts (Priority 100 training data)"""
         try:
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
                 # Export real user prompts
-                result = await session.execute("""
+                prompts = await scalar(session, text("""
                     SELECT prompt_text, enhancement_result, created_at, session_id
                     FROM training_prompts 
                     WHERE data_source = 'real'
                     ORDER BY created_at DESC
-                """)
-
-                prompts = result.fetchall()
+                """))
 
                 if not prompts:
                     self.console.print("  📝 No user prompts to backup", style="dim")
@@ -343,7 +347,7 @@ class APESMigrationManager:
 
         migration_data = {
             "version": "4.1",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": aware_utc_now().isoformat(),
             "source_system": platform.node(),
             "phase_1_complete": True,  # Verified MCP server functionality
             "database_schema_version": await self.get_schema_version(),
@@ -428,14 +432,17 @@ class APESMigrationManager:
     async def get_schema_version(self) -> str:
         """Get current database schema version"""
         try:
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
                 # Check for existence of key tables to determine schema version
-                result = await session.execute("""
+                tables = await scalar(session, text("""
                     SELECT table_name FROM information_schema.tables 
                     WHERE table_schema = 'public' 
                     ORDER BY table_name
-                """)
-                tables = [row[0] for row in result.fetchall()]
+                """))
 
                 # Create a simple hash of table names as version identifier
                 tables_str = ",".join(sorted(tables))
@@ -484,7 +491,7 @@ class APESMigrationManager:
                 f"  ⚠️  Database export system error: {e}", style="yellow"
             )
             db_file.touch()
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             self.console.print(f"  ⚠️  Database export timed out: {e}", style="yellow")
             db_file.touch()
 
@@ -541,13 +548,15 @@ class APESMigrationManager:
         prompts_file = temp_path / "user_prompts.jsonl.gz"
 
         try:
+            from sqlalchemy import text
+
             async with get_session() as session:
-                result = await session.execute("""
+                result = await session.execute(text("""
                     SELECT prompt_text, enhancement_result, created_at, session_id
                     FROM training_prompts 
                     WHERE data_source = 'real'
                     ORDER BY created_at DESC
-                """)
+                """))
 
                 prompts = result.fetchall()
 
@@ -614,11 +623,15 @@ class APESMigrationManager:
     async def get_user_prompts_count(self) -> int:
         """Get count of real user prompts"""
         try:
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                result = await session.execute("""
+                result = await scalar(session, text("""
                     SELECT COUNT(*) FROM training_prompts WHERE data_source = 'real'
-                """)
-                return result.scalar() or 0
+                """))
+                return result or 0
         except (ConnectionError, OSError):
             return 0
         except (ValueError, TypeError):
@@ -844,9 +857,12 @@ class APESMigrationManager:
                 )
 
             # Count restored records
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                result = await session.execute("SELECT COUNT(*) FROM training_prompts")
-                record_count = result.scalar()
+                record_count = await scalar(session, text("SELECT COUNT(*) FROM training_prompts"))
 
             self.console.print(
                 f"  🗄️  Database restored: {record_count} records", style="dim"
@@ -866,7 +882,7 @@ class APESMigrationManager:
         except (ConnectionError, gzip.BadGzipFile) as e:
             self.console.print(f"  ⚠️  Database restore data error: {e}", style="yellow")
             return 0
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             self.console.print(f"  ⚠️  Database restore timed out: {e}", style="yellow")
             return 0
 
@@ -969,11 +985,13 @@ class APESMigrationManager:
         try:
             restored_count = 0
 
+            from sqlalchemy import text
+
             async with get_session() as session:
                 # Clear existing prompts if force is enabled
                 if force:
                     await session.execute(
-                        "DELETE FROM training_prompts WHERE data_source = 'real'"
+                        text("DELETE FROM training_prompts WHERE data_source = 'real'")
                     )
 
                 # Restore prompts from backup
@@ -984,16 +1002,16 @@ class APESMigrationManager:
 
                             # Insert prompt data
                             await session.execute(
-                                """
+                                text("""
                                 INSERT INTO training_prompts (prompt_text, enhancement_result, created_at, session_id, data_source)
-                                VALUES ($1, $2, $3, $4, 'real')
-                            """,
-                                [
-                                    prompt_data["prompt_text"],
-                                    prompt_data["enhancement_result"],
-                                    prompt_data["created_at"],
-                                    prompt_data["session_id"],
-                                ],
+                                VALUES (:prompt_text, :enhancement_result, :created_at, :session_id, 'real')
+                            """),
+                                {
+                                    "prompt_text": prompt_data["prompt_text"],
+                                    "enhancement_result": prompt_data["enhancement_result"],
+                                    "created_at": prompt_data["created_at"],
+                                    "session_id": prompt_data["session_id"],
+                                },
                             )
 
                             restored_count += 1
@@ -1041,9 +1059,13 @@ class APESMigrationManager:
 
         try:
             # Check database connectivity
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                result = await session.execute("SELECT 1")
-                if not result.scalar():
+                result = await scalar(session, text("SELECT 1"))
+                if not result:
                     verification_results["warnings"].append(
                         "Database connectivity issue detected"
                     )

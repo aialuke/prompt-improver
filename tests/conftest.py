@@ -1,26 +1,131 @@
 """
 Centralized pytest configuration and shared fixtures for APES system testing.
 Provides comprehensive fixture infrastructure following pytest-asyncio best practices.
+
+Features:
+- Deterministic RNG seeding for reproducible test results
+- Optimized fixture data generation for faster test execution
+- Comprehensive database session management
+- Performance monitoring and profiling capabilities
 """
 
 import asyncio
+import os
+import random
 import tempfile
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import numpy as np
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typer.testing import CliRunner
+from testcontainers.redis import RedisContainer
+import redis.asyncio as aioredis
 
 from prompt_improver.database.models import (
+    ABExperiment,
     ImprovementSession,
     RuleMetadata,
     RulePerformance,
     UserFeedback,
 )
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
+# ML dependency checks for graceful test skipping
+try:
+    import sklearn
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
+
+try:
+    import deap
+    HAS_DEAP = True
+except ImportError:
+    HAS_DEAP = False
+
+try:
+    import pymc
+    HAS_PYMC = True
+except ImportError:
+    HAS_PYMC = False
+
+try:
+    import umap
+    HAS_UMAP = True  
+except ImportError:
+    HAS_UMAP = False
+
+try:
+    import hdbscan
+    HAS_HDBSCAN = True
+except ImportError:
+    HAS_HDBSCAN = False
+
+# Create skip markers for optional dependencies
+requires_sklearn = pytest.mark.skipif(not HAS_SKLEARN, reason="sklearn not installed")
+requires_deap = pytest.mark.skipif(not HAS_DEAP, reason="DEAP not installed") 
+requires_pymc = pytest.mark.skipif(not HAS_PYMC, reason="PyMC not installed")
+requires_umap = pytest.mark.skipif(not HAS_UMAP, reason="UMAP not installed")
+requires_hdbscan = pytest.mark.skipif(not HAS_HDBSCAN, reason="HDBSCAN not installed")
 
 
-# CLI Testing Infrastructure
+# ===============================
+# DETERMINISTIC TEST SETUP
+# ===============================
+
+# Set deterministic seed for reproducible test results
+TEST_RANDOM_SEED = 42
+
+@pytest.fixture(scope="session", autouse=True)
+def seed_random_generators():
+    """Seed all random number generators for reproducible test results.
+    
+    This fixture runs automatically for every test session to ensure
+    deterministic behavior across all tests.
+    """
+    # Seed Python's random module
+    random.seed(TEST_RANDOM_SEED)
+    
+    # Seed NumPy's random generator
+    np.random.seed(TEST_RANDOM_SEED)
+    
+    # Set environment variable for subprocess determinism
+    os.environ["PYTHONHASHSEED"] = str(TEST_RANDOM_SEED)
+    
+    # Additional seeding for ML libraries if available
+    try:
+        import sklearn
+        # sklearn uses numpy's random state, so np.random.seed() is sufficient
+        pass
+    except ImportError:
+        pass
+    
+    try:
+        import torch
+        torch.manual_seed(TEST_RANDOM_SEED)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(TEST_RANDOM_SEED)
+    except ImportError:
+        pass
+
+
+@pytest.fixture(scope="function")
+def deterministic_rng():
+    """Provide a deterministic random number generator for individual tests.
+    
+    This fixture ensures that each test gets a fresh, seeded RNG state
+    while maintaining reproducibility.
+    """
+    # Create a new random state for this test
+    rng = np.random.RandomState(TEST_RANDOM_SEED)
+    return rng
+
+
+# ===============================
+# CLI TESTING INFRASTRUCTURE
+# ===============================
 @pytest.fixture(scope="session")
 def cli_runner():
     """Session-scoped CLI runner for testing commands.
@@ -39,46 +144,40 @@ def isolated_cli_runner():
 
 # Database Testing Infrastructure
 @pytest.fixture(scope="function")
-def mock_db_session():
-    """Mock database session with proper async patterns.
+async def real_db_session(test_db_engine):
+    """Create a real database session for testing."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from sqlalchemy.orm import sessionmaker
+    from prompt_improver.database.models import SQLModel
 
-    Function-scoped to ensure test isolation and prevent state leakage.
-    """
-    session = AsyncMock()
-    session.execute = AsyncMock()
-    session.commit = AsyncMock()
-    session.rollback = AsyncMock()
-    session.add = AsyncMock()
-
-    # Configure common query patterns
-    session.scalar_one_or_none = AsyncMock()
-    session.fetchall = AsyncMock()
-    session.refresh = AsyncMock()
-
-    return session
-
-
-@pytest.fixture
-async def test_db_engine():
-    """Create test database engine using existing PostgreSQL configuration with retry logic."""
-    from tests.database_helpers import (
-        create_test_engine_with_retry,
-        ensure_test_database_exists,
-        wait_for_postgres_async,
+    async_session = async_sessionmaker(
+        bind=test_db_engine, expire_on_commit=False, class_=AsyncSession
     )
 
+    # Tables are already created by test_db_engine fixture
+    async with async_session() as session:
+        yield session
+        await session.rollback()  # Ensure rollback after each test to maintain isolation
+
+
+@pytest.fixture(scope="function")
+async def test_db_engine():
+    """Create test database engine using existing PostgreSQL configuration with retry logic."""
     from prompt_improver.database.config import DatabaseConfig
+    from tests.database_helpers import (
+        create_test_engine_with_retry,
+        cleanup_test_database,
+        wait_for_postgres_async,
+    )
+    import uuid
 
-    # Use existing database config but with test database name
     config = DatabaseConfig()
-
-    # First, wait for PostgreSQL to be ready
     postgres_ready = await wait_for_postgres_async(
         host=config.postgres_host,
         port=config.postgres_port,
         user=config.postgres_username,
         password=config.postgres_password,
-        database="postgres",  # Connect to default database first
+        database=config.postgres_database,  # Use main database (apes_production) instead of 'postgres'
         max_retries=30,
         retry_delay=1.0,
     )
@@ -86,31 +185,31 @@ async def test_db_engine():
     if not postgres_ready:
         pytest.skip("PostgreSQL server not available after 30 attempts")
 
-    # Ensure test database exists
-    db_exists = await ensure_test_database_exists(
+    # Create a unique test database for each test to prevent conflicts
+    test_db_name = f"apes_test_{uuid.uuid4().hex[:8]}"
+    
+    # Clean up test database for completely fresh state
+    db_cleaned = await cleanup_test_database(
         host=config.postgres_host,
         port=config.postgres_port,
         user=config.postgres_username,
         password=config.postgres_password,
-        test_db_name="apes_test",
+        test_db_name=test_db_name,
     )
 
-    if not db_exists:
-        pytest.skip("Could not create test database")
+    if not db_cleaned:
+        pytest.skip("Could not clean up test database")
 
-    # Now create the engine with retry logic
-    test_db_url = f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/apes_test"
+    test_db_url = f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/{test_db_name}"
 
     engine = await create_test_engine_with_retry(
         test_db_url,
         max_retries=3,
         connect_args={
-            "server_settings": {
-                "application_name": "apes_test_suite",
-            },
-            "command_timeout": 10,  # Increased timeout
+            "application_name": "apes_test_suite",
+            "connect_timeout": 10,
         },
-        pool_timeout=10,  # Increased timeout
+        pool_timeout=10,
     )
 
     if engine is None:
@@ -119,9 +218,34 @@ async def test_db_engine():
     try:
         yield engine
     finally:
-        # Cleanup
         try:
             await engine.dispose()
+        except Exception:
+            pass
+        
+        # Clean up the unique test database
+        try:
+            import asyncpg
+            
+            conn = await asyncpg.connect(
+                host=config.postgres_host,
+                port=config.postgres_port,
+                user=config.postgres_username,
+                password=config.postgres_password,
+                database=config.postgres_database,  # Use main database (apes_production) instead of 'postgres'
+                timeout=5.0,
+            )
+            
+            # Terminate connections to test database
+            await conn.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()",
+                test_db_name
+            )
+            
+            # Drop the unique test database
+            await conn.execute(f'DROP DATABASE IF EXISTS "{test_db_name}"')
+            await conn.close()
+            
         except Exception:
             pass  # Ignore cleanup errors
 
@@ -147,6 +271,263 @@ async def test_db_session(test_db_engine):
                 # Transaction may already be closed, ignore
                 pass
 
+
+@pytest.fixture
+async def mock_db_session(test_db_session):
+    """Alias for backward compatibility with tests expecting mock_db_session."""
+    return test_db_session
+
+
+@pytest.fixture
+async def populate_ab_experiment(real_db_session):
+    """
+    Populate database with ABExperiment and related RulePerformance records for testing.
+    Creates comprehensive experiment configurations with sufficient data for statistical validation.
+    """
+    import uuid
+    import numpy as np
+    from datetime import datetime, timedelta
+    from prompt_improver.database.models import PromptSession
+
+    # Create rule metadata records first to satisfy foreign key constraints
+    rule_metadata_records = [
+        RuleMetadata(
+            rule_id="clarity_rule",
+            rule_name="Clarity Enhancement Rule",
+            category="core",
+            description="Improves prompt clarity",
+            enabled=True,
+            priority=5,
+            default_parameters={"weight": 1.0, "threshold": 0.7},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+        RuleMetadata(
+            rule_id="specificity_rule",
+            rule_name="Specificity Enhancement Rule",
+            category="core",
+            description="Improves prompt specificity",
+            enabled=True,
+            priority=4,
+            default_parameters={"weight": 0.8, "threshold": 0.6},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+        RuleMetadata(
+            rule_id="chain_of_thought_rule",
+            rule_name="Chain of Thought Rule",
+            category="advanced",
+            description="Adds chain of thought reasoning",
+            enabled=True,
+            priority=3,
+            default_parameters={"weight": 0.9, "threshold": 0.5},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+        RuleMetadata(
+            rule_id="example_rule",
+            rule_name="Example Enhancement Rule",
+            category="enhancement",
+            description="Adds examples to prompts",
+            enabled=True,
+            priority=2,
+            default_parameters={"weight": 0.7, "threshold": 0.6},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+    ]
+
+    # Create multiple experiments with different configurations
+    experiments = [
+        ABExperiment(
+            experiment_id=str(uuid.uuid4()),
+            experiment_name="Clarity Enhancement A/B Test",
+            description="Testing impact of clarity rule improvements",
+            control_rules={"rule_ids": ["clarity_rule"]},
+            treatment_rules={"rule_ids": ["clarity_rule", "specificity_rule"]},
+            target_metric="improvement_score",
+            sample_size_per_group=150,
+            current_sample_size=300,
+            significance_threshold=0.05,
+            status="running",
+            started_at=aware_utc_now() - timedelta(days=5),
+            experiment_metadata={
+                "control_description": "Basic clarity rule only",
+                "treatment_description": "Clarity + specificity rules",
+                "expected_effect_size": 0.1
+            }
+        ),
+        ABExperiment(
+            experiment_id=str(uuid.uuid4()),
+            experiment_name="Multi-Rule Performance Test",
+            description="Testing comprehensive rule set performance",
+            control_rules={"rule_ids": ["clarity_rule", "specificity_rule"]},
+            treatment_rules={"rule_ids": ["clarity_rule", "specificity_rule", "chain_of_thought_rule"]},
+            target_metric="improvement_score",
+            sample_size_per_group=200,
+            current_sample_size=400,
+            significance_threshold=0.01,
+            status="running",
+            started_at=aware_utc_now() - timedelta(days=10),
+            experiment_metadata={
+                "control_description": "Standard two-rule set",
+                "treatment_description": "Enhanced three-rule set",
+                "expected_effect_size": 0.15
+            }
+        ),
+        ABExperiment(
+            experiment_id=str(uuid.uuid4()),
+            experiment_name="Completed Experiment",
+            description="Already completed experiment for historical analysis",
+            control_rules={"rule_ids": ["clarity_rule"]},
+            treatment_rules={"rule_ids": ["clarity_rule", "example_rule"]},
+            target_metric="improvement_score",
+            sample_size_per_group=100,
+            current_sample_size=200,
+            significance_threshold=0.05,
+            status="completed",
+            started_at=aware_utc_now() - timedelta(days=30),
+            completed_at=aware_utc_now() - timedelta(days=15),
+            results={
+                "control_mean": 0.72,
+                "treatment_mean": 0.78,
+                "p_value": 0.023,
+                "effect_size": 0.06,
+                "statistical_significance": True
+            }
+        )
+    ]
+
+    # Calculate total sessions needed for all experiments
+    total_sessions_needed = sum(exp.current_sample_size for exp in experiments)
+    
+    # Create corresponding PromptSession records for RulePerformance foreign keys
+    prompt_sessions = []
+    for i in range(total_sessions_needed):  # Sufficient sessions for all experiments
+        session = PromptSession(
+            session_id=f"exp_session_{i}",
+            original_prompt=f"Test prompt {i}",
+            improved_prompt=f"Enhanced test prompt {i} with better clarity and specificity",
+            user_context={"experiment_type": "ab_test", "session_number": i},
+            quality_score=np.random.uniform(0.6, 0.9),
+            improvement_score=np.random.uniform(0.5, 0.9),
+            confidence_level=np.random.uniform(0.7, 0.95),
+            created_at=aware_utc_now() - timedelta(hours=i // 10),
+            updated_at=aware_utc_now() - timedelta(hours=i // 10)
+        )
+        prompt_sessions.append(session)
+
+    # Create RulePerformance records for statistical validation
+    rule_performance_records = []
+    session_idx = 0
+    
+    # For each experiment, create realistic performance data
+    for exp_idx, experiment in enumerate(experiments):
+        experiment_sessions = experiment.current_sample_size
+        half_sessions = experiment_sessions // 2
+        
+        # Control group performance (based on control_rules)
+        control_base_score = 0.70 + (exp_idx * 0.02)  # Vary by experiment
+        for i in range(half_sessions):
+            score = np.random.normal(control_base_score, 0.08)
+            score = max(0.0, min(1.0, score))  # Clamp to valid range
+            
+            record = RulePerformance(
+                session_id=f"exp_session_{session_idx}",
+                rule_id="clarity_rule",  # Primary rule in control
+                improvement_score=score,
+                execution_time_ms=np.random.normal(120, 20),
+                confidence_level=np.random.uniform(0.8, 0.95),
+                parameters_used={"weight": 1.0, "threshold": 0.7, "experiment_arm": "control"},
+                created_at=aware_utc_now() - timedelta(hours=session_idx // 10)
+            )
+            rule_performance_records.append(record)
+            session_idx += 1
+        
+        # Treatment group performance (based on treatment_rules)
+        treatment_base_score = control_base_score + 0.05 + (exp_idx * 0.01)  # Slight improvement
+        for i in range(half_sessions):
+            score = np.random.normal(treatment_base_score, 0.08)
+            score = max(0.0, min(1.0, score))  # Clamp to valid range
+            
+            # Alternate between treatment rules for variety
+            rule_id = "specificity_rule" if i % 2 == 0 else "chain_of_thought_rule"
+            if exp_idx == 2:  # Completed experiment uses different treatment
+                rule_id = "example_rule"
+            
+            record = RulePerformance(
+                session_id=f"exp_session_{session_idx}",
+                rule_id=rule_id,
+                improvement_score=score,
+                execution_time_ms=np.random.normal(135, 25),  # Slightly higher for treatment
+                confidence_level=np.random.uniform(0.75, 0.92),
+                parameters_used={"weight": 0.8, "threshold": 0.6, "experiment_arm": "treatment"},
+                created_at=aware_utc_now() - timedelta(hours=session_idx // 10)
+            )
+            rule_performance_records.append(record)
+            session_idx += 1
+
+    # Add all records to database
+    real_db_session.add_all(rule_metadata_records + experiments + prompt_sessions + rule_performance_records)
+    await real_db_session.commit()
+
+    # Refresh to get database-generated values
+    for experiment in experiments:
+        await real_db_session.refresh(experiment)
+    
+    for session in prompt_sessions:
+        await real_db_session.refresh(session)
+
+    for record in rule_performance_records:
+        await real_db_session.refresh(record)
+
+    return experiments, rule_performance_records
+
+# ===============================
+# REDIS CONTAINER SETUP
+# ===============================
+
+@pytest.fixture(scope="session")
+def redis_container():
+    """Starts a Redis container for the duration of the testing session.
+    
+    Uses Testcontainers to spin up a disposable Redis instance that is
+    automatically cleaned up after the test session completes.
+    """
+    with RedisContainer() as container:
+        yield container
+
+@pytest.fixture(scope="function")
+async def redis_client(redis_container):
+    """Provides a fresh Redis client for each test and flushes the database.
+    
+    This fixture ensures clean Redis state between tests by:
+    1. Creating a new Redis client connection
+    2. Flushing the database before each test
+    3. Properly cleaning up the connection after each test
+    
+    Args:
+        redis_container: Session-scoped Redis container fixture
+        
+    Yields:
+        redis.asyncio.Redis: Async Redis client instance
+    """
+    # Get Redis client from container
+    sync_client = redis_container.get_client()
+    
+    # Create async client using connection parameters
+    host = redis_container.get_container_host_ip()
+    port = redis_container.get_exposed_port(6379)
+    
+    client = aioredis.Redis(
+        host=host,
+        port=port,
+        decode_responses=False
+    )
+    
+    # Ensure clean state for each test
+    await client.flushdb()
+    
+    yield client
+    
+    # Cleanup connection
+    await client.close()
 
 # Temporary File Infrastructure
 @pytest.fixture(scope="function")
@@ -233,7 +614,131 @@ def test_config():
     }
 
 
-# Sample Model Data Fixtures
+# Real Database Fixtures - Replace mocks with actual database records
+@pytest.fixture
+async def real_rule_metadata(real_db_session):
+    """Create real rule metadata in the test database."""
+    import uuid
+    from sqlalchemy import select
+    
+    test_suffix = str(uuid.uuid4())[:8]
+    
+    metadata_records = [
+        RuleMetadata(
+            rule_id=f"clarity_rule_{test_suffix}",
+            rule_name="Clarity Enhancement Rule",
+            category="core",
+            description="Improves prompt clarity",
+            enabled=True,
+            priority=5,
+            default_parameters={"weight": 1.0, "threshold": 0.7},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+        RuleMetadata(
+            rule_id=f"specificity_rule_{test_suffix}",
+            rule_name="Specificity Enhancement Rule",
+            category="core",
+            description="Improves prompt specificity",
+            enabled=True,
+            priority=4,
+            default_parameters={"weight": 0.8, "threshold": 0.6},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+        ),
+    ]
+    
+    # Add records to database
+    for record in metadata_records:
+        real_db_session.add(record)
+    await real_db_session.commit()
+    
+    # Refresh to get database-generated values
+    for record in metadata_records:
+        await real_db_session.refresh(record)
+    
+    return metadata_records
+
+
+@pytest.fixture
+async def real_prompt_sessions(real_db_session):
+    """Create real prompt sessions in the test database."""
+    from datetime import datetime, timedelta
+    from prompt_improver.database.models import PromptSession
+    
+    session_records = [
+        PromptSession(
+            id=1,
+            session_id="test_session_1",
+            original_prompt="Make this better",
+            improved_prompt="Please improve the clarity and specificity of this document",
+            user_context={"context": "document_improvement"},
+            quality_score=0.8,
+            improvement_score=0.75,
+            confidence_level=0.9,
+            created_at=aware_utc_now(),
+            updated_at=aware_utc_now(),
+        ),
+        PromptSession(
+            id=2,
+            session_id="test_session_2",
+            original_prompt="Help me with this task", 
+            improved_prompt="Please provide step-by-step guidance for completing this specific task",
+            user_context={"context": "task_guidance"},
+            quality_score=0.85,
+            improvement_score=0.8,
+            confidence_level=0.88,
+            created_at=aware_utc_now() - timedelta(hours=1),
+            updated_at=aware_utc_now() - timedelta(hours=1),
+        ),
+    ]
+    
+    # Add records to database
+    for record in session_records:
+        real_db_session.add(record)
+    await real_db_session.commit()
+    
+    # Refresh to get database-generated values
+    for record in session_records:
+        await real_db_session.refresh(record)
+    
+    return session_records
+
+
+# PromptSession fixtures for referential integrity
+@pytest.fixture
+def sample_prompt_sessions():
+    """Sample prompt sessions for testing with proper database relationships."""
+    from datetime import datetime, timedelta
+    from prompt_improver.database.models import PromptSession
+    
+    return [
+        PromptSession(
+            id=1,
+            session_id="test_session_1",
+            original_prompt="Make this better",
+            improved_prompt="Please improve the clarity and specificity of this document",
+            user_context={"context": "document_improvement"},
+            quality_score=0.8,
+            improvement_score=0.75,
+            confidence_level=0.9,
+            created_at=aware_utc_now(),
+            updated_at=aware_utc_now(),
+        ),
+        PromptSession(
+            id=2,
+            session_id="test_session_2",
+            original_prompt="Help me with this task", 
+            improved_prompt="Please provide step-by-step guidance for completing this specific task",
+            user_context={"context": "task_guidance"},
+            quality_score=0.85,
+            improvement_score=0.8,
+            confidence_level=0.88,
+            created_at=aware_utc_now() - timedelta(hours=1),
+            updated_at=aware_utc_now() - timedelta(hours=1),
+        ),
+    ]
+
+
+# Legacy fixture for backward compatibility
 @pytest.fixture
 def sample_rule_metadata():
     """Sample rule metadata for testing with unique IDs per test."""
@@ -244,47 +749,51 @@ def sample_rule_metadata():
 
     return [
         RuleMetadata(
-            id=1,
             rule_id=f"clarity_rule_{test_suffix}",
             rule_name="Clarity Enhancement Rule",
             category="core",
             description="Improves prompt clarity",
-            is_enabled=True,
+            enabled=True,
             priority=5,
             default_parameters={"weight": 1.0, "threshold": 0.7},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+            created_at=aware_utc_now(),
         ),
         RuleMetadata(
-            id=2,
             rule_id=f"specificity_rule_{test_suffix}",
             rule_name="Specificity Enhancement Rule",
             category="core",
             description="Improves prompt specificity",
-            is_enabled=True,
+            enabled=True,
             priority=4,
             default_parameters={"weight": 0.8, "threshold": 0.6},
+            parameter_constraints={"weight": {"min": 0.0, "max": 1.0}},
+            created_at=aware_utc_now(),
         ),
     ]
 
 
 @pytest.fixture
-def sample_rule_performance(sample_rule_metadata):
-    """Sample rule performance data for testing with unique rule IDs."""
+def sample_rule_performance(sample_rule_metadata, sample_prompt_sessions):
+    """Sample rule performance data for testing with unique rule IDs and proper database relationships."""
     import uuid
+    from datetime import datetime, timedelta
 
-    # Use the same unique rule IDs from sample_rule_metadata
+    # Use the same unique rule IDs from sample_rule_metadata and session_ids from sample_prompt_sessions
     base_data = [
         RulePerformance(
             id=1,
-            session_id="test_session_1",
+            session_id=sample_prompt_sessions[0].session_id,  # "test_session_1"
             rule_id=sample_rule_metadata[0].rule_id,  # clarity_rule with unique suffix
             improvement_score=0.8,
             confidence_level=0.9,
             execution_time_ms=150,
             parameters_used={"weight": 1.0, "threshold": 0.7},
+            created_at=aware_utc_now(),
         ),
         RulePerformance(
             id=2,
-            session_id="test_session_2",
+            session_id=sample_prompt_sessions[1].session_id,  # "test_session_2"
             rule_id=sample_rule_metadata[
                 1
             ].rule_id,  # specificity_rule with unique suffix
@@ -292,6 +801,7 @@ def sample_rule_performance(sample_rule_metadata):
             confidence_level=0.8,
             execution_time_ms=200,
             parameters_used={"weight": 0.8, "threshold": 0.6},
+            created_at=aware_utc_now() - timedelta(minutes=30),
         ),
     ]
 
@@ -302,15 +812,16 @@ def sample_rule_performance(sample_rule_metadata):
             # Create new instance with unique ID and constrained scores
             improvement_score = max(0.0, min(1.0, base.improvement_score + (i * 0.01)))
             confidence_level = max(0.0, min(1.0, base.confidence_level + (i * 0.005)))
-            
+
             new_record = RulePerformance(
                 id=i * len(base_data) + j + 1,  # Unique ID for each record
-                session_id=f"test_session_{i}_{j}",
+                session_id=base.session_id,  # Use session_id from base data (referencing existing sessions)
                 rule_id=base.rule_id,
                 improvement_score=improvement_score,  # Keep within 0-1 range
-                confidence_level=confidence_level,    # Keep within 0-1 range
+                confidence_level=confidence_level,  # Keep within 0-1 range
                 execution_time_ms=base.execution_time_ms + i,
                 parameters_used=base.parameters_used,
+                created_at=aware_utc_now() - timedelta(minutes=i*5),  # Staggered creation times
             )
             result.append(new_record)
 
@@ -330,7 +841,7 @@ def sample_user_feedback():
             is_processed=False,
             ml_optimized=False,
             model_id=None,
-            created_at=datetime.utcnow(),
+            created_at=aware_utc_now(),
         ),
         UserFeedback(
             id=2,
@@ -341,7 +852,7 @@ def sample_user_feedback():
             is_processed=True,
             ml_optimized=True,
             model_id="model_123",
-            created_at=datetime.utcnow() - timedelta(hours=2),
+            created_at=aware_utc_now() - timedelta(hours=2),
         ),
     ]
 
@@ -358,7 +869,7 @@ def sample_improvement_sessions():
             rules_applied=["clarity_rule"],
             user_context={"context": "document_improvement"},
             improvement_metrics={"clarity": 0.8, "specificity": 0.7},
-            created_at=datetime.utcnow(),
+            created_at=aware_utc_now(),
         ),
         ImprovementSession(
             id=2,
@@ -368,7 +879,7 @@ def sample_improvement_sessions():
             rules_applied=["clarity_rule", "specificity_rule"],
             user_context={"context": "task_guidance"},
             improvement_metrics={"clarity": 0.9, "specificity": 0.8},
-            created_at=datetime.utcnow() - timedelta(hours=1),
+            created_at=aware_utc_now() - timedelta(hours=1),
         ),
     ]
 
@@ -502,24 +1013,24 @@ def mock_rule_metadata_corrected():
 
     return [
         RuleMetadata(
-            id=1,
             rule_id="clarity_rule",
             rule_name="Clarity Enhancement Rule",
             category="core",
             description="Improves prompt clarity by replacing vague terms",
-            is_enabled=True,
+            enabled=True,
             priority=5,
             default_parameters={"vague_threshold": 0.7, "confidence_weight": 1.0},
+            parameter_constraints={"vague_threshold": {"min": 0.0, "max": 1.0}},
         ),
         RuleMetadata(
-            id=2,
             rule_id="specificity_rule",
             rule_name="Specificity Enhancement Rule",
             category="core",
             description="Improves prompt specificity by adding constraints and examples",
-            is_enabled=True,
+            enabled=True,
             priority=4,
             default_parameters={"min_length": 10, "add_format": True},
+            parameter_constraints={"min_length": {"min": 1, "max": 100}},
         ),
     ]
 
@@ -618,28 +1129,8 @@ def mock_prompt_service():
     return service
 
 
-@pytest.fixture
-def mock_analytics_service():
-    """Mock analytics service for testing."""
-    service = MagicMock()
-    service.get_performance_summary = AsyncMock(
-        return_value={
-            "total_sessions": 100,
-            "avg_improvement": 0.75,
-            "success_rate": 0.95,
-        }
-    )
-    service.get_rule_effectiveness = AsyncMock(
-        return_value={"clarity_rule": 0.85, "specificity_rule": 0.78}
-    )
-    service.get_ml_performance_summary = AsyncMock(
-        return_value={
-            "total_models": 5,
-            "avg_performance": 0.82,
-            "last_training": datetime.utcnow() - timedelta(hours=6),
-        }
-    )
-    return service
+# mock_analytics_service fixture removed - using real RealTimeAnalyticsService instead
+# This supports the transition from mocked to real services in orchestrator tests
 
 
 # MLflow and Optuna Mock Fixtures

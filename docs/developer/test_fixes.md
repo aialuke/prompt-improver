@@ -668,7 +668,7 @@ pytest --asyncio-mode=strict   # Explicit async marking required
 - [x] Unit test examples created (though require actual rule implementation)
 - [x] Performance requirement validation (<200ms response time)
 - [x] Error handling and recovery scenario testing
-- [x] Database integration testing (with aiosqlite dependency)
+- [x] Database integration testing (with asyncpg dependency)
 - [x] Coverage reporting with HTML output and fail-under threshold (85%)
 
 ---
@@ -738,7 +738,7 @@ This fix plan addresses the critical test infrastructure issues while following 
 **Integration Tests**: ⚠️ Partially Working
 - 3 MCP integration tests passing
 - Database integration tests failing due to JSONB type incompatibility with SQLite
-- Solution: Need JSONB→JSON type mapping for SQLite compatibility
+- Solution: Need JSONB→JSON type mapping for SQLite compatibility (migrating to PostgreSQL containers)
 
 **Unit Tests**: ⚠️ Created but Require Rule Implementation
 - Import paths fixed (prompt_improver.rule_engine.rules.clarity)
@@ -747,14 +747,14 @@ This fix plan addresses the critical test infrastructure issues while following 
 - Solution: Rules need actual improvement logic implementation
 
 **Dependencies**: ✅ Resolved
-- Added aiosqlite>=0.19.0 for SQLite async operations
+- Added asyncpg>=0.29.0 for PostgreSQL async operations
 - All required test dependencies properly installed
 
 ### **Remaining Minor Issues** 🔧
 
 1. **Database Type Compatibility**: JSONB types not supported in SQLite
-   - **Impact**: Some integration tests fail with SQLite
-   - **Solution**: Implement JSONB→JSON type mapping for test database
+   - **Impact**: Some integration tests fail with SQLite (migrating to PostgreSQL containers)
+   - **Solution**: Use PostgreSQL containers for full JSONB support
 
 2. **Rule Implementation Gap**: Rules return unchanged prompts
    - **Impact**: Unit tests fail with placeholder rule implementations  

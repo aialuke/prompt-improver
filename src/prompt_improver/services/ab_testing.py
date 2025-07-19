@@ -5,31 +5,34 @@ Advanced experimentation system for rule effectiveness validation
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, List, Dict
+from typing import Any, Dict, List, Optional
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 import numpy as np
 from scipy import stats
 from sklearn.utils import resample  # For bootstrap sampling
 from sqlalchemy import select
+from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance
-from .analytics import AnalyticsService
-from ..utils.error_handlers import handle_database_errors
 from ..optimization.early_stopping import (
-    AdvancedEarlyStoppingFramework, 
+    AdvancedEarlyStoppingFramework,
     EarlyStoppingConfig,
     StoppingDecision,
-    should_stop_experiment
+    should_stop_experiment,
 )
 from ..optimization.multi_armed_bandit import (
-    MultiarmedBanditFramework,
-    BanditConfig,
-    BanditAlgorithm,
     ArmResult,
+    BanditAlgorithm,
+    BanditConfig,
+    MultiarmedBanditFramework,
     create_rule_optimization_bandit,
-    intelligent_rule_selection
+    intelligent_rule_selection,
 )
+from ..utils.error_handlers import handle_database_errors
+from .analytics import AnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +74,10 @@ class ABTestingService:
         self.min_sample_size = 30  # Minimum sample size per group
         self.alpha = 0.05  # Significance threshold
         self.min_effect_size = 0.1  # Minimum practical effect size (10% improvement)
-        
+
         # Early stopping framework
         self.enable_early_stopping = enable_early_stopping
-        self.early_stopping_framework: Optional[AdvancedEarlyStoppingFramework] = None
+        self.early_stopping_framework: AdvancedEarlyStoppingFramework | None = None
         if enable_early_stopping:
             early_stopping_config = EarlyStoppingConfig(
                 alpha=self.alpha,
@@ -82,14 +85,18 @@ class ABTestingService:
                 effect_size_h1=self.min_effect_size,
                 max_looks=10,
                 enable_futility_stopping=True,
-                min_sample_size=self.min_sample_size
+                min_sample_size=self.min_sample_size,
             )
-            self.early_stopping_framework = AdvancedEarlyStoppingFramework(early_stopping_config)
-        
+            self.early_stopping_framework = AdvancedEarlyStoppingFramework(
+                early_stopping_config
+            )
+
         # Multi-armed bandit framework
         self.enable_bandits = enable_bandits
-        self.bandit_framework: Optional[MultiarmedBanditFramework] = None
-        self.bandit_experiments: dict[str, str] = {}  # Maps experiment_name -> bandit_experiment_id
+        self.bandit_framework: MultiarmedBanditFramework | None = None
+        self.bandit_experiments: dict[
+            str, str
+        ] = {}  # Maps experiment_name -> bandit_experiment_id
         if enable_bandits:
             bandit_config = BanditConfig(
                 algorithm=BanditAlgorithm.THOMPSON_SAMPLING,
@@ -102,7 +109,7 @@ class ABTestingService:
                 min_samples_per_arm=self.min_sample_size,
                 warmup_trials=50,
                 enable_regret_tracking=True,
-                confidence_level=0.95
+                confidence_level=0.95,
             )
             self.bandit_framework = MultiarmedBanditFramework(bandit_config)
 
@@ -113,7 +120,7 @@ class ABTestingService:
         treatment_rules: dict[str, Any],
         db_session: AsyncSession,
         target_metric: str = "improvement_score",
-        description: Optional[str] = None,
+        description: str | None = None,
         sample_size_per_group: int = 100,
     ) -> dict[str, Any]:
         """Create new A/B experiment for rule effectiveness testing.
@@ -158,7 +165,7 @@ class ABTestingService:
                 "message": "A/B experiment created successfully",
             }
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error creating A/B experiment: {e}")
             await db_session.rollback()
             return {"status": "error", "error": str(e)}
@@ -191,7 +198,7 @@ class ABTestingService:
             Statistical analysis results with recommendations
         """
         try:
-            # Get experiment details - SQLAlchemy metaclass magic for column access  
+            # Get experiment details - SQLAlchemy metaclass magic for column access
             stmt = select(ABExperiment).where(
                 ABExperiment.experiment_id == experiment_id  # type: ignore[arg-type]  # SQLAlchemy column comparison
             )
@@ -203,8 +210,8 @@ class ABTestingService:
 
             if experiment.status != "running":
                 return {
-                    "status": "error", 
-                    "error": f"Experiment is {experiment.status}, cannot analyze early stopping"
+                    "status": "error",
+                    "error": f"Experiment is {experiment.status}, cannot analyze early stopping",
                 }
 
             # Get performance data for both groups
@@ -272,7 +279,7 @@ class ABTestingService:
                 "next_actions": self._get_next_actions(analysis_result),
             }
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error analyzing experiment: {e}")
             return {"status": "error", "error": str(e)}
         except (ValueError, TypeError) as e:
@@ -293,8 +300,8 @@ class ABTestingService:
 
     @handle_database_errors(
         rollback_session=False,  # This is a read operation, no rollback needed
-        return_format="none",    # Return empty list on error instead of dict
-        operation_name="get_experiment_data"
+        return_format="none",  # Return empty list on error instead of dict
+        operation_name="get_experiment_data",
     )
     async def _get_experiment_data(
         self,
@@ -304,7 +311,7 @@ class ABTestingService:
         db_session: AsyncSession,
     ) -> list[float]:
         """Get performance data for experiment group.
-        
+
         Now uses standardized error handling decorator that provides:
         - Categorized exception handling (Database I/O, Validation, etc.)
         - Consistent logging patterns
@@ -336,7 +343,7 @@ class ABTestingService:
                 metric_values.append(record.confidence_level or 0.0)
 
         return metric_values
-    
+
     async def _get_pre_experiment_data(
         self,
         control_rules: dict[str, Any],
@@ -349,13 +356,14 @@ class ABTestingService:
         try:
             # Get data from 30 days before experiment start
             from datetime import timedelta
+
             pre_start = experiment_start - timedelta(days=30)
             pre_end = experiment_start
-            
+
             # Get control group pre-experiment data
             control_rule_ids: list[str] = control_rules.get("rule_ids", [])
             control_pre_data = []
-            
+
             if control_rule_ids:
                 # SQLAlchemy column access - type checker struggles with metaclass magic
                 stmt = select(RulePerformance).where(
@@ -365,7 +373,7 @@ class ABTestingService:
                 )
                 result = await db_session.execute(stmt)
                 control_records = result.scalars().all()
-                
+
                 for record in control_records:
                     if target_metric == "improvement_score":
                         control_pre_data.append(record.improvement_score or 0.0)
@@ -373,11 +381,11 @@ class ABTestingService:
                         control_pre_data.append(record.execution_time_ms or 0.0)
                     elif target_metric == "confidence_level":
                         control_pre_data.append(record.confidence_level or 0.0)
-            
+
             # Get treatment group pre-experiment data
             treatment_rule_ids: list[str] = treatment_rules.get("rule_ids", [])
             treatment_pre_data = []
-            
+
             if treatment_rule_ids:
                 # SQLAlchemy column access - type checker struggles with metaclass magic
                 stmt = select(RulePerformance).where(
@@ -387,7 +395,7 @@ class ABTestingService:
                 )
                 result = await db_session.execute(stmt)
                 treatment_records = result.scalars().all()
-                
+
                 for record in treatment_records:
                     if target_metric == "improvement_score":
                         treatment_pre_data.append(record.improvement_score or 0.0)
@@ -395,15 +403,12 @@ class ABTestingService:
                         treatment_pre_data.append(record.execution_time_ms or 0.0)
                     elif target_metric == "confidence_level":
                         treatment_pre_data.append(record.confidence_level or 0.0)
-            
-            return {
-                'control': control_pre_data,
-                'treatment': treatment_pre_data
-            }
-            
+
+            return {"control": control_pre_data, "treatment": treatment_pre_data}
+
         except Exception as e:
             logger.warning(f"Failed to get pre-experiment data: {e}")
-            return {'control': [], 'treatment': []}
+            return {"control": [], "treatment": []}
 
     def _perform_statistical_analysis(
         self, control_data: list[float], treatment_data: list[float]
@@ -412,7 +417,7 @@ class ABTestingService:
         control_array = np.array(control_data)
         treatment_array = np.array(treatment_data)
 
-        # Basic statistics  
+        # Basic statistics
         control_mean = float(np.mean(control_array))
         treatment_mean = float(np.mean(treatment_array))
 
@@ -430,12 +435,10 @@ class ABTestingService:
         )
 
         # Statistical significance test (Welch's t-test) - PROPER 2025 attribute access
-        ttest_result = stats.ttest_ind(
-            treatment_array, control_array, equal_var=False
-        )
+        ttest_result = stats.ttest_ind(treatment_array, control_array, equal_var=False)
         # Fix: Use proper attribute access, not tuple unpacking - scipy TtestResult object
         t_stat = float(ttest_result.statistic)  # type: ignore[attr-defined]  # scipy TtestResult attribute
-        p_value = float(ttest_result.pvalue)    # type: ignore[attr-defined]  # scipy TtestResult attribute
+        p_value = float(ttest_result.pvalue)  # type: ignore[attr-defined]  # scipy TtestResult attribute
 
         # Classical confidence interval for difference in means
         diff_mean = treatment_mean - control_mean
@@ -510,7 +513,7 @@ class ABTestingService:
         """Store experiment analysis results"""
         try:
             results_data = {
-                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "analysis_timestamp": aware_utc_now().isoformat(),
                 "control_mean": analysis_result.control_mean,
                 "treatment_mean": analysis_result.treatment_mean,
                 "effect_size": analysis_result.effect_size,
@@ -537,12 +540,12 @@ class ABTestingService:
                 and analysis_result.practical_significance
             ) or experiment.current_sample_size >= target_sample_size:
                 experiment.status = "completed"
-                experiment.completed_at = datetime.utcnow()
+                experiment.completed_at = aware_utc_now()
 
             db_session.add(experiment)
             await db_session.commit()
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error storing experiment results: {e}")
             await db_session.rollback()
         except (ValueError, TypeError, AttributeError) as e:
@@ -642,30 +645,30 @@ class ABTestingService:
         self,
         experiment_id: str,
         look_number: int = 1,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """Check if experiment should stop early using advanced early stopping mechanisms
-        
+
         Args:
             experiment_id: UUID of the experiment
             look_number: Current interim analysis number
             db_session: Database session
-            
+
         Returns:
             Early stopping analysis with recommendation
         """
         if db_session is None:
             return {"status": "error", "error": "Database session is required"}
-            
+
         if not self.enable_early_stopping or not self.early_stopping_framework:
             return {
                 "status": "disabled",
                 "message": "Early stopping is not enabled for this service",
-                "should_stop": False
+                "should_stop": False,
             }
-            
+
         try:
-            # Get experiment details - SQLAlchemy metaclass magic for column access  
+            # Get experiment details - SQLAlchemy metaclass magic for column access
             stmt = select(ABExperiment).where(
                 ABExperiment.experiment_id == experiment_id  # type: ignore[arg-type]  # SQLAlchemy column comparison
             )
@@ -677,8 +680,8 @@ class ABTestingService:
 
             if experiment.status != "running":
                 return {
-                    "status": "error", 
-                    "error": f"Experiment is {experiment.status}, cannot analyze early stopping"
+                    "status": "error",
+                    "error": f"Experiment is {experiment.status}, cannot analyze early stopping",
                 }
 
             # Get performance data for both groups
@@ -710,16 +713,18 @@ class ABTestingService:
                 }
 
             # Perform early stopping analysis
-            early_stopping_result = await self.early_stopping_framework.evaluate_stopping_criteria(
-                experiment_id=experiment_id,
-                control_data=control_data,
-                treatment_data=treatment_data,
-                look_number=look_number,
-                metadata={
-                    "experiment_name": experiment.experiment_name,
-                    "target_metric": experiment.target_metric,
-                    "started_at": experiment.started_at.isoformat()
-                }
+            early_stopping_result = (
+                await self.early_stopping_framework.evaluate_stopping_criteria(
+                    experiment_id=experiment_id,
+                    control_data=control_data,
+                    treatment_data=treatment_data,
+                    look_number=look_number,
+                    metadata={
+                        "experiment_name": experiment.experiment_name,
+                        "target_metric": experiment.target_metric,
+                        "started_at": experiment.started_at.isoformat(),
+                    },
+                )
             )
 
             # Update experiment status if stopping
@@ -727,8 +732,8 @@ class ABTestingService:
             if should_stop:
                 # Update experiment status
                 experiment.status = "stopped_early"
-                experiment.completed_at = datetime.utcnow()
-                
+                experiment.completed_at = aware_utc_now()
+
                 # Store early stopping results
                 if not experiment.results:
                     experiment.results = {}
@@ -743,10 +748,10 @@ class ABTestingService:
                         "stop_for_futility": early_stopping_result.stop_for_futility,
                         "conditional_power": early_stopping_result.conditional_power,
                         "samples_analyzed": early_stopping_result.samples_analyzed,
-                        "analysis_time": early_stopping_result.analysis_time.isoformat()
+                        "analysis_time": early_stopping_result.analysis_time.isoformat(),
                     }
                 })
-                
+
                 db_session.add(experiment)
                 await db_session.commit()
 
@@ -768,23 +773,47 @@ class ABTestingService:
                     "samples_analyzed": early_stopping_result.samples_analyzed,
                     "estimated_remaining_samples": early_stopping_result.estimated_remaining_samples,
                     "sprt_analysis": {
-                        "lower_bound": early_stopping_result.sprt_bounds.lower_bound if early_stopping_result.sprt_bounds else None,
-                        "upper_bound": early_stopping_result.sprt_bounds.upper_bound if early_stopping_result.sprt_bounds else None,
-                        "log_likelihood_ratio": early_stopping_result.sprt_bounds.log_likelihood_ratio if early_stopping_result.sprt_bounds else None,
-                        "decision": early_stopping_result.sprt_bounds.decision.value if early_stopping_result.sprt_bounds else None
-                    } if early_stopping_result.sprt_bounds else None,
+                        "lower_bound": early_stopping_result.sprt_bounds.lower_bound
+                        if early_stopping_result.sprt_bounds
+                        else None,
+                        "upper_bound": early_stopping_result.sprt_bounds.upper_bound
+                        if early_stopping_result.sprt_bounds
+                        else None,
+                        "log_likelihood_ratio": early_stopping_result.sprt_bounds.log_likelihood_ratio
+                        if early_stopping_result.sprt_bounds
+                        else None,
+                        "decision": early_stopping_result.sprt_bounds.decision.value
+                        if early_stopping_result.sprt_bounds
+                        else None,
+                    }
+                    if early_stopping_result.sprt_bounds
+                    else None,
                     "group_sequential_analysis": {
-                        "information_fraction": early_stopping_result.group_sequential_bounds.information_fraction if early_stopping_result.group_sequential_bounds else None,
-                        "alpha_spent": early_stopping_result.group_sequential_bounds.alpha_spent if early_stopping_result.group_sequential_bounds else None,
-                        "rejection_boundary": early_stopping_result.group_sequential_bounds.rejection_boundary if early_stopping_result.group_sequential_bounds else None,
-                        "futility_boundary": early_stopping_result.group_sequential_bounds.futility_boundary if early_stopping_result.group_sequential_bounds else None,
-                        "decision": early_stopping_result.group_sequential_bounds.decision.value if early_stopping_result.group_sequential_bounds else None
-                    } if early_stopping_result.group_sequential_bounds else None
+                        "information_fraction": early_stopping_result.group_sequential_bounds.information_fraction
+                        if early_stopping_result.group_sequential_bounds
+                        else None,
+                        "alpha_spent": early_stopping_result.group_sequential_bounds.alpha_spent
+                        if early_stopping_result.group_sequential_bounds
+                        else None,
+                        "rejection_boundary": early_stopping_result.group_sequential_bounds.rejection_boundary
+                        if early_stopping_result.group_sequential_bounds
+                        else None,
+                        "futility_boundary": early_stopping_result.group_sequential_bounds.futility_boundary
+                        if early_stopping_result.group_sequential_bounds
+                        else None,
+                        "decision": early_stopping_result.group_sequential_bounds.decision.value
+                        if early_stopping_result.group_sequential_bounds
+                        else None,
+                    }
+                    if early_stopping_result.group_sequential_bounds
+                    else None,
                 },
-                "next_actions": self._get_early_stopping_next_actions(early_stopping_result)
+                "next_actions": self._get_early_stopping_next_actions(
+                    early_stopping_result
+                ),
             }
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error in early stopping analysis: {e}")
             return {"status": "error", "error": str(e)}
         except (ValueError, TypeError, AttributeError) as e:
@@ -796,51 +825,63 @@ class ABTestingService:
         except Exception as e:
             logger.error(f"Unexpected error in early stopping analysis: {e}")
             import logging
+
             logging.exception("Unexpected error in check_early_stopping")
             return {"status": "error", "error": str(e)}
 
     def _get_early_stopping_next_actions(self, result) -> list[str]:
         """Get recommended next actions based on early stopping analysis"""
         actions = []
-        
+
         if result.decision == StoppingDecision.STOP_REJECT_NULL:
             actions.append("🎯 Deploy treatment - significant effect detected")
-            actions.append("📊 Conduct final analysis and document results") 
+            actions.append("📊 Conduct final analysis and document results")
             actions.append("🔄 Monitor post-deployment performance")
-            
+
         elif result.decision == StoppingDecision.STOP_FOR_SUPERIORITY:
             actions.append("🚀 Deploy treatment immediately - strong superiority shown")
             actions.append("📈 Scale to full population")
             actions.append("📊 Document superior performance metrics")
-            
-        elif result.decision in [StoppingDecision.STOP_FOR_FUTILITY, StoppingDecision.STOP_ACCEPT_NULL]:
+
+        elif result.decision in [
+            StoppingDecision.STOP_FOR_FUTILITY,
+            StoppingDecision.STOP_ACCEPT_NULL,
+        ]:
             actions.append("❌ Do not deploy treatment - no effect or negative effect")
             actions.append("🔍 Investigate why treatment underperformed")
             actions.append("💡 Consider alternative treatment variations")
             actions.append("📋 Archive experiment and document learnings")
-            
+
         elif result.conditional_power < 0.3:
-            actions.append("⚠️ Consider stopping for futility - low probability of success")
-            actions.append(f"📊 Current conditional power: {result.conditional_power:.1%}")
-            actions.append(f"🔢 Estimated {result.estimated_remaining_samples} more samples needed")
-            
+            actions.append(
+                "⚠️ Consider stopping for futility - low probability of success"
+            )
+            actions.append(
+                f"📊 Current conditional power: {result.conditional_power:.1%}"
+            )
+            actions.append(
+                f"🔢 Estimated {result.estimated_remaining_samples} more samples needed"
+            )
+
         else:
             actions.append("▶️ Continue experiment - insufficient evidence for stopping")
-            actions.append(f"🎯 Target {result.estimated_remaining_samples} additional samples")
+            actions.append(
+                f"🎯 Target {result.estimated_remaining_samples} additional samples"
+            )
             actions.append("📅 Schedule next interim analysis")
-            
+
         return actions
 
     async def list_experiments(
         self,
         status: str | None = None,
         limit: int = 20,
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """List A/B experiments with optional status filter"""
         if db_session is None:
             return {"status": "error", "error": "Database session is required"}
-            
+
         try:
             stmt = select(ABExperiment)
 
@@ -848,7 +889,7 @@ class ABTestingService:
                 # SQLAlchemy column comparison - type checker struggles with metaclass magic
                 stmt = stmt.where(ABExperiment.status == status)  # type: ignore[arg-type]  # SQLAlchemy column comparison
 
-            # SQLAlchemy column method access - type checker struggles with metaclass magic  
+            # SQLAlchemy column method access - type checker struggles with metaclass magic
             stmt = stmt.order_by(ABExperiment.started_at.desc()).limit(limit)  # type: ignore[attr-defined]  # SQLAlchemy column method
 
             result = await db_session.execute(stmt)
@@ -873,7 +914,7 @@ class ABTestingService:
                 "total_count": len(experiment_list),
             }
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error listing experiments: {e}")
             return {"status": "error", "error": str(e)}
         except (ValueError, TypeError, AttributeError) as e:
@@ -893,12 +934,12 @@ class ABTestingService:
         self,
         experiment_id: str,
         reason: str = "Manual stop",
-        db_session: Optional[AsyncSession] = None,
+        db_session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """Stop running experiment"""
         if db_session is None:
             return {"status": "error", "error": "Database session is required"}
-            
+
         try:
             # SQLAlchemy column comparison - type checker struggles with metaclass magic
             stmt = select(ABExperiment).where(
@@ -917,13 +958,13 @@ class ABTestingService:
                 }
 
             experiment.status = "stopped"
-            experiment.completed_at = datetime.utcnow()
+            experiment.completed_at = aware_utc_now()
 
             # Add stop reason to results
             if not experiment.results:
                 experiment.results = {}
             experiment.results["stop_reason"] = reason
-            experiment.results["stopped_at"] = datetime.utcnow().isoformat()
+            experiment.results["stopped_at"] = aware_utc_now().isoformat()
 
             db_session.add(experiment)
             await db_session.commit()
@@ -934,7 +975,7 @@ class ABTestingService:
                 "stop_reason": reason,
             }
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             logger.error(f"Database I/O error stopping experiment: {e}")
             await db_session.rollback()
             return {"status": "error", "error": str(e)}
@@ -973,9 +1014,15 @@ class ABTestingService:
                 )
 
                 # Calculate difference in means - ensure numpy arrays for proper typing
-                control_sample_array = np.asarray(control_sample)  # Explicit array conversion for type safety
-                treatment_sample_array = np.asarray(treatment_sample)  # Explicit array conversion for type safety
-                diff = float(np.mean(treatment_sample_array) - np.mean(control_sample_array))
+                control_sample_array = np.asarray(
+                    control_sample
+                )  # Explicit array conversion for type safety
+                treatment_sample_array = np.asarray(
+                    treatment_sample
+                )  # Explicit array conversion for type safety
+                diff = float(
+                    np.mean(treatment_sample_array) - np.mean(control_sample_array)
+                )
                 bootstrap_diffs.append(diff)
 
             # Calculate percentile-based confidence interval
@@ -1037,7 +1084,9 @@ class ABTestingService:
             )
 
             # Ensure proper float conversion for NDArray result
-            power_float = float(np.asarray(power).item())  # Convert NDArray to float safely
+            power_float = float(
+                np.asarray(power).item()
+            )  # Convert NDArray to float safely
             return min(max(power_float, 0.0), 1.0)  # Clamp between 0 and 1
 
         except (ValueError, TypeError, ZeroDivisionError) as e:
@@ -1140,12 +1189,12 @@ class ABTestingService:
 
             logging.exception("Unexpected error in _calculate_bayesian_probability")
             return 0.5  # Neutral probability
-    
+
     def _apply_cuped_analysis(self, treatment_data: dict, control_data: dict) -> dict:
         """CUPED variance reduction technique - 2025 industry standard.
-        
+
         Reduces variance by 40-50% using pre-experiment data.
-        
+
         Key insights from 2025 research:
         - Works with any pre-experiment covariate correlated with outcome
         - Maintains unbiased treatment effect estimation
@@ -1154,40 +1203,50 @@ class ABTestingService:
         """
         try:
             # Combine all data for covariate regression
-            all_outcomes = np.concatenate([treatment_data['outcome'], control_data['outcome']])
-            all_pre_values = np.concatenate([treatment_data['pre_value'], control_data['pre_value']])
-            
+            all_outcomes = np.concatenate([
+                treatment_data["outcome"],
+                control_data["outcome"],
+            ])
+            all_pre_values = np.concatenate([
+                treatment_data["pre_value"],
+                control_data["pre_value"],
+            ])
+
             # Check for sufficient data
             if len(all_outcomes) < 10 or len(all_pre_values) < 10:
                 return {}
-            
+
             # Step 1: Estimate theta (covariate coefficient) from all data
             # This preserves randomization and remains unbiased
             covariance = np.cov(all_outcomes, all_pre_values)[0, 1]
             pre_variance = np.var(all_pre_values)
             theta = covariance / pre_variance if pre_variance > 0 else 0
-            
+
             # Step 2: Calculate CUPED-adjusted outcomes
             # Y_cuped = Y - theta * (X_pre - E[X_pre])
             overall_pre_mean = np.mean(all_pre_values)
-            
-            treatment_cuped = (treatment_data['outcome'] - 
-                              theta * (treatment_data['pre_value'] - overall_pre_mean))
-            control_cuped = (control_data['outcome'] - 
-                            theta * (control_data['pre_value'] - overall_pre_mean))
-            
+
+            treatment_cuped = treatment_data["outcome"] - theta * (
+                treatment_data["pre_value"] - overall_pre_mean
+            )
+            control_cuped = control_data["outcome"] - theta * (
+                control_data["pre_value"] - overall_pre_mean
+            )
+
             # Step 3: Standard analysis on CUPED-adjusted outcomes
             treatment_effect_cuped = np.mean(treatment_cuped) - np.mean(control_cuped)
-            
+
             # Calculate variance reduction achieved
             original_variance = np.var(all_outcomes)
             cuped_variance = np.var(np.concatenate([treatment_cuped, control_cuped]))
-            variance_reduction = 1 - (cuped_variance / original_variance) if original_variance > 0 else 0
-            
+            variance_reduction = (
+                1 - (cuped_variance / original_variance) if original_variance > 0 else 0
+            )
+
             # Statistical test on adjusted outcomes (maintains Type I error) - proper 2025 scipy usage
             ttest_result = stats.ttest_ind(treatment_cuped, control_cuped)
             # Handle scipy return format properly - can be tuple or TtestResult object
-            if hasattr(ttest_result, 'statistic'):
+            if hasattr(ttest_result, "statistic"):
                 # Modern scipy TtestResult object
                 t_stat = float(ttest_result.statistic)  # type: ignore[attr-defined]  # scipy TtestResult attribute
                 p_value_float = float(ttest_result.pvalue)  # type: ignore[attr-defined]  # scipy TtestResult attribute
@@ -1196,44 +1255,63 @@ class ABTestingService:
                 t_stat_raw, p_value_raw = ttest_result  # type: ignore[misc]  # scipy tuple unpacking
                 t_stat = float(t_stat_raw)  # type: ignore[arg-type]  # scipy tuple element to float
                 p_value_float = float(p_value_raw)  # type: ignore[arg-type]  # scipy tuple element to float
-            
+
             # Confidence interval for CUPED estimate
-            pooled_se = np.sqrt(np.var(treatment_cuped, ddof=1)/len(treatment_cuped) + 
-                               np.var(control_cuped, ddof=1)/len(control_cuped))
+            pooled_se = np.sqrt(
+                np.var(treatment_cuped, ddof=1) / len(treatment_cuped)
+                + np.var(control_cuped, ddof=1) / len(control_cuped)
+            )
             ci_lower = treatment_effect_cuped - 1.96 * pooled_se
             ci_upper = treatment_effect_cuped + 1.96 * pooled_se
-            
+
             return {
-                'treatment_effect_cuped': float(treatment_effect_cuped),
-                'p_value': p_value_float,
-                'confidence_interval': [float(ci_lower), float(ci_upper)],
-                'variance_reduction_percent': float(variance_reduction * 100),
-                'theta_coefficient': float(theta),
-                'original_effect': float(np.mean(treatment_data['outcome']) - np.mean(control_data['outcome'])),
-                'power_improvement_factor': float(1 / np.sqrt(1 - variance_reduction)) if variance_reduction < 1 else 1.0,
-                'recommendation': self._interpret_cuped_results(float(variance_reduction), p_value_float)
+                "treatment_effect_cuped": float(treatment_effect_cuped),
+                "p_value": p_value_float,
+                "confidence_interval": [float(ci_lower), float(ci_upper)],
+                "variance_reduction_percent": float(variance_reduction * 100),
+                "theta_coefficient": float(theta),
+                "original_effect": float(
+                    np.mean(treatment_data["outcome"])
+                    - np.mean(control_data["outcome"])
+                ),
+                "power_improvement_factor": float(1 / np.sqrt(1 - variance_reduction))
+                if variance_reduction < 1
+                else 1.0,
+                "recommendation": self._interpret_cuped_results(
+                    float(variance_reduction), p_value_float
+                ),
             }
-            
+
         except Exception as e:
             logger.warning(f"CUPED analysis failed: {e}")
             return {}
-    
-    def _interpret_cuped_results(self, variance_reduction: float, p_value: float) -> str:
+
+    def _interpret_cuped_results(
+        self, variance_reduction: float, p_value: float
+    ) -> str:
         """Provide actionable interpretation of CUPED results"""
-        interpretation = f"CUPED achieved {variance_reduction*100:.1f}% variance reduction. "
-        
+        interpretation = (
+            f"CUPED achieved {variance_reduction * 100:.1f}% variance reduction. "
+        )
+
         if variance_reduction > 0.3:
             interpretation += "Excellent covariate - continue using for future tests. "
         elif variance_reduction > 0.1:
             interpretation += "Good covariate - provides meaningful power improvement. "
         else:
-            interpretation += "Weak covariate - consider alternative pre-experiment variables. "
-            
+            interpretation += (
+                "Weak covariate - consider alternative pre-experiment variables. "
+            )
+
         if p_value < 0.05:
-            interpretation += "Treatment effect is statistically significant with CUPED adjustment."
+            interpretation += (
+                "Treatment effect is statistically significant with CUPED adjustment."
+            )
         else:
-            interpretation += "No significant treatment effect detected even with variance reduction."
-            
+            interpretation += (
+                "No significant treatment effect detected even with variance reduction."
+            )
+
         return interpretation
 
     # Multi-Armed Bandit Methods
@@ -1241,43 +1319,44 @@ class ABTestingService:
     async def create_bandit_experiment(
         self,
         experiment_name: str,
-        rule_ids: List[str],
+        rule_ids: list[str],
         algorithm: BanditAlgorithm = BanditAlgorithm.THOMPSON_SAMPLING,
-        context_features: Optional[List[str]] = None,
-        db_session: Optional[AsyncSession] = None,
+        context_features: list[str] | None = None,
+        db_session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """Create a multi-armed bandit experiment for rule optimization
-        
+
         Args:
             experiment_name: Name of the bandit experiment
             rule_ids: List of rule IDs to test as arms
             algorithm: Bandit algorithm to use
             context_features: Optional contextual features to consider
             db_session: Database session
-            
+
         Returns:
             Experiment creation result with bandit experiment ID
         """
         if not self.enable_bandits:
             return {"status": "error", "error": "Multi-armed bandits not enabled"}
-        
+
         if len(rule_ids) < 2:
-            return {"status": "error", "error": "At least 2 rules required for bandit experiment"}
-        
+            return {
+                "status": "error",
+                "error": "At least 2 rules required for bandit experiment",
+            }
+
         try:
             if not self.bandit_framework:
                 return {"status": "error", "error": "Bandit framework not enabled"}
-                
+
             # Create bandit experiment
             bandit_experiment_id = await self.bandit_framework.create_experiment(
-                experiment_name=experiment_name,
-                arms=rule_ids,
-                algorithm=algorithm
+                experiment_name=experiment_name, arms=rule_ids, algorithm=algorithm
             )
-            
+
             # Store mapping
             self.bandit_experiments[experiment_name] = bandit_experiment_id
-            
+
             # Also create traditional A/B experiment record for tracking
             experiment_data = ABExperimentCreate(
                 experiment_name=f"bandit_{experiment_name}",
@@ -1288,19 +1367,21 @@ class ABTestingService:
                 sample_size_per_group=1000,  # Large sample for bandit
                 status="running",
             )
-            
+
             if db_session:
                 experiment = ABExperiment(**experiment_data.dict())
                 db_session.add(experiment)
                 await db_session.commit()
                 await db_session.refresh(experiment)
-                
+
                 traditional_experiment_id = str(experiment.experiment_id)
             else:
                 traditional_experiment_id = None
-            
-            logger.info(f"Created bandit experiment: {experiment_name} with {len(rule_ids)} arms using {algorithm.value}")
-            
+
+            logger.info(
+                f"Created bandit experiment: {experiment_name} with {len(rule_ids)} arms using {algorithm.value}"
+            )
+
             return {
                 "status": "success",
                 "bandit_experiment_id": bandit_experiment_id,
@@ -1308,9 +1389,9 @@ class ABTestingService:
                 "experiment_name": experiment_name,
                 "algorithm": algorithm.value,
                 "arms": rule_ids,
-                "message": f"Multi-armed bandit experiment created with {len(rule_ids)} arms"
+                "message": f"Multi-armed bandit experiment created with {len(rule_ids)} arms",
             }
-            
+
         except Exception as e:
             logger.error(f"Error creating bandit experiment: {e}")
             if db_session:
@@ -1318,36 +1399,41 @@ class ABTestingService:
             return {"status": "error", "error": str(e)}
 
     async def select_bandit_arm(
-        self,
-        experiment_name: str,
-        context: Optional[Dict[str, Any]] = None
+        self, experiment_name: str, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Select an arm (rule) using bandit algorithm
-        
+
         Args:
             experiment_name: Name of the bandit experiment
             context: Optional contextual information about the prompt
-            
+
         Returns:
             Selected arm information with confidence
         """
         if not self.enable_bandits:
             return {"status": "error", "error": "Multi-armed bandits not enabled"}
-        
+
         if experiment_name not in self.bandit_experiments:
-            return {"status": "error", "error": f"Unknown bandit experiment: {experiment_name}"}
-        
+            return {
+                "status": "error",
+                "error": f"Unknown bandit experiment: {experiment_name}",
+            }
+
         try:
             if not self.bandit_framework:
                 return {"status": "error", "error": "Bandit framework not enabled"}
-                
+
             bandit_experiment_id = self.bandit_experiments[experiment_name]
-            
+
             # Select arm using bandit algorithm
-            arm_result = await self.bandit_framework.select_arm(bandit_experiment_id, context)
-            
-            logger.debug(f"Bandit selected arm {arm_result.arm_id} for experiment {experiment_name} with confidence {arm_result.confidence:.3f}")
-            
+            arm_result = await self.bandit_framework.select_arm(
+                bandit_experiment_id, context
+            )
+
+            logger.debug(
+                f"Bandit selected arm {arm_result.arm_id} for experiment {experiment_name} with confidence {arm_result.confidence:.3f}"
+            )
+
             return {
                 "status": "success",
                 "selected_rule_id": arm_result.arm_id,
@@ -1355,9 +1441,9 @@ class ABTestingService:
                 "uncertainty": arm_result.uncertainty,
                 "experiment_id": bandit_experiment_id,
                 "context_used": context is not None,
-                "metadata": arm_result.metadata
+                "metadata": arm_result.metadata,
             }
-            
+
         except Exception as e:
             logger.error(f"Error selecting bandit arm: {e}")
             return {"status": "error", "error": str(e)}
@@ -1367,56 +1453,59 @@ class ABTestingService:
         experiment_name: str,
         selected_rule_id: str,
         reward: float,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Update bandit with observed reward from rule application
-        
+
         Args:
             experiment_name: Name of the bandit experiment
             selected_rule_id: Rule ID that was applied
             reward: Observed reward (improvement score, user rating, etc.)
             context: Optional contextual information
-            
+
         Returns:
             Update result with current bandit state
         """
         if not self.enable_bandits:
             return {"status": "error", "error": "Multi-armed bandits not enabled"}
-        
+
         if experiment_name not in self.bandit_experiments:
-            return {"status": "error", "error": f"Unknown bandit experiment: {experiment_name}"}
-        
+            return {
+                "status": "error",
+                "error": f"Unknown bandit experiment: {experiment_name}",
+            }
+
         try:
             if not self.bandit_framework:
                 return {"status": "error", "error": "Bandit framework not enabled"}
-                
+
             bandit_experiment_id = self.bandit_experiments[experiment_name]
-            
+
             # Create arm result for update
             context_array = None
             if context:
                 # Convert context to array if needed
                 context_array = self.bandit_framework._context_to_array(context)
-            
+
             arm_result = ArmResult(
                 arm_id=selected_rule_id,
                 reward=reward,
                 context=context_array,
-                metadata={"experiment_name": experiment_name}
+                metadata={"experiment_name": experiment_name},
             )
-            
+
             # Update bandit with reward
             await self.bandit_framework.update_reward(
-                bandit_experiment_id, 
-                arm_result, 
-                reward
+                bandit_experiment_id, arm_result, reward
             )
-            
+
             # Get updated experiment summary
             summary = self.bandit_framework.get_experiment_summary(bandit_experiment_id)
-            
-            logger.debug(f"Updated bandit reward for {selected_rule_id}: {reward:.3f}, total trials: {summary['total_trials']}")
-            
+
+            logger.debug(
+                f"Updated bandit reward for {selected_rule_id}: {reward:.3f}, total trials: {summary['total_trials']}"
+            )
+
             return {
                 "status": "success",
                 "updated_rule_id": selected_rule_id,
@@ -1425,66 +1514,72 @@ class ABTestingService:
                 "average_reward": summary["average_reward"],
                 "best_arm": summary["best_arm"],
                 "regret": summary.get("total_regret", 0.0),
-                "message": f"Bandit updated with reward {reward:.3f} for rule {selected_rule_id}"
+                "message": f"Bandit updated with reward {reward:.3f} for rule {selected_rule_id}",
             }
-            
+
         except Exception as e:
             logger.error(f"Error updating bandit reward: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def get_bandit_performance(
-        self,
-        experiment_name: str
-    ) -> dict[str, Any]:
+    async def get_bandit_performance(self, experiment_name: str) -> dict[str, Any]:
         """Get comprehensive performance analysis of bandit experiment
-        
+
         Args:
             experiment_name: Name of the bandit experiment
-            
+
         Returns:
             Detailed performance metrics and recommendations
         """
         if not self.enable_bandits:
             return {"status": "error", "error": "Multi-armed bandits not enabled"}
-        
+
         if experiment_name not in self.bandit_experiments:
-            return {"status": "error", "error": f"Unknown bandit experiment: {experiment_name}"}
-        
+            return {
+                "status": "error",
+                "error": f"Unknown bandit experiment: {experiment_name}",
+            }
+
         try:
             if not self.bandit_framework:
                 return {"status": "error", "error": "Bandit framework not enabled"}
-                
+
             bandit_experiment_id = self.bandit_experiments[experiment_name]
             summary = self.bandit_framework.get_experiment_summary(bandit_experiment_id)
-            
+
             # Calculate additional metrics
             arm_stats = summary["arm_statistics"]
-            
+
             # Find top performing arms
             top_arms = sorted(
-                arm_stats.items(),
-                key=lambda x: x[1]["mean_reward"],
-                reverse=True
+                arm_stats.items(), key=lambda x: x[1]["mean_reward"], reverse=True
             )[:3]
-            
+
             # Calculate exploration vs exploitation ratio
             total_pulls = sum(stats["pulls"] for stats in arm_stats.values())
             best_arm_pulls = arm_stats[summary["best_arm"]]["pulls"]
             exploitation_ratio = best_arm_pulls / max(1, total_pulls)
-            
+
             # Generate recommendations
             recommendations = []
-            
+
             if summary["total_trials"] < 100:
-                recommendations.append("Experiment is in early stage - continue collecting data")
+                recommendations.append(
+                    "Experiment is in early stage - continue collecting data"
+                )
             elif exploitation_ratio > 0.8:
-                recommendations.append("High exploitation detected - consider more exploration")
+                recommendations.append(
+                    "High exploitation detected - consider more exploration"
+                )
             elif exploitation_ratio < 0.3:
-                recommendations.append("High exploration detected - algorithm may be converging")
-            
+                recommendations.append(
+                    "High exploration detected - algorithm may be converging"
+                )
+
             if summary["total_regret"] > summary["total_reward"] * 0.2:
-                recommendations.append("High regret detected - consider switching to more exploitative algorithm")
-            
+                recommendations.append(
+                    "High regret detected - consider switching to more exploitative algorithm"
+                )
+
             return {
                 "status": "success",
                 "experiment_summary": summary,
@@ -1493,52 +1588,56 @@ class ABTestingService:
                 "exploration_ratio": 1 - exploitation_ratio,
                 "recommendations": recommendations,
                 "convergence_indicator": exploitation_ratio > 0.7,
-                "statistical_confidence": "high" if summary["total_trials"] > 200 else "medium" if summary["total_trials"] > 50 else "low"
+                "statistical_confidence": "high"
+                if summary["total_trials"] > 200
+                else "medium"
+                if summary["total_trials"] > 50
+                else "low",
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting bandit performance: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def stop_bandit_experiment(
-        self,
-        experiment_name: str
-    ) -> dict[str, Any]:
+    async def stop_bandit_experiment(self, experiment_name: str) -> dict[str, Any]:
         """Stop a running bandit experiment
-        
+
         Args:
             experiment_name: Name of the bandit experiment
-            
+
         Returns:
             Final experiment results and recommendations
         """
         if not self.enable_bandits:
             return {"status": "error", "error": "Multi-armed bandits not enabled"}
-        
+
         if experiment_name not in self.bandit_experiments:
-            return {"status": "error", "error": f"Unknown bandit experiment: {experiment_name}"}
-        
+            return {
+                "status": "error",
+                "error": f"Unknown bandit experiment: {experiment_name}",
+            }
+
         try:
             if not self.bandit_framework:
                 return {"status": "error", "error": "Bandit framework not enabled"}
-                
+
             bandit_experiment_id = self.bandit_experiments[experiment_name]
-            
+
             # Get final performance before stopping
             final_performance = await self.get_bandit_performance(experiment_name)
-            
+
             # Stop the experiment
             self.bandit_framework.stop_experiment(bandit_experiment_id)
-            
+
             logger.info(f"Stopped bandit experiment: {experiment_name}")
-            
+
             return {
                 "status": "success",
                 "experiment_name": experiment_name,
                 "final_performance": final_performance,
-                "message": f"Bandit experiment {experiment_name} stopped successfully"
+                "message": f"Bandit experiment {experiment_name} stopped successfully",
             }
-            
+
         except Exception as e:
             logger.error(f"Error stopping bandit experiment: {e}")
             return {"status": "error", "error": str(e)}

@@ -14,14 +14,14 @@ class DatabaseConfig(BaseSettings):
         default="apes_production", validation_alias="POSTGRES_DATABASE"
     )
     postgres_username: str = Field(
-        default="postgres",
+        default="apes_user",
         validation_alias="POSTGRES_USERNAME",
-        description="PostgreSQL username - defaults to 'postgres' for development",
+        description="PostgreSQL username - defaults to 'apes_user' to match Docker setup",
     )
     postgres_password: str = Field(
-        default="password",
+        default="apes_secure_password_2024",
         validation_alias="POSTGRES_PASSWORD",
-        description="PostgreSQL password - defaults to 'password' for development",
+        description="PostgreSQL password - defaults to match Docker setup",
     )
 
     # Advanced connection pool settings (research-validated patterns)
@@ -69,22 +69,39 @@ class DatabaseConfig(BaseSettings):
     @property
     def database_url_sync(self) -> str:
         """Generate synchronous PostgreSQL connection URL for migrations"""
+        return f"postgresql+psycopg://{self.postgres_username}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
+
+    @property
+    def psycopg_connection_string(self) -> str:
+        """Generate psycopg3 connection string for direct psycopg.connect() usage"""
         return f"postgresql://{self.postgres_username}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
 
     # Additional environment variables (allowing extra fields for flexibility)
-    external_database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
+    external_database_url: str | None = Field(
+        default=None, validation_alias="DATABASE_URL"
+    )
     test_db_name: str | None = Field(default=None, validation_alias="TEST_DB_NAME")
-    test_database_url: str | None = Field(default=None, validation_alias="TEST_DATABASE_URL")
-    
+    test_database_url: str | None = Field(
+        default=None, validation_alias="TEST_DATABASE_URL"
+    )
+
     # MCP configuration
-    mcp_postgres_enabled: bool = Field(default=True, validation_alias="MCP_POSTGRES_ENABLED")
-    mcp_postgres_connection_string: str | None = Field(default=None, validation_alias="MCP_POSTGRES_CONNECTION_STRING")
-    
+    mcp_postgres_enabled: bool = Field(
+        default=True, validation_alias="MCP_POSTGRES_ENABLED"
+    )
+    mcp_postgres_connection_string: str | None = Field(
+        default=None, validation_alias="MCP_POSTGRES_CONNECTION_STRING"
+    )
+
     # General application settings
     development_mode: bool = Field(default=True, validation_alias="DEVELOPMENT_MODE")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
-    enable_performance_monitoring: bool = Field(default=True, validation_alias="ENABLE_PERFORMANCE_MONITORING")
-    slow_query_threshold: int = Field(default=1000, validation_alias="SLOW_QUERY_THRESHOLD")
+    enable_performance_monitoring: bool = Field(
+        default=True, validation_alias="ENABLE_PERFORMANCE_MONITORING"
+    )
+    slow_query_threshold: int = Field(
+        default=1000, validation_alias="SLOW_QUERY_THRESHOLD"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

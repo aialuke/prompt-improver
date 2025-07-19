@@ -1,7 +1,13 @@
 """Service layer for APES business logic"""
 
 # Use lazy imports to avoid circular dependency issues
-__all__ = ["AnalyticsService", "PromptImprovementService", "AprioriAnalyzer", "AdvancedPatternDiscovery", "AutoMLOrchestrator"]
+__all__ = [
+    "AdvancedPatternDiscovery",
+    "AnalyticsService",
+    "AprioriAnalyzer",
+    "AutoMLOrchestrator",
+    "PromptImprovementService",
+]
 
 
 def __getattr__(name):

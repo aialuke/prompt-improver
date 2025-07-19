@@ -128,7 +128,7 @@ The industry consensus against database mocks is overwhelming:
 - ❌ **False Confidence** - Test mock logic, not database reality
 - ❌ **Maintenance Nightmare** - Brittle and constantly breaking
 - ❌ **Missing Critical Issues** - Can't catch constraint violations, performance problems
-- ❌ **Behavioral Differences** - SQLite vs PostgreSQL inconsistencies
+- ❌ **Behavioral Differences** - Mock vs PostgreSQL inconsistencies
 - ❌ **No Real Validation** - Bypass actual schema constraints
 
 ## 🔄 How to Run

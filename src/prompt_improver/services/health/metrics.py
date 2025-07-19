@@ -2,13 +2,15 @@
 PHASE 3: Health Check Consolidation - Metrics Integration
 """
 
-from functools import wraps
-from typing import Callable, Any
 import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
 
 
 class _Timer:
     """Context manager for timing code execution"""
+
     def __enter__(self):
         self.start = time.time()
         return self
@@ -21,31 +23,33 @@ class _Timer:
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, Summary
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     # Graceful degradation when prometheus_client is not available
     PROMETHEUS_AVAILABLE = False
-    
+
     class MockMetric:
         """Mock metric class for when Prometheus is not available"""
+
         def __init__(self, *args, **kwargs):
             pass
-        
+
         def inc(self, *args, **kwargs):
             pass
-        
+
         def set(self, *args, **kwargs):
             pass
-        
+
         def observe(self, *args, **kwargs):
             pass
-        
+
         def labels(self, *args, **kwargs):
             return self
-        
+
         def time(self):
             return _Timer()
-    
+
     Counter = Gauge = Histogram = Summary = MockMetric
 
 
@@ -57,18 +61,24 @@ def _create_metric_safe(metric_class, *args, **kwargs):
         class LocalMockMetric:
             def __init__(self, *args, **kwargs):
                 pass
+
             def inc(self, *args, **kwargs):
                 pass
+
             def set(self, *args, **kwargs):
                 pass
+
             def observe(self, *args, **kwargs):
                 pass
+
             def labels(self, *args, **kwargs):
                 return self
+
             def time(self):
                 return _Timer()
+
         return LocalMockMetric()
-    
+
     try:
         return metric_class(*args, **kwargs)
     except ValueError as e:
@@ -77,87 +87,158 @@ def _create_metric_safe(metric_class, *args, **kwargs):
             class LocalMockMetric:
                 def __init__(self, *args, **kwargs):
                     pass
+
                 def inc(self, *args, **kwargs):
                     pass
+
                 def set(self, *args, **kwargs):
                     pass
+
                 def observe(self, *args, **kwargs):
                     pass
+
                 def labels(self, *args, **kwargs):
                     return self
+
                 def time(self):
                     return _Timer()
+
             return LocalMockMetric()
-        else:
-            raise
+        raise
+
+
+# Enhanced Prometheus metrics for database and circuit breaker
+ACTIVE_CONNECTIONS = _create_metric_safe(
+    Gauge,
+    "active_connections",
+    "Number of active connections",
+    ["operation_type"],
+)
+
+POOL_UTILIZATION = _create_metric_safe(
+    Gauge,
+    "pool_utilization",
+    "Connection pool utilization in percentage",
+    [],
+)
+
+HEALTH_CHECK_FAILURES = _create_metric_safe(
+    Counter,
+    "health_check_failures",
+    "Total number of health check failures",
+    ["component"],
+)
+
+RETRY_EVENTS = _create_metric_safe(
+    Counter,
+    "retry_events",
+    "Total number of retries",
+    ["error_type"],
+)
+
+CIRCUIT_BREAKER_EVENTS = _create_metric_safe(
+    Counter,
+    "circuit_breaker_events",
+    "Total number of circuit breaker events",
+    ["state"],
+)
+
+CONNECT_LATENCY = _create_metric_safe(
+    Histogram,
+    "connect_latency_milliseconds",
+    "Latency distribution for database connects",
+    ["component"],
+    buckets=[10, 50, 100, 200, 500, 1000, 2000],
+)
+
+HEALTH_CHECK_LATENCY = _create_metric_safe(
+    Histogram,
+    "health_check_latency_milliseconds",
+    "Latency distribution for health checks",
+    ["component", "operation_type"],
+    buckets=[10, 50, 100, 200, 500, 1000, 2000],
+)
+
 
 HEALTH_CHECK_DURATION = _create_metric_safe(
     Summary,
-    'health_check_duration_seconds', 
-    'Time spent performing health checks',
-    ['component']
+    "health_check_duration_seconds",
+    "Time spent performing health checks",
+    ["component"],
 )
 
 HEALTH_CHECK_STATUS = _create_metric_safe(
     Gauge,
-    'health_check_status',
-    'Health check status (1=healthy, 0.5=warning, 0=failed)',
-    ['component']
+    "health_check_status",
+    "Health check status (1=healthy, 0.5=warning, 0=failed)",
+    ["component"],
 )
 
 HEALTH_CHECKS_TOTAL = _create_metric_safe(
     Counter,
-    'health_checks_total',
-    'Total number of health checks performed',
-    ['component', 'status']
+    "health_checks_total",
+    "Total number of health checks performed",
+    ["component", "status"],
 )
 
 HEALTH_CHECK_RESPONSE_TIME = _create_metric_safe(
     Histogram,
-    'health_check_response_time_milliseconds',
-    'Health check response time distribution',
-    ['component'],
-    buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000]
+    "health_check_response_time_milliseconds",
+    "Health check response time distribution",
+    ["component"],
+    buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000],
 )
 
 
 def instrument_health_check(component_name: str):
     """Decorator to instrument health checks with Prometheus metrics"""
+
     def decorator(check_func: Callable) -> Callable:
         if not PROMETHEUS_AVAILABLE:
             return check_func
-            
+
         @wraps(check_func)
         async def wrapper(*args, **kwargs):
             # Time the health check
             with HEALTH_CHECK_DURATION.labels(component=component_name).time():
                 result = await check_func(*args, **kwargs)
-                
+
                 # Record metrics based on result
-                if hasattr(result, 'status'):
+                if hasattr(result, "status"):
                     # Map status to numeric value
-                    status_value = {
-                        'healthy': 1.0,
-                        'warning': 0.5,
-                        'failed': 0.0
-                    }.get(result.status.value if hasattr(result.status, 'value') else str(result.status), 0.0)
-                    
-                    HEALTH_CHECK_STATUS.labels(component=component_name).set(status_value)
-                    
-                    status_str = result.status.value if hasattr(result.status, 'value') else str(result.status)
+                    status_value = {"healthy": 1.0, "warning": 0.5, "failed": 0.0}.get(
+                        result.status.value
+                        if hasattr(result.status, "value")
+                        else str(result.status),
+                        0.0,
+                    )
+
+                    HEALTH_CHECK_STATUS.labels(component=component_name).set(
+                        status_value
+                    )
+
+                    status_str = (
+                        result.status.value
+                        if hasattr(result.status, "value")
+                        else str(result.status)
+                    )
                     HEALTH_CHECKS_TOTAL.labels(
-                        component=component_name,
-                        status=status_str
+                        component=component_name, status=status_str
                     ).inc()
-                    
+
                     # Record response time if available
-                    if hasattr(result, 'response_time_ms') and result.response_time_ms is not None:
-                        HEALTH_CHECK_RESPONSE_TIME.labels(component=component_name).observe(
-                            result.response_time_ms
-                        )
-                
+                    if (
+                        hasattr(result, "response_time_ms")
+                        and result.response_time_ms is not None
+                    ):
+                        HEALTH_CHECK_RESPONSE_TIME.labels(
+                            component=component_name
+                        ).observe(result.response_time_ms)
+
                 return result
+
         return wrapper
+
     return decorator
 
 
@@ -165,9 +246,10 @@ def get_health_metrics_summary() -> dict:
     """Get current health metrics summary"""
     if not PROMETHEUS_AVAILABLE:
         return {"prometheus_available": False}
-    
+
     try:
         from prometheus_client import REGISTRY, generate_latest
+
         # This would typically be called by the metrics endpoint
         return {"prometheus_available": True, "metrics_registered": True}
     except Exception:
@@ -178,7 +260,7 @@ def reset_health_metrics():
     """Reset health check metrics (useful for testing)"""
     if not PROMETHEUS_AVAILABLE:
         return
-    
+
     try:
         # Clear counters and gauges
         HEALTH_CHECK_STATUS.clear()

@@ -16,7 +16,7 @@ from .rule_analyzer import RuleEffectivenessAnalyzer
 
 __all__ = [
     "ContextSpecificLearner",
-    "FailureModeAnalyzer", 
+    "FailureModeAnalyzer",
     "InsightGenerationEngine",
     "RuleEffectivenessAnalyzer",
 ]

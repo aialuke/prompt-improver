@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from .base import BasePromptRule
-from .rules.clarity import ClarityRule
-from .rules.specificity import SpecificityRule
 from .rules.chain_of_thought import ChainOfThoughtRule
+from .rules.clarity import ClarityRule
 from .rules.few_shot_examples import FewShotExampleRule
 from .rules.role_based_prompting import RoleBasedPromptingRule
+from .rules.specificity import SpecificityRule
 from .rules.xml_structure_enhancement import XMLStructureRule
 
 
@@ -114,7 +114,7 @@ __all__ = [
     "AppliedRuleResult",
     "ChainOfThoughtRule",
     "ClarityRule",
-    "FewShotExampleRule", 
+    "FewShotExampleRule",
     "RoleBasedPromptingRule",
     "RuleEngine",
     "RuleEngineResult",

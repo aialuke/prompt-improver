@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import typing
 from datetime import datetime
 from pathlib import Path
 
@@ -15,13 +16,19 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from prompt_improver.database import sessionmanager
+from prompt_improver.database import (
+    DatabaseSessionManager,
+    get_sessionmanager,
+)
 from prompt_improver.installation.initializer import APESInitializer
 from prompt_improver.installation.migration import APESMigrationManager
 from prompt_improver.service.manager import APESServiceManager
 from prompt_improver.service.security import PromptDataProtection
 from prompt_improver.services.analytics import AnalyticsService
+from prompt_improver.services.canary_testing import canary_service
 from prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.utils import ensure_running
+from prompt_improver.utils.redis_cache import redis_client
 
 app = typer.Typer(
     name="apes",
@@ -127,7 +134,7 @@ def start(
 def stop(
     graceful: bool = typer.Option(True, "--graceful/--force", help="Graceful shutdown"),
     timeout: int = typer.Option(
-        30, "--timeout", "-t", help="Shutdown timeout in seconds"
+        5, "--timeout", "-t", help="Shutdown timeout in seconds"
     ),
 ):
     """Stop APES MCP server."""
@@ -145,22 +152,35 @@ def stop(
 
         if graceful:
             # Try graceful shutdown first
-            os.kill(pid, 15)  # SIGTERM
-            console.print(f"📤 Sent SIGTERM to process {pid}", style="dim")
-
-            # Wait for process to terminate
-            import time
-
-            for i in range(timeout):
-                try:
-                    os.kill(pid, 0)  # Check if process exists
-                    time.sleep(1)
-                except ProcessLookupError:
-                    break
+            if not ensure_running(pid):
+                console.print("⚡ Process not running, no need to terminate", style="dim")
             else:
-                # Force kill if still running
-                os.kill(pid, 9)  # SIGKILL
-                console.print(f"⚡ Force killed process {pid}", style="yellow")
+                try:
+                    os.kill(pid, 15)  # SIGTERM
+                    console.print(f"📤 Sent SIGTERM to process {pid}", style="dim")
+
+                    # Wait for process to terminate
+                    import time
+
+                    for i in range(timeout):
+                        try:
+                            if ensure_running(pid):
+                                time.sleep(1)
+                            else:
+                                break
+                        except ProcessLookupError:
+                            break
+                    else:
+                        # Force kill if still running
+                        try:
+                            os.kill(pid, 9)  # SIGKILL
+                            console.print(f"⚡ Force killed process {pid}", style="yellow")
+                        except ProcessLookupError:
+                            # Process already terminated
+                            pass
+                except ProcessLookupError:
+                    # Process already terminated
+                    console.print("⚡ Process already terminated", style="dim")
         else:
             # Force kill immediately
             os.kill(pid, 9)  # SIGKILL
@@ -196,8 +216,7 @@ def status(
     if pid_file.exists():
         try:
             mcp_pid = int(pid_file.read_text().strip())
-            os.kill(mcp_pid, 0)  # Check if process exists
-            mcp_running = True
+            mcp_running = ensure_running(mcp_pid)
         except (ValueError, FileNotFoundError, ProcessLookupError, PermissionError):
             mcp_running = False
 
@@ -206,8 +225,13 @@ def status(
     try:
         # Run async check in sync context
         async def check_db() -> str:
-            async with sessionmanager.session() as session:
-                await session.execute("SELECT 1")
+            from sqlalchemy import text
+
+            from .database import scalar
+
+            sm: DatabaseSessionManager = get_sessionmanager()
+            async with sm.session() as session:
+                await scalar(session, text("SELECT 1"))
                 return "connected"
 
         db_status = asyncio.run(check_db())
@@ -275,7 +299,8 @@ def train(
     console.print("🧠 Starting Phase 3 ML training process...", style="green")
 
     async def run_training() -> None:
-        async with sessionmanager.session() as db_session:
+        sm: DatabaseSessionManager = get_sessionmanager()
+        async with sm.session() as db_session:
             # Parse rule IDs if provided
             selected_rule_ids = None
             if rule_ids:
@@ -481,17 +506,23 @@ def analytics(
     days: int = typer.Option(30, "--days", "-d", help="Number of days to analyze"),
 ):
     """View analytics and performance metrics."""
+    # Validate days parameter
+    if days < 1:
+        console.print("❌ Number of days must be positive", style="red")
+        raise typer.Exit(1)
+    
     if not any([rule_effectiveness, user_satisfaction, performance_trends]):
         # Default to showing all
         rule_effectiveness = user_satisfaction = performance_trends = True
 
     async def show_analytics() -> None:
-        async with sessionmanager.session() as db_session:
+        sm: DatabaseSessionManager = get_sessionmanager()
+        async with sm.session() as db_session:
             if rule_effectiveness:
                 console.print(f"\n[bold]Rule Effectiveness (Last {days} days)[/bold]")
 
                 stats = await analytics_service.get_rule_effectiveness(
-                    days=days, min_usage_count=1, db_session=db_session
+                    days=days, min_usage_count=1
                 )
 
                 if stats:
@@ -539,6 +570,10 @@ def analytics(
                         console.print(f"{day_data['date']}: [{bar}] {rating:.1f}")
                 else:
                     console.print("No user satisfaction data available", style="dim")
+
+            if performance_trends:
+                console.print("\n[bold]Performance Trends Analytics[/bold]")
+                console.print("Analytics feature coming soon...", style="dim")
 
     asyncio.run(show_analytics())
 
@@ -663,7 +698,8 @@ def doctor(
     try:
 
         async def check_db() -> str:
-            async with sessionmanager.session() as session:
+            sm: DatabaseSessionManager = get_sessionmanager()
+            async with sm.session() as session:
                 result = await session.fetch_one("SELECT version()")
                 return result["version"]
 
@@ -1187,7 +1223,8 @@ def discover_patterns(
     console.print("🔍 Starting Pattern Discovery Analysis...", style="blue")
 
     async def run_discovery():
-        async with sessionmanager.session() as db_session:
+        sm: DatabaseSessionManager = get_sessionmanager()
+        async with sm.session() as db_session:
             try:
                 # Run pattern discovery
                 discovery_result = await prompt_service.discover_patterns(
@@ -1294,7 +1331,8 @@ def ml_status(
     console.print("🤖 Phase 3 ML System Status", style="bold blue")
 
     async def show_status():
-        async with sessionmanager.session() as db_session:
+        sm: DatabaseSessionManager = get_sessionmanager()
+        async with sm.session() as db_session:
             try:
                 from sqlalchemy import text
 
@@ -1421,7 +1459,8 @@ def optimize_rules(
     console.print("⚙️ Starting Rule Optimization...", style="green")
 
     async def run_optimization():
-        async with sessionmanager.session() as db_session:
+        sm: DatabaseSessionManager = get_sessionmanager()
+        async with sm.session() as db_session:
             try:
                 if feedback_id:
                     # Optimize based on specific feedback
@@ -1478,7 +1517,55 @@ def optimize_rules(
     asyncio.run(run_optimization())
 
 
-# Phase 2 Commands: Production Operations
+# Canary Testing Operations
+
+@app.command()
+def canary_status():
+    """Show current canary testing status."""
+    async def show_status():
+        status = await canary_service.get_canary_status()
+        console.print_json(data=status)
+
+    asyncio.run(show_status())
+
+
+@app.command()
+def canary_adjust():
+    """Auto-adjust canary rollout based on metrics."""
+    async def adjust_rollout():
+        result = await canary_service.auto_adjust_rollout()
+        console.print_json(data=result)
+
+    asyncio.run(adjust_rollout())
+
+
+@app.command()
+def cache_stats():
+    """Display Redis cache statistics, including hit ratio and memory usage."""
+    try:
+        # Connect to Redis and fetch stats
+        stats = redis_client.info()
+        memory_usage = redis_client.memory_stats()
+        console.print("[bold]Cache Statistics:[/bold]", style="green")
+        console.print(f"Total Memory: {memory_usage.get('total.allocated', 0)} bytes")
+        console.print(f"Memory Peak: {memory_usage.get('peak.allocated', 0)} bytes")
+        console.print(f"Memory Fragmentation Ratio: {memory_usage.get('fragmentation', 0.0)}")
+        console.print(f"Cache Hits: {stats.get('keyspace_hits', 0)}")
+        console.print(f"Cache Misses: {stats.get('keyspace_misses', 0)}")
+        hit_ratio = (stats.get('keyspace_hits', 0) / (stats.get('keyspace_hits', 0) + stats.get('keyspace_misses', 0))) * 100 if (stats.get('keyspace_hits', 0) + stats.get('keyspace_misses', 0)) else 0
+        console.print(f"Cache Hit Ratio: {hit_ratio:.2f}%")
+    except Exception as e:
+        console.print(f"❌ Unable to retrieve Redis cache statistics: {e}", style="red")
+
+
+@app.command()
+def cache_clear():
+    """Clear Redis cache."""
+    try:
+        redis_client.flushdb()
+        console.print("✅ Cache cleared successfully!", style="green")
+    except Exception as e:
+        console.print(f"❌ Unable to clear Redis cache: {e}", style="red")
 
 
 @app.command()
@@ -2052,7 +2139,7 @@ def training_history(
             # - Arguments are controlled and validated (localhost binding)
             # - MLflow directory path is controlled and validated
             process = subprocess.Popen(
-                [  # noqa: S603
+                [
                     mlflow_path,
                     "ui",
                     "--backend-store-uri",
@@ -2097,7 +2184,8 @@ def training_history(
         async def list_training_runs():
             try:
                 # Search for training runs in the database
-                async with sessionmanager.session() as session:
+                sm: DatabaseSessionManager = get_sessionmanager()
+                async with sm.session() as session:
                     query = """
                         SELECT t.session_id, t.created_at, t.metrics_data, t.performance_score
                         FROM training_sessions t
@@ -2210,7 +2298,13 @@ def logs(
             )
 
             try:
-                for line in process.stdout:
+                if process.stdout is None:
+                    raise RuntimeError("Process stdout is None - cannot iterate over log lines")
+
+                # Type annotation for MyPy after None check
+                stdout: typing.TextIO = process.stdout
+
+                for line in stdout:
                     # Filter by log level if specified
                     if level and level.upper() not in line.upper():
                         continue
@@ -2473,7 +2567,7 @@ def health(
                     resource_table = Table()
                     resource_table.add_column("Resource", style="cyan")
                     resource_table.add_column("Usage", style="yellow")
-                    
+
                     details = system_check["details"]
                     if "memory_usage_percent" in details:
                         resource_table.add_row(
@@ -2711,17 +2805,17 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                         # - shell=False prevents shell injection attacks
                         # - file_path validated as existing file before use
                         # - timeout=30 prevents indefinite hanging
-                        result = subprocess.run(
+                        file_wc_result = subprocess.run(
                             [wc_path, "-l", file_path],
                             check=False,
                             capture_output=True,
                             text=True,
                             shell=False,
                             timeout=30,
-                        )  # noqa: S603
-                        if result.returncode == 0:
-                            lines = int(result.stdout.split()[0])
-                            total_lines += lines
+                        )
+                        if file_wc_result.returncode == 0:
+                            file_line_count: int = int(file_wc_result.stdout.split()[0])
+                            total_lines += file_line_count
                 elif os.path.isdir(file_path):
                     # Use absolute paths for find and wc commands for security
                     find_path = shutil.which("find")
@@ -2731,7 +2825,7 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                         # - shell=False prevents shell injection attacks
                         # - file_path validated as existing directory before use
                         # - timeout=60 prevents indefinite hanging
-                        result = subprocess.run(
+                        dir_find_result = subprocess.run(
                             [
                                 find_path,
                                 file_path,
@@ -2748,20 +2842,20 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                             text=True,
                             shell=False,
                             timeout=60,
-                        )  # noqa: S603
-                        if result.returncode == 0:
-                            lines = result.stdout.strip().split("\n")
-                            for line in lines:
-                                if line.strip() and not line.strip().endswith(".py"):
+                        )
+                        if dir_find_result.returncode == 0:
+                            output_lines = dir_find_result.stdout.strip().split("\n")
+                            for output_line in output_lines:
+                                if output_line.strip() and not output_line.strip().endswith(".py"):
                                     try:
-                                        total_lines += int(line.strip().split()[0])
+                                        total_lines += int(output_line.strip().split()[0])
                                     except (ValueError, IndexError):
                                         continue
 
             info["actual"] = total_lines
-            claimed = info["claimed"]
-            actual = info["actual"]
-            diff = actual - claimed
+            claimed: int = info["claimed"]
+            actual: int = info["actual"]
+            diff: int = actual - claimed
 
             if diff == 0:
                 status = "✅ ACCURATE"
@@ -2786,19 +2880,19 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
             # - shell=False prevents shell injection attacks
             # - timeout=30 prevents indefinite hanging
             # - Arguments are controlled and validated
-            result = subprocess.run(
-                [sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],  # noqa: S603
+            collect_result = subprocess.run(
+                [sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"],
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
                 shell=False,
             )
-            if result.returncode == 0:
-                test_count = len([
-                    line
-                    for line in result.stdout.split("\n")
-                    if "test" in line and "::" in line
+            if collect_result.returncode == 0:
+                test_count: int = len([
+                    test_line
+                    for test_line in collect_result.stdout.split("\n")
+                    if "test" in test_line and "::" in test_line
                 ])
                 console.print(f"Found {test_count} tests to run")
 
@@ -2810,7 +2904,7 @@ def _update_documentation(verify: bool = True, force: bool = False) -> None:
                 # - timeout=60 prevents indefinite hanging
                 # - Arguments are controlled and validated
                 test_result = subprocess.run(
-                    [sys.executable, "-m", "pytest", "tests/", "-x", "--tb=no", "-q"],  # noqa: S603
+                    [sys.executable, "-m", "pytest", "tests/", "-x", "--tb=no", "-q"],
                     check=False,
                     capture_output=True,
                     text=True,
@@ -2939,6 +3033,48 @@ def alerts(
         raise typer.Exit(1)
     except (ValueError, TypeError, KeyError) as e:
         console.print(f"❌ Alert data processing error: {e}", style="red")
+        raise typer.Exit(1)
+
+
+@app.command()
+def interactive(
+    refresh_rate: int = typer.Option(2, "--refresh-rate", "-r", help="Update refresh rate in seconds"),
+    dark_mode: bool = typer.Option(True, "--dark-mode/--light-mode", help="Use dark mode theme"),
+):
+    """Launch interactive Rich TUI dashboard for system monitoring and management."""
+    console.print("🎛️ Launching APES Interactive Dashboard...", style="green")
+
+    try:
+        # Import TUI dashboard
+        from prompt_improver.tui.dashboard import run_dashboard
+
+        # Check if required dependencies are available
+        try:
+            import rich
+            import textual
+        except ImportError as e:
+            console.print(f"❌ Missing TUI dependencies: {e}", style="red")
+            console.print("💡 Install with: pip install textual rich", style="yellow")
+            raise typer.Exit(1)
+
+        # Display startup information
+        console.print("📊 Starting Rich TUI Dashboard...", style="cyan")
+        console.print(f"🔄 Refresh rate: {refresh_rate} seconds", style="dim")
+        console.print(f"🎨 Theme: {'Dark' if dark_mode else 'Light'}", style="dim")
+        console.print("💡 Press Ctrl+C to exit", style="dim")
+        console.print("", style="dim")
+
+        # Run the dashboard
+        run_dashboard(console)
+
+    except KeyboardInterrupt:
+        console.print("\n👋 Dashboard closed by user", style="yellow")
+    except ImportError as e:
+        console.print(f"❌ Failed to import TUI components: {e}", style="red")
+        console.print("💡 Ensure textual and rich are installed", style="yellow")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"❌ Dashboard error: {e}", style="red")
         raise typer.Exit(1)
 
 

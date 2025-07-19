@@ -4,6 +4,33 @@
 
 The APES (Adaptive Prompt Enhancement System) test suite provides comprehensive testing coverage across all system components, from unit tests with maximum isolation to integration tests with real component interactions.
 
+## 🧪 2025 Integration Testing Standards Compliance
+
+This test suite follows **2025 Integration Testing Best Practices** as outlined in our [Integration Testing Guidelines](../2025_integration_testing_guidelines.md).
+
+### Key Standards Implemented
+
+#### 1. **No Mocks Policy (Signadot 2025)**
+- Uses real services in sandboxed environments for authentic behavior
+- Mocks only external APIs and services outside our control
+- Real-environment testing provides higher confidence than mock-based approaches
+- Reference: https://www.signadot.com/blog/why-mocks-fail-real-environment-testing-for-microservices
+
+#### 2. **Modern Test Pyramid (2025)**
+```
+Integration Tests (60-70%) - Primary focus
+Unit Tests (20-30%) - Business logic validation
+E2E Tests (5-10%) - Critical user journeys
+```
+
+#### 3. **Network Isolation Lightweight Patches**
+- Redis: Graceful fallback to in-memory for CI environments
+- Timeouts: Optimized for testing (10s vs production 300s)
+- Storage: PostgreSQL containers for test isolation
+- Database: PostgreSQL with transaction-based isolation
+
+**Rationale**: These patches provide network isolation without compromising test authenticity. They maintain real behavior while preventing external dependencies from causing test failures in CI environments.
+
 ## Test Suite Organization
 
 ### Directory Structure

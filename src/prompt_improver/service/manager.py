@@ -51,7 +51,8 @@ from typing import Any
 
 from rich.console import Console
 
-from ..database import get_session
+from ..database import get_session, get_sessionmanager
+from ..utils import ensure_running
 
 
 class APESServiceManager:
@@ -219,8 +220,12 @@ class APESServiceManager:
         """Check and start PostgreSQL if needed"""
         try:
             # Test database connection
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
-                await session.execute("SELECT 1")
+                await scalar(session, text("SELECT 1"))
                 self.logger.info("PostgreSQL connection verified")
                 return "connected"
 
@@ -280,37 +285,46 @@ class APESServiceManager:
         """Verify service health and performance using unified health service"""
         try:
             from ..services.health import get_health_service
-            
+
             health_service = get_health_service()
             health_result = await health_service.run_health_check()
-            
+
             # Convert to legacy format for compatibility
             health_status = {
-                "database_connection": health_result.checks.get("database", {}).status.value == "healthy",
-                "mcp_response_time": health_result.checks.get("mcp_server", {}).response_time_ms,
+                "database_connection": health_result.checks.get(
+                    "database", {}
+                ).status.value
+                == "healthy",
+                "mcp_response_time": health_result.checks.get(
+                    "mcp_server", {}
+                ).response_time_ms,
                 "memory_usage_mb": 0,
                 "cpu_usage_percent": 0,
-                "overall_status": health_result.overall_status.value
+                "overall_status": health_result.overall_status.value,
             }
-            
+
             # Extract system metrics if available
             system_check = health_result.checks.get("system_resources")
             if system_check and system_check.details:
-                health_status["memory_usage_mb"] = system_check.details.get("memory_usage_percent", 0) * 2.56  # Rough conversion
-                health_status["cpu_usage_percent"] = system_check.details.get("cpu_usage_percent", 0)
-            
+                health_status["memory_usage_mb"] = (
+                    system_check.details.get("memory_usage_percent", 0) * 2.56
+                )  # Rough conversion
+                health_status["cpu_usage_percent"] = system_check.details.get(
+                    "cpu_usage_percent", 0
+                )
+
             return health_status
-            
+
         except Exception as e:
             self.logger.error(f"Health service check failed: {e}")
             # Fallback to basic health status
             return {
                 "database_connection": False,
-                "mcp_response_time": None, 
+                "mcp_response_time": None,
                 "memory_usage_mb": 0,
                 "cpu_usage_percent": 0,
                 "overall_status": "failed",
-                "error": str(e)
+                "error": str(e),
             }
 
     async def optimize_performance_settings(self):
@@ -319,10 +333,12 @@ class APESServiceManager:
 
         try:
             # Optimize database connections
+            from sqlalchemy import text
+
             async with get_session() as session:
                 # Reset any long-running queries
                 await session.execute(
-                    "SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '30 seconds'"
+                    text("SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '30 seconds'")
                 )
 
             self.logger.info("Performance optimizations applied")
@@ -339,20 +355,28 @@ class APESServiceManager:
         while not self.shutdown_event.is_set():
             try:
                 from ..services.health import get_health_service
-                
+
                 health_service = get_health_service()
                 health_result = await health_service.run_health_check()
-                
+
                 # Monitor critical performance indicators
                 mcp_check = health_result.checks.get("mcp_server")
-                if mcp_check and mcp_check.response_time_ms and mcp_check.response_time_ms > alert_threshold_ms:
+                if (
+                    mcp_check
+                    and mcp_check.response_time_ms
+                    and mcp_check.response_time_ms > alert_threshold_ms
+                ):
                     await self.send_performance_alert(
                         f"High latency detected: {mcp_check.response_time_ms}ms"
                     )
 
                 # Check database connections
                 db_check = health_result.checks.get("database")
-                if db_check and db_check.details and db_check.details.get("active_connections", 0) > 15:
+                if (
+                    db_check
+                    and db_check.details
+                    and db_check.details.get("active_connections", 0) > 15
+                ):
                     await self.optimize_connection_pool()
 
                 # Check system resources
@@ -364,13 +388,17 @@ class APESServiceManager:
 
                 # Log health status for structured analysis
                 self.logger.info(f"Health status: {health_result.overall_status.value}")
-                
+
                 # Check for any failed components
                 if health_result.failed_checks:
-                    self.logger.error(f"Failed health checks: {', '.join(health_result.failed_checks)}")
-                
+                    self.logger.error(
+                        f"Failed health checks: {', '.join(health_result.failed_checks)}"
+                    )
+
                 if health_result.warning_checks:
-                    self.logger.warning(f"Warning health checks: {', '.join(health_result.warning_checks)}")
+                    self.logger.warning(
+                        f"Warning health checks: {', '.join(health_result.warning_checks)}"
+                    )
 
                 # Wait for next monitoring cycle
                 await asyncio.sleep(30)  # 30-second monitoring interval
@@ -391,16 +419,20 @@ class APESServiceManager:
 
         try:
             # Database metrics
+            from sqlalchemy import text
+
+            from ..database import scalar
+
             async with get_session() as session:
                 # Get active connections
                 result = await session.execute(
-                    "SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"
+                    text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
                 )
                 metrics["database_connections"] = result.scalar() or 0
 
                 # Test response time
                 start_time = asyncio.get_event_loop().time()
-                await session.execute("SELECT 1")
+                await scalar(session, text("SELECT 1"))
                 end_time = asyncio.get_event_loop().time()
                 metrics["avg_response_time"] = (end_time - start_time) * 1000
 
@@ -426,14 +458,16 @@ class APESServiceManager:
         self.logger.info("Optimizing database connection pool")
 
         try:
+            from sqlalchemy import text
+
             async with get_session() as session:
                 # Close idle connections
-                await session.execute("""
+                await session.execute(text("""
                     SELECT pg_terminate_backend(pid) 
                     FROM pg_stat_activity 
                     WHERE state = 'idle' 
                     AND state_change < NOW() - INTERVAL '5 minutes'
-                """)
+                """))
 
         except Exception as e:
             self.logger.error(f"Connection pool optimization failed: {e}")
@@ -467,7 +501,7 @@ class APESServiceManager:
                 self.pid_file.unlink()
 
             # Close database connections
-            await sessionmanager.close()
+            await get_sessionmanager().close()
 
             self.logger.info("Service shutdown completed")
 
@@ -485,7 +519,8 @@ class APESServiceManager:
                 pid = pid_data["pid"]
 
             # Check if process is running
-            if not psutil.pid_exists(pid):
+
+            if not ensure_running(pid):
                 self.pid_file.unlink()
                 return {"status": "not_running", "message": "Process not found"}
 
