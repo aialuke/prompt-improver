@@ -6,28 +6,19 @@ consolidating patterns from cli.py, monitoring.py, and manager.py as specified i
 duplicationtesting.md Phase 3 requirements.
 """
 
-import asyncio
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 # Import the comprehensive health system
 from ..services.health import (
     AggregatedHealthResult,
     HealthResult,
-    HealthService,
     HealthStatus,
     get_health_service,
 )
 
 # For backwards compatibility and simplified access
-from ..services.health.checkers import (
-    AnalyticsServiceHealthChecker,
-    DatabaseHealthChecker,
-    MCPServerHealthChecker,
-    MLServiceHealthChecker,
-    SystemResourcesHealthChecker,
-)
 
 
 class HealthChecker:

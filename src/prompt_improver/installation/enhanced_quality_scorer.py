@@ -9,27 +9,19 @@ Multi-dimensional quality assessment framework inspired by research from:
 Implements granular quality scoring to replace binary pass/fail system.
 """
 
-import asyncio
 import logging
 import warnings
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
-import pandas as pd
+
 from scipy import stats
 from scipy.spatial.distance import jensenshannon
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.metrics import (
-    calinski_harabasz_score,
-    davies_bouldin_score,
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score,
-    silhouette_score,
-)
+from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
