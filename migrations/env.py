@@ -43,7 +43,12 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Import database configuration to ensure we use psycopg3
+    from prompt_improver.database.connection import get_database_url
+    
+    # Get the correct database URL with psycopg3 driver
+    url = get_database_url(async_driver=False)  # Use sync driver for alembic
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -62,8 +67,18 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Import database configuration to ensure we use psycopg3
+    from prompt_improver.database.connection import get_database_url
+    
+    # Get the correct database URL with psycopg3 driver
+    database_url = get_database_url(async_driver=False)  # Use sync driver for alembic
+    
+    # Override the config with the correct URL
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = database_url
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
