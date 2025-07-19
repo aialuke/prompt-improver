@@ -1,17 +1,17 @@
 """AutoML Status Widget - displays optimization progress and results."""
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime
+
 
 from rich.bar import Bar
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
+
 from rich.table import Table
-from rich.text import Text
-from textual.containers import Horizontal, Vertical
+
+
 from textual.reactive import reactive
-from textual.widgets import ProgressBar, Static
+from textual.widgets import Static
 
 
 class AutoMLStatusWidget(Static):

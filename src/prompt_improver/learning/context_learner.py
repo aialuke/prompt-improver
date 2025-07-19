@@ -61,9 +61,6 @@ try:
     from ..analysis.linguistic_analyzer import (
         LinguisticAnalyzer,
         LinguisticConfig,
-        get_lightweight_config,
-        get_memory_optimized_config,
-        get_ultra_lightweight_config,
     )
 
     LINGUISTIC_ANALYSIS_AVAILABLE = True
@@ -75,11 +72,7 @@ except ImportError:
 
 # Domain-specific feature extraction integration
 try:
-    from ..analysis.domain_detector import PromptDomain
-    from ..analysis.domain_feature_extractor import (
-        DomainFeatureExtractor,
-        DomainFeatures,
-    )
+    from ..analysis.domain_feature_extractor import DomainFeatureExtractor
 
     DOMAIN_ANALYSIS_AVAILABLE = True
 except ImportError:

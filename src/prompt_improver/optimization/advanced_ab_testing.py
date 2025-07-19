@@ -9,19 +9,18 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 from scipy import stats
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.utils import resample
-from sqlalchemy import and_, select
+
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance
-from ..services.ab_testing import ABTestingService, ExperimentResult
+from ..database.models import ABExperiment, ABExperimentCreate
+from ..services.ab_testing import ABTestingService
 from ..services.analytics import AnalyticsService
 from ..utils.error_handlers import handle_database_errors
 

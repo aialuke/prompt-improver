@@ -3,20 +3,18 @@ Implements 2025 best practices for causal analysis and counterfactual reasoning
 """
 
 import logging
-import warnings
-from collections.abc import Callable
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
-import pandas as pd
+
 from scipy import stats
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import StandardScaler
+
+
+
 
 logger = logging.getLogger(__name__)
 
