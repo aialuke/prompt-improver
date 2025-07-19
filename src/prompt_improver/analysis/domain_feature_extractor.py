@@ -10,7 +10,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 try:
     import spacy

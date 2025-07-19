@@ -9,15 +9,15 @@ import hashlib
 import logging
 import warnings
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
-from scipy import stats
+
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.manifold import TSNE
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Phase 2 enhancement imports

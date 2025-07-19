@@ -8,29 +8,17 @@ import logging
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
-import joblib
 import numpy as np
-from sklearn.decomposition import PCA, FastICA, KernelPCA, SparsePCA, TruncatedSVD
+from sklearn.decomposition import PCA, FastICA, KernelPCA, TruncatedSVD
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.feature_selection import (
-    RFE,
-    RFECV,
-    SelectKBest,
-    SelectPercentile,
-    VarianceThreshold,
-    chi2,
-    f_classif,
-    f_regression,
-    mutual_info_classif,
-    mutual_info_regression,
-)
-from sklearn.linear_model import LogisticRegression
-from sklearn.manifold import MDS, TSNE, Isomap, LocallyLinearEmbedding
-from sklearn.model_selection import cross_val_score
+from sklearn.feature_selection import VarianceThreshold
+
+from sklearn.manifold import TSNE, Isomap
+
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.random_projection import GaussianRandomProjection, SparseRandomProjection
 
 # Advanced dimensionality reduction imports
@@ -48,6 +36,7 @@ try:
     FACTOR_ANALYSIS_AVAILABLE = True
 except ImportError:
     FACTOR_ANALYSIS_AVAILABLE = False
+    FactorAnalysis = None
     warnings.warn("FactorAnalysis not available in this sklearn version")
 
 logger = logging.getLogger(__name__)
