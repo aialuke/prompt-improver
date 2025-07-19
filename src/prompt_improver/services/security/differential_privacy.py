@@ -142,7 +142,7 @@ class DifferentialPrivacyService:
 
         return private_sum_val / private_count_val
 
-    def exponential_mechanism(self, candidates: list[any], utility_scores: list[float], 
+    def exponential_mechanism(self, candidates: list[any], utility_scores: list[float],
                             sensitivity: float = 1.0, epsilon: float = None) -> any:
         """Select candidate using exponential mechanism."""
         if len(candidates) != len(utility_scores):
@@ -156,7 +156,7 @@ class DifferentialPrivacyService:
 
         # Calculate probabilities
         max_utility = max(utility_scores)
-        exp_utilities = [math.exp((epsilon * (score - max_utility)) / (2 * sensitivity)) 
+        exp_utilities = [math.exp((epsilon * (score - max_utility)) / (2 * sensitivity))
                         for score in utility_scores]
 
         total_weight = sum(exp_utilities)

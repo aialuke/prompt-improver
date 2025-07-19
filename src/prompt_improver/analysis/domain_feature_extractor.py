@@ -5,7 +5,6 @@ enabling more targeted and relevant analysis for different types of prompts.
 """
 
 import asyncio
-import json
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -163,8 +162,6 @@ class TechnicalDomainExtractor(BaseDomainExtractor):
         self, text: str, domain_result: DomainClassificationResult
     ) -> dict[str, Any]:
         """Analyze technical vocabulary usage."""
-        text_lower = text.lower()
-
         # Count technical terms
         technical_terms = []
         for keywords in domain_result.domain_keywords_found.values():

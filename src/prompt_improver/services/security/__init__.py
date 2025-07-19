@@ -9,7 +9,7 @@ from .input_sanitization import InputSanitizer
 
 __all__ = [
     "AuthenticationService",
-    "AuthorizationService", 
+    "AuthorizationService",
     "Permission",
     "Role",
     "DifferentialPrivacyService",

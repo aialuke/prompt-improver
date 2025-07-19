@@ -108,8 +108,8 @@ class AuthenticationService:
         """Validate JWT token and return payload if valid."""
         try:
             payload = jwt.decode(
-                token, 
-                self.secret_key, 
+                token,
+                self.secret_key,
                 algorithms=["HS256"],
                 options={"verify_exp": True, "verify_iss": True},
                 issuer="prompt_improver_auth"

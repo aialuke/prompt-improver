@@ -68,7 +68,7 @@ class FederatedLearningService:
         decrypted_bytes = self.cipher.decrypt(encrypted_data)
         return decrypted_bytes.decode('utf-8')
 
-    def submit_encrypted_update(self, client_id: str, encrypted_update: bytes, 
+    def submit_encrypted_update(self, client_id: str, encrypted_update: bytes,
                               round_number: int | None = None) -> bool:
         """Submit encrypted model update from client."""
         if client_id not in self.registered_clients:
@@ -305,7 +305,7 @@ class FederatedLearningService:
         """Reset current round data (for testing purposes)."""
         # Clear current round updates
         for client_id in self.client_updates:
-            current_round_updates = [u for u in self.client_updates[client_id] 
+            current_round_updates = [u for u in self.client_updates[client_id]
                                    if u["round_number"] != self.aggregation_rounds]
             self.client_updates[client_id] = current_round_updates
 

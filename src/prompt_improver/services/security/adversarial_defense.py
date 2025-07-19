@@ -12,7 +12,7 @@ class AdversarialDefenseSystem:
     def __init__(self):
         self.defense_methods = [
             "gaussian_noise",
-            "input_validation", 
+            "input_validation",
             "adversarial_training",
             "gradient_masking",
             "input_preprocessing",
@@ -289,7 +289,7 @@ class AdversarialAttackSimulator:
 class RobustnessEvaluator:
     """Evaluates model robustness against adversarial attacks."""
 
-    def evaluate_robustness(self, model, clean_data: np.ndarray, 
+    def evaluate_robustness(self, model, clean_data: np.ndarray,
                           adversarial_data: np.ndarray, labels: np.ndarray) -> dict[str, float]:
         """Evaluate model robustness metrics."""
         # Simulate model predictions (in real implementation, use actual model)
