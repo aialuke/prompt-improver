@@ -370,18 +370,18 @@ Focus on making the prompt more precise, readable, and effective while preservin
                 "explanation": "Empty prompt cannot be evaluated",
                 "metadata": {"rule_name": "Linguistic Quality Rule", "error": False}
             }
-        
+
         try:
             # Perform linguistic analysis
             features = self.linguistic_analyzer.analyze(prompt)
-            
+
             # Calculate component scores
             readability_score = self._assess_readability(features)
             complexity_score = self._assess_complexity(features)
             structure_score = self._assess_structure(features)
             entity_score = self._assess_entity_richness(features)
             clarity_score = self._assess_clarity(features)
-            
+
             component_scores = {
                 "readability": readability_score,
                 "syntactic_complexity": complexity_score,
@@ -389,13 +389,13 @@ Focus on making the prompt more precise, readable, and effective while preservin
                 "entity_richness": entity_score,
                 "instruction_clarity": clarity_score,
             }
-            
+
             # Calculate overall score
             overall_score = self._calculate_overall_score(component_scores)
-            
+
             # Generate suggestions
             suggestions = self._generate_suggestions(features, component_scores)
-            
+
             # Create linguistic features dict for test compatibility
             linguistic_features = {
                 "flesch_reading_ease": features.flesch_reading_ease,
@@ -407,13 +407,13 @@ Focus on making the prompt more precise, readable, and effective while preservin
                 "has_examples": features.has_examples,
                 "has_context": features.has_context,
             }
-            
+
             # Generate explanation
             explanation = self._generate_explanation(overall_score, suggestions)
-            
+
             # Determine if passed
             passed = overall_score >= 0.5 and len(suggestions) <= 3
-            
+
             return {
                 "score": overall_score,
                 "confidence": features.confidence,
@@ -429,7 +429,7 @@ Focus on making the prompt more precise, readable, and effective while preservin
                     "error": False
                 }
             }
-            
+
         except Exception as e:
             self.logger.error(f"Linguistic quality evaluation failed: {e}")
             return {
@@ -439,17 +439,16 @@ Focus on making the prompt more precise, readable, and effective while preservin
                 "component_scores": {},
                 "linguistic_features": {},
                 "suggestions": [],
-                "explanation": f"Error during linguistic analysis: {str(e)}",
+                "explanation": f"Error during linguistic analysis: {e!s}",
                 "metadata": {"rule_name": "Linguistic Quality Rule", "error": True}
             }
-    
+
     def _generate_explanation(self, score: float, suggestions: list[str]) -> str:
         """Generate explanation based on score and suggestions."""
         if score >= 0.8:
             return "Excellent linguistic quality with clear structure and good readability."
-        elif score >= 0.6:
+        if score >= 0.6:
             return "Good linguistic quality with minor areas for improvement."
-        elif score >= 0.4:
+        if score >= 0.4:
             return "Moderate linguistic quality that needs improvement in several areas."
-        else:
-            return "Poor linguistic quality requiring significant improvement in clarity, structure, and readability."
+        return "Poor linguistic quality requiring significant improvement in clarity, structure, and readability."

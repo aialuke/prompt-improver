@@ -10,12 +10,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select as sqlmodel_select
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ..automl.orchestrator import AutoMLConfig, AutoMLMode, AutoMLOrchestrator
 from ..database import get_session_context

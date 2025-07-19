@@ -188,7 +188,7 @@ def _get_global_sessionmanager() -> DatabaseSessionManager:
             elif not database_url:
                 # Use default with psycopg3
                 database_url = "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
-            
+
             default_database_url = database_url
             _global_sessionmanager = DatabaseSessionManager(
                 default_database_url, echo=False
@@ -254,5 +254,3 @@ def get_database_url(async_driver: bool = False) -> str:
     if async_driver:
         return f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-
-

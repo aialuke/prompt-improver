@@ -9,14 +9,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.utils.datetime_utils import naive_utc_now
+import sqlmodel
+from sqlalchemy import JSON, Index, String, Text, UniqueConstraint
+from sqlmodel import Field, Relationship, SQLModel
 
 # Import centralized registry first to patch SQLModel
 from prompt_improver.database.registry import get_registry_manager
-
-import sqlmodel
-from sqlalchemy import JSON, Index, UniqueConstraint, String, Text
-from sqlmodel import Field, Relationship, SQLModel
+from prompt_improver.utils.datetime_utils import naive_utc_now
 
 # Ensure we're using the centralized registry
 _registry_manager = get_registry_manager()

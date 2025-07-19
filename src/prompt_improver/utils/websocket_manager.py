@@ -10,10 +10,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import redis.asyncio as redis
 from fastapi import WebSocket, WebSocketDisconnect
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 

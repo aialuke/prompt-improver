@@ -5,17 +5,14 @@ Provides comprehensive analytics and reporting for APES
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 from sqlalchemy import text
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
 from ..database import get_sessionmanager
-from ..database.models import (
-    RuleEffectivenessStats,
-    UserSatisfactionStats,
-)
+from ..database.models import RuleEffectivenessStats, UserSatisfactionStats
 from ..database.utils import fetch_all_rows, fetch_one_row
 from ..utils.error_handlers import handle_database_errors, handle_validation_errors
 

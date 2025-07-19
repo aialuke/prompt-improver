@@ -13,11 +13,11 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import psycopg
 from psycopg import errors as psycopg_errors
 from pydantic import BaseModel, ConfigDict
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -131,6 +131,7 @@ class CircuitBreaker:
             await self._on_failure()
             raise
 
+
 async def _on_success(self):
         CIRCUIT_BREAKER_EVENTS.labels(state="success").inc()
         """Handle successful operation."""
@@ -143,6 +144,7 @@ async def _on_success(self):
                     logger.info("Circuit breaker transitioning to CLOSED")
             elif self.state == CircuitBreakerState.CLOSED:
                 self.failure_count = 0
+
 
 async def _on_failure(self):
         CIRCUIT_BREAKER_EVENTS.labels(state="failure").inc()

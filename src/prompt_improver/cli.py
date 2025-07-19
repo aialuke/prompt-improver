@@ -16,10 +16,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from prompt_improver.database import (
-    DatabaseSessionManager,
-    get_sessionmanager,
-)
+from prompt_improver.database import DatabaseSessionManager, get_sessionmanager
 from prompt_improver.installation.initializer import APESInitializer
 from prompt_improver.installation.migration import APESMigrationManager
 from prompt_improver.service.manager import APESServiceManager
@@ -510,7 +507,7 @@ def analytics(
     if days < 1:
         console.print("❌ Number of days must be positive", style="red")
         raise typer.Exit(1)
-    
+
     if not any([rule_effectiveness, user_satisfaction, performance_trends]):
         # Default to showing all
         rule_effectiveness = user_satisfaction = performance_trends = True

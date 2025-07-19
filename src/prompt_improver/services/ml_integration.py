@@ -17,8 +17,6 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import mlflow
 import mlflow.sklearn
 import mlflow.tracking
@@ -36,6 +34,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ..database.connection import DatabaseManager, DatabaseSessionManager
 from ..database.models import MLModelPerformance, RuleMetadata, RulePerformance

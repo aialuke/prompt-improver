@@ -6,15 +6,21 @@ from datetime import datetime
 from typing import Union
 
 try:
-    from ...utils.redis_cache import redis_client, CACHE_ERRORS, CACHE_LATENCY_MS
+    from ...utils.redis_cache import CACHE_ERRORS, CACHE_LATENCY_MS, redis_client
 except ImportError:
     # Fallback if relative imports fail
-    from src.prompt_improver.utils.redis_cache import redis_client, CACHE_ERRORS, CACHE_LATENCY_MS
+    from src.prompt_improver.utils.redis_cache import (
+        CACHE_ERRORS,
+        CACHE_LATENCY_MS,
+        redis_client,
+    )
 
-from .base import HealthChecker, HealthResult, HealthStatus
-from .background_manager import get_background_task_manager
 import logging
+
 from prometheus_client import Counter
+
+from .background_manager import get_background_task_manager
+from .base import HealthChecker, HealthResult, HealthStatus
 
 # Configure logging
 logger = logging.getLogger("redis_health_monitor")
@@ -33,6 +39,7 @@ except ValueError:
         # Create with different name if still failing
         REDIS_CHECK_FAILURES = Counter('redis_check_failures_total_v2', 'Total number of Redis check failures')
 
+
 class RedisHealthMonitor(HealthChecker):
     """Async Redis health monitoring using PING and GET liveness checks."""
 
@@ -43,7 +50,7 @@ class RedisHealthMonitor(HealthChecker):
         self.last_check_time = None
         self.is_connected = True
 
-    async def ping_check(self) -> Union[str, None]:
+    async def ping_check(self) -> str | None:
         """Perform a Redis PING command to check if the server is alive."""
         try:
             response = await redis_client.ping()
@@ -54,7 +61,7 @@ class RedisHealthMonitor(HealthChecker):
             CACHE_ERRORS.labels(operation='ping').inc()
         return None
 
-    async def get_check(self) -> Union[str, None]:
+    async def get_check(self) -> str | None:
         """Perform a Redis GET command to check if data retrieval is working."""
         test_key = "health:check"
         try:
@@ -92,13 +99,12 @@ class RedisHealthMonitor(HealthChecker):
                     component=self.name,
                     message=f"{self.failure_count} consecutive failures",
                 )
-            else:
-                self.failure_count = 0
-                return HealthResult(
-                    status=HealthStatus.HEALTHY,
-                    component=self.name,
-                    message="Redis is healthy",
-                )
+            self.failure_count = 0
+            return HealthResult(
+                status=HealthStatus.HEALTHY,
+                component=self.name,
+                message="Redis is healthy",
+            )
         except Exception as e:
             logger.error(f"Unhandled exception during Redis check: {e}")
             return HealthResult(
@@ -134,6 +140,7 @@ class RedisHealthMonitor(HealthChecker):
         if retry_count == max_retries:
             logger.error("Redis reconnection failed after maximum retries")
 
+
 async def schedule_redis_health_checks(config):
     """Schedule and manage periodic Redis health checks."""
     task_manager = get_background_task_manager()
@@ -151,6 +158,7 @@ async def schedule_redis_health_checks(config):
             logger.error(f"Error scheduling Redis health check: {e}")
             await asyncio.sleep(check_interval)
 
+
 # Initialize the Redis Health Monitor
 default_monitor_config = {
     'check_interval': 60,  # Time between checks in seconds
@@ -158,6 +166,7 @@ default_monitor_config = {
     'latency_threshold': 100,
     'reconnection': {'max_retries': 5, 'backoff_factor': 2}
 }
+
 
 async def start_redis_health_monitor(config=None):
     """Start the Redis health monitoring task based on the configuration."""

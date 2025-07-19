@@ -12,7 +12,7 @@ from .base import HealthChecker, HealthResult, HealthStatus
 # Import Redis Health Monitor
 try:
     from .redis_monitor import RedisHealthMonitor
-    
+
     REDIS_MONITOR_AVAILABLE = True
 except Exception:
     REDIS_MONITOR_AVAILABLE = False
@@ -21,7 +21,7 @@ except Exception:
 # Graceful imports for various services
 try:
     from .background_manager import get_background_task_manager
-    
+
     BACKGROUND_MANAGER_AVAILABLE = True
 except Exception:
     BACKGROUND_MANAGER_AVAILABLE = False
@@ -29,7 +29,7 @@ except Exception:
 
 try:
     from ...optimization.batch_processor import BatchProcessor
-    
+
     BATCH_PROCESSOR_AVAILABLE = True
 except Exception as e:
     BATCH_PROCESSOR_AVAILABLE = False

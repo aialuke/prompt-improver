@@ -10,11 +10,7 @@ Based on research synthesis from:
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..base import (
-    BasePromptRule,
-    RuleCheckResult,
-    TransformationResult,
-)
+from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Domain detection patterns
 DOMAIN_PATTERNS = {

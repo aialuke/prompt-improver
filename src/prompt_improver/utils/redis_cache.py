@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class CircuitBreaker:
     """Lightweight circuit breaker for Redis operations."""
-    
+
     def __init__(self, failure_threshold: int = 5, reset_timeout: int = 60):
         self.failure_threshold = failure_threshold
         self.reset_timeout = reset_timeout
@@ -33,7 +33,7 @@ class CircuitBreaker:
         self.last_failure_time = 0
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
         self._lock = None  # Will be initialized per event loop
-    
+
     def _get_lock(self):
         """Get or create the lock for current event loop."""
         try:
@@ -45,7 +45,7 @@ class CircuitBreaker:
             # Different event loop, create new lock
             self._lock = asyncio.Lock()
             return self._lock
-    
+
     async def call(self, func, *args, **kwargs):
         """Execute function with circuit breaker protection."""
         lock = self._get_lock()
@@ -56,7 +56,7 @@ class CircuitBreaker:
                     logger.info("Circuit breaker transitioning to HALF_OPEN state")
                 else:
                     raise Exception("Circuit breaker is OPEN - operation blocked")
-            
+
             try:
                 result = await func(*args, **kwargs)
                 # Success - reset circuit breaker
@@ -68,17 +68,17 @@ class CircuitBreaker:
             except Exception as e:
                 self.failure_count += 1
                 self.last_failure_time = time.time()
-                
+
                 if self.failure_count >= self.failure_threshold:
                     self.state = "OPEN"
                     logger.warning(f"Circuit breaker opened after {self.failure_count} failures")
-                
+
                 raise e
-    
+
     def is_open(self) -> bool:
         """Check if circuit breaker is open."""
         return self.state == "OPEN"
-    
+
     def reset(self):
         """Manually reset the circuit breaker."""
         self.state = "CLOSED"
@@ -89,30 +89,30 @@ class CircuitBreaker:
 
 class RedisConfig(BaseModel):
     """Redis configuration with validation and sane defaults."""
-    
+
     # Connection settings
     host: str = Field(default="localhost", description="Redis server hostname")
     port: int = Field(default=6379, ge=1, le=65535, description="Redis server port")
     cache_db: int = Field(default=2, ge=0, le=15, description="Redis database number for cache")
-    
+
     # Pool settings
     pool_size: int = Field(default=10, ge=1, description="Connection pool size")
     max_connections: int = Field(default=50, ge=1, description="Maximum connections")
-    
+
     # Timeout settings
     connect_timeout: int = Field(default=5, ge=0, description="Connection timeout in seconds")
     socket_timeout: int = Field(default=5, ge=0, description="Socket timeout in seconds")
-    
+
     # Keep-alive settings
     socket_keepalive: bool = Field(default=True, description="Enable socket keep-alive")
     socket_keepalive_options: dict = Field(default_factory=dict, description="Socket keep-alive options")
-    
+
     # SSL settings
     use_ssl: bool = Field(default=False, description="Use SSL connection")
-    
+
     # Monitoring settings
     monitoring_enabled: bool = Field(default=True, description="Enable monitoring")
-    
+
     model_config = ConfigDict(
         validate_assignment=True,
         extra="forbid"
@@ -134,15 +134,15 @@ class RedisConfig(BaseModel):
             ValueError: If configuration structure is invalid
         """
         try:
-            with open(path, "r") as file:
+            with open(path) as file:
                 data = yaml.safe_load(file)
-                
+
             if not data or 'connection' not in data:
                 logger.warning(f"No 'connection' section found in {path}, using defaults")
                 return cls()
-                
+
             connection_config = data['connection']
-            
+
             # Map YAML keys to model fields
             mapped_config = {
                 'host': connection_config.get('host', 'localhost'),
@@ -157,11 +157,11 @@ class RedisConfig(BaseModel):
                 'use_ssl': connection_config.get('ssl', {}).get('enabled', False),
                 'monitoring_enabled': data.get('monitoring', {}).get('enabled', True)
             }
-            
+
             config = cls(**mapped_config)
             logger.info(f"Redis configuration loaded from {path}")
             return config
-            
+
         except FileNotFoundError:
             logger.warning(f"Redis config file {path} not found, using defaults")
             return cls()
@@ -174,39 +174,39 @@ class RedisConfig(BaseModel):
         except Exception as e:
             logger.error(f"Error loading Redis config: {e}")
             raise ValueError(f"Failed to load Redis configuration: {e}")
-    
+
     def validate_config(self) -> None:
         """Validate the Redis configuration and log warnings for potential issues."""
         warnings = []
-        
+
         # Check pool size vs max connections
         if self.pool_size > self.max_connections:
             warnings.append(f"Pool size ({self.pool_size}) exceeds max connections ({self.max_connections})")
-        
+
         # Check timeout values
         if self.connect_timeout > 30:
             warnings.append(f"Connect timeout ({self.connect_timeout}s) is quite high")
-        
+
         if self.socket_timeout > 30:
             warnings.append(f"Socket timeout ({self.socket_timeout}s) is quite high")
-        
+
         # Check for production readiness
         if self.host == "localhost" and self.monitoring_enabled:
             warnings.append("Using localhost - ensure this is appropriate for your deployment")
-        
+
         if not self.use_ssl and self.host != "localhost":
             warnings.append("SSL disabled for remote connection - consider enabling for security")
-        
+
         # Log warnings
         for warning in warnings:
             logger.warning(f"Redis config warning: {warning}")
-        
+
         # Log successful validation
         if not warnings:
             logger.info("Redis configuration validation passed")
         else:
             logger.info(f"Redis configuration loaded with {len(warnings)} warnings")
-        
+
         # Log final configuration
         logger.info(f"Redis config: {self.host}:{self.port}, DB {self.cache_db}, pool {self.pool_size}/{self.max_connections}")
 
@@ -401,7 +401,7 @@ class RedisCache:
         if _redis_get_breaker.is_open():
             logger.warning(f"Circuit breaker is open for Redis get operation on key {key}")
             return None
-        
+
         async def _redis_get_operation():
             """Internal Redis get operation."""
             start_time = time.perf_counter()
@@ -422,7 +422,7 @@ class RedisCache:
             else:
                 CACHE_MISSES.inc()
                 return None
-        
+
         for attempt in range(retries):
             try:
                 # Use circuit breaker for Redis operation
@@ -437,7 +437,7 @@ class RedisCache:
                 CACHE_ERRORS.labels(operation='get').inc()
                 logger.error(f"Redis get error for key {key}: {e}")
                 return None
-        
+
         # All retries exhausted
         CACHE_ERRORS.labels(operation='get').inc()
         logger.error(f"Redis get failed after {retries} attempts for key {key}")
@@ -459,7 +459,7 @@ class RedisCache:
         if _redis_set_breaker.is_open():
             logger.warning(f"Circuit breaker is open for Redis set operation on key {key}")
             return False
-        
+
         async def _redis_set_operation():
             """Internal Redis set operation."""
             start_time = time.perf_counter()
@@ -469,7 +469,7 @@ class RedisCache:
             end_time = time.perf_counter()
             CACHE_LATENCY_MS.labels(operation='set').observe((end_time - start_time) * 1000)
             return True
-        
+
         for attempt in range(retries):
             try:
                 # Use circuit breaker for Redis operation
@@ -484,7 +484,7 @@ class RedisCache:
                 CACHE_ERRORS.labels(operation='set').inc()
                 logger.error(f"Redis set error for key {key}: {e}")
                 return False
-        
+
         # All retries exhausted
         CACHE_ERRORS.labels(operation='set').inc()
         logger.error(f"Redis set failed after {retries} attempts for key {key}")
@@ -506,7 +506,7 @@ class RedisCache:
         if _redis_delete_breaker.is_open():
             logger.warning(f"Circuit breaker is open for Redis delete operation on key {key}")
             return False
-        
+
         async def _redis_delete_operation():
             """Internal Redis delete operation."""
             start_time = time.perf_counter()
@@ -515,7 +515,7 @@ class RedisCache:
             end_time = time.perf_counter()
             CACHE_LATENCY_MS.labels(operation='delete').observe((end_time - start_time) * 1000)
             return result > 0
-        
+
         for attempt in range(retries):
             try:
                 # Use circuit breaker for Redis operation
@@ -530,7 +530,7 @@ class RedisCache:
                 CACHE_ERRORS.labels(operation='delete').inc()
                 logger.error(f"Redis delete error for key {key}: {e}")
                 return False
-        
+
         # All retries exhausted
         CACHE_ERRORS.labels(operation='delete').inc()
         logger.error(f"Redis delete failed after {retries} attempts for key {key}")

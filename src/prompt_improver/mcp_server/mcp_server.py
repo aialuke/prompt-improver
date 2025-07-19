@@ -3,6 +3,7 @@ Provides prompt enhancement via Model Context Protocol with stdio transport.
 """
 
 import asyncio
+import logging
 import signal
 import sys
 import time
@@ -10,7 +11,6 @@ from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
-import logging
 
 from prompt_improver.database import get_session
 from prompt_improver.optimization.batch_processor import (

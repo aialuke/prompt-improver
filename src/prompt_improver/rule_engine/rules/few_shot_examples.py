@@ -11,11 +11,7 @@ import random
 import re
 from typing import Any, Dict, List, Tuple
 
-from ..base import (
-    BasePromptRule,
-    RuleCheckResult,
-    TransformationResult,
-)
+from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Task type patterns for example selection
 TASK_TYPE_PATTERNS = {

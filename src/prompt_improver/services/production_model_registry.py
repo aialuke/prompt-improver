@@ -16,13 +16,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import mlflow
 import mlflow.sklearn
 import numpy as np
 from mlflow.entities.model_registry import ModelVersion
 from mlflow.tracking import MlflowClient
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 

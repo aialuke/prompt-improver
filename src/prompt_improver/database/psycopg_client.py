@@ -12,8 +12,6 @@ import time
 from datetime import datetime
 from typing import Any, Optional, TypeVar
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import psycopg
 from psycopg import (
     errors as psycopg_errors,
@@ -22,6 +20,8 @@ from psycopg import (
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ValidationError
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from .config import DatabaseConfig
 from .error_handling import (

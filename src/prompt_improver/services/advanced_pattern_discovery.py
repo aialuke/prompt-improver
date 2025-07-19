@@ -129,7 +129,7 @@ class AdvancedPatternDiscovery:
         self._apriori_analyzer = None
         self._db_manager_lock = threading.Lock()
         self._apriori_analyzer_lock = threading.Lock()
-        
+
         logger.info("AdvancedPatternDiscovery initialized with lazy loading strategy")
 
     @property
@@ -145,7 +145,7 @@ class AdvancedPatternDiscovery:
                         logger.error(f"Failed to create DatabaseManager: {e}")
                         return None
         return self._db_manager
-    
+
     @property
     def apriori_analyzer(self) -> AprioriAnalyzer | None:
         """Get AprioriAnalyzer instance with lazy initialization."""
@@ -173,7 +173,7 @@ class AdvancedPatternDiscovery:
                         logger.warning("Cannot create AprioriAnalyzer - DatabaseManager not available")
                         return None
         return self._apriori_analyzer
-    
+
     def _ensure_database_connection(self) -> bool:
         """Ensure database connection is available with enhanced error handling."""
         try:
@@ -184,7 +184,7 @@ class AdvancedPatternDiscovery:
         except Exception as e:
             logger.error(f"Database connection check failed: {e}")
             return False
-    
+
     def _ensure_apriori_analyzer(self) -> bool:
         """Ensure AprioriAnalyzer is available with enhanced error handling."""
         try:

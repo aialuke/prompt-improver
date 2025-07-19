@@ -9,13 +9,13 @@ from typing import Dict, List, Optional
 
 from .base import AggregatedHealthResult, HealthChecker, HealthResult, HealthStatus
 from .checkers import (
+    REDIS_MONITOR_AVAILABLE,
     AnalyticsServiceHealthChecker,
     DatabaseHealthChecker,
     MCPServerHealthChecker,
     MLServiceHealthChecker,
-    SystemResourcesHealthChecker,
-    REDIS_MONITOR_AVAILABLE,
     RedisHealthMonitor,
+    SystemResourcesHealthChecker,
 )
 
 # Lazy import to avoid circular dependency
@@ -46,8 +46,9 @@ class HealthService:
                 try:
                     # Load Redis configuration
                     import yaml
+
                     from ...utils.redis_cache import redis_config
-                    
+
                     # Create health monitor configuration
                     monitor_config = {
                         'check_interval': 60,
@@ -55,11 +56,11 @@ class HealthService:
                         'latency_threshold': 100,
                         'reconnection': {'max_retries': 5, 'backoff_factor': 2}
                     }
-                    
+
                     # Update with YAML configuration if available
                     if hasattr(redis_config, 'health_monitor'):
                         monitor_config.update(redis_config.health_monitor)
-                    
+
                     self.checkers.append(RedisHealthMonitor(monitor_config))
                 except Exception as e:
                     # Log the error but continue without Redis health checker

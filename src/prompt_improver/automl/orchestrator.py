@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 # Delayed imports to avoid dependency issues at module level
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -20,6 +18,8 @@ import optuna
 from optuna.integration import OptunaSearchCV
 from optuna.storages import RDBStorage
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 if TYPE_CHECKING:
     from ..database.connection import DatabaseManager
@@ -215,7 +215,7 @@ class AutoMLOrchestrator:
 
             # Process and store results
             results = await self._process_optimization_results(optimization_result)
-            
+
             # Add execution time to results
             results["execution_time"] = time.time() - start_time
 
@@ -344,7 +344,7 @@ class AutoMLOrchestrator:
         def objective(trial: optuna.Trial) -> float:
             """Synchronous objective function compatible with Optuna (2025 best practice)."""
             import asyncio
-            
+
             try:
                 # Check if we're already in an async context
                 try:

@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import numpy as np
 from scipy import stats
 from sklearn.utils import resample  # For bootstrap sampling
 from sqlalchemy import select
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ..database.models import ABExperiment, ABExperimentCreate, RulePerformance
 from ..optimization.early_stopping import (

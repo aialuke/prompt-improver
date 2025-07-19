@@ -16,10 +16,10 @@ Architecture follows 2025 AutoML patterns:
 """
 
 from .callbacks import (
-    AutoMLCallback,
-    ExperimentCallback,
-    ModelSelectionCallback,
-    RealTimeAnalyticsCallback,
+                        AutoMLCallback,
+                        ExperimentCallback,
+                        ModelSelectionCallback,
+                        RealTimeAnalyticsCallback,
 )
 from .orchestrator import AutoMLOrchestrator
 

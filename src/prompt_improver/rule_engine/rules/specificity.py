@@ -12,11 +12,7 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from ...services.llm_transformer import LLMTransformerService
-from ..base import (
-    BasePromptRule,
-    RuleCheckResult,
-    TransformationResult,
-)
+from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Vague language patterns that reduce specificity
 VAGUE_LANGUAGE_PATTERNS = {

@@ -8,12 +8,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from prompt_improver.database import get_session
 from prompt_improver.services.ml_integration import get_ml_service
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 
 async def periodic_batch_processor_coroutine(batch_processor: "BatchProcessor") -> None:

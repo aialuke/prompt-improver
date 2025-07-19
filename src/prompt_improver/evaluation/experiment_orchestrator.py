@@ -12,11 +12,11 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 import numpy as np
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ..database.models import ABExperiment, RulePerformance
 from ..services.real_time_analytics import RealTimeAnalyticsService, RealTimeMetrics

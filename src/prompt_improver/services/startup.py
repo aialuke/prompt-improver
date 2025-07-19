@@ -338,7 +338,7 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
                     timeout=timeout / 2,
                 )
                 logger.info("✅ Background tasks cancelled")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("⚠️ Some background tasks did not cancel within timeout")
                 shutdown_errors.append("Background task cancellation timeout")
 

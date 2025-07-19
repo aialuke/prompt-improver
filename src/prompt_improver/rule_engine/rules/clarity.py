@@ -12,11 +12,7 @@ import string
 from typing import Any, Dict, List
 
 from ...services.llm_transformer import LLMTransformerService
-from ..base import (
-    BasePromptRule,
-    RuleCheckResult,
-    TransformationResult,
-)
+from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Enhanced vague words list based on research
 VAGUE_WORDS = [

@@ -12,8 +12,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from prompt_improver.utils.datetime_utils import aware_utc_now
-
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -22,6 +20,8 @@ from rich.progress import (
     TaskProgressColumn,
     TextColumn,
 )
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ..database import get_session
 
