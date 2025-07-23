@@ -9,34 +9,34 @@ from typing import Any, Dict, List, Optional
 
 # Import services with fallback handling
 try:
-    from prompt_improver.services.analytics import AnalyticsService
+    from prompt_improver.performance.analytics.analytics import AnalyticsService
 except ImportError:
     AnalyticsService = None
 
 try:
-    from prompt_improver.services.health.service import HealthService
+    from prompt_improver.performance.monitoring.health.service import HealthService
 except ImportError:
     HealthService = None
 
 try:
-    from prompt_improver.services.real_time_analytics import RealTimeAnalyticsService
+    from prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
 except ImportError:
     RealTimeAnalyticsService = None
 
 try:
-    from prompt_improver.automl.orchestrator import AutoMLOrchestrator
+    from prompt_improver.ml.automl.orchestrator import AutoMLOrchestrator
 except ImportError:
     AutoMLOrchestrator = None
 
 try:
-    from prompt_improver.evaluation.experiment_orchestrator import (
+    from prompt_improver.ml.evaluation.experiment_orchestrator import (
         ExperimentOrchestrator,
     )
 except ImportError:
     ExperimentOrchestrator = None
 
 try:
-    from prompt_improver.service.manager import APESServiceManager
+    from prompt_improver.core.services.manager import APESServiceManager
 except ImportError:
     APESServiceManager = None
 
@@ -96,9 +96,11 @@ class APESDataProvider:
         """Initialize all services."""
         try:
             # Initialize services that need async setup
-            if self.health_service and hasattr(self.health_service, 'initialize'):
+            if self.health_service and hasattr(self.health_service, "initialize"):
                 await self.health_service.initialize()
-            if self.real_time_analytics and hasattr(self.real_time_analytics, 'initialize'):
+            if self.real_time_analytics and hasattr(
+                self.real_time_analytics, "initialize"
+            ):
                 await self.real_time_analytics.initialize()
 
         except Exception as e:
@@ -111,18 +113,32 @@ class APESDataProvider:
 
         try:
             # Get system health
-            if self.health_service and hasattr(self.health_service, 'get_health_status'):
+            if self.health_service and hasattr(
+                self.health_service, "get_health_status"
+            ):
                 health_data = await self.health_service.get_health_status()
             else:
-                health_data = {"status": "unknown", "services": {}, "memory": {}, "cpu": {}, "disk": {}}
+                health_data = {
+                    "status": "unknown",
+                    "services": {},
+                    "memory": {},
+                    "cpu": {},
+                    "disk": {},
+                }
 
             # Get basic system info
             system_info = {
-                "status": "online" if health_data.get("status") == "healthy" else "warning",
+                "status": "online"
+                if health_data.get("status") == "healthy"
+                else "warning",
                 "uptime": self._calculate_uptime(),
                 "version": "3.0.0",
                 "last_restart": datetime.now() - timedelta(hours=2, minutes=15),
-                "active_services": len([s for s in health_data.get("services", {}).values() if s.get("status") == "healthy"]),
+                "active_services": len([
+                    s
+                    for s in health_data.get("services", {}).values()
+                    if s.get("status") == "healthy"
+                ]),
                 "total_services": len(health_data.get("services", {})),
                 "memory_usage": health_data.get("memory", {}).get("usage_percent", 0),
                 "cpu_usage": health_data.get("cpu", {}).get("usage_percent", 0),
@@ -131,7 +147,7 @@ class APESDataProvider:
 
             self._cache["system_overview"] = {
                 "data": system_info,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
 
             return system_info
@@ -157,7 +173,9 @@ class APESDataProvider:
 
         try:
             # Get current optimization status
-            if self.automl_orchestrator and hasattr(self.automl_orchestrator, 'get_optimization_status'):
+            if self.automl_orchestrator and hasattr(
+                self.automl_orchestrator, "get_optimization_status"
+            ):
                 status = await self.automl_orchestrator.get_optimization_status()
             else:
                 status = {"status": "idle", "current_trial": 0, "total_trials": 0}
@@ -178,7 +196,7 @@ class APESDataProvider:
 
             self._cache["automl_status"] = {
                 "data": automl_data,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
 
             return automl_data
@@ -205,19 +223,48 @@ class APESDataProvider:
             return self._cache["ab_testing"]["data"]
 
         try:
-            # Get active experiments
-            if self.experiment_orchestrator and hasattr(self.experiment_orchestrator, 'get_active_experiments'):
-                experiments = await self.experiment_orchestrator.get_active_experiments()
+            # Get active experiments from the orchestrator
+            if self.experiment_orchestrator:
+                experiments = (
+                    await self.experiment_orchestrator.get_active_experiments()
+                )
+                all_experiments = (
+                    await self.experiment_orchestrator.get_all_experiments()
+                )
+                total_experiments = len(all_experiments)
             else:
                 experiments = []
+                total_experiments = 0
+
+            # Calculate summary statistics from real data
+            significant_results = sum(
+                1
+                for exp in experiments
+                if exp.get("results", {}).get("statistical_significance")
+            )
+
+            # Note: success_rate and avg_improvement may require more complex calculations
+            # depending on the business logic. Using placeholders for now.
+            success_rate = 0.0
+            avg_improvement = 0.0
+            if experiments:
+                # Placeholder: Calculate success rate as ratio of significant results
+                success_rate = (
+                    significant_results / len(experiments) if experiments else 0.0
+                )
+                # Placeholder: Average effect size as improvement metric
+                avg_improvement = sum(
+                    exp.get("results", {}).get("effect_size", 0.0)
+                    for exp in experiments
+                ) / len(experiments)
 
             ab_data = {
                 "active_experiments": len(experiments),
-                "total_experiments": len(experiments) + 10,  # Mock historical count
+                "total_experiments": total_experiments,
                 "experiments": [],
-                "success_rate": 0.75,
-                "avg_improvement": 0.12,
-                "significant_results": 0,
+                "success_rate": success_rate,
+                "avg_improvement": avg_improvement,
+                "significant_results": significant_results,
             }
 
             # Process experiment data
@@ -229,20 +276,17 @@ class APESDataProvider:
                     "start_date": exp.get("start_date"),
                     "participants": exp.get("participants", 0),
                     "conversion_rate": exp.get("results", {}).get("conversion_rate", 0),
-                    "statistical_significance": exp.get("results", {}).get("statistical_significance", False),
-                    "confidence_interval": exp.get("results", {}).get("confidence_interval", [0, 0]),
+                    "statistical_significance": exp.get("results", {}).get(
+                        "statistical_significance", False
+                    ),
+                    "confidence_interval": exp.get("results", {}).get(
+                        "confidence_interval", [0, 0]
+                    ),
                     "effect_size": exp.get("results", {}).get("effect_size", 0),
                 }
                 ab_data["experiments"].append(experiment_data)
 
-                if experiment_data["statistical_significance"]:
-                    ab_data["significant_results"] += 1
-
-            self._cache["ab_testing"] = {
-                "data": ab_data,
-                "timestamp": datetime.now()
-            }
-
+            self._cache["ab_testing"] = {"data": ab_data, "timestamp": datetime.now()}
             return ab_data
 
         except Exception as e:
@@ -263,10 +307,16 @@ class APESDataProvider:
 
         try:
             # Get real-time metrics
-            if self.real_time_analytics and hasattr(self.real_time_analytics, 'get_current_metrics'):
+            if self.real_time_analytics and hasattr(
+                self.real_time_analytics, "get_current_metrics"
+            ):
                 metrics = await self.real_time_analytics.get_current_metrics()
             else:
-                metrics = {"avg_response_time": 125.5, "requests_per_second": 45.2, "error_rate": 0.02}
+                metrics = {
+                    "avg_response_time": 125.5,
+                    "requests_per_second": 45.2,
+                    "error_rate": 0.02,
+                }
 
             performance_data = {
                 "response_time": metrics.get("avg_response_time", 0),
@@ -283,7 +333,7 @@ class APESDataProvider:
 
             self._cache["performance_metrics"] = {
                 "data": performance_data,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
 
             return performance_data
@@ -310,27 +360,41 @@ class APESDataProvider:
 
         try:
             # Get service manager status
-            if self.service_manager and hasattr(self.service_manager, 'get_all_service_status'):
+            if self.service_manager and hasattr(
+                self.service_manager, "get_all_service_status"
+            ):
                 services = await self.service_manager.get_all_service_status()
             else:
                 services = {
-                    "mcp_server": {"status": "running", "pid": 1234, "uptime": "2h 15m"},
+                    "mcp_server": {
+                        "status": "running",
+                        "pid": 1234,
+                        "uptime": "2h 15m",
+                    },
                     "analytics": {"status": "running", "pid": 1235, "uptime": "2h 15m"},
-                    "health_service": {"status": "running", "pid": 1236, "uptime": "2h 15m"},
+                    "health_service": {
+                        "status": "running",
+                        "pid": 1236,
+                        "uptime": "2h 15m",
+                    },
                 }
 
             service_data = {
                 "services": services,
                 "total_services": len(services),
-                "running_services": len([s for s in services.values() if s.get("status") == "running"]),
-                "failed_services": len([s for s in services.values() if s.get("status") == "failed"]),
+                "running_services": len([
+                    s for s in services.values() if s.get("status") == "running"
+                ]),
+                "failed_services": len([
+                    s for s in services.values() if s.get("status") == "failed"
+                ]),
                 "system_load": 0.65,
                 "auto_restart_enabled": True,
             }
 
             self._cache["service_status"] = {
                 "data": service_data,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
 
             return service_data
@@ -349,7 +413,9 @@ class APESDataProvider:
     async def restart_service(self, service_name: str) -> bool:
         """Restart a specific service."""
         try:
-            if self.service_manager and hasattr(self.service_manager, 'restart_service'):
+            if self.service_manager and hasattr(
+                self.service_manager, "restart_service"
+            ):
                 return await self.service_manager.restart_service(service_name)
             return False
         except Exception:
@@ -358,7 +424,7 @@ class APESDataProvider:
     async def stop_service(self, service_name: str) -> bool:
         """Stop a specific service."""
         try:
-            if self.service_manager and hasattr(self.service_manager, 'stop_service'):
+            if self.service_manager and hasattr(self.service_manager, "stop_service"):
                 return await self.service_manager.stop_service(service_name)
             return False
         except Exception:
@@ -367,7 +433,7 @@ class APESDataProvider:
     async def start_service(self, service_name: str) -> bool:
         """Start a specific service."""
         try:
-            if self.service_manager and hasattr(self.service_manager, 'start_service'):
+            if self.service_manager and hasattr(self.service_manager, "start_service"):
                 return await self.service_manager.start_service(service_name)
             return False
         except Exception:

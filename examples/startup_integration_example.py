@@ -10,7 +10,7 @@ import signal
 import sys
 from pathlib import Path
 
-from prompt_improver.services.startup import (
+from prompt_improver.core.services.startup import (
     init_startup_tasks,
     is_startup_complete,
     shutdown_startup_tasks,

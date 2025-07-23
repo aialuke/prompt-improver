@@ -48,12 +48,15 @@ class DatabasePerformanceMonitor:
     - Automatic slow query detection
     - Connection pool monitoring
     - Index effectiveness analysis
+    - Event-driven monitoring with orchestrator integration
     """
 
-    def __init__(self, client: TypeSafePsycopgClient | None = None):
+    def __init__(self, client: TypeSafePsycopgClient | None = None, event_bus=None):
         self.client = client
+        self.event_bus = event_bus
         self._monitoring = False
         self._snapshots: list[DatabasePerformanceSnapshot] = []
+        self._last_alert_times = {}  # Track last alert times to prevent spam
 
     async def get_client(self) -> TypeSafePsycopgClient:
         """Get database client"""
@@ -236,6 +239,12 @@ class DatabasePerformanceMonitor:
         if len(self._snapshots) > 100:
             self._snapshots = self._snapshots[-100:]
 
+        # Emit performance snapshot event for orchestrator
+        await self._emit_performance_snapshot_event(snapshot)
+
+        # Check for performance issues and emit alerts
+        await self._check_and_emit_performance_alerts(snapshot)
+
         return snapshot
 
     async def start_monitoring(self, interval_seconds: int = 30):
@@ -335,14 +344,120 @@ class DatabasePerformanceMonitor:
 
         return recommendations
 
+    async def _emit_performance_snapshot_event(self, snapshot: DatabasePerformanceSnapshot):
+        """Emit performance snapshot event for orchestrator coordination."""
+        if not self.event_bus:
+            return
+
+        try:
+            # Import here to avoid circular imports
+            from ..ml.orchestration.events.event_types import EventType, MLEvent
+
+            await self.event_bus.emit(MLEvent(
+                event_type=EventType.DATABASE_PERFORMANCE_SNAPSHOT_TAKEN,
+                source="database_performance_monitor",
+                data={
+                    "snapshot": {
+                        "timestamp": snapshot.timestamp.isoformat(),
+                        "cache_hit_ratio": snapshot.cache_hit_ratio,
+                        "active_connections": snapshot.active_connections,
+                        "total_queries": snapshot.total_queries,
+                        "avg_query_time_ms": snapshot.avg_query_time_ms,
+                        "slow_queries_count": snapshot.slow_queries_count,
+                        "database_size_mb": snapshot.database_size_mb,
+                        "index_hit_ratio": snapshot.index_hit_ratio
+                    }
+                }
+            ))
+        except Exception as e:
+            # Don't fail monitoring if event emission fails
+            pass
+
+    async def _check_and_emit_performance_alerts(self, snapshot: DatabasePerformanceSnapshot):
+        """Check performance thresholds and emit alerts if needed."""
+        if not self.event_bus:
+            return
+
+        try:
+            # Import here to avoid circular imports
+            from ..ml.orchestration.events.event_types import EventType, MLEvent
+            from datetime import timedelta
+
+            current_time = datetime.utcnow()
+
+            # Check cache hit ratio (target: >90%)
+            if snapshot.cache_hit_ratio < 90.0:
+                # Throttle alerts to once per 5 minutes
+                last_alert = self._last_alert_times.get("cache_hit_ratio")
+                if not last_alert or current_time - last_alert > timedelta(minutes=5):
+                    await self.event_bus.emit(MLEvent(
+                        event_type=EventType.DATABASE_CACHE_HIT_RATIO_LOW,
+                        source="database_performance_monitor",
+                        data={
+                            "cache_hit_ratio": snapshot.cache_hit_ratio,
+                            "threshold": 90.0,
+                            "severity": "warning"
+                        }
+                    ))
+                    self._last_alert_times["cache_hit_ratio"] = current_time
+
+            # Check query performance (target: <50ms)
+            if snapshot.avg_query_time_ms > 50.0:
+                last_alert = self._last_alert_times.get("slow_queries")
+                if not last_alert or current_time - last_alert > timedelta(minutes=5):
+                    await self.event_bus.emit(MLEvent(
+                        event_type=EventType.DATABASE_SLOW_QUERY_DETECTED,
+                        source="database_performance_monitor",
+                        data={
+                            "avg_query_time_ms": snapshot.avg_query_time_ms,
+                            "threshold": 50.0,
+                            "slow_queries_count": snapshot.slow_queries_count,
+                            "severity": "warning"
+                        }
+                    ))
+                    self._last_alert_times["slow_queries"] = current_time
+
+            # Check for performance degradation (multiple indicators)
+            performance_issues = []
+            if snapshot.cache_hit_ratio < 80.0:
+                performance_issues.append("critical_cache_hit_ratio")
+            if snapshot.avg_query_time_ms > 100.0:
+                performance_issues.append("critical_query_time")
+            if snapshot.active_connections > 25:
+                performance_issues.append("high_connection_count")
+
+            if performance_issues:
+                last_alert = self._last_alert_times.get("performance_degraded")
+                if not last_alert or current_time - last_alert > timedelta(minutes=10):
+                    await self.event_bus.emit(MLEvent(
+                        event_type=EventType.DATABASE_PERFORMANCE_DEGRADED,
+                        source="database_performance_monitor",
+                        data={
+                            "issues": performance_issues,
+                            "snapshot_data": {
+                                "cache_hit_ratio": snapshot.cache_hit_ratio,
+                                "avg_query_time_ms": snapshot.avg_query_time_ms,
+                                "active_connections": snapshot.active_connections
+                            },
+                            "severity": "critical"
+                        }
+                    ))
+                    self._last_alert_times["performance_degraded"] = current_time
+
+        except Exception as e:
+            # Don't fail monitoring if event emission fails
+            pass
+
 
 # Global monitor instance
 _monitor: DatabasePerformanceMonitor | None = None
 
 
-async def get_performance_monitor() -> DatabasePerformanceMonitor:
-    """Get or create global performance monitor"""
+async def get_performance_monitor(event_bus=None) -> DatabasePerformanceMonitor:
+    """Get or create global performance monitor with optional event bus integration"""
     global _monitor
     if _monitor is None:
-        _monitor = DatabasePerformanceMonitor()
+        _monitor = DatabasePerformanceMonitor(event_bus=event_bus)
+    elif event_bus and not _monitor.event_bus:
+        _monitor.event_bus = event_bus
     return _monitor

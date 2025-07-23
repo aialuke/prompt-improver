@@ -13,7 +13,8 @@ from .error_handlers import (
                              handle_network_errors,
                              handle_validation_errors,
 )
-from .redis_cache import RedisCache, get, invalidate, set, with_singleflight
+# Removed redis_cache import to prevent circular imports
+# Import redis_cache directly when needed: from .redis_cache import RedisCache
 
 # Health checks removed to avoid circular import
 # Import directly from utils.health_checks if needed

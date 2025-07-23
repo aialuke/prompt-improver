@@ -14,7 +14,7 @@ import pytest
 def test_no_duplicate_method_definitions():
     """Test that there are no duplicate method definitions in FailureModeAnalyzer."""
     # Import the module
-    from prompt_improver.learning.failure_analyzer import FailureModeAnalyzer
+    from prompt_improver.ml.learning.algorithms.failure_analyzer import FailureModeAnalyzer
 
     # Get all methods from the class
     all_methods = inspect.getmembers(FailureModeAnalyzer, predicate=inspect.ismethod)
@@ -38,7 +38,7 @@ def test_no_duplicate_method_definitions():
 
 def test_specific_methods_single_definition():
     """Test that specific methods that were previously duplicated now have exactly one definition."""
-    from prompt_improver.learning.failure_analyzer import FailureModeAnalyzer
+    from prompt_improver.ml.learning.algorithms.failure_analyzer import FailureModeAnalyzer
 
     # Methods that were previously duplicated
     target_methods = [
@@ -118,7 +118,7 @@ def test_no_undefined_method_calls():
     import inspect
 
     # Get the source code of the class
-    from prompt_improver.learning.failure_analyzer import FailureModeAnalyzer
+    from prompt_improver.ml.learning.algorithms.failure_analyzer import FailureModeAnalyzer
 
     source = inspect.getsource(FailureModeAnalyzer)
 

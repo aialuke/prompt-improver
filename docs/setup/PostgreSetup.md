@@ -620,52 +620,86 @@ class EnhancedMLOptimizer:
     
     async def optimize_rule_parameters(self, rule_id: str) -> Dict:
         """
-        Optimize rule parameters based on historical performance data
+        Optimize rule parameters based on historical performance data using RuleOptimizer
         """
-        # Get rule-specific performance data
+        # Get rule-specific performance data for RuleOptimizer
+        performance_data = await self.get_rule_performance_data(rule_id)
+        if not performance_data:
+            return {'status': 'insufficient_data'}
+
+        # Get historical data for advanced optimization
+        historical_data = await self.get_historical_data(rule_id)
+
+        # Use the actual RuleOptimizer.optimize_rule method
+        optimization_result = await self.rule_optimizer.optimize_rule(
+            rule_id=rule_id,
+            performance_data=performance_data,
+            historical_data=historical_data
+        )
+
+        # Track optimization experiment in MLflow
+        with mlflow.start_run(run_name=f"rule_optimization_{rule_id}"):
+            mlflow.log_params(optimization_result.get('optimized_parameters', {}))
+            mlflow.log_metric("optimization_status", 1 if optimization_result['status'] == 'optimized' else 0)
+            if 'multi_objective_optimization' in optimization_result:
+                mlflow.log_metric("pareto_solutions", len(optimization_result['multi_objective_optimization'].get('pareto_frontier', [])))
+            if 'gaussian_process_optimization' in optimization_result:
+                mlflow.log_metric("gp_predicted_performance", optimization_result['gaussian_process_optimization'].get('predicted_performance', 0))
+
+        return optimization_result
+
+    async def get_rule_performance_data(self, rule_id: str) -> Dict:
+        """Get performance data in the format expected by RuleOptimizer"""
         async with self.db_client.direct_client.pool.acquire() as conn:
             performance_data = await conn.fetch("""
-                SELECT 
-                    rule_parameters,
-                    improvement_score,
-                    confidence_level,
-                    prompt_characteristics
-                FROM rule_performance 
-                WHERE rule_id = $1 
+                SELECT
+                    COUNT(*) as total_applications,
+                    AVG(improvement_score) as avg_improvement,
+                    STDDEV(improvement_score) as improvement_stddev,
+                    AVG(confidence_level) as avg_confidence
+                FROM rule_performance
+                WHERE rule_id = $1
+                AND created_at >= NOW() - INTERVAL '90 days'
+            """, rule_id)
+
+        if not performance_data or not performance_data[0]['total_applications']:
+            return {}
+
+        row = performance_data[0]
+        return {
+            rule_id: {
+                "total_applications": row['total_applications'],
+                "avg_improvement": float(row['avg_improvement'] or 0),
+                "consistency_score": 1.0 - float(row['improvement_stddev'] or 0.1),
+                "confidence_level": float(row['avg_confidence'] or 0.5)
+            }
+        }
+
+    async def get_historical_data(self, rule_id: str) -> List[Dict]:
+        """Get historical data in the format expected by RuleOptimizer"""
+        async with self.db_client.direct_client.pool.acquire() as conn:
+            historical_data = await conn.fetch("""
+                SELECT
+                    improvement_score as score,
+                    prompt_characteristics as context,
+                    created_at as timestamp,
+                    rule_parameters
+                FROM rule_performance
+                WHERE rule_id = $1
                 AND created_at >= NOW() - INTERVAL '90 days'
                 ORDER BY created_at DESC
                 LIMIT 1000
             """, rule_id)
-        
-        if not performance_data:
-            return {'status': 'insufficient_data'}
-        
-        # Convert to DataFrame for analysis
-        df = pd.DataFrame([
+
+        return [
             {
-                'parameters': row['rule_parameters'],
-                'score': row['improvement_score'],
-                'confidence': row['confidence_level'],
-                'characteristics': row['prompt_characteristics']
+                'score': float(row['score']),
+                'context': row['context'] or {},
+                'timestamp': row['timestamp'].isoformat(),
+                'rule_parameters': row['rule_parameters'] or {}
             }
-            for row in performance_data
-        ])
-        
-        # Perform parameter optimization using historical data
-        optimal_params = self._optimize_parameters(df)
-        
-        # Track optimization experiment in MLflow
-        with mlflow.start_run(run_name=f"rule_optimization_{rule_id}"):
-            mlflow.log_params(optimal_params)
-            mlflow.log_metric("historical_performance", df['score'].mean())
-            mlflow.log_metric("sample_size", len(df))
-        
-        return {
-            'rule_id': rule_id,
-            'optimized_parameters': optimal_params,
-            'expected_improvement': self._predict_improvement(optimal_params, df),
-            'confidence': self._calculate_optimization_confidence(df)
-        }
+            for row in historical_data
+        ]
     
     async def discover_rule_patterns(self) -> List[Dict]:
         """
@@ -824,7 +858,18 @@ async def optimize_rules():
     # Optimize existing rules
     rule_ids = ['clarity_rule', 'specificity_rule']  # Get from config
     for rule_id in rule_ids:
-        await ml_optimizer.optimize_rule_parameters(rule_id)
+        # Get performance data for the rule
+        performance_data = await ml_optimizer.get_rule_performance_data(rule_id)
+        if performance_data:
+            # Call the actual RuleOptimizer.optimize_rule method with proper parameters
+            optimization_result = await ml_optimizer.rule_optimizer.optimize_rule(
+                rule_id=rule_id,
+                performance_data=performance_data,
+                historical_data=await ml_optimizer.get_historical_data(rule_id)
+            )
+            console.print(f"[green]Optimized {rule_id}: {optimization_result['status']}[/green]")
+        else:
+            console.print(f"[yellow]Insufficient data for {rule_id}[/yellow]")
 ```
 
 ### Phase 3: MCP Server Integration

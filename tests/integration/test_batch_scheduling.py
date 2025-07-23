@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from prompt_improver.optimization.batch_processor import (
+from prompt_improver.ml.optimization.batch.batch_processor import (
     BatchProcessor,
     BatchProcessorConfig,
     PriorityQueue,

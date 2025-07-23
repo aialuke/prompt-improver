@@ -11,7 +11,7 @@ import re
 import string
 from typing import Any, Dict, List
 
-from ...services.llm_transformer import LLMTransformerService
+from ...ml.preprocessing.llm_transformer import LLMTransformerService
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Enhanced vague words list based on research

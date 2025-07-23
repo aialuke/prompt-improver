@@ -888,8 +888,8 @@ def sample_improvement_sessions():
 @pytest.fixture
 def ml_service():
     """Create ML service instance for testing."""
-    with patch("prompt_improver.services.ml_integration.mlflow"):
-        from prompt_improver.services.ml_integration import MLModelService
+    with patch("prompt_improver.ml.core.ml_integration.mlflow"):
+        from prompt_improver.ml.core.ml_integration import MLModelService
 
         return MLModelService()
 
@@ -897,7 +897,7 @@ def ml_service():
 @pytest.fixture
 def prompt_service():
     """Create PromptImprovementService instance."""
-    from prompt_improver.services.prompt_improvement import PromptImprovementService
+    from prompt_improver.core.services.prompt_improvement import PromptImprovementService
 
     return PromptImprovementService()
 

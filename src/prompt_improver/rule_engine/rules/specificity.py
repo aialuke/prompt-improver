@@ -11,7 +11,7 @@ import asyncio
 import re
 from typing import Any, Dict, List, Tuple
 
-from ...services.llm_transformer import LLMTransformerService
+from ...ml.preprocessing.llm_transformer import LLMTransformerService
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
 # Vague language patterns that reduce specificity

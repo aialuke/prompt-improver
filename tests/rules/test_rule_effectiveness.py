@@ -5,7 +5,7 @@ import time
 import pytest
 
 from prompt_improver.rule_engine.base import BasePromptRule
-from prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.core.services.prompt_improvement import PromptImprovementService
 
 # Load prompts from fixtures
 fixture_file = os.path.join(os.path.dirname(__file__), "../fixtures/prompts.json")

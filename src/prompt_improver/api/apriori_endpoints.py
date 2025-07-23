@@ -23,9 +23,9 @@ from ..database.models import (
     PatternDiscoveryRequest,
     PatternDiscoveryResponse,
 )
-from ..services.advanced_pattern_discovery import AdvancedPatternDiscovery
-from ..services.apriori_analyzer import AprioriAnalyzer, AprioriConfig
-from ..services.ml_integration import MLModelService, get_ml_service
+from ..ml.learning.patterns.advanced_pattern_discovery import AdvancedPatternDiscovery
+from ..ml.learning.patterns.apriori_analyzer import AprioriAnalyzer, AprioriConfig
+from ..ml.core.ml_integration import MLModelService, get_ml_service
 
 logger = logging.getLogger(__name__)
 

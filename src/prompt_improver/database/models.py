@@ -40,7 +40,6 @@ class PromptSession(SQLModel, table=True):
     updated_at: datetime | None = Field(default=None)
 
     # Relationships
-    rule_performances: list["prompt_improver.database.models.RulePerformance"] = Relationship(back_populates="session")
     user_feedback: Optional["prompt_improver.database.models.UserFeedback"] = Relationship(back_populates="session")
     training_data: Optional[List["TrainingPrompt"]] = Relationship(back_populates="session")
 
@@ -114,24 +113,36 @@ class RuleMetadata(SQLModel, table=True):
 
 
 class RulePerformance(SQLModel, table=True):
-    """Table for tracking rule performance metrics"""
+    """Table for tracking rule performance metrics - matches actual database schema"""
 
     __tablename__: str = "rule_performance"
     __table_args__ = {"extend_existing": True}
 
     id: int = Field(primary_key=True)
-    session_id: str = Field(foreign_key="prompt_sessions.session_id", index=True)
     rule_id: str = Field(foreign_key="rule_metadata.rule_id", index=True)
-    improvement_score: float
-    execution_time_ms: float
-    confidence_level: float
-    parameters_used: dict[str, Any] | None = Field(
+    rule_name: str = Field(index=True)
+    prompt_id: Optional[str] = Field(default=None, index=True)
+    prompt_type: Optional[str] = Field(default=None)
+    prompt_category: Optional[str] = Field(default=None)
+    improvement_score: Optional[float] = Field(default=None)
+    confidence_level: Optional[float] = Field(default=None)
+    execution_time_ms: Optional[int] = Field(default=None)
+    rule_parameters: Optional[dict[str, Any]] = Field(
         default=None, sa_column=sqlmodel.Column(JSON)
     )
-    created_at: datetime = Field(default_factory=naive_utc_now)
+    prompt_characteristics: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=sqlmodel.Column(JSON)
+    )
+    before_metrics: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=sqlmodel.Column(JSON)
+    )
+    after_metrics: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=sqlmodel.Column(JSON)
+    )
+    created_at: Optional[datetime] = Field(default_factory=naive_utc_now)
+    updated_at: Optional[datetime] = Field(default=None)
 
-    # Relationships
-    session: "prompt_improver.database.models.PromptSession" = Relationship(back_populates="rule_performances")
+    # Relationships - updated to match actual schema
     rule: "prompt_improver.database.models.RuleMetadata" = Relationship(back_populates="performances")
 
 

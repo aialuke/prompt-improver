@@ -16,7 +16,7 @@ from typing import Any, Optional, Union
 import lz4.frame
 import redis.asyncio as redis
 import yaml
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # Configure logging
@@ -266,68 +266,59 @@ def cached(ttl=3600, key_func=None):
     return decorator
 
 
-# Initialize Prometheus metrics with collision avoidance
-from prometheus_client import REGISTRY, CollectorRegistry
+# Lazy import to prevent circular imports
+def _get_cache_metrics():
+    """Lazy initialization of cache metrics."""
+    try:
+        from ..performance.monitoring.metrics_registry import get_metrics_registry, StandardMetrics
+        metrics_registry = get_metrics_registry()
+        return {
+            'hits': metrics_registry.get_or_create_counter(
+                StandardMetrics.CACHE_HITS_TOTAL,
+                'Total number of Redis cache hits'
+            ),
+            'misses': metrics_registry.get_or_create_counter(
+                StandardMetrics.CACHE_MISSES_TOTAL,
+                'Total number of Redis cache misses'
+            ),
+            'latency': metrics_registry.get_or_create_histogram(
+                StandardMetrics.CACHE_OPERATION_DURATION,
+                'Redis cache operation latency in seconds',
+                ['operation']
+            )
+        }
+    except ImportError:
+        # Fallback to mock metrics
+        class MockMetric:
+            def inc(self, *args, **kwargs): pass
+            def observe(self, *args, **kwargs): pass
+            def labels(self, *args, **kwargs): return self
 
-try:
-    CACHE_HITS = Counter('redis_cache_hits_total', 'Total number of Redis cache hits')
-except ValueError:
-    # Metric already exists, retrieve it
-    for collector in REGISTRY._collector_to_names.keys():
-        if hasattr(collector, '_name') and collector._name == 'redis_cache_hits_total':
-            CACHE_HITS = collector
-            break
-    else:
-        # Create with different name if still failing
-        CACHE_HITS = Counter('redis_cache_hits_total_v2', 'Total number of Redis cache hits')
+        return {
+            'hits': MockMetric(),
+            'misses': MockMetric(),
+            'latency': MockMetric()
+        }
 
-try:
-    CACHE_MISSES = Counter('redis_cache_misses_total', 'Total number of Redis cache misses')
-except ValueError:
-    for collector in REGISTRY._collector_to_names.keys():
-        if hasattr(collector, '_name') and collector._name == 'redis_cache_misses_total':
-            CACHE_MISSES = collector
-            break
-    else:
-        CACHE_MISSES = Counter('redis_cache_misses_total_v2', 'Total number of Redis cache misses')
+# Initialize metrics lazily
+_cache_metrics = None
 
-try:
-    CACHE_LATENCY = Histogram(
-        'redis_cache_operation_duration_seconds',
-        'Redis cache operation latency in seconds',
-        ['operation']
-    )
-except ValueError:
-    for collector in REGISTRY._collector_to_names.keys():
-        if hasattr(collector, '_name') and collector._name == 'redis_cache_operation_duration_seconds':
-            CACHE_LATENCY = collector
-            break
-    else:
-        CACHE_LATENCY = Histogram(
-            'redis_cache_operation_duration_seconds_v2',
-            'Redis cache operation latency in seconds',
-            ['operation']
-        )
+def get_cache_metrics():
+    global _cache_metrics
+    if _cache_metrics is None:
+        _cache_metrics = _get_cache_metrics()
+    return _cache_metrics
 
-try:
-    CACHE_LATENCY_MS = Histogram(
-        'redis_cache_latency_ms',
-        'Redis cache operation latency in milliseconds',
-        ['operation'],
-        buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, float('inf'))
-    )
-except ValueError:
-    for collector in REGISTRY._collector_to_names.keys():
-        if hasattr(collector, '_name') and collector._name == 'redis_cache_latency_ms':
-            CACHE_LATENCY_MS = collector
-            break
-    else:
-        CACHE_LATENCY_MS = Histogram(
-            'redis_cache_latency_ms_v2',
-            'Redis cache operation latency in milliseconds',
-            ['operation'],
-            buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, float('inf'))
-        )
+# Legacy metric accessors for backward compatibility
+def _get_legacy_metric(metric_name):
+    """Get legacy metric with lazy loading."""
+    metrics = get_cache_metrics()
+    return metrics.get(metric_name, metrics['hits'])  # Fallback to hits metric
+
+CACHE_HITS = property(lambda self: get_cache_metrics()['hits'])
+CACHE_MISSES = property(lambda self: get_cache_metrics()['misses'])
+CACHE_LATENCY = property(lambda self: get_cache_metrics()['latency'])
+CACHE_LATENCY_MS = property(lambda self: get_cache_metrics()['latency'])  # Same as CACHE_LATENCY
 
 try:
     CACHE_ERRORS = Counter('redis_cache_errors_total', 'Total number of Redis cache errors', ['operation'])
@@ -405,22 +396,23 @@ class RedisCache:
         async def _redis_get_operation():
             """Internal Redis get operation."""
             start_time = time.perf_counter()
-            with CACHE_LATENCY.labels(operation='get').time():
+            metrics = get_cache_metrics()
+            with metrics['latency'].labels(operation='get').time():
                 data = await redis_client.get(key)
             end_time = time.perf_counter()
-            CACHE_LATENCY_MS.labels(operation='get').observe((end_time - start_time) * 1000)
+            metrics['latency'].labels(operation='get').observe((end_time - start_time) * 1000)
             if data:
-                CACHE_HITS.inc()
+                metrics['hits'].inc()
                 try:
                     return lz4.frame.decompress(data)
                 except Exception as e:
                     logger.warning(f"Failed to decompress cache data for key {key}: {e}")
                     # Clean up corrupted cache entry
                     await redis_client.delete(key)
-                    CACHE_MISSES.inc()
+                    metrics['misses'].inc()
                     return None
             else:
-                CACHE_MISSES.inc()
+                metrics['misses'].inc()
                 return None
 
         for attempt in range(retries):

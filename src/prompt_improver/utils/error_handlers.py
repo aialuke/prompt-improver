@@ -873,9 +873,9 @@ def handle_network_errors(
     retry_delay: float = 1.0,
     backoff_multiplier: float = 2.0,
 ):
-    """Decorator for network operations with retry logic.
+    """Decorator for network operations with unified retry logic.
 
-    Handles network-specific errors with exponential backoff:
+    Handles network-specific errors using the unified retry manager:
     - Connection errors
     - Timeout errors
     - HTTP errors
@@ -894,51 +894,56 @@ def handle_network_errors(
         async def async_wrapper(*args, **kwargs) -> Any:
             operation = operation_name or func.__name__
 
-            for attempt in range(retry_count + 1):
-                try:
-                    return await func(*args, **kwargs)
+            # Use unified retry manager for network operations
+            from ..ml.orchestration.core.unified_retry_manager import (
+                get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
+            )
 
-                except (ConnectionError, TimeoutError) as e:
-                    if attempt < retry_count:
-                        delay = retry_delay * (backoff_multiplier**attempt)
-                        logger.warning(
-                            f"Network error in {operation} (attempt {attempt + 1}/{retry_count + 1}): {e}. "
-                            f"Retrying in {delay:.1f}s..."
-                        )
-                        await asyncio.sleep(delay)
-                        continue
+            retry_config = RetryConfig(
+                max_attempts=retry_count + 1,
+                strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
+                initial_delay_ms=int(retry_delay * 1000),
+                multiplier=backoff_multiplier,
+                jitter=True,
+                retryable_errors=[RetryableErrorType.NETWORK, RetryableErrorType.TIMEOUT],
+                operation_name=operation
+            )
 
-                    logger.error(
-                        f"Network error in {operation} after {retry_count + 1} attempts: {e}"
-                    )
+            retry_manager = get_retry_manager()
 
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "network",
-                        }
-                    if return_format == "raise":
+            try:
+                async def network_operation():
+                    try:
+                        return await func(*args, **kwargs)
+                    except (ConnectionError, TimeoutError) as e:
+                        # These are retryable network errors
                         raise
-                    return None
-
-                except KeyboardInterrupt:
-                    logger.warning(f"{operation} cancelled by user")
-                    raise
-
-                except Exception as e:
-                    logger.error(f"Unexpected network error in {operation}: {e}")
-                    logging.exception(f"Unexpected error in {operation}")
-
-                    if return_format == "dict":
+                    except KeyboardInterrupt:
+                        logger.warning(f"{operation} cancelled by user")
+                        raise
+                    except Exception as e:
+                        logger.error(f"Unexpected network error in {operation}: {e}")
+                        logging.exception(f"Unexpected error in {operation}")
+                        if return_format == "raise":
+                            raise
                         return {
                             "status": "error",
                             "error": str(e),
                             "error_type": "unexpected",
-                        }
-                    if return_format == "raise":
-                        raise
-                    return None
+                        } if return_format == "dict" else None
+
+                return await retry_manager.retry_async(network_operation, config=retry_config)
+
+            except Exception as e:
+                if return_format == "dict":
+                    return {
+                        "status": "error",
+                        "error": str(e),
+                        "error_type": "network",
+                    }
+                elif return_format == "raise":
+                    raise
+                return None
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs) -> Any:

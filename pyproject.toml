@@ -347,6 +347,7 @@ markers = [
     "property_based: marks tests using Hypothesis property-based testing",
     "metamorphic: marks tests for ML metamorphic property validation",
     "ml_performance: marks tests for ML component performance characterization",
+    "stress: marks tests as stress/load tests for high-volume scenarios",
     "ml_data_validation: marks tests for ML data quality validation",
     "database_constraints: marks tests for database constraint validation",
     "database_transactions: marks tests for database transaction integrity",

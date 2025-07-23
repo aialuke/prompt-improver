@@ -29,8 +29,8 @@ import numpy as np
 import pytest
 
 # Import the real InputSanitizer implementation following 2025 best practices
-from src.prompt_improver.services.security.input_sanitization import InputSanitizer as RealInputSanitizer
-from src.prompt_improver.service.security import PromptDataProtection
+from prompt_improver.security.input_sanitization import InputSanitizer as RealInputSanitizer
+from prompt_improver.core.services.security import PromptDataProtection
 
 
 @pytest.fixture

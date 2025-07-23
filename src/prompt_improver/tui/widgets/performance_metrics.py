@@ -1,7 +1,17 @@
-"""Performance Metrics Widget - displays real-time system performance data."""
+"""
+Performance Metrics Widget - displays real-time system performance data.
 
-from datetime import datetime
-from typing import Any, Dict, List
+Enhanced with 2025 best practices:
+- SLI/SLO integration and monitoring
+- Error budget tracking and burn rate analysis
+- Adaptive thresholds and anomaly detection
+- Multi-dimensional metrics visualization
+- Real-time alerting and health status
+"""
+
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Union
+import logging
 
 from rich.bar import Bar
 from rich.console import Console
@@ -12,31 +22,108 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 
+# Optional import for SLO integration
+try:
+    from ...performance.monitoring.performance_monitor import (
+        EnhancedPerformanceMonitor,
+        SLO,
+        SLI,
+        SLIType
+    )
+    SLO_INTEGRATION_AVAILABLE = True
+except ImportError:
+    SLO_INTEGRATION_AVAILABLE = False
+
 
 class PerformanceMetricsWidget(Static):
-    """Widget displaying real-time performance metrics."""
+    """
+    Enhanced Performance Metrics Widget with 2025 best practices.
+
+    Features:
+    - SLI/SLO monitoring and error budget tracking
+    - Burn rate analysis and adaptive thresholds
+    - Multi-dimensional metrics visualization
+    - Real-time alerting and health status
+    - Orchestrator integration support
+    """
 
     performance_data = reactive({})
+    slo_data = reactive({})
+    health_status = reactive("unknown")
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 enable_slo_monitoring: bool = True,
+                 enable_adaptive_thresholds: bool = True,
+                 **kwargs):
         super().__init__(**kwargs)
         self.console = Console()
+        self.logger = logging.getLogger(__name__)
+
+        # 2025 best practices configuration
+        self.enable_slo_monitoring = enable_slo_monitoring and SLO_INTEGRATION_AVAILABLE
+        self.enable_adaptive_thresholds = enable_adaptive_thresholds
+
+        # Enhanced thresholds (2025 best practices)
+        self.adaptive_thresholds = {
+            "response_time": {"warning": 150.0, "critical": 300.0},
+            "error_rate": {"warning": 0.01, "critical": 0.05},
+            "cpu_usage": {"warning": 70.0, "critical": 90.0},
+            "memory_usage": {"warning": 80.0, "critical": 95.0},
+            "queue_length": {"warning": 20, "critical": 50},
+            "cache_hit_rate": {"warning": 0.8, "critical": 0.6}
+        }
+
+        # SLO integration
+        self.performance_monitor = None
+        if self.enable_slo_monitoring:
+            try:
+                self.performance_monitor = EnhancedPerformanceMonitor(
+                    enable_anomaly_detection=True,
+                    enable_adaptive_thresholds=enable_adaptive_thresholds
+                )
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize SLO monitoring: {e}")
+                self.enable_slo_monitoring = False
 
     def compose(self):
-        """Compose the widget layout."""
-        yield Static(id="performance-metrics-content")
+        """Compose the widget layout with enhanced structure."""
+        with Vertical():
+            yield Static("", id="performance-metrics-content")
+            if self.enable_slo_monitoring:
+                yield Static("", id="slo-metrics-content")
 
     def on_mount(self) -> None:
         """Initialize the widget when mounted."""
         self.update_display()
+        if self.enable_slo_monitoring:
+            self.update_slo_display()
 
     async def update_data(self, data_provider) -> None:
-        """Update widget data from data provider."""
+        """Update widget data from data provider with enhanced error handling."""
         try:
+            # Get performance metrics
             self.performance_data = await data_provider.get_performance_metrics()
+
+            # Update SLO data if monitoring is enabled
+            if self.enable_slo_monitoring and self.performance_monitor:
+                await self._update_slo_data()
+
+            # Update adaptive thresholds
+            if self.enable_adaptive_thresholds:
+                self._update_adaptive_thresholds()
+
+            # Update health status
+            self._update_health_status()
+
+            # Update displays
             self.update_display()
+            if self.enable_slo_monitoring:
+                self.update_slo_display()
+
         except Exception as e:
+            self.logger.error(f"Failed to update performance data: {e}")
             self.performance_data = {"error": str(e)}
+            self.health_status = "error"
             self.update_display()
 
     def update_display(self) -> None:
@@ -138,25 +225,37 @@ class PerformanceMetricsWidget(Static):
             from rich.console import Group
             final_content = Group(*content)
 
-        # Update the display
-        content_widget = self.query_one("#performance-metrics-content", Static)
-        content_widget.update(final_content)
+        # Update the display (with safe fallback for non-mounted widgets)
+        try:
+            content_widget = self.query_one("#performance-metrics-content", Static)
+            content_widget.update(final_content)
+        except Exception:
+            # Fallback for widgets not mounted in full Textual app
+            self.update(final_content)
 
     def _get_response_time_color(self, response_time: float) -> str:
-        """Get color for response time based on performance thresholds."""
-        if response_time < 100:
+        """Get color for response time based on adaptive thresholds."""
+        warning_threshold = self.adaptive_thresholds["response_time"]["warning"]
+        critical_threshold = self.adaptive_thresholds["response_time"]["critical"]
+
+        if response_time < warning_threshold:
             return "green"
-        if response_time < 500:
+        elif response_time < critical_threshold:
             return "yellow"
-        return "red"
+        else:
+            return "red"
 
     def _get_error_rate_color(self, error_rate: float) -> str:
-        """Get color for error rate."""
-        if error_rate < 0.01:  # < 1%
+        """Get color for error rate based on adaptive thresholds."""
+        warning_threshold = self.adaptive_thresholds["error_rate"]["warning"]
+        critical_threshold = self.adaptive_thresholds["error_rate"]["critical"]
+
+        if error_rate < warning_threshold:
             return "green"
-        if error_rate < 0.05:  # < 5%
+        elif error_rate < critical_threshold:
             return "yellow"
-        return "red"
+        else:
+            return "red"
 
     def _get_queue_color(self, queue_length: int) -> str:
         """Get color for queue length."""
@@ -271,3 +370,212 @@ class PerformanceMetricsWidget(Static):
             alerts.append(f"[yellow]⚠ Low cache hit rate: {cache_hit_rate:.1%}[/yellow]")
 
         return alerts
+
+    async def _update_slo_data(self) -> None:
+        """Update SLO data from performance monitor."""
+        if not self.performance_monitor:
+            return
+
+        try:
+            # Record current performance measurement
+            response_time = self.performance_data.get("response_time", 0)
+            error_rate = self.performance_data.get("error_rate", 0.0)
+
+            await self.performance_monitor.record_performance_measurement(
+                operation_name="widget_metrics",
+                response_time_ms=response_time,
+                is_error=error_rate > 0.01,
+                business_value=1.0
+            )
+
+            # Get SLO dashboard data
+            self.slo_data = self.performance_monitor.get_slo_dashboard()
+
+        except Exception as e:
+            self.logger.warning(f"Failed to update SLO data: {e}")
+
+    def _update_adaptive_thresholds(self) -> None:
+        """Update adaptive thresholds based on historical data."""
+        if not self.enable_adaptive_thresholds:
+            return
+
+        try:
+            # Simple adaptive threshold adjustment based on recent trends
+            response_time = self.performance_data.get("response_time", 0)
+            error_rate = self.performance_data.get("error_rate", 0.0)
+
+            # Adjust response time thresholds
+            if response_time > 0:
+                current_warning = self.adaptive_thresholds["response_time"]["warning"]
+                current_critical = self.adaptive_thresholds["response_time"]["critical"]
+
+                # Gradually adjust thresholds based on current performance
+                adjustment_factor = 0.05  # 5% adjustment
+                if response_time > current_critical:
+                    # Performance is worse, relax thresholds slightly
+                    self.adaptive_thresholds["response_time"]["warning"] *= (1 + adjustment_factor)
+                    self.adaptive_thresholds["response_time"]["critical"] *= (1 + adjustment_factor)
+                elif response_time < current_warning * 0.8:
+                    # Performance is better, tighten thresholds slightly
+                    self.adaptive_thresholds["response_time"]["warning"] *= (1 - adjustment_factor)
+                    self.adaptive_thresholds["response_time"]["critical"] *= (1 - adjustment_factor)
+
+            # Adjust error rate thresholds
+            if error_rate > 0:
+                current_warning = self.adaptive_thresholds["error_rate"]["warning"]
+                current_critical = self.adaptive_thresholds["error_rate"]["critical"]
+
+                adjustment_factor = 0.1  # 10% adjustment for error rates
+                if error_rate > current_critical:
+                    self.adaptive_thresholds["error_rate"]["warning"] *= (1 + adjustment_factor)
+                    self.adaptive_thresholds["error_rate"]["critical"] *= (1 + adjustment_factor)
+                elif error_rate < current_warning * 0.5:
+                    self.adaptive_thresholds["error_rate"]["warning"] *= (1 - adjustment_factor)
+                    self.adaptive_thresholds["error_rate"]["critical"] *= (1 - adjustment_factor)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to update adaptive thresholds: {e}")
+
+    def _update_health_status(self) -> None:
+        """Update overall health status based on current metrics."""
+        try:
+            if "error" in self.performance_data:
+                self.health_status = "error"
+                return
+
+            # Check critical thresholds
+            response_time = self.performance_data.get("response_time", 0)
+            error_rate = self.performance_data.get("error_rate", 0.0)
+            cpu_usage = self.performance_data.get("cpu_usage", 0)
+            memory_usage = self.performance_data.get("memory_usage", 0)
+
+            critical_issues = []
+            warning_issues = []
+
+            # Check response time
+            if response_time > self.adaptive_thresholds["response_time"]["critical"]:
+                critical_issues.append("response_time")
+            elif response_time > self.adaptive_thresholds["response_time"]["warning"]:
+                warning_issues.append("response_time")
+
+            # Check error rate
+            if error_rate > self.adaptive_thresholds["error_rate"]["critical"]:
+                critical_issues.append("error_rate")
+            elif error_rate > self.adaptive_thresholds["error_rate"]["warning"]:
+                warning_issues.append("error_rate")
+
+            # Check CPU usage
+            if cpu_usage > self.adaptive_thresholds["cpu_usage"]["critical"]:
+                critical_issues.append("cpu_usage")
+            elif cpu_usage > self.adaptive_thresholds["cpu_usage"]["warning"]:
+                warning_issues.append("cpu_usage")
+
+            # Check memory usage
+            if memory_usage > self.adaptive_thresholds["memory_usage"]["critical"]:
+                critical_issues.append("memory_usage")
+            elif memory_usage > self.adaptive_thresholds["memory_usage"]["warning"]:
+                warning_issues.append("memory_usage")
+
+            # Determine overall health
+            if critical_issues:
+                self.health_status = "critical"
+            elif warning_issues:
+                self.health_status = "warning"
+            else:
+                self.health_status = "healthy"
+
+        except Exception as e:
+            self.logger.warning(f"Failed to update health status: {e}")
+            self.health_status = "unknown"
+
+    def update_slo_display(self) -> None:
+        """Update SLO metrics display."""
+        if not self.enable_slo_monitoring or not self.slo_data:
+            return
+
+        try:
+            content = []
+
+            # SLO Health Overview
+            health_table = Table(title="SLO Health Status", show_header=False, box=None)
+            health_table.add_column("Metric", style="cyan")
+            health_table.add_column("Status", style="white")
+
+            overall_health = self.slo_data.get("overall_health", "unknown")
+            health_color = self._get_health_color(overall_health)
+            health_table.add_row("Overall Health", f"[{health_color}]{overall_health.upper()}[/{health_color}]")
+
+            active_violations = self.slo_data.get("active_violations", 0)
+            violation_color = "red" if active_violations > 0 else "green"
+            health_table.add_row("Active Violations", f"[{violation_color}]{active_violations}[/{violation_color}]")
+
+            content.append(health_table)
+
+            # Error Budget Status
+            error_budgets = self.slo_data.get("error_budgets", {})
+            if error_budgets:
+                budget_table = Table(title="Error Budget Status", show_header=True, box=None)
+                budget_table.add_column("SLO", style="cyan")
+                budget_table.add_column("Remaining", style="white")
+                budget_table.add_column("Burn Rate", style="white")
+
+                for slo_name, budget_info in error_budgets.items():
+                    remaining_percent = budget_info.get("remaining_percent", 0)
+                    burn_rate = budget_info.get("current_burn_rate", 0)
+
+                    remaining_color = self._get_budget_color(remaining_percent)
+                    burn_rate_color = self._get_burn_rate_color(burn_rate)
+
+                    budget_table.add_row(
+                        slo_name,
+                        f"[{remaining_color}]{remaining_percent:.1f}%[/{remaining_color}]",
+                        f"[{burn_rate_color}]{burn_rate:.2f}x[/{burn_rate_color}]"
+                    )
+
+                content.append(budget_table)
+
+            # Combine content
+            if len(content) == 1:
+                final_content = content[0]
+            else:
+                from rich.console import Group
+                final_content = Group(*content)
+
+            # Update SLO display
+            try:
+                slo_widget = self.query_one("#slo-metrics-content", Static)
+                slo_widget.update(final_content)
+            except Exception:
+                # Fallback for widgets not mounted in full Textual app
+                pass
+
+        except Exception as e:
+            self.logger.warning(f"Failed to update SLO display: {e}")
+
+    def _get_health_color(self, health_status: str) -> str:
+        """Get color for health status."""
+        health_colors = {
+            "healthy": "green",
+            "warning": "yellow",
+            "critical": "red",
+            "unknown": "gray"
+        }
+        return health_colors.get(health_status.lower(), "gray")
+
+    def _get_budget_color(self, remaining_percent: float) -> str:
+        """Get color for error budget remaining percentage."""
+        if remaining_percent > 50:
+            return "green"
+        elif remaining_percent > 20:
+            return "yellow"
+        else:
+            return "red"
+
+    def _get_burn_rate_color(self, burn_rate: float) -> str:
+        """Get color for burn rate."""
+        if burn_rate < 1.0:
+            return "green"
+        elif burn_rate < 5.0:
+            return "yellow"
+        else:
+            return "red"

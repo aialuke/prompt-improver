@@ -179,13 +179,15 @@ class TestStartupOrchestration:
     @pytest.mark.asyncio
     async def test_batch_processor_integration(self):
         """Test batch processor integration with custom config."""
-        custom_config = {
-            "batch_size": 3,
-            "batch_timeout": 5,
-            "max_attempts": 1,
-            "concurrency": 1,
-            "dry_run": True,  # Safe for testing
-        }
+        from prompt_improver.ml.optimization.batch.batch_processor import BatchProcessorConfig
+
+        custom_config = BatchProcessorConfig(
+            batch_size=3,
+            batch_timeout=5,
+            max_attempts=1,
+            concurrency=1,
+            dry_run=True,  # Safe for testing
+        )
 
         result = await init_startup_tasks(batch_config=custom_config)
         assert result["status"] == "success"

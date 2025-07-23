@@ -25,7 +25,7 @@ from prompt_improver.database.models import (
     RulePerformance,
     UserFeedback,
 )
-from prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.core.services.prompt_improvement import PromptImprovementService
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 

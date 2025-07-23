@@ -22,8 +22,8 @@ from prompt_improver.mcp_server.mcp_server import (
     health_live,
     health_ready,
 )
-from prompt_improver.optimization.batch_processor import BatchProcessor, BatchProcessorConfig
-from prompt_improver.services.health.background_manager import (
+from prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
+from prompt_improver.performance.monitoring.health.background_manager import (
     BackgroundTaskManager,
     get_background_task_manager,
 )

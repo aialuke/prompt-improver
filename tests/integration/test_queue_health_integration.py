@@ -10,13 +10,13 @@ from typing import Any, Dict
 
 import pytest
 
-from prompt_improver.optimization.batch_processor import BatchProcessor, BatchProcessorConfig
-from prompt_improver.services.health import HealthStatus, get_health_service
-from prompt_improver.services.health.background_manager import (
+from prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
+from prompt_improver.performance.monitoring.health import HealthStatus, get_health_service
+from prompt_improver.performance.monitoring.health.background_manager import (
     BackgroundTaskManager,
     get_background_task_manager,
 )
-from prompt_improver.services.health.checkers import QueueHealthChecker
+from prompt_improver.performance.monitoring.health.checkers import QueueHealthChecker
 
 
 class TestQueueHealthIntegration:
@@ -98,7 +98,7 @@ class TestQueueHealthIntegration:
         """Test basic queue health checker functionality with real components."""
         # Monkeypatch the get_background_task_manager to return our real instance
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             lambda: real_task_manager
         )
         
@@ -127,7 +127,7 @@ class TestQueueHealthIntegration:
         """Test queue health checker integration with health service using real components."""
         # Monkeypatch the get_background_task_manager
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             lambda: real_task_manager
         )
         
@@ -148,7 +148,7 @@ class TestQueueHealthIntegration:
     async def test_queue_health_metrics_collection(self, real_batch_processor, real_task_manager, monkeypatch):
         """Test comprehensive metrics collection with real components."""
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             lambda: real_task_manager
         )
         
@@ -217,7 +217,7 @@ class TestQueueHealthIntegration:
         
         # Setup real health service
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             lambda: real_task_manager
         )
         
@@ -252,7 +252,7 @@ class TestQueueHealthIntegration:
             raise Exception("Background task manager not available")
         
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             mock_no_background_manager
         )
         
@@ -267,7 +267,7 @@ class TestQueueHealthIntegration:
     async def test_queue_health_comprehensive_integration(self, real_batch_processor, real_task_manager, monkeypatch):
         """Test end-to-end integration of queue health monitoring with real components."""
         monkeypatch.setattr(
-            "prompt_improver.services.health.checkers.get_background_task_manager",
+            "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
             lambda: real_task_manager
         )
         
@@ -357,11 +357,19 @@ class TestQueueHealthIntegration:
         assert task_id in real_task_manager.tasks
         task = real_task_manager.tasks[task_id]
         
-        # Wait for completion
-        await asyncio.sleep(0.2)
-        
+        # Wait for completion with timeout
+        max_wait = 2.0
+        wait_interval = 0.1
+        waited = 0
+
+        while waited < max_wait:
+            if task.status.value == "completed":
+                break
+            await asyncio.sleep(wait_interval)
+            waited += wait_interval
+
         # Verify task completed
-        assert task.status.value == "completed"
+        assert task.status.value == "completed", f"Task status is {task.status.value} after {waited}s"
         assert task.result == "lifecycle_complete"
         assert task.completed_at is not None
         assert task.completed_at > task.started_at

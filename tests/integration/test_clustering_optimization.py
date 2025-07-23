@@ -12,7 +12,7 @@ import pytest
 from sklearn.datasets import make_blobs, make_classification
 from sklearn.preprocessing import StandardScaler
 
-from prompt_improver.optimization.clustering_optimizer import (
+from prompt_improver.ml.optimization.algorithms.clustering_optimizer import (
     ClusteringConfig,
     ClusteringMetrics,
     ClusteringOptimizer,
