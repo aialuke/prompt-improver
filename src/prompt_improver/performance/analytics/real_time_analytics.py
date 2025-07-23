@@ -1036,7 +1036,7 @@ class EnhancedRealTimeAnalyticsService:
                 current_windows[0].anomalies.append(anomaly_detection)
 
     async def _collect_comprehensive_analytics_data(self, experiment_ids: List[str]) -> Dict[str, Any]:
-        """Collect comprehensive analytics data"""
+        """Collect comprehensive analytics data with O(n log n) optimization"""
         data = {
             "experiments": {},
             "global_metrics": {
@@ -1046,13 +1046,28 @@ class EnhancedRealTimeAnalyticsService:
             }
         }
 
-        # Collect data for each experiment
+        # OPTIMIZED: Create experiment-to-windows index for O(1) lookups
+        experiment_windows_index = {}
+        experiment_anomalies_cache = {}
+
+        # Single pass to build indexes - O(W) complexity instead of O(W*E)
+        for window in self.stream_windows.values():
+            exp_id = window.experiment_id
+            if exp_id not in experiment_windows_index:
+                experiment_windows_index[exp_id] = []
+                experiment_anomalies_cache[exp_id] = []
+
+            experiment_windows_index[exp_id].append(window.to_dict())
+            # Batch anomaly processing - avoid nested loops
+            experiment_anomalies_cache[exp_id].extend([a.to_dict() for a in window.anomalies])
+
+        # Process each experiment with O(1) lookups - O(E) complexity
         for exp_id in experiment_ids:
             if exp_id in self.monitoring_tasks:
                 data["experiments"][exp_id] = {
                     "status": "monitoring",
-                    "windows": [w.to_dict() for w in self.stream_windows.values() if w.experiment_id == exp_id],
-                    "recent_anomalies": [a.to_dict() for w in self.stream_windows.values() if w.experiment_id == exp_id for a in w.anomalies]
+                    "windows": experiment_windows_index.get(exp_id, []),
+                    "recent_anomalies": experiment_anomalies_cache.get(exp_id, [])
                 }
 
         return data

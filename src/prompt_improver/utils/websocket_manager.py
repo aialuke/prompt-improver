@@ -192,7 +192,8 @@ class ConnectionManager:
         finally:
             try:
                 await pubsub.unsubscribe()
-            except:
+            except (ConnectionError, redis.RedisError, Exception) as e:
+                logger.warning(f"Failed to unsubscribe from Redis pubsub: {e}")
                 pass
 
     def get_connection_count(self, experiment_id: str = None) -> int:
@@ -223,7 +224,8 @@ class ConnectionManager:
             for websocket in list(experiment_connections):
                 try:
                     await websocket.close()
-                except:
+                except (ConnectionError, Exception) as e:
+                    logger.warning(f"Failed to close websocket connection: {e}")
                     pass
 
         # Clear all data structures

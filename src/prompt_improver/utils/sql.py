@@ -1,4 +1,4 @@
-from typing import Type, TypeVar
+from typing import Type, TypeVar, cast
 
 from sqlalchemy import Executable
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,5 +20,5 @@ async def fetch_scalar(session: AsyncSession, stmt: Executable, typ: type[T]) ->
     result = await session.execute(stmt)
     scalar_result = result.scalar()
     if scalar_result is not None:
-        return typ(scalar_result)
+        return cast(T, scalar_result)
     raise ValueError("No result fetched")

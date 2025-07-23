@@ -76,9 +76,9 @@ class DatabaseHealthChecker(HealthChecker):
 
                 # Check for long-running queries
                 long_queries = await scalar(session, text("""
-                    SELECT count(*) 
-                    FROM pg_stat_activity 
-                    WHERE state = 'active' 
+                    SELECT count(*)
+                    FROM pg_stat_activity
+                    WHERE state = 'active'
                     AND query_start < NOW() - INTERVAL '30 seconds'
                 """))
                 long_queries = long_queries or 0

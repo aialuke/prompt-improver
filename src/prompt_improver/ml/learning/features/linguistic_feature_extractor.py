@@ -700,10 +700,10 @@ class LinguisticFeatureExtractor:
         
         # Include configuration in cache key to invalidate on config changes
         config_hash = hashlib.md5(
-            self.config.model_dump_json().encode()
+            self.config.model_dump_json().encode(), usedforsecurity=False
         ).hexdigest()[:8]
         
-        text_hash = hashlib.md5(text.encode()).hexdigest()
+        text_hash = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
         return f"linguistic_features:{config_hash}:{text_hash}"
     
     def _create_default_response(

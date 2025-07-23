@@ -464,11 +464,11 @@ async def get_orchestrator_status() -> JSONResponse:
         # Import orchestrator
         from ..ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from ..ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator (lightweight check)
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Get status information
         status_data = {
             "state": orchestrator.state.value,
@@ -476,7 +476,7 @@ async def get_orchestrator_status() -> JSONResponse:
             "active_workflows": len(orchestrator.active_workflows),
             "timestamp": datetime.now().isoformat()
         }
-        
+
         # If initialized, get component information
         if orchestrator._is_initialized:
             components = orchestrator.get_loaded_components()
@@ -485,13 +485,13 @@ async def get_orchestrator_status() -> JSONResponse:
                 "component_list": components[:10],  # First 10 components
                 "recent_invocations": len(orchestrator.get_invocation_history())
             })
-        
+
         return JSONResponse(content={
             "success": True,
             "data": status_data,
             "message": "Orchestrator status retrieved successfully"
         })
-        
+
     except ImportError as e:
         logger.error(f"Failed to import orchestrator: {e}")
         return JSONResponse(
@@ -520,16 +520,16 @@ async def get_orchestrator_components() -> JSONResponse:
     try:
         from ..ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from ..ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         if not orchestrator._is_initialized:
             await orchestrator.initialize()
-        
+
         components = orchestrator.get_loaded_components()
         component_details = []
-        
+
         for component_name in components:
             methods = orchestrator.get_component_methods(component_name)
             component_details.append({
@@ -539,7 +539,7 @@ async def get_orchestrator_components() -> JSONResponse:
                 "is_loaded": orchestrator.component_loader.is_component_loaded(component_name),
                 "is_initialized": orchestrator.component_loader.is_component_initialized(component_name)
             })
-        
+
         return JSONResponse(content={
             "success": True,
             "data": {
@@ -549,7 +549,7 @@ async def get_orchestrator_components() -> JSONResponse:
             },
             "message": f"Retrieved {len(components)} components"
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting orchestrator components: {e}")
         return JSONResponse(
@@ -571,24 +571,24 @@ async def get_orchestrator_history(
     try:
         from ..ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from ..ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         if not orchestrator._is_initialized:
             return JSONResponse(content={
                 "success": False,
                 "error": "Orchestrator not initialized",
                 "message": "Initialize orchestrator first"
             })
-        
+
         history = orchestrator.get_invocation_history(component)[-limit:]
-        
+
         # Calculate success rate
         total_invocations = len(history)
         successful_invocations = sum(1 for inv in history if inv["success"])
         success_rate = successful_invocations / total_invocations if total_invocations > 0 else 0.0
-        
+
         return JSONResponse(content={
             "success": True,
             "data": {
@@ -601,7 +601,7 @@ async def get_orchestrator_history(
             },
             "message": f"Retrieved {total_invocations} invocation records"
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting orchestrator history: {e}")
         return JSONResponse(

@@ -32,10 +32,10 @@ from .utils import scalar
 
 def get_sessionmanager() -> DatabaseSessionManager:
     """Get the global database session manager.
-    
+
     Returns:
         DatabaseSessionManager: The non-optional session manager instance
-        
+
     Raises:
         RuntimeError: If session manager initialization fails
     """

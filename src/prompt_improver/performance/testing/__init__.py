@@ -15,7 +15,7 @@ from .ab_testing_service import (
 
 __all__ = [
     "ModernABTestingService",
-    "ABTestingService", 
+    "ABTestingService",
     "ModernABConfig",
     "StatisticalResult",
     "TestStatus",

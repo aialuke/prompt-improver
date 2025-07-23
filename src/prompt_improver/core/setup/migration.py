@@ -220,7 +220,7 @@ class APESMigrationManager:
                 # Export real user prompts
                 prompts = await scalar(session, text("""
                     SELECT prompt_text, enhancement_result, created_at, session_id
-                    FROM training_prompts 
+                    FROM training_prompts
                     WHERE data_source = 'real'
                     ORDER BY created_at DESC
                 """))
@@ -439,14 +439,14 @@ class APESMigrationManager:
             async with get_session() as session:
                 # Check for existence of key tables to determine schema version
                 tables = await scalar(session, text("""
-                    SELECT table_name FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public'
                     ORDER BY table_name
                 """))
 
                 # Create a simple hash of table names as version identifier
                 tables_str = ",".join(sorted(tables))
-                version_hash = hashlib.md5(tables_str.encode()).hexdigest()[:8]
+                version_hash = hashlib.md5(tables_str.encode(), usedforsecurity=False).hexdigest()[:8]
                 return f"schema_{version_hash}"
 
         except (ConnectionError, OSError) as e:
@@ -553,7 +553,7 @@ class APESMigrationManager:
             async with get_session() as session:
                 result = await session.execute(text("""
                     SELECT prompt_text, enhancement_result, created_at, session_id
-                    FROM training_prompts 
+                    FROM training_prompts
                     WHERE data_source = 'real'
                     ORDER BY created_at DESC
                 """))
@@ -760,7 +760,8 @@ class APESMigrationManager:
         """Extract migration package to temporary directory"""
         try:
             with tarfile.open(package_path, "r:gz") as tar:
-                tar.extractall(temp_path)
+                # 2025 Security: Use safe extraction with filter to prevent path traversal
+                tar.extractall(temp_path, filter='data')
             self.console.print("  📦 Migration package extracted", style="dim")
         except (FileNotFoundError, PermissionError) as e:
             raise Exception(
@@ -907,7 +908,8 @@ class APESMigrationManager:
 
             # Extract configuration files
             with tarfile.open(config_backup, "r:gz") as tar:
-                tar.extractall(target_dir)
+                # 2025 Security: Use safe extraction with filter to prevent path traversal
+                tar.extractall(target_dir, filter='data')
 
             # Count restored files
             file_count = (
@@ -951,7 +953,8 @@ class APESMigrationManager:
 
             # Extract ML artifacts
             with tarfile.open(ml_backup, "r:gz") as tar:
-                tar.extractall(target_dir / "data")
+                # 2025 Security: Use safe extraction with filter to prevent path traversal
+                tar.extractall(target_dir / "data", filter='data')
 
             # Count restored artifacts
             artifact_count = (

@@ -418,7 +418,7 @@ class DomainFeatureExtractor:
     
     def _generate_correlation_id(self) -> str:
         """Generate correlation ID for request tracing."""
-        return hashlib.md5(f"{time.time()}_{id(self)}".encode()).hexdigest()[:8]
+        return hashlib.md5(f"{time.time()}_{id(self)}".encode(), usedforsecurity=False).hexdigest()[:8]
     
     async def _get_cached_features_async(self, cache_key: str) -> Optional[List[float]]:
         """Get cached features if available with TTL check."""

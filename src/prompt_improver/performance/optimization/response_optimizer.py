@@ -66,7 +66,7 @@ class CompressionResult:
     def size_reduction_bytes(self) -> int:
         """Calculate size reduction in bytes"""
         return self.original_size - self.compressed_size
-    
+
     @property
     def size_reduction_percent(self) -> float:
         """Calculate size reduction percentage."""
@@ -75,14 +75,14 @@ class CompressionResult:
 
 class FastJSONSerializer:
     """High-performance JSON serialization with multiple backends."""
-    
+
     def __init__(self, use_orjson: bool = True):
         self.use_orjson = use_orjson and HAS_ORJSON
         if self.use_orjson:
             logger.info("Using orjson for high-performance JSON serialization")
         else:
             logger.info("Using standard json library (consider installing orjson for better performance)")
-    
+
     def serialize(self, data: Any) -> bytes:
         """Serialize data to JSON bytes with optimal performance."""
         if self.use_orjson:
@@ -99,14 +99,14 @@ class FastJSONSerializer:
                 ensure_ascii=False,
                 default=self._json_default
             ).encode('utf-8')
-    
+
     def deserialize(self, data: bytes) -> Any:
         """Deserialize JSON bytes to Python objects."""
         if self.use_orjson:
             return orjson.loads(data)
         else:
             return json.loads(data.decode('utf-8'))
-    
+
     def _json_default(self, obj: Any) -> Any:
         """Default serializer for non-standard types."""
         if isinstance(obj, datetime):
@@ -151,7 +151,7 @@ class EnhancedResponseCompressor:
             'binary': 'lz4',
             'default': 'gzip'
         }
-    
+
     def compress(
         self,
         data: bytes,
@@ -200,7 +200,7 @@ class EnhancedResponseCompressor:
             algorithm=algorithm,
             compression_time_ms=compression_time
         )
-    
+
     def _select_optimal_algorithm(self, data: bytes, content_type: Optional[str] = None) -> str:
         """Enhanced algorithm selection based on data characteristics and content type."""
         size = len(data)
@@ -286,15 +286,15 @@ class EnhancedResponseCompressor:
             # These content types compress very well even when small
             return data_size > 20
         return False
-    
+
     def _compress_gzip(self, data: bytes) -> bytes:
         """Compress using gzip (best compression ratio)."""
         return gzip.compress(data, compresslevel=6)  # Balanced speed/compression
-    
+
     def _compress_deflate(self, data: bytes) -> bytes:
         """Compress using deflate (good compression, fast)."""
         return zlib.compress(data, level=6)
-    
+
     def _compress_lz4(self, data: bytes) -> bytes:
         """Compress using LZ4 (fastest compression)."""
         return lz4.frame.compress(data, compression_level=1)
@@ -338,7 +338,7 @@ class EnhancedPayloadOptimizer:
             'text/javascript': self._optimize_js_content,
             'default': self._optimize_generic_content
         }
-    
+
     def optimize_response(
         self,
         data: Any,
@@ -368,15 +368,15 @@ class EnhancedPayloadOptimizer:
             algorithm=compression_algorithm,
             content_type=content_type
         )
-        
+
         optimization_time = (time.perf_counter() - start_time) * 1000
-        
+
         result = {
             'data': compression_result.compressed_data,
             'compressed': compression_result.algorithm != 'none',
             'compression_algorithm': compression_result.algorithm
         }
-        
+
         if include_metadata:
             result['optimization_metadata'] = {
                 'original_size_bytes': compression_result.original_size,
@@ -386,9 +386,9 @@ class EnhancedPayloadOptimizer:
                 'optimization_time_ms': optimization_time,
                 'serializer': 'orjson' if self.json_serializer.use_orjson else 'json'
             }
-        
+
         return result
-    
+
     def _minimize_payload(self, data: Any) -> Any:
         """Minimize payload size by removing unnecessary data."""
         if isinstance(data, dict):
@@ -400,13 +400,13 @@ class EnhancedPayloadOptimizer:
                         continue  # Skip empty collections
                     minimized[key] = self._minimize_payload(value)
             return minimized
-        
+
         elif isinstance(data, list):
             return [self._minimize_payload(item) for item in data if item is not None]
-        
+
         else:
             return data
-    
+
     def create_streaming_response(
         self,
         data_generator,
@@ -420,7 +420,7 @@ class EnhancedPayloadOptimizer:
                     include_metadata=False
                 )
                 yield optimized_chunk['data']
-        
+
         return stream_chunks()
 
     def _detect_content_type_from_data(self, data: Any) -> str:
@@ -510,7 +510,7 @@ class ResponseOptimizer:
             'total_optimization_time_ms': 0,
             'compression_algorithm_usage': {}
         }
-    
+
     async def optimize_mcp_response(
         self,
         response_data: Any,
@@ -520,19 +520,19 @@ class ResponseOptimizer:
         """Optimize MCP response with comprehensive optimization."""
         async with measure_mcp_operation(f"optimize_{operation_name}") as perf_metrics:
             start_time = time.perf_counter()
-            
+
             try:
                 # Optimize the response payload
                 optimized = self.payload_optimizer.optimize_response(
                     response_data,
                     compression_algorithm='lz4' if enable_compression else 'none'
                 )
-                
+
                 optimization_time = (time.perf_counter() - start_time) * 1000
-                
+
                 # Update statistics
                 self._update_stats(optimized, optimization_time)
-                
+
                 # Add performance metadata
                 perf_metrics.metadata.update({
                     'original_size': optimized.get('optimization_metadata', {}).get('original_size_bytes', 0),
@@ -540,9 +540,9 @@ class ResponseOptimizer:
                     'compression_algorithm': optimized.get('compression_algorithm', 'none'),
                     'optimization_time_ms': optimization_time
                 })
-                
+
                 return optimized
-                
+
             except Exception as e:
                 logger.error(f"Response optimization failed: {e}")
                 # Fallback to unoptimized response
@@ -552,29 +552,29 @@ class ResponseOptimizer:
                     'compression_algorithm': 'none',
                     'error': str(e)
                 }
-    
+
     def _update_stats(self, optimized_response: Dict[str, Any], optimization_time: float):
         """Update optimization statistics."""
         self._optimization_stats['total_responses'] += 1
         self._optimization_stats['total_optimization_time_ms'] += optimization_time
-        
+
         metadata = optimized_response.get('optimization_metadata', {})
         if metadata:
             bytes_saved = metadata.get('original_size_bytes', 0) - metadata.get('compressed_size_bytes', 0)
             self._optimization_stats['total_bytes_saved'] += bytes_saved
-            
+
             algorithm = optimized_response.get('compression_algorithm', 'none')
             self._optimization_stats['compression_algorithm_usage'][algorithm] = (
                 self._optimization_stats['compression_algorithm_usage'].get(algorithm, 0) + 1
             )
-    
+
     def get_optimization_stats(self) -> Dict[str, Any]:
         """Get comprehensive optimization statistics."""
         total_responses = self._optimization_stats['total_responses']
-        
+
         if total_responses == 0:
             return {"message": "No responses optimized yet"}
-        
+
         return {
             'total_responses_optimized': total_responses,
             'total_bytes_saved': self._optimization_stats['total_bytes_saved'],

@@ -13,7 +13,8 @@ async def debug_mcp_startup():
     """Debug MCP server startup with detailed logging"""
     # Set environment variable
     env = os.environ.copy()
-    env['DATABASE_URL'] = "postgresql+asyncpg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
+    # Security Fix: Use environment variable instead of hardcoded credentials
+    env['DATABASE_URL'] = os.getenv('DATABASE_URL', "postgresql+asyncpg://apes_user:${POSTGRES_PASSWORD}@localhost:5432/apes_production")
     
     # Start the MCP server with stderr capture
     process = subprocess.Popen(

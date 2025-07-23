@@ -1000,28 +1000,28 @@ class HealthService(EnhancedHealthService):
         del self.checker_map[component_name]
         return True
 
-    def configure_ml_orchestration_checkers(self, orchestrator=None, registry=None, 
+    def configure_ml_orchestration_checkers(self, orchestrator=None, registry=None,
                                           resource_manager=None, workflow_engine=None, event_bus=None):
         """Configure ML orchestration health checkers with their respective components."""
         if not ML_ORCHESTRATION_CHECKERS_AVAILABLE:
             return False
-        
+
         try:
             if hasattr(self, 'ml_orchestrator_checker') and orchestrator:
                 self.ml_orchestrator_checker.set_orchestrator(orchestrator)
-            
+
             if hasattr(self, 'ml_registry_checker') and registry:
                 self.ml_registry_checker.set_registry(registry)
-                
+
             if hasattr(self, 'ml_resource_checker') and resource_manager:
                 self.ml_resource_checker.set_resource_manager(resource_manager)
-                
+
             if hasattr(self, 'ml_workflow_checker') and workflow_engine:
                 self.ml_workflow_checker.set_workflow_engine(workflow_engine)
-                
+
             if hasattr(self, 'ml_event_checker') and event_bus:
                 self.ml_event_checker.set_event_bus(event_bus)
-                
+
             return True
         except Exception as e:
             print(f"Warning: Failed to configure ML orchestration health checkers: {e}")

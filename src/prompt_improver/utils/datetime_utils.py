@@ -14,14 +14,14 @@ from typing import Optional
 
 def naive_utc_now() -> datetime:
     """Get current UTC time as a naive datetime object.
-    
+
     This function provides identical behavior to the deprecated datetime.utcnow()
     and is intended for use with database models and systems that expect naive
     UTC timestamps.
-    
+
     Returns:
         datetime: Current UTC time as naive datetime (no timezone info)
-        
+
     Example:
         >>> dt = naive_utc_now()
         >>> dt.tzinfo is None
@@ -32,14 +32,14 @@ def naive_utc_now() -> datetime:
 
 def aware_utc_now() -> datetime:
     """Get current UTC time as a timezone-aware datetime object.
-    
+
     This function returns a timezone-aware datetime in UTC, which is the
     recommended approach for services, logging, and API responses that need
     proper timezone handling.
-    
+
     Returns:
         datetime: Current UTC time with timezone info attached
-        
+
     Example:
         >>> dt = aware_utc_now()
         >>> dt.tzinfo is not None
@@ -52,16 +52,16 @@ def aware_utc_now() -> datetime:
 
 def naive_utc_from_timestamp(timestamp: float) -> datetime:
     """Convert Unix timestamp to naive UTC datetime.
-    
+
     This function provides identical behavior to the deprecated
     datetime.utcfromtimestamp() and is intended for database compatibility.
-    
+
     Args:
         timestamp: Unix timestamp (seconds since epoch)
-        
+
     Returns:
         datetime: UTC datetime as naive object (no timezone info)
-        
+
     Example:
         >>> dt = naive_utc_from_timestamp(0)
         >>> dt.tzinfo is None
@@ -72,16 +72,16 @@ def naive_utc_from_timestamp(timestamp: float) -> datetime:
 
 def aware_utc_from_timestamp(timestamp: float) -> datetime:
     """Convert Unix timestamp to timezone-aware UTC datetime.
-    
+
     This function returns a timezone-aware datetime in UTC from a Unix timestamp,
     which is the recommended approach for services and API responses.
-    
+
     Args:
         timestamp: Unix timestamp (seconds since epoch)
-        
+
     Returns:
         datetime: UTC datetime with timezone info attached
-        
+
     Example:
         >>> dt = aware_utc_from_timestamp(0)
         >>> dt.tzinfo is not None
@@ -92,16 +92,16 @@ def aware_utc_from_timestamp(timestamp: float) -> datetime:
 
 def ensure_naive_utc(dt: datetime) -> datetime:
     """Ensure datetime is naive UTC.
-    
+
     If the datetime is already naive, returns it unchanged (assumes UTC).
     If the datetime is timezone-aware, converts to UTC and removes timezone info.
-    
+
     Args:
         dt: Input datetime (naive or aware)
-        
+
     Returns:
         datetime: Naive UTC datetime
-        
+
     Example:
         >>> from datetime import timezone
         >>> aware_dt = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -118,16 +118,16 @@ def ensure_naive_utc(dt: datetime) -> datetime:
 
 def ensure_aware_utc(dt: datetime) -> datetime:
     """Ensure datetime is timezone-aware UTC.
-    
+
     If the datetime is already aware, converts to UTC if necessary.
     If the datetime is naive, assumes it's UTC and adds timezone info.
-    
+
     Args:
         dt: Input datetime (naive or aware)
-        
+
     Returns:
         datetime: Timezone-aware UTC datetime
-        
+
     Example:
         >>> naive_dt = datetime(2023, 1, 1, 12, 0, 0)
         >>> aware_dt = ensure_aware_utc(naive_dt)

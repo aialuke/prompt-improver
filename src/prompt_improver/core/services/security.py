@@ -415,7 +415,7 @@ class PromptDataProtection:
 
                 # Check if session exists
                 check_query = text("""
-                    SELECT id, session_metadata FROM improvement_sessions 
+                    SELECT id, session_metadata FROM improvement_sessions
                     WHERE session_id = :session_id
                 """)
                 result = await db_session.execute(
@@ -436,7 +436,7 @@ class PromptDataProtection:
                     existing_metadata["security_audit"] = audit_data
 
                     update_query = text("""
-                        UPDATE improvement_sessions 
+                        UPDATE improvement_sessions
                         SET session_metadata = :metadata
                         WHERE session_id = :session_id
                     """)
@@ -462,7 +462,7 @@ class PromptDataProtection:
                     }
 
                     insert_query = text("""
-                        INSERT INTO improvement_sessions 
+                        INSERT INTO improvement_sessions
                         (session_id, original_prompt, final_prompt, rules_applied, session_metadata, started_at, status)
                         VALUES (:session_id, :original_prompt, :final_prompt, :rules_applied, :metadata, :started_at, :status)
                     """)
@@ -502,7 +502,7 @@ class PromptDataProtection:
                 # Use parameterized query to prevent SQL injection
                 audit_query = text(
                     """
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_sessions,
                         COUNT(*) FILTER (WHERE session_metadata->'security_audit'->>'redactions' != '0') as sessions_with_redactions,
                         SUM((session_metadata->'security_audit'->>'redactions')::int) FILTER (WHERE session_metadata->'security_audit'->>'redactions' IS NOT NULL) as total_redactions,
@@ -520,7 +520,7 @@ class PromptDataProtection:
                 # Get redaction type breakdown - use parameterized query to prevent SQL injection
                 redaction_types_query = text(
                     """
-                    SELECT 
+                    SELECT
                         jsonb_object_keys(session_metadata->'security_audit'->'redaction_details') as redaction_type,
                         COUNT(*) as occurrence_count
                     FROM improvement_sessions

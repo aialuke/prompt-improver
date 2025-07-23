@@ -71,20 +71,20 @@ class PerformanceMetrics:
     duration_ms: Optional[float] = None
     status: str = "success"
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def complete(self, status: str = "success", **metadata) -> None:
         """Mark the operation as complete and calculate duration."""
         self.end_time = time.perf_counter()
         self.duration_ms = (self.end_time - self.start_time) * 1000
         self.status = status
         self.metadata.update(metadata)
-        
+
         # Record Prometheus metrics
         get_response_time_histogram().labels(
             operation=self.operation_name,
             status=self.status
         ).observe(self.duration_ms / 1000)
-        
+
         # Check if we exceeded the 200ms target
         if self.duration_ms > 200:
             get_response_time_violations().labels(
@@ -109,11 +109,11 @@ class PerformanceBaseline:
     min_duration_ms: float
     success_rate: float
     timestamp: datetime
-    
+
     def meets_target(self, target_ms: float = 200) -> bool:
         """Check if performance meets the target."""
         return self.p95_duration_ms <= target_ms
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -133,90 +133,90 @@ class PerformanceBaseline:
 
 class PerformanceOptimizer:
     """Comprehensive performance optimization and monitoring system."""
-    
+
     def __init__(self):
         self._measurements: Dict[str, List[PerformanceMetrics]] = {}
         self._baselines: Dict[str, PerformanceBaseline] = {}
         self._optimization_enabled = True
-        
+
     @asynccontextmanager
     async def measure_operation(
-        self, 
+        self,
         operation_name: str,
         **metadata
     ) -> AsyncGenerator[PerformanceMetrics, None]:
         """Context manager for measuring operation performance.
-        
+
         Args:
             operation_name: Name of the operation being measured
             **metadata: Additional metadata to include
-            
+
         Yields:
             PerformanceMetrics instance for the operation
         """
         get_active_requests().inc()
-        
+
         metrics = PerformanceMetrics(
             operation_name=operation_name,
             start_time=time.perf_counter(),
             metadata=metadata
         )
-        
+
         try:
             yield metrics
             metrics.complete(status="success")
-            
+
         except Exception as e:
             metrics.complete(status="error", error=str(e))
             raise
-            
+
         finally:
             get_active_requests().dec()
-            
+
             # Store measurement for analysis
             if operation_name not in self._measurements:
                 self._measurements[operation_name] = []
             self._measurements[operation_name].append(metrics)
-            
+
             # Keep only last 1000 measurements per operation
             if len(self._measurements[operation_name]) > 1000:
                 self._measurements[operation_name] = self._measurements[operation_name][-1000:]
-    
+
     async def calculate_baseline(
-        self, 
+        self,
         operation_name: str,
         min_samples: int = 10
     ) -> Optional[PerformanceBaseline]:
         """Calculate performance baseline for an operation.
-        
+
         Args:
             operation_name: Name of the operation
             min_samples: Minimum number of samples required
-            
+
         Returns:
             PerformanceBaseline if enough samples, None otherwise
         """
         measurements = self._measurements.get(operation_name, [])
-        
+
         if len(measurements) < min_samples:
             logger.warning(
                 f"Insufficient samples for {operation_name}: "
                 f"{len(measurements)} < {min_samples}"
             )
             return None
-        
+
         # Extract successful measurements only
         successful_measurements = [
-            m for m in measurements 
+            m for m in measurements
             if m.status == "success" and m.duration_ms is not None
         ]
-        
+
         if not successful_measurements:
             logger.warning(f"No successful measurements for {operation_name}")
             return None
-        
+
         durations = [m.duration_ms for m in successful_measurements]
-        
+
         baseline = PerformanceBaseline(
             operation_name=operation_name,
             sample_count=len(successful_measurements),
@@ -229,10 +229,10 @@ class PerformanceOptimizer:
             success_rate=len(successful_measurements) / len(measurements),
             timestamp=datetime.utcnow()
         )
-        
+
         self._baselines[operation_name] = baseline
         return baseline
-    
+
     @staticmethod
     def _percentile(data: List[float], percentile: float) -> float:
         """Calculate percentile of data."""

@@ -36,15 +36,13 @@ apriori_router = APIRouter(
 
 async def get_apriori_analyzer() -> AprioriAnalyzer:
     """Dependency to get AprioriAnalyzer instance with proper database configuration"""
-    # Use environment variable or default database URL for sync operations
+    # Use secure database configuration from environment variables
     import os
+    from ..database.config import get_database_config
 
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production",
-    ).replace(
-        "postgresql+asyncpg://", "postgresql+psycopg://"
-    )  # Convert async to sync psycopg3
+    db_config = get_database_config()
+    # Use the secure database URL from config
+    database_url = db_config.database_url_sync
 
     db_manager = DatabaseManager(database_url)
     return AprioriAnalyzer(db_manager=db_manager)
@@ -52,15 +50,13 @@ async def get_apriori_analyzer() -> AprioriAnalyzer:
 
 async def get_pattern_discovery() -> AdvancedPatternDiscovery:
     """Dependency to get AdvancedPatternDiscovery instance with proper database configuration"""
-    # Use environment variable or default database URL for sync operations
+    # Use secure database configuration from environment variables
     import os
+    from ..database.config import get_database_config
 
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production",
-    ).replace(
-        "postgresql+asyncpg://", "postgresql+psycopg://"
-    )  # Convert async to sync psycopg3
+    db_config = get_database_config()
+    # Use the secure database URL from config
+    database_url = db_config.database_url_sync
 
     db_manager = DatabaseManager(database_url)
     return AdvancedPatternDiscovery(db_manager=db_manager)

@@ -204,7 +204,7 @@ class MemoryGuard:
         """Check current memory usage and return statistics."""
         current_memory = self._get_memory_usage()
         self.peak_memory = max(self.peak_memory, current_memory)
-        
+
         memory_stats = {
             "current_mb": current_memory,
             "peak_mb": self.peak_memory,
@@ -213,11 +213,11 @@ class MemoryGuard:
             "limit_mb": self.max_memory_mb,
             "usage_percent": (current_memory / self.max_memory_mb) * 100
         }
-        
+
         # Log warning if approaching limit
         if memory_stats["usage_percent"] > 80:
             self.logger.warning(f"High memory usage: {memory_stats['usage_percent']:.1f}%")
-            
+
         return memory_stats
 
     async def check_memory_usage_async(self, operation_name: str = "unknown", component_name: str = None) -> ResourceStats:
@@ -246,99 +246,99 @@ class MemoryGuard:
 
     def validate_buffer_size(self, data: Union[bytes, np.ndarray, Any], operation: str = "unknown") -> bool:
         """Validate buffer size before operations to prevent overflow.
-        
+
         Args:
             data: Data to validate
             operation: Description of operation for logging
-            
+
         Returns:
             True if safe, False if too large
-            
+
         Raises:
             MemoryError: If data exceeds safety limits
         """
         size = self._get_data_size(data)
-        
+
         if size > self.max_buffer_size:
             error_msg = f"Buffer size {size:,} bytes exceeds limit {self.max_buffer_size:,} for {operation}"
             self.logger.error(error_msg)
             raise MemoryError(error_msg)
-            
+
         # Check if operation would exceed memory limit
         projected_memory = self._get_memory_usage() + (size / 1024 / 1024)
         if projected_memory > self.max_memory_mb:
             error_msg = f"Operation {operation} would exceed memory limit: {projected_memory:.1f}MB > {self.max_memory_mb}MB"
             self.logger.error(error_msg)
             raise MemoryError(error_msg)
-            
+
         return True
-    
+
     def safe_frombuffer(self, buffer: bytes, dtype: np.dtype, count: int = -1) -> np.ndarray:
         """Safely create numpy array from buffer with validation.
-        
+
         Args:
             buffer: Bytes buffer
             dtype: Target numpy dtype
             count: Number of items (default: all)
-            
+
         Returns:
             Numpy array
-            
+
         Raises:
             MemoryError: If buffer validation fails
             ValueError: If buffer size is invalid
         """
         # Validate buffer size
         self.validate_buffer_size(buffer, f"frombuffer with dtype {dtype}")
-        
+
         # Validate buffer size matches dtype requirements
         dtype_size = np.dtype(dtype).itemsize
         if len(buffer) % dtype_size != 0:
             raise ValueError(f"Buffer size {len(buffer)} not divisible by dtype size {dtype_size}")
-            
+
         # Calculate expected element count
         expected_count = len(buffer) // dtype_size
         if count != -1 and count > expected_count:
             raise ValueError(f"Requested count {count} exceeds available elements {expected_count}")
-            
+
         # Additional safety: limit array size
         max_elements = min(1_000_000, self.max_buffer_size // dtype_size)  # 1M elements or buffer limit
         actual_count = min(expected_count, max_elements) if count == -1 else min(count, max_elements)
-        
+
         if actual_count < expected_count:
             self.logger.warning(f"Truncating array from {expected_count} to {actual_count} elements for safety")
-            
+
         # Create array safely
         try:
             return np.frombuffer(buffer[:actual_count * dtype_size], dtype=dtype, count=actual_count)
         except Exception as e:
             self.logger.error(f"Failed to create array from buffer: {e}")
             raise
-    
+
     def safe_tobytes(self, array: np.ndarray) -> bytes:
         """Safely convert numpy array to bytes with validation.
-        
+
         Args:
             array: Numpy array to convert
-            
+
         Returns:
             Bytes representation
-            
+
         Raises:
             MemoryError: If array is too large
         """
         self.validate_buffer_size(array, "tobytes conversion")
-        
+
         try:
             return array.tobytes()
         except Exception as e:
             self.logger.error(f"Failed to convert array to bytes: {e}")
             raise
-    
+
     def monitor_operation(self, operation_name: str):
         """Context manager for monitoring memory during operations."""
         return MemoryMonitor(self, operation_name)
-    
+
     async def force_garbage_collection_async(self, operation_name: str = "gc_cleanup"):
         """Async force garbage collection with event emission."""
         memory_before = self._get_memory_usage()
@@ -431,7 +431,7 @@ class MemoryGuard:
                     raise MemoryError(error_msg)
 
         return True
-    
+
     def _get_memory_usage(self) -> float:
         """Get current memory usage in MB."""
         if PSUTIL_AVAILABLE:
@@ -440,13 +440,13 @@ class MemoryGuard:
                 return process.memory_info().rss / 1024 / 1024  # Convert to MB
             except Exception:
                 pass
-        
+
         # Fallback to resource module
         try:
             return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # Linux: KB to MB
         except Exception:
             return 0.0
-    
+
     def _get_data_size(self, data: Any) -> int:
         """Get size of data in bytes."""
         if isinstance(data, bytes):
@@ -542,31 +542,31 @@ class MemoryMonitor:
         self.operation_name = operation_name
         self.start_memory = None
         self.start_time = None
-        
+
     def __enter__(self):
         self.start_memory = self.guard._get_memory_usage()
         self.start_time = time.time()
         self.guard.logger.debug(f"Starting {self.operation_name} - Memory: {self.start_memory:.1f}MB")
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         import time
         end_memory = self.guard._get_memory_usage()
         end_time = time.time()
-        
+
         memory_delta = end_memory - self.start_memory
         time_delta = end_time - self.start_time
-        
+
         level = logging.INFO if memory_delta > 10 else logging.DEBUG
         self.guard.logger.log(
             level,
             f"Completed {self.operation_name} - Memory: {end_memory:.1f}MB "
             f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s"
         )
-        
+
         # Update peak memory
         self.guard.peak_memory = max(self.guard.peak_memory, end_memory)
-        
+
         # Force cleanup if memory delta is significant
         if memory_delta > 50:  # 50MB threshold
             self.guard.force_garbage_collection()

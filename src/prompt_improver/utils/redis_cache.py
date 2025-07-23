@@ -121,13 +121,13 @@ class RedisConfig(BaseModel):
     @classmethod
     def load_from_yaml(cls, path: str) -> "RedisConfig":
         """Load Redis configuration from YAML file with validation.
-        
+
         Args:
             path: Path to the YAML configuration file
-            
+
         Returns:
             Validated RedisConfig instance
-            
+
         Raises:
             FileNotFoundError: If configuration file doesn't exist
             ValidationError: If configuration is invalid
@@ -215,11 +215,11 @@ class RedisConfig(BaseModel):
 
 def cached(ttl=3600, key_func=None):
     """Decorator to cache function results in Redis with graceful fallback.
-    
+
     Args:
         ttl: Time-to-live in seconds for cached values
         key_func: Optional function to generate cache key from args/kwargs
-        
+
     Returns:
         Decorator function
     """
@@ -240,7 +240,7 @@ def cached(ttl=3600, key_func=None):
                     'kwargs': str(sorted(kwargs.items()))
                 }
                 key_str = json.dumps(key_data, sort_keys=True, default=str)
-                cache_key = f"{fn.__name__}:{hashlib.md5(key_str.encode()).hexdigest()}"
+                cache_key = f"{fn.__name__}:{hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()}"
 
             # Try fetching from cache first
             try:
@@ -381,10 +381,10 @@ class RedisCache:
     @staticmethod
     async def get(key: str, retries: int = 3, backoff_factor: float = 0.5) -> bytes | None:
         """Retrieve a value from the cache.
-        
+
         Args:
             key: Cache key to retrieve
-            
+
         Returns:
             Decompressed bytes if found, None otherwise
         """
@@ -438,12 +438,12 @@ class RedisCache:
     @staticmethod
     async def set(key: str, value: bytes, expire: int | None = None, retries: int = 3, backoff_factor: float = 0.5) -> bool:
         """Store a value in the cache with optional expiration.
-        
+
         Args:
             key: Cache key to store
             value: Bytes to store (will be compressed)
             expire: Expiration time in seconds (optional)
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -485,12 +485,12 @@ class RedisCache:
     @staticmethod
     async def invalidate(key: str, retries: int = 3, backoff_factor: float = 0.5) -> bool:
         """Remove a value from the cache.
-        
+
         Args:
             key: Cache key to remove
             retries: Number of retry attempts
             backoff_factor: Exponential backoff factor
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -531,14 +531,14 @@ class RedisCache:
     @staticmethod
     def with_singleflight(cache_key_fn=None, expire: int | None = None):
         """Decorator to ensure a single flight of concurrent cache requests.
-        
+
         Prevents thundering herd problem by ensuring only one instance of
         the same function call executes at a time.
-        
+
         Args:
             cache_key_fn: Function to generate cache key from args/kwargs
             expire: Cache expiration time in seconds
-            
+
         Returns:
             Decorator function
         """
@@ -556,7 +556,7 @@ class RedisCache:
                         'kwargs': kwargs
                     }
                     key_str = json.dumps(key_data, sort_keys=True, default=str)
-                    cache_key = hashlib.md5(key_str.encode()).hexdigest()
+                    cache_key = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
                 # Check cache first
                 cached_value = await RedisCache.get(cache_key)

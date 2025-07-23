@@ -429,7 +429,7 @@ def get_startup_task_count() -> int:
 class StartupOrchestrator:
     """
     Modern startup orchestrator following 2025 best practices.
-    
+
     Implements:
     - Asynchronous dependency injection pattern
     - Lifecycle management with proper setup/teardown
@@ -437,7 +437,7 @@ class StartupOrchestrator:
     - Service initialization with callbacks
     - Graceful error handling and partial startup recovery
     """
-    
+
     def __init__(self):
         """Initialize the orchestrator with empty state."""
         self._initialized_components: Dict[str, Any] = {}
@@ -445,39 +445,39 @@ class StartupOrchestrator:
         self._shutdown_callbacks: List[Callable] = []
         self._is_running = False
         self._startup_complete = False
-        
+
     async def __aenter__(self):
         """Async context manager entry - starts all services."""
         await self.startup()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit - graceful shutdown."""
         await self.shutdown()
-        
-    async def startup(self, 
+
+    async def startup(self,
                      batch_processor: Optional[BatchProcessor] = None,
                      health_service: Optional[Any] = None,
                      session_store: Optional[SessionStore] = None,
                      startup_delay: float = 2.0) -> Dict[str, Any]:
         """
         Initialize all services with proper dependency injection.
-        
+
         Args:
             batch_processor: Optional batch processor instance
-            health_service: Optional health monitoring service  
+            health_service: Optional health monitoring service
             session_store: Optional session storage service
             startup_delay: Delay before starting services
-            
+
         Returns:
             Dictionary of initialized components
         """
         if self._is_running:
             logger.warning("Startup already in progress")
             return self._initialized_components
-            
+
         self._is_running = True
-        
+
         try:
             # Use existing init_startup_tasks function
             components = await init_startup_tasks(
@@ -486,81 +486,81 @@ class StartupOrchestrator:
                 session_store=session_store,
                 startup_delay=startup_delay
             )
-            
+
             self._initialized_components = components
             self._startup_complete = True
-            
+
             # Register shutdown callbacks
             if batch_processor:
                 self._shutdown_callbacks.append(
                     lambda: logger.info("Batch processor shutdown registered")
                 )
-                
+
             return components
-            
+
         except Exception as e:
             logger.error(f"Startup failed: {e}")
             await self._cleanup_partial_startup()
             raise
-            
+
     async def shutdown(self, timeout: float = 30.0) -> Dict[str, Any]:
         """
         Gracefully shutdown all services.
-        
+
         Args:
             timeout: Maximum time to wait for shutdown
-            
+
         Returns:
             Shutdown results for each component
         """
         if not self._is_running:
             return {}
-            
+
         try:
             # Use existing shutdown_startup_tasks function
             results = await shutdown_startup_tasks(timeout=timeout)
-            
+
             # Run registered callbacks
             for callback in self._shutdown_callbacks:
                 try:
                     callback()
                 except Exception as e:
                     logger.error(f"Shutdown callback error: {e}")
-                    
+
             self._is_running = False
             self._startup_complete = False
             self._initialized_components.clear()
-            
+
             return results
-            
+
         except Exception as e:
             logger.error(f"Shutdown error: {e}")
             raise
-            
+
     async def _cleanup_partial_startup(self):
         """Clean up after partial startup failure."""
         if self._initialized_components:
             await cleanup_partial_startup(self._initialized_components)
         self._initialized_components.clear()
         self._is_running = False
-        
+
     @property
     def is_running(self) -> bool:
         """Check if services are running."""
         return self._is_running and is_startup_complete()
-        
+
     @property
     def components(self) -> Dict[str, Any]:
         """Get initialized components."""
         return self._initialized_components.copy()
-        
+
     def get_component(self, name: str) -> Optional[Any]:
         """
         Get a specific initialized component.
-        
+
         Args:
             name: Component name
-            
+
         Returns:
             Component instance or None
         """

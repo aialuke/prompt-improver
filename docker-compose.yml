@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: apes_production
       POSTGRES_USER: apes_user
-      POSTGRES_PASSWORD: apes_secure_password_2024
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-please_set_secure_password}  # Use environment variable
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "5432:5432" # Direct port mapping since no Homebrew PostgreSQL conflict
@@ -26,7 +26,7 @@ services:
     container_name: apes_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@apes.local
-      PGADMIN_DEFAULT_PASSWORD: admin_password_2024
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-please_set_secure_password}  # Use environment variable
     ports:
       - "8080:80"
     depends_on:

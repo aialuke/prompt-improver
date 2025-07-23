@@ -8,10 +8,11 @@ duplicationtesting.md Phase 3 requirements.
 
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable, Awaitable
+from collections.abc import Coroutine
 
 # Import the comprehensive health system
-from ..services.health import (
+from ..performance.monitoring.health import (
     AggregatedHealthResult,
     HealthResult,
     HealthStatus,
@@ -136,7 +137,7 @@ class HealthChecker:
 
 
 # Decorator for health check components (as specified in Phase 3)
-def health_check_component(component_name: str):
+def health_check_component(component_name: str) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Callable[..., Awaitable[dict[str, Any]]]]:
     """Decorator for standardized health checking
 
     Usage:
@@ -146,8 +147,8 @@ def health_check_component(component_name: str):
             return {"status": "healthy", "message": "Service OK"}
     """
 
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., Awaitable[dict[str, Any]]]) -> Callable[..., Awaitable[dict[str, Any]]]:
+        async def wrapper(*args: Any, **kwargs: Any) -> dict[str, Any]:
             start_time = time.time()
             try:
                 result = await func(*args, **kwargs)

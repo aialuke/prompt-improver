@@ -1722,7 +1722,7 @@ class AdvancedDimensionalityReducer:
         import hashlib
 
         key_data = f"{X.shape}_{method}_{self.config.target_dimensions}_{self.config.random_state}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def _update_performance_tracking(self, result: ReductionResult):
         """Update performance tracking for the reduction method."""

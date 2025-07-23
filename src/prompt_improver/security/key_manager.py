@@ -245,11 +245,11 @@ class SecureKeyManager:
 
         # Initialize with first key
         self._generate_new_key()
-    
+
     def run_orchestrated_analysis(self, operation: str, parameters: dict = None) -> Dict[str, Any]:
         """Synchronous orchestrator-compatible interface for testing and simple operations"""
         parameters = parameters or {}
-        
+
         try:
             if operation == "get_key":
                 key_id = parameters.get("key_id")
@@ -270,7 +270,7 @@ class SecureKeyManager:
                         "key_id": current_key_id,
                         "timestamp": aware_utc_now().isoformat()
                     }
-            
+
             elif operation == "generate_key":
                 key_id = parameters.get("key_id")
                 if key_id:
@@ -297,7 +297,7 @@ class SecureKeyManager:
                         "result": key_bytes,
                         "timestamp": aware_utc_now().isoformat()
                     }
-            
+
             elif operation == "rotate_key":
                 key_id = parameters.get("key_id")
                 new_key_id = self.rotate_key()
@@ -310,7 +310,7 @@ class SecureKeyManager:
                     "result": key_bytes,
                     "timestamp": aware_utc_now().isoformat()
                 }
-            
+
             elif operation == "get_status":
                 security_status = self.get_security_status()
                 return {
@@ -324,7 +324,7 @@ class SecureKeyManager:
                     },
                     "timestamp": aware_utc_now().isoformat()
                 }
-            
+
             elif operation == "cleanup":
                 key_id = parameters.get("key_id")
                 removed_count = self.cleanup_expired_keys()
@@ -334,7 +334,7 @@ class SecureKeyManager:
                     "result": removed_count,
                     "timestamp": aware_utc_now().isoformat()
                 }
-            
+
             else:
                 return {
                     "orchestrator_compatible": True,
@@ -343,7 +343,7 @@ class SecureKeyManager:
                     "error": f"Unknown operation: {operation}",
                     "timestamp": aware_utc_now().isoformat()
                 }
-        
+
         except Exception as e:
             return {
                 "orchestrator_compatible": True,
@@ -442,7 +442,7 @@ class SecureKeyManager:
                     "component_version": "1.0.0"
                 }
             }
-    
+
     def get_current_key(self) -> Tuple[bytes, str]:
         """Get the current encryption key with enhanced security checks.
 
@@ -479,42 +479,42 @@ class SecureKeyManager:
 
         self.logger.debug(f"Retrieved current key: {self.current_key_id}")
         return key_info.key, self.current_key_id
-    
+
     def get_key_by_id(self, key_id: str) -> Optional[bytes]:
         """Get a specific key by ID for decryption.
-        
+
         Args:
             key_id: The key identifier
-            
+
         Returns:
             Key bytes if found and valid, None otherwise
         """
         if key_id not in self.keys:
             self.logger.warning(f"Key not found: {key_id}")
             return None
-        
+
         key_info = self.keys[key_id]
-        
+
         # Check if key is too old to use
         if key_info.is_expired(self.config.max_key_age_hours):
             self.logger.warning(f"Key expired: {key_id}")
             return None
-        
+
         key_info.mark_used()
         self.logger.debug(f"Retrieved key by ID: {key_id}")
         return key_info.key
-    
+
     def rotate_key(self) -> str:
         """Manually rotate the encryption key.
-        
+
         Returns:
             New key ID
         """
         return self._rotate_key()
-    
+
     def get_key_info(self) -> Dict[str, dict]:
         """Get information about all managed keys.
-        
+
         Returns:
             Dictionary mapping key IDs to key information
         """
@@ -530,47 +530,47 @@ class SecureKeyManager:
                 "should_rotate": key_info.should_rotate(self.config.rotation_interval_hours)
             }
         return info
-    
+
     def cleanup_expired_keys(self) -> int:
         """Remove expired keys that are no longer needed.
-        
+
         Returns:
             Number of keys removed
         """
         expired_keys = []
-        
+
         for key_id, key_info in self.keys.items():
             # Don't remove current key even if expired
             if key_id == self.current_key_id:
                 continue
-                
+
             # Remove if expired and not recently used
             if key_info.is_expired(self.config.max_key_age_hours):
                 # Grace period for recently used keys
                 time_since_last_use = aware_utc_now() - key_info.last_used
                 if time_since_last_use > timedelta(hours=1):  # 1 hour grace period
                     expired_keys.append(key_id)
-        
+
         # Enforce version limit
         sorted_keys = sorted(
-            self.keys.items(), 
-            key=lambda x: x[1].created_at, 
+            self.keys.items(),
+            key=lambda x: x[1].created_at,
             reverse=True
         )
-        
+
         if len(sorted_keys) > self.config.key_version_limit:
             excess_keys = sorted_keys[self.config.key_version_limit:]
             for key_id, _ in excess_keys:
                 if key_id != self.current_key_id and key_id not in expired_keys:
                     expired_keys.append(key_id)
-        
+
         # Remove expired keys
         for key_id in expired_keys:
             del self.keys[key_id]
             self.logger.info(f"Removed expired key: {key_id}")
-        
+
         return len(expired_keys)
-    
+
     def _generate_new_key(self) -> str:
         """Generate a new encryption key using 2025 security best practices.
 
@@ -666,43 +666,43 @@ class SecureKeyManager:
         # Convert to Fernet-compatible key
         import base64
         return base64.urlsafe_b64encode(key_material)
-    
+
     def _rotate_key(self) -> str:
         """Rotate to a new encryption key.
-        
+
         Returns:
             New key ID
         """
         old_key_id = self.current_key_id
         new_key_id = self._generate_new_key()
-        
+
         # Clean up old keys
         removed_count = self.cleanup_expired_keys()
-        
+
         self.logger.info(
             f"Key rotation completed: {old_key_id} -> {new_key_id}, "
             f"removed {removed_count} expired keys"
         )
-        
+
         return new_key_id
-    
+
     def _should_rotate_current_key(self) -> bool:
         """Check if current key should be rotated."""
         if self.current_key_id is None:
             return True
-        
+
         key_info = self.keys.get(self.current_key_id)
         if key_info is None:
             return True
-        
+
         return key_info.should_rotate(self.config.rotation_interval_hours)
-    
+
     def _generate_key_id(self, key_bytes: bytes) -> str:
         """Generate a unique key identifier.
-        
+
         Args:
             key_bytes: The key material
-            
+
         Returns:
             Unique key identifier
         """
@@ -710,7 +710,7 @@ class SecureKeyManager:
         timestamp = str(int(time.time()))
         random_component = secrets.token_hex(8)
         key_hash = hashlib.sha256(key_bytes).hexdigest()[:8]
-        
+
         key_id = f"key_{timestamp}_{random_component}_{key_hash}"
         return key_id
 
@@ -859,20 +859,20 @@ class SecureKeyManager:
 
 class FernetKeyManager:
     """Wrapper for Fernet encryption using SecureKeyManager."""
-    
+
     def __init__(self, key_manager: Optional[SecureKeyManager] = None):
         self.key_manager = key_manager or SecureKeyManager()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-    
+
     def run_orchestrated_analysis(self, operation: str, parameters: dict = None) -> Dict[str, Any]:
         """Synchronous orchestrator-compatible interface for testing and simple operations"""
         parameters = parameters or {}
-        
+
         try:
             if operation == "encrypt":
                 data = parameters.get("data")
                 key_id = parameters.get("key_id")
-                
+
                 if data is None:
                     return {
                         "orchestrator_compatible": True,
@@ -880,11 +880,11 @@ class FernetKeyManager:
                         "result": {"success": False, "error": "No data provided"},
                         "timestamp": aware_utc_now().isoformat()
                     }
-                
+
                 # Handle string data
                 if isinstance(data, str):
                     data = data.encode('utf-8')
-                
+
                 encrypted_data, used_key_id = self.encrypt(data)
                 return {
                     "orchestrator_compatible": True,
@@ -896,11 +896,11 @@ class FernetKeyManager:
                     },
                     "timestamp": aware_utc_now().isoformat()
                 }
-            
+
             elif operation == "decrypt":
                 encrypted_data = parameters.get("encrypted_data")
                 key_id = parameters.get("key_id")
-                
+
                 if encrypted_data is None or key_id is None:
                     return {
                         "orchestrator_compatible": True,
@@ -908,7 +908,7 @@ class FernetKeyManager:
                         "result": {"success": False, "error": "Missing encrypted_data or key_id"},
                         "timestamp": aware_utc_now().isoformat()
                     }
-                
+
                 try:
                     decrypted_data = self.decrypt(encrypted_data, key_id)
                     # Decode bytes to string for testing
@@ -919,7 +919,7 @@ class FernetKeyManager:
                             decrypted_str = decrypted_data  # Keep as bytes if can't decode
                     else:
                         decrypted_str = decrypted_data
-                    
+
                     return {
                         "orchestrator_compatible": True,
                         "operation": operation,
@@ -941,7 +941,7 @@ class FernetKeyManager:
                         },
                         "timestamp": aware_utc_now().isoformat()
                     }
-            
+
             elif operation == "test_encryption":
                 test_data = "Test encryption cycle"
                 try:
@@ -949,9 +949,9 @@ class FernetKeyManager:
                     encrypted_data, key_id = self.encrypt(test_data.encode('utf-8'))
                     decrypted_data = self.decrypt(encrypted_data, key_id)
                     end_time = time.time()
-                    
+
                     success = decrypted_data.decode('utf-8') == test_data
-                    
+
                     return {
                         "orchestrator_compatible": True,
                         "operation": operation,
@@ -975,7 +975,7 @@ class FernetKeyManager:
                         },
                         "timestamp": aware_utc_now().isoformat()
                     }
-            
+
             elif operation == "get_status":
                 return {
                     "orchestrator_compatible": True,
@@ -987,7 +987,7 @@ class FernetKeyManager:
                     },
                     "timestamp": aware_utc_now().isoformat()
                 }
-            
+
             else:
                 return {
                     "orchestrator_compatible": True,
@@ -996,7 +996,7 @@ class FernetKeyManager:
                     "error": f"Unknown operation: {operation}",
                     "timestamp": aware_utc_now().isoformat()
                 }
-        
+
         except Exception as e:
             return {
                 "orchestrator_compatible": True,
@@ -1030,15 +1030,15 @@ class FernetKeyManager:
             if operation == "encrypt":
                 if data is None:
                     raise ValueError("Data required for encryption operation")
-                
+
                 # Handle both string and bytes data
                 if isinstance(data, str):
                     data_bytes = data.encode('utf-8')
                 else:
                     data_bytes = data
-                
+
                 encrypted_data, used_key_id = self.encrypt(data_bytes)
-                
+
                 result = {
                     "encryption_successful": True,
                     "encrypted_data_size": len(encrypted_data),
@@ -1048,9 +1048,9 @@ class FernetKeyManager:
             elif operation == "decrypt":
                 if data is None or key_id is None:
                     raise ValueError("Data and key_id required for decryption operation")
-                
+
                 decrypted_data = self.decrypt(data, key_id)
-                
+
                 result = {
                     "decryption_successful": True,
                     "decrypted_data_size": len(decrypted_data),
@@ -1060,16 +1060,16 @@ class FernetKeyManager:
             elif operation == "test_encryption":
                 # Perform round-trip encryption test
                 test_message = test_data if isinstance(test_data, bytes) else str(test_data).encode('utf-8')
-                
+
                 # Encrypt
                 encrypted_data, used_key_id = self.encrypt(test_message)
-                
+
                 # Decrypt
                 decrypted_data = self.decrypt(encrypted_data, used_key_id)
-                
+
                 # Verify
                 test_successful = decrypted_data == test_message
-                
+
                 result = {
                     "encryption_test_successful": test_successful,
                     "test_message_size": len(test_message),
@@ -1081,7 +1081,7 @@ class FernetKeyManager:
             elif operation == "get_status":
                 # Delegate to underlying key manager
                 key_manager_status = await self.key_manager.run_orchestrated_analysis({"operation": "get_status"})
-                
+
                 result = {
                     "fernet_manager_active": True,
                     "underlying_key_manager": key_manager_status.get("component_result", {}),
@@ -1116,40 +1116,40 @@ class FernetKeyManager:
                     "component_version": "1.0.0"
                 }
             }
-    
+
     def encrypt(self, data: bytes) -> Tuple[bytes, str]:
         """Encrypt data with current key.
-        
+
         Args:
             data: Data to encrypt
-            
+
         Returns:
             Tuple of (encrypted_data, key_id)
         """
         key_bytes, key_id = self.key_manager.get_current_key()
         fernet = Fernet(key_bytes)
         encrypted_data = fernet.encrypt(data)
-        
+
         self.logger.debug(f"Encrypted data with key: {key_id}")
         return encrypted_data, key_id
-    
+
     def decrypt(self, encrypted_data: bytes, key_id: str) -> bytes:
         """Decrypt data with specific key.
-        
+
         Args:
             encrypted_data: Data to decrypt
             key_id: Key identifier used for encryption
-            
+
         Returns:
             Decrypted data
-            
+
         Raises:
             ValueError: If key not found or decryption fails
         """
         key_bytes = self.key_manager.get_key_by_id(key_id)
         if key_bytes is None:
             raise ValueError(f"Encryption key not found: {key_id}")
-        
+
         try:
             fernet = Fernet(key_bytes)
             decrypted_data = fernet.decrypt(encrypted_data)
@@ -1158,30 +1158,30 @@ class FernetKeyManager:
         except Exception as e:
             self.logger.error(f"Failed to decrypt data with key {key_id}: {e}")
             raise ValueError(f"Decryption failed: {e}")
-    
+
     def get_current_fernet(self) -> Tuple[Fernet, str]:
         """Get current Fernet instance and key ID.
-        
+
         Returns:
             Tuple of (Fernet instance, key_id)
         """
         key_bytes, key_id = self.key_manager.get_current_key()
         fernet = Fernet(key_bytes)
         return fernet, key_id
-    
+
     def get_fernet_by_id(self, key_id: str) -> Optional[Fernet]:
         """Get Fernet instance for specific key.
-        
+
         Args:
             key_id: Key identifier
-            
+
         Returns:
             Fernet instance if key found, None otherwise
         """
         key_bytes = self.key_manager.get_key_by_id(key_id)
         if key_bytes is None:
             return None
-        
+
         return Fernet(key_bytes)
 
 

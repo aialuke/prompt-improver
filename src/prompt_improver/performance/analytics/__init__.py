@@ -7,6 +7,6 @@ from .analytics import AnalyticsService
 from .real_time_analytics import RealTimeAnalyticsService
 
 __all__ = [
-    "AnalyticsService", 
+    "AnalyticsService",
     "RealTimeAnalyticsService",
 ]

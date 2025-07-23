@@ -173,7 +173,9 @@ class ContextualRule:
         try:
             # Simple evaluation - in production would use a proper expression evaluator
             return eval(self.condition, {"__builtins__": {}}, context)
-        except:
+        except (SyntaxError, NameError, TypeError, ValueError, ZeroDivisionError) as e:
+            # Log the specific error for debugging
+            logger.warning(f"Condition evaluation failed: {e}")
             return False
 
 
@@ -489,8 +491,9 @@ class EnhancedCanaryTestingService:
             cpu_utilization = psutil.cpu_percent(interval=0.1)
             memory_info = psutil.virtual_memory()
             memory_utilization = memory_info.percent
-        except:
-            # Fallback if psutil not available
+        except (ImportError, AttributeError, OSError) as e:
+            # Fallback if psutil not available or system metrics unavailable
+            logger.warning(f"Failed to get system metrics: {e}")
             cpu_utilization = random.normalvariate(45, 15)
             memory_utilization = random.normalvariate(60, 20)
 

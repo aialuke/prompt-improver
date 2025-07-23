@@ -12,6 +12,8 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypeVar
 
+import aiofiles
+
 import psycopg
 from psycopg import (
     errors as psycopg_errors,
@@ -807,14 +809,14 @@ class TypeSafePsycopgClient:
 
                 copy_sql += ")"
 
-                # Execute COPY TO
+                # Execute COPY TO with async file operations
                 row_count = 0
-                with open(file_path, "w", encoding="utf-8") as f:
+                async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
                     async with cur.copy(copy_sql) as copy:  # type: ignore[arg-type]
                         async for data in copy:
                             # Proper binary data handling for 2025
                             content = bytes(data).decode("utf-8")
-                            f.write(content)
+                            await f.write(content)
                             # Count rows (approximation for CSV)
                             row_count += content.count("\n")
 
@@ -879,11 +881,11 @@ class TypeSafePsycopgClient:
 
                 copy_sql += ")"
 
-                # Execute COPY FROM
+                # Execute COPY FROM with async file operations
                 row_count = 0
-                with open(file_path, encoding="utf-8") as f:
+                async with aiofiles.open(file_path, encoding="utf-8") as f:
                     async with cur.copy(copy_sql) as copy:  # type: ignore[arg-type]
-                        content = f.read()
+                        content = await f.read()
                         await copy.write(content)
                         # Count rows (approximation for CSV)
                         row_count = content.count("\n")
@@ -995,12 +997,12 @@ class TypeSafePsycopgClient:
         """Get current performance statistics with 2025 enhanced monitoring."""
         # Get PostgreSQL cache hit ratio
         cache_hit_query = """
-        SELECT 
-            CASE 
+        SELECT
+            CASE
                 WHEN (blks_hit + blks_read) = 0 THEN 0
                 ELSE blks_hit::float / (blks_hit + blks_read)
             END as cache_hit_ratio
-        FROM pg_stat_database 
+        FROM pg_stat_database
         WHERE datname = current_database()
         """
 
@@ -1068,7 +1070,7 @@ class TypeSafePsycopgClient:
             async with self.connection() as conn:
                 # Get connection info
                 info_query = """
-                SELECT 
+                SELECT
                     current_setting('application_name') as app_name,
                     current_setting('TimeZone') as timezone,
                     current_setting('default_transaction_isolation') as isolation_level,
@@ -1255,7 +1257,7 @@ class TypeSafePsycopgClient:
             # 4. Server health check
             try:
                 server_query = """
-                SELECT 
+                SELECT
                     pg_database_size(current_database()) as db_size,
                     (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') as active_connections,
                     (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle') as idle_connections,
@@ -1316,36 +1318,36 @@ class TypeSafePsycopgClient:
 
             # Get additional PostgreSQL metrics
             metrics_query = """
-            SELECT 
+            SELECT
                 -- Database stats
                 pg_database_size(current_database()) as database_size,
                 pg_size_pretty(pg_database_size(current_database())) as database_size_pretty,
-                
+
                 -- Connection stats
                 (SELECT count(*) FROM pg_stat_activity) as total_connections,
                 (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') as active_connections,
                 (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle') as idle_connections,
                 (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle in transaction') as idle_in_transaction,
-                
+
                 -- Lock stats
                 (SELECT count(*) FROM pg_locks WHERE NOT granted) as blocked_queries,
                 (SELECT count(*) FROM pg_locks WHERE granted) as granted_locks,
-                
+
                 -- Cache and I/O stats
                 (SELECT sum(blks_hit) FROM pg_stat_database) as total_cache_hits,
                 (SELECT sum(blks_read) FROM pg_stat_database) as total_disk_reads,
                 (SELECT sum(tup_returned) FROM pg_stat_database) as total_rows_returned,
                 (SELECT sum(tup_fetched) FROM pg_stat_database) as total_rows_fetched,
-                
+
                 -- Transaction stats
                 (SELECT sum(xact_commit) FROM pg_stat_database) as total_commits,
                 (SELECT sum(xact_rollback) FROM pg_stat_database) as total_rollbacks,
-                
+
                 -- Replication lag (if applicable)
-                CASE 
-                    WHEN pg_is_in_recovery() THEN 
+                CASE
+                    WHEN pg_is_in_recovery() THEN
                         EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))
-                    ELSE 0 
+                    ELSE 0
                 END as replication_lag_seconds
             """
 
@@ -1520,13 +1522,13 @@ class TypeSafePsycopgClient:
     async def run_orchestrated_analysis(self, analysis_type: str = "performance_metrics", **kwargs) -> Dict[str, Any]:
         """
         Run orchestrated analysis for TypeSafePsycopgClient component.
-        
+
         Compatible with ML orchestrator integration patterns.
-        
+
         Args:
             analysis_type: Type of analysis to run
             **kwargs: Additional analysis parameters
-            
+
         Returns:
             Dictionary containing analysis results
         """
@@ -1542,12 +1544,12 @@ class TypeSafePsycopgClient:
             return await self._run_comprehensive_analysis(**kwargs)
         else:
             raise ValueError(f"Unknown analysis type: {analysis_type}")
-    
+
     async def _analyze_performance_metrics(self, **kwargs) -> Dict[str, Any]:
         """Analyze database performance metrics."""
         performance_stats = await self.get_performance_stats()
         detailed_metrics = await self.get_detailed_metrics()
-        
+
         return {
             "component": "TypeSafePsycopgClient",
             "analysis_type": "performance_metrics",
@@ -1567,13 +1569,13 @@ class TypeSafePsycopgClient:
             "recommendations": self._generate_performance_recommendations(performance_stats),
             "timestamp": aware_utc_now().isoformat()
         }
-    
+
     async def _analyze_connection_health(self, **kwargs) -> Dict[str, Any]:
         """Analyze connection pool and database health."""
         health_status = await self.health_check()
         pool_stats = await self.get_pool_stats()
         connection_info = await self.get_connection_info()
-        
+
         return {
             "component": "TypeSafePsycopgClient",
             "analysis_type": "connection_health",
@@ -1592,16 +1594,16 @@ class TypeSafePsycopgClient:
             "recommendations": self._generate_health_recommendations(health_status, pool_stats),
             "timestamp": aware_utc_now().isoformat()
         }
-    
+
     async def _analyze_query_patterns(self, **kwargs) -> Dict[str, Any]:
         """Analyze query execution patterns."""
         detailed_metrics = await self.get_detailed_metrics()
         alerts = await self.get_alerts()
-        
+
         # Analyze slow queries
         slow_query_analysis = self._analyze_slow_queries()
         query_complexity_analysis = self._analyze_query_complexity()
-        
+
         return {
             "component": "TypeSafePsycopgClient",
             "analysis_type": "query_analysis",
@@ -1616,7 +1618,7 @@ class TypeSafePsycopgClient:
             "optimization_opportunities": self._identify_optimization_opportunities(),
             "timestamp": aware_utc_now().isoformat()
         }
-    
+
     async def _analyze_type_safety(self, **kwargs) -> Dict[str, Any]:
         """Analyze type safety and validation effectiveness."""
         return {
@@ -1648,22 +1650,22 @@ class TypeSafePsycopgClient:
             ],
             "timestamp": aware_utc_now().isoformat()
         }
-    
+
     async def _run_comprehensive_analysis(self, **kwargs) -> Dict[str, Any]:
         """Run comprehensive analysis combining all analysis types."""
         performance_analysis = await self._analyze_performance_metrics(**kwargs)
         health_analysis = await self._analyze_connection_health(**kwargs)
         query_analysis = await self._analyze_query_patterns(**kwargs)
         type_safety_analysis = await self._analyze_type_safety(**kwargs)
-        
+
         # Calculate overall score
         performance_score = self._calculate_performance_score(performance_analysis)
         health_score = self._calculate_health_score(health_analysis)
         query_score = self._calculate_query_score(query_analysis)
         type_safety_score = self._calculate_type_safety_score(type_safety_analysis)
-        
+
         overall_score = (performance_score + health_score + query_score + type_safety_score) / 4
-        
+
         return {
             "component": "TypeSafePsycopgClient",
             "analysis_type": "comprehensive_analysis",
@@ -1683,55 +1685,55 @@ class TypeSafePsycopgClient:
             "executive_summary": self._generate_executive_summary(overall_score, performance_analysis, health_analysis),
             "timestamp": aware_utc_now().isoformat()
         }
-    
+
     def _generate_performance_recommendations(self, performance_stats: Dict[str, Any]) -> List[str]:
         """Generate performance improvement recommendations."""
         recommendations = []
-        
+
         avg_query_time = performance_stats.get("avg_query_time_ms", 0)
         if avg_query_time > self.config.target_query_time_ms:
             recommendations.append(f"Average query time ({avg_query_time}ms) exceeds target - consider query optimization")
-        
+
         cache_hit_ratio = performance_stats.get("cache_hit_ratio", 0)
         if cache_hit_ratio < self.config.target_cache_hit_ratio:
             recommendations.append("Cache hit ratio below target - consider index optimization or caching strategy")
-        
+
         pool_utilization = performance_stats.get("pool_status", {}).get("pool_utilization", 0)
         if pool_utilization > 80:
             recommendations.append("High pool utilization - consider increasing pool size")
         elif pool_utilization < 20:
             recommendations.append("Low pool utilization - consider reducing pool size")
-        
+
         return recommendations
-    
+
     def _generate_health_recommendations(self, health_status: Dict[str, Any], pool_stats: Dict[str, Any]) -> List[str]:
         """Generate health improvement recommendations."""
         recommendations = []
-        
+
         overall_health = health_status.get("overall_health", "UNKNOWN")
         if overall_health == "UNHEALTHY":
             recommendations.append("Critical health issues detected - immediate attention required")
         elif overall_health == "DEGRADED":
             recommendations.append("Performance degradation detected - investigate and optimize")
-        
+
         blocked_queries = health_status.get("checks", {}).get("server", {}).get("blocked_queries", 0)
         if blocked_queries > 0:
             recommendations.append(f"Blocked queries detected ({blocked_queries}) - investigate locking issues")
-        
+
         pool_health = pool_stats.get("pool_health", "UNKNOWN")
         if pool_health == "EXHAUSTED":
             recommendations.append("Connection pool exhausted - increase pool size or optimize connection usage")
-        
+
         return recommendations
-    
+
     def _analyze_slow_queries(self) -> Dict[str, Any]:
         """Analyze slow query patterns."""
         if not self.metrics.slow_queries:
             return {"status": "no_slow_queries"}
-        
+
         # Group slow queries by duration ranges
         duration_ranges = {"50-100ms": 0, "100-500ms": 0, "500-1000ms": 0, "1000ms+": 0}
-        
+
         for query in self.metrics.slow_queries:
             duration = query.get("duration_ms", 0)
             if duration <= 100:
@@ -1742,69 +1744,69 @@ class TypeSafePsycopgClient:
                 duration_ranges["500-1000ms"] += 1
             else:
                 duration_ranges["1000ms+"] += 1
-        
+
         return {
             "total_slow_queries": len(self.metrics.slow_queries),
             "duration_distribution": duration_ranges,
             "avg_slow_query_duration": sum(q.get("duration_ms", 0) for q in self.metrics.slow_queries) / len(self.metrics.slow_queries),
             "worst_query": max(self.metrics.slow_queries, key=lambda q: q.get("duration_ms", 0)) if self.metrics.slow_queries else None
         }
-    
+
     def _analyze_query_complexity(self) -> Dict[str, Any]:
         """Analyze query complexity patterns."""
         if not self.metrics.slow_queries:
             return {"status": "no_data"}
-        
+
         complexity_patterns = {"simple": 0, "moderate": 0, "complex": 0}
-        
+
         for query in self.metrics.slow_queries:
             query_text = query.get("query", "").lower()
             complexity = "simple"
-            
+
             if any(keyword in query_text for keyword in ["join", "subquery", "with", "window"]):
                 complexity = "moderate"
             if any(keyword in query_text for keyword in ["recursive", "pivot", "lateral", "over("]):
                 complexity = "complex"
-            
+
             complexity_patterns[complexity] += 1
-        
+
         return {
             "complexity_distribution": complexity_patterns,
             "most_complex_queries": [q for q in self.metrics.slow_queries if "join" in q.get("query", "").lower() or "with" in q.get("query", "").lower()][:5]
         }
-    
+
     def _identify_optimization_opportunities(self) -> List[str]:
         """Identify query optimization opportunities."""
         opportunities = []
-        
+
         if len(self.metrics.slow_queries) > 10:
             opportunities.append("High number of slow queries - consider index optimization")
-        
+
         if self.metrics.avg_query_time > 50:
             opportunities.append("Average query time above target - query optimization needed")
-        
+
         if self.metrics.queries_under_50ms < 80:
             opportunities.append("Less than 80% of queries meet performance target")
-        
+
         return opportunities
-    
+
     def _calculate_performance_score(self, analysis: Dict[str, Any]) -> float:
         """Calculate performance score (0-100)."""
         query_perf = analysis.get("query_performance", {})
         target_compliance = query_perf.get("queries_under_50ms_percent", 0)
         avg_query_time = query_perf.get("avg_query_time_ms", 100)
-        
+
         # Score based on target compliance and query time
         compliance_score = target_compliance
         time_score = max(0, 100 - (avg_query_time / 50) * 50)  # 50ms target
-        
+
         return (compliance_score + time_score) / 2
-    
+
     def _calculate_health_score(self, analysis: Dict[str, Any]) -> float:
         """Calculate health score (0-100)."""
         overall_health = analysis.get("overall_health", "UNKNOWN")
         pool_analysis = analysis.get("pool_analysis", {})
-        
+
         if overall_health == "HEALTHY":
             health_score = 100
         elif overall_health == "DEGRADED":
@@ -1813,50 +1815,50 @@ class TypeSafePsycopgClient:
             health_score = 30
         else:
             health_score = 50
-        
+
         # Adjust based on pool utilization
         pool_util = pool_analysis.get("utilization", 0)
         if pool_util > 90:
             health_score *= 0.8
         elif pool_util < 20:
             health_score *= 0.9
-        
+
         return health_score
-    
+
     def _calculate_query_score(self, analysis: Dict[str, Any]) -> float:
         """Calculate query analysis score (0-100)."""
         query_stats = analysis.get("query_statistics", {})
         slow_queries = query_stats.get("slow_queries", 0)
         total_queries = query_stats.get("total_queries", 1)
-        
+
         # Score based on slow query ratio
         slow_ratio = slow_queries / total_queries if total_queries > 0 else 0
         score = max(0, 100 - (slow_ratio * 100))
-        
+
         return score
-    
+
     def _calculate_type_safety_score(self, analysis: Dict[str, Any]) -> float:
         """Calculate type safety score (0-100)."""
         # Type safety is always high due to Pydantic integration
         validation_features = analysis.get("validation_features", {})
         error_handling = analysis.get("error_handling", {})
         security_features = analysis.get("security_features", {})
-        
+
         # All features are implemented, so score is high
         base_score = 95
-        
+
         # Small deductions for any missing features
         if not error_handling.get("circuit_breaker_enabled", False):
             base_score -= 2
         if not error_handling.get("comprehensive_error_metrics", False):
             base_score -= 3
-        
+
         return base_score
-    
+
     def _generate_executive_summary(self, overall_score: float, performance_analysis: Dict[str, Any], health_analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Generate executive summary of database analysis."""
         status = "EXCELLENT" if overall_score >= 90 else "GOOD" if overall_score >= 80 else "NEEDS_IMPROVEMENT" if overall_score >= 60 else "CRITICAL"
-        
+
         key_metrics = {
             "overall_score": overall_score,
             "status": status,
@@ -1865,7 +1867,7 @@ class TypeSafePsycopgClient:
             "health_status": health_analysis.get("overall_health", "UNKNOWN"),
             "pool_health": health_analysis.get("pool_analysis", {}).get("health", "UNKNOWN")
         }
-        
+
         critical_issues = []
         if overall_score < 60:
             critical_issues.append("Overall database performance below acceptable threshold")
@@ -1873,7 +1875,7 @@ class TypeSafePsycopgClient:
             critical_issues.append("Database health status is unhealthy")
         if performance_analysis.get("query_performance", {}).get("target_compliance") == "NEEDS_IMPROVEMENT":
             critical_issues.append("Query performance does not meet targets")
-        
+
         return {
             "key_metrics": key_metrics,
             "critical_issues": critical_issues,

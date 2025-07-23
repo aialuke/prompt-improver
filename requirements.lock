@@ -230,7 +230,7 @@ SQLAlchemy==2.0.41
 sqlmodel==0.0.24
 sqlparse==0.5.3
 sse-starlette==2.3.6
-starlette==0.46.2
+starlette==0.47.2
 statsmodels==0.14.4
 stdlib-list==0.11.1
 sympy==1.14.0

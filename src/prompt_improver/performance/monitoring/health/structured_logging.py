@@ -34,7 +34,7 @@ class LogContext:
     user_id: Optional[str] = None
     tenant_id: Optional[str] = None
     environment: str = "production"
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values"""
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -44,11 +44,11 @@ class StructuredLogger:
     """
     Enhanced logger with structured output for 2025 observability standards
     """
-    
+
     def __init__(self, logger_name: str):
         self.logger = logging.getLogger(logger_name)
         self._context_stack = []
-    
+
     @contextmanager
     def context(self, **kwargs):
         """Add contextual information to all logs within this block"""
@@ -57,9 +57,9 @@ class StructuredLogger:
             yield
         finally:
             self._context_stack.pop()
-    
+
     def _build_log_entry(
-        self, 
+        self,
         level: str,
         message: str,
         **kwargs
@@ -67,7 +67,7 @@ class StructuredLogger:
         """Build structured log entry with all context"""
         # Get correlation ID from context (if available)
         correlation_id = get_correlation_id() or "unknown"
-        
+
         # Base log structure
         log_entry = {
             "timestamp": time.time(),
@@ -76,14 +76,14 @@ class StructuredLogger:
             "message": message,
             "correlation_id": correlation_id,
         }
-        
+
         # Add stacked context
         for context in self._context_stack:
             log_entry.update(context)
-        
+
         # Add additional kwargs
         log_entry.update(kwargs)
-        
+
         # Add error details if present
         if "error" in kwargs and isinstance(kwargs["error"], Exception):
             error = kwargs["error"]
@@ -92,9 +92,9 @@ class StructuredLogger:
                 "message": str(error),
                 "traceback": traceback.format_exc()
             }
-        
+
         return log_entry
-    
+
     def _make_json_safe(self, obj):
         """Convert non-JSON-serializable objects to strings recursively"""
         if isinstance(obj, dict):
@@ -108,30 +108,30 @@ class StructuredLogger:
                     self._make_json_safe(value)
                 elif isinstance(value, list):
                     obj[key] = [
-                        {'type': type(item).__name__, 'message': str(item)} 
-                        if isinstance(item, (Exception, BaseException, type)) 
-                        else item 
+                        {'type': type(item).__name__, 'message': str(item)}
+                        if isinstance(item, (Exception, BaseException, type))
+                        else item
                         for item in value
                     ]
         return obj
-    
+
     def info(self, message: str, **kwargs):
         """Log info with structured data"""
         log_entry = self._build_log_entry("INFO", message, **kwargs)
         self.logger.info(json.dumps(log_entry))
-    
+
     def warning(self, message: str, **kwargs):
         """Log warning with structured data"""
         log_entry = self._build_log_entry("WARNING", message, **kwargs)
         self.logger.warning(json.dumps(log_entry))
-    
+
     def error(self, message: str, **kwargs):
         """Log error with structured data"""
         log_entry = self._build_log_entry("ERROR", message, **kwargs)
         # Handle exception serialization
         self._make_json_safe(log_entry)
         self.logger.error(json.dumps(log_entry))
-    
+
     def debug(self, message: str, **kwargs):
         """Log debug with structured data"""
         log_entry = self._build_log_entry("DEBUG", message, **kwargs)
@@ -149,10 +149,10 @@ def log_health_check(
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
             logger = StructuredLogger(f"{self.__class__.__module__}.{self.__class__.__name__}")
-            
+
             # Start timing
             start_time = time.time()
-            
+
             # Log health check start
             logger.info(
                 f"Health check started: {component_name}",
@@ -162,14 +162,14 @@ def log_health_check(
                 class_name=self.__class__.__name__,
                 method_name=func.__name__
             )
-            
+
             try:
                 # Execute health check
                 result = await func(self, *args, **kwargs)
-                
+
                 # Calculate duration
                 duration_ms = (time.time() - start_time) * 1000
-                
+
                 # Log successful completion
                 logger.info(
                     f"Health check completed: {component_name}",
@@ -182,13 +182,13 @@ def log_health_check(
                     response_time_ms=getattr(result, 'response_time_ms', None),
                     details=getattr(result, 'details', {})
                 )
-                
+
                 return result
-                
+
             except Exception as e:
                 # Calculate duration even on failure
                 duration_ms = (time.time() - start_time) * 1000
-                
+
                 # Log failure with full context
                 logger.error(
                     f"Health check failed: {component_name}",
@@ -200,9 +200,9 @@ def log_health_check(
                     class_name=self.__class__.__name__,
                     method_name=func.__name__
                 )
-                
+
                 raise
-        
+
         return wrapper
     return decorator
 
@@ -211,14 +211,14 @@ class HealthMetricsLogger:
     """
     Specialized logger for health metrics with aggregation support
     """
-    
+
     def __init__(self, component_name: str):
         self.component_name = component_name
         self.logger = StructuredLogger(f"health_metrics.{component_name}")
         self._metrics_buffer = []
         self._last_flush = time.time()
         self._flush_interval = 60  # seconds
-    
+
     def record_check(
         self,
         status: str,
@@ -233,25 +233,25 @@ class HealthMetricsLogger:
             "response_time_ms": response_time_ms,
             "details": details or {}
         }
-        
+
         self._metrics_buffer.append(metric)
-        
+
         # Auto-flush if needed
         if time.time() - self._last_flush > self._flush_interval:
             self.flush()
-    
+
     def flush(self):
         """Flush aggregated metrics"""
         if not self._metrics_buffer:
             return
-        
+
         # Calculate aggregates
         response_times = [m["response_time_ms"] for m in self._metrics_buffer]
         status_counts = {}
         for metric in self._metrics_buffer:
             status = metric["status"]
             status_counts[status] = status_counts.get(status, 0) + 1
-        
+
         # Log aggregated metrics
         self.logger.info(
             f"Health metrics summary for {self.component_name}",
@@ -266,7 +266,7 @@ class HealthMetricsLogger:
             status_distribution=status_counts,
             success_rate=status_counts.get("HEALTHY", 0) / len(self._metrics_buffer)
         )
-        
+
         # Clear buffer
         self._metrics_buffer = []
         self._last_flush = time.time()

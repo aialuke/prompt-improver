@@ -32,7 +32,7 @@ class QueryPerformanceMetrics:
     rows_returned: int
     cache_hit: bool
     timestamp: datetime
-    
+
     def meets_target(self, target_ms: float = 50) -> bool:
         """Check if query meets performance target."""
         return self.execution_time_ms <= target_ms
@@ -40,47 +40,47 @@ class QueryPerformanceMetrics:
 
 class PreparedStatementCache:
     """Cache for prepared statements to improve query performance."""
-    
+
     def __init__(self, max_size: int = 100):
         self._statements: Dict[str, str] = {}
         self._usage_count: Dict[str, int] = {}
         self._max_size = max_size
-    
+
     def get_or_create_statement(self, query: str, params: Dict[str, Any]) -> str:
         """Get or create a prepared statement for the query."""
         # Create a hash of the query structure (without parameter values)
         query_hash = self._hash_query_structure(query)
-        
+
         if query_hash not in self._statements:
             if len(self._statements) >= self._max_size:
                 # Remove least used statement
                 least_used = min(self._usage_count.items(), key=lambda x: x[1])
                 del self._statements[least_used[0]]
                 del self._usage_count[least_used[0]]
-            
+
             self._statements[query_hash] = query
             self._usage_count[query_hash] = 0
-        
+
         self._usage_count[query_hash] += 1
         return self._statements[query_hash]
-    
+
     def _hash_query_structure(self, query: str) -> str:
         """Create a hash of the query structure for caching."""
         import hashlib
         # Normalize query by removing extra whitespace and converting to lowercase
         normalized = " ".join(query.lower().split())
-        return hashlib.md5(normalized.encode()).hexdigest()
-    
+        return hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()
+
     async def run_orchestrated_analysis(self, analysis_type: str = "cache_performance", **kwargs) -> Dict[str, Any]:
         """
         Run orchestrated analysis for PreparedStatementCache component.
-        
+
         Compatible with ML orchestrator integration patterns.
-        
+
         Args:
             analysis_type: Type of analysis to run
             **kwargs: Additional analysis parameters
-            
+
         Returns:
             Dictionary containing analysis results
         """
@@ -92,7 +92,7 @@ class PreparedStatementCache:
             return await self._analyze_cache_efficiency(**kwargs)
         else:
             raise ValueError(f"Unknown analysis type: {analysis_type}")
-    
+
     async def _analyze_cache_performance(self, **kwargs) -> Dict[str, Any]:
         """Analyze cache performance metrics."""
         return {
@@ -107,7 +107,7 @@ class PreparedStatementCache:
             "cache_efficiency": "high" if len(self._statements) / self._max_size > 0.7 else "medium" if len(self._statements) / self._max_size > 0.3 else "low",
             "timestamp": datetime.utcnow().isoformat()
         }
-    
+
     async def _analyze_query_optimization(self, **kwargs) -> Dict[str, Any]:
         """Analyze query optimization potential."""
         # Calculate query complexity distribution
@@ -115,7 +115,7 @@ class PreparedStatementCache:
         for query_hash, query in self._statements.items():
             complexity = self._calculate_query_complexity(query)
             query_complexity[query_hash] = complexity
-        
+
         return {
             "component": "PreparedStatementCache",
             "analysis_type": "query_optimization",
@@ -125,7 +125,7 @@ class PreparedStatementCache:
             "cache_hit_potential": sum(self._usage_count.values()) / len(self._usage_count) if self._usage_count else 0,
             "timestamp": datetime.utcnow().isoformat()
         }
-    
+
     async def _analyze_cache_efficiency(self, **kwargs) -> Dict[str, Any]:
         """Analyze cache efficiency and provide recommendations."""
         if not self._usage_count:
@@ -135,16 +135,16 @@ class PreparedStatementCache:
                 "status": "no_data",
                 "message": "No usage data available for analysis"
             }
-        
+
         # Calculate efficiency metrics
         usage_values = list(self._usage_count.values())
         total_usage = sum(usage_values)
         avg_usage = total_usage / len(usage_values)
-        
+
         # Identify hot and cold queries
         hot_queries = {k: v for k, v in self._usage_count.items() if v > avg_usage * 2}
         cold_queries = {k: v for k, v in self._usage_count.items() if v < avg_usage * 0.5}
-        
+
         return {
             "component": "PreparedStatementCache",
             "analysis_type": "cache_efficiency",
@@ -156,82 +156,82 @@ class PreparedStatementCache:
             "recommendations": self._generate_cache_recommendations(hot_queries, cold_queries),
             "timestamp": datetime.utcnow().isoformat()
         }
-    
+
     def _calculate_query_complexity(self, query: str) -> str:
         """Calculate query complexity based on SQL keywords."""
         query_lower = query.lower()
         complexity_score = 0
-        
+
         # Basic queries
         if any(keyword in query_lower for keyword in ['select', 'insert', 'update', 'delete']):
             complexity_score += 1
-        
+
         # Joins increase complexity
         if any(keyword in query_lower for keyword in ['join', 'inner join', 'left join', 'right join']):
             complexity_score += 2
-        
+
         # Subqueries and CTEs
         if any(keyword in query_lower for keyword in ['with', 'exists', 'in (']):
             complexity_score += 2
-        
+
         # Aggregation
         if any(keyword in query_lower for keyword in ['group by', 'having', 'count', 'sum', 'avg']):
             complexity_score += 1
-        
+
         # Window functions
         if 'over(' in query_lower.replace(' ', ''):
             complexity_score += 3
-        
+
         if complexity_score >= 5:
             return "complex"
         elif complexity_score >= 3:
             return "moderate"
         else:
             return "simple"
-    
+
     def _generate_optimization_recommendations(self) -> List[str]:
         """Generate optimization recommendations based on cache state."""
         recommendations = []
-        
+
         if len(self._statements) >= self._max_size * 0.9:
             recommendations.append("Consider increasing cache size to reduce eviction")
-        
+
         if self._usage_count:
             usage_values = list(self._usage_count.values())
             if max(usage_values) > sum(usage_values) * 0.5:
                 recommendations.append("Cache shows good hot query concentration")
             else:
                 recommendations.append("Consider implementing query-specific optimization")
-        
+
         if len(self._statements) < self._max_size * 0.3:
             recommendations.append("Cache is underutilized, consider reducing size")
-        
+
         return recommendations
-    
+
     def _generate_cache_recommendations(self, hot_queries: Dict[str, int], cold_queries: Dict[str, int]) -> List[str]:
         """Generate cache-specific recommendations."""
         recommendations = []
-        
+
         if len(hot_queries) > len(self._usage_count) * 0.2:
             recommendations.append("Good query locality detected - cache is effective")
-        
+
         if len(cold_queries) > len(self._usage_count) * 0.5:
             recommendations.append("Many cold queries detected - consider cache cleanup")
-        
+
         if len(hot_queries) < 3:
             recommendations.append("Limited hot queries - consider query optimization")
-        
+
         return recommendations
 
 
 class OptimizedQueryExecutor:
     """High-performance query executor with caching and optimization."""
-    
+
     def __init__(self):
         self._prepared_cache = PreparedStatementCache()
         self._query_cache = RedisCache()
         self._performance_metrics: List[QueryPerformanceMetrics] = []
-        
+
     @asynccontextmanager
     async def execute_optimized_query(
         self,
@@ -242,7 +242,7 @@ class OptimizedQueryExecutor:
         enable_cache: bool = True
     ):
         """Execute a query with optimization and caching.
-        
+
         Args:
             session: Database session
             query: SQL query string
@@ -251,10 +251,10 @@ class OptimizedQueryExecutor:
             enable_cache: Whether to use query result caching
         """
         params = params or {}
-        
+
         # Generate cache key for query result caching
         cache_key = self._generate_cache_key(query, params) if enable_cache else None
-        
+
         # Check cache first
         if cache_key and enable_cache:
             cached_result = await self._query_cache.get(cache_key)
@@ -265,25 +265,25 @@ class OptimizedQueryExecutor:
                     "execution_time_ms": 0
                 }
                 return
-        
+
         # Execute query with performance measurement
         async with measure_database_operation("optimized_query") as perf_metrics:
             start_time = time.perf_counter()
-            
+
             try:
                 # Use prepared statement if beneficial
                 prepared_query = self._prepared_cache.get_or_create_statement(query, params)
-                
+
                 # Execute the query
                 result = await session.execute(text(prepared_query), params)
                 rows = result.fetchall()
-                
+
                 execution_time = (time.perf_counter() - start_time) * 1000
-                
+
                 # Cache the result if enabled
                 if cache_key and enable_cache and execution_time < 1000:  # Only cache fast queries
                     await self._query_cache.set(cache_key, rows, expire=cache_ttl)
-                
+
                 # Record performance metrics
                 query_metrics = QueryPerformanceMetrics(
                     query_hash=self._prepared_cache._hash_query_structure(query),
@@ -293,56 +293,56 @@ class OptimizedQueryExecutor:
                     timestamp=datetime.utcnow()
                 )
                 self._performance_metrics.append(query_metrics)
-                
+
                 # Keep only last 1000 metrics
                 if len(self._performance_metrics) > 1000:
                     self._performance_metrics = self._performance_metrics[-1000:]
-                
+
                 # Log slow queries
                 if execution_time > 50:
                     logger.warning(
                         f"Slow query detected: {execution_time:.2f}ms "
                         f"(target: <50ms) - {query[:100]}..."
                     )
-                
+
                 yield {
                     "result": rows,
                     "cache_hit": False,
                     "execution_time_ms": execution_time
                 }
-                
+
             except Exception as e:
                 logger.error(f"Query execution failed: {e}")
                 raise
-    
+
     def _generate_cache_key(self, query: str, params: Dict[str, Any]) -> str:
         """Generate a cache key for the query and parameters."""
         import hashlib
         import json
-        
+
         # Create a deterministic string from query and params
         cache_data = {
             "query": query.strip(),
             "params": sorted(params.items()) if params else []
         }
         cache_string = json.dumps(cache_data, sort_keys=True)
-        return f"query_cache:{hashlib.md5(cache_string.encode()).hexdigest()}"
-    
+        return f"query_cache:{hashlib.md5(cache_string.encode(), usedforsecurity=False).hexdigest()}"
+
     async def get_performance_summary(self) -> Dict[str, Any]:
         """Get performance summary for executed queries."""
         if not self._performance_metrics:
             return {"message": "No query metrics available"}
-        
+
         recent_metrics = [
-            m for m in self._performance_metrics 
+            m for m in self._performance_metrics
             if m.timestamp > datetime.utcnow() - timedelta(hours=1)
         ]
-        
+
         if not recent_metrics:
             return {"message": "No recent query metrics available"}
-        
+
         execution_times = [m.execution_time_ms for m in recent_metrics]
-        
+
         return {
             "total_queries": len(recent_metrics),
             "avg_execution_time_ms": sum(execution_times) / len(execution_times),
@@ -437,7 +437,7 @@ class DatabaseConnectionOptimizer:
             "SET jit = on",
             "SET jit_above_cost = 100000",
         ]
-        
+
         async with client.connection() as conn:
             applied_settings = []
             for query in optimization_queries:
@@ -450,42 +450,42 @@ class DatabaseConnectionOptimizer:
 
         # Emit optimization event for orchestrator coordination
         await self._emit_optimization_event(applied_settings, system_resources, memory_settings)
-    
+
     async def create_performance_indexes(self):
         """Create indexes for optimal query performance."""
         client = await get_psycopg_client()
-        
+
         # Performance-critical indexes
         index_queries = [
             # Index for rule effectiveness queries
             """
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_rule_effectiveness_lookup 
-            ON rule_effectiveness (rule_id, created_at DESC) 
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_rule_effectiveness_lookup
+            ON rule_effectiveness (rule_id, created_at DESC)
             WHERE active = true
             """,
-            
+
             # Index for session queries
             """
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sessions_active_lookup 
-            ON sessions (session_id, updated_at DESC) 
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sessions_active_lookup
+            ON sessions (session_id, updated_at DESC)
             WHERE active = true
             """,
-            
+
             # Index for prompt improvement queries
             """
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_prompt_improvements_recent 
-            ON prompt_improvements (created_at DESC, session_id) 
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_prompt_improvements_recent
+            ON prompt_improvements (created_at DESC, session_id)
             WHERE created_at > NOW() - INTERVAL '7 days'
             """,
-            
+
             # Partial index for analytics queries
             """
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_analytics_recent_data 
-            ON analytics_events (event_type, created_at DESC) 
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_analytics_recent_data
+            ON analytics_events (event_type, created_at DESC)
             WHERE created_at > NOW() - INTERVAL '30 days'
             """
         ]
-        
+
         async with client.connection() as conn:
             created_indexes = []
             for index_query in index_queries:

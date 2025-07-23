@@ -1569,9 +1569,9 @@ class HealthMonitor:
             # Check for long-running queries
             result = await session.execute(
                 text("""
-                SELECT count(*) 
-                FROM pg_stat_activity 
-                WHERE state = 'active' 
+                SELECT count(*)
+                FROM pg_stat_activity
+                WHERE state = 'active'
                 AND query_start < NOW() - INTERVAL '30 seconds'
             """)
             )

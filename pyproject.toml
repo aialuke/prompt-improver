@@ -56,11 +56,57 @@ dev = [
 ]
 
 [tool.mypy]
+# 2025 Best Practices: Strict mypy configuration
 python_version = "3.11"
-warn_return_any = true
-ignore_missing_imports = false
 strict = true
-plugins = ["sqlalchemy.ext.mypy.plugin"]
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+ignore_missing_imports = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+no_implicit_optional = true
+strict_optional = true
+strict_equality = true
+check_untyped_defs = true
+show_error_codes = true
+show_column_numbers = true
+pretty = true
+
+# Source layout configuration
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+
+# Plugin support
+plugins = ["sqlalchemy.ext.mypy.plugin", "pydantic.mypy"]
+
+# Module-specific overrides for gradual adoption
+[[tool.mypy.overrides]]
+module = [
+    "tests.*",
+    "migrations.*",
+    "scripts.*"
+]
+# Relaxed settings for test and utility code
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "sklearn.*",
+    "nltk.*",
+    "evidently.*",
+    "kafka.*"
+]
+# Ignore missing stubs for packages without type support
+ignore_missing_imports = true
 
 [tool.ruff]
 # Target Python 3.11+ with ML project awareness

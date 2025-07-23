@@ -512,9 +512,9 @@ class APESServiceManager:
             async with get_session() as session:
                 # Close idle connections
                 await session.execute(text("""
-                    SELECT pg_terminate_backend(pid) 
-                    FROM pg_stat_activity 
-                    WHERE state = 'idle' 
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE state = 'idle'
                     AND state_change < NOW() - INTERVAL '5 minutes'
                 """))
 

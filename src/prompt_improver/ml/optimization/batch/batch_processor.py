@@ -878,6 +878,12 @@ class BatchProcessor:
             results["results"].extend(batch_results["results"])
             results["errors"].extend(batch_results["errors"])
 
+            # Memory optimization: explicit cleanup for large batches
+            if index % 10 == 0 and index > 0:  # Every 10 batches
+                import gc
+                gc.collect()
+                self.logger.debug(f"Memory cleanup after batch {index + 1}")
+
             # Rate limiting using new config
             await sleep(self.config.base_delay)
 

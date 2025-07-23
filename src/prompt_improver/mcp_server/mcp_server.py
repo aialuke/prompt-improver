@@ -154,7 +154,7 @@ async def improve_prompt(
     """
     # Track start time for fallback metrics
     start_time = time.time()
-    
+
     # Use performance optimizer for comprehensive measurement
     async with measure_mcp_operation(
         "improve_prompt",
@@ -853,7 +853,7 @@ async def get_performance_status() -> dict[str, Any]:
 @mcp.tool()
 async def get_orchestrator_status() -> dict[str, Any]:
     """Get ML Pipeline Orchestrator status and component information.
-    
+
     Returns:
         Orchestrator state, loaded components, and workflow information
     """
@@ -861,11 +861,11 @@ async def get_orchestrator_status() -> dict[str, Any]:
         # Import orchestrator
         from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Get basic status
         status = {
             "timestamp": time.time(),
@@ -873,12 +873,12 @@ async def get_orchestrator_status() -> dict[str, Any]:
             "initialized": orchestrator._is_initialized,
             "active_workflows": len(orchestrator.active_workflows),
         }
-        
+
         # If initialized, get detailed information
         if orchestrator._is_initialized:
             components = orchestrator.get_loaded_components()
             history = orchestrator.get_invocation_history()
-            
+
             status.update({
                 "loaded_components": len(components),
                 "component_list": components,
@@ -886,9 +886,9 @@ async def get_orchestrator_status() -> dict[str, Any]:
                 "success_rate": sum(1 for inv in history if inv["success"]) / len(history) if history else 0.0,
                 "component_health": {comp: True for comp in components}  # Simplified health check
             })
-        
+
         return status
-        
+
     except Exception as e:
         logger.error(f"Failed to get orchestrator status: {e}")
         return {"error": str(e), "timestamp": time.time()}
@@ -897,7 +897,7 @@ async def get_orchestrator_status() -> dict[str, Any]:
 @mcp.tool()
 async def initialize_orchestrator() -> dict[str, Any]:
     """Initialize the ML Pipeline Orchestrator and load all components.
-    
+
     Returns:
         Initialization result with loaded component information
     """
@@ -905,18 +905,18 @@ async def initialize_orchestrator() -> dict[str, Any]:
         # Import orchestrator
         from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Initialize if not already done
         if not orchestrator._is_initialized:
             await orchestrator.initialize()
-        
+
         # Get results
         components = orchestrator.get_loaded_components()
-        
+
         return {
             "timestamp": time.time(),
             "success": True,
@@ -925,7 +925,7 @@ async def initialize_orchestrator() -> dict[str, Any]:
             "component_list": components,
             "message": f"Orchestrator initialized with {len(components)} components"
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
@@ -934,10 +934,10 @@ async def initialize_orchestrator() -> dict[str, Any]:
 @mcp.tool()
 async def run_ml_training_workflow(training_data: str = "sample training data") -> dict[str, Any]:
     """Run a complete ML training workflow using the orchestrator.
-    
+
     Args:
         training_data: Input training data for the workflow
-        
+
     Returns:
         Training workflow results and performance metrics
     """
@@ -945,24 +945,24 @@ async def run_ml_training_workflow(training_data: str = "sample training data") 
         # Import orchestrator
         from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Initialize if not done
         if not orchestrator._is_initialized:
             await orchestrator.initialize()
-        
+
         # Run training workflow
         start_time = time.time()
         results = await orchestrator.run_training_workflow(training_data)
         execution_time = time.time() - start_time
-        
+
         # Get workflow history
         history = orchestrator.get_invocation_history()
         recent_history = history[-10:]  # Last 10 invocations
-        
+
         return {
             "timestamp": time.time(),
             "success": True,
@@ -973,7 +973,7 @@ async def run_ml_training_workflow(training_data: str = "sample training data") 
             "invocation_details": recent_history,
             "message": f"Training workflow completed in {execution_time:.2f}s"
         }
-        
+
     except Exception as e:
         logger.error(f"Training workflow failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
@@ -982,10 +982,10 @@ async def run_ml_training_workflow(training_data: str = "sample training data") 
 @mcp.tool()
 async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation data") -> dict[str, Any]:
     """Run a complete ML evaluation workflow using the orchestrator.
-    
+
     Args:
         evaluation_data: Input evaluation data for the workflow
-        
+
     Returns:
         Evaluation workflow results and analysis
     """
@@ -993,20 +993,20 @@ async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation d
         # Import orchestrator
         from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Initialize if not done
         if not orchestrator._is_initialized:
             await orchestrator.initialize()
-        
+
         # Run evaluation workflow
         start_time = time.time()
         results = await orchestrator.run_evaluation_workflow(evaluation_data)
         execution_time = time.time() - start_time
-        
+
         return {
             "timestamp": time.time(),
             "success": True,
@@ -1015,7 +1015,7 @@ async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation d
             "analysis_steps": len(results),
             "message": f"Evaluation workflow completed in {execution_time:.2f}s"
         }
-        
+
     except Exception as e:
         logger.error(f"Evaluation workflow failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
@@ -1024,12 +1024,12 @@ async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation d
 @mcp.tool()
 async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -> dict[str, Any]:
     """Invoke a specific method on a loaded ML component.
-    
+
     Args:
         component_name: Name of the ML component to invoke
         method_name: Method name to call on the component
         **kwargs: Additional arguments for the method
-        
+
     Returns:
         Component invocation result and execution details
     """
@@ -1037,15 +1037,15 @@ async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -
         # Import orchestrator
         from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
         from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-        
+
         # Initialize orchestrator
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
-        
+
         # Initialize if not done
         if not orchestrator._is_initialized:
             await orchestrator.initialize()
-        
+
         # Check if component is loaded
         components = orchestrator.get_loaded_components()
         if component_name not in components:
@@ -1055,7 +1055,7 @@ async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -
                 "timestamp": time.time(),
                 "success": False
             }
-        
+
         # Get available methods
         methods = orchestrator.get_component_methods(component_name)
         if method_name not in methods:
@@ -1065,12 +1065,12 @@ async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -
                 "timestamp": time.time(),
                 "success": False
             }
-        
+
         # Invoke the component method
         start_time = time.time()
         result = await orchestrator.invoke_component(component_name, method_name, **kwargs)
         execution_time = time.time() - start_time
-        
+
         return {
             "timestamp": time.time(),
             "success": True,
@@ -1080,7 +1080,7 @@ async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -
             "result": result,
             "message": f"Successfully invoked {component_name}.{method_name}"
         }
-        
+
     except Exception as e:
         logger.error(f"Component invocation failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}

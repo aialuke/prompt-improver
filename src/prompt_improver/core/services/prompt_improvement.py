@@ -291,7 +291,7 @@ class PromptImprovementService:
 
     async def get_active_rules_standalone(self) -> dict[str, BasePromptRule]:
         """Get active rules without requiring external database session
-        
+
         This method creates its own database session following 2025 best practices.
         Useful for initialization and testing scenarios.
         """
@@ -1253,13 +1253,13 @@ class PromptImprovementService:
             lookback_days=30,
             synthetic_ratio=0.3,  # Allow up to 30% synthetic data
         )
-        
+
         # Load training data automatically combining real and synthetic
         training_data = await data_loader.load_training_data(
             db_session=db_session,
             rule_ids=rule_ids
         )
-        
+
         # Check if we have sufficient data
         if not training_data["validation"]["is_valid"]:
             logger.warning(
@@ -1279,7 +1279,7 @@ class PromptImprovementService:
         # Extract features and labels from the unified training data
         features = training_data["features"]
         effectiveness_scores = training_data["labels"]
-        
+
         logger.info(
             f"Using {len(features)} training samples for ML optimization: "
             f"{training_data['metadata']['real_samples']} real, "

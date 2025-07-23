@@ -1,6 +1,6 @@
 """Core Services
 
-System services including prompt improvement, startup orchestration, 
+System services including prompt improvement, startup orchestration,
 service management, and security.
 """
 
@@ -13,7 +13,7 @@ __all__ = [
     "PromptImprovementService",
     "StartupOrchestrator",
     "init_startup_tasks",
-    "shutdown_startup_tasks", 
+    "shutdown_startup_tasks",
     "startup_context",
     "is_startup_complete",
     "APESServiceManager",

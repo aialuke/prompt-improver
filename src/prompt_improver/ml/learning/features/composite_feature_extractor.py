@@ -613,7 +613,7 @@ class CompositeFeatureExtractor:
         if context_data:
             key_data += str(sorted(context_data.items()))
 
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def _cleanup_cache(self):
         """Clean up cache based on size limits."""

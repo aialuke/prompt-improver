@@ -153,13 +153,13 @@ class CacheEntry:
     last_accessed: datetime
     access_count: int = 0
     ttl_seconds: Optional[int] = None
-    
+
     def is_expired(self) -> bool:
         """Check if the cache entry is expired."""
         if self.ttl_seconds is None:
             return False
         return datetime.utcnow() > self.created_at + timedelta(seconds=self.ttl_seconds)
-    
+
     def touch(self) -> None:
         """Update access metadata."""
         self.last_accessed = datetime.utcnow()
@@ -168,13 +168,13 @@ class CacheEntry:
 
 class LRUCache:
     """High-performance in-memory LRU cache for L1 caching."""
-    
+
     def __init__(self, max_size: int = 1000):
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._max_size = max_size
         self._hits = 0
         self._misses = 0
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache."""
         if key in self._cache:
@@ -183,16 +183,16 @@ class LRUCache:
                 del self._cache[key]
                 self._misses += 1
                 return None
-            
+
             # Move to end (most recently used)
             self._cache.move_to_end(key)
             entry.touch()
             self._hits += 1
             return entry.value
-        
+
         self._misses += 1
         return None
-    
+
     def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         """Set value in cache."""
         if key in self._cache:
@@ -207,7 +207,7 @@ class LRUCache:
             if len(self._cache) >= self._max_size:
                 # Remove least recently used
                 self._cache.popitem(last=False)
-            
+
             entry = CacheEntry(
                 value=value,
                 created_at=datetime.utcnow(),
@@ -215,25 +215,25 @@ class LRUCache:
                 ttl_seconds=ttl_seconds
             )
             self._cache[key] = entry
-    
+
     def delete(self, key: str) -> bool:
         """Delete key from cache."""
         if key in self._cache:
             del self._cache[key]
             return True
         return False
-    
+
     def clear(self) -> None:
         """Clear all cache entries."""
         self._cache.clear()
         self._hits = 0
         self._misses = 0
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         total_requests = self._hits + self._misses
         hit_rate = self._hits / total_requests if total_requests > 0 else 0
-        
+
         return {
             "size": len(self._cache),
             "max_size": self._max_size,
@@ -246,7 +246,7 @@ class LRUCache:
 
 class MultiLevelCache:
     """Multi-level cache system with L1 (memory) and L2 (Redis) tiers."""
-    
+
     def __init__(
         self,
         l1_max_size: int = 1000,
@@ -257,13 +257,13 @@ class MultiLevelCache:
         self._l2_cache = RedisCache() if enable_l2 else None
         self._l2_default_ttl = l2_default_ttl
         self._enable_l2 = enable_l2
-        
+
         # Performance metrics
         self._l1_hits = 0
         self._l2_hits = 0
         self._l3_hits = 0  # Database hits
         self._total_requests = 0
-    
+
     @trace_cache_operation("cache.get")
     async def get(
         self,
@@ -273,18 +273,18 @@ class MultiLevelCache:
         l1_ttl: Optional[int] = None
     ) -> Optional[Any]:
         """Get value from multi-level cache with fallback.
-        
+
         Args:
             key: Cache key
             fallback_func: Async function to call if not in cache
             l2_ttl: TTL for L2 cache (Redis)
             l1_ttl: TTL for L1 cache (memory)
-            
+
         Returns:
             Cached value or result from fallback function
         """
         self._total_requests += 1
-        
+
         async with measure_cache_operation("multi_level_get") as perf_metrics:
             # Try L1 cache first (fastest)
             l1_value = self._l1_cache.get(key)
@@ -292,7 +292,7 @@ class MultiLevelCache:
                 self._l1_hits += 1
                 perf_metrics.metadata["cache_level"] = "L1"
                 return l1_value
-            
+
             # Try L2 cache (Redis)
             if self._enable_l2 and self._l2_cache:
                 try:
@@ -300,16 +300,16 @@ class MultiLevelCache:
                     if l2_value is not None:
                         # Deserialize from Redis
                         value = json.loads(l2_value.decode('utf-8'))
-                        
+
                         # Populate L1 cache
                         self._l1_cache.set(key, value, l1_ttl)
-                        
+
                         self._l2_hits += 1
                         perf_metrics.metadata["cache_level"] = "L2"
                         return value
                 except Exception as e:
                     logger.warning(f"L2 cache error for key {key}: {e}")
-            
+
             # Fallback to source (L3 - database or computation)
             if fallback_func:
                 try:
@@ -317,16 +317,16 @@ class MultiLevelCache:
                     if value is not None:
                         # Store in both cache levels
                         await self.set(key, value, l2_ttl, l1_ttl)
-                        
+
                         self._l3_hits += 1
                         perf_metrics.metadata["cache_level"] = "L3"
                         return value
                 except Exception as e:
                     logger.error(f"Fallback function failed for key {key}: {e}")
                     raise
-            
+
             return None
-    
+
     @trace_cache_operation("cache.set")
     async def set(
         self,
@@ -336,7 +336,7 @@ class MultiLevelCache:
         l1_ttl: Optional[int] = None
     ) -> None:
         """Set value in multi-level cache.
-        
+
         Args:
             key: Cache key
             value: Value to cache
@@ -346,7 +346,7 @@ class MultiLevelCache:
         async with measure_cache_operation("multi_level_set"):
             # Set in L1 cache
             self._l1_cache.set(key, value, l1_ttl)
-            
+
             # Set in L2 cache (Redis)
             if self._enable_l2 and self._l2_cache:
                 try:
@@ -355,7 +355,7 @@ class MultiLevelCache:
                     await self._l2_cache.set(key, serialized_value, expire=ttl)
                 except Exception as e:
                     logger.warning(f"Failed to set L2 cache for key {key}: {e}")
-    
+
     @trace_cache_operation("cache.delete")
     async def delete(self, key: str) -> None:
         """Delete key from all cache levels."""
@@ -385,7 +385,7 @@ class MultiLevelCache:
                     logger.info("L2 cache clear requested - implement pattern-based clearing if needed")
                 except Exception as e:
                     logger.warning(f"Failed to clear L2 cache: {e}")
-    
+
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get comprehensive cache performance statistics."""
         l1_stats = self._l1_cache.get_stats()
@@ -440,7 +440,7 @@ class MultiLevelCache:
 
 class SpecializedCaches:
     """Specialized cache instances for different data types."""
-    
+
     def __init__(self):
         # Rule metadata cache - frequently accessed, small data
         self.rule_cache = MultiLevelCache(
@@ -448,28 +448,28 @@ class SpecializedCaches:
             l2_default_ttl=7200,  # 2 hours
             enable_l2=True
         )
-        
+
         # Session data cache - medium frequency, session-scoped
         self.session_cache = MultiLevelCache(
             l1_max_size=1000,
             l2_default_ttl=1800,  # 30 minutes
             enable_l2=True
         )
-        
+
         # Analytics cache - less frequent, larger data
         self.analytics_cache = MultiLevelCache(
             l1_max_size=200,
             l2_default_ttl=3600,  # 1 hour
             enable_l2=True
         )
-        
+
         # Prompt improvement cache - high frequency, critical path
         self.prompt_cache = MultiLevelCache(
             l1_max_size=2000,
             l2_default_ttl=900,  # 15 minutes
             enable_l2=True
         )
-    
+
     def get_cache_for_type(self, cache_type: str) -> MultiLevelCache:
         """Get specialized cache by type."""
         cache_map = {
@@ -479,7 +479,7 @@ class SpecializedCaches:
             "prompt": self.prompt_cache
         }
         return cache_map.get(cache_type, self.prompt_cache)
-    
+
     def get_all_stats(self) -> Dict[str, Any]:
         """Get statistics for all specialized caches."""
         return {

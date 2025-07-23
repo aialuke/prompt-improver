@@ -1279,7 +1279,7 @@ class ClusteringOptimizer:
 
         # Create key based on feature shape and configuration
         key_data = f"{features.shape}_{self.config.target_dimensions}_{self.config.auto_dim_reduction}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def _get_memory_usage(self) -> float:
         """Get current memory usage in MB."""

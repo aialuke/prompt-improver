@@ -48,7 +48,7 @@ def start(
         False, "--background", "-b", help="Run in background"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-):
+) -> None:
     """Start APES MCP server with stdio transport."""
     console.print("🚀 Starting APES MCP server...", style="green")
 
@@ -322,7 +322,7 @@ def train(
 
                 # Get real data stats from rule_performance
                 stats_query = text("""
-                    SELECT 
+                    SELECT
                         COUNT(*) FILTER (WHERE rp.improvement_score >= 0.7) as high_quality_count,
                         COUNT(*) FILTER (WHERE rm.enabled = true) as active_rules_count,
                         COUNT(DISTINCT rp.prompt_id) as unique_prompts,
@@ -335,7 +335,7 @@ def train(
 
                 result = await db_session.execute(stats_query)
                 stats = result.fetchone()
-                
+
                 # Get training data composition stats
                 training_stats = await get_training_data_stats(db_session)
 
@@ -390,17 +390,17 @@ def train(
             )
 
             console.print(table)
-            
+
             # Show training data composition
             comp_table = Table(title="Training Data Composition (Auto-Combined)")
             comp_table.add_column("Data Source", style="cyan")
             comp_table.add_column("Samples", justify="right", style="green")
             comp_table.add_column("Percentage", justify="right", style="yellow")
-            
+
             real_samples = training_stats["real_data"]["total_samples"]
             synthetic_samples = training_stats["synthetic_data"]["total_samples"]
             total_samples = training_stats["combined"]["total_samples"]
-            
+
             comp_table.add_row(
                 "Real Data (Prioritized)",
                 str(real_samples),
@@ -417,7 +417,7 @@ def train(
                 "100.0%",
                 style="bold"
             )
-            
+
             console.print("\n")
             console.print(comp_table)
 
@@ -1164,13 +1164,13 @@ def export_training_data(
 
         # Query training data
         query = """
-        SELECT 
+        SELECT
             prompt_text,
             enhancement_result,
             data_source,
             training_priority,
             created_at
-        FROM training_prompts 
+        FROM training_prompts
         WHERE created_at >= NOW() - INTERVAL '%s days'
         ORDER BY created_at DESC
         """
@@ -1371,7 +1371,7 @@ def ml_status(
                 if show_models:
                     # Get model performance data
                     models_query = text("""
-                        SELECT 
+                        SELECT
                             model_id,
                             performance_score,
                             accuracy,
@@ -1414,7 +1414,7 @@ def ml_status(
                 if show_experiments:
                     # Show A/B experiments
                     experiments_query = text("""
-                        SELECT 
+                        SELECT
                             experiment_name,
                             status,
                             started_at,
@@ -3078,48 +3078,48 @@ def orchestrator(
 ):
     """Manage ML Pipeline Orchestrator (Phase 6 integration)."""
     console.print(f"🎯 ML Pipeline Orchestrator - {action.title()}", style="bold blue")
-    
+
     async def run_orchestrator_command():
         try:
             # Import orchestrator
             from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
             from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-            
+
             # Initialize orchestrator
             config = OrchestratorConfig()
             orchestrator = MLPipelineOrchestrator(config)
-            
+
             if action == "status":
                 console.print("📊 Orchestrator Status", style="cyan")
                 console.print(f"State: {orchestrator.state.value}")
                 console.print(f"Initialized: {orchestrator._is_initialized}")
                 console.print(f"Active workflows: {len(orchestrator.active_workflows)}")
-                
+
                 if orchestrator._is_initialized:
                     components = orchestrator.get_loaded_components()
                     console.print(f"Loaded components: {len(components)}")
                     if verbose and components:
                         for comp in components[:10]:  # Show first 10
                             console.print(f"  • {comp}")
-            
+
             elif action == "start":
                 console.print("🚀 Starting ML Pipeline Orchestrator...", style="green")
                 await orchestrator.initialize()
                 console.print("✅ Orchestrator started successfully", style="green")
                 console.print(f"Loaded {len(orchestrator.get_loaded_components())} components")
-                
+
             elif action == "stop":
                 console.print("🛑 Stopping ML Pipeline Orchestrator...", style="yellow")
                 await orchestrator.shutdown()
                 console.print("✅ Orchestrator stopped successfully", style="green")
-                
+
             elif action == "components":
                 if not orchestrator._is_initialized:
                     await orchestrator.initialize()
-                
+
                 components = orchestrator.get_loaded_components()
                 console.print(f"📦 Loaded Components ({len(components)})", style="cyan")
-                
+
                 if component:
                     if component in components:
                         methods = orchestrator.get_component_methods(component)
@@ -3132,18 +3132,18 @@ def orchestrator(
                 else:
                     for comp in components:
                         console.print(f"  • {comp}")
-                        
+
             elif action == "workflows":
                 if not orchestrator._is_initialized:
                     await orchestrator.initialize()
-                
+
                 if data_file and Path(data_file).exists():
                     console.print(f"🔄 Running {workflow_type} workflow...", style="cyan")
-                    
+
                     # Read data file
                     with open(data_file, 'r') as f:
                         data = f.read()
-                    
+
                     try:
                         if workflow_type == "training":
                             results = await orchestrator.run_training_workflow(data)
@@ -3154,29 +3154,29 @@ def orchestrator(
                         else:
                             console.print(f"❌ Unknown workflow type: {workflow_type}", style="red")
                             return
-                        
+
                         if verbose:
                             console.print("\n📊 Workflow Results:")
                             for step, result in results.items():
                                 console.print(f"  {step}: Success")
-                                
+
                     except Exception as e:
                         console.print(f"❌ Workflow failed: {e}", style="red")
-                        
+
                 else:
                     # Show workflow history
                     history = orchestrator.get_invocation_history()
                     console.print(f"📈 Workflow History ({len(history)} invocations)", style="cyan")
-                    
+
                     for inv in history[-10:]:  # Last 10 invocations
                         status = "✅" if inv["success"] else "❌"
                         console.print(f"  {status} {inv['component_name']}.{inv['method_name']} ({inv['execution_time']:.3f}s)")
-                        
+
             else:
                 console.print(f"❌ Unknown action: {action}", style="red")
                 console.print("Available actions: status, start, stop, components, workflows")
                 raise typer.Exit(1)
-                
+
         except ImportError as e:
             console.print(f"❌ Failed to import orchestrator: {e}", style="red")
             console.print("💡 Ensure ML orchestration components are available", style="yellow")
@@ -3187,7 +3187,7 @@ def orchestrator(
                 import traceback
                 console.print(traceback.format_exc(), style="dim")
             raise typer.Exit(1)
-    
+
     # Run the async command
     asyncio.run(run_orchestrator_command())
 

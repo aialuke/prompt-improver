@@ -62,7 +62,7 @@ import optuna
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.prompt_improver.automl.orchestrator import (
+from src.prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
     AutoMLOrchestrator,

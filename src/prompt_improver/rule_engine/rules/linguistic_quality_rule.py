@@ -351,11 +351,11 @@ Focus on making the prompt more precise, readable, and effective while preservin
 
     def evaluate(self, prompt: str, context: dict[str, Any] = None) -> dict[str, Any]:
         """Evaluate prompt using real linguistic analysis (for testing compatibility).
-        
+
         Args:
             prompt: The prompt text to evaluate
             context: Additional context for evaluation
-            
+
         Returns:
             Dictionary containing evaluation results matching test expectations
         """

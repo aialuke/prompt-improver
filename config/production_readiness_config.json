@@ -1,0 +1,194 @@
+{
+  "base_url": "http://localhost:8080",
+  "load_test": {
+    "virtual_users": 100,
+    "duration": "30s",
+    "target_response_time_ms": 200,
+    "target_error_rate": 0.01,
+    "ramp_up_duration": "10s",
+    "scenarios": {
+      "health_check": {
+        "executor": "constant-vus",
+        "vus": 50,
+        "duration": "30s"
+      },
+      "api_endpoints": {
+        "executor": "ramping-vus",
+        "startVUs": 0,
+        "stages": [
+          {"duration": "10s", "target": 20},
+          {"duration": "20s", "target": 100},
+          {"duration": "10s", "target": 0}
+        ]
+      }
+    }
+  },
+  "security": {
+    "enable_sast": true,
+    "enable_dependency_scan": true,
+    "enable_secrets_scan": true,
+    "enable_dast": false,
+    "sast_tools": ["bandit"],
+    "dependency_tools": ["safety"],
+    "secrets_tools": ["truffleHog", "detect-secrets"],
+    "security_thresholds": {
+      "high_severity_max": 0,
+      "medium_severity_max": 5,
+      "low_severity_max": 20
+    }
+  },
+  "observability": {
+    "prometheus_url": "http://localhost:9090",
+    "grafana_url": "http://localhost:3000",
+    "jaeger_url": "http://localhost:16686",
+    "required_metrics": [
+      "http_requests_total",
+      "http_request_duration_seconds",
+      "process_resident_memory_bytes",
+      "process_cpu_seconds_total",
+      "database_connections_active",
+      "database_query_duration_seconds",
+      "ml_model_inference_duration_seconds",
+      "ml_model_accuracy_score",
+      "cache_hit_ratio",
+      "error_rate_total"
+    ],
+    "required_logs": [
+      "application_logs",
+      "access_logs",
+      "error_logs",
+      "security_logs"
+    ],
+    "required_traces": [
+      "http_requests",
+      "database_queries",
+      "ml_inference",
+      "cache_operations"
+    ]
+  },
+  "slo_targets": {
+    "availability": 99.9,
+    "response_time_p50_ms": 100,
+    "response_time_p95_ms": 200,
+    "response_time_p99_ms": 500,
+    "error_rate": 0.01,
+    "throughput_rps": 1000,
+    "mttr_minutes": 15,
+    "mtbf_hours": 720
+  },
+  "performance": {
+    "memory_threshold_mb": 500,
+    "cpu_threshold_percent": 80,
+    "disk_threshold_percent": 85,
+    "network_latency_ms": 50,
+    "database_connection_pool_size": 20,
+    "cache_hit_ratio_min": 0.8,
+    "concurrent_users_max": 1000
+  },
+  "reliability": {
+    "health_check_endpoints": [
+      "/health",
+      "/health/ready",
+      "/health/live",
+      "/api/v1/health"
+    ],
+    "required_health_checks": [
+      "database_connectivity",
+      "cache_connectivity",
+      "external_api_connectivity",
+      "disk_space",
+      "memory_usage"
+    ],
+    "backup_requirements": [
+      "database_backup",
+      "configuration_backup",
+      "model_artifacts_backup",
+      "logs_backup"
+    ],
+    "disaster_recovery": {
+      "rto_minutes": 60,
+      "rpo_minutes": 15,
+      "backup_frequency_hours": 6,
+      "backup_retention_days": 30
+    }
+  },
+  "scalability": {
+    "horizontal_scaling": {
+      "min_replicas": 2,
+      "max_replicas": 10,
+      "target_cpu_utilization": 70,
+      "target_memory_utilization": 80
+    },
+    "vertical_scaling": {
+      "min_cpu_cores": 1,
+      "max_cpu_cores": 8,
+      "min_memory_gb": 2,
+      "max_memory_gb": 16
+    },
+    "database_scaling": {
+      "read_replicas": 2,
+      "connection_pooling": true,
+      "query_optimization": true
+    }
+  },
+  "compliance": {
+    "required_documentation": [
+      "README.md",
+      "API_DOCUMENTATION.md",
+      "DEPLOYMENT_GUIDE.md",
+      "SECURITY_POLICY.md",
+      "INCIDENT_RESPONSE.md",
+      "RUNBOOKS.md"
+    ],
+    "code_quality": {
+      "test_coverage_min": 80,
+      "type_coverage_min": 90,
+      "complexity_max": 10,
+      "duplication_max": 5
+    },
+    "security_compliance": [
+      "OWASP_TOP_10",
+      "CIS_BENCHMARKS",
+      "NIST_FRAMEWORK"
+    ]
+  },
+  "environments": {
+    "development": {
+      "base_url": "http://localhost:5000",
+      "strict_validation": false,
+      "skip_external_dependencies": true
+    },
+    "staging": {
+      "base_url": "https://staging.apes.example.com",
+      "strict_validation": true,
+      "skip_external_dependencies": false
+    },
+    "production": {
+      "base_url": "https://api.apes.example.com",
+      "strict_validation": true,
+      "skip_external_dependencies": false,
+      "additional_validations": [
+        "chaos_engineering",
+        "penetration_testing",
+        "compliance_audit"
+      ]
+    }
+  },
+  "notifications": {
+    "slack_webhook": "",
+    "email_recipients": [],
+    "pagerduty_integration": false,
+    "notification_thresholds": {
+      "critical_failures": 1,
+      "warning_threshold": 5,
+      "performance_degradation": 0.2
+    }
+  },
+  "reporting": {
+    "output_formats": ["json", "html", "pdf"],
+    "include_recommendations": true,
+    "include_next_steps": true,
+    "include_historical_comparison": true,
+    "retention_days": 90
+  }
+}

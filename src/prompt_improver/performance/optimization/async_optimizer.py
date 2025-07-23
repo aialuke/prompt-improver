@@ -36,7 +36,7 @@ try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    
+
 # Legacy aioredis support (commented out due to Python 3.13 compatibility issues)
 # try:
 #     import aioredis
@@ -542,14 +542,14 @@ class ConnectionPoolManager:
                     enable_cleanup_closed=True,
                     ssl=ssl_context  # Add SSL context for certificate handling
                 )
-                
+
                 # Optimized timeout settings
                 timeout = aiohttp.ClientTimeout(
                     total=30,  # Total timeout
                     connect=10,  # Connection timeout
                     sock_read=10  # Socket read timeout
                 )
-                
+
                 self._http_session = aiohttp.ClientSession(
                     connector=connector,
                     timeout=timeout,
@@ -561,15 +561,15 @@ class ConnectionPoolManager:
             else:
                 span.set_attribute("session_created", False)
                 span.set_attribute("session_reused", True)
-            
+
             return self._http_session
 
     async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrator-compatible interface for ML pipeline integration.
-        
+
         Args:
             config: Configuration from orchestrator
-            
+
         Returns:
             Standardized orchestrator response with pool health and metrics
         """
@@ -578,25 +578,25 @@ class ConnectionPoolManager:
         }):
             try:
                 operation_type = config.get("operation", "health_check")
-                
+
                 if operation_type == "health_check":
                     health_status = {
                         pool_name: health for pool_name, health in self._pool_health.items()
                     }
-                    
+
                     pool_metrics = {
                         "http_session_active": self._http_session is not None and not self._http_session.closed,
                         "database_pools": len(self._database_pools),
                         "redis_pools": len(self._redis_pools),
                         "health_status": health_status
                     }
-                    
+
                 elif operation_type == "get_metrics":
                     pool_metrics = dict(self._pool_metrics)
-                    
+
                 else:
                     raise ValueError(f"Unsupported operation type: {operation_type}")
-                
+
                 return {
                     "orchestrator_compatible": True,
                     "component_result": pool_metrics,
@@ -606,7 +606,7 @@ class ConnectionPoolManager:
                         "pools_managed": len(self._database_pools) + len(self._redis_pools) + (1 if self._http_session else 0)
                     }
                 }
-                
+
             except Exception as e:
                 return {
                     "orchestrator_compatible": True,
@@ -621,15 +621,15 @@ class ConnectionPoolManager:
 
 class AsyncBatchProcessor:
     """Batches async operations for improved throughput."""
-    
+
     def __init__(self, config: AsyncOperationConfig):
         self.config = config
         self._pending_operations: List[Tuple[Callable, tuple, dict]] = []
         self._batch_lock = asyncio.Lock()
         self._processing = False
-    
+
     async def add_operation(
-        self, 
+        self,
         operation: Callable,
         *args,
         **kwargs
@@ -638,32 +638,32 @@ class AsyncBatchProcessor:
         async with self._batch_lock:
             future = asyncio.Future()
             self._pending_operations.append((operation, args, kwargs, future))
-            
+
             # Trigger batch processing if we hit the batch size
             if len(self._pending_operations) >= self.config.batch_size:
                 asyncio.create_task(self._process_batch())
-            
+
             return await future
-    
+
     async def _process_batch(self):
         """Process a batch of operations concurrently."""
         if self._processing:
             return
-        
+
         self._processing = True
-        
+
         try:
             async with self._batch_lock:
                 if not self._pending_operations:
                     return
-                
+
                 # Take current batch
                 batch = self._pending_operations[:self.config.batch_size]
                 self._pending_operations = self._pending_operations[self.config.batch_size:]
-            
+
             # Process batch with concurrency control
             semaphore = asyncio.Semaphore(self.config.max_concurrent_operations)
-            
+
             async def process_operation(operation, args, kwargs, future):
                 async with semaphore:
                     try:
@@ -671,55 +671,55 @@ class AsyncBatchProcessor:
                         future.set_result(result)
                     except Exception as e:
                         future.set_exception(e)
-            
+
             # Execute all operations in the batch
             tasks = [
                 asyncio.create_task(process_operation(op, args, kwargs, future))
                 for op, args, kwargs, future in batch
             ]
-            
+
             await asyncio.gather(*tasks, return_exceptions=True)
-            
+
         finally:
             self._processing = False
 
 
 class AsyncTaskScheduler:
     """Optimized task scheduler for high-performance async operations."""
-    
+
     def __init__(self):
         self._task_queue: asyncio.Queue = asyncio.Queue()
         self._workers: List[asyncio.Task] = []
         self._running = False
         self._worker_count = 4  # Optimal for most workloads
-    
+
     async def start(self):
         """Start the task scheduler workers."""
         if self._running:
             return
-        
+
         self._running = True
         self._workers = [
             asyncio.create_task(self._worker(f"worker-{i}"))
             for i in range(self._worker_count)
         ]
-        
+
         logger.info(f"Started {self._worker_count} async task workers")
-    
+
     async def stop(self):
         """Stop the task scheduler workers."""
         self._running = False
-        
+
         # Cancel all workers
         for worker in self._workers:
             worker.cancel()
-        
+
         # Wait for workers to finish
         await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers.clear()
-        
+
         logger.info("Stopped async task scheduler")
-    
+
     async def schedule_task(
         self,
         operation: Callable,
@@ -732,11 +732,11 @@ class AsyncTaskScheduler:
         task_item = (priority, time.time(), operation, args, kwargs, future)
         await self._task_queue.put(task_item)
         return future
-    
+
     async def _worker(self, worker_name: str):
         """Worker coroutine for processing tasks."""
         logger.debug(f"Started async worker: {worker_name}")
-        
+
         while self._running:
             try:
                 # Get task with timeout to allow graceful shutdown
@@ -744,9 +744,9 @@ class AsyncTaskScheduler:
                     self._task_queue.get(),
                     timeout=1.0
                 )
-                
+
                 priority, scheduled_time, operation, args, kwargs, future = task_item
-                
+
                 # Execute the operation
                 try:
                     result = await operation(*args, **kwargs)
@@ -755,7 +755,7 @@ class AsyncTaskScheduler:
                     future.set_exception(e)
                 finally:
                     self._task_queue.task_done()
-                    
+
             except asyncio.TimeoutError:
                 # Timeout is expected for graceful shutdown
                 continue
@@ -773,7 +773,7 @@ class AsyncOptimizer:
         self.batch_processor = AsyncBatchProcessor(self.config)
         self.task_scheduler = AsyncTaskScheduler()
         self._optimization_enabled = True
-    
+
     async def initialize(self):
         """Initialize the async optimizer."""
         await self.task_scheduler.start()
@@ -787,7 +787,7 @@ class AsyncOptimizer:
         # Use modern connection manager's close method
         await self.connection_manager.close()
         logger.info("Async optimizer shutdown complete")
-    
+
     @asynccontextmanager
     async def optimized_operation(
         self,
@@ -798,7 +798,7 @@ class AsyncOptimizer:
         """Context manager for optimized async operations."""
         async with measure_mcp_operation(f"async_{operation_name}") as perf_metrics:
             start_time = time.perf_counter()
-            
+
             try:
                 if enable_batching and self._optimization_enabled:
                     # Use batch processing for eligible operations
@@ -806,15 +806,15 @@ class AsyncOptimizer:
                 else:
                     # Direct execution
                     yield None
-                
+
                 execution_time = (time.perf_counter() - start_time) * 1000
                 perf_metrics.metadata["execution_time_ms"] = execution_time
                 perf_metrics.metadata["optimization_enabled"] = self._optimization_enabled
-                
+
             except Exception as e:
                 perf_metrics.metadata["error"] = str(e)
                 raise
-    
+
     async def execute_with_retry(
         self,
         operation: Callable,
@@ -843,7 +843,7 @@ class AsyncOptimizer:
             return await operation(*args, **kwargs)
 
         return await retry_manager.retry_async(retry_operation, config=retry_config)
-    
+
     async def execute_concurrent_operations(
         self,
         operations: List[Tuple[Callable, tuple, dict]],
@@ -852,18 +852,18 @@ class AsyncOptimizer:
         """Execute multiple operations concurrently with controlled concurrency."""
         max_concurrency = max_concurrency or self.config.max_concurrent_operations
         semaphore = asyncio.Semaphore(max_concurrency)
-        
+
         async def execute_with_semaphore(operation, args, kwargs):
             async with semaphore:
                 return await operation(*args, **kwargs)
-        
+
         tasks = [
             asyncio.create_task(execute_with_semaphore(op, args, kwargs))
             for op, args, kwargs in operations
         ]
-        
+
         return await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     def get_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for the async optimizer."""
         return {
@@ -907,7 +907,7 @@ async def optimized_async_operation(
 ) -> Any:
     """Execute an operation with full async optimization."""
     optimizer = await get_async_optimizer()
-    
+
     async with optimizer.optimized_operation(operation_name, enable_batching):
         if enable_retry:
             return await optimizer.execute_with_retry(operation, *args, **kwargs)

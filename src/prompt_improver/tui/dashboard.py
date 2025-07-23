@@ -24,7 +24,7 @@ from .widgets.system_overview import SystemOverviewWidget
 
 class APESDashboard(App):
     """APES Interactive Dashboard - Rich TUI application for system monitoring.
-    
+
     Features:
     - Real-time system monitoring
     - AutoML optimization tracking

@@ -154,7 +154,7 @@ start_pgadmin() {
     print_success "pgAdmin started!"
     print_status "Access pgAdmin at: http://localhost:8080"
     print_status "Email: admin@apes.local"
-    print_status "Password: admin_password_2024"
+    print_status "Password: ${PGADMIN_PASSWORD:-admin_password_2024}"
 }
 
 show_connection_info() {
@@ -164,13 +164,13 @@ show_connection_info() {
     echo "Port: 5432"
     echo "Database: $DB_NAME"
     echo "Username: $DB_USER"
-    echo "Password: apes_secure_password_2024"
+    echo "Password: ${POSTGRES_PASSWORD:-apes_secure_password_2024}"
     echo ""
     echo "Connection String:"
-    echo "postgresql://$DB_USER:apes_secure_password_2024@localhost:5432/$DB_NAME"
+    echo "postgresql://$DB_USER:${POSTGRES_PASSWORD:-apes_secure_password_2024}@localhost:5432/$DB_NAME"
     echo ""
     echo "For MCP Server configuration:"
-    echo '  "args": ["npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production"]'
+    echo '  "args": ["npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://apes_user:'${POSTGRES_PASSWORD:-apes_secure_password_2024}'@localhost:5432/apes_production"]'
     echo ""
 }
 

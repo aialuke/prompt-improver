@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class ErrorCategory(Enum):
     """Database error categories for classification."""
-    
+
     CONNECTION = "connection"
     TIMEOUT = "timeout"
     TRANSIENT = "transient"
@@ -41,7 +41,7 @@ class ErrorCategory(Enum):
 
 class ErrorSeverity(Enum):
     """Error severity levels."""
-    
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -50,55 +50,55 @@ class ErrorSeverity(Enum):
 
 class DatabaseErrorClassifier:
     """Classifies database errors for appropriate handling."""
-    
+
     # Error classification mappings
     ERROR_MAPPINGS = {
         # Connection errors
         psycopg_errors.OperationalError: (ErrorCategory.CONNECTION, ErrorSeverity.HIGH),
         psycopg_errors.InterfaceError: (ErrorCategory.CONNECTION, ErrorSeverity.HIGH),
-        
+
         # Timeout errors
         psycopg_errors.QueryCanceled: (ErrorCategory.TIMEOUT, ErrorSeverity.MEDIUM),
-        
+
         # Transient errors
         psycopg_errors.DeadlockDetected: (ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM),
         psycopg_errors.SerializationFailure: (ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM),
-        
+
         # Constraint violations
         psycopg_errors.IntegrityError: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
         psycopg_errors.UniqueViolation: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
         psycopg_errors.ForeignKeyViolation: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
-        
+
         # Syntax errors
         psycopg_errors.SyntaxError: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
         psycopg_errors.UndefinedTable: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
         psycopg_errors.UndefinedColumn: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
-        
+
         # Permission errors
         psycopg_errors.InsufficientPrivilege: (ErrorCategory.PERMISSION, ErrorSeverity.HIGH),
-        
+
         # Resource errors
         psycopg_errors.DiskFull: (ErrorCategory.RESOURCE, ErrorSeverity.CRITICAL),
         psycopg_errors.OutOfMemory: (ErrorCategory.RESOURCE, ErrorSeverity.CRITICAL),
     }
-    
+
     @classmethod
     def classify_error(cls, error: Exception) -> Tuple[ErrorCategory, ErrorSeverity]:
         """Classify database error into category and severity."""
         error_type = type(error)
-        
+
         # Direct mapping
         if error_type in cls.ERROR_MAPPINGS:
             return cls.ERROR_MAPPINGS[error_type]
-        
+
         # Check parent classes
         for mapped_type, (category, severity) in cls.ERROR_MAPPINGS.items():
             if isinstance(error, mapped_type):
                 return category, severity
-        
+
         # Fallback to string analysis for unknown errors
         error_str = str(error).lower()
-        
+
         if any(term in error_str for term in ['connection', 'connect', 'network']):
             return ErrorCategory.CONNECTION, ErrorSeverity.HIGH
         elif any(term in error_str for term in ['timeout', 'timed out']):
@@ -109,14 +109,14 @@ class DatabaseErrorClassifier:
             return ErrorCategory.PERMISSION, ErrorSeverity.HIGH
         elif any(term in error_str for term in ['syntax', 'undefined']):
             return ErrorCategory.SYNTAX, ErrorSeverity.HIGH
-        
+
         return ErrorCategory.UNKNOWN, ErrorSeverity.MEDIUM
-    
+
     @classmethod
     def is_retryable(cls, error: Exception) -> bool:
         """Determine if error is retryable."""
         category, _ = cls.classify_error(error)
-        
+
         # Retryable categories
         retryable_categories = {
             ErrorCategory.CONNECTION,
@@ -124,14 +124,14 @@ class DatabaseErrorClassifier:
             ErrorCategory.TRANSIENT,
             ErrorCategory.RESOURCE
         }
-        
+
         return category in retryable_categories
 
 
 class ErrorMetrics:
     """Metrics collection for database errors."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.metrics_registry = get_metrics_registry()
 
         self.error_counter = self.metrics_registry.get_or_create_counter(
@@ -151,8 +151,8 @@ class ErrorMetrics:
             'Database circuit breaker state',
             ['operation']
         )
-    
-    def record_error(self, category: ErrorCategory, severity: ErrorSeverity, operation: str):
+
+    def record_error(self, category: ErrorCategory, severity: ErrorSeverity, operation: str) -> None:
         """Record database error metrics."""
         self.error_counter.labels(
             category=category.value,
@@ -160,7 +160,7 @@ class ErrorMetrics:
             operation=operation
         ).inc()
 
-    def record_retry(self, operation: str, attempt: int):
+    def record_retry(self, operation: str, attempt: int) -> None:
         """Record retry attempt metrics."""
         self.retry_counter.labels(
             operation=operation,
@@ -179,7 +179,7 @@ global_error_metrics = ErrorMetrics()
 def enhance_error_context(error: Exception, operation: str, **kwargs) -> Dict[str, Any]:
     """Enhance error with context information."""
     category, severity = DatabaseErrorClassifier.classify_error(error)
-    
+
     context = {
         "error_type": type(error).__name__,
         "error_message": str(error),
@@ -190,10 +190,10 @@ def enhance_error_context(error: Exception, operation: str, **kwargs) -> Dict[st
         "retryable": DatabaseErrorClassifier.is_retryable(error),
         **kwargs
     }
-    
+
     # Record metrics
     global_error_metrics.record_error(category, severity, operation)
-    
+
     return context
 
 
@@ -202,9 +202,9 @@ def create_database_error_classifier():
     def classify_for_retry(error: Exception):
         """Classify database error for retry manager."""
         from ..ml.orchestration.core.unified_retry_manager import RetryableErrorType
-        
+
         category, _ = DatabaseErrorClassifier.classify_error(error)
-        
+
         # Map database categories to retry error types
         category_mapping = {
             ErrorCategory.CONNECTION: RetryableErrorType.NETWORK,
@@ -212,9 +212,9 @@ def create_database_error_classifier():
             ErrorCategory.TRANSIENT: RetryableErrorType.TRANSIENT,
             ErrorCategory.RESOURCE: RetryableErrorType.RESOURCE_EXHAUSTION,
         }
-        
+
         return category_mapping.get(category, RetryableErrorType.TRANSIENT)
-    
+
     return classify_for_retry
 
 
@@ -222,7 +222,7 @@ def create_database_error_classifier():
 def get_default_database_retry_config():
     """Get default retry configuration for database operations."""
     from ..ml.orchestration.core.unified_retry_manager import RetryConfig, RetryStrategy, RetryableErrorType
-    
+
     return RetryConfig(
         max_attempts=3,
         strategy=RetryStrategy.EXPONENTIAL_BACKOFF,

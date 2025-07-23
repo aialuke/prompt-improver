@@ -236,7 +236,7 @@ class PerformanceAlert:
     threshold_value: float
     timestamp: datetime
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert alert to dictionary."""
         return {
@@ -266,13 +266,13 @@ class PerformanceThresholds:
 
 class PerformanceTrendAnalyzer:
     """Analyzes performance trends and predicts issues."""
-    
+
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
         self._response_times: deque = deque(maxlen=window_size)
         self._timestamps: deque = deque(maxlen=window_size)
         self._error_counts: deque = deque(maxlen=window_size)
-    
+
     def add_measurement(
         self,
         response_time_ms: float,
@@ -281,37 +281,37 @@ class PerformanceTrendAnalyzer:
     ):
         """Add a performance measurement."""
         timestamp = timestamp or datetime.now(timezone.utc)
-        
+
         self._response_times.append(response_time_ms)
         self._timestamps.append(timestamp)
         self._error_counts.append(1 if is_error else 0)
-    
+
     def get_trend_analysis(self) -> Dict[str, Any]:
         """Get comprehensive trend analysis."""
         if len(self._response_times) < 10:
             return {"status": "insufficient_data", "sample_count": len(self._response_times)}
-        
+
         response_times = list(self._response_times)
-        
+
         # Calculate basic statistics
         avg_response_time = statistics.mean(response_times)
         median_response_time = statistics.median(response_times)
         p95_response_time = self._percentile(response_times, 95)
         p99_response_time = self._percentile(response_times, 99)
-        
+
         # Calculate error rate
         error_rate = sum(self._error_counts) / len(self._error_counts) * 100
-        
+
         # Calculate throughput (requests per second)
         if len(self._timestamps) >= 2:
             time_span = (self._timestamps[-1] - self._timestamps[0]).total_seconds()
             throughput = len(self._timestamps) / time_span if time_span > 0 else 0
         else:
             throughput = 0
-        
+
         # Trend detection (simple linear regression on recent data)
         trend_direction = self._detect_trend()
-        
+
         return {
             "status": "analyzed",
             "sample_count": len(response_times),
@@ -324,7 +324,7 @@ class PerformanceTrendAnalyzer:
             "trend_direction": trend_direction,
             "performance_grade": self._calculate_performance_grade(avg_response_time, error_rate)
         }
-    
+
     def _percentile(self, data: List[float], percentile: float) -> float:
         """Calculate percentile of data."""
         if not data:
@@ -337,24 +337,24 @@ class PerformanceTrendAnalyzer:
             lower = sorted_data[int(index)]
             upper = sorted_data[int(index) + 1]
             return lower + (upper - lower) * (index - int(index))
-    
+
     def _detect_trend(self) -> str:
         """Detect performance trend direction."""
         if len(self._response_times) < 20:
             return "unknown"
-        
+
         # Compare recent half with earlier half
         mid_point = len(self._response_times) // 2
         recent_avg = statistics.mean(list(self._response_times)[mid_point:])
         earlier_avg = statistics.mean(list(self._response_times)[:mid_point])
-        
+
         if recent_avg > earlier_avg * 1.1:  # 10% increase
             return "degrading"
         elif recent_avg < earlier_avg * 0.9:  # 10% improvement
             return "improving"
         else:
             return "stable"
-    
+
     def _calculate_performance_grade(self, avg_response_time: float, error_rate: float) -> str:
         """Calculate overall performance grade."""
         if avg_response_time < 50 and error_rate < 1:
@@ -1081,7 +1081,7 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
     def add_alert_handler(self, handler: Callable[[PerformanceAlert], None]):
         """Add an alert handler function."""
         self._alert_handlers.append(handler)
-    
+
     async def record_operation(
         self,
         operation_name: str,
@@ -1092,19 +1092,19 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
         """Record a performance measurement."""
         if not self._monitoring_enabled:
             return
-        
+
         # Update counters
         self._total_requests += 1
         self._total_response_time += response_time_ms
         if is_error:
             self._total_errors += 1
-        
+
         # Add to trend analyzer
         self.trend_analyzer.add_measurement(response_time_ms, is_error)
-        
+
         # Check for threshold violations
         await self._check_thresholds(operation_name, response_time_ms, is_error, metadata)
-    
+
     async def _check_thresholds(
         self,
         operation_name: str,
@@ -1114,7 +1114,7 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
     ):
         """Check if any thresholds are violated and generate alerts."""
         alerts_to_generate = []
-        
+
         # Response time thresholds
         if response_time_ms >= self.thresholds.response_time_critical_ms:
             alert = PerformanceAlert(
@@ -1129,7 +1129,7 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
                 metadata=metadata or {}
             )
             alerts_to_generate.append(alert)
-            
+
         elif response_time_ms >= self.thresholds.response_time_warning_ms:
             alert = PerformanceAlert(
                 alert_id=f"response_time_warning_{int(time.time())}",
@@ -1143,11 +1143,11 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
                 metadata=metadata or {}
             )
             alerts_to_generate.append(alert)
-        
+
         # Error rate threshold (calculated over recent requests)
         if self._total_requests >= 10:  # Only check after sufficient samples
             current_error_rate = (self._total_errors / self._total_requests) * 100
-            
+
             if current_error_rate >= self.thresholds.error_rate_critical_percent:
                 alert = PerformanceAlert(
                     alert_id=f"error_rate_critical_{int(time.time())}",
@@ -1161,49 +1161,49 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
                     metadata=metadata or {}
                 )
                 alerts_to_generate.append(alert)
-        
+
         # Process alerts
         for alert in alerts_to_generate:
             await self._process_alert(alert)
-    
+
     async def _process_alert(self, alert: PerformanceAlert):
         """Process and handle a performance alert."""
         # Store alert
         self._active_alerts[alert.alert_id] = alert
         self._alert_history.append(alert)
-        
+
         # Keep alert history manageable
         if len(self._alert_history) > 1000:
             self._alert_history = self._alert_history[-1000:]
-        
+
         # Log alert
         log_level = logging.CRITICAL if alert.severity == "critical" else logging.WARNING
         logger.log(log_level, f"Performance Alert: {alert.message}")
-        
+
         # Call alert handlers
         for handler in self._alert_handlers:
             try:
                 await handler(alert) if asyncio.iscoroutinefunction(handler) else handler(alert)
             except Exception as e:
                 logger.error(f"Alert handler failed: {e}")
-    
+
     def get_current_performance_status(self) -> Dict[str, Any]:
         """Get current performance status and metrics."""
         trend_analysis = self.trend_analyzer.get_trend_analysis()
-        
+
         # Calculate current metrics
         avg_response_time = (
-            self._total_response_time / self._total_requests 
+            self._total_response_time / self._total_requests
             if self._total_requests > 0 else 0
         )
         error_rate = (
-            (self._total_errors / self._total_requests) * 100 
+            (self._total_errors / self._total_requests) * 100
             if self._total_requests > 0 else 0
         )
-        
+
         # Calculate uptime
         uptime_seconds = (datetime.now(timezone.utc) - self._last_reset_time).total_seconds()
-        
+
         return {
             "monitoring_enabled": self._monitoring_enabled,
             "uptime_seconds": uptime_seconds,
@@ -1222,20 +1222,20 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
             "performance_grade": trend_analysis.get("performance_grade", "N/A"),
             "meets_200ms_target": avg_response_time < 200
         }
-    
+
     def get_active_alerts(self) -> List[Dict[str, Any]]:
         """Get all active performance alerts."""
         return [alert.to_dict() for alert in self._active_alerts.values()]
-    
+
     def get_alert_history(self, hours: int = 24) -> List[Dict[str, Any]]:
         """Get alert history for the specified time period."""
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_alerts = [
-            alert for alert in self._alert_history 
+            alert for alert in self._alert_history
             if alert.timestamp > cutoff_time
         ]
         return [alert.to_dict() for alert in recent_alerts]
-    
+
     def reset_counters(self):
         """Reset performance counters."""
         self._total_requests = 0

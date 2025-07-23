@@ -12,7 +12,7 @@ from ...ml.optimization.batch.batch_processor import BatchProcessor, BatchProces
 __all__ = [
     "AsyncBatchProcessor",
     "ConnectionPoolManager",
-    "get_performance_optimizer", 
+    "get_performance_optimizer",
     "PerformanceOptimizer",
     "ResponseOptimizer",
     "FastJSONSerializer",

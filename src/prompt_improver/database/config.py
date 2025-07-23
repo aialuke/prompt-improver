@@ -19,9 +19,8 @@ class DatabaseConfig(BaseSettings):
         description="PostgreSQL username - defaults to 'apes_user' to match Docker setup",
     )
     postgres_password: str = Field(
-        default="apes_secure_password_2024",
         validation_alias="POSTGRES_PASSWORD",
-        description="PostgreSQL password - defaults to match Docker setup",
+        description="PostgreSQL password from environment variable (required for security)",
     )
 
     # Advanced connection pool settings (research-validated patterns)

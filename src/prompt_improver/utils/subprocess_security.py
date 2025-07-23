@@ -328,13 +328,13 @@ def secure_subprocess(
 
 def ensure_running(pid: int) -> bool:
     """Centralized function to validate if a background process is running.
-    
+
     This function consolidates PID validation logic used across the codebase
     to avoid duplication. It handles both psutil-based and OS-based checks.
-    
+
     Args:
         pid: Process ID to check
-        
+
     Returns:
         True if process is running, False otherwise
     """

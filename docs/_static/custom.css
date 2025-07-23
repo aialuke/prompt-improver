@@ -1,0 +1,234 @@
+/* Custom CSS for APES Documentation - 2025 Standards */
+
+/* Brand colors and modern design */
+:root {
+  --apes-primary: #2563eb;
+  --apes-secondary: #60a5fa;
+  --apes-success: #10b981;
+  --apes-warning: #f59e0b;
+  --apes-error: #ef4444;
+  --apes-gray: #6b7280;
+  --apes-light-gray: #f3f4f6;
+  --apes-dark-gray: #374151;
+}
+
+/* Enhanced code blocks */
+.highlight {
+  border-radius: 8px;
+  border: 1px solid var(--apes-light-gray);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.highlight pre {
+  padding: 1rem;
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-complete {
+  background-color: var(--apes-success);
+  color: white;
+}
+
+.status-in-progress {
+  background-color: var(--apes-warning);
+  color: white;
+}
+
+.status-planned {
+  background-color: var(--apes-gray);
+  color: white;
+}
+
+/* Performance metrics table */
+.performance-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.performance-table th {
+  background-color: var(--apes-primary);
+  color: white;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.performance-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--apes-light-gray);
+}
+
+.performance-table tr:hover {
+  background-color: var(--apes-light-gray);
+}
+
+/* API documentation enhancements */
+.py.class > dt {
+  background-color: var(--apes-light-gray);
+  border-left: 4px solid var(--apes-primary);
+  padding: 0.5rem;
+  margin-top: 1rem;
+}
+
+.py.method > dt {
+  background-color: #f8fafc;
+  border-left: 3px solid var(--apes-secondary);
+  padding: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.py.function > dt {
+  background-color: #f0f9ff;
+  border-left: 3px solid var(--apes-success);
+  padding: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+/* Enhanced admonitions */
+.admonition {
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0;
+}
+
+.admonition.note {
+  border-left: 4px solid var(--apes-primary);
+  background-color: #eff6ff;
+}
+
+.admonition.warning {
+  border-left: 4px solid var(--apes-warning);
+  background-color: #fffbeb;
+}
+
+.admonition.important {
+  border-left: 4px solid var(--apes-error);
+  background-color: #fef2f2;
+}
+
+.admonition.tip {
+  border-left: 4px solid var(--apes-success);
+  background-color: #f0fdf4;
+}
+
+/* Navigation enhancements */
+.toctree-wrapper ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.toctree-wrapper li {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.toctree-wrapper li:hover {
+  background-color: var(--apes-light-gray);
+}
+
+.toctree-wrapper a {
+  text-decoration: none;
+  color: var(--apes-dark-gray);
+  font-weight: 500;
+}
+
+.toctree-wrapper a:hover {
+  color: var(--apes-primary);
+}
+
+/* Code signature styling */
+.sig-name {
+  color: var(--apes-primary);
+  font-weight: 600;
+}
+
+.sig-param {
+  color: var(--apes-dark-gray);
+}
+
+.sig-return {
+  color: var(--apes-success);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .highlight pre {
+    font-size: 0.8rem;
+    padding: 0.75rem;
+  }
+  
+  .performance-table {
+    font-size: 0.9rem;
+  }
+  
+  .performance-table th,
+  .performance-table td {
+    padding: 0.5rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .highlight {
+    border-color: var(--apes-dark-gray);
+  }
+  
+  .performance-table th {
+    background-color: var(--apes-dark-gray);
+  }
+  
+  .performance-table td {
+    border-bottom-color: var(--apes-dark-gray);
+  }
+  
+  .py.class > dt {
+    background-color: var(--apes-dark-gray);
+    color: white;
+  }
+  
+  .py.method > dt,
+  .py.function > dt {
+    background-color: #1f2937;
+    color: white;
+  }
+}
+
+/* Print styles */
+@media print {
+  .highlight {
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
+  
+  .status-badge {
+    border: 1px solid #ccc;
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .performance-table {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}

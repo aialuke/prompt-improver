@@ -35,7 +35,7 @@ class TelemetryProvider:
     """
     Manages OpenTelemetry instrumentation for health checks
     """
-    
+
     def __init__(
         self,
         service_name: str,
@@ -47,13 +47,13 @@ class TelemetryProvider:
         self.service_version = service_version
         self.environment = environment
         self.otlp_endpoint = otlp_endpoint or "localhost:4317"
-        
+
         if OTEL_AVAILABLE:
             self._setup_telemetry()
         else:
             self.tracer = None
             self.meter = None
-    
+
     def _setup_telemetry(self):
         """Initialize OpenTelemetry providers"""
         # Create resource
@@ -62,10 +62,10 @@ class TelemetryProvider:
             "service.version": self.service_version,
             "deployment.environment": self.environment,
         })
-        
+
         # Setup tracing
         trace_provider = TracerProvider(resource=resource)
-        
+
         # Add OTLP exporter for traces
         otlp_trace_exporter = OTLPSpanExporter(
             endpoint=self.otlp_endpoint,
@@ -74,10 +74,10 @@ class TelemetryProvider:
         trace_provider.add_span_processor(
             BatchSpanProcessor(otlp_trace_exporter)
         )
-        
+
         trace.set_tracer_provider(trace_provider)
         self.tracer = trace.get_tracer(self.service_name, self.service_version)
-        
+
         # Setup metrics
         metric_reader = PeriodicExportingMetricReader(
             exporter=OTLPMetricExporter(
@@ -86,44 +86,44 @@ class TelemetryProvider:
             ),
             export_interval_millis=60000  # Export every minute
         )
-        
+
         meter_provider = MeterProvider(
             resource=resource,
             metric_readers=[metric_reader]
         )
-        
+
         metrics.set_meter_provider(meter_provider)
         self.meter = metrics.get_meter(self.service_name, self.service_version)
-        
+
         # Create metrics instruments
         self._create_metrics_instruments()
-    
+
     def _create_metrics_instruments(self):
         """Create reusable metrics instruments"""
         if not self.meter:
             return
-            
+
         # Health check duration histogram
         self.health_check_duration = self.meter.create_histogram(
             name="health_check_duration",
             description="Duration of health checks in milliseconds",
             unit="ms"
         )
-        
+
         # Health check status counter
         self.health_check_counter = self.meter.create_counter(
             name="health_check_total",
             description="Total number of health checks",
             unit="1"
         )
-        
+
         # Current health status gauge
         self.health_status_gauge = self.meter.create_up_down_counter(
             name="health_status",
             description="Current health status (1=healthy, 0=unhealthy)",
             unit="1"
         )
-        
+
         # SLA compliance gauge
         self.sla_compliance_gauge = self.meter.create_observable_gauge(
             name="sla_compliance",
@@ -169,7 +169,7 @@ def health_check_span(
     if not provider or not provider.tracer:
         yield None
         return
-    
+
     # Start span
     with provider.tracer.start_as_current_span(
         f"{HEALTH_CHECK_SPAN_NAME}.{component_name}",
@@ -179,7 +179,7 @@ def health_check_span(
         span.set_attribute("health_check.component", component_name)
         span.set_attribute("health_check.type", check_type)
         span.set_attribute("service.name", provider.service_name)
-        
+
         # Add correlation ID if available
         try:
             from src.middleware.correlation_context import get_correlation_id
@@ -188,12 +188,12 @@ def health_check_span(
                 span.set_attribute("correlation.id", correlation_id)
         except ImportError:
             pass
-        
+
         # Add custom attributes
         if attributes:
             for key, value in attributes.items():
                 span.set_attribute(f"health_check.{key}", value)
-        
+
         try:
             yield span
         except Exception as e:
@@ -217,10 +217,10 @@ def instrument_health_check(
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
             provider = get_telemetry()
-            
+
             # Start timing
             start_time = time.time()
-            
+
             # Create span context
             with health_check_span(
                 component_name=component_name,
@@ -233,20 +233,20 @@ def instrument_health_check(
                 try:
                     # Execute health check
                     result = await func(self, *args, **kwargs)
-                    
+
                     # Calculate duration
                     duration_ms = (time.time() - start_time) * 1000
-                    
+
                     # Add result attributes to span
                     if span and hasattr(result, 'status'):
                         span.set_attribute("health_check.status", result.status.name)
-                        span.set_attribute("health_check.healthy", 
+                        span.set_attribute("health_check.healthy",
                                          result.status.name == "HEALTHY")
-                    
+
                     if span and hasattr(result, 'response_time_ms'):
-                        span.set_attribute("health_check.response_time_ms", 
+                        span.set_attribute("health_check.response_time_ms",
                                          result.response_time_ms)
-                    
+
                     # Record metrics
                     if provider and provider.meter:
                         # Duration histogram
@@ -258,7 +258,7 @@ def instrument_health_check(
                                           if hasattr(result, 'status') else "unknown"
                             }
                         )
-                        
+
                         # Status counter
                         provider.health_check_counter.add(
                             1,
@@ -268,17 +268,17 @@ def instrument_health_check(
                                           if hasattr(result, 'status') else "unknown"
                             }
                         )
-                        
+
                         # Update health gauge
-                        is_healthy = (hasattr(result, 'status') and 
+                        is_healthy = (hasattr(result, 'status') and
                                     result.status.name == "HEALTHY")
                         provider.health_status_gauge.add(
                             1 if is_healthy else -1,
                             attributes={"component": component_name}
                         )
-                    
+
                     return result
-                    
+
                 except Exception as e:
                     # Record failure metrics
                     if provider and provider.meter:
@@ -289,14 +289,14 @@ def instrument_health_check(
                                 "status": "ERROR"
                             }
                         )
-                        
+
                         provider.health_status_gauge.add(
                             -1,
                             attributes={"component": component_name}
                         )
-                    
+
                     raise
-        
+
         return wrapper
     return decorator
 
@@ -305,19 +305,19 @@ class TelemetryContext:
     """
     Helper class for managing telemetry context in health checks
     """
-    
+
     def __init__(self, component_name: str):
         self.component_name = component_name
         self.provider = get_telemetry()
         self._span_stack = []
-    
+
     @contextmanager
     def span(self, operation: str, **attributes):
         """Create a nested span for sub-operations"""
         if not self.provider or not self.provider.tracer:
             yield None
             return
-        
+
         with self.provider.tracer.start_as_current_span(
             f"{self.component_name}.{operation}",
             kind=trace.SpanKind.INTERNAL
@@ -325,28 +325,28 @@ class TelemetryContext:
             # Add attributes
             span.set_attribute("component", self.component_name)
             span.set_attribute("operation", operation)
-            
+
             for key, value in attributes.items():
                 span.set_attribute(key, value)
-            
+
             self._span_stack.append(span)
             try:
                 yield span
             finally:
                 self._span_stack.pop()
-    
+
     def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
         """Add an event to the current span"""
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.add_event(name, attributes=attributes or {})
-    
+
     def set_attribute(self, key: str, value: Any):
         """Set attribute on current span"""
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.set_attribute(key, value)
-    
+
     def record_exception(self, exception: Exception):
         """Record exception in current span"""
         if self._span_stack:
@@ -363,7 +363,7 @@ def create_health_check_span(
     provider = get_telemetry()
     if not provider or not provider.tracer:
         return None
-    
+
     return provider.tracer.start_as_current_span(
         f"{component_name}.health_check.{operation}",
         kind=trace.SpanKind.INTERNAL

@@ -69,12 +69,12 @@ class DatabasePerformanceMonitor:
         client = await self.get_client()
 
         query = """
-        SELECT 
-            CASE 
+        SELECT
+            CASE
                 WHEN (blks_hit + blks_read) = 0 THEN 0
                 ELSE ROUND(blks_hit::numeric / (blks_hit + blks_read) * 100, 2)
             END as cache_hit_ratio
-        FROM pg_stat_database 
+        FROM pg_stat_database
         WHERE datname = current_database()
         """
 
@@ -86,8 +86,8 @@ class DatabasePerformanceMonitor:
         client = await self.get_client()
 
         query = """
-        SELECT 
-            CASE 
+        SELECT
+            CASE
                 WHEN (idx_blks_hit + idx_blks_read) = 0 THEN 0
                 ELSE ROUND(idx_blks_hit::numeric / (idx_blks_hit + idx_blks_read) * 100, 2)
             END as index_hit_ratio
@@ -105,7 +105,7 @@ class DatabasePerformanceMonitor:
 
         query = """
         SELECT count(*) as active_connections
-        FROM pg_stat_activity 
+        FROM pg_stat_activity
         WHERE state = 'active' AND datname = current_database()
         """
 
@@ -117,7 +117,7 @@ class DatabasePerformanceMonitor:
         client = await self.get_client()
 
         query = """
-        SELECT 
+        SELECT
             ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 2) as size_mb
         """
 
@@ -145,7 +145,7 @@ class DatabasePerformanceMonitor:
         if has_extension:
             # Use pg_stat_statements for detailed query analysis
             query = """
-            SELECT 
+            SELECT
                 query as query_text,
                 calls,
                 total_exec_time,
@@ -153,10 +153,10 @@ class DatabasePerformanceMonitor:
                 max_exec_time,
                 min_exec_time,
                 rows
-            FROM pg_stat_statements 
+            FROM pg_stat_statements
             WHERE calls >= %s
             AND query NOT LIKE '%%pg_stat_statements%%'
-            ORDER BY mean_exec_time DESC 
+            ORDER BY mean_exec_time DESC
             LIMIT 10
             """
 

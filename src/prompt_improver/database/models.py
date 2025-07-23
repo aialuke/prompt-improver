@@ -592,26 +592,26 @@ class UserSatisfactionStats(BaseModel):
 class TrainingPrompt(SQLModel, table=True):
     """Training data model for ML pipeline - follows 2025 SQLModel patterns"""
     __tablename__: str = "training_prompts"
-    
+
     # Primary key with Optional[int] for auto-increment (2025 pattern)
     id: Optional[int] = Field(default=None, primary_key=True)
-    
+
     # Core training data fields
     prompt_text: str = Field(max_length=10000, index=True)
     enhancement_result: Dict[str, Any] = Field(sa_column=sqlmodel.Column(JSON))
-    
+
     # Data source and priority (audit trail pattern)
     data_source: str = Field(default="synthetic", index=True)  # synthetic, user, api
     training_priority: int = Field(default=100, ge=1, le=1000)
-    
+
     # Audit trail fields (2025 best practice)
     created_at: datetime = Field(default_factory=naive_utc_now)
     updated_at: Optional[datetime] = None
-    
+
     # Soft delete pattern (2025 best practice)
     deleted_at: Optional[datetime] = None
     is_active: bool = Field(default=True, index=True)
-    
+
     # Relationship to existing PromptSession (entity-relationship pattern)
     session_id: Optional[str] = Field(default=None, foreign_key="prompt_sessions.session_id")
     session: Optional["PromptSession"] = Relationship(back_populates="training_data")

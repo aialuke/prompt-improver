@@ -44,7 +44,7 @@ _centralized_metadata = MetaData(
 
 class PromptImproverBase(DeclarativeBase):
     """Single declarative base for all prompt improver models.
-    
+
     This follows 2025 best practices by:
     - Using a single registry for all models
     - Providing centralized metadata access
@@ -58,7 +58,7 @@ class PromptImproverBase(DeclarativeBase):
 
 class RegistryManager:
     """Registry manager for handling SQLAlchemy model registration.
-    
+
     Provides utilities to:
     - Clear registries for test isolation
     - Inspect current registrations
@@ -71,7 +71,7 @@ class RegistryManager:
 
     def clear_registry(self) -> None:
         """Clear the registry for test isolation.
-        
+
         This prevents "Multiple classes found" errors when running tests
         that import models multiple times.
         """
@@ -90,7 +90,7 @@ class RegistryManager:
 
     def get_registered_classes(self) -> dict[str, type]:
         """Get all currently registered classes.
-        
+
         Returns:
             Dict mapping class names to class objects
         """
@@ -98,10 +98,10 @@ class RegistryManager:
 
     def is_class_registered(self, class_name: str) -> bool:
         """Check if a class is already registered.
-        
+
         Args:
             class_name: The name of the class to check
-            
+
         Returns:
             True if class is registered, False otherwise
         """
@@ -109,10 +109,10 @@ class RegistryManager:
 
     def get_class_by_name(self, class_name: str) -> type | None:
         """Get a registered class by name.
-        
+
         Args:
             class_name: The name of the class to retrieve
-            
+
         Returns:
             The class object if found, None otherwise
         """
@@ -120,10 +120,10 @@ class RegistryManager:
 
     def resolve_class_path_conflict(self, class_name: str) -> str:
         """Resolve class path conflicts by providing fully qualified names.
-        
+
         Args:
             class_name: The class name that has conflicts
-            
+
         Returns:
             Fully qualified class path
         """
@@ -136,7 +136,7 @@ class RegistryManager:
     @contextmanager
     def isolated_registry(self) -> Iterator[None]:
         """Context manager for isolated registry operations.
-        
+
         This is particularly useful for tests that need to ensure
         clean registry state.
         """
@@ -155,7 +155,7 @@ class RegistryManager:
 
     def diagnose_registry_conflicts(self) -> dict[str, Any]:
         """Diagnose registry conflicts and provide detailed information.
-        
+
         Returns:
             Dictionary with conflict information
         """
@@ -189,7 +189,7 @@ _registry_manager: RegistryManager | None = None
 
 def get_registry_manager() -> RegistryManager:
     """Get the global registry manager instance.
-    
+
     Returns:
         RegistryManager instance
     """
@@ -201,7 +201,7 @@ def get_registry_manager() -> RegistryManager:
 
 def clear_registry() -> None:
     """Clear the global registry.
-    
+
     This is a convenience function for test setup.
     """
     get_registry_manager().clear_registry()
@@ -225,7 +225,7 @@ def clear_registry() -> None:
 
 def diagnose_registry() -> dict[str, Any]:
     """Diagnose registry conflicts.
-    
+
     Returns:
         Dictionary with conflict information
     """
@@ -235,7 +235,7 @@ def diagnose_registry() -> dict[str, Any]:
 # Integrate with SQLModel
 def patch_sqlmodel_registry():
     """Patch SQLModel to use our centralized registry.
-    
+
     This prevents SQLModel from creating its own registry and
     ensures all models use the same registry.
     """

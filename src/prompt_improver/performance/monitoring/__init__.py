@@ -8,6 +8,6 @@ from .performance_benchmark import MCPPerformanceBenchmark
 
 __all__ = [
     "get_performance_monitor",
-    "PerformanceMonitor", 
+    "PerformanceMonitor",
     "MCPPerformanceBenchmark",
 ]

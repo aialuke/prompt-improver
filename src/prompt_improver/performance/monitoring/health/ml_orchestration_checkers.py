@@ -15,22 +15,22 @@ from .metrics import instrument_health_check
 
 class MLOrchestratorHealthChecker(HealthChecker):
     """Health checker for the main ML Pipeline Orchestrator."""
-    
+
     def __init__(self):
         """Initialize the ML orchestrator health checker."""
         super().__init__(name="ml_orchestrator")
         self.logger = logging.getLogger(__name__)
         self._orchestrator = None
-    
+
     def set_orchestrator(self, orchestrator):
         """Set the orchestrator instance to monitor."""
         self._orchestrator = orchestrator
-    
+
     @instrument_health_check("ml_orchestrator")
     async def check(self) -> HealthResult:
         """Perform health check on the ML orchestrator."""
         start_time = datetime.now(timezone.utc)
-        
+
         try:
             if not self._orchestrator:
                 return HealthResult(
@@ -41,7 +41,7 @@ class MLOrchestratorHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Check orchestrator state
             if not self._orchestrator._is_initialized:
                 return HealthResult(
@@ -52,25 +52,25 @@ class MLOrchestratorHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Check component health
             component_health = await self._orchestrator.get_component_health()
             healthy_components = sum(1 for h in component_health.values() if h)
             total_components = len(component_health)
-            
+
             # Check resource usage
             resource_usage = await self._orchestrator.get_resource_usage()
-            
+
             # Check active workflows
             workflows = await self._orchestrator.list_workflows()
             active_workflows = len([w for w in workflows if w.state.value == "running"])
-            
+
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             # Determine health status
             health_percentage = (healthy_components / total_components * 100) if total_components > 0 else 100
-            
+
             if health_percentage >= 90:
                 status = HealthStatus.HEALTHY
                 message = f"ML orchestrator healthy ({healthy_components}/{total_components} components)"
@@ -80,7 +80,7 @@ class MLOrchestratorHealthChecker(HealthChecker):
             else:
                 status = HealthStatus.FAILED
                 message = f"ML orchestrator unhealthy ({healthy_components}/{total_components} components)"
-            
+
             return HealthResult(
                 status=status,
                 component=self.name,
@@ -96,13 +96,13 @@ class MLOrchestratorHealthChecker(HealthChecker):
                 timestamp=start_time,
                 response_time_ms=response_time * 1000
             )
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             self.logger.error(f"ML orchestrator health check failed: {e}")
-            
+
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -115,22 +115,22 @@ class MLOrchestratorHealthChecker(HealthChecker):
 
 class MLComponentRegistryHealthChecker(HealthChecker):
     """Health checker for the ML Component Registry."""
-    
+
     def __init__(self):
         """Initialize the component registry health checker."""
         super().__init__(name="ml_component_registry")
         self.logger = logging.getLogger(__name__)
         self._registry = None
-    
+
     def set_registry(self, registry):
         """Set the component registry instance to monitor."""
         self._registry = registry
-    
+
     @instrument_health_check("ml_component_registry")
     async def check(self) -> HealthResult:
         """Perform health check on the component registry."""
         start_time = datetime.now(timezone.utc)
-        
+
         try:
             if not self._registry:
                 return HealthResult(
@@ -141,19 +141,19 @@ class MLComponentRegistryHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Get health summary
             health_summary = await self._registry.get_health_summary()
-            
+
             # List all components
             components = await self._registry.list_components()
-            
+
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             # Determine health status based on component health
             health_percentage = health_summary.get("overall_health_percentage", 0)
-            
+
             if health_percentage >= 90:
                 status = HealthStatus.HEALTHY
                 message = f"Component registry healthy ({health_percentage:.1f}%)"
@@ -163,7 +163,7 @@ class MLComponentRegistryHealthChecker(HealthChecker):
             else:
                 status = HealthStatus.FAILED
                 message = f"Component registry unhealthy ({health_percentage:.1f}%)"
-            
+
             return HealthResult(
                 status=status,
                 component=self.name,
@@ -176,13 +176,13 @@ class MLComponentRegistryHealthChecker(HealthChecker):
                 timestamp=start_time,
                 response_time_ms=response_time * 1000
             )
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             self.logger.error(f"Component registry health check failed: {e}")
-            
+
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -195,22 +195,22 @@ class MLComponentRegistryHealthChecker(HealthChecker):
 
 class MLResourceManagerHealthChecker(HealthChecker):
     """Health checker for the ML Resource Manager."""
-    
+
     def __init__(self):
         """Initialize the resource manager health checker."""
         super().__init__(name="ml_resource_manager")
         self.logger = logging.getLogger(__name__)
         self._resource_manager = None
-    
+
     def set_resource_manager(self, resource_manager):
         """Set the resource manager instance to monitor."""
         self._resource_manager = resource_manager
-    
+
     @instrument_health_check("ml_resource_manager")
     async def check(self) -> HealthResult:
         """Perform health check on the resource manager."""
         start_time = datetime.now(timezone.utc)
-        
+
         try:
             if not self._resource_manager:
                 return HealthResult(
@@ -221,27 +221,27 @@ class MLResourceManagerHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Get usage statistics
             usage_stats = await self._resource_manager.get_usage_stats()
-            
+
             # Get current allocations
             allocations = await self._resource_manager.get_allocations()
-            
+
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             # Check for resource exhaustion
             critical_resources = []
             warning_resources = []
-            
+
             for resource_type, stats in usage_stats.items():
                 usage_pct = stats.get("usage_percentage", 0)
                 if usage_pct >= 90:
                     critical_resources.append(f"{resource_type}: {usage_pct:.1f}%")
                 elif usage_pct >= 75:
                     warning_resources.append(f"{resource_type}: {usage_pct:.1f}%")
-            
+
             # Determine health status
             if critical_resources:
                 status = HealthStatus.FAILED
@@ -252,7 +252,7 @@ class MLResourceManagerHealthChecker(HealthChecker):
             else:
                 status = HealthStatus.HEALTHY
                 message = "Resource usage within normal limits"
-            
+
             return HealthResult(
                 status=status,
                 component=self.name,
@@ -267,13 +267,13 @@ class MLResourceManagerHealthChecker(HealthChecker):
                 timestamp=start_time,
                 response_time_ms=response_time * 1000
             )
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             self.logger.error(f"Resource manager health check failed: {e}")
-            
+
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -286,22 +286,22 @@ class MLResourceManagerHealthChecker(HealthChecker):
 
 class MLWorkflowEngineHealthChecker(HealthChecker):
     """Health checker for the ML Workflow Execution Engine."""
-    
+
     def __init__(self):
         """Initialize the workflow engine health checker."""
         super().__init__(name="ml_workflow_engine")
         self.logger = logging.getLogger(__name__)
         self._workflow_engine = None
-    
+
     def set_workflow_engine(self, workflow_engine):
         """Set the workflow engine instance to monitor."""
         self._workflow_engine = workflow_engine
-    
+
     @instrument_health_check("ml_workflow_engine")
     async def check(self) -> HealthResult:
         """Perform health check on the workflow engine."""
         start_time = datetime.now(timezone.utc)
-        
+
         try:
             if not self._workflow_engine:
                 return HealthResult(
@@ -312,22 +312,22 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Get workflow definitions
             workflow_definitions = await self._workflow_engine.list_workflow_definitions()
-            
+
             # Get active executors
             active_executors = len(self._workflow_engine.active_executors)
-            
+
             # Check for failed workflows
             failed_workflows = []
             for workflow_id, executor in self._workflow_engine.active_executors.items():
                 if hasattr(executor, 'is_cancelled') and executor.is_cancelled:
                     failed_workflows.append(workflow_id)
-            
+
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             # Determine health status
             if failed_workflows:
                 status = HealthStatus.WARNING
@@ -338,7 +338,7 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
             else:
                 status = HealthStatus.HEALTHY
                 message = "Workflow engine idle and ready"
-            
+
             return HealthResult(
                 status=status,
                 component=self.name,
@@ -352,13 +352,13 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
                 timestamp=start_time,
                 response_time_ms=response_time * 1000
             )
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             self.logger.error(f"Workflow engine health check failed: {e}")
-            
+
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -371,22 +371,22 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
 
 class MLEventBusHealthChecker(HealthChecker):
     """Health checker for the ML Event Bus."""
-    
+
     def __init__(self):
         """Initialize the event bus health checker."""
         super().__init__(name="ml_event_bus")
         self.logger = logging.getLogger(__name__)
         self._event_bus = None
-    
+
     def set_event_bus(self, event_bus):
         """Set the event bus instance to monitor."""
         self._event_bus = event_bus
-    
+
     @instrument_health_check("ml_event_bus")
     async def check(self) -> HealthResult:
         """Perform health check on the event bus."""
         start_time = datetime.now(timezone.utc)
-        
+
         try:
             if not self._event_bus:
                 return HealthResult(
@@ -397,26 +397,26 @@ class MLEventBusHealthChecker(HealthChecker):
                     timestamp=start_time,
                     response_time_ms=0.0
                 )
-            
+
             # Check event bus statistics
             stats = self._event_bus.get_statistics()
-            
+
             # Test event emission (simple health check event)
             test_start = datetime.now(timezone.utc)
             await self._event_bus.emit_health_check_event("ml_event_bus_health_test")
             test_end = datetime.now(timezone.utc)
             test_response_time = (test_end - test_start).total_seconds()
-            
+
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             # Determine health status based on metrics
             total_events = stats.get("total_events", 0)
             failed_events = stats.get("failed_events", 0)
             active_handlers = stats.get("active_handlers", 0)
-            
+
             failure_rate = (failed_events / total_events * 100) if total_events > 0 else 0
-            
+
             if test_response_time > 1.0:  # Event emission took too long
                 status = HealthStatus.FAILED
                 message = f"Event bus slow (test emission: {test_response_time:.2f}s)"
@@ -426,7 +426,7 @@ class MLEventBusHealthChecker(HealthChecker):
             else:
                 status = HealthStatus.HEALTHY
                 message = f"Event bus healthy ({active_handlers} handlers active)"
-            
+
             return HealthResult(
                 status=status,
                 component=self.name,
@@ -439,13 +439,13 @@ class MLEventBusHealthChecker(HealthChecker):
                 timestamp=start_time,
                 response_time_ms=response_time * 1000
             )
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             response_time = (end_time - start_time).total_seconds()
-            
+
             self.logger.error(f"Event bus health check failed: {e}")
-            
+
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,

@@ -41,6 +41,14 @@ from .config import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
+# Import security validation
+try:
+    from ..security.secure_startup import get_secure_database_url, check_environment_security
+    SECURITY_MODULE_AVAILABLE = True
+except ImportError:
+    SECURITY_MODULE_AVAILABLE = False
+    logger.warning("Security module not available - using basic environment variable validation")
+
 
 @runtime_checkable
 class SessionProvider(Protocol):
@@ -180,14 +188,41 @@ def _get_global_sessionmanager() -> DatabaseSessionManager:
 
     if _global_sessionmanager is None:
         try:
-            # Get database URL and ensure it uses psycopg3 driver
-            database_url = os.getenv("DATABASE_URL")
-            if database_url and database_url.startswith("postgresql://"):
-                # Convert generic postgresql:// to psycopg3 specific
-                database_url = database_url.replace("postgresql://", "postgresql+psycopg://")
-            elif not database_url:
-                # Use default with psycopg3
-                database_url = "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
+            # Use secure database URL generation if security module is available
+            if SECURITY_MODULE_AVAILABLE:
+                # Perform security check first
+                if not check_environment_security():
+                    logger.warning("Environment security check failed - proceeding with basic validation")
+
+                try:
+                    database_url = get_secure_database_url()
+                    logger.info("Using secure database configuration")
+                except Exception as e:
+                    logger.warning(f"Secure database URL generation failed: {e}, falling back to basic method")
+                    database_url = None
+            else:
+                database_url = None
+
+            # Fallback to basic environment variable method
+            if not database_url:
+                database_url = os.getenv("DATABASE_URL")
+                if database_url and database_url.startswith("postgresql://"):
+                    # Convert generic postgresql:// to psycopg3 specific
+                    database_url = database_url.replace("postgresql://", "postgresql+psycopg://")
+                elif not database_url:
+                    # Secure fallback - use environment variables or fail securely
+                    username = os.getenv("POSTGRES_USERNAME", "postgres")
+                    password = os.getenv("POSTGRES_PASSWORD")
+                    if not password:
+                        raise ValueError(
+                            "Database credentials must be provided via environment variables. "
+                            "Set POSTGRES_PASSWORD or DATABASE_URL environment variable. "
+                            "NEVER use hardcoded credentials in production."
+                        )
+                    host = os.getenv("POSTGRES_HOST", "localhost")
+                    port = os.getenv("POSTGRES_PORT", "5432")
+                    db_name = os.getenv("POSTGRES_DATABASE", "apes_production")
+                    database_url = f"postgresql+psycopg://{username}:{password}@{host}:{port}/{db_name}"
 
             default_database_url = database_url
             _global_sessionmanager = DatabaseSessionManager(
@@ -225,10 +260,10 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 @contextlib.asynccontextmanager
 async def get_session_context() -> AsyncIterator[AsyncSession]:
     """Database session context manager following SQLAlchemy 2.0 best practices
-    
+
     This is the preferred method for getting database sessions in application code.
     It provides proper async context management with automatic cleanup.
-    
+
     Usage:
         async with get_session_context() as session:
             # Use session here
