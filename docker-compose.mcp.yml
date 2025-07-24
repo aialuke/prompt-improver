@@ -1,0 +1,134 @@
+# Docker Compose for APES MCP Server Phase 0 Development & Testing
+# Includes all dependencies for unified architecture
+
+version: '3.8'
+
+services:
+  # PostgreSQL database with MCP user setup
+  postgres:
+    image: postgres:15-alpine
+    container_name: apes_postgres_mcp
+    environment:
+      POSTGRES_DB: apes_production
+      POSTGRES_USER: apes_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_default_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/migrations/001_phase0_mcp_user_permissions.sql:/docker-entrypoint-initdb.d/02_mcp_permissions.sql
+      - ./database/migrations/002_phase0_unified_feedback_schema.sql:/docker-entrypoint-initdb.d/03_feedback_schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apes_user -d apes_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: apes_redis_mcp
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # MCP Server for Phase 0
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: apes_mcp_server
+    environment:
+      # Database connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=apes_production
+      - POSTGRES_USERNAME=apes_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_default_password}
+      
+      # MCP-specific configuration
+      - MCP_POSTGRES_PASSWORD=${MCP_POSTGRES_PASSWORD:-secure_mcp_user_password}
+      - MCP_JWT_SECRET_KEY=${MCP_JWT_SECRET_KEY:-your_jwt_secret_key_here_32_chars_minimum_length}
+      - MCP_CACHE_REDIS_URL=redis://redis:6379/3
+      - MCP_RATE_LIMIT_REDIS_URL=redis://redis:6379/2
+      
+      # Performance settings
+      - MCP_LOG_LEVEL=INFO
+      - MCP_FEEDBACK_ENABLED=true
+      - MCP_DB_POOL_SIZE=20
+      - MCP_DB_MAX_OVERFLOW=10
+      - MCP_REQUEST_TIMEOUT_MS=200
+      - MCP_CACHE_TTL_SECONDS=7200
+      - MCP_PERFORMANCE_MONITORING_ENABLED=true
+      
+      # FastMCP settings
+      - FASTMCP_LOG_LEVEL=INFO
+      - FASTMCP_MASK_ERROR_DETAILS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, '/app/src'); from prompt_improver.database.mcp_connection_pool import get_mcp_connection_pool; import asyncio; asyncio.run(get_mcp_connection_pool().health_check())"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    restart: unless-stopped
+    # For stdio transport, we don't expose ports, but include for debugging
+    # ports:
+    #   - "8000:8000"
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: apes_pgadmin_mcp
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@apes.local
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin_password}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+    restart: unless-stopped
+
+  # Optional: Redis Commander for cache management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: apes_redis_commander_mcp
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: apes_mcp_network

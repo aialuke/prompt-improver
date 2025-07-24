@@ -30,8 +30,8 @@ import pytest
 import pytest_asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from prometheus_client import REGISTRY
-import fakeredis.aioredis
-import redis.asyncio as redis
+import fakeredis
+import coredis
 import lz4.frame
 
 from src.prompt_improver.utils.redis_cache import (
@@ -169,7 +169,7 @@ class TestRedisCache:
         """Test handling of Redis connection errors."""
         # Setup - patch redis_client to raise ConnectionError
         with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
-            mock_client.get.side_effect = redis.ConnectionError("Connection failed")
+            mock_client.get.side_effect = coredis.ConnectionError("Connection failed")
 
             # Execute
             result = await RedisCache.get("test_key")
@@ -420,7 +420,7 @@ class TestErrorHandling:
     async def test_redis_set_error_handling(self):
         """Test handling of Redis set errors."""
         with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
-            mock_client.set.side_effect = redis.ConnectionError("Connection failed")
+            mock_client.set.side_effect = coredis.ConnectionError("Connection failed")
             
             result = await RedisCache.set("test_key", b"test_data")
             assert result is False
@@ -429,7 +429,7 @@ class TestErrorHandling:
     async def test_redis_delete_error_handling(self):
         """Test handling of Redis delete errors."""
         with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
-            mock_client.delete.side_effect = redis.ConnectionError("Connection failed")
+            mock_client.delete.side_effect = coredis.ConnectionError("Connection failed")
             
             result = await RedisCache.invalidate("test_key")
             assert result is False
@@ -455,9 +455,13 @@ class TestPerformanceCharacteristics:
     @pytest.mark.asyncio
     async def test_cache_latency_metrics(self):
         """Test that latency metrics are recorded."""
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=False)
+        # Use mock instead of fakeredis for coredis compatibility
+        mock_redis = AsyncMock()
+        mock_redis.set.return_value = True
+        mock_redis.get.return_value = b"data"
+        mock_redis.delete.return_value = 1
         
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", fake_redis):
+        with patch("src.prompt_improver.utils.redis_cache.redis_client", mock_redis):
             # Perform operations
             await RedisCache.set("perf_test", b"data")
             await RedisCache.get("perf_test")
@@ -465,8 +469,6 @@ class TestPerformanceCharacteristics:
             
             # Just verify operations completed without error
             assert True  # Operations completed successfully
-
-        await fake_redis.aclose()
 
 
 # Integration test for full workflow

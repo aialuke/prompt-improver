@@ -100,7 +100,11 @@ class DatabaseConfig(BaseSettings):
         default=1000, validation_alias="SLOW_QUERY_THRESHOLD"
     )
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        case_sensitive=False,
+        extra='allow'  # Allow extra fields for MCP environment variables
+    )
 
 def get_database_config() -> DatabaseConfig:
     """Get database configuration instance."""

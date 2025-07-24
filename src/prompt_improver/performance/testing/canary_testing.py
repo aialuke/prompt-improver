@@ -848,7 +848,7 @@ class CanaryTestingService(EnhancedCanaryTestingService):
 
         try:
             # Get existing metrics or create new
-            existing_metrics = self.redis_client.get(metric_key)
+            existing_metrics = await self.redis_client.get(metric_key)
             if existing_metrics:
                 metrics = json.loads(existing_metrics)
             else:
@@ -878,7 +878,7 @@ class CanaryTestingService(EnhancedCanaryTestingService):
                     metrics["cache_misses"] += 1
 
             # Store updated metrics with 48-hour expiration
-            self.redis_client.setex(
+            await self.redis_client.setex(
                 metric_key,
                 86400 * 2,  # 48 hours
                 json.dumps(metrics)
@@ -916,7 +916,7 @@ class CanaryTestingService(EnhancedCanaryTestingService):
             metric_key = f"canary_metrics:{group}:{current_time.strftime('%Y%m%d_%H')}"
 
             try:
-                metrics_data = self.redis_client.get(metric_key)
+                metrics_data = await self.redis_client.get(metric_key)
                 if metrics_data:
                     metrics = json.loads(metrics_data)
                     total_requests += metrics.get("total_requests", 0)
@@ -1086,7 +1086,7 @@ class CanaryTestingService(EnhancedCanaryTestingService):
         try:
             # Store in Redis for immediate use
             config_key = "canary_config:rollout_percentage"
-            self.redis_client.set(config_key, str(new_percentage))
+            await self.redis_client.set(config_key, str(new_percentage))
 
             # Update local config
             if 'ab_testing' not in self.config:
@@ -1107,7 +1107,7 @@ class CanaryTestingService(EnhancedCanaryTestingService):
 
         # Get current percentage from Redis (most up-to-date)
         try:
-            stored_percentage = self.redis_client.get("canary_config:rollout_percentage")
+            stored_percentage = await self.redis_client.get("canary_config:rollout_percentage")
             current_percentage = int(stored_percentage) if stored_percentage else canary_config.get('initial_percentage', 0)
         except Exception:
             current_percentage = canary_config.get('initial_percentage', 0)

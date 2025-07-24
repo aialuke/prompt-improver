@@ -10,7 +10,7 @@ This script demonstrates:
 """
 
 import asyncio
-import redis.asyncio as aioredis
+import coredis
 from testcontainers.redis import RedisContainer
 
 
@@ -27,7 +27,7 @@ async def demo_redis_fixture():
             print(f"✅ Redis container started at {host}:{port}")
             
             # This is what happens in the function fixture
-            client = aioredis.Redis(
+            client = coredis.Redis(
                 host=host,
                 port=port,
                 decode_responses=True
@@ -45,14 +45,13 @@ async def demo_redis_fixture():
             
             # Test hash operations
             print("\n🗂️ Testing hash operations...")
-            await client.hset("test_hash", "field1", "value1")
-            await client.hset("test_hash", "field2", "value2")
+            await client.hset("test_hash", {"field1": "value1", "field2": "value2"})
             hash_data = await client.hgetall("test_hash")
             print(f"Hash data: {hash_data}")
             
             # Test list operations
             print("\n📋 Testing list operations...")
-            await client.lpush("test_list", "item1", "item2", "item3")
+            await client.lpush("test_list", ["item1", "item2", "item3"])
             list_data = await client.lrange("test_list", 0, -1)
             print(f"List data: {list_data}")
             
@@ -62,7 +61,7 @@ async def demo_redis_fixture():
             print(f"\n🔄 After flush, keys remaining: {keys_after_flush}")
             
             # Cleanup
-            await client.close()
+            client.connection_pool.disconnect()
             print("🔌 Client connection closed")
             
     except Exception as e:

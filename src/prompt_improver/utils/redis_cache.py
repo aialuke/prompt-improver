@@ -14,7 +14,8 @@ from functools import wraps
 from typing import Any, Optional, Union
 
 import lz4.frame
-import redis.asyncio as redis
+import coredis
+from coredis import exceptions as coredis_exceptions
 import yaml
 from prometheus_client import Counter, Histogram, REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -330,21 +331,14 @@ config_path = "config/redis_config.yaml"
 redis_config = RedisConfig.load_from_yaml(config_path)
 redis_config.validate_config()
 
-# Redis client initialization with configurable connection pool
-# Using ConnectionPool for better connection reuse and performance
-connection_pool = redis.ConnectionPool(
+# Redis client initialization with coredis
+# Using direct Redis client for better compatibility
+redis_client = coredis.Redis(
     host=redis_config.host,
     port=redis_config.port,
     db=redis_config.cache_db,
-    max_connections=redis_config.max_connections,
-    socket_connect_timeout=redis_config.connect_timeout,
-    socket_timeout=redis_config.socket_timeout,
-    socket_keepalive=redis_config.socket_keepalive,
-    socket_keepalive_options=redis_config.socket_keepalive_options,
-    ssl=redis_config.use_ssl
+    max_connections=redis_config.max_connections
 )
-
-redis_client = redis.Redis(connection_pool=connection_pool)
 
 # Circuit breaker instances for Redis operations
 _redis_get_breaker = CircuitBreaker(failure_threshold=5, reset_timeout=60)
@@ -401,7 +395,7 @@ class RedisCache:
                 except Exception as e:
                     logger.warning(f"Failed to decompress cache data for key {key}: {e}")
                     # Clean up corrupted cache entry
-                    await redis_client.delete(key)
+                    await redis_client.delete([key])
                     metrics['misses'].inc()
                     return None
             else:
@@ -412,7 +406,7 @@ class RedisCache:
             try:
                 # Use circuit breaker for Redis operation
                 return await _redis_get_breaker.call(_redis_get_operation)
-            except (redis.ConnectionError, redis.TimeoutError, redis.BusyLoadingError) as e:
+            except (coredis_exceptions.ConnectionError, coredis_exceptions.TimeoutError, coredis_exceptions.BusyLoadingError) as e:
                 # Calculate sleep time with exponential back-off
                 sleep_time = backoff_factor * (2 ** attempt)
                 logger.warning(f"Retrying Redis get for key {key} after error: {e}. Attempt {attempt + 1}/{retries}, sleeping for {sleep_time} seconds.")
@@ -447,19 +441,20 @@ class RedisCache:
 
         async def _redis_set_operation():
             """Internal Redis set operation."""
+            # Metrics handling
+            metrics = get_cache_metrics()
             start_time = time.perf_counter()
-            with CACHE_LATENCY.labels(operation='set').time():
-                compressed_data = lz4.frame.compress(value)
-                await redis_client.set(key, compressed_data, ex=expire)
+            compressed_data = lz4.frame.compress(value)
+            await redis_client.set(key, compressed_data, ex=expire)
             end_time = time.perf_counter()
-            CACHE_LATENCY_MS.labels(operation='set').observe((end_time - start_time) * 1000)
+            metrics['latency'].labels(operation='set').observe((end_time - start_time) * 1000)
             return True
 
         for attempt in range(retries):
             try:
                 # Use circuit breaker for Redis operation
                 return await _redis_set_breaker.call(_redis_set_operation)
-            except (redis.ConnectionError, redis.TimeoutError, redis.BusyLoadingError) as e:
+            except (coredis_exceptions.ConnectionError, coredis_exceptions.TimeoutError, coredis_exceptions.BusyLoadingError) as e:
                 # Calculate sleep time with exponential back-off
                 sleep_time = backoff_factor * (2 ** attempt)
                 logger.warning(f"Retrying Redis set for key {key} after error: {e}. Attempt {attempt + 1}/{retries}, sleeping for {sleep_time} seconds.")
@@ -494,18 +489,19 @@ class RedisCache:
 
         async def _redis_delete_operation():
             """Internal Redis delete operation."""
+            # Metrics handling
+            metrics = get_cache_metrics()
             start_time = time.perf_counter()
-            with CACHE_LATENCY.labels(operation='delete').time():
-                result = await redis_client.delete(key)
+            result = await redis_client.delete([key])
             end_time = time.perf_counter()
-            CACHE_LATENCY_MS.labels(operation='delete').observe((end_time - start_time) * 1000)
+            metrics['latency'].labels(operation='delete').observe((end_time - start_time) * 1000)
             return result > 0
 
         for attempt in range(retries):
             try:
                 # Use circuit breaker for Redis operation
                 return await _redis_delete_breaker.call(_redis_delete_operation)
-            except (redis.ConnectionError, redis.TimeoutError, redis.BusyLoadingError) as e:
+            except (coredis_exceptions.ConnectionError, coredis_exceptions.TimeoutError, coredis_exceptions.BusyLoadingError) as e:
                 # Calculate sleep time with exponential back-off
                 sleep_time = backoff_factor * (2 ** attempt)
                 logger.warning(f"Retrying Redis delete for key {key} after error: {e}. Attempt {attempt + 1}/{retries}, sleeping for {sleep_time} seconds.")
@@ -622,7 +618,7 @@ class CacheSubscriber:
             return
 
         try:
-            self.pubsub = redis_client.pubsub()
+            self.pubsub = await redis_client.pubsub()
             await self.pubsub.subscribe('pattern.invalidate')
             self.is_running = True
 
@@ -648,7 +644,7 @@ class CacheSubscriber:
                 pass
 
         if self.pubsub:
-            await self.pubsub.close()
+            await self.pubsub.aclose()
 
         logger.info("Cache subscriber stopped")
 
@@ -719,7 +715,7 @@ class CacheSubscriber:
             if keys_to_delete:
                 # Convert bytes keys to strings if needed
                 str_keys = [k.decode() if isinstance(k, bytes) else k for k in keys_to_delete]
-                deleted_count = await redis_client.delete(*str_keys)
+                deleted_count = await redis_client.delete(str_keys)
                 logger.debug(f"Deleted {deleted_count} keys with prefix '{prefix}'")
                 return deleted_count
             logger.debug(f"No keys found with prefix '{prefix}'")

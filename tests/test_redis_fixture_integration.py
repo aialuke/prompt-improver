@@ -9,7 +9,7 @@ Tests verify:
 """
 
 import pytest
-import redis.asyncio as aioredis
+import coredis
 
 
 pytestmark = pytest.mark.redis_integration
@@ -26,7 +26,7 @@ async def test_redis_fixture_basic_operations(redis_client):
     assert value == "test_value"
     
     # Test DELETE operation
-    await redis_client.delete("test_key")
+    await redis_client.delete(["test_key"])
     deleted_value = await redis_client.get("test_key")
     assert deleted_value is None
 
@@ -55,9 +55,8 @@ async def test_redis_fixture_isolation_verification(redis_client):
 @pytest.mark.asyncio
 async def test_redis_fixture_hash_operations(redis_client):
     """Test Redis hash operations with the fixture."""
-    # Test HSET operation
-    await redis_client.hset("test_hash", "field1", "value1")
-    await redis_client.hset("test_hash", "field2", "value2")
+    # Test HSET operation - coredis expects a mapping
+    await redis_client.hset("test_hash", {"field1": "value1", "field2": "value2"})
     
     # Test HGET operation
     value1 = await redis_client.hget("test_hash", "field1")
@@ -73,8 +72,8 @@ async def test_redis_fixture_hash_operations(redis_client):
 @pytest.mark.asyncio
 async def test_redis_fixture_list_operations(redis_client):
     """Test Redis list operations with the fixture."""
-    # Test LPUSH operation
-    await redis_client.lpush("test_list", "item1", "item2", "item3")
+    # Test LPUSH operation - coredis expects a list of elements
+    await redis_client.lpush("test_list", ["item1", "item2", "item3"])
     
     # Test LRANGE operation
     items = await redis_client.lrange("test_list", 0, -1)
@@ -92,8 +91,8 @@ async def test_redis_fixture_list_operations(redis_client):
 @pytest.mark.asyncio
 async def test_redis_fixture_expiration(redis_client):
     """Test Redis key expiration with the fixture."""
-    # Set a key with expiration
-    await redis_client.setex("expiring_key", 1, "expiring_value")
+    # Set a key with expiration - coredis expects (key, value, seconds)
+    await redis_client.setex("expiring_key", "expiring_value", 1)
     
     # Verify key exists
     value = await redis_client.get("expiring_key")
@@ -107,8 +106,8 @@ async def test_redis_fixture_expiration(redis_client):
 @pytest.mark.asyncio
 async def test_redis_fixture_pipeline_operations(redis_client):
     """Test Redis pipeline operations with the fixture."""
-    # Create a pipeline
-    pipe = redis_client.pipeline()
+    # Create a pipeline - coredis pipeline() is async
+    pipe = await redis_client.pipeline()
     
     # Add multiple operations to pipeline
     pipe.set("pipe_key1", "value1")
@@ -135,11 +134,11 @@ async def test_redis_container_connection_details(redis_container):
     assert port is not None
     
     # Test direct connection using the connection details
-    direct_client = aioredis.Redis(host=host, port=port, decode_responses=True)
+    direct_client = coredis.Redis(host=host, port=port, decode_responses=True)
     await direct_client.set("direct_test", "direct_value")
     value = await direct_client.get("direct_test")
     assert value == "direct_value"
-    await direct_client.close()
+    direct_client.connection_pool.disconnect()
 
 
 @pytest.mark.asyncio

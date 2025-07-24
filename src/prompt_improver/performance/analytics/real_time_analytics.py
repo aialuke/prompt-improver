@@ -22,7 +22,7 @@ from collections import defaultdict, deque
 import statistics
 
 import numpy as np
-import redis.asyncio as redis
+import coredis
 from scipy import stats
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -306,7 +306,7 @@ class EnhancedRealTimeAnalyticsService:
     def __init__(
         self,
         db_session: AsyncSession,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: Optional[coredis.Redis] = None,
         kafka_config: Optional[Dict[str, Any]] = None,
         enable_stream_processing: bool = True,
         enable_anomaly_detection: bool = True,
@@ -1066,7 +1066,7 @@ class EnhancedRealTimeAnalyticsService:
 class RealTimeAnalyticsService(EnhancedRealTimeAnalyticsService):
     """Backward compatible real-time analytics service."""
 
-    def __init__(self, db_session: AsyncSession, redis_client: Optional[redis.Redis] = None):
+    def __init__(self, db_session: AsyncSession, redis_client: Optional[coredis.Redis] = None):
         super().__init__(
             db_session=db_session,
             redis_client=redis_client,
@@ -1523,7 +1523,7 @@ class RealTimeAnalyticsService(EnhancedRealTimeAnalyticsService):
 _real_time_service: RealTimeAnalyticsService | None = None
 
 async def get_real_time_analytics_service(
-    db_session: AsyncSession, redis_client: redis.Redis | None = None
+    db_session: AsyncSession, redis_client: coredis.Redis | None = None
 ) -> RealTimeAnalyticsService:
     """Get singleton RealTimeAnalyticsService instance"""
     global _real_time_service

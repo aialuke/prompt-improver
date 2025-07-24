@@ -126,13 +126,13 @@ class TestAdvancedABTestingComplete:
         real_time_service = RealTimeAnalyticsService(db_session=test_db_session)
         
         # Configure Redis connection for real behavior
-        import redis.asyncio as redis
+        import coredis
         import os
         
         # Try to use real Redis if available, otherwise use None for in-memory fallback
         try:
             redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-            redis_client = redis.from_url(redis_url)
+            redis_client = coredis.from_url(redis_url)
             # Test connection
             await redis_client.ping()
             real_time_service.redis_client = redis_client

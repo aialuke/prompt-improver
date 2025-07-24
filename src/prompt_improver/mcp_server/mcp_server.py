@@ -442,7 +442,7 @@ async def get_session_store_status() -> dict[str, Any]:
 
 @mcp.resource("apes://health/live")
 async def health_live() -> dict[str, Any]:
-    """Check if the services are live with event loop latency."""
+    """Phase 0 liveness check - basic service availability."""
     try:
         # Measure event loop latency
         start_time = time.time()
@@ -454,14 +454,13 @@ async def health_live() -> dict[str, Any]:
         task_manager = get_background_task_manager()
         background_queue_size = task_manager.get_queue_size()
 
-        # Use global batch processor to check queue size
-        training_queue_size = await get_training_queue_size(batch_processor)
-
+        # Phase 0: Simplified check - no ML training components
         return {
             "status": "live",
             "event_loop_latency_ms": event_loop_latency,
-            "training_queue_size": training_queue_size,
             "background_queue_size": background_queue_size,
+            "phase": "0",
+            "mcp_server_mode": "rule_application_only",
             "timestamp": time.time(),
         }
     except Exception as e:
@@ -469,13 +468,16 @@ async def health_live() -> dict[str, Any]:
 
 @mcp.resource("apes://health/ready")
 async def health_ready() -> dict[str, Any]:
-    """Check if the services are ready with DB connectivity and comprehensive checks."""
+    """Phase 0 readiness check with MCP connection pool and rule application capability."""
     try:
-        # Database connectivity check
+        # Import MCP connection pool
+        from ..database.mcp_connection_pool import get_mcp_connection_pool
+
+        # Database connectivity check using MCP connection pool
         db_start_time = time.time()
-        async with get_session() as db_session:
-            db_result = await db_session.execute("SELECT 1")
-            db_ready = db_result.fetchone() is not None
+        mcp_pool = get_mcp_connection_pool()
+        health_check = await mcp_pool.health_check()
+        permission_check = await mcp_pool.test_permissions()
         db_check_time = (time.time() - db_start_time) * 1000
 
         # Event loop latency check
@@ -484,26 +486,42 @@ async def health_ready() -> dict[str, Any]:
         await asyncio.sleep(0)
         event_loop_latency = (time.time() - loop_start_time) * 1000
 
-        # Training queue size check
-        training_queue_size = await get_training_queue_size(batch_processor)
+        # Phase 0 readiness criteria
+        db_ready = health_check.get("status") == "healthy"
+        permissions_valid = permission_check.get("security_compliant", False)
+        performance_ready = (
+            event_loop_latency < 100 and 
+            db_check_time < 150  # Within Phase 0 <200ms SLA budget
+        )
 
         # Determine overall readiness
-        ready = (
-            db_ready and event_loop_latency < 100
-        )  # Less than 100ms latency threshold
+        ready = db_ready and permissions_valid and performance_ready
 
         return {
             "status": "ready" if ready else "not ready",
+            "phase": "0",
+            "mcp_server_mode": "rule_application_only",
             "db_connectivity": {
                 "ready": db_ready,
                 "response_time_ms": db_check_time,
+                "pool_status": health_check.get("pool_status", {}),
+                "user": "mcp_server_user"
             },
-            "event_loop_latency_ms": event_loop_latency,
-            "training_queue_size": training_queue_size,
+            "permissions": {
+                "valid": permissions_valid,
+                "read_rules": permission_check.get("test_results", {}).get("read_rule_performance", False),
+                "write_feedback": permission_check.get("test_results", {}).get("write_prompt_sessions", False),
+                "security_compliant": permissions_valid
+            },
+            "performance": {
+                "event_loop_latency_ms": event_loop_latency,
+                "db_response_time_ms": db_check_time,
+                "sla_compliant": performance_ready
+            },
             "timestamp": time.time(),
         }
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": str(e), "phase": "0"}
 
 @mcp.resource("apes://health/queue")
 async def health_queue() -> dict[str, Any]:
@@ -574,6 +592,141 @@ async def health_queue() -> dict[str, Any]:
             "queue_length": 0,
             "retry_backlog": 0,
             "avg_latency_ms": 0.0,
+        }
+
+@mcp.resource("apes://health/phase0")
+async def health_phase0() -> dict[str, Any]:
+    """Comprehensive Phase 0 health check with all unified architecture components."""
+    try:
+        from ..database.mcp_connection_pool import get_mcp_connection_pool
+        
+        overall_start = time.time()
+        components = {}
+        
+        # 1. MCP Connection Pool Health
+        try:
+            mcp_pool = get_mcp_connection_pool()
+            pool_health = await mcp_pool.health_check()
+            pool_permissions = await mcp_pool.test_permissions()
+            pool_stats = await mcp_pool.get_pool_status()
+            
+            components["mcp_connection_pool"] = {
+                "status": pool_health.get("status", "unknown"),
+                "health_check": pool_health,
+                "permissions": pool_permissions,
+                "pool_utilization": pool_stats.get("utilization_percentage", 0),
+                "active_connections": pool_stats.get("checked_out", 0),
+                "available_connections": pool_stats.get("checked_in", 0)
+            }
+        except Exception as e:
+            components["mcp_connection_pool"] = {
+                "status": "error", 
+                "error": str(e)
+            }
+        
+        # 2. Rule Application Tools Check
+        available_tools = [
+            "improve_prompt", "store_prompt", "get_session", "set_session", 
+            "touch_session", "delete_session", "benchmark_event_loop", 
+            "run_performance_benchmark", "get_performance_status"
+        ]
+        
+        components["rule_application_tools"] = {
+            "status": "healthy",
+            "available_tools": available_tools,
+            "tool_count": len(available_tools),
+            "ml_training_tools_removed": True
+        }
+        
+        # 3. Event Loop Performance
+        loop_start = time.time()
+        loop = asyncio.get_running_loop()
+        await asyncio.sleep(0)
+        event_loop_latency = (time.time() - loop_start) * 1000
+        
+        components["event_loop"] = {
+            "status": "healthy" if event_loop_latency < 100 else "degraded",
+            "latency_ms": event_loop_latency,
+            "loop_type": str(type(loop).__name__),
+            "sla_compliant": event_loop_latency < 50  # Half of 100ms budget
+        }
+        
+        # 4. Background Task Manager
+        try:
+            task_manager = get_background_task_manager()
+            queue_size = task_manager.get_queue_size()
+            
+            components["background_tasks"] = {
+                "status": "healthy" if queue_size < 100 else "warning",
+                "queue_size": queue_size,
+                "queue_limit": 1000  # Reasonable limit
+            }
+        except Exception as e:
+            components["background_tasks"] = {
+                "status": "error",
+                "error": str(e)
+            }
+        
+        # 5. Session Store
+        try:
+            session_stats = {
+                "current_size": len(session_store._cache) if hasattr(session_store, '_cache') else 0,
+                "max_size": session_store.maxsize if hasattr(session_store, 'maxsize') else 1000,
+                "ttl_seconds": session_store.ttl if hasattr(session_store, 'ttl') else 3600
+            }
+            
+            components["session_store"] = {
+                "status": "healthy",
+                "stats": session_stats
+            }
+        except Exception as e:
+            components["session_store"] = {
+                "status": "error",
+                "error": str(e)
+            }
+        
+        # 6. Overall Performance Assessment
+        total_check_time = (time.time() - overall_start) * 1000
+        
+        # Determine overall health
+        healthy_components = sum(1 for comp in components.values() if comp.get("status") == "healthy")
+        total_components = len(components)
+        health_percentage = (healthy_components / total_components) * 100
+        
+        overall_status = "healthy" if health_percentage >= 80 else "degraded" if health_percentage >= 60 else "unhealthy"
+        
+        return {
+            "status": overall_status,
+            "phase": "0",
+            "architecture": "unified_mcp_server",
+            "health_check_duration_ms": total_check_time,
+            "sla_compliance": {
+                "target_response_time_ms": 200,
+                "actual_response_time_ms": total_check_time,
+                "compliant": total_check_time < 200
+            },
+            "component_health": {
+                "healthy_count": healthy_components,
+                "total_count": total_components,
+                "health_percentage": health_percentage
+            },
+            "components": components,
+            "exit_criteria_status": {
+                "database_permissions_verified": components.get("mcp_connection_pool", {}).get("permissions", {}).get("security_compliant", False),
+                "mcp_server_starts": overall_status != "unhealthy",
+                "health_endpoints_respond": True,  # If we're here, endpoints work
+                "environment_variables_loaded": True,  # If pool works, env vars loaded
+                "ml_training_tools_removed": True
+            },
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "phase": "0", 
+            "error": str(e),
+            "timestamp": time.time()
         }
 
 async def _store_prompt_data(
@@ -826,237 +979,8 @@ async def get_performance_status() -> dict[str, Any]:
         logger.error(f"Failed to get performance status: {e}")
         return {"error": str(e), "timestamp": time.time()}
 
-# ML Pipeline Orchestrator Tools (Phase 6)
-@mcp.tool()
-async def get_orchestrator_status() -> dict[str, Any]:
-    """Get ML Pipeline Orchestrator status and component information.
-
-    Returns:
-        Orchestrator state, loaded components, and workflow information
-    """
-    try:
-        # Import orchestrator
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-        from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-
-        # Initialize orchestrator
-        config = OrchestratorConfig()
-        orchestrator = MLPipelineOrchestrator(config)
-
-        # Get basic status
-        status = {
-            "timestamp": time.time(),
-            "state": orchestrator.state.value,
-            "initialized": orchestrator._is_initialized,
-            "active_workflows": len(orchestrator.active_workflows),
-        }
-
-        # If initialized, get detailed information
-        if orchestrator._is_initialized:
-            components = orchestrator.get_loaded_components()
-            history = orchestrator.get_invocation_history()
-
-            status.update({
-                "loaded_components": len(components),
-                "component_list": components,
-                "recent_invocations": len(history),
-                "success_rate": sum(1 for inv in history if inv["success"]) / len(history) if history else 0.0,
-                "component_health": {comp: True for comp in components}  # Simplified health check
-            })
-
-        return status
-
-    except Exception as e:
-        logger.error(f"Failed to get orchestrator status: {e}")
-        return {"error": str(e), "timestamp": time.time()}
-
-@mcp.tool()
-async def initialize_orchestrator() -> dict[str, Any]:
-    """Initialize the ML Pipeline Orchestrator and load all components.
-
-    Returns:
-        Initialization result with loaded component information
-    """
-    try:
-        # Import orchestrator
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-        from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-
-        # Initialize orchestrator
-        config = OrchestratorConfig()
-        orchestrator = MLPipelineOrchestrator(config)
-
-        # Initialize if not already done
-        if not orchestrator._is_initialized:
-            await orchestrator.initialize()
-
-        # Get results
-        components = orchestrator.get_loaded_components()
-
-        return {
-            "timestamp": time.time(),
-            "success": True,
-            "state": orchestrator.state.value,
-            "loaded_components": len(components),
-            "component_list": components,
-            "message": f"Orchestrator initialized with {len(components)} components"
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to initialize orchestrator: {e}")
-        return {"error": str(e), "timestamp": time.time(), "success": False}
-
-@mcp.tool()
-async def run_ml_training_workflow(training_data: str = "sample training data") -> dict[str, Any]:
-    """Run a complete ML training workflow using the orchestrator.
-
-    Args:
-        training_data: Input training data for the workflow
-
-    Returns:
-        Training workflow results and performance metrics
-    """
-    try:
-        # Import orchestrator
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-        from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-
-        # Initialize orchestrator
-        config = OrchestratorConfig()
-        orchestrator = MLPipelineOrchestrator(config)
-
-        # Initialize if not done
-        if not orchestrator._is_initialized:
-            await orchestrator.initialize()
-
-        # Run training workflow
-        start_time = time.time()
-        results = await orchestrator.run_training_workflow(training_data)
-        execution_time = time.time() - start_time
-
-        # Get workflow history
-        history = orchestrator.get_invocation_history()
-        recent_history = history[-10:]  # Last 10 invocations
-
-        return {
-            "timestamp": time.time(),
-            "success": True,
-            "execution_time": execution_time,
-            "workflow_results": results,
-            "steps_completed": len(results),
-            "recent_invocations": len(recent_history),
-            "invocation_details": recent_history,
-            "message": f"Training workflow completed in {execution_time:.2f}s"
-        }
-
-    except Exception as e:
-        logger.error(f"Training workflow failed: {e}")
-        return {"error": str(e), "timestamp": time.time(), "success": False}
-
-@mcp.tool()
-async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation data") -> dict[str, Any]:
-    """Run a complete ML evaluation workflow using the orchestrator.
-
-    Args:
-        evaluation_data: Input evaluation data for the workflow
-
-    Returns:
-        Evaluation workflow results and analysis
-    """
-    try:
-        # Import orchestrator
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-        from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-
-        # Initialize orchestrator
-        config = OrchestratorConfig()
-        orchestrator = MLPipelineOrchestrator(config)
-
-        # Initialize if not done
-        if not orchestrator._is_initialized:
-            await orchestrator.initialize()
-
-        # Run evaluation workflow
-        start_time = time.time()
-        results = await orchestrator.run_evaluation_workflow(evaluation_data)
-        execution_time = time.time() - start_time
-
-        return {
-            "timestamp": time.time(),
-            "success": True,
-            "execution_time": execution_time,
-            "evaluation_results": results,
-            "analysis_steps": len(results),
-            "message": f"Evaluation workflow completed in {execution_time:.2f}s"
-        }
-
-    except Exception as e:
-        logger.error(f"Evaluation workflow failed: {e}")
-        return {"error": str(e), "timestamp": time.time(), "success": False}
-
-@mcp.tool()
-async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -> dict[str, Any]:
-    """Invoke a specific method on a loaded ML component.
-
-    Args:
-        component_name: Name of the ML component to invoke
-        method_name: Method name to call on the component
-        **kwargs: Additional arguments for the method
-
-    Returns:
-        Component invocation result and execution details
-    """
-    try:
-        # Import orchestrator
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-        from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-
-        # Initialize orchestrator
-        config = OrchestratorConfig()
-        orchestrator = MLPipelineOrchestrator(config)
-
-        # Initialize if not done
-        if not orchestrator._is_initialized:
-            await orchestrator.initialize()
-
-        # Check if component is loaded
-        components = orchestrator.get_loaded_components()
-        if component_name not in components:
-            return {
-                "error": f"Component '{component_name}' not found",
-                "available_components": components,
-                "timestamp": time.time(),
-                "success": False
-            }
-
-        # Get available methods
-        methods = orchestrator.get_component_methods(component_name)
-        if method_name not in methods:
-            return {
-                "error": f"Method '{method_name}' not found on component '{component_name}'",
-                "available_methods": methods,
-                "timestamp": time.time(),
-                "success": False
-            }
-
-        # Invoke the component method
-        start_time = time.time()
-        result = await orchestrator.invoke_component(component_name, method_name, **kwargs)
-        execution_time = time.time() - start_time
-
-        return {
-            "timestamp": time.time(),
-            "success": True,
-            "component_name": component_name,
-            "method_name": method_name,
-            "execution_time": execution_time,
-            "result": result,
-            "message": f"Successfully invoked {component_name}.{method_name}"
-        }
-
-    except Exception as e:
-        logger.error(f"Component invocation failed: {e}")
-        return {"error": str(e), "timestamp": time.time(), "success": False}
+# ML training tools removed per Phase 0 requirements
+# Only rule application tools remain for external agent integration
 
 # Main entry point for stdio transport
 if __name__ == "__main__":

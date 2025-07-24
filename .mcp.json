@@ -1,24 +1,28 @@
 {
-	"mcpServers": {
-		"task-master-ai": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"-y",
-				"--package=task-master-ai",
-				"task-master-ai"
-			],
-			"env": {
-				"ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY_HERE",
-				"PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
-				"OPENAI_API_KEY": "YOUR_OPENAI_KEY_HERE",
-				"GOOGLE_API_KEY": "YOUR_GOOGLE_KEY_HERE",
-				"XAI_API_KEY": "YOUR_XAI_KEY_HERE",
-				"OPENROUTER_API_KEY": "YOUR_OPENROUTER_KEY_HERE",
-				"MISTRAL_API_KEY": "YOUR_MISTRAL_KEY_HERE",
-				"AZURE_OPENAI_API_KEY": "YOUR_AZURE_KEY_HERE",
-				"OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
-			}
-		}
-	}
+  "mcpServers": {
+    "apes-rule-application": {
+      "command": "python",
+      "args": ["-m", "prompt_improver.mcp_server.mcp_server"],
+      "env": {
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DATABASE": "apes_production",
+        "POSTGRES_USERNAME": "mcp_server_user",
+        "POSTGRES_PASSWORD": "${MCP_POSTGRES_PASSWORD}",
+        "MCP_JWT_SECRET_KEY": "${MCP_JWT_SECRET_KEY}",
+        "MCP_RATE_LIMIT_REDIS_URL": "redis://localhost:6379/2",
+        "MCP_CACHE_REDIS_URL": "redis://localhost:6379/3",
+        "MCP_LOG_LEVEL": "INFO",
+        "MCP_PERFORMANCE_MONITORING_ENABLED": "true",
+        "MCP_FEEDBACK_ENABLED": "true",
+        "MCP_MAX_PROMPT_LENGTH": "10240",
+        "MCP_REQUEST_TIMEOUT_MS": "200",
+        "MCP_CACHE_TTL_SECONDS": "7200",
+        "MCP_DB_POOL_SIZE": "20",
+        "MCP_DB_MAX_OVERFLOW": "10",
+        "FASTMCP_LOG_LEVEL": "INFO",
+        "FASTMCP_MASK_ERROR_DETAILS": "true"
+      }
+    }
+  }
 }

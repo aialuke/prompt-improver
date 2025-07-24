@@ -122,7 +122,7 @@ class TestAutoMLEndToEndWorkflow:
     ):
         """Fully configured AutoML orchestrator with real services."""
         import os
-        import redis.asyncio as redis
+        import coredis
 
         # === 2025 Network Isolation Lightweight Patch ===
         # For integration testing, use PostgreSQL with test schema to avoid conflicts
@@ -143,7 +143,7 @@ class TestAutoMLEndToEndWorkflow:
         redis_client = None
         
         try:
-            redis_client = redis.from_url(redis_url)
+            redis_client = coredis.from_url(redis_url)
             # Test connection
             await redis_client.ping()
         except Exception:

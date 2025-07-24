@@ -29,10 +29,13 @@ from .english_nltk_manager import get_english_nltk_manager
 # Modern async imports
 try:
     import aiofiles
-    import aioredis
+    # Skip aioredis import for Phase 0 compatibility (Python 3.13 issue)
+    # import aioredis  # Disabled due to TimeoutError conflicts
     ASYNC_SUPPORT = True
+    AIOREDIS_AVAILABLE = False
 except ImportError:
     ASYNC_SUPPORT = False
+    AIOREDIS_AVAILABLE = False
 
 # Enhanced linguistic analysis
 try:

@@ -12,8 +12,11 @@ from typing import Any, Dict, List, Optional
 import psutil
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-import aioredis
 import asyncpg
+
+# Skip aioredis import for Phase 0 compatibility (Python 3.13 issue)
+# import aioredis  # Disabled due to TimeoutError conflicts
+AIOREDIS_AVAILABLE = False
 
 from ..database.connection import get_database_connection
 from ..utils.redis_cache import get_redis_connection

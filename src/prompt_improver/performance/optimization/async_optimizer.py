@@ -30,9 +30,9 @@ from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
 
-# Enhanced caching imports - Use redis.asyncio which is more compatible
+# Enhanced caching imports - Use coredis for better async compatibility
 try:
-    import redis.asyncio as redis
+    import coredis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -231,22 +231,37 @@ class IntelligentCache:
         }
 
         # Redis connection for distributed caching
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: Optional[coredis.Redis] = None
+        self._redis_initialization_task: Optional[asyncio.Task] = None
         if REDIS_AVAILABLE:
-            asyncio.create_task(self._initialize_redis())
+            # Don't create task immediately during __init__ to avoid event loop issues
+            # Initialize Redis on first use or explicitly via ensure_redis_connection()
+            pass
 
     async def _initialize_redis(self):
         """Initialize Redis connection for distributed caching"""
         try:
-            self.redis_client = redis.from_url("redis://localhost:6379", decode_responses=True)
+            self.redis_client = coredis.Redis(host="localhost", port=6379, decode_responses=True)
             await self.redis_client.ping()
             logger.info("Redis cache initialized")
         except Exception as e:
             logger.warning(f"Redis not available, using local cache only: {e}")
             self.redis_client = None
 
+    async def ensure_redis_connection(self):
+        """Ensure Redis connection is established"""
+        if not REDIS_AVAILABLE:
+            return
+            
+        if self.redis_client is None and self._redis_initialization_task is None:
+            self._redis_initialization_task = asyncio.create_task(self._initialize_redis())
+            await self._redis_initialization_task
+
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache with intelligent strategy"""
+        # Ensure Redis connection if needed
+        await self.ensure_redis_connection()
+        
         # Try local cache first
         if key in self.cache:
             self.access_times[key] = datetime.utcnow()
@@ -283,6 +298,9 @@ class IntelligentCache:
 
     async def set(self, key: str, value: Any, ttl: Optional[int] = None, local_only: bool = False):
         """Set value in cache with intelligent eviction"""
+        # Ensure Redis connection if needed
+        await self.ensure_redis_connection()
+        
         # Check if eviction is needed
         if len(self.cache) >= self.config.max_size:
             await self._evict_items()
@@ -304,6 +322,9 @@ class IntelligentCache:
 
     async def delete(self, key: str):
         """Delete key from cache"""
+        # Ensure Redis connection if needed
+        await self.ensure_redis_connection()
+        
         if key in self.cache:
             del self.cache[key]
             del self.access_times[key]

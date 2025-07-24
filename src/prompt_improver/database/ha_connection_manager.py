@@ -20,8 +20,8 @@ import time
 import json
 
 import asyncpg
-import redis.sentinel
-import redis.asyncio as aioredis
+import coredis
+from coredis.sentinel import Sentinel
 from psycopg_pool import AsyncConnectionPool
 
 from .config import DatabaseConfig
@@ -97,9 +97,9 @@ class HAConnectionManager:
         self.pg_replica_pools: List[AsyncConnectionPool] = []
         
         # Redis endpoints
-        self.redis_sentinel: Optional[redis.sentinel.Sentinel] = None
-        self.redis_master: Optional[aioredis.Redis] = None
-        self.redis_replica: Optional[aioredis.Redis] = None
+        self.redis_sentinel: Optional[Sentinel] = None
+        self.redis_master: Optional[coredis.Redis] = None
+        self.redis_replica: Optional[coredis.Redis] = None
         
         # State management
         self.failover_in_progress = False
@@ -213,26 +213,22 @@ class HAConnectionManager:
                 ("redis-sentinel-3", 26379),
             ]
             
-            self.redis_sentinel = redis.sentinel.Sentinel(
-                sentinel_hosts,
-                socket_timeout=0.1,
-                socket_connect_timeout=0.1,
-                socket_keepalive=True,
-                socket_keepalive_options={}
+            self.redis_sentinel = Sentinel(
+                sentinels=sentinel_hosts,
+                stream_timeout=0.1,
+                connect_timeout=0.1
             )
             
             # Get master and replica connections
-            self.redis_master = self.redis_sentinel.master_for(
+            self.redis_master = self.redis_sentinel.primary_for(
                 'mymaster',
-                socket_timeout=0.1,
-                socket_connect_timeout=0.1,
-                socket_keepalive=True,
+                stream_timeout=0.1,
                 password=getattr(self.redis_config, 'password', None)
             )
             
-            self.redis_replica = self.redis_sentinel.slave_for(
+            self.redis_replica = self.redis_sentinel.replica_for(
                 'mymaster',
-                socket_timeout=0.1,
+                stream_timeout=0.1,
                 password=getattr(self.redis_config, 'password', None)
             )
             
@@ -246,13 +242,13 @@ class HAConnectionManager:
     async def _setup_redis_fallback(self):
         """Setup direct Redis connection as fallback."""
         try:
-            self.redis_master = aioredis.Redis(
+            self.redis_master = coredis.Redis(
                 host=self.redis_config.host,
                 port=self.redis_config.port,
                 db=self.redis_config.cache_db,
                 password=getattr(self.redis_config, 'password', None),
-                socket_timeout=self.redis_config.socket_timeout,
-                socket_connect_timeout=self.redis_config.connect_timeout
+                stream_timeout=self.redis_config.socket_timeout,
+                connect_timeout=self.redis_config.connect_timeout
             )
             
             self.logger.info("Redis fallback connection initialized")
@@ -307,7 +303,7 @@ class HAConnectionManager:
             await self._handle_connection_failure(e)
             raise
     
-    async def get_redis_connection(self, read_only: bool = False) -> Union[aioredis.Redis, redis.Redis]:
+    async def get_redis_connection(self, read_only: bool = False) -> coredis.Redis:
         """Get Redis connection with automatic failover.
         
         Args:
@@ -500,9 +496,9 @@ class HAConnectionManager:
         
         # Close Redis connections
         if self.redis_master:
-            await self.redis_master.close()
+            await self.redis_master.aclose()
         
         if self.redis_replica:
-            await self.redis_replica.close()
+            await self.redis_replica.aclose()
         
         self.logger.info("HA connection manager shutdown complete")

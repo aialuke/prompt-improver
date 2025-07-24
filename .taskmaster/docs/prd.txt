@@ -1,0 +1,188 @@
+# MCP Rule Application Server Implementation PRD
+
+## Executive Summary
+
+Implement a production-ready MCP (Model Context Protocol) Rule Application Server that provides external AI agents with optimized prompt enhancement capabilities. The server focuses exclusively on rule application with <200ms response times, maintaining strict architectural separation from CLI training operations.
+
+## Current State Analysis
+
+### Existing Implementation Strengths
+- FastMCP-based server with stdio transport at `src/prompt_improver/mcp_server/mcp_server.py`
+- Complete database schema with rule_performance, rule_metadata, and rule_combinations tables
+- Production-ready JWT authentication system in `src/prompt_improver/security/authentication.py`
+- Advanced Redis caching implementation with circuit breaker pattern
+- Comprehensive performance monitoring and health check endpoints
+- 20+ existing MCP tools including core `improve_prompt` functionality
+
+### Critical Implementation Gaps
+- Missing RuleCombinations SQLModel class for database ORM operations
+- ML training tools present in MCP server (violates architectural separation)
+- Missing PromptImprovementSession model for feedback collection
+- No Docker containerization configuration
+- Missing MCP server configuration in .mcp.json
+- No database permission isolation (mcp_server_user)
+- Missing advanced rule combination optimization tools
+
+## Technical Requirements
+
+### Phase 0: Environment & Configuration Setup
+- Create APES MCP server configuration in .mcp.json
+- Add unified MCP environment variables to .env.example
+- Create dedicated MCP database user with limited permissions
+- Implement feedback infrastructure with PromptImprovementSession table
+- Set up Docker configuration for production deployment
+
+### Phase 1: Unified Architecture & Security Implementation
+- Remove ML training tools from MCP server (5 specific tools)
+- Implement unified database connection pool for mixed read/write workload
+- Add direct feedback collection using FastAPI BackgroundTasks
+- Implement intelligent rule selection algorithm with multi-criteria scoring
+- Add JWT-based authentication integration for MCP server
+- Implement OWASP 2025-compliant input validation and sanitization
+- Configure sliding window rate limiting with burst handling
+
+### Phase 2: Rule Application Optimization
+- Leverage existing MultiLevelCache infrastructure for rule optimization
+- Implement L1 cache (1000 rules, 64MB, <1ms access) and L2 Redis cache
+- Create specialized tools for AI development integration
+- Add performance optimization with <200ms SLA enforcement
+- Implement comprehensive logging with performance metadata
+
+### Phase 3: Testing & Quality Assurance
+- Implement advanced rule application testing with real database connections
+- Add security validation testing (JWT, rate limiting, input validation)
+- Perform production readiness testing with 50+ concurrent clients
+- Validate architectural separation and read-only database access
+- Complete integration testing with external MCP clients
+
+### Phase 4: Advanced Features & Production Deployment
+- Implement multi-criteria rule scoring with weighted algorithms
+- Add specialized Claude Code and Augment Code integration tools
+- Create production Docker configuration and health monitoring
+- Implement advanced caching strategies and performance optimization
+- Complete documentation and operations handoff
+
+## Performance Requirements
+
+### Response Time Targets
+- <200ms response time for 95th percentile including feedback collection
+- <1ms L1 cache access time (in-memory hash map)
+- 1-10ms L2 Redis cache access time
+- 10-50ms database query time with 150ms timeout protection
+
+### Scalability Requirements
+- Support 50+ concurrent MCP clients with stable performance
+- >90% cache hit rate across L1+L2 levels
+- >95% feedback collection success rate
+- 99.9% uptime with graceful degradation under load
+
+### Security Standards
+- OWASP 2025-compliant input validation with injection detection
+- JWT authentication for all external agent access
+- Database permission isolation (read rules, write feedback only)
+- Rate limiting: 60 requests/minute basic, 300 professional, 1000+ enterprise
+
+## Database Schema Requirements
+
+### Required Tables
+- rule_performance (existing - read-only access)
+- rule_metadata (existing - read-only access) 
+- rule_combinations (existing - read-only access)
+- prompt_improvement_sessions (new - write access only)
+
+### Permission Model
+- Create mcp_server_user with controlled database permissions
+- Read-only access to all rule tables
+- Write access only to feedback tables
+- Explicit denial of write access to rule tables (fail-safe)
+
+## Architecture Principles
+
+### Clean Modern Implementation
+- Python 3.12+ with async/await throughout
+- FastAPI with async database sessions
+- No legacy compatibility layers or deprecated patterns
+- Modern async patterns with proper error handling
+
+### Real Behavior Testing Strategy
+- All tests use real PostgreSQL connections, no mocked database calls
+- Test actual MCP server endpoints with real HTTP requests
+- End-to-end testing with live Redis cache and database connections
+- Performance testing with actual response time measurements
+- Security testing with real JWT tokens and rate limiting validation
+
+### Progressive Documentation Updates  
+- Update MCP_ROADMAP.md status at each phase completion
+- Document actual vs planned timelines in roadmap
+- Record and resolve implementation blockers directly in roadmap
+- Update success criteria with measured results, not estimates
+
+## Success Criteria
+
+### Implementation Success Metrics
+- 0 ML training tools remaining in MCP server
+- Database permission-based security enforced
+- <200ms response time for 95th percentile maintained
+- >90% cache hit rate across L1+L2 levels
+- >95% feedback collection success rate
+- JWT authentication operational for all external agents
+- OWASP-compliant security validation passed
+
+### Production Readiness Metrics
+- 50+ concurrent clients supported with stable performance
+- 99.9% uptime with graceful degradation under load
+- Feedback data integrated with ML training pipeline within 24 hours
+- Security penetration testing passed
+- Complete documentation and handoff to operations team
+
+## Risk Mitigation
+
+### Critical Risks
+- Architectural violations from ML training tools in MCP server
+- Security gaps without JWT authentication and input validation
+- Performance issues without unified connection pool and caching
+- Missing configuration preventing MCP server deployment
+
+### Timeline Risks
+- Database schema changes requiring migration testing
+- Performance optimization requiring extensive load testing
+- Security implementation requiring penetration testing validation
+- Docker containerization requiring production environment testing
+
+## Deliverables
+
+### Code Deliverables
+- Updated MCP server with removed ML training tools
+- RuleCombinations SQLModel implementation
+- PromptImprovementSession model and migration
+- Docker configuration (Dockerfile.mcp, docker-compose.mcp.yml)
+- Updated .mcp.json with APES server configuration
+- Enhanced authentication integration for MCP server
+
+### Documentation Deliverables
+- Updated MCP_ROADMAP.md with implementation progress
+- Docker deployment documentation
+- MCP client integration guide
+- Security implementation documentation
+- Performance optimization guide
+
+### Testing Deliverables
+- Comprehensive MCP tool test suite with real behavior testing
+- Performance benchmarking suite with <200ms SLA validation
+- Security test suite with JWT and rate limiting validation
+- Load testing configuration for 50+ concurrent clients
+- Integration test suite for external MCP client compatibility
+
+## Technical Debt Resolution
+
+### Immediate Technical Debt (Week 1)
+- Remove architectural violations (ML tools in MCP server)
+- Add missing database models (RuleCombinations, PromptImprovementSession)
+- Implement proper database permission isolation
+- Add missing Docker containerization configuration
+
+### Future Technical Debt (Week 2-4)
+- Optimize database query performance with prepared statements
+- Implement advanced caching strategies for rule combinations
+- Add comprehensive monitoring and alerting infrastructure
+- Create automated deployment and rollback procedures

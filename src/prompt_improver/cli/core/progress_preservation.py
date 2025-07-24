@@ -518,6 +518,135 @@ class ProgressPreservationManager:
         except Exception as e:
             self.logger.warning(f"Memory cleanup failed: {e}")
 
+    def create_pid_file(self, session_id: str) -> bool:
+        """
+        Create PID file for training session process tracking.
+
+        Args:
+            session_id: Training session identifier
+
+        Returns:
+            True if PID file created successfully
+        """
+        try:
+            pid_file = self.backup_dir / f"{session_id}.pid"
+
+            # Check if PID file already exists
+            if pid_file.exists():
+                # Check if process is still running
+                try:
+                    with open(pid_file, 'r') as f:
+                        old_pid = int(f.read().strip())
+
+                    # Check if process exists
+                    try:
+                        os.kill(old_pid, 0)  # Signal 0 just checks if process exists
+                        self.logger.warning(f"Training session {session_id} already running with PID {old_pid}")
+                        return False
+                    except OSError:
+                        # Process doesn't exist, remove stale PID file
+                        pid_file.unlink()
+                        self.logger.info(f"Removed stale PID file for session {session_id}")
+                except (ValueError, FileNotFoundError):
+                    # Invalid PID file, remove it
+                    pid_file.unlink()
+
+            # Create new PID file
+            current_pid = os.getpid()
+            with open(pid_file, 'w') as f:
+                f.write(str(current_pid))
+
+            self.logger.info(f"Created PID file for session {session_id} with PID {current_pid}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to create PID file for session {session_id}: {e}")
+            return False
+
+    def remove_pid_file(self, session_id: str) -> bool:
+        """
+        Remove PID file for training session.
+
+        Args:
+            session_id: Training session identifier
+
+        Returns:
+            True if PID file removed successfully
+        """
+        try:
+            pid_file = self.backup_dir / f"{session_id}.pid"
+
+            if pid_file.exists():
+                pid_file.unlink()
+                self.logger.info(f"Removed PID file for session {session_id}")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to remove PID file for session {session_id}: {e}")
+            return False
+
+    def check_orphaned_sessions(self) -> List[str]:
+        """
+        Check for orphaned training sessions (PID files without running processes).
+
+        Returns:
+            List of orphaned session IDs
+        """
+        orphaned_sessions = []
+
+        try:
+            for pid_file in self.backup_dir.glob("*.pid"):
+                session_id = pid_file.stem
+
+                try:
+                    with open(pid_file, 'r') as f:
+                        pid = int(f.read().strip())
+
+                    # Check if process is still running
+                    try:
+                        os.kill(pid, 0)
+                    except OSError:
+                        # Process doesn't exist
+                        orphaned_sessions.append(session_id)
+                        self.logger.warning(f"Found orphaned session: {session_id} (PID {pid})")
+
+                except (ValueError, FileNotFoundError):
+                    # Invalid PID file
+                    orphaned_sessions.append(session_id)
+                    self.logger.warning(f"Found invalid PID file for session: {session_id}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to check for orphaned sessions: {e}")
+
+        return orphaned_sessions
+
+    async def cleanup_orphaned_sessions(self) -> int:
+        """
+        Cleanup orphaned training sessions.
+
+        Returns:
+            Number of sessions cleaned up
+        """
+        orphaned_sessions = self.check_orphaned_sessions()
+        cleaned_count = 0
+
+        for session_id in orphaned_sessions:
+            try:
+                # Remove PID file
+                self.remove_pid_file(session_id)
+
+                # Cleanup resources
+                await self.cleanup_resources(session_id)
+
+                cleaned_count += 1
+                self.logger.info(f"Cleaned up orphaned session: {session_id}")
+
+            except Exception as e:
+                self.logger.error(f"Failed to cleanup orphaned session {session_id}: {e}")
+
+        return cleaned_count
+
     async def export_session_results(
         self,
         session_id: str,

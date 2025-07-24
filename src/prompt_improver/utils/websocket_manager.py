@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 from uuid import uuid4
 
-import redis.asyncio as redis
+import coredis
 from fastapi import WebSocket, WebSocketDisconnect
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class ConnectionManager:
     """Manages WebSocket connections for real-time experiment analytics"""
 
-    def __init__(self, redis_client: redis.Redis | None = None):
+    def __init__(self, redis_client: coredis.Redis | None = None):
         # Active WebSocket connections by experiment_id
         self.experiment_connections: dict[str, set[WebSocket]] = defaultdict(set)
         # Connection metadata (user info, connection time, etc.)
@@ -165,35 +165,29 @@ class ConnectionManager:
     async def _redis_subscription_handler(self, experiment_id: str):
         """Handle Redis pub/sub messages for experiment updates"""
         try:
-            pubsub = self.redis_client.pubsub()
             channel_name = f"experiment:{experiment_id}:updates"
-            await pubsub.subscribe(channel_name)
+            
+            # Use coredis async context manager for proper cleanup
+            async with self.redis_client.pubsub(channels=[channel_name]) as pubsub:
+                logger.info(f"Started Redis subscription for experiment {experiment_id}")
 
-            logger.info(f"Started Redis subscription for experiment {experiment_id}")
-
-            async for message in pubsub.listen():
-                if message["type"] == "message":
-                    try:
-                        # Parse Redis message and broadcast to WebSocket connections
-                        data = json.loads(message["data"])
-                        await self.broadcast_to_experiment(experiment_id, data)
-                    except json.JSONDecodeError:
-                        logger.error(
-                            f"Invalid JSON in Redis message: {message['data']}"
-                        )
-                    except Exception as e:
-                        logger.error(f"Error processing Redis message: {e}")
+                async for message in pubsub:
+                    if message["type"] == "message":
+                        try:
+                            # Parse Redis message and broadcast to WebSocket connections
+                            data = json.loads(message["data"])
+                            await self.broadcast_to_experiment(experiment_id, data)
+                        except json.JSONDecodeError:
+                            logger.error(
+                                f"Invalid JSON in Redis message: {message['data']}"
+                            )
+                        except Exception as e:
+                            logger.error(f"Error processing Redis message: {e}")
 
         except Exception as e:
             logger.error(
                 f"Redis subscription error for experiment {experiment_id}: {e}"
             )
-        finally:
-            try:
-                await pubsub.unsubscribe()
-            except (ConnectionError, redis.RedisError, Exception) as e:
-                logger.warning(f"Failed to unsubscribe from Redis pubsub: {e}")
-                pass
 
     def get_connection_count(self, experiment_id: str = None) -> int:
         """Get number of active connections for experiment or total"""
@@ -237,10 +231,10 @@ connection_manager = ConnectionManager()
 
 async def setup_redis_connection(
     redis_url: str = "redis://localhost:6379",
-) -> redis.Redis:
+) -> coredis.Redis:
     """Setup Redis connection for WebSocket manager"""
     try:
-        redis_client = redis.from_url(redis_url, decode_responses=True)
+        redis_client = coredis.Redis.from_url(redis_url, decode_responses=True)
         await redis_client.ping()
 
         # Set Redis client on connection manager
@@ -253,7 +247,7 @@ async def setup_redis_connection(
         return None
 
 async def publish_experiment_update(
-    experiment_id: str, update_data: dict[str, Any], redis_client: redis.Redis = None
+    experiment_id: str, update_data: dict[str, Any], redis_client: coredis.Redis = None
 ):
     """Publish experiment update to Redis for real-time broadcasting"""
     if not redis_client and connection_manager.redis_client:

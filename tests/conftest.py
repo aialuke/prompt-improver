@@ -21,7 +21,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typer.testing import CliRunner
 from testcontainers.redis import RedisContainer
-import redis.asyncio as aioredis
+import coredis
 
 from prompt_improver.database.models import (
     ABExperiment,
@@ -506,7 +506,7 @@ async def redis_client(redis_container):
         redis_container: Session-scoped Redis container fixture
         
     Yields:
-        redis.asyncio.Redis: Async Redis client instance
+        coredis.Redis: Async Redis client instance
     """
     # Get Redis client from container
     sync_client = redis_container.get_client()
@@ -515,10 +515,10 @@ async def redis_client(redis_container):
     host = redis_container.get_container_host_ip()
     port = redis_container.get_exposed_port(6379)
     
-    client = aioredis.Redis(
+    client = coredis.Redis(
         host=host,
         port=port,
-        decode_responses=False
+        decode_responses=True
     )
     
     # Ensure clean state for each test
@@ -527,7 +527,7 @@ async def redis_client(redis_container):
     yield client
     
     # Cleanup connection
-    await client.close()
+    client.connection_pool.disconnect()
 
 # Temporary File Infrastructure
 @pytest.fixture(scope="function")
