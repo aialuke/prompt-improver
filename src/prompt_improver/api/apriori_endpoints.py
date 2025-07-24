@@ -33,7 +33,6 @@ apriori_router = APIRouter(
     prefix="/api/v1/apriori", tags=["apriori", "pattern-discovery"]
 )
 
-
 async def get_apriori_analyzer() -> AprioriAnalyzer:
     """Dependency to get AprioriAnalyzer instance with proper database configuration"""
     # Use secure database configuration from environment variables
@@ -47,7 +46,6 @@ async def get_apriori_analyzer() -> AprioriAnalyzer:
     db_manager = DatabaseManager(database_url)
     return AprioriAnalyzer(db_manager=db_manager)
 
-
 async def get_pattern_discovery() -> AdvancedPatternDiscovery:
     """Dependency to get AdvancedPatternDiscovery instance with proper database configuration"""
     # Use secure database configuration from environment variables
@@ -60,7 +58,6 @@ async def get_pattern_discovery() -> AdvancedPatternDiscovery:
 
     db_manager = DatabaseManager(database_url)
     return AdvancedPatternDiscovery(db_manager=db_manager)
-
 
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)
 async def run_apriori_analysis(
@@ -141,7 +138,6 @@ async def run_apriori_analysis(
             detail=f"Internal error during Apriori analysis: {e!s}",
         )
 
-
 @apriori_router.post("/discover-patterns", response_model=PatternDiscoveryResponse)
 async def comprehensive_pattern_discovery(
     request: PatternDiscoveryRequest,
@@ -212,7 +208,6 @@ async def comprehensive_pattern_discovery(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal error during pattern discovery: {e!s}",
         )
-
 
 @apriori_router.get("/rules", response_model=list[dict[str, Any]])
 async def get_association_rules(
@@ -286,7 +281,6 @@ async def get_association_rules(
             detail=f"Error retrieving association rules: {e!s}",
         )
 
-
 @apriori_router.post("/contextualized-patterns")
 async def get_contextualized_patterns(
     context_items: list[str],
@@ -334,7 +328,6 @@ async def get_contextualized_patterns(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error analyzing contextualized patterns: {e!s}",
         )
-
 
 @apriori_router.get("/discovery-runs", response_model=list[dict[str, Any]])
 async def get_discovery_runs(
@@ -394,7 +387,6 @@ async def get_discovery_runs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving discovery runs: {e!s}",
         )
-
 
 @apriori_router.get("/insights/{discovery_run_id}")
 async def get_discovery_insights(
@@ -484,9 +476,7 @@ async def get_discovery_insights(
             detail=f"Error retrieving insights: {e!s}",
         )
 
-
 # Helper functions for database operations
-
 
 async def _store_apriori_analysis_metadata(
     db_session: DBSession,
@@ -519,7 +509,6 @@ async def _store_apriori_analysis_metadata(
     except Exception as e:
         logger.error(f"Error storing Apriori analysis metadata: {e}")
         await db_session.rollback()
-
 
 async def _store_pattern_discovery_results(
     db_session: DBSession, discovery_run_id: str, results: dict[str, Any]

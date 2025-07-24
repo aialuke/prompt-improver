@@ -1,0 +1,303 @@
+# High Availability Docker Compose Configuration
+# Implements PostgreSQL streaming replication and Redis Sentinel for automatic failover
+# Following 2025 best practices for production-ready ML Pipeline Orchestrator
+
+version: '3.8'
+
+services:
+  # PostgreSQL Primary Database
+  postgres-primary:
+    image: postgres:15
+    container_name: apes_postgres_primary
+    environment:
+      POSTGRES_DB: apes_production
+      POSTGRES_USER: apes_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-please_set_secure_password}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replication_password}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql
+      - ./database/ha/setup-replication.sql:/docker-entrypoint-initdb.d/03-setup-replication.sql
+    command: |
+      postgres 
+      -c wal_level=replica 
+      -c max_wal_senders=3 
+      -c max_replication_slots=3 
+      -c hot_standby=on
+      -c archive_mode=on
+      -c archive_command='test ! -f /var/lib/postgresql/archive/%f && cp %p /var/lib/postgresql/archive/%f'
+      -c listen_addresses='*'
+      -c shared_preload_libraries='pg_stat_statements'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apes_user -d apes_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=postgres"
+      - "apes.role=primary"
+
+  # PostgreSQL Replica Database
+  postgres-replica:
+    image: postgres:15
+    container_name: apes_postgres_replica
+    environment:
+      POSTGRES_USER: apes_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-please_set_secure_password}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replication_password}
+      POSTGRES_PRIMARY_HOST: postgres-primary
+      POSTGRES_PRIMARY_PORT: 5432
+      PGUSER: replicator
+    ports:
+      - "5433:5432"  # Different port for replica
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./database/ha/setup-replica.sh:/docker-entrypoint-initdb.d/setup-replica.sh
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    command: |
+      bash -c "
+      echo 'Waiting for primary to be ready...'
+      until pg_isready -h postgres-primary -p 5432 -U replicator; do
+        echo 'Primary not ready, waiting...'
+        sleep 2
+      done
+      
+      echo 'Setting up replica...'
+      rm -rf /var/lib/postgresql/data/*
+      
+      pg_basebackup \
+        --pgdata=/var/lib/postgresql/data \
+        --format=p \
+        --write-recovery-conf \
+        --checkpoint=fast \
+        --label=replica_backup \
+        --host=postgres-primary \
+        --port=5432 \
+        --username=replicator \
+        --verbose \
+        --progress \
+        --wal-method=stream
+      
+      echo 'standby_mode = on' >> /var/lib/postgresql/data/postgresql.conf
+      echo 'hot_standby = on' >> /var/lib/postgresql/data/postgresql.conf
+      echo 'max_standby_streaming_delay = 30s' >> /var/lib/postgresql/data/postgresql.conf
+      
+      chmod 0700 /var/lib/postgresql/data
+      
+      echo 'Starting replica...'
+      postgres
+      "
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apes_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=postgres"
+      - "apes.role=replica"
+
+  # Redis Master
+  redis-master:
+    image: redis:7-alpine
+    container_name: apes_redis_master
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_master_data:/data
+      - ./database/ha/redis-master.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=redis"
+      - "apes.role=master"
+
+  # Redis Replica
+  redis-replica:
+    image: redis:7-alpine
+    container_name: apes_redis_replica
+    ports:
+      - "6380:6379"  # Different port for replica
+    volumes:
+      - redis_replica_data:/data
+      - ./database/ha/redis-replica.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=redis"
+      - "apes.role=replica"
+
+  # Redis Sentinel 1
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: apes_redis_sentinel_1
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./database/ha/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=redis-sentinel"
+      - "apes.instance=1"
+
+  # Redis Sentinel 2
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: apes_redis_sentinel_2
+    ports:
+      - "26380:26379"
+    volumes:
+      - ./database/ha/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=redis-sentinel"
+      - "apes.instance=2"
+
+  # Redis Sentinel 3
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: apes_redis_sentinel_3
+    ports:
+      - "26381:26379"
+    volumes:
+      - ./database/ha/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=redis-sentinel"
+      - "apes.instance=3"
+
+  # HAProxy Load Balancer for PostgreSQL
+  postgres-lb:
+    image: haproxy:2.8-alpine
+    container_name: apes_postgres_lb
+    ports:
+      - "5434:5432"  # Load balancer port
+    volumes:
+      - ./database/ha/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - postgres-primary
+      - postgres-replica
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=load-balancer"
+      - "apes.type=postgres"
+
+  # Health Monitor Service
+  health-monitor:
+    build:
+      context: .
+      dockerfile: ./database/ha/Dockerfile.health-monitor
+    container_name: apes_health_monitor
+    environment:
+      - POSTGRES_PRIMARY_HOST=postgres-primary
+      - POSTGRES_REPLICA_HOST=postgres-replica
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_REPLICA_HOST=redis-replica
+      - SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+    volumes:
+      - ./database/ha/health-monitor.py:/app/health-monitor.py
+    depends_on:
+      - postgres-primary
+      - postgres-replica
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+    networks:
+      - apes_ha_network
+    labels:
+      - "apes.service=health-monitor"
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: apes_pgadmin_ha
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@apes.local
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-please_set_secure_password}
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres-lb
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    profiles:
+      - admin
+    restart: unless-stopped
+    networks:
+      - apes_ha_network
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  redis_master_data:
+    driver: local
+  redis_replica_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  apes_ha_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

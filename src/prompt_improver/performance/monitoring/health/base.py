@@ -9,14 +9,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-
 class HealthStatus(Enum):
     """Health check status levels"""
 
     HEALTHY = "healthy"
     WARNING = "warning"
     FAILED = "failed"
-
 
 @dataclass
 class HealthResult:
@@ -33,7 +31,6 @@ class HealthResult:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now()
-
 
 @dataclass
 class AggregatedHealthResult:
@@ -58,7 +55,6 @@ class AggregatedHealthResult:
                 for name, result in self.checks.items()
                 if result.status == HealthStatus.WARNING
             ]
-
 
 class HealthChecker(ABC):
     """Base interface for health check components"""

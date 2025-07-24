@@ -79,11 +79,10 @@ SUCCESS_CRITERIA_PATTERNS = [
     "Requirements:",
 ]
 
-
 class ClarityRule(BasePromptRule):
     """Enhanced clarity rule using research-validated patterns from Anthropic and OpenAI.
 
-    Features:
+    features:
     - XML structure enhancement (Anthropic patterns)
     - Specificity enhancement (OpenAI patterns)
     - Success criteria addition (AWS guidelines)

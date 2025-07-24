@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 from ..event_types import EventType, MLEvent
 
-
 class OptimizationEventHandler:
     """
     Handles optimization-related events in the ML pipeline orchestration.

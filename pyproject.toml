@@ -55,6 +55,10 @@ dev = [
   "httpx>=0.25.0", # For test client
 ]
 
+[project.scripts]
+# Ultra-minimal 3-command CLI entry point
+apes = "prompt_improver.cli.clean_cli:app"
+
 [tool.mypy]
 # 2025 Best Practices: Strict mypy configuration
 python_version = "3.11"
@@ -123,7 +127,7 @@ exclude = [
     ".mypy_cache", ".nox", ".pants.d", ".ruff_cache",
     ".svn", ".tox", ".venv", "__pypackages__",
     "_build", "buck-out", "build", "dist", "node_modules", "venv",
-    
+
     # ML-specific exclusions
     "ml",                    # Legacy ML directory
     "mlruns",               # MLflow experiments (archived)
@@ -131,7 +135,7 @@ exclude = [
     "*.egg-info",           # Package metadata
     "**/__pycache__",       # Python cache
     "**/.*_cache",          # Various cache directories
-    
+
     # Archive exclusions
     ".archive",              # Archived files
     "tests/deprecated",      # Deprecated tests (temporary)
@@ -145,10 +149,10 @@ preview = true
 select = [
     # Core Python best practices
     "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings  
+    "W",      # pycodestyle warnings
     "F",      # Pyflakes
     "I",      # isort
-    
+
     # Code quality & maintainability
     "C4",     # flake8-comprehensions
     "B",      # flake8-bugbear
@@ -159,38 +163,38 @@ select = [
     "UP",     # pyupgrade
     "SIM",    # flake8-simplify
     "RUF",    # Ruff-specific rules
-    
+
     # Security & performance
     "S",      # bandit
     "PERF",   # perflint
-    
+
     # Async patterns
     "ASYNC",  # flake8-async
-    
+
     # Documentation & type hints
     "D",      # pydocstyle
     "ANN",    # flake8-annotations
-    
+
     # Import organization
     "TCH",    # flake8-type-checking
     "TID",    # flake8-tidy-imports
-    
+
     # Error handling
     "BLE",    # flake8-blind-except
     "FBT",    # flake8-boolean-trap
     "RET",    # flake8-return
-    
+
     # Code complexity
     "C90",    # mccabe
     "PLR",    # pylint refactor
     "PLW",    # pylint warnings
     "PLE",    # pylint errors
-    
+
     # Unused code detection
     "F401",   # unused-import
     "F841",   # unused-variable
     "ARG",    # flake8-unused-arguments
-    
+
     # Additional modern practices
     "PTH",    # flake8-use-pathlib
     "TD",     # flake8-todos
@@ -201,33 +205,33 @@ select = [
 ignore = [
     # Line length handled by formatter
     "E501",   # line-too-long
-    
+
     # ML experiment patterns
     "T201",   # print-found (needed for ML debugging)
     "S101",   # assert-used (common in ML validation)
     "PLR0913", # too-many-arguments (ML models often have many params)
     "PLR0915", # too-many-statements (ML pipelines can be complex)
-    
+
     # Legacy patterns (no longer needed)
     "B008",   # do-not-use-function-calls-in-argument-defaults (legacy - no longer needed)
-    
+
     # Documentation (gradual adoption)
     "D100",   # undocumented-public-module
     "D103",   # undocumented-public-function
     "D104",   # undocumented-public-package
-    
+
     # Type annotations (gradual adoption)
     "ANN001", # missing-type-annotation-for-function-argument
     "ANN002", # missing-type-annotation-for-args
     "ANN003", # missing-type-annotation-for-kwargs
     "ANN201", # missing-return-type-annotation
-    
+
     # Async patterns
     "ASYNC109", # async-function-with-timeout (false positives)
-    
+
     # Performance (carefully considered)
     "PERF203", # try-except-in-loop (sometimes necessary in ML)
-    
+
     # TODO/FIXME patterns (transitional)
     "TD002",   # missing-todo-author (gradual adoption)
     "TD003",   # missing-todo-link (gradual adoption)
@@ -361,7 +365,7 @@ addopts = [
     "--import-mode=importlib",
     # Temporarily disable coverage to focus on test functionality
     # "--cov=src",
-    # "--cov-branch", 
+    # "--cov-branch",
     # "--cov-report=term-missing:skip-covered",
     # "--cov-report=html:htmlcov",
     # "--cov-fail-under=85",
@@ -384,7 +388,7 @@ asyncio_default_test_loop_scope = "function"
 # Enhanced test categorization with reorganized structure
 markers = [
     "asyncio: marks tests as async",
-    "integration: marks tests as integration tests requiring real components", 
+    "integration: marks tests as integration tests requiring real components",
     "slow: marks tests as slow-running (>1 second)",
     "performance: marks tests that validate performance requirements",
     "unit: marks tests as pure unit tests with maximum isolation",
@@ -420,4 +424,4 @@ filterwarnings = [
 # Test discovery patterns
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
-python_functions = ["test_*"] 
+python_functions = ["test_*"]

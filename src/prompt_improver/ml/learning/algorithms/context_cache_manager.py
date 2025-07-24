@@ -11,7 +11,6 @@ from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
 
-
 class ContextCacheManager:
     """Modern cache manager with TTL support and observability."""
     

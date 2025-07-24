@@ -43,7 +43,6 @@ real_time_router = APIRouter(
     prefix="/api/v1/experiments/real-time", tags=["real-time-analytics"]
 )
 
-
 @real_time_router.websocket("/live/{experiment_id}")
 async def websocket_experiment_endpoint(
     websocket: WebSocket, experiment_id: str, user_id: str | None = None
@@ -99,7 +98,6 @@ async def websocket_experiment_endpoint(
     finally:
         # Clean up connection
         await connection_manager.disconnect(websocket)
-
 
 async def handle_websocket_message(
     websocket: WebSocket, experiment_id: str, message: dict[str, Any]
@@ -159,7 +157,6 @@ async def handle_websocket_message(
         await connection_manager.send_to_connection(
             websocket, {"type": "error", "message": "Failed to process message"}
         )
-
 
 @real_time_router.get("/experiments/{experiment_id}/metrics")
 async def get_experiment_metrics(
@@ -232,7 +229,6 @@ async def get_experiment_metrics(
             detail="Failed to retrieve experiment metrics",
         )
 
-
 @real_time_router.post("/experiments/{experiment_id}/monitoring/start")
 async def start_monitoring(
     experiment_id: str, db_session: DBSession, update_interval: int = 30
@@ -274,7 +270,6 @@ async def start_monitoring(
             detail="Failed to start experiment monitoring",
         )
 
-
 @real_time_router.post("/experiments/{experiment_id}/monitoring/stop")
 async def stop_monitoring(experiment_id: str, db_session: DBSession) -> JSONResponse:
     """Stop real-time monitoring for an experiment
@@ -302,7 +297,6 @@ async def stop_monitoring(experiment_id: str, db_session: DBSession) -> JSONResp
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to stop experiment monitoring",
         )
-
 
 @real_time_router.get("/monitoring/active")
 async def get_active_monitoring(db_session: DBSession) -> JSONResponse:
@@ -340,7 +334,6 @@ async def get_active_monitoring(db_session: DBSession) -> JSONResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve active monitoring information",
         )
-
 
 @real_time_router.get("/dashboard/config/{experiment_id}")
 async def get_dashboard_config(
@@ -411,7 +404,6 @@ async def get_dashboard_config(
             detail="Failed to retrieve dashboard configuration",
         )
 
-
 @real_time_router.get("/health")
 async def health_check() -> JSONResponse:
     """Health check endpoint for real-time services"""
@@ -454,7 +446,6 @@ async def health_check() -> JSONResponse:
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
-
 
 # ML Pipeline Orchestrator Integration (Phase 6)
 @real_time_router.get("/orchestrator/status")
@@ -513,7 +504,6 @@ async def get_orchestrator_status() -> JSONResponse:
             }
         )
 
-
 @real_time_router.get("/orchestrator/components")
 async def get_orchestrator_components() -> JSONResponse:
     """Get loaded ML components information."""
@@ -560,7 +550,6 @@ async def get_orchestrator_components() -> JSONResponse:
                 "message": str(e)
             }
         )
-
 
 @real_time_router.get("/orchestrator/history")
 async def get_orchestrator_history(
@@ -613,7 +602,6 @@ async def get_orchestrator_history(
             }
         )
 
-
 # Startup and shutdown events for the real-time system
 async def setup_real_time_system(redis_url: str = "redis://localhost:6379"):
     """Setup real-time system with Redis connection"""
@@ -628,7 +616,6 @@ async def setup_real_time_system(redis_url: str = "redis://localhost:6379"):
     except Exception as e:
         logger.error(f"Failed to setup real-time system: {e}")
 
-
 async def cleanup_real_time_system():
     """Cleanup real-time system resources"""
     try:
@@ -636,7 +623,6 @@ async def cleanup_real_time_system():
         logger.info("Real-time system cleanup completed")
     except Exception as e:
         logger.error(f"Error during real-time system cleanup: {e}")
-
 
 # Export the router
 __all__ = ["cleanup_real_time_system", "real_time_router", "setup_real_time_system"]

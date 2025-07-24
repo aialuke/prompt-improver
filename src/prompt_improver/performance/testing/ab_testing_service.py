@@ -28,33 +28,29 @@ from ...utils.error_handlers import handle_database_errors
 
 logger = logging.getLogger(__name__)
 
-
 class TestStatus(Enum):
     """Modern test execution status with 2025 enhancements"""
-    PENDING = "pending"
+    pending = "pending"
     WARMING_UP = "warming_up"  # Initial sample collection phase
-    RUNNING = "running"
+    running = "running"
     EARLY_STOPPED = "early_stopped"  # Stopped by statistical criteria
     COMPLETED = "completed"
     FAILED = "failed"
-    CANCELLED = "cancelled"
-
+    cancelled = "cancelled"
 
 class StatisticalMethod(Enum):
     """Statistical approaches for significance testing"""
-    FREQUENTIST = "frequentist"
-    BAYESIAN = "bayesian"
-    HYBRID = "hybrid"  # 2025 recommended approach
-
+    frequentist = "frequentist"
+    bayesian = "bayesian"
+    hybrid = "hybrid"  # 2025 recommended approach
 
 class StoppingReason(Enum):
     """Reasons for early stopping"""
     STATISTICAL_SIGNIFICANCE = "statistical_significance"
-    FUTILITY = "futility"
+    futility = "futility"
     PRACTICAL_EQUIVALENCE = "practical_equivalence"
     SAMPLE_SIZE_REACHED = "sample_size_reached"
     TIME_LIMIT = "time_limit"
-
 
 @dataclass
 class ModernABConfig:
@@ -72,7 +68,7 @@ class ModernABConfig:
     maximum_duration_days: int = 30
 
     # Advanced statistical options
-    statistical_method: StatisticalMethod = StatisticalMethod.HYBRID
+    statistical_method: StatisticalMethod = StatisticalMethod.hybrid
     enable_early_stopping: bool = True
     enable_sequential_testing: bool = True
     alpha_spending_function: str = "obrien_fleming"  # O'Brien-Fleming boundaries
@@ -80,7 +76,6 @@ class ModernABConfig:
     # Multiple testing correction
     multiple_testing_correction: str = "bonferroni"  # or "benjamini_hochberg"
     family_wise_error_rate: float = 0.05
-
 
 @dataclass
 class StatisticalResult:
@@ -120,7 +115,6 @@ class StatisticalResult:
     should_stop_early: bool = False
     stopping_reason: Optional[StoppingReason] = None
 
-
 @dataclass
 class ExperimentMetrics:
     """Advanced experiment tracking metrics"""
@@ -144,12 +138,11 @@ class ExperimentMetrics:
     sample_ratio_mismatch: float = 0.0  # SRM detection
     statistical_warnings: List[str] = field(default_factory=list)
 
-
 class ModernABTestingService:
     """
     Advanced A/B Testing Service incorporating 2025 best practices
 
-    Features:
+    features:
     - Hybrid Bayesian-Frequentist statistics for optimal accuracy
     - Sequential testing with O'Brien-Fleming boundaries
     - Bootstrap confidence intervals and effect size measurement
@@ -278,12 +271,12 @@ class ModernABTestingService:
         treatment_rate = treatment_conversions / treatment_visitors if treatment_visitors > 0 else 0
 
         # Perform statistical analysis based on configured method
-        if self.config.statistical_method == StatisticalMethod.HYBRID:
+        if self.config.statistical_method == StatisticalMethod.hybrid:
             result = await self._hybrid_statistical_analysis(
                 control_conversions, control_visitors,
                 treatment_conversions, treatment_visitors
             )
-        elif self.config.statistical_method == StatisticalMethod.BAYESIAN:
+        elif self.config.statistical_method == StatisticalMethod.bayesian:
             result = await self._bayesian_analysis(
                 control_conversions, control_visitors,
                 treatment_conversions, treatment_visitors
@@ -502,7 +495,7 @@ class ModernABTestingService:
         # Futility analysis
         if self._check_futility(result):
             result.should_stop_early = True
-            result.stopping_reason = StoppingReason.FUTILITY
+            result.stopping_reason = StoppingReason.futility
 
         # Practical equivalence
         if self._check_practical_equivalence(result):
@@ -835,7 +828,6 @@ class ModernABTestingService:
         boundary_factor = np.sqrt(4.0 / look_number)  # Simplified
         return base_alpha / boundary_factor
 
-
     async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Orchestrator-compatible interface for A/B testing (2025 pattern)
@@ -884,7 +876,7 @@ class ModernABTestingService:
                         "early_stopping_enabled": enable_early_stopping,
                         "minimum_detectable_effect": self.config.minimum_detectable_effect,
                         "statistical_power": self.config.statistical_power,
-                        "hybrid_analysis": self.config.statistical_method == StatisticalMethod.HYBRID,
+                        "hybrid_analysis": self.config.statistical_method == StatisticalMethod.hybrid,
                         "sequential_testing": self.config.enable_sequential_testing,
                         "alpha_spending": self.config.alpha_spending_function
                     },
@@ -998,12 +990,12 @@ class ModernABTestingService:
         """Perform statistical analysis on synthetic data"""
 
         # Use the existing statistical analysis methods
-        if self.config.statistical_method == StatisticalMethod.HYBRID:
+        if self.config.statistical_method == StatisticalMethod.hybrid:
             return await self._hybrid_statistical_analysis(
                 control_conversions, control_visitors,
                 treatment_conversions, treatment_visitors
             )
-        elif self.config.statistical_method == StatisticalMethod.BAYESIAN:
+        elif self.config.statistical_method == StatisticalMethod.bayesian:
             return await self._bayesian_analysis(
                 control_conversions, control_visitors,
                 treatment_conversions, treatment_visitors
@@ -1054,7 +1046,6 @@ class ModernABTestingService:
             }
         }
 
-
 # Factory function for creating the service
 def create_ab_testing_service(config: Optional[ModernABConfig] = None) -> ModernABTestingService:
     """Create an A/B testing service with optimal 2025 configuration"""
@@ -1066,13 +1057,13 @@ def create_ab_testing_service(config: Optional[ModernABConfig] = None) -> Modern
             statistical_power=0.80,
             minimum_detectable_effect=0.05,
             practical_significance_threshold=0.02,
-            statistical_method=StatisticalMethod.HYBRID,
+            statistical_method=StatisticalMethod.hybrid,
             enable_early_stopping=True,
             enable_sequential_testing=True
         )
 
     return ModernABTestingService(config)
 
-
-# Convenience alias for backward compatibility
+# Convenience aliases for backward compatibility
 ABTestingService = ModernABTestingService
+ab_testing_service = ModernABTestingService

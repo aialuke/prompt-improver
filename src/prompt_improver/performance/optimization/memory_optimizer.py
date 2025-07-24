@@ -16,7 +16,6 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class MemoryStats:
     """Memory usage statistics"""
@@ -30,7 +29,6 @@ class MemoryStats:
     indexed_experiments: int
     cached_windows: int
     active_tasks: int
-
 
 class MemoryOptimizedBuffer:
     """Memory-optimized buffer with automatic cleanup"""
@@ -69,7 +67,6 @@ class MemoryOptimizedBuffer:
     def __iter__(self):
         with self._lock:
             return iter(list(self.buffer))
-
 
 class MemoryOptimizedAnalyticsService:
     """Memory-optimized analytics service with efficient data structures"""
@@ -135,7 +132,7 @@ class MemoryOptimizedAnalyticsService:
     async def _check_memory_usage(self):
         """Check current memory usage and trigger cleanup if needed"""
         try:
-            process = psutil.Process()
+            process = psutil.process()
             memory_mb = process.memory_info().rss / 1024 / 1024
 
             # Update peak memory
@@ -155,7 +152,7 @@ class MemoryOptimizedAnalyticsService:
         """Comprehensive memory cleanup with metrics"""
         try:
             # Get memory usage before cleanup
-            process = psutil.Process()
+            process = psutil.process()
             memory_before_mb = process.memory_info().rss / 1024 / 1024
 
             cleanup_actions = 0
@@ -216,7 +213,7 @@ class MemoryOptimizedAnalyticsService:
         """Background memory monitoring loop"""
         while self._monitoring_active:
             try:
-                process = psutil.Process()
+                process = psutil.process()
                 memory_mb = process.memory_info().rss / 1024 / 1024
 
                 # Update peak memory
@@ -270,7 +267,7 @@ class MemoryOptimizedAnalyticsService:
     def get_memory_stats(self) -> MemoryStats:
         """Get current memory usage statistics"""
         try:
-            process = psutil.Process()
+            process = psutil.process()
             current_memory_mb = process.memory_info().rss / 1024 / 1024
 
             return MemoryStats(
@@ -356,10 +353,8 @@ class MemoryOptimizedAnalyticsService:
         self._sync_memory_cleanup()
         logger.info("Memory optimization service shut down")
 
-
 # Global memory optimizer instance
 _memory_optimizer: Optional[MemoryOptimizedAnalyticsService] = None
-
 
 def get_memory_optimizer(
     memory_threshold_mb: int = 500,
@@ -375,7 +370,6 @@ def get_memory_optimizer(
         )
 
     return _memory_optimizer
-
 
 def shutdown_memory_optimizer():
     """Shutdown the global memory optimizer"""

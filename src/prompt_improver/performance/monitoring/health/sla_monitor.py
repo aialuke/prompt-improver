@@ -15,13 +15,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class SLAStatus(Enum):
     """SLA compliance status"""
     MEETING = "meeting"      # Meeting all SLA targets
     AT_RISK = "at_risk"      # Close to breaching SLA
     BREACHING = "breaching"  # Currently breaching SLA
-
 
 @dataclass
 class SLATarget:
@@ -39,7 +37,6 @@ class SLATarget:
     # Alert configuration
     alert_on_breach: bool = True
     alert_cooldown_seconds: int = 300  # Don't re-alert for 5 minutes
-
 
 @dataclass
 class SLAConfiguration:
@@ -60,7 +57,6 @@ class SLAConfiguration:
 
     # Custom SLA targets
     custom_targets: List[SLATarget] = field(default_factory=list)
-
 
 class SLAMeasurement:
     """Tracks measurements for a specific SLA target"""
@@ -83,10 +79,10 @@ class SLAMeasurement:
         current_time = time.time()
         window_start = current_time - self.target.measurement_window_seconds
 
-        # Filter measurements within window
+        # Filter measurements within window with strict time bounds
         recent_values = [
             value for timestamp, value in self.measurements
-            if timestamp >= window_start
+            if window_start <= timestamp <= current_time
         ]
 
         if not recent_values:
@@ -99,17 +95,13 @@ class SLAMeasurement:
             return statistics.median(recent_values)
         elif "p95" in self.target.name:
             sorted_values = sorted(recent_values)
-            index = int(len(sorted_values) * 0.95)
-            # Handle edge case for 100th percentile
-            if index >= len(sorted_values):
-                index = len(sorted_values) - 1
+            # Use proper percentile calculation (0-based indexing)
+            index = max(0, min(len(sorted_values) - 1, int(len(sorted_values) * 0.95)))
             return sorted_values[index]
         elif "p99" in self.target.name:
             sorted_values = sorted(recent_values)
-            index = int(len(sorted_values) * 0.99)
-            # Handle edge case for 100th percentile
-            if index >= len(sorted_values):
-                index = len(sorted_values) - 1
+            # Use proper percentile calculation (0-based indexing)
+            index = max(0, min(len(sorted_values) - 1, int(len(sorted_values) * 0.99)))
             return sorted_values[index]
         else:
             return statistics.mean(recent_values)
@@ -120,12 +112,15 @@ class SLAMeasurement:
         if current_value is None:
             return SLAStatus.MEETING  # No data = assume meeting
 
-        # For availability and success rates, higher values are better
-        # For response times and error rates, lower values are better
+        # For availability, success rates, throughput, hit rates: higher values are better
+        # For response times, error rates, queue depth, latency: lower values are better
         is_higher_better = (
             "availability" in self.target.name.lower() or
             "success" in self.target.name.lower() or
-            "uptime" in self.target.name.lower()
+            "uptime" in self.target.name.lower() or
+            "throughput" in self.target.name.lower() or
+            "hit_rate" in self.target.name.lower() or
+            "accuracy" in self.target.name.lower()
         )
 
         if is_higher_better:
@@ -138,10 +133,10 @@ class SLAMeasurement:
                 return SLAStatus.MEETING
         else:
             # For response time/error rate: current should be <= target
-            ratio = current_value / self.target.target_value
-            if ratio >= self.target.critical_threshold:
+            # Lower values are better, so we compare against target directly
+            if current_value >= self.target.target_value * self.target.critical_threshold:
                 return SLAStatus.BREACHING
-            elif ratio >= self.target.warning_threshold:
+            elif current_value >= self.target.target_value * self.target.warning_threshold:
                 return SLAStatus.AT_RISK
             else:
                 return SLAStatus.MEETING
@@ -161,7 +156,6 @@ class SLAMeasurement:
                 return False
 
         return True
-
 
 class SLAMonitor:
     """
@@ -372,10 +366,8 @@ class SLAMonitor:
 
         return metrics
 
-
 # Global SLA monitor registry
 sla_monitors: Dict[str, SLAMonitor] = {}
-
 
 def get_or_create_sla_monitor(
     service_name: str,

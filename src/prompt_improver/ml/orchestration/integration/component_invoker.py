@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 
 from .direct_component_loader import DirectComponentLoader, LoadedComponent
 
-
 @dataclass
 class InvocationResult:
     """Result of a component method invocation."""
@@ -28,7 +27,6 @@ class InvocationResult:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now(timezone.utc)
-
 
 class ComponentInvoker:
     """

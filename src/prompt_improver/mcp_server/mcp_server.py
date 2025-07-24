@@ -75,7 +75,6 @@ batch_processor = BatchProcessor(BatchProcessorConfig(
     enable_opentelemetry=True
 ))
 
-
 # Register periodic batch processing task as background task
 # This will be registered once the event loop is running
 async def register_periodic_batch_processor():
@@ -93,7 +92,6 @@ async def register_periodic_batch_processor():
         # Fallback: create the task directly
         asyncio.create_task(periodic_batch_processor_coroutine(batch_processor))
 
-
 # Schedule the registration to run when the event loop is available
 if hasattr(asyncio, "get_running_loop"):
     try:
@@ -110,7 +108,6 @@ session_store = SessionStore(
     cleanup_interval=300,  # Cleanup every 5 minutes
 )
 
-
 class PromptEnhancementRequest(BaseModel):
     """Request model for prompt enhancement"""
 
@@ -120,7 +117,6 @@ class PromptEnhancementRequest(BaseModel):
     )
     session_id: str | None = Field(default=None, description="Session ID for tracking")
 
-
 class PromptStorageRequest(BaseModel):
     """Request model for storing prompt data"""
 
@@ -128,7 +124,6 @@ class PromptStorageRequest(BaseModel):
     enhanced: str = Field(..., description="The enhanced prompt")
     metrics: dict[str, Any] = Field(..., description="Success metrics")
     session_id: str | None = Field(default=None, description="Session ID for tracking")
-
 
 @mcp.tool()
 async def improve_prompt(
@@ -230,7 +225,6 @@ async def improve_prompt(
                 "fallback": True,
             }
 
-
 @mcp.tool()
 async def store_prompt(
     original: str = Field(..., description="The original prompt"),
@@ -272,7 +266,6 @@ async def store_prompt(
     except Exception as e:
         return {"status": "error", "error": str(e), "priority": 0}
 
-
 @mcp.tool()
 async def get_session(
     session_id: str = Field(..., description="Session ID to retrieve"),
@@ -301,7 +294,6 @@ async def get_session(
         }
     except Exception as e:
         return {"status": "error", "error": str(e), "session_id": session_id}
-
 
 @mcp.tool()
 async def set_session(
@@ -334,7 +326,6 @@ async def set_session(
     except Exception as e:
         return {"status": "error", "error": str(e), "session_id": session_id}
 
-
 @mcp.tool()
 async def touch_session(
     session_id: str = Field(..., description="Session ID to touch"),
@@ -364,7 +355,6 @@ async def touch_session(
     except Exception as e:
         return {"status": "error", "error": str(e), "session_id": session_id}
 
-
 @mcp.tool()
 async def delete_session(
     session_id: str = Field(..., description="Session ID to delete"),
@@ -392,7 +382,6 @@ async def delete_session(
         }
     except Exception as e:
         return {"status": "error", "error": str(e), "session_id": session_id}
-
 
 @mcp.resource("apes://rule_status")
 async def get_rule_status() -> dict[str, Any]:
@@ -434,7 +423,6 @@ async def get_rule_status() -> dict[str, Any]:
     except Exception as e:
         return {"status": "error", "error": str(e), "active_rules": 0}
 
-
 @mcp.resource("apes://session_store/status")
 async def get_session_store_status() -> dict[str, Any]:
     """Get session store statistics and status.
@@ -451,7 +439,6 @@ async def get_session_store_status() -> dict[str, Any]:
         }
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
 
 @mcp.resource("apes://health/live")
 async def health_live() -> dict[str, Any]:
@@ -479,7 +466,6 @@ async def health_live() -> dict[str, Any]:
         }
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
 
 @mcp.resource("apes://health/ready")
 async def health_ready() -> dict[str, Any]:
@@ -518,7 +504,6 @@ async def health_ready() -> dict[str, Any]:
         }
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
 
 @mcp.resource("apes://health/queue")
 async def health_queue() -> dict[str, Any]:
@@ -591,7 +576,6 @@ async def health_queue() -> dict[str, Any]:
             "avg_latency_ms": 0.0,
         }
 
-
 async def _store_prompt_data(
     original: str,
     enhanced: str,
@@ -618,12 +602,10 @@ async def _store_prompt_data(
         # Log error but don't raise - this is async background task
         logger.error(f"Error enqueueing prompt data: {e}")
 
-
 # Helper function to check batch processor queue sizes
 async def get_training_queue_size(batch_processor: BatchProcessor) -> int:
     """Get the size of the training queue."""
     return batch_processor.get_queue_size()
-
 
 # Startup initialization
 async def initialize_event_loop_optimization():
@@ -661,7 +643,6 @@ async def initialize_event_loop_optimization():
         logger.error(f"Event loop initialization failed: {e}")
         return None
 
-
 # Add new MCP tool for event loop benchmarking
 @mcp.tool()
 async def benchmark_event_loop(
@@ -692,7 +673,6 @@ async def benchmark_event_loop(
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
 
 # Add new MCP resource for event loop status
 @mcp.resource("apes://event_loop/status")
@@ -728,7 +708,6 @@ async def get_event_loop_status() -> dict[str, Any]:
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
 
 @mcp.tool()
 async def run_performance_benchmark(
@@ -807,7 +786,6 @@ async def run_performance_benchmark(
             "status": "failed"
         }
 
-
 @mcp.tool()
 async def get_performance_status() -> dict[str, Any]:
     """Get current performance status and optimization metrics.
@@ -847,7 +825,6 @@ async def get_performance_status() -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to get performance status: {e}")
         return {"error": str(e), "timestamp": time.time()}
-
 
 # ML Pipeline Orchestrator Tools (Phase 6)
 @mcp.tool()
@@ -893,7 +870,6 @@ async def get_orchestrator_status() -> dict[str, Any]:
         logger.error(f"Failed to get orchestrator status: {e}")
         return {"error": str(e), "timestamp": time.time()}
 
-
 @mcp.tool()
 async def initialize_orchestrator() -> dict[str, Any]:
     """Initialize the ML Pipeline Orchestrator and load all components.
@@ -929,7 +905,6 @@ async def initialize_orchestrator() -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
-
 
 @mcp.tool()
 async def run_ml_training_workflow(training_data: str = "sample training data") -> dict[str, Any]:
@@ -978,7 +953,6 @@ async def run_ml_training_workflow(training_data: str = "sample training data") 
         logger.error(f"Training workflow failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
 
-
 @mcp.tool()
 async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation data") -> dict[str, Any]:
     """Run a complete ML evaluation workflow using the orchestrator.
@@ -1019,7 +993,6 @@ async def run_ml_evaluation_workflow(evaluation_data: str = "sample evaluation d
     except Exception as e:
         logger.error(f"Evaluation workflow failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
-
 
 @mcp.tool()
 async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -> dict[str, Any]:
@@ -1084,7 +1057,6 @@ async def invoke_ml_component(component_name: str, method_name: str, **kwargs) -
     except Exception as e:
         logger.error(f"Component invocation failed: {e}")
         return {"error": str(e), "timestamp": time.time(), "success": False}
-
 
 # Main entry point for stdio transport
 if __name__ == "__main__":

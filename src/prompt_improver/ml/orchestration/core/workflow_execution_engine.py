@@ -16,7 +16,6 @@ from ..config.orchestrator_config import OrchestratorConfig
 from ..events.event_types import EventType, MLEvent
 from .workflow_types import WorkflowStep, WorkflowDefinition, WorkflowStepStatus
 
-
 class WorkflowExecutor:
     """Executes individual workflows."""
     
@@ -332,7 +331,6 @@ class WorkflowExecutor:
         for step in self.definition.steps:
             graph[step.step_id] = step.dependencies.copy()
         return graph
-
 
 class WorkflowExecutionEngine:
     """

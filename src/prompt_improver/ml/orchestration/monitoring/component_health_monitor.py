@@ -14,15 +14,13 @@ from enum import Enum
 from ..events.event_types import EventType, MLEvent
 from ..connectors.component_connector import ComponentStatus
 
-
 class ComponentHealthStatus(Enum):
     """Component health status levels."""
     HEALTHY = "healthy"
     WARNING = "warning"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
-    DISCONNECTED = "disconnected"
-
+    disconnected = "disconnected"
 
 @dataclass
 class ComponentHealthCheck:
@@ -33,7 +31,6 @@ class ComponentHealthCheck:
     error_message: Optional[str]
     details: Dict[str, Any]
     timestamp: datetime
-
 
 class ComponentHealthMonitor:
     """
@@ -159,7 +156,7 @@ class ComponentHealthMonitor:
             # Remove components that are no longer registered
             for component_name in removed_components:
                 self.monitored_components.discard(component_name)
-                self.current_health[component_name] = ComponentHealthStatus.DISCONNECTED
+                self.current_health[component_name] = ComponentHealthStatus.disconnected
                 self.logger.info(f"Stopped monitoring component: {component_name}")
             
         except Exception as e:
@@ -191,7 +188,7 @@ class ComponentHealthMonitor:
             if not connector:
                 await self._record_health_check(
                     component_name,
-                    ComponentHealthStatus.DISCONNECTED,
+                    ComponentHealthStatus.disconnected,
                     None,
                     "Component connector not found",
                     {}
@@ -284,19 +281,19 @@ class ComponentHealthMonitor:
             self.current_health[component_name] = health_status
             
             # Track consecutive failures
-            if health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.DISCONNECTED]:
+            if health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]:
                 self.failed_checks[component_name] = self.failed_checks.get(component_name, 0) + 1
             else:
                 self.failed_checks[component_name] = 0
             
             # Check if component became unhealthy
             if (previous_health != health_status and 
-                health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.DISCONNECTED]):
+                health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]):
                 
                 await self._handle_component_unhealthy(component_name, health_check)
             
             # Check if component recovered
-            elif (previous_health in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.DISCONNECTED] and
+            elif (previous_health in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected] and
                   health_status == ComponentHealthStatus.HEALTHY):
                 
                 await self._handle_component_recovered(component_name, health_check)
@@ -405,7 +402,7 @@ class ComponentHealthMonitor:
         """Get list of currently unhealthy components."""
         return [
             component_name for component_name, health_status in self.current_health.items()
-            if health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.DISCONNECTED]
+            if health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]
         ]
     
     async def get_health_summary(self) -> Dict[str, Any]:
@@ -417,7 +414,7 @@ class ComponentHealthMonitor:
         )
         unhealthy_count = sum(
             1 for status in self.current_health.values()
-            if status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.DISCONNECTED]
+            if status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]
         )
         
         return {

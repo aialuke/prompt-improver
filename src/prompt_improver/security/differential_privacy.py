@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-
 class DifferentialPrivacyService:
     """Real differential privacy service that implements secure privacy-preserving mechanisms."""
 

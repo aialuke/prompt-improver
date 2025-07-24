@@ -49,11 +49,10 @@ COMPLEX_REASONING_INDICATORS = [
     "flow",
 ]
 
-
 class ChainOfThoughtRule(BasePromptRule):
     """Enhanced Chain of Thought rule using research-validated reasoning patterns.
 
-    Features:
+    features:
     - Zero-shot CoT with optimized triggers
     - Few-shot CoT with structured examples
     - Thinking tags for intermediate reasoning

@@ -10,9 +10,7 @@ from typing import Any, Callable, Optional
 from .authentication import AuthenticationService
 from .input_validator import InputValidator, ValidationError
 
-
 logger = logging.getLogger(__name__)
-
 
 def require_valid_session(auth_service: Optional[AuthenticationService] = None):
     """Decorator to require valid session for method calls.
@@ -93,7 +91,6 @@ def require_valid_session(auth_service: Optional[AuthenticationService] = None):
         return wrapper
     return decorator
 
-
 def require_user_permission(permission: str, auth_service: Optional[AuthenticationService] = None):
     """Decorator to require specific user permission.
 
@@ -168,7 +165,6 @@ def require_user_permission(permission: str, auth_service: Optional[Authenticati
 
         return wrapper
     return decorator
-
 
 def audit_ml_operation(operation_type: str):
     """Decorator to audit ML operations for security monitoring.

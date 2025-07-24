@@ -43,15 +43,13 @@ try:
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
 
-
 # Enhanced 2025 enums and data structures
 class ProcessingMode(Enum):
     """Processing modes for batch processor"""
-    LOCAL = "local"
+    local = "local"
     DISTRIBUTED_RAY = "distributed_ray"
     DISTRIBUTED_DASK = "distributed_dask"
     STREAM_PROCESSING = "stream_processing"
-
 
 class PartitionStrategy(Enum):
     """Data partitioning strategies"""
@@ -61,14 +59,12 @@ class PartitionStrategy(Enum):
     CONTENT_AWARE = "content_aware"
     LOAD_BALANCED = "load_balanced"
 
-
 class WorkerScalingMode(Enum):
     """Worker auto-scaling modes"""
-    FIXED = "fixed"
+    fixed = "fixed"
     QUEUE_DEPTH = "queue_depth"
     LATENCY_BASED = "latency_based"
     ADAPTIVE = "adaptive"
-
 
 @dataclass
 class BatchMetrics:
@@ -87,7 +83,6 @@ class BatchMetrics:
     retry_count: int
     timestamp: datetime
 
-
 @dataclass
 class WorkerStats:
     """Worker statistics for auto-scaling"""
@@ -98,7 +93,6 @@ class WorkerStats:
     cpu_utilization: float
     memory_utilization: float
 
-
 @dataclass
 class CircuitBreakerConfig:
     """Circuit breaker configuration"""
@@ -106,13 +100,11 @@ class CircuitBreakerConfig:
     recovery_timeout: float = 60.0
     success_threshold: int = 3
 
-
 class CircuitBreakerState(Enum):
     """Circuit breaker states"""
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
-
 
 @dataclass
 class CircuitBreaker:
@@ -156,7 +148,6 @@ class CircuitBreaker:
                 self.state = CircuitBreakerState.OPEN
         elif self.state == CircuitBreakerState.HALF_OPEN:
             self.state = CircuitBreakerState.OPEN
-
 
 async def periodic_batch_processor_coroutine(batch_processor: "BatchProcessor") -> None:
     """Periodic coroutine that triggers batch processing at configured intervals.
@@ -209,7 +200,6 @@ async def periodic_batch_processor_coroutine(batch_processor: "BatchProcessor") 
             logger.error(f"Error in periodic batch processor: {e}")
             # Continue running despite errors
             await asyncio.sleep(1)
-
 
 class BatchProcessorConfig(BaseModel):
     """Configuration for BatchProcessor with validation and best practices."""
@@ -278,13 +268,13 @@ class BatchProcessorConfig(BaseModel):
 
     # Enhanced 2025 features
     processing_mode: ProcessingMode = Field(
-        default=ProcessingMode.LOCAL, description="Processing mode (local, distributed, stream)"
+        default=ProcessingMode.local, description="Processing mode (local, distributed, stream)"
     )
     partition_strategy: PartitionStrategy = Field(
         default=PartitionStrategy.ROUND_ROBIN, description="Data partitioning strategy"
     )
     worker_scaling_mode: WorkerScalingMode = Field(
-        default=WorkerScalingMode.FIXED, description="Worker auto-scaling mode"
+        default=WorkerScalingMode.fixed, description="Worker auto-scaling mode"
     )
 
     # Distributed processing settings
@@ -337,7 +327,6 @@ class BatchProcessorConfig(BaseModel):
         if self.rate_limit_per_second is None:
             return None
         return 1.0 / self.rate_limit_per_second
-
 
 class AsyncQueueWrapper:
     """Asyncio Queue wrapper with exponential backoff and rate limiting."""
@@ -449,7 +438,6 @@ class AsyncQueueWrapper:
         except TimeoutError:
             self.logger.warning(f"Queue processing timeout after {timeout} seconds")
 
-
 @dataclass(order=True)
 class PriorityRecord:
     """Wrapper for priority queue records with priority ordering."""
@@ -459,7 +447,6 @@ class PriorityRecord:
     timestamp: float = field(default_factory=time.time, compare=False)
     attempts: int = field(default=0, compare=False)
     next_retry: float | None = field(default=None, compare=False)
-
 
 class PriorityQueue:
     """Heap-based priority queue with support for priority:int on records."""
@@ -505,7 +492,6 @@ class PriorityQueue:
     def size(self) -> int:
         """Return the number of items in the queue."""
         return len(self._queue) - len(self._removed)
-
 
 class BatchProcessor:
     def __init__(self, config: BatchProcessorConfig | None = None):
@@ -587,7 +573,7 @@ class BatchProcessor:
             asyncio.create_task(self._initialize_stream_processing())
 
         # Start auto-scaling if enabled
-        if self.config.worker_scaling_mode != WorkerScalingMode.FIXED:
+        if self.config.worker_scaling_mode != WorkerScalingMode.fixed:
             asyncio.create_task(self._auto_scaling_loop())
 
         self.logger.info(f"Enhanced batch processor initialized with {self.config.processing_mode.value} mode")
@@ -1004,7 +990,7 @@ class BatchProcessor:
                 self.logger.info("Dask distributed processing initialized")
         except Exception as e:
             self.logger.warning(f"Failed to initialize distributed processing: {e}")
-            self.config.processing_mode = ProcessingMode.LOCAL
+            self.config.processing_mode = ProcessingMode.local
 
     async def _initialize_stream_processing(self):
         """Initialize stream processing with Kafka"""

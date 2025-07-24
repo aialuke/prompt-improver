@@ -24,7 +24,6 @@ from ..optimization.async_optimizer import get_async_optimizer
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class PerformanceValidationResult:
     """Result of performance validation."""
@@ -53,7 +52,6 @@ class PerformanceValidationResult:
             'optimizations_applied': self.optimizations_applied,
             'improvement_details': self.improvement_details
         }
-
 
 class PerformanceValidator:
     """Comprehensive performance validation system."""
@@ -461,7 +459,6 @@ class PerformanceValidator:
             recommendations.append("All performance targets met - system is optimally configured")
 
         return recommendations
-
 
 # Convenience function for running validation
 async def run_performance_validation(samples_per_test: int = 100) -> Dict[str, Any]:

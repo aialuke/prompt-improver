@@ -39,7 +39,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class StructuralElementType(Enum):
     """Types of structural elements in 2025 analysis"""
 
@@ -54,7 +53,6 @@ class StructuralElementType(Enum):
     OUTPUT_SPEC = "output_specification"
     SEMANTIC_SECTION = "semantic_section"
 
-
 class StructuralRelationType(Enum):
     """Types of relationships between structural elements"""
 
@@ -64,7 +62,6 @@ class StructuralRelationType(Enum):
     SEMANTIC_SIMILARITY = "semantic_similarity"
     FUNCTIONAL = "functional"
     CAUSAL = "causal"
-
 
 @dataclass
 class StructuralElement:
@@ -81,7 +78,6 @@ class StructuralElement:
     relationships: List[Tuple[str, StructuralRelationType, float]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class StructuralGraph:
     """Graph representation of document structure"""
@@ -91,7 +87,6 @@ class StructuralGraph:
     graph_metrics: Dict[str, float]
     semantic_clusters: List[List[str]]
     structural_patterns: List[Dict[str, Any]]
-
 
 @dataclass
 class EnhancedStructuralConfig:
@@ -130,11 +125,10 @@ class EnhancedStructuralConfig:
     max_patterns: int = 20
     pattern_confidence_threshold: float = 0.6
 
-
 class EnhancedStructuralAnalyzer:
     """Enhanced structural analyzer implementing 2025 best practices
 
-    Features:
+    features:
     - Graph-based structural representation
     - Semantic understanding with transformers
     - Automated pattern discovery
@@ -880,7 +874,6 @@ class EnhancedStructuralAnalyzer:
             if analysis_type == "enhanced":
                 result = await self.analyze_enhanced_structure(text)
             else:
-                # Legacy analysis for backward compatibility
                 legacy_result = await self.analyze_structure(text)
                 result = {"legacy_analysis": legacy_result}
 
@@ -916,7 +909,6 @@ class EnhancedStructuralAnalyzer:
                     "component_version": "2025.1.0"
                 }
             }
-
 
 class GraphStructuralAnalyzer:
     """Graph-based structural analysis using NetworkX"""
@@ -1108,7 +1100,6 @@ class GraphStructuralAnalyzer:
 
         return patterns
 
-
 class StructuralPatternDiscoverer:
     """Automated structural pattern discovery using ML techniques"""
 
@@ -1206,7 +1197,6 @@ class StructuralPatternDiscoverer:
                 })
 
         return patterns
-
 
 # Maintain backward compatibility with original class name
 StructuralAnalyzer = EnhancedStructuralAnalyzer

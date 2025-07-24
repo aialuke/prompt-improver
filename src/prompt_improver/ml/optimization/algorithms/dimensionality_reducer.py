@@ -1,4 +1,4 @@
-"""Advanced Dimensionality Reduction for High-Dimensional Linguistic Features.
+"""Advanced Dimensionality Reduction for High-Dimensional Linguistic features.
 
 Implements multiple dimensionality reduction techniques with intelligent method selection
 and variance preservation optimization for 31-dimensional linguistic feature vectors.
@@ -14,9 +14,19 @@ import logging
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+from numpy.typing import NDArray
+
+# Import ML-specific types
+from ...types import (
+    features,
+    labels,
+    reduced_features,
+    float_array,
+    metrics_dict,
+)
 from sklearn.decomposition import PCA, FastICA, KernelPCA, TruncatedSVD, IncrementalPCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.feature_selection import VarianceThreshold
@@ -37,13 +47,13 @@ except ImportError:
     warnings.warn("UMAP not available. Install with: pip install umap-learn")
 
 try:
-    from sklearn.decomposition import FactorAnalysis
+    from sklearn.decomposition import factor_analysis
 
     FACTOR_ANALYSIS_AVAILABLE = True
 except ImportError:
     FACTOR_ANALYSIS_AVAILABLE = False
-    FactorAnalysis = None
-    warnings.warn("FactorAnalysis not available in this sklearn version")
+    factor_analysis = None
+    warnings.warn("factor_analysis not available in this sklearn version")
 
 # Neural network and deep learning imports
 try:
@@ -67,7 +77,6 @@ except ImportError:
     warnings.warn("TensorFlow not available. Some neural network methods will be disabled. Install with: pip install tensorflow")
 
 logger = logging.getLogger(__name__)
-
 
 # Neural Network Autoencoder Classes
 class StandardAutoencoder(nn.Module):
@@ -114,7 +123,6 @@ class StandardAutoencoder(nn.Module):
 
     def encode(self, x):
         return self.encoder(x)
-
 
 class VariationalAutoencoder(nn.Module):
     """Variational autoencoder for probabilistic dimensionality reduction."""
@@ -180,7 +188,6 @@ class VariationalAutoencoder(nn.Module):
         recon_loss = nn.functional.mse_loss(recon_x, x, reduction='sum')
         kld_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return recon_loss + self.beta * kld_loss
-
 
 class NeuralDimensionalityReducer:
     """Neural network-based dimensionality reduction wrapper."""
@@ -279,7 +286,6 @@ class NeuralDimensionalityReducer:
         """Fit the model and transform the data."""
         return self.fit(X).transform(X)
 
-
 class TransformerDimensionalityReducer(nn.Module):
     """Transformer-based dimensionality reduction using attention mechanisms."""
 
@@ -323,7 +329,6 @@ class TransformerDimensionalityReducer(nn.Module):
         x = self.output_projection(x.squeeze(1))  # (batch_size, output_dim)
 
         return x
-
 
 class DiffusionDimensionalityReducer:
     """Diffusion model-based dimensionality reduction."""
@@ -441,7 +446,6 @@ class DiffusionDimensionalityReducer:
     def fit_transform(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Fit the model and transform the data."""
         return self.fit(X, **kwargs).transform(X)
-
 
 class ModernNeuralDimensionalityReducer:
     """Enhanced neural dimensionality reducer with transformer and diffusion support."""
@@ -564,7 +568,6 @@ class ModernNeuralDimensionalityReducer:
         """Fit the model and transform the data."""
         return self.fit(X).transform(X)
 
-
 @dataclass
 class DimensionalityConfig:
     """Configuration for dimensionality reduction optimization."""
@@ -645,7 +648,6 @@ class DimensionalityConfig:
     use_randomized_svd: bool = True  # Use randomized SVD for faster PCA
     optimize_memory_usage: bool = True  # Enable memory optimizations
 
-
 @dataclass
 class ReductionResult:
     """Result of dimensionality reduction process."""
@@ -661,7 +663,6 @@ class ReductionResult:
     transformer: Any
     feature_importance: np.ndarray | None = None
     evaluation_metrics: dict[str, float] | None = None
-
 
 class AdvancedDimensionalityReducer:
     """Advanced dimensionality reduction with intelligent method selection."""
@@ -961,33 +962,33 @@ class AdvancedDimensionalityReducer:
     # Training Data Integration Methods
     async def optimize_feature_space(self, db_session) -> dict[str, Any]:
         """Optimize feature space using training data
-        
+
         Analyzes the complete training dataset to determine optimal
         dimensionality reduction approach and parameters.
         """
         try:
             self.logger.info("Starting feature space optimization with training data")
-            
+
             # Load training data from pipeline
             training_data = await self.training_loader.load_training_data(db_session)
-            
+
             # Check if training data validation passed
             if not training_data.get("validation", {}).get("is_valid", False):
                 self.logger.warning("Insufficient training data for feature space optimization")
                 return {"status": "insufficient_data", "samples": training_data["metadata"]["total_samples"]}
-            
+
             if training_data["metadata"]["total_samples"] < 10:
                 self.logger.warning("Insufficient training data for feature space optimization")
                 return {"status": "insufficient_data", "samples": training_data["metadata"]["total_samples"]}
-            
+
             # Extract features from training data
             full_features = np.array(training_data.get("features", []))
             if full_features.size == 0:
                 self.logger.warning("No features found in training data")
                 return {"status": "no_features"}
-            
+
             self.logger.info(f"Optimizing feature space on {full_features.shape[0]} samples with {full_features.shape[1]} dimensions")
-            
+
             # Try multiple reduction techniques and evaluate each
             results = {}
             for method in ['pca', 'umap', 'autoencoder']:
@@ -1004,13 +1005,13 @@ class AdvancedDimensionalityReducer:
                 except Exception as e:
                     self.logger.warning(f"Failed to evaluate method {method}: {e}")
                     results[method] = {'quality_score': 0.0, 'error': str(e)}
-            
+
             # Select best method based on quality scores
             best_method = max(results.items(), key=lambda x: x[1].get('quality_score', 0.0))
-            
+
             # Update configuration with optimal parameters
             self._update_config_with_best_method(best_method[0], best_method[1])
-            
+
             result = {
                 "status": "success",
                 "training_samples": full_features.shape[0],
@@ -1025,46 +1026,46 @@ class AdvancedDimensionalityReducer:
                     'variance_preserved': v.get('variance_preserved', 0.0)
                 } for k, v in results.items()}
             }
-            
+
             self.logger.info(f"Feature space optimization completed. Best method: {best_method[0]} (score: {best_method[1].get('quality_score', 0.0):.3f})")
             return result
-            
+
         except Exception as e:
             self.logger.error(f"Failed to optimize feature space: {e}")
             return {"status": "error", "error": str(e)}
 
     async def adaptive_reduction(self, new_data: np.ndarray, db_session) -> dict[str, Any]:
         """Adaptively adjust dimensionality based on new data
-        
+
         Combines new data with training data to determine if dimensionality
         reduction parameters need adjustment.
         """
         try:
             self.logger.info("Performing adaptive dimensionality reduction")
-            
+
             # Load existing training data
             training_data = await self.training_loader.load_training_data(db_session)
             existing_features = np.array(training_data.get("features", []))
-            
+
             if existing_features.size == 0:
                 self.logger.warning("No existing training data for adaptive reduction")
                 return await self._reduce_new_data_only(new_data)
-            
+
             # Combine new data with existing training data
             combined_data = await self._merge_with_training_data(new_data, existing_features)
-            
+
             # Analyze if current reduction is still optimal
             optimal_dims = await self._find_optimal_dimensions(combined_data)
-            
+
             # Update reducer if needed
             if optimal_dims != self.config.target_dimensions:
                 self.logger.info(f"Updating target dimensions from {self.config.target_dimensions} to {optimal_dims}")
                 self.config.target_dimensions = optimal_dims
                 self.reducer = await self._update_reducer(optimal_dims)
-            
+
             # Apply reduction to new data
             reduced_new_data = await self.reduce_dimensions(new_data)
-            
+
             result = {
                 "status": "success",
                 "new_data_samples": new_data.shape[0],
@@ -1073,10 +1074,10 @@ class AdvancedDimensionalityReducer:
                 "dimensions_changed": optimal_dims != self.config.target_dimensions,
                 "reduced_data": reduced_new_data.reduced_data if hasattr(reduced_new_data, 'reduced_data') else None
             }
-            
+
             self.logger.info(f"Adaptive reduction completed with {optimal_dims} dimensions")
             return result
-            
+
         except Exception as e:
             self.logger.error(f"Failed to perform adaptive reduction: {e}")
             return {"status": "error", "error": str(e)}
@@ -1088,7 +1089,7 @@ class AdvancedDimensionalityReducer:
                 from sklearn.decomposition import PCA
                 reducer = PCA(n_components=min(self.config.target_dimensions, features.shape[1]))
                 return reducer.fit_transform(features)
-            
+
             elif method == 'umap' and UMAP_AVAILABLE:
                 reducer = umap.UMAP(
                     n_components=min(self.config.target_dimensions, features.shape[1]),
@@ -1097,7 +1098,7 @@ class AdvancedDimensionalityReducer:
                     random_state=self.config.random_state
                 )
                 return reducer.fit_transform(features)
-            
+
             elif method == 'autoencoder' and TORCH_AVAILABLE:
                 reducer = NeuralDimensionalityReducer(
                     model_type="autoencoder",
@@ -1122,13 +1123,13 @@ class AdvancedDimensionalityReducer:
                     device=self.config.neural_device
                 )
                 return reducer.fit_transform(features)
-            
+
             else:
                 # Fallback to PCA
                 from sklearn.decomposition import PCA
                 reducer = PCA(n_components=min(self.config.target_dimensions, features.shape[1]))
                 return reducer.fit_transform(features)
-                
+
         except Exception as e:
             self.logger.error(f"Failed to apply {method} reduction: {e}")
             return np.array([])
@@ -1138,19 +1139,19 @@ class AdvancedDimensionalityReducer:
         try:
             if reduced_data.size == 0 or original_data.size == 0:
                 return 0.0
-            
+
             # Calculate variance preservation
             if reduced_data.shape[0] != original_data.shape[0]:
                 return 0.0
-            
+
             # Simple quality metric: variance preservation + reconstruction error
             variance_preserved = np.var(reduced_data) / np.var(original_data)
-            
+
             # Normalize to 0-1 range
             quality_score = min(1.0, max(0.0, variance_preserved))
-            
+
             return quality_score
-            
+
         except Exception as e:
             self.logger.debug(f"Failed to evaluate reduction quality: {e}")
             return 0.0
@@ -1160,15 +1161,15 @@ class AdvancedDimensionalityReducer:
         try:
             if reduced_data.size == 0 or original_data.size == 0:
                 return 0.0
-            
+
             reduced_var = np.var(reduced_data)
             original_var = np.var(original_data)
-            
+
             if original_var == 0:
                 return 1.0
-            
+
             return min(1.0, reduced_var / original_var)
-            
+
         except Exception as e:
             self.logger.debug(f"Failed to calculate variance preserved: {e}")
             return 0.0
@@ -1179,19 +1180,19 @@ class AdvancedDimensionalityReducer:
             # Update preferred methods list
             if self.config.preferred_methods is None:
                 self.config.preferred_methods = []
-            
+
             # Put best method first
             if method in self.config.preferred_methods:
                 self.config.preferred_methods.remove(method)
             self.config.preferred_methods.insert(0, method)
-            
+
             # Update target dimensions if significantly different
             optimal_dims = results.get('dimensions', self.config.target_dimensions)
             if abs(optimal_dims - self.config.target_dimensions) > 2:
                 self.config.target_dimensions = optimal_dims
-            
+
             self.logger.info(f"Configuration updated with best method: {method}")
-            
+
         except Exception as e:
             self.logger.error(f"Failed to update config: {e}")
 
@@ -1205,11 +1206,11 @@ class AdvancedDimensionalityReducer:
                 min_features = min(new_data.shape[1], existing_data.shape[1])
                 new_data = new_data[:, :min_features]
                 existing_data = existing_data[:, :min_features]
-            
+
             # Combine data
             combined = np.vstack([existing_data, new_data])
             return combined
-            
+
         except Exception as e:
             self.logger.error(f"Failed to merge data: {e}")
             return new_data
@@ -1219,20 +1220,20 @@ class AdvancedDimensionalityReducer:
         try:
             # Use PCA to analyze variance explained
             from sklearn.decomposition import PCA
-            
+
             max_components = min(data.shape[1], data.shape[0] - 1, 20)  # Reasonable upper bound
             pca = PCA(n_components=max_components)
             pca.fit(data)
-            
+
             # Find number of components for desired variance threshold
             cumsum_var = np.cumsum(pca.explained_variance_ratio_)
             optimal_dims = np.argmax(cumsum_var >= self.config.variance_threshold) + 1
-            
+
             # Ensure within configured bounds
             optimal_dims = max(self.config.min_dimensions, min(optimal_dims, self.config.max_dimensions))
-            
+
             return optimal_dims
-            
+
         except Exception as e:
             self.logger.error(f"Failed to find optimal dimensions: {e}")
             return self.config.target_dimensions
@@ -1834,7 +1835,6 @@ class AdvancedDimensionalityReducer:
 
         return "pca"
 
-
 # Factory function for easy integration
 def get_dimensionality_reducer(
     config: DimensionalityConfig | None = None,
@@ -1848,3 +1848,7 @@ def get_dimensionality_reducer(
         AdvancedDimensionalityReducer instance
     """
     return AdvancedDimensionalityReducer(config=config)
+
+
+# Backward compatibility alias
+DimensionalityReducer = AdvancedDimensionalityReducer

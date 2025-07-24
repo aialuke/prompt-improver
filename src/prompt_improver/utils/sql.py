@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T")
 
-
 async def fetch_scalar(session: AsyncSession, stmt: Executable, typ: type[T]) -> T:
     """Execute a statement and return a scalar result of a specified type.
 

@@ -56,7 +56,6 @@ from prompt_improver.utils.redis_cache import redis_client
 
 console = Console()
 
-
 class DeploymentStrategy(Enum):
     """Progressive delivery strategies"""
 
@@ -65,7 +64,6 @@ class DeploymentStrategy(Enum):
     RING_BASED = "ring_based"
     FEATURE_FLAG = "feature_flag"
     ROLLING = "rolling"
-
 
 class RollbackTrigger(Enum):
     """Rollback trigger types"""
@@ -77,7 +75,6 @@ class RollbackTrigger(Enum):
     ANOMALY_DETECTED = "anomaly_detected"
     TRAFFIC_DROP = "traffic_drop"
 
-
 class CanaryPhase(Enum):
     """Canary deployment phases"""
 
@@ -88,7 +85,6 @@ class CanaryPhase(Enum):
     COMPLETED = "completed"
     ROLLING_BACK = "rolling_back"
     FAILED = "failed"
-
 
 @dataclass
 class SLITarget:
@@ -115,7 +111,6 @@ class SLITarget:
         elif self.operator == "<":
             return actual_value < self.target_value
         return False
-
 
 @dataclass
 class CanaryMetrics:
@@ -157,7 +152,6 @@ class CanaryMetrics:
             "sli_scores": self.sli_scores
         }
 
-
 @dataclass
 class ContextualRule:
     """Context-aware feature flag rule"""
@@ -178,7 +172,6 @@ class ContextualRule:
             logger.warning(f"Condition evaluation failed: {e}")
             return False
 
-
 @dataclass
 class CanaryGroup:
     """Enhanced configuration for a canary group"""
@@ -195,8 +188,6 @@ class CanaryGroup:
     contextual_rules: List[ContextualRule] = field(default_factory=list)
     traffic_split_config: Dict[str, Any] = field(default_factory=dict)
     rollback_triggers: List[RollbackTrigger] = field(default_factory=list)
-
-    # Legacy compatibility
     success_criteria: Optional[Dict] = None
     rollback_criteria: Optional[Dict] = None
 
@@ -214,7 +205,6 @@ class CanaryGroup:
             "traffic_split_config": self.traffic_split_config,
             "rollback_triggers": [trigger.value for trigger in self.rollback_triggers]
         }
-
 
 @dataclass
 class RollbackEvent:
@@ -238,7 +228,6 @@ class RollbackEvent:
             "metrics_snapshot": self.metrics_snapshot.to_dict(),
             "trace_id": self.trace_id
         }
-
 
 # OpenTelemetry setup
 if OPENTELEMETRY_AVAILABLE:
@@ -270,11 +259,10 @@ else:
     CANARY_ROLLBACKS = None
     TRAFFIC_SPLIT_RATIO = None
 
-
 class EnhancedCanaryTestingService:
     """Enhanced canary testing service with 2025 best practices
 
-    Features:
+    features:
     - Progressive delivery with ring-based deployments
     - Service mesh integration for traffic splitting
     - SLI/SLO-based automated rollback decisions
@@ -307,8 +295,6 @@ class EnhancedCanaryTestingService:
         # Traffic management
         self.traffic_controllers: Dict[str, Any] = {}
         self.active_deployments: Dict[str, Dict[str, Any]] = {}
-
-        # Legacy compatibility
         self.metrics_store = {}
 
         # Observability
@@ -793,7 +779,6 @@ class EnhancedCanaryTestingService:
             "context_providers": list(self.context_providers.keys())
         }
 
-
 # Maintain backward compatibility
 class CanaryTestingService(EnhancedCanaryTestingService):
     """Backward compatible canary testing service."""
@@ -1162,7 +1147,6 @@ class CanaryTestingService(EnhancedCanaryTestingService):
         }
 
         return report
-
 
 # Global instance
 canary_service = CanaryTestingService()

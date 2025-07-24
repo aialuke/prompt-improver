@@ -5,7 +5,6 @@ Configuration management for ML Pipeline Orchestrator.
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 
-
 @dataclass
 class OrchestratorConfig:
     """Configuration for ML Pipeline Orchestrator."""

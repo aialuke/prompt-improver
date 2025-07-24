@@ -13,7 +13,6 @@ import nltk
 from nltk import ne_chunk, pos_tag, word_tokenize
 from nltk.tree import Tree
 
-
 @dataclass
 class EntityResult:
     """Result container for a named entity."""
@@ -24,7 +23,6 @@ class EntityResult:
     start: int
     end: int
     context: str | None = None
-
 
 class NERExtractor:
     """Named Entity Recognition extractor using NLTK and transformers.

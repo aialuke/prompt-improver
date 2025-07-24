@@ -16,7 +16,6 @@ from nltk.stem import WordNetLemmatizer
 
 logger = logging.getLogger(__name__)
 
-
 class EnglishNLTKManager:
     """Lightweight NLTK manager for English-only processing.
     
@@ -298,7 +297,6 @@ class EnglishNLTKManager:
             self.logger.debug(f"Error calculating cleanup info: {e}")
         
         return cleanup_info
-
 
 # Global instance for reuse
 _english_nltk_manager = None

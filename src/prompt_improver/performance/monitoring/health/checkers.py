@@ -11,12 +11,12 @@ from .base import HealthChecker, HealthResult, HealthStatus
 
 # Import Redis Health Monitor
 try:
-    from .redis_monitor import RedisHealthMonitor
+    from .redis_monitor import redis_health_monitor
 
     REDIS_MONITOR_AVAILABLE = True
 except Exception:
     REDIS_MONITOR_AVAILABLE = False
-    RedisHealthMonitor = None
+    redis_health_monitor = None
 
 # Graceful imports for various services
 try:
@@ -28,13 +28,13 @@ except Exception:
     get_background_task_manager = None
 
 try:
-    from ....ml.optimization.batch.batch_processor import BatchProcessor
+    from ....ml.optimization.batch.batch_processor import batch_processor
 
     BATCH_PROCESSOR_AVAILABLE = True
 except Exception as e:
     BATCH_PROCESSOR_AVAILABLE = False
-    BatchProcessor = None
-    print(f"BatchProcessor import failed: {e}")
+    batch_processor = None
+    print(f"batch_processor import failed: {e}")
 
 QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE or BATCH_PROCESSOR_AVAILABLE
 
@@ -46,7 +46,6 @@ try:
 except Exception:
     DATABASE_AVAILABLE = False
     get_session = None
-
 
 class DatabaseHealthChecker(HealthChecker):
     """Database connectivity and performance health checker"""
@@ -116,7 +115,6 @@ class DatabaseHealthChecker(HealthChecker):
                 message="Database connection failed",
             )
 
-
 class MCPServerHealthChecker(HealthChecker):
     """MCP server performance health checker"""
 
@@ -167,7 +165,6 @@ class MCPServerHealthChecker(HealthChecker):
                 message="MCP server health check failed",
             )
 
-
 class AnalyticsServiceHealthChecker(HealthChecker):
     """Analytics service functionality health checker"""
 
@@ -208,7 +205,6 @@ class AnalyticsServiceHealthChecker(HealthChecker):
                 message="Analytics service check failed",
             )
 
-
 class MLServiceHealthChecker(HealthChecker):
     """ML service availability health checker"""
 
@@ -247,11 +243,10 @@ class MLServiceHealthChecker(HealthChecker):
                 message="ML service unavailable (fallback to rule-based)",
             )
 
-
 class QueueHealthChecker(HealthChecker):
     """Queue systems health checker for monitoring queue metrics"""
 
-    def __init__(self, batch_processor: Union[BatchProcessor, None] = None):
+    def __init__(self, batch_processor: Union[batch_processor, None] = None):
         super().__init__("queue")
         self.batch_processor = batch_processor
 
@@ -482,7 +477,6 @@ class QueueHealthChecker(HealthChecker):
         if status == HealthStatus.WARNING:
             return f"Queue warning - {total_backlog} items queued, {capacity_util:.1%} capacity, {success_rate:.1%} success"
         return f"Queue failed - {total_backlog} items queued, {capacity_util:.1%} capacity, {success_rate:.1%} success"
-
 
 class SystemResourcesHealthChecker(HealthChecker):
     """System resource usage health checker"""

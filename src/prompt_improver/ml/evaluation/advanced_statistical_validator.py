@@ -19,27 +19,24 @@ from statsmodels.stats.weightstats import ztest
 
 logger = logging.getLogger(__name__)
 
-
 class CorrectionMethod(Enum):
     """Multiple testing correction methods"""
 
-    BONFERRONI = "bonferroni"
-    HOLM = "holm"  # Step-down Holm-Bonferroni
-    SIDAK = "sidak"
+    bonferroni = "bonferroni"
+    holm = "holm"  # Step-down Holm-Bonferroni
+    sidak = "sidak"
     BENJAMINI_HOCHBERG = "fdr_bh"  # FDR Benjamini-Hochberg
     BENJAMINI_YEKUTIELI = "fdr_by"  # FDR Benjamini-Yekutieli
     FALSE_DISCOVERY_RATE = "fdr_tsbh"  # Two-stage FDR
 
-
 class EffectSizeMagnitude(Enum):
     """Effect size magnitude classifications"""
 
-    NEGLIGIBLE = "negligible"  # < 0.1
-    SMALL = "small"  # 0.1 - 0.3
+    negligible = "negligible"  # < 0.1
+    small = "small"  # 0.1 - 0.3
     MEDIUM = "medium"  # 0.3 - 0.5
-    LARGE = "large"  # 0.5 - 0.8
+    large = "large"  # 0.5 - 0.8
     VERY_LARGE = "very_large"  # > 0.8
-
 
 @dataclass
 class StatisticalTestResult:
@@ -57,7 +54,6 @@ class StatisticalTestResult:
     assumptions_met: dict[str, bool] | None = None
     notes: list[str] = field(default_factory=list)
 
-
 @dataclass
 class MultipleTestingCorrection:
     """Results of multiple testing correction"""
@@ -69,7 +65,6 @@ class MultipleTestingCorrection:
     alpha_corrected: float
     family_wise_error_rate: float
     false_discovery_rate: float | None = None
-
 
 @dataclass
 class AdvancedValidationResult:
@@ -112,7 +107,6 @@ class AdvancedValidationResult:
 
     # Quality metrics
     validation_quality_score: float = 0.0
-
 
 class AdvancedStatisticalValidator:
     """Advanced statistical validator implementing 2025 best practices"""
@@ -552,13 +546,13 @@ class AdvancedStatisticalValidator:
             if np.isinf(abs_effect) or abs_effect >= 5.0:
                 magnitude = EffectSizeMagnitude.VERY_LARGE
             elif abs_effect < 0.1:
-                magnitude = EffectSizeMagnitude.NEGLIGIBLE
+                magnitude = EffectSizeMagnitude.negligible
             elif abs_effect < 0.3:
-                magnitude = EffectSizeMagnitude.SMALL
+                magnitude = EffectSizeMagnitude.small
             elif abs_effect < 0.5:
                 magnitude = EffectSizeMagnitude.MEDIUM
             elif abs_effect < 0.8:
-                magnitude = EffectSizeMagnitude.LARGE
+                magnitude = EffectSizeMagnitude.large
             else:
                 magnitude = EffectSizeMagnitude.VERY_LARGE
 
@@ -582,7 +576,7 @@ class AdvancedStatisticalValidator:
 
         except Exception as e:
             logger.warning(f"Error analyzing effect size: {e}")
-            return EffectSizeMagnitude.NEGLIGIBLE, False, False
+            return EffectSizeMagnitude.negligible, False, False
 
     def _apply_multiple_testing_correction(
         self, p_values: list[float], method: CorrectionMethod
@@ -597,9 +591,9 @@ class AdvancedStatisticalValidator:
             )
 
             # Calculate family-wise error rate
-            if method == CorrectionMethod.BONFERRONI:
+            if method == CorrectionMethod.bonferroni:
                 fwer = min(len(p_values) * self.alpha, 1.0)
-            elif method == CorrectionMethod.SIDAK:
+            elif method == CorrectionMethod.sidak:
                 fwer = 1 - (1 - self.alpha) ** len(p_values)
             else:
                 fwer = self.alpha  # For FDR methods
@@ -615,7 +609,7 @@ class AdvancedStatisticalValidator:
                 corrected_p_values=p_corrected.tolist(),
                 rejected=rejected.tolist(),
                 alpha_corrected=alpha_bonf
-                if method == CorrectionMethod.BONFERRONI
+                if method == CorrectionMethod.bonferroni
                 else self.alpha,
                 family_wise_error_rate=fwer,
                 false_discovery_rate=fdr,
@@ -910,7 +904,7 @@ class AdvancedStatisticalValidator:
                 recommendations.append(
                     "🎯 Excellent effect size - strong business impact expected"
                 )
-            elif result.effect_size_magnitude == EffectSizeMagnitude.LARGE:
+            elif result.effect_size_magnitude == EffectSizeMagnitude.large:
                 recommendations.append(
                     "📈 Good effect size - meaningful business impact expected"
                 )
@@ -1045,10 +1039,10 @@ class AdvancedStatisticalValidator:
             # Effect size adequacy (25%)
             if result.effect_size_magnitude:
                 effect_scores = {
-                    EffectSizeMagnitude.NEGLIGIBLE: 0.1,
-                    EffectSizeMagnitude.SMALL: 0.4,
+                    EffectSizeMagnitude.negligible: 0.1,
+                    EffectSizeMagnitude.small: 0.4,
                     EffectSizeMagnitude.MEDIUM: 0.7,
-                    EffectSizeMagnitude.LARGE: 0.9,
+                    EffectSizeMagnitude.large: 0.9,
                     EffectSizeMagnitude.VERY_LARGE: 1.0,
                 }
                 effect_score = effect_scores.get(result.effect_size_magnitude, 0.0)
@@ -1089,7 +1083,6 @@ class AdvancedStatisticalValidator:
         except Exception as e:
             logger.warning(f"Error calculating validation quality score: {e}")
             return 0.0
-
 
 # Utility functions for external use
 def quick_validation(

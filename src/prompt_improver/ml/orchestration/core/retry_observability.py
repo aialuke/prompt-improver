@@ -30,7 +30,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class AlertSeverity(Enum):
     """Alert severity levels."""
     
@@ -38,7 +37,6 @@ class AlertSeverity(Enum):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
-
 
 @dataclass
 class RetryMetrics:
@@ -92,7 +90,6 @@ class RetryMetrics:
         """Update metrics for circuit breaker trip."""
         self.circuit_breaker_trips += 1
 
-
 @dataclass
 class AlertRule:
     """Alert rule configuration."""
@@ -119,12 +116,11 @@ class AlertRule:
         
         return False
 
-
 class RetryObservabilityManager:
     """
     Comprehensive observability manager for retry operations.
     
-    Features:
+    features:
     - Prometheus metrics collection
     - OpenTelemetry tracing
     - Custom alerting rules
@@ -410,10 +406,8 @@ class RetryObservabilityManager:
         """Remove an alert rule by name."""
         self.alert_rules = [rule for rule in self.alert_rules if rule.name != rule_name]
 
-
 # Global observability manager instance
 _global_observability_manager: Optional[RetryObservabilityManager] = None
-
 
 def get_observability_manager() -> RetryObservabilityManager:
     """Get global observability manager instance."""
@@ -421,7 +415,6 @@ def get_observability_manager() -> RetryObservabilityManager:
     if _global_observability_manager is None:
         _global_observability_manager = RetryObservabilityManager()
     return _global_observability_manager
-
 
 def set_observability_manager(manager: RetryObservabilityManager):
     """Set global observability manager instance."""

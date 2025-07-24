@@ -4,7 +4,7 @@ Enhanced 2025 implementation combining multiple specialized feature extractors
 to create comprehensive feature vectors. Implements the Composite pattern
 with async operations, event-driven architecture, and modern observability.
 
-Features:
+features:
 - Async/await pattern for non-blocking operations
 - Event-driven integration with ML Pipeline Orchestrator
 - Comprehensive observability and metrics
@@ -31,20 +31,17 @@ from .context_feature_extractor import ContextFeatureExtractor
 
 logger = logging.getLogger(__name__)
 
-
 class ExtractionMode(Enum):
     """Feature extraction execution modes."""
     SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
+    parallel = "parallel"
     ADAPTIVE = "adaptive"  # 2025: Adaptive based on resource availability
-
 
 class CircuitBreakerState(Enum):
     """Circuit breaker states for fault tolerance."""
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
-
 
 @dataclass
 class FeatureExtractionConfig:
@@ -102,7 +99,6 @@ class FeatureExtractionConfig:
         if not 0.0 <= self.min_confidence_threshold <= 1.0:
             raise ValueError("min_confidence_threshold must be between 0.0 and 1.0")
 
-
 @dataclass
 class ExtractionMetrics:
     """Metrics for feature extraction operations."""
@@ -132,7 +128,6 @@ class ExtractionMetrics:
         if self.total_extractions == 0:
             return 0.0
         return (self.successful_extractions / self.total_extractions) * 100.0
-
 
 class CompositeFeatureExtractor:
     """Enhanced 2025 composite feature extractor with async operations and observability.
@@ -475,7 +470,7 @@ class CompositeFeatureExtractor:
 
     async def _perform_extraction_async(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Perform the actual feature extraction based on execution mode."""
-        if self.config.execution_mode == ExtractionMode.PARALLEL:
+        if self.config.execution_mode == ExtractionMode.parallel:
             return await self._extract_parallel(text, context_data)
         elif self.config.execution_mode == ExtractionMode.ADAPTIVE:
             return await self._extract_adaptive(text, context_data)
@@ -745,7 +740,6 @@ class CompositeFeatureExtractor:
                 "error": str(e),
                 "component": "composite_feature_extractor"
             }
-
 
 class FeatureExtractorFactory:
     """Factory for creating configured feature extractors."""

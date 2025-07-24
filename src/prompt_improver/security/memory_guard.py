@@ -30,7 +30,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class MemoryThreatLevel(Enum):
     """Memory threat levels for resource monitoring."""
     LOW = 1
@@ -58,7 +57,6 @@ class MemoryThreatLevel(Enum):
             return self.value >= other.value
         return NotImplemented
 
-
 @dataclass
 class MemoryEvent:
     """Memory event for monitoring and alerting."""
@@ -73,7 +71,6 @@ class MemoryEvent:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now(timezone.utc)
-
 
 @dataclass
 class ResourceStats:
@@ -93,12 +90,11 @@ class ResourceStats:
         if self.timestamp is None:
             self.timestamp = datetime.now(timezone.utc)
 
-
 class MemoryGuard:
     """
     Enhanced memory safety and monitoring for ML pipeline orchestration.
 
-    Features:
+    features:
     - Async memory monitoring patterns
     - Resource lifecycle management
     - Event-driven memory alerts
@@ -436,7 +432,7 @@ class MemoryGuard:
         """Get current memory usage in MB."""
         if PSUTIL_AVAILABLE:
             try:
-                process = psutil.Process()
+                process = psutil.process()
                 return process.memory_info().rss / 1024 / 1024  # Convert to MB
             except Exception:
                 pass
@@ -458,7 +454,6 @@ class MemoryGuard:
         else:
             # Rough estimate for other types
             return len(str(data).encode('utf-8'))
-
 
 class AsyncMemoryMonitor:
     """Async context manager for monitoring memory usage during operations."""
@@ -533,7 +528,6 @@ class AsyncMemoryMonitor:
         if memory_delta > 50:  # 50MB threshold
             await self.guard.force_garbage_collection_async(f"cleanup_{self.operation_name}")
 
-
 class MemoryMonitor:
     """Context manager for monitoring memory usage during operations."""
 
@@ -570,7 +564,6 @@ class MemoryMonitor:
         # Force cleanup if memory delta is significant
         if memory_delta > 50:  # 50MB threshold
             self.guard.force_garbage_collection()
-
 
 # Global memory guard instance
 _default_memory_guard = None

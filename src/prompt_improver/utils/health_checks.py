@@ -21,7 +21,6 @@ from ..performance.monitoring.health import (
 
 # For backwards compatibility and simplified access
 
-
 class HealthChecker:
     """Simplified HealthChecker interface for consolidated patterns
 
@@ -135,7 +134,6 @@ class HealthChecker:
         """Get list of available health check components"""
         return self.health_service.get_available_checks()
 
-
 # Decorator for health check components (as specified in Phase 3)
 def health_check_component(component_name: str) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Callable[..., Awaitable[dict[str, Any]]]]:
     """Decorator for standardized health checking
@@ -177,7 +175,6 @@ def health_check_component(component_name: str) -> Callable[[Callable[..., Await
 
     return decorator
 
-
 # Convenience functions for backwards compatibility
 async def run_health_check() -> dict[str, Any]:
     """Run comprehensive health check
@@ -187,36 +184,30 @@ async def run_health_check() -> dict[str, Any]:
     checker = HealthChecker()
     return await checker.check_all()
 
-
 async def check_database_health() -> dict[str, Any]:
     """Check database health - extracted pattern from monitoring.py:591-626"""
     checker = HealthChecker()
     return await checker.check_database_health()
-
 
 async def check_mcp_performance() -> dict[str, Any]:
     """Check MCP performance - extracted pattern from monitoring.py:628-658"""
     checker = HealthChecker()
     return await checker.check_mcp_performance()
 
-
 async def check_analytics_service() -> dict[str, Any]:
     """Check analytics service - extracted pattern from monitoring.py:660-679"""
     checker = HealthChecker()
     return await checker.check_analytics_service()
-
 
 async def check_ml_service() -> dict[str, Any]:
     """Check ML service - extracted pattern from monitoring.py:681-701"""
     checker = HealthChecker()
     return await checker.check_ml_service()
 
-
 async def check_system_resources() -> dict[str, Any]:
     """Check system resources - extracted pattern from monitoring.py:703-751"""
     checker = HealthChecker()
     return await checker.check_system_resources()
-
 
 # Export standardized interface
 __all__ = [

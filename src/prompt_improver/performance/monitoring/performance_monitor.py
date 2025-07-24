@@ -61,16 +61,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class SLIType(Enum):
     """Service Level Indicator types."""
 
-    AVAILABILITY = "availability"
-    LATENCY = "latency"
-    THROUGHPUT = "throughput"
+    availability = "availability"
+    latency = "latency"
+    throughput = "throughput"
     ERROR_RATE = "error_rate"
-    SATURATION = "saturation"
-
+    saturation = "saturation"
 
 class SLOStatus(Enum):
     """SLO compliance status."""
@@ -80,7 +78,6 @@ class SLOStatus(Enum):
     CRITICAL = "critical"
     EXHAUSTED = "exhausted"  # Error budget exhausted
 
-
 class BurnRateLevel(Enum):
     """Error budget burn rate levels."""
 
@@ -88,7 +85,6 @@ class BurnRateLevel(Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
-
 
 @dataclass
 class SLI:
@@ -101,9 +97,8 @@ class SLI:
     target_percentile: Optional[float] = None  # For latency SLIs (e.g., 95.0)
 
     def __post_init__(self):
-        if self.sli_type == SLIType.LATENCY and self.target_percentile is None:
+        if self.sli_type == SLIType.latency and self.target_percentile is None:
             self.target_percentile = 95.0
-
 
 @dataclass
 class SLO:
@@ -123,7 +118,7 @@ class SLO:
     @property
     def error_budget_percent(self) -> float:
         """Calculate error budget percentage based on SLI type."""
-        if self.sli.sli_type == SLIType.AVAILABILITY:
+        if self.sli.sli_type == SLIType.availability:
             # For availability, error budget is (100 - target_value)
             # e.g., 99.9% availability -> 0.1% error budget
             return 100.0 - self.target_value
@@ -131,11 +126,11 @@ class SLO:
             # For error rate, the target is the maximum acceptable error rate
             # e.g., 1% error rate target -> 1% error budget
             return self.target_value
-        elif self.sli.sli_type == SLIType.LATENCY:
+        elif self.sli.sli_type == SLIType.latency:
             # For latency, we define error budget as percentage of requests
             # that can exceed the target (typically small, e.g., 0.1%)
             return 0.1  # 0.1% of requests can exceed latency target
-        elif self.sli.sli_type == SLIType.THROUGHPUT:
+        elif self.sli.sli_type == SLIType.throughput:
             # For throughput, error budget is percentage below target that's acceptable
             # e.g., 5% below target throughput is acceptable
             return 5.0
@@ -148,7 +143,6 @@ class SLO:
         """Calculate error budget in minutes for the measurement period."""
         total_minutes = self.measurement_period.total_seconds() / 60
         return total_minutes * (self.error_budget_percent / 100.0)
-
 
 @dataclass
 class SLOViolation:
@@ -165,7 +159,6 @@ class SLOViolation:
     timestamp: datetime
     duration: Optional[timedelta] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class PerformanceMetrics:
@@ -191,7 +184,6 @@ class PerformanceMetrics:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     sample_count: int = 0
     measurement_window: timedelta = timedelta(minutes=1)
-
 
 # Use centralized metrics registry
 from .metrics_registry import get_metrics_registry
@@ -223,7 +215,6 @@ PERFORMANCE_HISTOGRAM = metrics_registry.get_or_create_histogram(
     ['metric_type']
 )
 
-
 @dataclass
 class PerformanceAlert:
     """Performance alert data structure."""
@@ -251,7 +242,6 @@ class PerformanceAlert:
             'metadata': self.metadata
         }
 
-
 @dataclass
 class PerformanceThresholds:
     """Performance monitoring thresholds."""
@@ -262,7 +252,6 @@ class PerformanceThresholds:
     throughput_warning_rps: float = 10.0  # requests per second
     memory_usage_warning_percent: float = 80.0
     memory_usage_critical_percent: float = 90.0
-
 
 class PerformanceTrendAnalyzer:
     """Analyzes performance trends and predicts issues."""
@@ -368,11 +357,10 @@ class PerformanceTrendAnalyzer:
         else:
             return "F"
 
-
 class EnhancedPerformanceMonitor:
     """Enhanced performance monitor with SLI/SLO framework and 2025 best practices.
 
-    Features:
+    features:
     - SLI/SLO framework with error budget tracking
     - Multi-dimensional metrics (RED/USE patterns)
     - Percentile-based monitoring (P50, P95, P99)
@@ -442,13 +430,13 @@ class EnhancedPerformanceMonitor:
         default_slis = [
             SLI(
                 name="response_time_p95",
-                sli_type=SLIType.LATENCY,
+                sli_type=SLIType.latency,
                 description="95th percentile response time",
                 target_percentile=95.0
             ),
             SLI(
                 name="availability",
-                sli_type=SLIType.AVAILABILITY,
+                sli_type=SLIType.availability,
                 description="Service availability"
             ),
             SLI(
@@ -458,7 +446,7 @@ class EnhancedPerformanceMonitor:
             ),
             SLI(
                 name="throughput",
-                sli_type=SLIType.THROUGHPUT,
+                sli_type=SLIType.throughput,
                 description="Request throughput"
             )
         ]
@@ -577,19 +565,19 @@ class EnhancedPerformanceMonitor:
         for slo in self.slos:
             sli = slo.sli
 
-            if sli.sli_type == SLIType.LATENCY:
+            if sli.sli_type == SLIType.latency:
                 if sli.target_percentile == 95.0:
                     value = metrics.response_time_p95
                 elif sli.target_percentile == 99.0:
                     value = metrics.response_time_p99
                 else:
                     value = metrics.response_time_p50
-            elif sli.sli_type == SLIType.AVAILABILITY:
+            elif sli.sli_type == SLIType.availability:
                 # Calculate availability as (1 - error_rate) * 100
                 value = (1.0 - metrics.error_rate / 100.0) * 100.0
             elif sli.sli_type == SLIType.ERROR_RATE:
                 value = metrics.error_rate
-            elif sli.sli_type == SLIType.THROUGHPUT:
+            elif sli.sli_type == SLIType.throughput:
                 value = metrics.request_rate
             else:
                 value = 0.0
@@ -675,7 +663,7 @@ class EnhancedPerformanceMonitor:
             value = measurement["value"]
             target = slo.target_value
 
-            if slo.sli.sli_type == SLIType.LATENCY:
+            if slo.sli.sli_type == SLIType.latency:
                 # For latency, lower is better
                 if value <= target:
                     compliant_measurements += 1
@@ -1057,7 +1045,6 @@ class EnhancedPerformanceMonitor:
                 business_value=random.uniform(1, 10)
             )
 
-
 # Maintain backward compatibility
 class PerformanceMonitor(EnhancedPerformanceMonitor):
     """Backward compatible performance monitor."""
@@ -1244,10 +1231,8 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
         self._last_reset_time = datetime.now(timezone.utc)
         self._active_alerts.clear()
 
-
 # Global performance monitor instance
 _global_monitor: Optional[PerformanceMonitor] = None
-
 
 def get_performance_monitor() -> PerformanceMonitor:
     """Get the global performance monitor instance."""
@@ -1255,7 +1240,6 @@ def get_performance_monitor() -> PerformanceMonitor:
     if _global_monitor is None:
         _global_monitor = PerformanceMonitor()
     return _global_monitor
-
 
 # Convenience functions
 async def record_mcp_operation(
@@ -1267,7 +1251,6 @@ async def record_mcp_operation(
     """Record an MCP operation performance measurement."""
     monitor = get_performance_monitor()
     await monitor.record_operation(operation_name, response_time_ms, is_error, metadata)
-
 
 def add_performance_alert_handler(handler: Callable):
     """Add a performance alert handler."""

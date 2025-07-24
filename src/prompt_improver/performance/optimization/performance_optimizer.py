@@ -61,7 +61,6 @@ def get_cache_performance():
         )
     return _metrics['cache_performance']
 
-
 @dataclass
 class PerformanceMetrics:
     """Container for performance measurement data."""
@@ -94,7 +93,6 @@ class PerformanceMetrics:
                 f"Response time target violation: {self.operation_name} "
                 f"took {self.duration_ms:.2f}ms (target: <200ms)"
             )
-
 
 @dataclass
 class PerformanceBaseline:
@@ -129,7 +127,6 @@ class PerformanceBaseline:
             "timestamp": self.timestamp.isoformat(),
             "meets_200ms_target": self.meets_target(200)
         }
-
 
 class PerformanceOptimizer:
     """Comprehensive performance optimization and monitoring system."""
@@ -362,10 +359,8 @@ class PerformanceOptimizer:
         summary["operations"] = operation_summaries
         return summary
 
-
 # Global performance optimizer instance
 _global_optimizer: Optional[PerformanceOptimizer] = None
-
 
 def get_performance_optimizer() -> PerformanceOptimizer:
     """Get the global performance optimizer instance."""
@@ -374,19 +369,16 @@ def get_performance_optimizer() -> PerformanceOptimizer:
         _global_optimizer = PerformanceOptimizer()
     return _global_optimizer
 
-
 # Convenience functions for common operations
 async def measure_mcp_operation(operation_name: str, **metadata):
     """Convenience function for measuring MCP operations."""
     optimizer = get_performance_optimizer()
     return optimizer.measure_operation(f"mcp_{operation_name}", **metadata)
 
-
 async def measure_database_operation(operation_name: str, **metadata):
     """Convenience function for measuring database operations."""
     optimizer = get_performance_optimizer()
     return optimizer.measure_operation(f"db_{operation_name}", **metadata)
-
 
 async def measure_cache_operation(operation_name: str, **metadata):
     """Convenience function for measuring cache operations."""

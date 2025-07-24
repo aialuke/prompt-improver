@@ -5,7 +5,7 @@ intelligent rule selection and optimization in the APES system.
 
 Supports:
 - Epsilon-Greedy with decay scheduling
-- Upper Confidence Bound (UCB) with configurable exploration
+- Upper Confidence Bound (ucb) with configurable exploration
 - Thompson Sampling with Bayesian updating
 - Contextual bandits for rule-specific optimization
 - Integration with A/B testing framework
@@ -33,25 +33,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-
 class BanditAlgorithm(Enum):
     """Multi-armed bandit algorithm types"""
 
     EPSILON_GREEDY = "epsilon_greedy"
     EPSILON_DECAY = "epsilon_decay"
-    UCB = "ucb"
+    ucb = "ucb"
     THOMPSON_SAMPLING = "thompson_sampling"
     CONTEXTUAL_UCB = "contextual_ucb"
     CONTEXTUAL_THOMPSON = "contextual_thompson"
 
-
 class ExplorationStrategy(Enum):
     """Exploration strategy types"""
 
-    RANDOM = "random"
-    OPTIMISTIC = "optimistic"
+    random = "random"
+    optimistic = "optimistic"
     UNCERTAINTY_BASED = "uncertainty_based"
-
 
 @dataclass
 class BanditConfig:
@@ -65,7 +62,7 @@ class BanditConfig:
     epsilon_decay: float = 0.99
     min_epsilon: float = 0.01
 
-    # UCB parameters
+    # ucb parameters
     ucb_confidence: float = 2.0
     ucb_exploration_bonus: float = 1.0
 
@@ -88,7 +85,6 @@ class BanditConfig:
     enable_confidence_intervals: bool = True
     confidence_level: float = 0.95
 
-
 @dataclass
 class ArmResult:
     """Result from pulling a bandit arm"""
@@ -100,7 +96,6 @@ class ArmResult:
     timestamp: datetime = field(default_factory=datetime.utcnow)
     confidence: float = 0.0
     uncertainty: float = 0.0
-
 
 @dataclass
 class BanditState:
@@ -121,7 +116,6 @@ class BanditState:
     context_features: np.ndarray | None = None
     last_update: datetime = field(default_factory=datetime.utcnow)
 
-
 @dataclass
 class BanditExperiment:
     """Multi-armed bandit experiment tracking"""
@@ -136,7 +130,6 @@ class BanditExperiment:
     regret_history: list[float] = field(default_factory=list)
     arm_states: dict[str, BanditState] = field(default_factory=dict)
     is_active: bool = True
-
 
 class BaseBandit(ABC):
     """Abstract base class for multi-armed bandit algorithms"""
@@ -245,7 +238,6 @@ class BaseBandit(ABC):
         )
         return max(0.0, total_optimal_reward - total_actual_reward)
 
-
 class EpsilonGreedyBandit(BaseBandit):
     """Epsilon-Greedy bandit with optional decay"""
 
@@ -273,18 +265,17 @@ class EpsilonGreedyBandit(BaseBandit):
         # Exploit: select best arm
         return self.get_best_arm()
 
-
 class UCBBandit(BaseBandit):
     """Upper Confidence Bound bandit"""
 
     async def select_arm(self, context: np.ndarray | None = None) -> str:
-        """Select arm using UCB strategy"""
+        """Select arm using ucb strategy"""
         # Warmup phase: ensure each arm is pulled at least once
         unpulled_arms = [arm for arm in self.arms if self.arm_states[arm].pulls == 0]
         if unpulled_arms:
             return np.random.choice(unpulled_arms)
 
-        # Calculate UCB values
+        # Calculate ucb values
         ucb_values = {}
         for arm in self.arms:
             state = self.arm_states[arm]
@@ -297,9 +288,8 @@ class UCBBandit(BaseBandit):
                 )
                 ucb_values[arm] = state.mean_reward + confidence_radius
 
-        # Select arm with highest UCB value
+        # Select arm with highest ucb value
         return max(ucb_values.keys(), key=lambda arm: ucb_values[arm])
-
 
 class ThompsonSamplingBandit(BaseBandit):
     """Thompson Sampling bandit using Beta distributions"""
@@ -327,7 +317,6 @@ class ThompsonSamplingBandit(BaseBandit):
 
         # Select arm with highest sampled value
         return max(sampled_values.keys(), key=lambda arm: sampled_values[arm])
-
 
 class ContextualBandit(BaseBandit):
     """Contextual bandit using linear models"""
@@ -389,7 +378,6 @@ class ContextualBandit(BaseBandit):
 
         # Select arm with highest prediction
         return max(predictions.keys(), key=lambda arm: predictions[arm])
-
 
 class MultiarmedBanditFramework:
     """Main framework for multi-armed bandit experiments"""
@@ -591,7 +579,7 @@ class MultiarmedBanditFramework:
         """Create bandit instance based on algorithm"""
         if algorithm in [BanditAlgorithm.EPSILON_GREEDY, BanditAlgorithm.EPSILON_DECAY]:
             return EpsilonGreedyBandit(arms, config)
-        if algorithm == BanditAlgorithm.UCB:
+        if algorithm == BanditAlgorithm.ucb:
             return UCBBandit(arms, config)
         if algorithm == BanditAlgorithm.THOMPSON_SAMPLING:
             return ThompsonSamplingBandit(arms, config)
@@ -940,9 +928,7 @@ class MultiarmedBanditFramework:
 
         return stats
 
-
 # Utility functions for easy integration
-
 
 async def create_rule_optimization_bandit(
     rule_ids: list[str],
@@ -968,7 +954,6 @@ async def create_rule_optimization_bandit(
     )
 
     return framework, experiment_id
-
 
 async def intelligent_rule_selection(
     framework: MultiarmedBanditFramework,

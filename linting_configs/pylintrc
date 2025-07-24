@@ -1,0 +1,104 @@
+[MASTER]
+# Use multiple processes to speed up Pylint
+jobs=0
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+[MESSAGES CONTROL]
+# Enable naming convention checks
+enable=
+    invalid-name,
+    bad-classmethod-argument,
+    bad-mcs-classmethod-argument,
+    bad-mcs-method-argument
+
+# Disable some checks during transition
+disable=
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements
+
+[BASIC]
+# Naming style enforcement
+
+# Variable names should be snake_case
+variable-rgx=[a-z_][a-z0-9_]{2,30}$
+variable-name-hint=snake_case
+
+# Function names should be snake_case  
+function-rgx=[a-z_][a-z0-9_]{2,30}$
+function-name-hint=snake_case
+
+# Method names should be snake_case
+method-rgx=[a-z_][a-z0-9_]{2,30}$
+method-name-hint=snake_case
+
+# Class names should be PascalCase
+class-rgx=[A-Z_][a-zA-Z0-9]+$
+class-name-hint=PascalCase
+
+# Module names should be snake_case
+module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+module-name-hint=snake_case
+
+# Constant names should be UPPER_CASE
+const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
+const-name-hint=UPPER_CASE
+
+# Attribute names should be snake_case
+attr-rgx=[a-z_][a-z0-9_]{2,30}$
+attr-name-hint=snake_case
+
+# Argument names should be snake_case
+argument-rgx=[a-z_][a-z0-9_]{2,30}$
+argument-name-hint=snake_case
+
+# Class attribute names should be snake_case
+class-attribute-rgx=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
+
+# Good variable names which should always be accepted
+good-names=i,j,k,ex,Run,_,x,y,z,X,Y,Z,T,K,V,id
+
+# Bad variable names which should always be refused
+bad-names=foo,bar,baz,toto,tutu,tata
+
+# Include a hint for the correct naming format with invalid-name
+include-naming-hint=yes
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=88
+
+# String used as indentation unit
+indent-string='    '
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=10
+
+# Maximum number of locals for function / method body
+max-locals=25
+
+# Maximum number of return / yield for function / method body
+max-returns=6
+
+# Maximum number of branch for function / method body
+max-branches=20
+
+# Maximum number of statements in function / method body
+max-statements=50
+
+# Maximum number of parents for a class
+max-parents=7
+
+# Maximum number of attributes for a class
+max-attributes=15
+
+# Minimum number of public methods for a class
+min-public-methods=1
+
+# Maximum number of public methods for a class
+max-public-methods=25

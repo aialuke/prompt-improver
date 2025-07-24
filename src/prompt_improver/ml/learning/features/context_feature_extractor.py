@@ -1,9 +1,9 @@
 """Context Feature Extractor
 
 Modernized 2025 implementation for extracting context-specific features from prompt data.
-Features async/await patterns, Pydantic validation, circuit breaker, and orchestrator integration.
+features async/await patterns, Pydantic validation, circuit breaker, and orchestrator integration.
 
-Features:
+features:
 - Async-first architecture with non-blocking operations
 - Pydantic models for configuration and data validation
 - Circuit breaker pattern for fault tolerance
@@ -33,13 +33,11 @@ from ....utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 
-
 class CircuitBreakerState(Enum):
     """Circuit breaker states for fault tolerance."""
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
-
 
 class ContextFeatureConfig(BaseModel):
     """Enhanced 2025 configuration model for context feature extraction."""
@@ -81,7 +79,6 @@ class ContextFeatureConfig(BaseModel):
         if v.upper() not in valid_levels:
             raise ValueError(f"log_level must be one of: {valid_levels}")
         return v.upper()
-
 
 @dataclass
 class ContextExtractionMetrics:
@@ -127,7 +124,6 @@ class ContextExtractionMetrics:
             "circuit_breaker_trips": self.circuit_breaker_trips,
             "last_extraction_time": self.last_extraction_time
         }
-
 
 class ContextFeatureExtractor:
     """Enhanced 2025 context feature extractor with async operations and observability.

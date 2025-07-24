@@ -159,11 +159,10 @@ EXPERT_PERSONAS = {
     },
 }
 
-
 class RoleBasedPromptingRule(BasePromptRule):
     """Enhanced role-based prompting rule using Anthropic research patterns.
 
-    Features:
+    features:
     - Automatic domain detection from prompt content
     - Expert persona assignment based on task complexity
     - Persona consistency maintenance throughout interaction

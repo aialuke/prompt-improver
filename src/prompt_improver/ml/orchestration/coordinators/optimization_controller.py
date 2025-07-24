@@ -13,15 +13,13 @@ from enum import Enum
 
 from ..events.event_types import EventType, MLEvent
 
-
 class OptimizationType(Enum):
     """Types of optimization workflows."""
-    HYPERPARAMETER = "hyperparameter"
+    hyperparameter = "hyperparameter"
     MULTI_OBJECTIVE = "multi_objective"
     BAYESIAN = "bayesian"
     EVOLUTIONARY = "evolutionary"
-    AUTOML = "automl"
-
+    automl = "automl"
 
 @dataclass
 class OptimizationConfig:
@@ -35,7 +33,6 @@ class OptimizationConfig:
     def __post_init__(self):
         if self.optimization_metrics is None:
             self.optimization_metrics = ["accuracy", "latency", "memory_usage"]
-
 
 class OptimizationController:
     """
@@ -84,7 +81,7 @@ class OptimizationController:
         self.logger.info(f"Starting optimization workflow {workflow_id}")
         
         # Validate optimization parameters
-        optimization_type = OptimizationType(parameters.get("type", OptimizationType.HYPERPARAMETER.value))
+        optimization_type = OptimizationType(parameters.get("type", OptimizationType.hyperparameter.value))
         
         # Register optimization workflow
         self.active_optimizations[workflow_id] = {
@@ -162,9 +159,9 @@ class OptimizationController:
         """Execute the specific optimization strategy."""
         self.logger.info(f"Executing {optimization_type.value} optimization strategy for {workflow_id}")
         
-        if optimization_type == OptimizationType.AUTOML:
+        if optimization_type == OptimizationType.automl:
             await self._coordinate_automl_optimization(workflow_id, parameters)
-        elif optimization_type == OptimizationType.HYPERPARAMETER:
+        elif optimization_type == OptimizationType.hyperparameter:
             await self._execute_hyperparameter_optimization(workflow_id, parameters)
         elif optimization_type == OptimizationType.MULTI_OBJECTIVE:
             await self._execute_multi_objective_optimization(workflow_id, parameters)

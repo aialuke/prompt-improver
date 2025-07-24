@@ -13,14 +13,12 @@ from enum import Enum
 
 from ..events.event_types import EventType, MLEvent
 
-
 class DeploymentStrategy(Enum):
     """Deployment strategies."""
     BLUE_GREEN = "blue_green"
     CANARY = "canary"
     ROLLING = "rolling"
-    IMMEDIATE = "immediate"
-
+    immediate = "immediate"
 
 @dataclass
 class DeploymentConfig:
@@ -30,7 +28,6 @@ class DeploymentConfig:
     health_check_interval: int = 30  # seconds
     rollback_timeout: int = 300  # 5 minutes
     canary_traffic_percentage: float = 0.1  # 10%
-
 
 class DeploymentController:
     """
@@ -166,7 +163,7 @@ class DeploymentController:
             await self._execute_canary_deployment(deployment_id, parameters)
         elif strategy == DeploymentStrategy.ROLLING:
             await self._execute_rolling_deployment(deployment_id, parameters)
-        elif strategy == DeploymentStrategy.IMMEDIATE:
+        elif strategy == DeploymentStrategy.immediate:
             await self._execute_immediate_deployment(deployment_id, parameters)
         
         self.logger.info(f"Deployment strategy {strategy.value} executed for {deployment_id}")

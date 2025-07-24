@@ -23,7 +23,6 @@ from prompt_improver.utils.redis_cache import RedisCache
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class QueryPerformanceMetrics:
     """Metrics for query performance tracking."""
@@ -36,7 +35,6 @@ class QueryPerformanceMetrics:
     def meets_target(self, target_ms: float = 50) -> bool:
         """Check if query meets performance target."""
         return self.execution_time_ms <= target_ms
-
 
 class PreparedStatementCache:
     """Cache for prepared statements to improve query performance."""
@@ -223,7 +221,6 @@ class PreparedStatementCache:
 
         return recommendations
 
-
 class OptimizedQueryExecutor:
     """High-performance query executor with caching and optimization."""
 
@@ -231,6 +228,12 @@ class OptimizedQueryExecutor:
         self._prepared_cache = PreparedStatementCache()
         self._query_cache = RedisCache()
         self._performance_metrics: List[QueryPerformanceMetrics] = []
+        self._cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "cache_time_saved_ms": 0.0,
+            "total_cached_queries": 0
+        }
 
     @asynccontextmanager
     async def execute_optimized_query(
@@ -257,14 +260,39 @@ class OptimizedQueryExecutor:
 
         # Check cache first
         if cache_key and enable_cache:
-            cached_result = await self._query_cache.get(cache_key)
-            if cached_result:
-                yield {
-                    "result": cached_result,
-                    "cache_hit": True,
-                    "execution_time_ms": 0
-                }
-                return
+            cache_start = time.perf_counter()
+            try:
+                cached_result = await self._query_cache.get(cache_key)
+                if cached_result:
+                    cache_time = (time.perf_counter() - cache_start) * 1000
+                    
+                    # Update cache statistics
+                    self._cache_stats["hits"] += 1
+                    self._cache_stats["cache_time_saved_ms"] += max(0, 50 - cache_time)  # Assuming 50ms baseline
+                    
+                    # Record cache hit metric
+                    query_metrics = QueryPerformanceMetrics(
+                        query_hash=self._prepared_cache._hash_query_structure(query),
+                        execution_time_ms=cache_time,
+                        rows_returned=len(cached_result) if isinstance(cached_result, list) else 1,
+                        cache_hit=True,
+                        timestamp=datetime.utcnow()
+                    )
+                    self._performance_metrics.append(query_metrics)
+                    
+                    logger.debug(f"Cache hit for query {query[:50]}... (saved ~{50-cache_time:.1f}ms)")
+                    
+                    yield {
+                        "result": cached_result,
+                        "cache_hit": True,
+                        "execution_time_ms": cache_time
+                    }
+                    return
+                else:
+                    self._cache_stats["misses"] += 1
+            except Exception as e:
+                logger.warning(f"Cache lookup failed: {e}, proceeding without cache")
+                self._cache_stats["misses"] += 1
 
         # Execute query with performance measurement
         async with measure_database_operation("optimized_query") as perf_metrics:
@@ -282,7 +310,21 @@ class OptimizedQueryExecutor:
 
                 # Cache the result if enabled
                 if cache_key and enable_cache and execution_time < 1000:  # Only cache fast queries
-                    await self._query_cache.set(cache_key, rows, expire=cache_ttl)
+                    try:
+                        # Serialize the result for caching
+                        import json
+                        serialized_rows = json.dumps(
+                            [{k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v 
+                              for k, v in row.items()} for row in rows],
+                            default=str
+                        ).encode()
+                        
+                        await self._query_cache.set(cache_key, serialized_rows, expire=cache_ttl)
+                        self._cache_stats["total_cached_queries"] += 1
+                        
+                        logger.debug(f"Cached query result: {query[:50]}... ({len(rows)} rows, TTL: {cache_ttl}s)")
+                    except Exception as e:
+                        logger.warning(f"Failed to cache query result: {e}")
 
                 # Record performance metrics
                 query_metrics = QueryPerformanceMetrics(
@@ -342,6 +384,15 @@ class OptimizedQueryExecutor:
             return {"message": "No recent query metrics available"}
 
         execution_times = [m.execution_time_ms for m in recent_metrics]
+        cache_hits = sum(1 for m in recent_metrics if m.cache_hit)
+        cache_misses = len(recent_metrics) - cache_hits
+
+        # Calculate database load reduction
+        total_cache_operations = self._cache_stats["hits"] + self._cache_stats["misses"]
+        cache_hit_rate = self._cache_stats["hits"] / total_cache_operations if total_cache_operations > 0 else 0
+        
+        # Estimate database load reduction (cache hits avoid DB queries)
+        estimated_db_load_reduction = cache_hit_rate * 100  # Each cache hit is a DB query avoided
 
         return {
             "total_queries": len(recent_metrics),
@@ -350,10 +401,14 @@ class OptimizedQueryExecutor:
             "min_execution_time_ms": min(execution_times),
             "queries_meeting_target": sum(1 for t in execution_times if t <= 50),
             "target_compliance_rate": sum(1 for t in execution_times if t <= 50) / len(execution_times),
-            "cache_hit_rate": sum(1 for m in recent_metrics if m.cache_hit) / len(recent_metrics),
+            "cache_hit_rate": cache_hit_rate,
+            "cache_hits": self._cache_stats["hits"],
+            "cache_misses": self._cache_stats["misses"],
+            "cache_time_saved_ms": self._cache_stats["cache_time_saved_ms"],
+            "total_cached_queries": self._cache_stats["total_cached_queries"],
+            "estimated_db_load_reduction_percent": round(estimated_db_load_reduction, 1),
             "slow_queries_count": sum(1 for t in execution_times if t > 50)
         }
-
 
 class DatabaseConnectionOptimizer:
     """Optimizer for database connection settings and pool configuration with dynamic resource detection."""
@@ -566,10 +621,8 @@ class DatabaseConnectionOptimizer:
             # Don't fail analysis if event emission fails
             logger.debug(f"Failed to emit resource analysis event: {e}")
 
-
 # Global query executor instance
 _global_executor: Optional[OptimizedQueryExecutor] = None
-
 
 def get_query_executor() -> OptimizedQueryExecutor:
     """Get the global optimized query executor."""
@@ -577,7 +630,6 @@ def get_query_executor() -> OptimizedQueryExecutor:
     if _global_executor is None:
         _global_executor = OptimizedQueryExecutor()
     return _global_executor
-
 
 # Convenience function for optimized queries
 async def execute_optimized_query(

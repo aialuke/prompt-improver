@@ -11,10 +11,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 
-
 try:
     import spacy
-    from spacy.lang.en import English
+    from spacy.lang.en import english
     from spacy.language import Language
     from spacy.matcher import Matcher, PhraseMatcher
     from spacy.tokens import Doc, Span, Token
@@ -22,7 +21,7 @@ try:
     SPACY_AVAILABLE = True
 except ImportError:
     spacy = None
-    English = None
+    english = None
     Language = None
     PhraseMatcher = None
     Matcher = None
@@ -30,7 +29,6 @@ except ImportError:
     Span = None
     Token = None
     SPACY_AVAILABLE = False
-
 
 class PromptDomain(Enum):
     """Enumeration of prompt domains for classification."""
@@ -46,32 +44,31 @@ class PromptDomain(Enum):
     # Creative domains
     CREATIVE_WRITING = "creative_writing"
     CONTENT_CREATION = "content_creation"
-    MARKETING = "marketing"
-    STORYTELLING = "storytelling"
+    marketing = "marketing"
+    storytelling = "storytelling"
 
     # Academic domains
-    RESEARCH = "research"
-    EDUCATION = "education"
+    research = "research"
+    education = "education"
     ACADEMIC_WRITING = "academic_writing"
-    SCIENTIFIC = "scientific"
+    scientific = "scientific"
 
     # Business domains
     BUSINESS_ANALYSIS = "business_analysis"
     PROJECT_MANAGEMENT = "project_management"
     CUSTOMER_SERVICE = "customer_service"
-    SALES = "sales"
+    sales = "sales"
 
     # Medical/Legal domains
-    MEDICAL = "medical"
-    LEGAL = "legal"
-    HEALTHCARE = "healthcare"
+    medical = "medical"
+    legal = "legal"
+    healthcare = "healthcare"
 
     # General domains
-    CONVERSATIONAL = "conversational"
-    INSTRUCTIONAL = "instructional"
-    ANALYTICAL = "analytical"
-    GENERAL = "general"
-
+    conversational = "conversational"
+    instructional = "instructional"
+    analytical = "analytical"
+    general = "general"
 
 @dataclass
 class DomainKeywords:
@@ -466,7 +463,6 @@ class DomainKeywords:
         }
     )
 
-
 @dataclass
 class DomainClassificationResult:
     """Result of domain classification analysis."""
@@ -478,7 +474,6 @@ class DomainClassificationResult:
     technical_complexity: float = 0.0
     domain_specificity: float = 0.0
     hybrid_domain: bool = False
-
 
 class DomainDetector:
     """Intelligent domain detection system for prompts."""
@@ -505,12 +500,12 @@ class DomainDetector:
     def _initialize_spacy_components(self):
         """Initialize spaCy components for domain detection."""
         try:
-            # Use a lightweight English model or create blank pipeline
+            # Use a lightweight english model or create blank pipeline
             try:
                 self.nlp = spacy.load("en_core_web_sm")
             except OSError:
-                self.nlp = English()
-                self.logger.info("Using blank English pipeline for domain detection")
+                self.nlp = english()
+                self.logger.info("Using blank english pipeline for domain detection")
 
             # Add custom domain detection component
             if not self.nlp.has_pipe("domain_detector"):
@@ -601,13 +596,13 @@ class DomainDetector:
                 r"\b(?:stakeholder|requirement|process)\b",
                 r"\b(?:strategy|optimization|efficiency)\b",
             ],
-            PromptDomain.MEDICAL: [
+            PromptDomain.medical: [
                 r"\b(?:patient|diagnosis|treatment|symptom)\b",
                 r"\b(?:clinical trial|medical procedure)\b",
                 r"\b(?:healthcare|medical record|prescription)\b",
                 r"\b(?:pathology|epidemiology|prognosis)\b",
             ],
-            PromptDomain.LEGAL: [
+            PromptDomain.legal: [
                 r"\b(?:contract|agreement|clause|liability)\b",
                 r"\b(?:litigation|settlement|jurisdiction)\b",
                 r"\b(?:plaintiff|defendant|evidence|testimony)\b",
@@ -644,7 +639,7 @@ class DomainDetector:
         """
         if not text or not text.strip():
             return DomainClassificationResult(
-                primary_domain=PromptDomain.GENERAL, confidence=0.0
+                primary_domain=PromptDomain.general, confidence=0.0
             )
 
         text_lower = text.lower()
@@ -691,12 +686,12 @@ class DomainDetector:
             "web_development": PromptDomain.WEB_DEVELOPMENT,
             "creative_writing": PromptDomain.CREATIVE_WRITING,
             "content_creation": PromptDomain.CONTENT_CREATION,
-            "research": PromptDomain.RESEARCH,
-            "education": PromptDomain.EDUCATION,
+            "research": PromptDomain.research,
+            "education": PromptDomain.education,
             "academic_writing": PromptDomain.ACADEMIC_WRITING,
             "business_analysis": PromptDomain.BUSINESS_ANALYSIS,
-            "medical": PromptDomain.MEDICAL,
-            "legal": PromptDomain.LEGAL,
+            "medical": PromptDomain.medical,
+            "legal": PromptDomain.legal,
         }
 
         for domain_name, score in domain_scores.items():
@@ -717,7 +712,7 @@ class DomainDetector:
 
         # Determine primary domain
         if not final_scores:
-            primary_domain = PromptDomain.GENERAL
+            primary_domain = PromptDomain.general
             confidence = 0.0
             secondary_domains = []
         else:
@@ -797,12 +792,12 @@ class DomainDetector:
             PromptDomain.WEB_DEVELOPMENT: "web_development",
             PromptDomain.CREATIVE_WRITING: "creative_writing",
             PromptDomain.CONTENT_CREATION: "content_creation",
-            PromptDomain.RESEARCH: "research",
-            PromptDomain.EDUCATION: "education",
+            PromptDomain.research: "research",
+            PromptDomain.education: "education",
             PromptDomain.ACADEMIC_WRITING: "academic_writing",
             PromptDomain.BUSINESS_ANALYSIS: "business_analysis",
-            PromptDomain.MEDICAL: "medical",
-            PromptDomain.LEGAL: "legal",
+            PromptDomain.medical: "medical",
+            PromptDomain.legal: "legal",
         }
 
         attr_name = domain_attr_map.get(domain)

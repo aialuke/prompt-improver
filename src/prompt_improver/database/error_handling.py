@@ -25,28 +25,25 @@ from ..performance.monitoring.metrics_registry import (
 
 logger = logging.getLogger(__name__)
 
-
 class ErrorCategory(Enum):
     """Database error categories for classification."""
 
-    CONNECTION = "connection"
-    TIMEOUT = "timeout"
-    TRANSIENT = "transient"
-    CONSTRAINT = "constraint"
-    SYNTAX = "syntax"
-    PERMISSION = "permission"
-    RESOURCE = "resource"
-    UNKNOWN = "unknown"
-
+    connection = "connection"
+    timeout = "timeout"
+    transient = "transient"
+    constraint = "constraint"
+    syntax = "syntax"
+    permission = "permission"
+    resource = "resource"
+    unknown = "unknown"
 
 class ErrorSeverity(Enum):
     """Error severity levels."""
 
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
 
 class DatabaseErrorClassifier:
     """Classifies database errors for appropriate handling."""
@@ -54,32 +51,32 @@ class DatabaseErrorClassifier:
     # Error classification mappings
     ERROR_MAPPINGS = {
         # Connection errors
-        psycopg_errors.OperationalError: (ErrorCategory.CONNECTION, ErrorSeverity.HIGH),
-        psycopg_errors.InterfaceError: (ErrorCategory.CONNECTION, ErrorSeverity.HIGH),
+        psycopg_errors.OperationalError: (ErrorCategory.connection, ErrorSeverity.high),
+        psycopg_errors.InterfaceError: (ErrorCategory.connection, ErrorSeverity.high),
 
         # Timeout errors
-        psycopg_errors.QueryCanceled: (ErrorCategory.TIMEOUT, ErrorSeverity.MEDIUM),
+        psycopg_errors.QueryCanceled: (ErrorCategory.timeout, ErrorSeverity.medium),
 
         # Transient errors
-        psycopg_errors.DeadlockDetected: (ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM),
-        psycopg_errors.SerializationFailure: (ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM),
+        psycopg_errors.DeadlockDetected: (ErrorCategory.transient, ErrorSeverity.medium),
+        psycopg_errors.SerializationFailure: (ErrorCategory.transient, ErrorSeverity.medium),
 
         # Constraint violations
-        psycopg_errors.IntegrityError: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
-        psycopg_errors.UniqueViolation: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
-        psycopg_errors.ForeignKeyViolation: (ErrorCategory.CONSTRAINT, ErrorSeverity.LOW),
+        psycopg_errors.IntegrityError: (ErrorCategory.constraint, ErrorSeverity.low),
+        psycopg_errors.UniqueViolation: (ErrorCategory.constraint, ErrorSeverity.low),
+        psycopg_errors.ForeignKeyViolation: (ErrorCategory.constraint, ErrorSeverity.low),
 
         # Syntax errors
-        psycopg_errors.SyntaxError: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
-        psycopg_errors.UndefinedTable: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
-        psycopg_errors.UndefinedColumn: (ErrorCategory.SYNTAX, ErrorSeverity.HIGH),
+        psycopg_errors.SyntaxError: (ErrorCategory.syntax, ErrorSeverity.high),
+        psycopg_errors.UndefinedTable: (ErrorCategory.syntax, ErrorSeverity.high),
+        psycopg_errors.UndefinedColumn: (ErrorCategory.syntax, ErrorSeverity.high),
 
         # Permission errors
-        psycopg_errors.InsufficientPrivilege: (ErrorCategory.PERMISSION, ErrorSeverity.HIGH),
+        psycopg_errors.InsufficientPrivilege: (ErrorCategory.permission, ErrorSeverity.high),
 
         # Resource errors
-        psycopg_errors.DiskFull: (ErrorCategory.RESOURCE, ErrorSeverity.CRITICAL),
-        psycopg_errors.OutOfMemory: (ErrorCategory.RESOURCE, ErrorSeverity.CRITICAL),
+        psycopg_errors.DiskFull: (ErrorCategory.resource, ErrorSeverity.critical),
+        psycopg_errors.OutOfMemory: (ErrorCategory.resource, ErrorSeverity.critical),
     }
 
     @classmethod
@@ -100,17 +97,17 @@ class DatabaseErrorClassifier:
         error_str = str(error).lower()
 
         if any(term in error_str for term in ['connection', 'connect', 'network']):
-            return ErrorCategory.CONNECTION, ErrorSeverity.HIGH
+            return ErrorCategory.connection, ErrorSeverity.high
         elif any(term in error_str for term in ['timeout', 'timed out']):
-            return ErrorCategory.TIMEOUT, ErrorSeverity.MEDIUM
+            return ErrorCategory.timeout, ErrorSeverity.medium
         elif any(term in error_str for term in ['deadlock', 'serialization']):
-            return ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM
+            return ErrorCategory.transient, ErrorSeverity.medium
         elif any(term in error_str for term in ['permission', 'privilege']):
-            return ErrorCategory.PERMISSION, ErrorSeverity.HIGH
+            return ErrorCategory.permission, ErrorSeverity.high
         elif any(term in error_str for term in ['syntax', 'undefined']):
-            return ErrorCategory.SYNTAX, ErrorSeverity.HIGH
+            return ErrorCategory.syntax, ErrorSeverity.high
 
-        return ErrorCategory.UNKNOWN, ErrorSeverity.MEDIUM
+        return ErrorCategory.unknown, ErrorSeverity.medium
 
     @classmethod
     def is_retryable(cls, error: Exception) -> bool:
@@ -119,14 +116,13 @@ class DatabaseErrorClassifier:
 
         # Retryable categories
         retryable_categories = {
-            ErrorCategory.CONNECTION,
-            ErrorCategory.TIMEOUT,
-            ErrorCategory.TRANSIENT,
-            ErrorCategory.RESOURCE
+            ErrorCategory.connection,
+            ErrorCategory.timeout,
+            ErrorCategory.transient,
+            ErrorCategory.resource
         }
 
         return category in retryable_categories
-
 
 class ErrorMetrics:
     """Metrics collection for database errors."""
@@ -171,10 +167,8 @@ class ErrorMetrics:
         """Update circuit breaker state metrics."""
         self.circuit_breaker_gauge.labels(operation=operation).set(state)
 
-
 # Global error metrics instance
 global_error_metrics = ErrorMetrics()
-
 
 def enhance_error_context(error: Exception, operation: str, **kwargs) -> Dict[str, Any]:
     """Enhance error with context information."""
@@ -196,7 +190,6 @@ def enhance_error_context(error: Exception, operation: str, **kwargs) -> Dict[st
 
     return context
 
-
 def create_database_error_classifier():
     """Create error classifier function for unified retry manager."""
     def classify_for_retry(error: Exception):
@@ -207,16 +200,15 @@ def create_database_error_classifier():
 
         # Map database categories to retry error types
         category_mapping = {
-            ErrorCategory.CONNECTION: RetryableErrorType.NETWORK,
-            ErrorCategory.TIMEOUT: RetryableErrorType.TIMEOUT,
-            ErrorCategory.TRANSIENT: RetryableErrorType.TRANSIENT,
-            ErrorCategory.RESOURCE: RetryableErrorType.RESOURCE_EXHAUSTION,
+            ErrorCategory.connection: RetryableErrorType.NETWORK,
+            ErrorCategory.timeout: RetryableErrorType.timeout,
+            ErrorCategory.transient: RetryableErrorType.transient,
+            ErrorCategory.resource: RetryableErrorType.RESOURCE_EXHAUSTION,
         }
 
-        return category_mapping.get(category, RetryableErrorType.TRANSIENT)
+        return category_mapping.get(category, RetryableErrorType.transient)
 
     return classify_for_retry
-
 
 # Default configurations for database operations
 def get_default_database_retry_config():
@@ -235,15 +227,14 @@ def get_default_database_retry_config():
         recovery_timeout_ms=60000,
         retryable_errors=[
             RetryableErrorType.NETWORK,
-            RetryableErrorType.TIMEOUT,
-            RetryableErrorType.TRANSIENT,
+            RetryableErrorType.timeout,
+            RetryableErrorType.transient,
             RetryableErrorType.RESOURCE_EXHAUSTION
         ],
         error_classifier=create_database_error_classifier(),
         enable_metrics=True,
         enable_tracing=True
     )
-
 
 # Convenience function for database operations with retry
 async def execute_with_database_retry(operation, operation_name: str, **kwargs):
@@ -256,7 +247,6 @@ async def execute_with_database_retry(operation, operation_name: str, **kwargs):
 
     return await retry_manager.retry_async(operation, config=config)
 
-
 class RetryManager:
     """
     Database-specific Retry Manager with 2025 best practices.
@@ -264,7 +254,7 @@ class RetryManager:
     Integrates with UnifiedRetryManager for ML Pipeline Orchestrator while providing
     database-specific error handling, circuit breaker patterns, and observability.
 
-    Features:
+    features:
     - Database-specific error classification and retry logic
     - Circuit breaker pattern with adaptive thresholds
     - Comprehensive observability with OpenTelemetry-ready metrics

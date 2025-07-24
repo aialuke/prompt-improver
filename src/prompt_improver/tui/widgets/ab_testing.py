@@ -12,7 +12,6 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import DataTable, Static
 
-
 class ABTestingWidget(Static):
     """Widget displaying A/B testing experiments and results."""
 

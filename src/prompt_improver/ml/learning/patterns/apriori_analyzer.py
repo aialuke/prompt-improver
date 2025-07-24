@@ -25,7 +25,6 @@ from ....database.connection import DatabaseManager
 from ....utils.error_handlers import handle_common_errors as handle_errors
 from ....utils.redis_cache import cached
 
-
 @dataclass
 class AprioriConfig:
     """Configuration for Apriori algorithm parameters."""
@@ -36,7 +35,6 @@ class AprioriConfig:
     transaction_window: int = 1000
     use_sparse: bool = False
     verbose: bool = False
-
 
 class AprioriAnalyzer:
     """Apriori Algorithm Analyzer for discovering association rules in prompt improvement data.

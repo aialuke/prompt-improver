@@ -32,7 +32,7 @@ except ImportError:
 
     class MockPsutil:
         @staticmethod
-        def Process(pid=None):
+        def process(pid=None):
             return MockProcess()
 
         @staticmethod
@@ -53,7 +53,6 @@ from rich.console import Console
 
 from ...database import get_session, get_sessionmanager
 from ...utils.subprocess_security import ensure_running
-
 
 class APESServiceManager:
     """
@@ -486,7 +485,7 @@ class APESServiceManager:
                 metrics["avg_response_time"] = (end_time - start_time) * 1000
 
             # System metrics
-            process = psutil.Process()
+            process = psutil.process()
             metrics["memory_usage_mb"] = process.memory_info().rss / (1024 * 1024)
             metrics["cpu_usage_percent"] = process.cpu_percent()
 
@@ -584,7 +583,7 @@ class APESServiceManager:
                 self.pid_file.unlink()
                 return {"status": "not_running", "message": "Process not found"}
 
-            process = psutil.Process(pid)
+            process = psutil.process(pid)
 
             # Send SIGTERM for graceful shutdown
             process.terminate()
@@ -670,7 +669,7 @@ class APESServiceManager:
                 started_at = datetime.fromisoformat(pid_data["started_at"])
 
             if psutil.pid_exists(pid):
-                process = psutil.Process(pid)
+                process = psutil.process(pid)
 
                 status.update({
                     "running": True,

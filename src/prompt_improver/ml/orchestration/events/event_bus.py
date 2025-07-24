@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from .event_types import EventType, MLEvent
 from ..config.orchestrator_config import OrchestratorConfig
 
-
 @dataclass
 class EventSubscription:
     """Event subscription details."""
@@ -21,7 +20,6 @@ class EventSubscription:
     handler: Callable[[MLEvent], Any]
     subscription_id: str
     is_async: bool = True
-
 
 class EventBus:
     """

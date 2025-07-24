@@ -34,13 +34,11 @@ from prometheus_client import Counter, Histogram, Gauge
 from .background_manager import get_background_task_manager
 from .base import HealthChecker, HealthResult, HealthStatus
 
-
 class CircuitBreakerState(Enum):
     """Circuit breaker states for Redis health monitoring."""
     CLOSED = "closed"      # Normal operation
     OPEN = "open"          # Failing, blocking requests
     HALF_OPEN = "half_open"  # Testing if service recovered
-
 
 class RedisHealthMetrics:
     """Enhanced metrics collection for Redis health monitoring."""
@@ -97,12 +95,11 @@ REDIS_CHECK_FAILURES = metrics_registry.get_or_create_counter(
     'Total number of Redis check failures'
 )
 
-
 class RedisHealthMonitor(HealthChecker):
     """
     Enhanced Redis health monitoring with 2025 best practices.
 
-    Features:
+    features:
     - Connection pool monitoring and health tracking
     - Adaptive thresholds based on performance trends
     - Circuit breaker patterns for resilience
@@ -487,7 +484,6 @@ class RedisHealthMonitor(HealthChecker):
             logger.error(f"Failed to get enhanced status: {e}")
             return {"component": self.name, "error": str(e)}
 
-
 async def schedule_redis_health_checks(config):
     """Schedule and manage periodic Redis health checks."""
     task_manager = get_background_task_manager()
@@ -505,7 +501,6 @@ async def schedule_redis_health_checks(config):
             logger.error(f"Error scheduling Redis health check: {e}")
             await asyncio.sleep(check_interval)
 
-
 # Initialize the Redis Health Monitor
 default_monitor_config = {
     'check_interval': 60,  # Time between checks in seconds
@@ -513,7 +508,6 @@ default_monitor_config = {
     'latency_threshold': 100,
     'reconnection': {'max_retries': 5, 'backoff_factor': 2}
 }
-
 
 async def start_redis_health_monitor(config=None):
     """Start the Redis health monitoring task based on the configuration."""

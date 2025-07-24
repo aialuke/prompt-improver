@@ -22,7 +22,6 @@ from sqlmodel import SQLModel
 
 logger = logging.getLogger(__name__)
 
-
 # Create a centralized registry
 _centralized_registry = registry(
     type_annotation_map={
@@ -41,7 +40,6 @@ _centralized_metadata = MetaData(
     }
 )
 
-
 class PromptImproverBase(DeclarativeBase):
     """Single declarative base for all prompt improver models.
 
@@ -54,7 +52,6 @@ class PromptImproverBase(DeclarativeBase):
     # Use the centralized registry
     registry = _centralized_registry
     metadata = _centralized_metadata
-
 
 class RegistryManager:
     """Registry manager for handling SQLAlchemy model registration.
@@ -182,10 +179,8 @@ class RegistryManager:
             'registry_size': len(self.registry._class_registry)
         }
 
-
 # Global registry manager instance
 _registry_manager: RegistryManager | None = None
-
 
 def get_registry_manager() -> RegistryManager:
     """Get the global registry manager instance.
@@ -197,7 +192,6 @@ def get_registry_manager() -> RegistryManager:
     if _registry_manager is None:
         _registry_manager = RegistryManager()
     return _registry_manager
-
 
 def clear_registry() -> None:
     """Clear the global registry.
@@ -222,7 +216,6 @@ def clear_registry() -> None:
     _registry_manager = None
     patch_sqlmodel_registry()
 
-
 def diagnose_registry() -> dict[str, Any]:
     """Diagnose registry conflicts.
 
@@ -230,7 +223,6 @@ def diagnose_registry() -> dict[str, Any]:
         Dictionary with conflict information
     """
     return get_registry_manager().diagnose_registry_conflicts()
-
 
 # Integrate with SQLModel
 def patch_sqlmodel_registry():
@@ -244,7 +236,6 @@ def patch_sqlmodel_registry():
     SQLModel.metadata = PromptImproverBase.metadata
 
     logger.info("SQLModel registry patched to use centralized registry")
-
 
 # Apply the patch at module import
 patch_sqlmodel_registry()

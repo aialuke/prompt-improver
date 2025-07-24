@@ -27,7 +27,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-
 class StoppingDecision(Enum):
     """Early stopping decisions"""
 
@@ -37,15 +36,13 @@ class StoppingDecision(Enum):
     STOP_FOR_SUPERIORITY = "stop_for_superiority"  # Clear winner
     STOP_FOR_FUTILITY = "stop_for_futility"  # Unlikely to find effect
 
-
 class AlphaSpendingFunction(Enum):
     """Error spending function types"""
 
-    POCOCK = "pocock"
+    pocock = "pocock"
     OBRIEN_FLEMING = "obrien_fleming"
     WANG_TSIATIS = "wang_tsiatis"
     CUSTOM = "custom"
-
 
 @dataclass
 class EarlyStoppingConfig:
@@ -78,7 +75,6 @@ class EarlyStoppingConfig:
     mixture_weights: list[float] = field(default_factory=lambda: [0.5, 0.5])
     mixture_effects: list[float] = field(default_factory=lambda: [0.1, 0.2])
 
-
 @dataclass
 class SPRTBounds:
     """SPRT decision boundaries"""
@@ -88,7 +84,6 @@ class SPRTBounds:
     log_likelihood_ratio: float
     samples_analyzed: int
     decision: StoppingDecision
-
 
 @dataclass
 class GroupSequentialBounds:
@@ -100,7 +95,6 @@ class GroupSequentialBounds:
     rejection_boundary: float
     futility_boundary: float | None
     decision: StoppingDecision
-
 
 @dataclass
 class EarlyStoppingResult:
@@ -132,7 +126,6 @@ class EarlyStoppingResult:
     recommendation: str = ""
     confidence: float = 0.0
     estimated_remaining_samples: int = 0
-
 
 class AdvancedEarlyStoppingFramework:
     """Advanced early stopping framework implementing research-validated methods"""
@@ -596,7 +589,7 @@ class AdvancedEarlyStoppingFramework:
         """Calculate cumulative alpha spending at information time t"""
         alpha = self.config.alpha
 
-        if function_type == AlphaSpendingFunction.POCOCK:
+        if function_type == AlphaSpendingFunction.pocock:
             # Pocock boundary: α * ln(1 + (e-1)*t)
             if t <= 0:
                 return 0
@@ -845,9 +838,7 @@ class AdvancedEarlyStoppingFramework:
 
         self.logger.info(f"Cleaned up {len(to_remove)} old experiments")
 
-
 # Utility functions for integration with existing A/B testing service
-
 
 def create_early_stopping_framework(
     alpha: float = 0.05,
@@ -864,7 +855,6 @@ def create_early_stopping_framework(
         alpha_spending_function=AlphaSpendingFunction.OBRIEN_FLEMING,
     )
     return AdvancedEarlyStoppingFramework(config)
-
 
 async def should_stop_experiment(
     experiment_id: str,

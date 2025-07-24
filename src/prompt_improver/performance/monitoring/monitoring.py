@@ -92,25 +92,22 @@ from ...database.models import RulePerformance
 from ..analytics.analytics import AnalyticsService
 from ...utils.error_handlers import handle_common_errors, handle_database_errors
 
-
 class TraceLevel(Enum):
     """Trace level for distributed tracing."""
 
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
     CRITICAL = "critical"
-
 
 class MetricType(Enum):
     """Types of metrics for collection."""
 
-    COUNTER = "counter"
-    HISTOGRAM = "histogram"
-    GAUGE = "gauge"
-    SUMMARY = "summary"
-
+    counter = "counter"
+    histogram = "histogram"
+    gauge = "gauge"
+    summary = "summary"
 
 class AlertSeverity(Enum):
     """Alert severity levels."""
@@ -119,7 +116,6 @@ class AlertSeverity(Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
-
 
 @dataclass
 class TraceContext:
@@ -139,7 +135,6 @@ class TraceContext:
             "baggage": self.baggage,
             "correlation_id": self.correlation_id
         }
-
 
 @dataclass
 class CustomMetric:
@@ -163,7 +158,6 @@ class CustomMetric:
             "value": self.value,
             "timestamp": self.timestamp.isoformat()
         }
-
 
 @dataclass
 class EnhancedAlert:
@@ -198,7 +192,6 @@ class EnhancedAlert:
             "resolution_time": self.resolution_time.isoformat() if self.resolution_time else None
         }
 
-
 @dataclass
 class ServiceHealth:
     """Service health status with detailed metrics."""
@@ -225,7 +218,6 @@ class ServiceHealth:
             "dependencies": self.dependencies,
             "custom_metrics": self.custom_metrics
         }
-
 
 # OpenTelemetry setup
 if OPENTELEMETRY_AVAILABLE:
@@ -279,7 +271,6 @@ else:
     ERROR_COUNTER = MockInstrument()
     SERVICE_HEALTH_GAUGE = MockInstrument()
 
-
 # Use centralized metrics registry
 from .metrics_registry import get_metrics_registry
 
@@ -305,7 +296,6 @@ REALTIME_ACTIVE_CONNECTIONS = metrics_registry.get_or_create_gauge(
     ['service']
 )
 
-
 @dataclass
 class AlertThreshold:
     """Alert threshold configuration"""
@@ -315,7 +305,6 @@ class AlertThreshold:
     database_connections: int = 15
     memory_usage_mb: int = 256
     error_rate_percent: float = 5.0
-
 
 @dataclass
 class PerformanceAlert:
@@ -329,11 +318,10 @@ class PerformanceAlert:
     severity: str  # 'warning', 'critical'
     message: str
 
-
 class EnhancedRealTimeMonitor:
     """Enhanced real-time monitor with OpenTelemetry and 2025 best practices.
 
-    Features:
+    features:
     - OpenTelemetry integration for distributed tracing
     - Structured logging with correlation IDs
     - Multi-dimensional metrics collection
@@ -442,18 +430,18 @@ class EnhancedRealTimeMonitor:
         if self.enable_metrics:
             labels = {"service": self.service_name, **metric.labels}
 
-            if metric.metric_type == MetricType.COUNTER:
+            if metric.metric_type == MetricType.counter:
                 REQUEST_COUNTER.add(metric.value, labels)
-            elif metric.metric_type == MetricType.HISTOGRAM:
+            elif metric.metric_type == MetricType.histogram:
                 RESPONSE_TIME_HISTOGRAM.record(metric.value, labels)
-            elif metric.metric_type == MetricType.GAUGE:
+            elif metric.metric_type == MetricType.gauge:
                 SERVICE_HEALTH_GAUGE.set(metric.value, labels)
 
         # Record to Prometheus
         if PROMETHEUS_AVAILABLE and REALTIME_REQUESTS:
-            if metric.metric_type == MetricType.COUNTER:
+            if metric.metric_type == MetricType.counter:
                 REALTIME_REQUESTS.labels(service=self.service_name, method=metric.name).inc(metric.value)
-            elif metric.metric_type == MetricType.HISTOGRAM:
+            elif metric.metric_type == MetricType.histogram:
                 REALTIME_RESPONSE_TIME.labels(service=self.service_name).observe(metric.value)
 
         self.logger.debug(f"Recorded metric: {metric.name} = {metric.value}")
@@ -506,7 +494,7 @@ class EnhancedRealTimeMonitor:
         health_score = self._calculate_health_score(health)
         await self.record_metric(CustomMetric(
             name=f"service_health_{service_name}",
-            metric_type=MetricType.GAUGE,
+            metric_type=MetricType.gauge,
             description=f"Health score for {service_name}",
             value=health_score,
             labels={"service": service_name}
@@ -689,7 +677,7 @@ class EnhancedRealTimeMonitor:
                         # Record database metrics
                         await self.record_metric(CustomMetric(
                             name="database_response_time",
-                            metric_type=MetricType.HISTOGRAM,
+                            metric_type=MetricType.histogram,
                             description="Database response time",
                             unit="ms",
                             value=db_response_time,
@@ -703,7 +691,7 @@ class EnhancedRealTimeMonitor:
                 # Record error
                 await self.record_metric(CustomMetric(
                     name="database_errors",
-                    metric_type=MetricType.COUNTER,
+                    metric_type=MetricType.counter,
                     description="Database errors",
                     value=1,
                     labels={"error_type": "connection"}
@@ -726,7 +714,7 @@ class EnhancedRealTimeMonitor:
                 # Record system metrics
                 await self.record_metric(CustomMetric(
                     name="memory_usage",
-                    metric_type=MetricType.GAUGE,
+                    metric_type=MetricType.gauge,
                     description="Memory usage percentage",
                     unit="percent",
                     value=memory_info.percent
@@ -734,7 +722,7 @@ class EnhancedRealTimeMonitor:
 
                 await self.record_metric(CustomMetric(
                     name="cpu_usage",
-                    metric_type=MetricType.GAUGE,
+                    metric_type=MetricType.gauge,
                     description="CPU usage percentage",
                     unit="percent",
                     value=cpu_percent
@@ -1005,7 +993,6 @@ class EnhancedRealTimeMonitor:
             summary["error_rate"] = (len(self.error_history) / len(self.request_history)) * 100
 
         return summary
-
 
 # Maintain backward compatibility
 class RealTimeMonitor(EnhancedRealTimeMonitor):
@@ -1304,7 +1291,7 @@ class RealTimeMonitor(EnhancedRealTimeMonitor):
         try:
             import psutil
 
-            process = psutil.Process()
+            process = psutil.process()
             metrics["memory_usage_mb"] = process.memory_info().rss / (1024 * 1024)
             metrics["cpu_usage_percent"] = process.cpu_percent()
         except ImportError:
@@ -1496,7 +1483,6 @@ class RealTimeMonitor(EnhancedRealTimeMonitor):
         if response_time > 200 or memory_usage > 256 or db_connections > 15:
             return "warning"
         return "healthy"
-
 
 class HealthMonitor:
     """System health monitoring with automated diagnostics"""

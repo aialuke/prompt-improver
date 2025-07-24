@@ -12,13 +12,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class CircuitState(Enum):
     """Circuit breaker states"""
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"      # Failing, reject all calls
+    closed = "closed"  # Normal operation
+    open = "open"      # Failing, reject all calls
     HALF_OPEN = "half_open"  # Testing if service recovered
-
 
 @dataclass
 class CircuitBreakerConfig:
@@ -31,7 +29,6 @@ class CircuitBreakerConfig:
     # 2025 addition: SLA-based thresholds
     response_time_threshold_ms: float = 1000  # Consider slow response as failure
     success_rate_threshold: float = 0.95  # Minimum success rate to stay closed
-
 
 class CircuitBreaker:
     """
@@ -49,7 +46,7 @@ class CircuitBreaker:
         self.on_state_change = on_state_change
 
         # State management
-        self._state = CircuitState.CLOSED
+        self._state = CircuitState.closed
         self._failure_count = 0
         self._last_failure_time: Optional[float] = None
         self._half_open_calls = 0
@@ -66,7 +63,7 @@ class CircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Get current circuit state with automatic transition logic"""
-        if self._state == CircuitState.OPEN:
+        if self._state == CircuitState.open:
             if self._should_attempt_reset():
                 self._transition_to(CircuitState.HALF_OPEN)
         return self._state
@@ -101,7 +98,7 @@ class CircuitBreaker:
             # Reset counters based on state
             if new_state == CircuitState.HALF_OPEN:
                 self._half_open_calls = 0
-            elif new_state == CircuitState.CLOSED:
+            elif new_state == CircuitState.closed:
                 self._failure_count = 0
                 self._half_open_calls = 0
 
@@ -121,10 +118,10 @@ class CircuitBreaker:
             Original exception: If function fails
         """
         # Check if we should reject immediately
-        if self.state == CircuitState.OPEN:
+        if self.state == CircuitState.open:
             self._call_metrics["rejected_calls"] += 1
             raise CircuitBreakerOpen(
-                f"Circuit breaker '{self.name}' is OPEN. Service is unavailable."
+                f"Circuit breaker '{self.name}' is open. Service is unavailable."
             )
 
         # Track call metrics
@@ -168,8 +165,8 @@ class CircuitBreaker:
             self._half_open_calls += 1
             if self._half_open_calls >= self.config.half_open_max_calls:
                 # Enough successful calls, close the circuit
-                self._transition_to(CircuitState.CLOSED)
-        elif self._state == CircuitState.CLOSED:
+                self._transition_to(CircuitState.closed)
+        elif self._state == CircuitState.closed:
             # Check success rate for SLA monitoring
             success_rate = self._calculate_success_rate()
             if success_rate < self.config.success_rate_threshold:
@@ -188,11 +185,11 @@ class CircuitBreaker:
 
         if self._state == CircuitState.HALF_OPEN:
             # Failed during recovery attempt, reopen
-            self._transition_to(CircuitState.OPEN)
-        elif self._state == CircuitState.CLOSED:
+            self._transition_to(CircuitState.open)
+        elif self._state == CircuitState.closed:
             self._failure_count += 1
             if self._failure_count >= self.config.failure_threshold:
-                self._transition_to(CircuitState.OPEN)
+                self._transition_to(CircuitState.open)
 
     def _record_slow_response(self):
         """Record slow response for circuit breaker failure counting"""
@@ -200,11 +197,11 @@ class CircuitBreaker:
 
         if self._state == CircuitState.HALF_OPEN:
             # Slow response during recovery attempt, reopen
-            self._transition_to(CircuitState.OPEN)
-        elif self._state == CircuitState.CLOSED:
+            self._transition_to(CircuitState.open)
+        elif self._state == CircuitState.closed:
             self._failure_count += 1
             if self._failure_count >= self.config.failure_threshold:
-                self._transition_to(CircuitState.OPEN)
+                self._transition_to(CircuitState.open)
 
     def _calculate_success_rate(self) -> float:
         """Calculate current success rate"""
@@ -229,16 +226,14 @@ class CircuitBreaker:
 
     def reset(self):
         """Manually reset the circuit breaker"""
-        self._transition_to(CircuitState.CLOSED)
+        self._transition_to(CircuitState.closed)
         self._failure_count = 0
         self._last_failure_time = None
         logger.info(f"Circuit breaker '{self.name}' manually reset")
 
-
 class CircuitBreakerOpen(Exception):
     """Exception raised when circuit breaker is open"""
     pass
-
 
 # Circuit breaker registry for centralized management
 class CircuitBreakerRegistry:
@@ -268,7 +263,6 @@ class CircuitBreakerRegistry:
         """Reset all circuit breakers"""
         for breaker in self._breakers.values():
             breaker.reset()
-
 
 # Global registry instance
 circuit_breaker_registry = CircuitBreakerRegistry()

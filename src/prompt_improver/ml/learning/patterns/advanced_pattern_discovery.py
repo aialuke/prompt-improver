@@ -52,7 +52,6 @@ from ....utils.redis_cache import cached
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class PatternCluster:
     """Advanced pattern cluster with metadata"""
@@ -67,7 +66,6 @@ class PatternCluster:
     samples_count: int
     effectiveness_range: tuple[float, float]
 
-
 @dataclass
 class FrequentPattern:
     """Frequent pattern from FP-Growth mining"""
@@ -79,7 +77,6 @@ class FrequentPattern:
     conviction: float | None
     effectiveness_impact: float
     rule_context: str
-
 
 @dataclass
 class AprioriPattern:
@@ -94,7 +91,6 @@ class AprioriPattern:
     rule_strength: float
     business_insight: str
     pattern_category: str
-
 
 class AdvancedPatternDiscovery:
     """Advanced Pattern Discovery using modern 2025 techniques:
@@ -2127,7 +2123,7 @@ class AdvancedPatternDiscovery:
                 
                 if max_correlation > 0.3:
                     recommendations.append(
-                        f"📊 Strong Features: {n_significant} features show significant correlation (max: {max_correlation:.3f})"
+                        f"📊 Strong features: {n_significant} features show significant correlation (max: {max_correlation:.3f})"
                     )
                     recommendations.append(
                         "⚙️ Optimization Focus: Prioritize top correlated features for rule tuning"
@@ -2167,10 +2163,8 @@ class AdvancedPatternDiscovery:
         
         return recommendations
 
-
 # Singleton instance for easy access
 _advanced_pattern_discovery = None
-
 
 async def get_advanced_pattern_discovery(db_manager: DatabaseManager | None = None) -> AdvancedPatternDiscovery:
     """Get singleton AdvancedPatternDiscovery instance with lazy initialization support.

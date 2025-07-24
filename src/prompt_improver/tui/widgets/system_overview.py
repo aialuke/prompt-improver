@@ -23,12 +23,11 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Label, Static
 
-
 class SystemOverviewWidget(Static):
     """
     Widget displaying system overview and health metrics with 2025 best practices.
 
-    Features:
+    features:
     - Real-time system monitoring with async updates
     - Event-driven orchestrator integration
     - Comprehensive error handling and recovery

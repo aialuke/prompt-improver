@@ -7,7 +7,6 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-
 class _Timer:
     """Context manager for timing code execution"""
 
@@ -19,7 +18,6 @@ class _Timer:
         self.end = time.time()
         self.duration = self.end - self.start
         return False  # Don't suppress exceptions
-
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, Summary
@@ -51,7 +49,6 @@ except ImportError:
             return _Timer()
 
     Counter = Gauge = Histogram = Summary = MockMetric
-
 
 # Health check metrics with graceful duplicate handling
 def _create_metric_safe(metric_class, *args, **kwargs):
@@ -106,7 +103,6 @@ def _create_metric_safe(metric_class, *args, **kwargs):
             return LocalMockMetric()
         raise
 
-
 # Enhanced Prometheus metrics for database and circuit breaker
 ACTIVE_CONNECTIONS = _create_metric_safe(
     Gauge,
@@ -159,7 +155,6 @@ HEALTH_CHECK_LATENCY = _create_metric_safe(
     buckets=[10, 50, 100, 200, 500, 1000, 2000],
 )
 
-
 HEALTH_CHECK_DURATION = _create_metric_safe(
     Summary,
     "health_check_duration_seconds",
@@ -188,7 +183,6 @@ HEALTH_CHECK_RESPONSE_TIME = _create_metric_safe(
     ["component"],
     buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000],
 )
-
 
 def instrument_health_check(component_name: str):
     """Decorator to instrument health checks with Prometheus metrics"""
@@ -241,7 +235,6 @@ def instrument_health_check(component_name: str):
 
     return decorator
 
-
 def get_health_metrics_summary() -> dict:
     """Get current health metrics summary"""
     if not PROMETHEUS_AVAILABLE:
@@ -254,7 +247,6 @@ def get_health_metrics_summary() -> dict:
         return {"prometheus_available": True, "metrics_registered": True}
     except Exception:
         return {"prometheus_available": True, "error": "Failed to generate metrics"}
-
 
 def reset_health_metrics():
     """Reset health check metrics (useful for testing)"""

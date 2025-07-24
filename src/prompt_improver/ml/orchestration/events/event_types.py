@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from datetime import datetime, timezone
 
-
 class EventType(Enum):
     """ML Pipeline event types."""
     
@@ -124,7 +123,6 @@ class EventType(Enum):
     DATABASE_PERFORMANCE_DEGRADED = "database.performance_degraded"
     DATABASE_PERFORMANCE_IMPROVED = "database.performance_improved"
     DATABASE_RESOURCE_ANALYSIS_COMPLETED = "database.resource_analysis_completed"
-
 
 @dataclass
 class MLEvent:

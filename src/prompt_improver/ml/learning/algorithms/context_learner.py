@@ -29,7 +29,6 @@ from ...optimization.algorithms.clustering_optimizer import (
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class ContextConfig:
     """Configuration for context learner."""
@@ -57,7 +56,6 @@ class ContextConfig:
     min_sample_size: int = 20
     min_silhouette_score: float = 0.3
 
-
 @dataclass
 class ContextLearningResult:
     """Result of context learning operation."""
@@ -68,7 +66,6 @@ class ContextLearningResult:
     processing_time: float
     quality_metrics: Dict[str, float]
     recommendations: List[str]
-
 
 class ContextLearner:
     """Context-specific learning engine using specialized components.

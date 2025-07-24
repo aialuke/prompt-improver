@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 
 from cryptography.fernet import Fernet
 
-
 class FederatedLearningService:
     """Real federated learning service that implements secure multi-party computation."""
 

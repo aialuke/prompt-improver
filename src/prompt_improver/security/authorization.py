@@ -3,7 +3,6 @@
 from enum import Enum
 from typing import Any, Dict, List, Set
 
-
 class Permission(Enum):
     """Permission enum for fine-grained access control."""
     # Model permissions
@@ -25,15 +24,13 @@ class Permission(Enum):
     VIEW_AUDIT_LOGS = "view_audit_logs"
     CONFIGURE_SECURITY = "configure_security"
 
-
 class Role(Enum):
     """Role enum with predefined permission sets."""
-    USER = "user"
+    user = "user"
     ML_ENGINEER = "ml_engineer"
     PRIVACY_OFFICER = "privacy_officer"
     SECURITY_ADMIN = "security_admin"
-    ADMIN = "admin"
-
+    admin = "admin"
 
 class AuthorizationService:
     """Real authorization service that implements RBAC (Role-Based Access Control)."""
@@ -41,7 +38,7 @@ class AuthorizationService:
     def __init__(self):
         # Define role-permission mappings
         self.role_permissions: dict[Role, set[Permission]] = {
-            Role.USER: {
+            Role.user: {
                 Permission.READ_MODELS,
                 Permission.VIEW_USERS,
             },
@@ -67,7 +64,7 @@ class AuthorizationService:
                 Permission.VIEW_USERS,
                 Permission.MANAGE_USERS,
             },
-            Role.ADMIN: set(Permission),  # Admin has all permissions
+            Role.admin: set(Permission),  # Admin has all permissions
         }
 
         # User role assignments

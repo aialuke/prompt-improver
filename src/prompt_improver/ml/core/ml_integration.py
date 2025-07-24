@@ -53,7 +53,6 @@ from ..models.production_registry import (
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class ModelCacheEntry:
     """Model cache entry with TTL and metadata"""
@@ -75,7 +74,6 @@ class ModelCacheEntry:
         """Update access tracking"""
         self.last_accessed = aware_utc_now()
         self.access_count += 1
-
 
 class InMemoryModelRegistry:
     """Thread-safe in-memory model registry with TTL and lazy loading"""
@@ -237,7 +235,6 @@ class InMemoryModelRegistry:
                 logger.info(f"Cleaned up {len(expired_ids)} expired models")
 
             return len(expired_ids)
-
 
 class MLModelService:
     """Enhanced ML service with direct Python integration and production deployment capabilities
@@ -546,7 +543,7 @@ class MLModelService:
         Direct Python integration replacing bridge cmd_optimize_model.
 
         Args:
-            training_data: Features and effectiveness scores
+            training_data: features and effectiveness scores
             db_session: Database session for storing results
             rule_ids: Specific rules to optimize (None = all active rules)
 
@@ -930,7 +927,7 @@ class MLModelService:
         Direct Python integration replacing bridge cmd_optimize_stacking_model.
 
         Args:
-            training_data: Features and effectiveness scores
+            training_data: features and effectiveness scores
             db_session: Database session for storing results
 
         Returns:
@@ -2250,10 +2247,8 @@ class MLModelService:
                 }
             }
 
-
 # Global service instance
 _ml_service: MLModelService | None = None
-
 
 async def get_ml_service() -> MLModelService:
     """Get or create global ML service instance."""

@@ -25,7 +25,6 @@ from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ...database import get_session
 
-
 class APESMigrationManager:
     """Complete system migration and backup management"""
 

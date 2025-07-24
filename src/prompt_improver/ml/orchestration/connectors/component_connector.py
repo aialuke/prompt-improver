@@ -14,17 +14,15 @@ from enum import Enum
 
 from ..events.event_types import EventType, MLEvent
 
-
 class ComponentStatus(Enum):
     """Component status states."""
     UNKNOWN = "unknown"
     INITIALIZING = "initializing"
-    READY = "ready"
+    ready = "ready"
     RUNNING = "running"
-    BUSY = "busy"
+    busy = "busy"
     ERROR = "error"
     STOPPED = "stopped"
-
 
 class ComponentTier(Enum):
     """Component tier classifications."""
@@ -34,7 +32,6 @@ class ComponentTier(Enum):
     TIER_4_PERFORMANCE = "tier4_performance"
     TIER_5_INFRASTRUCTURE = "tier5_infrastructure"
     TIER_6_SECURITY = "tier6_security"
-
 
 @dataclass
 class ComponentCapability:
@@ -48,7 +45,6 @@ class ComponentCapability:
     def __post_init__(self):
         if self.dependencies is None:
             self.dependencies = []
-
 
 @dataclass
 class ComponentMetadata:
@@ -66,7 +62,6 @@ class ComponentMetadata:
             self.api_endpoints = []
         if self.resource_requirements is None:
             self.resource_requirements = {}
-
 
 class ComponentInterface(Protocol):
     """Protocol defining the interface that components must implement."""
@@ -90,7 +85,6 @@ class ComponentInterface(Protocol):
     async def stop(self) -> None:
         """Stop the component."""
         ...
-
 
 class ComponentConnector(ABC):
     """
@@ -143,7 +137,7 @@ class ComponentConnector(ABC):
                     }
                 ))
             
-            self.status = ComponentStatus.READY
+            self.status = ComponentStatus.ready
             self.connected_at = datetime.now(timezone.utc)
             
             self.logger.info(f"Component {self.metadata.name} connected successfully")
@@ -197,7 +191,7 @@ class ComponentConnector(ABC):
             raise ValueError(f"Capability {capability_name} not found in component {self.metadata.name}")
         
         # Check component status
-        if self.status != ComponentStatus.READY:
+        if self.status != ComponentStatus.ready:
             raise RuntimeError(f"Component {self.metadata.name} not ready for execution (status: {self.status})")
         
         # Track execution
@@ -223,7 +217,7 @@ class ComponentConnector(ABC):
             self.execution_history.append(self.active_executions[execution_id].copy())
             del self.active_executions[execution_id]
             
-            self.status = ComponentStatus.READY
+            self.status = ComponentStatus.ready
             
             # Emit completion event
             if self.event_bus:
@@ -283,7 +277,7 @@ class ComponentConnector(ABC):
         
         # Reset status if no more active executions
         if not self.active_executions:
-            self.status = ComponentStatus.READY
+            self.status = ComponentStatus.ready
         
         self.logger.info(f"Execution {execution_id} stopped for component {self.metadata.name}")
     

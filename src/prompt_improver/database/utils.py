@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T")
 
-
 async def scalar(session: AsyncSession, stmt: Executable) -> Any:
     """Execute a statement and return a scalar result.
 
@@ -40,7 +39,6 @@ async def scalar(session: AsyncSession, stmt: Executable) -> Any:
     """
     result = await session.execute(stmt)
     return result.scalar()
-
 
 async def scalar_with_type(session: AsyncSession, stmt: Executable) -> Row[tuple[int]] | None:
     """Execute a statement and return a typed scalar result.
@@ -73,7 +71,6 @@ async def scalar_with_type(session: AsyncSession, stmt: Executable) -> Row[tuple
     result = await session.execute(stmt)
     return result.first()
 
-
 async def fetch_one_row(session: AsyncSession, stmt: Executable) -> Row[Any] | None:
     """Execute a statement and return a single row with type narrowing.
 
@@ -104,7 +101,6 @@ async def fetch_one_row(session: AsyncSession, stmt: Executable) -> Row[Any] | N
     """
     result = await session.execute(stmt)
     return result.first()
-
 
 async def fetch_all_rows(session: AsyncSession, stmt: Executable, parameters: dict[str, Any] | None = None) -> list[Row[Any]]:
     """Execute a statement and return all rows with type narrowing.

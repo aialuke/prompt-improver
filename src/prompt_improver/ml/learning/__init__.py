@@ -33,7 +33,7 @@ __all__ = [
     "FailureAnalyzer",
     "InsightGenerationEngine",
     "RuleAnalyzer",
-    # Features
+    # features
     "CompositeFeatureExtractor",
     "LinguisticFeatureExtractor",
     "DomainFeatureExtractor",

@@ -13,7 +13,6 @@ from pathlib import Path
 
 from ..core.component_registry import ComponentInfo, ComponentTier
 
-
 @dataclass
 class LoadedComponent:
     """Represents a loaded ML component with its metadata."""
@@ -23,7 +22,6 @@ class LoadedComponent:
     module_path: str = ""
     dependencies: List[str] = None
     is_initialized: bool = False
-
 
 class DirectComponentLoader:
     """

@@ -62,7 +62,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class FailureConfig:
     """Configuration for failure mode analysis"""
@@ -105,7 +104,6 @@ class FailureConfig:
     )
     alert_cooldown_seconds: int = 300
 
-
 @dataclass
 @dataclass
 class FailurePattern:
@@ -119,7 +117,6 @@ class FailurePattern:
     common_characteristics: dict[str, Any]
     example_cases: list[dict[str, Any]]
 
-
 @dataclass
 class RootCause:
     """Root cause of failures"""
@@ -131,7 +128,6 @@ class RootCause:
     evidence: list[str]
     suggested_fixes: list[str]
 
-
 @dataclass
 class EdgeCase:
     """Edge case that causes failures"""
@@ -141,7 +137,6 @@ class EdgeCase:
     characteristics: dict[str, Any]
     failure_examples: list[dict[str, Any]]
     suggested_handling: str
-
 
 @dataclass
 class SystematicIssue:
@@ -155,7 +150,6 @@ class SystematicIssue:
     impact_magnitude: float
     priority: str  # 'critical', 'high', 'medium', 'low'
 
-
 @dataclass
 class FailureRecommendation:
     """Recommendation to address failures"""
@@ -167,7 +161,6 @@ class FailureRecommendation:
     implementation_effort: str
     priority: str
     target_failures: list[str]
-
 
 @dataclass
 class MLFailureMode:
@@ -183,7 +176,6 @@ class MLFailureMode:
     detection_methods: list[str]
     mitigation_strategies: list[str]
 
-
 @dataclass
 class RobustnessTestResult:
     """Results from robustness validation tests (Phase 3)"""
@@ -194,7 +186,6 @@ class RobustnessTestResult:
     robustness_score: float
     failed_samples: list[dict[str, Any]]
     recommendations: list[str]
-
 
 @dataclass
 class PrometheusAlert:
@@ -207,7 +198,6 @@ class PrometheusAlert:
     severity: str  # 'critical', 'warning', 'info'
     description: str
     triggered_at: datetime | None = None
-
 
 class FailureModeAnalyzer:
     """Failure Mode Analysis Engine for prompt improvement systems"""

@@ -19,27 +19,24 @@ from statsmodels.stats.proportion import proportions_ztest
 
 logger = logging.getLogger(__name__)
 
-
 class PatternType(Enum):
     """Types of patterns that can be analyzed"""
 
     SEQUENTIAL = "sequential"
-    CATEGORICAL = "categorical"
-    TEMPORAL = "temporal"
-    BEHAVIORAL = "behavioral"
-    PERFORMANCE = "performance"
-
+    categorical = "categorical"
+    temporal = "temporal"
+    behavioral = "behavioral"
+    performance = "performance"
 
 class SignificanceMethod(Enum):
     """Statistical methods for significance testing"""
 
     CHI_SQUARE = "chi_square"
     FISHER_EXACT = "fisher_exact"
-    MCNEMAR = "mcnemar"
+    mcnemar = "mcnemar"
     PROPORTION_Z_TEST = "proportion_z_test"
     TREND_TEST = "trend_test"
     SEQUENCE_TEST = "sequence_test"
-
 
 @dataclass
 class PatternTestResult:
@@ -59,7 +56,6 @@ class PatternTestResult:
     recommendations: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class PatternSignificanceReport:
     """Comprehensive pattern significance analysis report"""
@@ -76,7 +72,6 @@ class PatternSignificanceReport:
     pattern_interactions: dict[str, Any] | None = None
     business_insights: list[str] = field(default_factory=list)
     quality_score: float = 0.0
-
 
 class PatternSignificanceAnalyzer:
     """Advanced pattern significance analyzer implementing 2025 best practices"""
@@ -141,8 +136,8 @@ class PatternSignificanceAnalyzer:
                     try:
                         converted_pattern_types[pattern_id] = PatternType(pattern_type_str)
                     except ValueError:
-                        logger.warning(f"Unknown pattern type '{pattern_type_str}' for pattern '{pattern_id}', using BEHAVIORAL")
-                        converted_pattern_types[pattern_id] = PatternType.BEHAVIORAL
+                        logger.warning(f"Unknown pattern type '{pattern_type_str}' for pattern '{pattern_id}', using behavioral")
+                        converted_pattern_types[pattern_id] = PatternType.behavioral
                 pattern_types = converted_pattern_types
 
             # Perform pattern significance analysis using existing method
@@ -290,9 +285,9 @@ class PatternSignificanceAnalyzer:
             test_results = []
             for pattern_id, pattern_data in validated_patterns.items():
                 pattern_type = (
-                    pattern_types.get(pattern_id, PatternType.CATEGORICAL)
+                    pattern_types.get(pattern_id, PatternType.categorical)
                     if pattern_types
-                    else PatternType.CATEGORICAL
+                    else PatternType.categorical
                 )
 
                 result = self._test_pattern_significance(
@@ -467,7 +462,7 @@ class PatternSignificanceAnalyzer:
             treatment_pattern = treatment_data[pattern_id]
 
             # Choose appropriate test based on pattern type
-            if pattern_type == PatternType.CATEGORICAL:
+            if pattern_type == PatternType.categorical:
                 return self._test_categorical_pattern(
                     pattern_id, control_pattern, treatment_pattern
                 )
@@ -475,15 +470,15 @@ class PatternSignificanceAnalyzer:
                 return self._test_sequential_pattern(
                     pattern_id, control_pattern, treatment_pattern
                 )
-            if pattern_type == PatternType.TEMPORAL:
+            if pattern_type == PatternType.temporal:
                 return self._test_temporal_pattern(
                     pattern_id, control_pattern, treatment_pattern
                 )
-            if pattern_type == PatternType.BEHAVIORAL:
+            if pattern_type == PatternType.behavioral:
                 return self._test_behavioral_pattern(
                     pattern_id, control_pattern, treatment_pattern
                 )
-            if pattern_type == PatternType.PERFORMANCE:
+            if pattern_type == PatternType.performance:
                 return self._test_performance_pattern(
                     pattern_id, control_pattern, treatment_pattern
                 )
@@ -560,7 +555,7 @@ class PatternSignificanceAnalyzer:
 
             return PatternTestResult(
                 pattern_id=pattern_id,
-                pattern_type=PatternType.CATEGORICAL,
+                pattern_type=PatternType.categorical,
                 test_method=test_method,
                 statistic=float(statistic),
                 p_value=float(p_value),
@@ -706,7 +701,7 @@ class PatternSignificanceAnalyzer:
 
             return PatternTestResult(
                 pattern_id=pattern_id,
-                pattern_type=PatternType.TEMPORAL,
+                pattern_type=PatternType.temporal,
                 test_method=SignificanceMethod.SEQUENCE_TEST,
                 statistic=float(statistic),
                 p_value=float(p_value),
@@ -786,7 +781,7 @@ class PatternSignificanceAnalyzer:
 
             return PatternTestResult(
                 pattern_id=pattern_id,
-                pattern_type=PatternType.PERFORMANCE,
+                pattern_type=PatternType.performance,
                 test_method=SignificanceMethod.PROPORTION_Z_TEST,  # Using as placeholder
                 statistic=float(statistic),
                 p_value=float(p_value),
@@ -1190,7 +1185,6 @@ class PatternSignificanceAnalyzer:
             )
 
         return recommendations
-
 
 # Utility functions for external use
 def quick_pattern_analysis(

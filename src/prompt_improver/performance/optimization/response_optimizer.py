@@ -44,7 +44,6 @@ from .performance_optimizer import measure_mcp_operation
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class CompressionResult:
     """Result of compression operation with 2025 enhancements."""
@@ -71,7 +70,6 @@ class CompressionResult:
     def size_reduction_percent(self) -> float:
         """Calculate size reduction percentage."""
         return (1 - self.compressed_size / self.original_size) * 100
-
 
 class FastJSONSerializer:
     """High-performance JSON serialization with multiple backends."""
@@ -115,7 +113,6 @@ class FastJSONSerializer:
             return obj.__dict__
         else:
             return str(obj)
-
 
 class EnhancedResponseCompressor:
     """Enhanced multi-algorithm response compression with 2025 best practices."""
@@ -322,7 +319,6 @@ class EnhancedResponseCompressor:
         """No compression (passthrough)."""
         return data
 
-
 class EnhancedPayloadOptimizer:
     """Enhanced payload optimizer with content-aware optimization and 2025 best practices."""
 
@@ -498,7 +494,6 @@ class EnhancedPayloadOptimizer:
         """Generic content optimization"""
         return data
 
-
 class ResponseOptimizer:
     """Enhanced response optimization coordinator with 2025 best practices."""
 
@@ -584,10 +579,8 @@ class ResponseOptimizer:
             'orjson_available': HAS_ORJSON
         }
 
-
 # Global response optimizer instance
 _global_optimizer: Optional[ResponseOptimizer] = None
-
 
 def get_response_optimizer() -> ResponseOptimizer:
     """Get the global response optimizer instance."""
@@ -595,7 +588,6 @@ def get_response_optimizer() -> ResponseOptimizer:
     if _global_optimizer is None:
         _global_optimizer = ResponseOptimizer()
     return _global_optimizer
-
 
 # Convenience function
 async def optimize_mcp_response(

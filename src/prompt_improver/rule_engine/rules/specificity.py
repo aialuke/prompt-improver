@@ -129,11 +129,10 @@ SUCCESS_CRITERIA_KEYWORDS = [
     "outcome",
 ]
 
-
 class SpecificityRule(BasePromptRule):
     """Enhanced specificity rule using research-validated patterns for vague language detection and replacement.
 
-    Features:
+    features:
     - Comprehensive vague language detection and replacement
     - Who/what/when/where specificity patterns
     - Concrete examples and quantifiable metrics integration

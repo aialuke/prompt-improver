@@ -21,7 +21,6 @@ from statsmodels.stats.multitest import multipletests
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class StatisticalConfig:
     """Configuration for statistical analysis"""
@@ -43,7 +42,6 @@ class StatisticalConfig:
                 "validity_threshold": 0.6,
             }
 
-
 @dataclass
 class DescriptiveStats:
     """Descriptive statistics for a metric"""
@@ -62,7 +60,6 @@ class DescriptiveStats:
     kurtosis: float
     coefficient_of_variation: float
 
-
 @dataclass
 class DistributionAnalysis:
     """Distribution analysis results"""
@@ -71,7 +68,6 @@ class DistributionAnalysis:
     histogram: dict[str, Any]
     outliers: list[float]
     distribution_type: str
-
 
 @dataclass
 class CorrelationResult:
@@ -82,7 +78,6 @@ class CorrelationResult:
     significance: str
     strength: str
     direction: str
-
 
 class StatisticalAnalyzer:
     """Statistical Analysis Framework for evaluation results"""

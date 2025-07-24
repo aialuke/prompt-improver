@@ -16,7 +16,6 @@ from typing import Any, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
-
 class SecureSubprocessManager:
     """Secure subprocess execution manager with comprehensive security patterns.
 
@@ -275,10 +274,8 @@ class SecureSubprocessManager:
             logger.error(f"Unexpected error starting {operation}: {e}")
             raise
 
-
 # Global instance for convenience
 _default_manager = SecureSubprocessManager()
-
 
 def secure_subprocess(
     operation: str,
@@ -324,7 +321,6 @@ def secure_subprocess(
         return wrapper
 
     return decorator
-
 
 def ensure_running(pid: int) -> bool:
     """Centralized function to validate if a background process is running.

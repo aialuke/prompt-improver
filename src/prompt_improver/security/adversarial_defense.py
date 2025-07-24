@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
-
 class AdversarialDefenseSystem:
     """Real adversarial defense system that implements multiple defense mechanisms."""
 
@@ -262,7 +261,6 @@ class AdversarialDefenseSystem:
         if len(self.attack_log) > 1000:
             self.attack_log = self.attack_log[-1000:]
 
-
 class AdversarialAttackSimulator:
     """Simulates adversarial attacks for testing defense mechanisms."""
 
@@ -285,12 +283,11 @@ class AdversarialAttackSimulator:
 
         return adversarial_data
 
-
 class RobustnessEvaluator:
     """
     2025 NIST-compliant ML robustness evaluator with comprehensive adversarial testing.
 
-    Features:
+    features:
     - Async evaluation for scalability
     - Multi-attack testing (FGSM, PGD, C&W, DeepFool, Boundary)
     - NIST AI security framework compliance

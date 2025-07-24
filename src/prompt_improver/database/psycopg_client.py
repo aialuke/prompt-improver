@@ -40,7 +40,6 @@ from .error_handling import (
 T = TypeVar("T", bound=BaseModel)
 logger = logging.getLogger(__name__)
 
-
 class QueryMetrics:
     """Track query performance metrics for Phase 2 requirements"""
 
@@ -75,7 +74,6 @@ class QueryMetrics:
             return 0
         under_target = sum(1 for t in self.query_times if t <= 50)
         return (under_target / len(self.query_times)) * 100
-
 
 class TypeSafePsycopgClient:
     """High-performance type-safe database client using psycopg3 + Pydantic.
@@ -167,7 +165,7 @@ class TypeSafePsycopgClient:
     ) -> list[T]:
         """Execute query and return typed Pydantic models with enhanced error handling.
 
-        Features:
+        features:
         - Zero serialization overhead with direct row mapping
         - Automatic retry for transient errors
         - Circuit breaker protection
@@ -1882,10 +1880,8 @@ class TypeSafePsycopgClient:
             "recommendations_summary": f"Database shows {status.lower()} performance with {len(critical_issues)} critical issues to address"
         }
 
-
 # Global client instance
 _client: TypeSafePsycopgClient | None = None
-
 
 async def get_psycopg_client() -> TypeSafePsycopgClient:
     """Get or create the global psycopg client"""
@@ -1894,7 +1890,6 @@ async def get_psycopg_client() -> TypeSafePsycopgClient:
         _client = TypeSafePsycopgClient()
         await _client.__aenter__()
     return _client
-
 
 async def close_psycopg_client():
     """Close the global psycopg client"""

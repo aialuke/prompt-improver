@@ -10,7 +10,6 @@ from typing import Any, Dict, List
 from ...ml.analysis.linguistic_analyzer import LinguisticAnalyzer, LinguisticConfig
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 
-
 class LinguisticQualityRule(BasePromptRule):
     """Rule that evaluates prompts using advanced linguistic analysis.
 

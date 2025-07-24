@@ -27,7 +27,6 @@ from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class QualityDimension:
     """Individual quality dimension with granular scoring"""
@@ -39,7 +38,6 @@ class QualityDimension:
     threshold_met: bool
     confidence_interval: tuple[float, float]
     interpretation: str
-
 
 @dataclass
 class EnhancedQualityMetrics:
@@ -64,7 +62,6 @@ class EnhancedQualityMetrics:
     assessment_timestamp: str
     total_samples: int
     assessment_duration: float
-
 
 class EnhancedQualityScorer:
     """Advanced quality scoring system with multi-dimensional assessment"""

@@ -65,27 +65,24 @@ except ImportError:
 
 from .base import AggregatedHealthResult, HealthChecker, HealthResult, HealthStatus
 
-
 class HealthTrend(Enum):
     """Health trend analysis."""
 
-    IMPROVING = "improving"
-    STABLE = "stable"
-    DEGRADING = "degrading"
+    improving = "improving"
+    stable = "stable"
+    degrading = "degrading"
     CRITICAL = "critical"
-
 
 class DependencyType(Enum):
     """Types of service dependencies."""
 
     DATABASE = "database"
-    CACHE = "cache"
+    cache = "cache"
     EXTERNAL_API = "external_api"
     MESSAGE_QUEUE = "message_queue"
     ML_SERVICE = "ml_service"
-    STORAGE = "storage"
-    NETWORK = "network"
-
+    storage = "storage"
+    network = "network"
 
 @dataclass
 class HealthMetrics:
@@ -99,7 +96,7 @@ class HealthMetrics:
     last_failure_time: Optional[datetime] = None
     consecutive_failures: int = 0
     consecutive_successes: int = 0
-    trend: HealthTrend = HealthTrend.STABLE
+    trend: HealthTrend = HealthTrend.stable
 
     @property
     def success_rate(self) -> float:
@@ -113,7 +110,6 @@ class HealthMetrics:
         """Calculate failure rate."""
         return 1.0 - self.success_rate
 
-
 @dataclass
 class DependencyInfo:
     """Information about service dependencies."""
@@ -126,7 +122,6 @@ class DependencyInfo:
     last_check_time: Optional[datetime] = None
     cache_ttl: int = 30  # seconds
 
-
 @dataclass
 class PredictiveHealthAnalysis:
     """Predictive health analysis results."""
@@ -138,7 +133,6 @@ class PredictiveHealthAnalysis:
     time_to_failure: Optional[timedelta] = None
     recommended_actions: List[str] = field(default_factory=list)
     risk_factors: List[str] = field(default_factory=list)
-
 
 # Use centralized metrics registry
 from ..metrics_registry import get_metrics_registry, StandardMetrics
@@ -175,9 +169,11 @@ from .checkers import (
     DatabaseHealthChecker,
     MCPServerHealthChecker,
     MLServiceHealthChecker,
-    RedisHealthMonitor,
     SystemResourcesHealthChecker,
 )
+
+# Import RedisHealthMonitor from the correct module
+from .redis_monitor import RedisHealthMonitor
 
 # Import ML-specific health checkers
 try:
@@ -193,10 +189,10 @@ except ImportError:
 
 # Lazy import to avoid circular dependency
 try:
-    from .checkers import QueueHealthChecker
+    from .checkers import queue_health_checker
 except ImportError:
     # Use lazy import to avoid circular dependency issues
-    QueueHealthChecker = None
+    queue_health_checker = None
 
 # Import ML orchestration health checkers
 try:
@@ -213,11 +209,10 @@ except ImportError:
 
 from .metrics import instrument_health_check
 
-
 class EnhancedHealthService:
     """Enhanced health service with 2025 best practices
 
-    Features:
+    features:
     - Circuit breaker integration for dependency health
     - Predictive health monitoring with trend analysis
     - Health check result caching and optimization
@@ -284,13 +279,13 @@ class EnhancedHealthService:
                     # Log the error but continue without Redis health checker
                     print(f"Warning: Could not initialize RedisHealthMonitor: {e}")
 
-            # Add QueueHealthChecker if available (avoid circular import)
-            if QueueHealthChecker is not None:
+            # Add queue_health_checker if available (avoid circular import)
+            if queue_health_checker is not None:
                 try:
-                    self.checkers.append(QueueHealthChecker())
+                    self.checkers.append(queue_health_checker())
                 except Exception as e:
                     # Log the error but continue without queue health checker
-                    print(f"Warning: Could not initialize QueueHealthChecker: {e}")
+                    print(f"Warning: Could not initialize queue_health_checker: {e}")
 
             # Add ML orchestration health checkers if available
             if ML_ORCHESTRATION_CHECKERS_AVAILABLE:
@@ -346,7 +341,7 @@ class EnhancedHealthService:
         """Initialize dependency information and circuit breakers."""
         dependency_mapping = {
             "database": DependencyType.DATABASE,
-            "redis": DependencyType.CACHE,
+            "redis": DependencyType.cache,
             "mcp_server": DependencyType.EXTERNAL_API,
             "analytics": DependencyType.EXTERNAL_API,
             "ml_service": DependencyType.ML_SERVICE,
@@ -356,7 +351,7 @@ class EnhancedHealthService:
             "ml_workflow": DependencyType.ML_SERVICE,
             "ml_event": DependencyType.MESSAGE_QUEUE,
             "queue": DependencyType.MESSAGE_QUEUE,
-            "system": DependencyType.NETWORK
+            "system": DependencyType.network
         }
 
         for checker in self.checkers:
@@ -643,7 +638,7 @@ class EnhancedHealthService:
 
         for component, history in self.health_history.items():
             if len(history) < 2:
-                trends[component] = {"trend": HealthTrend.STABLE.value, "confidence": 0.0}
+                trends[component] = {"trend": HealthTrend.stable.value, "confidence": 0.0}
                 continue
 
             # Analyze recent trend
@@ -651,13 +646,13 @@ class EnhancedHealthService:
             healthy_count = sum(1 for status in recent_statuses if status == HealthStatus.HEALTHY)
 
             if healthy_count == len(recent_statuses):
-                trend = HealthTrend.STABLE if len(recent_statuses) >= 3 else HealthTrend.IMPROVING
+                trend = HealthTrend.stable if len(recent_statuses) >= 3 else HealthTrend.improving
             elif healthy_count == 0:
                 trend = HealthTrend.CRITICAL
             elif healthy_count < len(recent_statuses) / 2:
-                trend = HealthTrend.DEGRADING
+                trend = HealthTrend.degrading
             else:
-                trend = HealthTrend.IMPROVING
+                trend = HealthTrend.improving
 
             confidence = min(1.0, len(recent_statuses) / 5.0)
 
@@ -972,7 +967,6 @@ class EnhancedHealthService:
                 }
             }
 
-
 # Maintain backward compatibility
 class HealthService(EnhancedHealthService):
     """Backward compatible health service."""
@@ -1039,19 +1033,17 @@ class HealthService(EnhancedHealthService):
 
         # Try to dynamically import and add queue checker
         try:
-            from .checkers import QueueHealthChecker
+            from .checkers import queue_health_checker
 
-            queue_checker = QueueHealthChecker()
+            queue_checker = queue_health_checker()
             self.add_checker(queue_checker)
             return True
         except Exception as e:
-            print(f"Warning: Could not add QueueHealthChecker: {e}")
+            print(f"Warning: Could not add queue_health_checker: {e}")
             return False
-
 
 # Global health service instance
 _health_service_instance: HealthService | None = None
-
 
 def get_health_service() -> HealthService:
     """Get or create the global health service instance"""
@@ -1059,7 +1051,6 @@ def get_health_service() -> HealthService:
     if _health_service_instance is None:
         _health_service_instance = HealthService()
     return _health_service_instance
-
 
 def reset_health_service() -> None:
     """Reset the global health service instance (useful for testing)"""

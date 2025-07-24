@@ -1,9 +1,9 @@
 """Domain Feature Extractor
 
 Modernized 2025 implementation for extracting domain-specific features from prompt text.
-Features async/await patterns, Pydantic validation, circuit breaker, and orchestrator integration.
+features async/await patterns, Pydantic validation, circuit breaker, and orchestrator integration.
 
-Features:
+features:
 - Async-first architecture with non-blocking operations
 - Pydantic models for configuration and data validation
 - Circuit breaker pattern for fault tolerance
@@ -42,13 +42,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class CircuitBreakerState(Enum):
     """Circuit breaker states for fault tolerance."""
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
-
 
 class DomainFeatureConfig(BaseModel):
     """Enhanced 2025 configuration model for domain feature extraction."""
@@ -95,7 +93,6 @@ class DomainFeatureConfig(BaseModel):
         if v.upper() not in valid_levels:
             raise ValueError(f"log_level must be one of: {valid_levels}")
         return v.upper()
-
 
 @dataclass
 class DomainExtractionMetrics:
@@ -154,7 +151,6 @@ class DomainExtractionMetrics:
             "circuit_breaker_trips": self.circuit_breaker_trips,
             "last_extraction_time": self.last_extraction_time
         }
-
 
 class DomainFeatureExtractor:
     """Enhanced 2025 domain feature extractor with async operations and observability.

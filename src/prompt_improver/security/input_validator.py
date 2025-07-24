@@ -12,7 +12,6 @@ import numpy as np
 
 from .input_sanitization import InputSanitizer
 
-
 class ValidationError(Exception):
     """Raised when input validation fails."""
 
@@ -21,7 +20,6 @@ class ValidationError(Exception):
         self.field = field
         self.value = value
         super().__init__(message)
-
 
 @dataclass
 class ValidationSchema:
@@ -46,7 +44,6 @@ class ValidationSchema:
     required: bool = True
     allowed_types: Optional[List[type]] = None
     custom_validator: Optional[callable] = None
-
 
 class InputValidator:
     """Comprehensive input validator for ML context learning system."""

@@ -64,7 +64,6 @@ except ImportError:
                     self.state = "open"
                 raise e
 
-
 class TaskStatus(Enum):
     """Enhanced task status with 2025 patterns."""
 
@@ -77,7 +76,6 @@ class TaskStatus(Enum):
     RETRYING = "retrying"
     DEAD_LETTER = "dead_letter"
 
-
 class TaskPriority(Enum):
     """Task priority levels for scheduling."""
 
@@ -87,10 +85,8 @@ class TaskPriority(Enum):
     LOW = 4
     BACKGROUND = 5
 
-
 # Import unified retry configuration
 from ....ml.orchestration.core.unified_retry_manager import RetryConfig, RetryStrategy
-
 
 @dataclass
 class TaskMetrics:
@@ -103,7 +99,6 @@ class TaskMetrics:
     retry_count: int = 0
     last_execution_time: Optional[datetime] = None
     average_duration: float = 0.0
-
 
 @dataclass
 class EnhancedBackgroundTask:
@@ -137,7 +132,6 @@ class EnhancedBackgroundTask:
         """For priority queue ordering."""
         return self.priority.value < other.priority.value
 
-
 # Use centralized metrics registry
 from ..metrics_registry import get_metrics_registry, StandardMetrics
 
@@ -167,7 +161,6 @@ CIRCUIT_BREAKER_STATE = metrics_registry.get_or_create_gauge(
     ['task_type']
 )
 
-
 @dataclass
 class BackgroundTask:
     """Legacy task class for backward compatibility."""
@@ -181,7 +174,6 @@ class BackgroundTask:
     error: str | None = None
     result: Any | None = None
     asyncio_task: asyncio.Task | None = None
-
 
 class EnhancedBackgroundTaskManager:
     """Enhanced background task manager with 2025 best practices."""
@@ -940,15 +932,12 @@ class EnhancedBackgroundTaskManager:
                 }
             }
 
-
 # Maintain backward compatibility
 class BackgroundTaskManager(EnhancedBackgroundTaskManager):
     """Backward compatible task manager."""
 
     def __init__(self, max_concurrent_tasks: int = 10):
         super().__init__(max_concurrent_tasks=max_concurrent_tasks, enable_metrics=False)
-
-        # Legacy task storage for compatibility
         self.legacy_tasks: Dict[str, BackgroundTask] = {}
 
     async def submit_task(self, task_id: str, coroutine: Callable, **kwargs) -> str:
@@ -985,10 +974,8 @@ class BackgroundTaskManager(EnhancedBackgroundTaskManager):
             "error": enhanced_status["error"]
         }
 
-
 # Global instance for easy access
 _background_task_manager: BackgroundTaskManager | None = None
-
 
 def get_background_task_manager() -> BackgroundTaskManager:
     """Get the global background task manager instance."""
@@ -996,7 +983,6 @@ def get_background_task_manager() -> BackgroundTaskManager:
     if _background_task_manager is None:
         _background_task_manager = BackgroundTaskManager()
     return _background_task_manager
-
 
 async def init_background_task_manager(
     max_concurrent_tasks: int = 10,
@@ -1013,7 +999,6 @@ async def init_background_task_manager(
     _background_task_manager = BackgroundTaskManager(max_concurrent_tasks)
     await _background_task_manager.start()
     return _background_task_manager
-
 
 async def shutdown_background_task_manager(timeout: float = 30.0) -> None:
     """Shutdown the global background task manager.

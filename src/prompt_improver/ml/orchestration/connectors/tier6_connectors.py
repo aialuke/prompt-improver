@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier
 
-
 class AdversarialDefenseConnector(ComponentConnector):
     """Connector for AdversarialDefense component."""
     
@@ -91,7 +90,6 @@ class AdversarialDefenseConnector(ComponentConnector):
             "compliance_status": "passed",
             "recommendations": ["update_defense_params", "enhance_monitoring"]
         }
-
 
 class DifferentialPrivacyConnector(ComponentConnector):
     """Connector for DifferentialPrivacy component."""
@@ -173,7 +171,6 @@ class DifferentialPrivacyConnector(ComponentConnector):
             "convergence_achieved": True
         }
 
-
 class FederatedLearningConnector(ComponentConnector):
     """Connector for FederatedLearning component."""
     
@@ -254,7 +251,6 @@ class FederatedLearningConnector(ComponentConnector):
             "client_health": "good",
             "data_distribution": "non_iid"
         }
-
 
 class Tier6ConnectorFactory:
     """Factory for creating Tier 6 component connectors."""

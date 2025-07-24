@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier
 
-
 class ModelManagerConnector(ComponentConnector):
     """Connector for ModelManager component."""
     
@@ -90,7 +89,6 @@ class ModelManagerConnector(ComponentConnector):
             "endpoint_url": "https://api.example.com/v1/model",
             "health_check": "passing"
         }
-
 
 class RedisCacheConnector(ComponentConnector):
     """Connector for RedisCache component."""
@@ -173,7 +171,6 @@ class RedisCacheConnector(ComponentConnector):
             "invalidation_time": "50ms"
         }
 
-
 class PerformanceOptimizerConnector(ComponentConnector):
     """Connector for PerformanceOptimizer component."""
     
@@ -235,7 +232,6 @@ class PerformanceOptimizerConnector(ComponentConnector):
             "network_optimization": 0.15,
             "cost_reduction": 0.20
         }
-
 
 class Tier5ConnectorFactory:
     """Factory for creating Tier 5 component connectors."""

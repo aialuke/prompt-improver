@@ -18,23 +18,20 @@ from rich.console import Console
 from ...database import get_sessionmanager
 from ...performance.analytics.analytics import AnalyticsService
 
-
 class SecurityLevel(Enum):
     """Security levels for data classification."""
-    PUBLIC = "public"
-    INTERNAL = "internal"
-    CONFIDENTIAL = "confidential"
-    RESTRICTED = "restricted"
-
+    public = "public"
+    internal = "internal"
+    confidential = "confidential"
+    restricted = "restricted"
 
 class PrivacyTechnique(Enum):
     """Privacy preservation techniques."""
-    REDACTION = "redaction"
-    MASKING = "masking"
-    TOKENIZATION = "tokenization"
+    redaction = "redaction"
+    masking = "masking"
+    tokenization = "tokenization"
     DIFFERENTIAL_PRIVACY = "differential_privacy"
     HOMOMORPHIC_ENCRYPTION = "homomorphic_encryption"
-
 
 @dataclass
 class DataProtectionMetrics:
@@ -48,7 +45,6 @@ class DataProtectionMetrics:
     processing_time_ms: float = 0.0
     last_updated: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-
 @dataclass
 class SensitiveDataMatch:
     """Represents a detected sensitive data match."""
@@ -59,7 +55,6 @@ class SensitiveDataMatch:
     confidence_score: float
     risk_level: str
     recommended_action: str
-
 
 class PromptDataProtection:
     """
@@ -171,7 +166,7 @@ class PromptDataProtection:
                     # Full redaction for high-risk data
                     redaction_placeholder = f"[REDACTED_{pattern_type.upper()}]"
                     sanitized = re.sub(pattern, redaction_placeholder, sanitized)
-                    privacy_techniques_used.append(PrivacyTechnique.REDACTION.value)
+                    privacy_techniques_used.append(PrivacyTechnique.redaction.value)
                 elif risk_level == "MEDIUM":
                     # Masking for medium-risk data
                     def mask_match(match):
@@ -180,7 +175,7 @@ class PromptDataProtection:
                             return "*" * len(text)
                         return text[:2] + "*" * (len(text) - 4) + text[-2:]
                     sanitized = re.sub(pattern, mask_match, sanitized)
-                    privacy_techniques_used.append(PrivacyTechnique.MASKING.value)
+                    privacy_techniques_used.append(PrivacyTechnique.masking.value)
 
                 redaction_details[pattern_type] = {
                     "count": len(matches),
@@ -889,7 +884,6 @@ class PromptDataProtection:
         except Exception as e:
             self.logger.error(f"Error during PromptDataProtection shutdown: {e}")
             return False
-
 
 class SecureMCPServer:
     """MCP Server security configuration (builds on existing MCP server)"""

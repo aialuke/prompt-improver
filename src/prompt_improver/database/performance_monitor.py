@@ -9,7 +9,6 @@ from typing import Any
 
 from .psycopg_client import TypeSafePsycopgClient, get_psycopg_client
 
-
 @dataclass
 class QueryPerformanceMetric:
     """Individual query performance metric"""
@@ -22,7 +21,6 @@ class QueryPerformanceMetric:
     min_exec_time: float
     rows_affected: int
     cache_hit_ratio: float
-
 
 @dataclass
 class DatabasePerformanceSnapshot:
@@ -38,11 +36,10 @@ class DatabasePerformanceSnapshot:
     database_size_mb: float
     index_hit_ratio: float
 
-
 class DatabasePerformanceMonitor:
     """Real-time database performance monitoring using PostgreSQL statistics.
 
-    Features:
+    features:
     - Real-time cache hit ratio monitoring (target: >90%)
     - Query performance tracking (target: <50ms)
     - Automatic slow query detection
@@ -448,10 +445,8 @@ class DatabasePerformanceMonitor:
             # Don't fail monitoring if event emission fails
             pass
 
-
 # Global monitor instance
 _monitor: DatabasePerformanceMonitor | None = None
-
 
 async def get_performance_monitor(event_bus=None) -> DatabasePerformanceMonitor:
     """Get or create global performance monitor with optional event bus integration"""

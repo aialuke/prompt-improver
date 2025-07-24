@@ -14,13 +14,11 @@ from opentelemetry import trace
 tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
 
-
 class TransformationStrategy(Enum):
     """Strategy for prompt transformations."""
     RULE_BASED = "rule_based"
     ML_DRIVEN = "ml_driven"
     HYBRID = "hybrid"
-
 
 class TransformationType(Enum):
     """Types of transformations available."""
@@ -29,7 +27,6 @@ class TransformationType(Enum):
     FORMAT_SPECIFICATION = "format_specification"
     CONSTRAINT_ADDITION = "constraint_addition"
     EXAMPLE_ADDITION = "example_addition"
-
 
 @dataclass
 class TransformationConfig:
@@ -43,7 +40,6 @@ class TransformationConfig:
     enable_observability: bool = True
     cache_patterns: bool = True
 
-
 class TransformationProvider(Protocol):
     """Protocol for transformation pattern providers."""
     
@@ -54,7 +50,6 @@ class TransformationProvider(Protocol):
     async def update_patterns(self, patterns: Dict[str, Any]) -> bool:
         """Update transformation patterns."""
         ...
-
 
 class ConfigurablePatternProvider:
     """File-based configurable transformation patterns."""
@@ -129,7 +124,6 @@ class ConfigurablePatternProvider:
             }
         }
 
-
 class MLPatternProvider:
     """ML-based transformation pattern provider using trained models."""
 
@@ -170,8 +164,8 @@ class MLPatternProvider:
 
             # Lazy load model manager for transformer models
             if self._model_manager is None:
-                from ..models.model_manager import ModelManager, ModelConfig
-                model_config = ModelConfig(
+                from ..models.model_manager import ModelManager, model_config
+                model_config = model_config(
                     model_name="distilbert-base-uncased",  # Lightweight model for pattern generation
                     task="text-classification",
                     use_quantization=True,
@@ -236,7 +230,6 @@ class MLPatternProvider:
         }
 
         return base_patterns
-
 
 class LLMTransformerService:
     """Modern configurable ML-driven prompt transformation service."""

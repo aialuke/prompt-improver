@@ -15,14 +15,12 @@ from ..events.event_types import EventType, MLEvent
 from .component_health_monitor import ComponentHealthStatus, ComponentHealthMonitor
 from .orchestrator_monitor import HealthStatus, OrchestratorMonitor
 
-
 class PipelineHealthStatus(Enum):
     """Pipeline-level health status."""
     HEALTHY = "healthy"
-    DEGRADED = "degraded"
+    degraded = "degraded"
     CRITICAL = "critical"
     UNKNOWN = "unknown"
-
 
 @dataclass
 class PipelineHealthSnapshot:
@@ -34,7 +32,6 @@ class PipelineHealthSnapshot:
     performance_metrics: Dict[str, Any]
     timestamp: datetime
 
-
 @dataclass
 class HealthTrend:
     """Health trend analysis."""
@@ -44,7 +41,6 @@ class HealthTrend:
     avg_response_time: float
     failure_rate: float
     availability: float
-
 
 class PipelineHealthMonitor:
     """
@@ -350,9 +346,9 @@ class PipelineHealthMonitor:
             if critical_factors:
                 return PipelineHealthStatus.CRITICAL
             elif degraded_factors:
-                return PipelineHealthStatus.DEGRADED
+                return PipelineHealthStatus.degraded
             elif health_factors:
-                return PipelineHealthStatus.DEGRADED
+                return PipelineHealthStatus.degraded
             else:
                 return PipelineHealthStatus.HEALTHY
         

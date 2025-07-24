@@ -17,7 +17,6 @@ from ...utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 
-
 class TrainingDataLoader:
     """Unified training data loader that automatically combines real and synthetic data"""
     
@@ -293,7 +292,6 @@ class TrainingDataLoader:
                     )
         
         return validation
-
 
 async def get_training_data_stats(db_session: AsyncSession) -> Dict[str, Any]:
     """Get comprehensive training data statistics"""

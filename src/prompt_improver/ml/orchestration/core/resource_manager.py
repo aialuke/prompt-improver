@@ -18,11 +18,11 @@ from ..events.event_types import EventType, MLEvent
 
 # Kubernetes integration with graceful fallback
 try:
-    from ..k8s.resource_integration import KubernetesResourceManager
+    from ..k8s.resource_integration import kubernetes_resource_manager
     KUBERNETES_INTEGRATION_AVAILABLE = True
 except ImportError:
     KUBERNETES_INTEGRATION_AVAILABLE = False
-    KubernetesResourceManager = None
+    kubernetes_resource_manager = None
 
 # Circuit breaker implementation for resource management
 class CircuitBreakerState(Enum):
@@ -31,14 +31,12 @@ class CircuitBreakerState(Enum):
     OPEN = "open"
     HALF_OPEN = "half_open"
 
-
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
     failure_threshold: int = 5
     recovery_timeout: float = 60.0
     success_threshold: int = 3  # For half-open state
-
 
 class ResourceCircuitBreaker:
     """Circuit breaker for resource allocation operations."""
@@ -107,21 +105,19 @@ class ResourceCircuitBreaker:
             "last_failure_time": self.last_failure_time
         }
 
-
 class ResourceType(Enum):
     """Types of resources managed by the orchestrator."""
     CPU = "cpu"
-    MEMORY = "memory"
+    memory = "memory"
     GPU = "gpu"
     GPU_MEMORY = "gpu_memory"  # Added for 2025 GPU-aware management
-    DISK = "disk"
+    disk = "disk"
     DATABASE_CONNECTIONS = "database_connections"
     CACHE_CONNECTIONS = "cache_connections"
     
     # 2025 GPU scheduling types (following NVIDIA KAI Scheduler patterns)
     GPU_MIG_SLICE = "gpu_mig_slice"  # Multi-Instance GPU slices
     GPU_TIME_SLICE = "gpu_time_slice"  # Time-sliced GPU sharing
-
 
 @dataclass
 class ResourceAllocation:
@@ -135,7 +131,6 @@ class ResourceAllocation:
     expires_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)  # Added for GPU management
 
-
 @dataclass
 class ResourceUsage:
     """Current resource usage statistics."""
@@ -144,7 +139,6 @@ class ResourceUsage:
     currently_allocated: float
     usage_percentage: float
     last_updated: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
 
 class ResourceManager:
     """
@@ -173,10 +167,10 @@ class ResourceManager:
         self._initialize_circuit_breakers()
 
         # Kubernetes integration
-        self.k8s_manager: Optional[KubernetesResourceManager] = None
+        self.k8s_manager: Optional[kubernetes_resource_manager] = None
         if KUBERNETES_INTEGRATION_AVAILABLE:
             try:
-                self.k8s_manager = KubernetesResourceManager()
+                self.k8s_manager = kubernetes_resource_manager()
                 self.logger.info("Kubernetes resource integration enabled")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize Kubernetes integration: {e}")
@@ -201,7 +195,7 @@ class ResourceManager:
         # Configure circuit breakers for critical resource types
         critical_resources = [
             ResourceType.CPU,
-            ResourceType.MEMORY,
+            ResourceType.memory,
             ResourceType.GPU,
             ResourceType.GPU_MEMORY,
             ResourceType.GPU_MIG_SLICE,
@@ -450,12 +444,12 @@ class ResourceManager:
         """Initialize resource limits from configuration."""
         self.resource_limits = {
             ResourceType.CPU: float(self.config.cpu_limit_cores),
-            ResourceType.MEMORY: self.config.memory_limit_gb * 1024 * 1024 * 1024,  # Convert to bytes
+            ResourceType.memory: self.config.memory_limit_gb * 1024 * 1024 * 1024,  # Convert to bytes
             ResourceType.GPU: 1.0,  # Assume single GPU for now
             ResourceType.GPU_MEMORY: 24.0 * 1024 * 1024 * 1024,  # 24GB GPU memory in bytes
             ResourceType.GPU_MIG_SLICE: 7.0,  # 7 MIG slices (for A100)
             ResourceType.GPU_TIME_SLICE: 4.0,  # 4 time slices (25% each)
-            ResourceType.DISK: 100.0 * 1024 * 1024 * 1024,  # 100GB in bytes
+            ResourceType.disk: 100.0 * 1024 * 1024 * 1024,  # 100GB in bytes
             ResourceType.DATABASE_CONNECTIONS: float(self.config.db_connection_pool_size),
             ResourceType.CACHE_CONNECTIONS: float(self.config.redis_connection_pool_size)
         }
@@ -548,7 +542,7 @@ class ResourceManager:
         if resource_type == ResourceType.CPU:
             # Get actual CPU count
             return float(psutil.cpu_count())
-        elif resource_type == ResourceType.MEMORY:
+        elif resource_type == ResourceType.memory:
             # Get actual memory amount
             return float(psutil.virtual_memory().total)
         else:
@@ -574,7 +568,7 @@ class ResourceManager:
                 await self._emit_threshold_alert(resource_type, usage.usage_percentage)
             
             # Check memory threshold
-            elif (resource_type == ResourceType.MEMORY and 
+            elif (resource_type == ResourceType.memory and 
                   usage.usage_percentage > self.config.alert_threshold_memory * 100):
                 await self._emit_threshold_alert(resource_type, usage.usage_percentage)
     
@@ -794,7 +788,7 @@ class ResourceManager:
         # For Phase 1, implement basic optimization
         # Later phases can implement more sophisticated strategies
         
-        if resource_type == ResourceType.MEMORY:
+        if resource_type == ResourceType.memory:
             # Trigger garbage collection for memory optimization
             import gc
             gc.collect()
@@ -895,7 +889,6 @@ class ResourceManager:
             resource_type.value: breaker.get_state()
             for resource_type, breaker in self.circuit_breakers.items()
         }
-
 
 class ResourceExhaustionError(Exception):
     """Raised when requested resources are not available."""

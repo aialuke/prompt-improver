@@ -18,11 +18,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 class AutoMLCallback:
     """Main AutoML callback implementing 2025 Optuna integration patterns
 
-    Features:
+    features:
     - Real-time trial monitoring and reporting
     - Artifact storage for model persistence
     - Early stopping based on performance criteria
@@ -227,7 +226,6 @@ class AutoMLCallback:
         except Exception:
             return None
 
-
 class RealTimeAnalyticsCallback:
     """Callback for real-time analytics integration
     Streams optimization progress to WebSocket connections
@@ -276,7 +274,6 @@ class RealTimeAnalyticsCallback:
 
         except Exception as e:
             logger.error(f"Real-time analytics callback failed: {e}")
-
 
 class ExperimentCallback:
     """Callback for A/B testing experiment integration
@@ -383,7 +380,6 @@ class ExperimentCallback:
         except Exception as e:
             logger.error(f"Failed to update experiment tracking: {e}")
 
-
 class ModelSelectionCallback:
     """Callback for automated model selection and management
     Updates model configurations based on optimization results
@@ -458,7 +454,6 @@ class ModelSelectionCallback:
 
         except Exception as e:
             logger.error(f"Failed to track model performance: {e}")
-
 
 # Utility functions for callback management
 def create_standard_callbacks(orchestrator: "AutoMLOrchestrator") -> list:

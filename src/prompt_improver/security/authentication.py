@@ -11,7 +11,6 @@ import jwt
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
-
 class AuthenticationService:
     """Real authentication service that implements secure authentication flows."""
 

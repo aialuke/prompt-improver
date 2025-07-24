@@ -26,26 +26,22 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
-from src.prompt_improver.utils.datetime_utils import aware_utc_now
-
+from ..utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 
-
 class SecurityLevel(Enum):
     """Security levels following NIST guidelines (2025)."""
-    BASIC = "basic"           # Standard encryption, basic rotation
-    ENHANCED = "enhanced"     # Advanced KDF, frequent rotation
+    basic = "basic"           # Standard encryption, basic rotation
+    enhanced = "enhanced"     # Advanced KDF, frequent rotation
     HIGH = "high"            # HSM-ready, strict policies
     CRITICAL = "critical"    # Zero-trust, maximum security
 
-
 class KeyDerivationMethod(Enum):
     """Key derivation methods (2025 best practices)."""
-    PBKDF2 = "pbkdf2"        # PBKDF2-HMAC-SHA256
-    SCRYPT = "scrypt"        # Scrypt (memory-hard)
-    DIRECT = "direct"        # Direct Fernet key generation
-
+    pbkdf2 = "pbkdf2"        # pbkdf2-HMAC-SHA256
+    scrypt = "scrypt"        # Scrypt (memory-hard)
+    direct = "direct"        # Direct Fernet key generation
 
 class AuditEvent(Enum):
     """Security audit events for compliance."""
@@ -56,7 +52,6 @@ class AuditEvent(Enum):
     KEY_DELETED = "key_deleted"
     SECURITY_VIOLATION = "security_violation"
 
-
 class SecurityAuditLogger:
     """Enhanced security audit logging for compliance (2025)."""
 
@@ -65,7 +60,7 @@ class SecurityAuditLogger:
         self.logger = logging.getLogger(f"{__name__}.{component_name}.Audit")
 
     def log_event(self, event: AuditEvent, details: Dict[str, Any],
-                  security_level: SecurityLevel = SecurityLevel.BASIC):
+                  security_level: SecurityLevel = SecurityLevel.basic):
         """Log security audit event with structured data."""
         audit_entry = {
             "timestamp": aware_utc_now().isoformat(),
@@ -84,7 +79,6 @@ class SecurityAuditLogger:
         else:
             self.logger.debug(f"SECURITY_AUDIT: {audit_entry}")
 
-
 class KeyRotationConfig:
     """Enhanced key rotation configuration following 2025 security best practices."""
 
@@ -94,8 +88,8 @@ class KeyRotationConfig:
         max_key_age_hours: int = 72,
         key_version_limit: int = 5,
         auto_rotation_enabled: bool = True,
-        security_level: SecurityLevel = SecurityLevel.ENHANCED,
-        key_derivation_method: KeyDerivationMethod = KeyDerivationMethod.SCRYPT,
+        security_level: SecurityLevel = SecurityLevel.enhanced,
+        key_derivation_method: KeyDerivationMethod = KeyDerivationMethod.scrypt,
         enable_audit_logging: bool = True,
         zero_trust_mode: bool = True,
         hsm_ready: bool = False,
@@ -130,17 +124,16 @@ class KeyRotationConfig:
             self.rotation_interval_hours = min(self.rotation_interval_hours, 12)  # 12 hours max
             self.max_key_age_hours = min(self.max_key_age_hours, 48)  # 48 hours max
             self.zero_trust_mode = True
-        elif self.security_level == SecurityLevel.ENHANCED:
+        elif self.security_level == SecurityLevel.enhanced:
             self.rotation_interval_hours = min(self.rotation_interval_hours, 24)  # 24 hours max
             self.enable_audit_logging = True
-
 
 class KeyInfo:
     """Enhanced key information with 2025 security metadata."""
 
     def __init__(self, key: bytes, key_id: str, created_at: datetime, version: int = 1,
-                 security_level: SecurityLevel = SecurityLevel.ENHANCED,
-                 derivation_method: KeyDerivationMethod = KeyDerivationMethod.SCRYPT):
+                 security_level: SecurityLevel = SecurityLevel.enhanced,
+                 derivation_method: KeyDerivationMethod = KeyDerivationMethod.scrypt):
         self.key = key
         self.key_id = key_id
         self.created_at = created_at
@@ -214,14 +207,13 @@ class KeyInfo:
             "access_frequency": len(self.access_history) / max(age_hours, 1)  # accesses per hour
         }
 
-
 class SecureKeyManager:
     """Enhanced secure key management with 2025 security best practices.
 
-    Features:
+    features:
     - Zero Trust Architecture compliance
     - NIST SP 800-57 key management standards
-    - Advanced key derivation (Scrypt/PBKDF2)
+    - Advanced key derivation (Scrypt/pbkdf2)
     - Comprehensive audit logging
     - HSM readiness
     - Cloud KMS integration readiness
@@ -578,9 +570,9 @@ class SecureKeyManager:
             New key ID
         """
         # Generate cryptographically secure key using enhanced methods
-        if self.config.key_derivation_method == KeyDerivationMethod.SCRYPT:
+        if self.config.key_derivation_method == KeyDerivationMethod.scrypt:
             key_bytes = self._generate_scrypt_key()
-        elif self.config.key_derivation_method == KeyDerivationMethod.PBKDF2:
+        elif self.config.key_derivation_method == KeyDerivationMethod.pbkdf2:
             key_bytes = self._generate_pbkdf2_key()
         else:
             # Fallback to direct Fernet key generation
@@ -646,14 +638,14 @@ class SecureKeyManager:
         return base64.urlsafe_b64encode(key_material)
 
     def _generate_pbkdf2_key(self) -> bytes:
-        """Generate key using PBKDF2-HMAC-SHA256 (NIST approved)."""
+        """Generate key using pbkdf2-HMAC-SHA256 (NIST approved)."""
         # Generate high-entropy salt
         salt = secrets.token_bytes(32)
 
         # Use strong password from system entropy
         password = secrets.token_bytes(64)
 
-        # PBKDF2 parameters (2025 NIST recommendations)
+        # pbkdf2 parameters (2025 NIST recommendations)
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,  # 256 bits for Fernet
@@ -855,7 +847,6 @@ class SecureKeyManager:
             "hsm_ready": self.config.hsm_ready,
             "suspicious_patterns": len(self._analyze_access_patterns())
         }
-
 
 class FernetKeyManager:
     """Wrapper for Fernet encryption using SecureKeyManager."""
@@ -1184,7 +1175,6 @@ class FernetKeyManager:
 
         return Fernet(key_bytes)
 
-
 # Global key manager instance
 _default_key_manager = None
 
@@ -1194,7 +1184,6 @@ def get_key_manager() -> SecureKeyManager:
     if _default_key_manager is None:
         _default_key_manager = SecureKeyManager()
     return _default_key_manager
-
 
 def get_fernet_manager() -> FernetKeyManager:
     """Get global Fernet key manager instance."""

@@ -18,16 +18,15 @@ from datetime import datetime
 # Kubernetes client with graceful fallback
 try:
     from kubernetes import client, config
-    from kubernetes.client.rest import ApiException
+    from kubernetes.client.rest import api_exception
     KUBERNETES_AVAILABLE = True
 except ImportError:
     KUBERNETES_AVAILABLE = False
     client = None
     config = None
-    ApiException = Exception
+    api_exception = Exception
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class NodeResourceInfo:
@@ -42,7 +41,6 @@ class NodeResourceInfo:
     labels: Dict[str, str]
     taints: List[Dict[str, str]]
 
-
 @dataclass
 class PodResourceInfo:
     """Information about pod resource requests/limits."""
@@ -53,7 +51,6 @@ class PodResourceInfo:
     cpu_limit: str
     memory_limit: str
     gpu_request: str
-
 
 @dataclass
 class ResourceQuotaInfo:
@@ -66,7 +63,6 @@ class ResourceQuotaInfo:
     cpu_used: str
     memory_used: str
     gpu_used: str
-
 
 class KubernetesResourceManager:
     """Kubernetes resource management integration."""
@@ -155,7 +151,7 @@ class KubernetesResourceManager:
             
             return node_resources
             
-        except ApiException as e:
+        except api_exception as e:
             self.logger.error(f"Error getting node resources: {e}")
             return []
     
@@ -189,7 +185,7 @@ class KubernetesResourceManager:
             
             return quota_info
             
-        except ApiException as e:
+        except api_exception as e:
             self.logger.error(f"Error getting resource quotas: {e}")
             return []
     
@@ -250,7 +246,7 @@ class KubernetesResourceManager:
             
             return pod_resources
             
-        except ApiException as e:
+        except api_exception as e:
             self.logger.error(f"Error getting pod resources: {e}")
             return []
     
@@ -299,7 +295,7 @@ class KubernetesResourceManager:
             self.logger.info(f"Created HPA for deployment {deployment_name}")
             return True
             
-        except ApiException as e:
+        except api_exception as e:
             self.logger.error(f"Error creating HPA: {e}")
             return False
     

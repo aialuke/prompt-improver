@@ -98,11 +98,10 @@ CONTENT_PATTERNS = {
     ],
 }
 
-
 class XMLStructureRule(BasePromptRule):
     """Enhanced XML structure rule using Anthropic optimization patterns.
 
-    Features:
+    features:
     - Context, instruction, example, thinking, and response tag organization
     - Automatic content type detection and appropriate tagging
     - Nested structure support with hierarchy enforcement

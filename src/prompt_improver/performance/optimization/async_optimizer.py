@@ -2,7 +2,7 @@
 
 Advanced async optimizer implementing 2025 best practices:
 - Intelligent connection pooling with health monitoring
-- Multi-tier caching with TTL and LRU strategies
+- Multi-tier caching with ttl and lru strategies
 - Resource optimization with memory and CPU management
 - Enhanced monitoring with OpenTelemetry integration
 - Adaptive batching with dynamic sizing
@@ -37,7 +37,6 @@ try:
 except ImportError:
     REDIS_AVAILABLE = False
 
-# Legacy aioredis support (commented out due to Python 3.13 compatibility issues)
 # try:
 #     import aioredis
 #     AIOREDIS_AVAILABLE = True
@@ -75,45 +74,40 @@ from .performance_optimizer import measure_mcp_operation
 
 logger = logging.getLogger(__name__)
 
-
 # Enhanced 2025 enums and data structures
 class CacheStrategy(Enum):
     """Caching strategies"""
-    LRU = "lru"
-    TTL = "ttl"
-    LFU = "lfu"
-    ADAPTIVE = "adaptive"
+    lru = "lru"
+    ttl = "ttl"
+    lfu = "lfu"
+    adaptive = "adaptive"
     WRITE_THROUGH = "write_through"
     WRITE_BACK = "write_back"
-
 
 class ConnectionPoolType(Enum):
     """Connection pool types"""
     HTTP = "http"
-    DATABASE = "database"
-    REDIS = "redis"
-    CUSTOM = "custom"
-
+    database = "database"
+    redis = "redis"
+    custom = "custom"
 
 class ResourceOptimizationMode(Enum):
     """Resource optimization modes"""
     MEMORY_OPTIMIZED = "memory_optimized"
     CPU_OPTIMIZED = "cpu_optimized"
-    BALANCED = "balanced"
+    balanced = "balanced"
     THROUGHPUT_OPTIMIZED = "throughput_optimized"
-
 
 @dataclass
 class CacheConfig:
     """Configuration for intelligent caching"""
-    strategy: CacheStrategy = CacheStrategy.LRU
+    strategy: CacheStrategy = CacheStrategy.lru
     max_size: int = 1000
     ttl_seconds: int = 300
     enable_compression: bool = True
     enable_serialization: bool = True
     cache_hit_threshold: float = 0.8
     eviction_policy: str = "lru"
-
 
 @dataclass
 class ConnectionPoolConfig:
@@ -126,7 +120,6 @@ class ConnectionPoolConfig:
     health_check_interval: float = 60.0
     retry_attempts: int = 3
     enable_health_monitoring: bool = True
-
 
 @dataclass
 class ResourceMetrics:
@@ -152,7 +145,6 @@ class ResourceMetrics:
             "timestamp": self.timestamp.isoformat()
         }
 
-
 @dataclass
 class AsyncOperationConfig:
     """Enhanced configuration for async operation optimization."""
@@ -171,7 +163,7 @@ class AsyncOperationConfig:
     enable_circuit_breaker: bool = True
 
     # Resource optimization
-    resource_optimization_mode: ResourceOptimizationMode = ResourceOptimizationMode.BALANCED
+    resource_optimization_mode: ResourceOptimizationMode = ResourceOptimizationMode.balanced
     memory_limit_mb: int = 512
     cpu_limit_percent: float = 80.0
 
@@ -185,7 +177,6 @@ class AsyncOperationConfig:
     circuit_breaker_failure_threshold: int = 5
     circuit_breaker_timeout_seconds: int = 60
     circuit_breaker_half_open_max_calls: int = 3
-
 
 # OpenTelemetry setup
 if OPENTELEMETRY_AVAILABLE:
@@ -223,7 +214,6 @@ else:
     CACHE_HIT_RATE = None
     CONNECTION_POOL_UTILIZATION = None
     RESOURCE_UTILIZATION = None
-
 
 class IntelligentCache:
     """Intelligent caching with multiple strategies and optimization"""
@@ -263,8 +253,8 @@ class IntelligentCache:
             self.access_counts[key] += 1
             self.cache_stats["hits"] += 1
 
-            # Check TTL if enabled
-            if self.config.strategy == CacheStrategy.TTL:
+            # Check ttl if enabled
+            if self.config.strategy == CacheStrategy.ttl:
                 if self._is_expired(key):
                     await self.delete(key)
                     self.cache_stats["misses"] += 1
@@ -333,14 +323,14 @@ class IntelligentCache:
 
         evict_count = max(1, len(self.cache) // 10)  # Evict 10% of items
 
-        if self.config.strategy == CacheStrategy.LRU:
+        if self.config.strategy == CacheStrategy.lru:
             # Evict least recently used
             sorted_items = sorted(self.access_times.items(), key=lambda x: x[1])
             for key, _ in sorted_items[:evict_count]:
                 await self.delete(key)
                 self.cache_stats["evictions"] += 1
 
-        elif self.config.strategy == CacheStrategy.LFU:
+        elif self.config.strategy == CacheStrategy.lfu:
             # Evict least frequently used
             sorted_items = sorted(self.access_counts.items(), key=lambda x: x[1])
             for key, _ in sorted_items[:evict_count]:
@@ -348,7 +338,7 @@ class IntelligentCache:
                 self.cache_stats["evictions"] += 1
 
     def _is_expired(self, key: str) -> bool:
-        """Check if key is expired (TTL strategy)"""
+        """Check if key is expired (ttl strategy)"""
         if key not in self.access_times:
             return True
 
@@ -360,14 +350,13 @@ class IntelligentCache:
         total = self.cache_stats["hits"] + self.cache_stats["misses"]
         return self.cache_stats["hits"] / total if total > 0 else 0.0
 
-
 class ConnectionPoolManager:
     """Modern connection pool manager with health monitoring and optimization.
 
     2025 Best Practice: Uses async context manager for proper lifecycle management
     and avoids creating tasks in __init__ to prevent event loop issues.
 
-    Features:
+    features:
     - Multi-pool support (HTTP, Database, Redis)
     - Health monitoring with background tasks
     - OpenTelemetry observability
@@ -376,8 +365,7 @@ class ConnectionPoolManager:
     """
 
     def __init__(self, config: Optional[AsyncOperationConfig] = None):
-        # Backward compatibility: create default config if none provided
-        self.config = config or AsyncOperationConfig()
+        
         self._http_session: Optional[aiohttp.ClientSession] = None
         self._database_pools: Dict[str, Any] = {}
         self._redis_pools: Dict[str, Any] = {}
@@ -536,7 +524,7 @@ class ConnectionPoolManager:
                 connector = aiohttp.TCPConnector(
                     limit=100,  # Total connection pool size
                     limit_per_host=20,  # Connections per host
-                    ttl_dns_cache=300,  # DNS cache TTL
+                    ttl_dns_cache=300,  # DNS cache ttl
                     use_dns_cache=True,
                     keepalive_timeout=30,
                     enable_cleanup_closed=True,
@@ -618,7 +606,6 @@ class ConnectionPoolManager:
                     }
                 }
 
-
 class AsyncBatchProcessor:
     """Batches async operations for improved throughput."""
 
@@ -682,7 +669,6 @@ class AsyncBatchProcessor:
 
         finally:
             self._processing = False
-
 
 class AsyncTaskScheduler:
     """Optimized task scheduler for high-performance async operations."""
@@ -761,7 +747,6 @@ class AsyncTaskScheduler:
                 continue
             except Exception as e:
                 logger.error(f"Worker {worker_name} error: {e}")
-
 
 class AsyncOptimizer:
     """Main async optimization coordinator."""
@@ -882,10 +867,8 @@ class AsyncOptimizer:
             }
         }
 
-
 # Global async optimizer instance
 _global_optimizer: Optional[AsyncOptimizer] = None
-
 
 async def get_async_optimizer() -> AsyncOptimizer:
     """Get the global async optimizer instance."""
@@ -894,7 +877,6 @@ async def get_async_optimizer() -> AsyncOptimizer:
         _global_optimizer = AsyncOptimizer()
         await _global_optimizer.initialize()
     return _global_optimizer
-
 
 # Convenience functions
 async def optimized_async_operation(
@@ -914,7 +896,6 @@ async def optimized_async_operation(
         else:
             return await operation(*args, **kwargs)
 
-
 async def shutdown_async_optimizer():
     """Shutdown the global async optimizer."""
     global _global_optimizer
@@ -922,6 +903,5 @@ async def shutdown_async_optimizer():
         await _global_optimizer.shutdown()
         _global_optimizer = None
 
-
 # Note: ConnectionPoolManager is the modern 2025-compliant implementation
-# Features: Health monitoring, multi-pool support, orchestrator interface, observability
+# features: Health monitoring, multi-pool support, orchestrator interface, observability

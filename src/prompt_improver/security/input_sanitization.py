@@ -24,11 +24,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
 class SecurityError(Exception):
     """Exception raised for critical security threats."""
     pass
-
 
 class SecurityThreatLevel(Enum):
     """Security threat levels for validation results."""
@@ -57,7 +55,6 @@ class SecurityThreatLevel(Enum):
             return self.value >= other.value
         return NotImplemented
 
-
 class ValidationResult:
     """Result of input validation with security context."""
 
@@ -70,7 +67,6 @@ class ValidationResult:
         self.threats_detected = threats_detected or []
         self.message = message
         self.timestamp = datetime.now(timezone.utc)
-
 
 @dataclass
 class SecurityEvent:
@@ -87,12 +83,11 @@ class SecurityEvent:
         if self.timestamp is None:
             self.timestamp = datetime.now(timezone.utc)
 
-
 class InputSanitizer:
     """
     Enhanced input sanitization service implementing 2025 OWASP security best practices.
 
-    Features:
+    features:
     - Prompt injection protection (OWASP LLM01:2025)
     - Async validation patterns
     - ML-specific threat detection

@@ -1,0 +1,263 @@
+{
+  "name": "Prompt Improver Development Environment (2025)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "PYTHON_VERSION": "3.12"
+    }
+  },
+  
+  // Container configuration with 2025 optimizations
+  "runArgs": [
+    "--init",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt", "seccomp=unconfined",
+    "--add-host=host.docker.internal:host-gateway"
+  ],
+  
+  // Environment variables optimized for 2025 development
+  "containerEnv": {
+    "PYTHONPATH": "/workspaces/prompt-improver/src",
+    "PYTHONUNBUFFERED": "1",
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+    "NODE_ENV": "development",
+    "VITE_DEV_SERVER_HOST": "0.0.0.0",
+    "VITE_DEV_SERVER_PORT": "5173",
+    "DATABASE_URL": "postgresql+psycopg://postgres:postgres@localhost:5432/prompt_improver_dev",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "DEVELOPMENT_MODE": "true"
+  },
+  
+  // Optimized mounts for performance
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspaces/prompt-improver,type=bind,consistency=cached",
+    "source=prompt-improver-node_modules,target=/workspaces/prompt-improver/node_modules,type=volume",
+    "source=prompt-improver-pip-cache,target=/home/vscode/.cache/pip,type=volume",
+    "source=prompt-improver-postgres-data,target=/var/lib/postgresql/data,type=volume"
+  ],
+  
+  // Modern dev container features (2025 best practices)
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true,
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installJupyterlab": true,
+      "installTools": true,
+      "optimize": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20",
+      "nodeGypDependencies": true,
+      "installYarnBerry": false
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true,
+      "azureDnsAutoDetection": true,
+      "installDockerBuildx": true,
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+  
+  // Enhanced VS Code extensions for 2025
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Python Development
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-python.flake8",
+        "ms-python.mypy-type-checker",
+        "ms-python.debugpy",
+        "ms-python.pytest",
+        
+        // TypeScript/JavaScript Development  
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.vscode-json",
+        
+        // Vite and Modern Frontend
+        "antfu.vite",
+        "Vue.vscode-typescript-vue-plugin",
+        "ms-vscode.vscode-css-peek",
+        "zignd.html-css-class-completion",
+        
+        // Database Tools
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "cweijan.vscode-redis-client",
+        
+        // DevOps and Containers
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        
+        // Git and Version Control
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github",
+        "github.copilot",
+        "github.copilot-chat",
+        
+        // Testing and Quality
+        "hbenl.vscode-test-explorer",
+        "ryanluker.vscode-coverage-gutters",
+        
+        // AI/ML Development
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        
+        // Enhanced Development Experience
+        "usernamehw.errorlens",
+        "gruntfuggly.todo-tree",
+        "streetsidesoftware.code-spell-checker",
+        "aaron-bond.better-comments"
+      ],
+      "settings": {
+        // Python Configuration
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.typeCheckingMode": "strict",
+        "python.formatting.provider": "black",
+        
+        // TypeScript Configuration
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "typescript.suggest.autoImports": true,
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "typescript.inlayHints.parameterNames.enabled": "literals",
+        "typescript.inlayHints.variableTypes.enabled": true,
+        
+        // Editor Configuration
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit",
+          "source.fixAll.eslint": "explicit"
+        },
+        "editor.rulers": [88, 120],
+        "editor.tabSize": 4,
+        
+        // Terminal Configuration
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.cwd": "/workspaces/prompt-improver",
+        
+        // Performance Optimizations
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/node_modules": true,
+          "**/dist": true,
+          "**/.coverage": true,
+          "**/htmlcov": true
+        }
+      }
+    }
+  },
+  
+  // Enhanced port forwarding with 2025 optimizations
+  "forwardPorts": [
+    {
+      "port": 5173,
+      "label": "Vite Dev Server",
+      "onAutoForward": "notify"
+    },
+    {
+      "port": 8000,
+      "label": "Python API Server",
+      "onAutoForward": "notify"
+    },
+    {
+      "port": 5432,
+      "label": "PostgreSQL Database",
+      "onAutoForward": "silent"
+    },
+    {
+      "port": 6379,
+      "label": "Redis Cache",
+      "onAutoForward": "silent"
+    },
+    {
+      "port": 3000,
+      "label": "TUI Dashboard",
+      "onAutoForward": "notify"
+    }
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite Dev Server",
+      "requireLocalPort": false,
+      "protocol": "http"
+    },
+    "8000": {
+      "label": "Python API Server",
+      "requireLocalPort": false,
+      "protocol": "http"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    },
+    "3000": {
+      "label": "TUI Dashboard",
+      "onAutoForward": "notify"
+    }
+  },
+  
+  // Lifecycle scripts for 2025 development workflow
+  "initializeCommand": "echo 'Initializing development environment...'",
+  "onCreateCommand": [
+    "sudo chown -R vscode:vscode /workspaces/prompt-improver",
+    "pip install --upgrade pip setuptools wheel"
+  ],
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "updateContentCommand": [
+    "pip install -r requirements.txt",
+    "npm install",
+    "python -m alembic upgrade head"
+  ],
+  "postStartCommand": [
+    "bash scripts/setup-dev-environment.sh",
+    "echo 'Development environment ready! Use npm run dev for Vite server.'"
+  ],
+  
+  // User configuration
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
+  
+  // Workspace configuration
+  "workspaceFolder": "/workspaces/prompt-improver",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/prompt-improver,type=bind,consistency=cached",
+  
+  // Development optimizations
+  "shutdownAction": "stopContainer",
+  "overrideCommand": false,
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "10gb"
+  }
+}

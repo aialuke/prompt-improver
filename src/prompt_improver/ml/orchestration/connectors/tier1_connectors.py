@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier, ComponentStatus
 
-
 class TrainingDataLoaderConnector(ComponentConnector):
     """Connector for TrainingDataLoader component."""
     
@@ -93,7 +92,6 @@ class TrainingDataLoaderConnector(ComponentConnector):
             "split_ratio": [0.7, 0.2, 0.1]
         }
 
-
 class MLModelServiceConnector(ComponentConnector):
     """Connector for MLModelService component."""
     
@@ -173,7 +171,6 @@ class MLModelServiceConnector(ComponentConnector):
             "prediction_time": "0.05s"
         }
 
-
 class RuleOptimizerConnector(ComponentConnector):
     """Connector for RuleOptimizer component."""
     
@@ -234,7 +231,6 @@ class RuleOptimizerConnector(ComponentConnector):
             "coverage": 0.94
         }
 
-
 class MultiArmedBanditConnector(ComponentConnector):
     """Connector for MultiArmedBandit component."""
     
@@ -294,7 +290,6 @@ class MultiArmedBanditConnector(ComponentConnector):
             "confidence_interval": [0.65, 0.88],
             "exploration_bonus": 0.12
         }
-
 
 class AprioriAnalyzerConnector(ComponentConnector):
     """Connector for AprioriAnalyzer component."""
@@ -358,7 +353,6 @@ class AprioriAnalyzerConnector(ComponentConnector):
             "most_frequent": ["pattern_A", "pattern_B", "pattern_C"],
             "pattern_strength": 0.82
         }
-
 
 class ContextLearnerConnector(ComponentConnector):
     """Connector for ContextLearner component."""
@@ -440,7 +434,6 @@ class ContextLearnerConnector(ComponentConnector):
                 "calinski_harabasz_score": 245.7
             }
         }
-
 
 # Additional Tier 1 connectors would be implemented similarly:
 # - BatchProcessorConnector

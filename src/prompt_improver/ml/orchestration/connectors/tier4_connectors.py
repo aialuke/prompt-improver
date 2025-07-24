@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier
 
-
 class AdvancedABTestingConnector(ComponentConnector):
     """Connector for AdvancedABTesting component."""
     
@@ -74,7 +73,6 @@ class AdvancedABTestingConnector(ComponentConnector):
             "significance_matrix": "all_significant"
         }
 
-
 class RealTimeAnalyticsConnector(ComponentConnector):
     """Connector for RealTimeAnalytics component."""
     
@@ -134,7 +132,6 @@ class RealTimeAnalyticsConnector(ComponentConnector):
             "notification_channels": ["email", "slack", "webhook"],
             "response_time": "500ms"
         }
-
 
 class PerformanceMonitoringConnector(ComponentConnector):
     """Connector for PerformanceMonitoring component."""
@@ -196,7 +193,6 @@ class PerformanceMonitoringConnector(ComponentConnector):
             "storage_used": "125GB",
             "bandwidth_usage": "850 Mbps"
         }
-
 
 class DatabasePerformanceMonitorConnector(ComponentConnector):
     """Connector for DatabasePerformanceMonitor component."""
@@ -332,7 +328,6 @@ class DatabasePerformanceMonitorConnector(ComponentConnector):
             "recommendation_count": len(recommendations)
         }
 
-
 class DatabaseConnectionOptimizerConnector(ComponentConnector):
     """Connector for DatabaseConnectionOptimizer component."""
 
@@ -430,7 +425,6 @@ class DatabaseConnectionOptimizerConnector(ComponentConnector):
             "recommended_settings": memory_settings,
             "analysis_timestamp": datetime.now().isoformat()
         }
-
 
 class PreparedStatementCacheConnector(ComponentConnector):
     """Connector for PreparedStatementCache component."""
@@ -535,7 +529,6 @@ class PreparedStatementCacheConnector(ComponentConnector):
             "analysis_result": analysis_result,
             "connector": "PreparedStatementCacheConnector"
         }
-
 
 class TypeSafePsycopgClientConnector(ComponentConnector):
     """Connector for TypeSafePsycopgClient component."""
@@ -683,7 +676,6 @@ class TypeSafePsycopgClientConnector(ComponentConnector):
             "analysis_result": analysis_result,
             "connector": "TypeSafePsycopgClientConnector"
         }
-
 
 class RetryManagerConnector(ComponentConnector):
     """Connector for UnifiedRetryManager component."""
@@ -894,7 +886,6 @@ class RetryManagerConnector(ComponentConnector):
             "config_updates": config_updates,
             "connector": "RetryManagerConnector"
         }
-
 
 class Tier4ConnectorFactory:
     """Factory for creating Tier 4 component connectors."""

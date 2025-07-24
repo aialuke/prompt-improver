@@ -15,7 +15,6 @@ from prompt_improver.utils.session_event_loop import get_session_wrapper
 
 logger = logging.getLogger(__name__)
 
-
 class EventLoopBenchmark:
     """Comprehensive event loop benchmarking suite."""
 
@@ -382,7 +381,6 @@ class EventLoopBenchmark:
             "comparison_available": bool(self.baseline_results and self.uvloop_results),
         }
 
-
 async def run_startup_benchmark() -> dict[str, Any]:
     """Run benchmark during application startup."""
     logger.info("Running startup performance benchmark")
@@ -404,7 +402,6 @@ async def run_startup_benchmark() -> dict[str, Any]:
         )
 
     return results
-
 
 async def run_full_benchmark_suite() -> dict[str, Any]:
     """Run the complete benchmark suite."""

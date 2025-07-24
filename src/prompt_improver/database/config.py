@@ -3,7 +3,6 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class DatabaseConfig(BaseSettings):
     """Database configuration with environment variable support"""
 
@@ -40,7 +39,6 @@ class DatabaseConfig(BaseSettings):
         default=300, validation_alias="DB_POOL_MAX_IDLE"
     )  # 5min idle timeout
 
-    # Legacy SQLAlchemy pool settings (for backward compatibility)
     pool_size: int = Field(default=5, validation_alias="DB_POOL_SIZE")
     max_overflow: int = Field(default=10, validation_alias="DB_MAX_OVERFLOW")
     pool_recycle: int = Field(default=3600, validation_alias="DB_POOL_RECYCLE")
@@ -103,7 +101,6 @@ class DatabaseConfig(BaseSettings):
     )
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
-
 
 def get_database_config() -> DatabaseConfig:
     """Get database configuration instance."""

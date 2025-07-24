@@ -14,22 +14,19 @@ import json
 
 from ..events.event_types import EventType, MLEvent
 
-
 class AlertSeverity(Enum):
     """Alert severity levels."""
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
-    EMERGENCY = "emergency"
-
+    emergency = "emergency"
 
 class AlertStatus(Enum):
     """Alert status."""
     ACTIVE = "active"
-    ACKNOWLEDGED = "acknowledged"
-    RESOLVED = "resolved"
-    SUPPRESSED = "suppressed"
-
+    acknowledged = "acknowledged"
+    resolved = "resolved"
+    suppressed = "suppressed"
 
 @dataclass
 class Alert:
@@ -51,7 +48,6 @@ class Alert:
     resolved_at: Optional[datetime]
     resolution_note: Optional[str]
 
-
 @dataclass
 class AlertRule:
     """Alert rule configuration."""
@@ -65,7 +61,6 @@ class AlertRule:
     enabled: bool
     tags: Dict[str, str]
 
-
 @dataclass
 class AlertStats:
     """Alert statistics."""
@@ -77,7 +72,6 @@ class AlertStats:
     alerts_last_day: int
     avg_resolution_time_hours: float
     top_alert_types: List[Dict[str, Any]]
-
 
 class AlertManager:
     """
@@ -341,7 +335,7 @@ class AlertManager:
                 return False
             
             alert = self.active_alerts[alert_id]
-            alert.status = AlertStatus.ACKNOWLEDGED
+            alert.status = AlertStatus.acknowledged
             alert.acknowledged_at = datetime.now(timezone.utc)
             alert.acknowledged_by = acknowledged_by
             alert.updated_at = datetime.now(timezone.utc)
@@ -378,7 +372,7 @@ class AlertManager:
                 return False
             
             alert = self.active_alerts[alert_id]
-            alert.status = AlertStatus.RESOLVED
+            alert.status = AlertStatus.resolved
             alert.resolved_at = datetime.now(timezone.utc)
             alert.resolution_note = resolution_note
             alert.updated_at = datetime.now(timezone.utc)
@@ -454,7 +448,7 @@ class AlertManager:
                 self.alert_stats.warning_alerts -= 1
                 self.alert_stats.critical_alerts += 1
             elif alert.severity == AlertSeverity.CRITICAL:
-                alert.severity = AlertSeverity.EMERGENCY
+                alert.severity = AlertSeverity.emergency
             
             alert.updated_at = datetime.now(timezone.utc)
             
@@ -487,7 +481,7 @@ class AlertManager:
             if self.enable_slack_alerts:
                 await self._send_slack_notification(alert)
             
-            if self.enable_pagerduty_alerts and alert.severity in [AlertSeverity.CRITICAL, AlertSeverity.EMERGENCY]:
+            if self.enable_pagerduty_alerts and alert.severity in [AlertSeverity.CRITICAL, AlertSeverity.emergency]:
                 await self._send_pagerduty_notification(alert)
         
         except Exception as e:

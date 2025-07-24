@@ -90,7 +90,6 @@ from ...utils.websocket_manager import connection_manager, publish_experiment_up
 
 logger = logging.getLogger(__name__)
 
-
 class AlertType(Enum):
     """Types of real-time alerts"""
 
@@ -105,7 +104,6 @@ class AlertType(Enum):
     CONVERSION_DROP = "conversion_drop"
     BIAS_DETECTED = "bias_detected"
 
-
 class EventType(Enum):
     """Types of analytics events"""
 
@@ -118,14 +116,12 @@ class EventType(Enum):
     CONVERSION_EVENT = "conversion_event"
     USER_ASSIGNMENT = "user_assignment"
 
-
 class StreamProcessingMode(Enum):
     """Stream processing modes"""
 
     REAL_TIME = "real_time"  # Sub-second processing
     NEAR_REAL_TIME = "near_real_time"  # 1-5 second windows
     MICRO_BATCH = "micro_batch"  # 5-30 second windows
-
 
 @dataclass
 class AnalyticsEvent:
@@ -168,7 +164,6 @@ class AnalyticsEvent:
             correlation_id=data.get("correlation_id")
         )
 
-
 @dataclass
 class AnomalyDetection:
     """Anomaly detection result"""
@@ -194,7 +189,6 @@ class AnomalyDetection:
             "context": self.context
         }
 
-
 @dataclass
 class StreamWindow:
     """Stream processing window"""
@@ -217,7 +211,6 @@ class StreamWindow:
             "metrics": self.metrics,
             "anomalies": [a.to_dict() for a in self.anomalies]
         }
-
 
 # OpenTelemetry setup
 if OPENTELEMETRY_AVAILABLE:
@@ -248,7 +241,6 @@ else:
     EVENTS_PROCESSED = MockInstrument()
     PROCESSING_LATENCY = MockInstrument()
     ANOMALIES_DETECTED = MockInstrument()
-
 
 @dataclass
 class RealTimeMetrics:
@@ -286,7 +278,6 @@ class RealTimeMetrics:
     early_stopping_recommendation: str | None
     early_stopping_confidence: float | None
 
-
 @dataclass
 class RealTimeAlert:
     """Real-time alert for experiment events"""
@@ -301,11 +292,10 @@ class RealTimeAlert:
     data: dict[str, Any]
     acknowledged: bool = False
 
-
 class EnhancedRealTimeAnalyticsService:
     """Enhanced real-time analytics service with 2025 best practices
 
-    Features:
+    features:
     - Event-driven architecture with Kafka/Pulsar integration
     - Stream processing with windowing and aggregations
     - ML-powered anomaly detection
@@ -1072,7 +1062,6 @@ class EnhancedRealTimeAnalyticsService:
 
         return data
 
-
 # Maintain backward compatibility
 class RealTimeAnalyticsService(EnhancedRealTimeAnalyticsService):
     """Backward compatible real-time analytics service."""
@@ -1530,10 +1519,8 @@ class RealTimeAnalyticsService(EnhancedRealTimeAnalyticsService):
         for experiment_id in list(self.monitoring_tasks.keys()):
             await self.stop_experiment_monitoring(experiment_id)
 
-
 # Global service instance
 _real_time_service: RealTimeAnalyticsService | None = None
-
 
 async def get_real_time_analytics_service(
     db_session: AsyncSession, redis_client: redis.Redis | None = None

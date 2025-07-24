@@ -32,7 +32,6 @@ _health_state = {
     "component_status": {}
 }
 
-
 class HealthChecker:
     """
     Comprehensive health checker following 2025 best practices
@@ -373,10 +372,8 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-
 # Initialize health checker
 health_checker = HealthChecker()
-
 
 # Health endpoint implementations
 @health_router.get("/")
@@ -399,7 +396,6 @@ async def health_check():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE
         )
 
-
 @health_router.get("/live")
 async def liveness_probe():
     """Kubernetes liveness probe endpoint"""
@@ -416,7 +412,6 @@ async def liveness_probe():
             },
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE
         )
-
 
 @health_router.get("/ready")
 async def readiness_probe():
@@ -436,7 +431,6 @@ async def readiness_probe():
             },
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE
         )
-
 
 @health_router.get("/startup")
 async def startup_probe():

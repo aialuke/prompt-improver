@@ -46,7 +46,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 # Modern Pydantic models for configuration and validation
 class FeatureExtractionConfig(BaseModel):
     """Configuration model with validation and type safety."""
@@ -66,7 +65,6 @@ class FeatureExtractionConfig(BaseModel):
             raise ValueError('Weight must be numeric')
         return float(v)
 
-
 class FeatureExtractionRequest(BaseModel):
     """Request model for feature extraction with validation."""
     
@@ -81,7 +79,6 @@ class FeatureExtractionRequest(BaseModel):
         if not v.strip():
             raise ValueError('Text cannot be empty or whitespace only')
         return v.strip()
-
 
 class FeatureExtractionResponse(BaseModel):
     """Response model with comprehensive metadata."""
@@ -100,7 +97,6 @@ class FeatureExtractionResponse(BaseModel):
         if any(f < 0.0 or f > 1.0 for f in v):
             raise ValueError('All features must be in range [0.0, 1.0]')
         return v
-
 
 @dataclass
 class ExtractionMetrics:
@@ -144,7 +140,6 @@ class ExtractionMetrics:
         if self.total_extractions == 0:
             return 0.0
         return (self.errors / self.total_extractions) * 100
-
 
 class LinguisticFeatureExtractor:
     """Modern async-first linguistic feature extractor with orchestrator integration.
@@ -305,7 +300,7 @@ class LinguisticFeatureExtractor:
             self.metrics.update_timing(extraction_time, cache_hit=False)
             
             logger.info(
-                f"Features extracted successfully",
+                f"features extracted successfully",
                 extra={
                     "component": "linguistic_feature_extractor",
                     "extraction_time_ms": extraction_time,

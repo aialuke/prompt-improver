@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from ..events.event_types import EventType, MLEvent
 from ..core.workflow_types import WorkflowStep, WorkflowStepStatus
 
-
 @dataclass
 class TrainingWorkflowConfig:
     """Configuration for training workflows."""
@@ -21,7 +20,6 @@ class TrainingWorkflowConfig:
     max_retries: int = 3
     batch_size: int = 1000
     validation_split: float = 0.2
-
 
 class TrainingWorkflowCoordinator:
     """

@@ -16,7 +16,6 @@ import json
 
 from ..events.event_types import EventType, MLEvent
 
-
 class MetricType(Enum):
     """Types of metrics collected."""
     PERFORMANCE = "performance"
@@ -25,7 +24,6 @@ class MetricType(Enum):
     RESOURCE_UTILIZATION = "resource_utilization"
     WORKFLOW_DURATION = "workflow_duration"
     COMPONENT_LATENCY = "component_latency"
-
 
 @dataclass
 class WorkflowMetric:
@@ -38,7 +36,6 @@ class WorkflowMetric:
     workflow_id: Optional[str]
     tags: Dict[str, str]
     timestamp: datetime
-
 
 @dataclass
 class MetricAggregation:
@@ -53,7 +50,6 @@ class MetricAggregation:
     percentile_99: float
     window_start: datetime
     window_end: datetime
-
 
 class WorkflowMetricsCollector:
     """

@@ -1,5 +1,5 @@
 """
-Enhanced Base Health Checker with 2025 Features
+Enhanced Base Health Checker with 2025 features
 Integrates circuit breaker, SLA monitoring, structured logging, and OpenTelemetry
 """
 
@@ -15,7 +15,6 @@ from .sla_monitor import get_or_create_sla_monitor, SLAConfiguration
 from .telemetry import instrument_health_check, TelemetryContext
 
 logger = logging.getLogger(__name__)
-
 
 class EnhancedHealthChecker(HealthChecker):
     """
@@ -180,7 +179,6 @@ class EnhancedHealthChecker(HealthChecker):
             "sla_report": self.sla_monitor.get_sla_report(),
             "sla_metrics": self.sla_monitor.get_sla_metrics_for_export()
         }
-
 
 def create_enhanced_health_checker(
     component_name: str,

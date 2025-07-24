@@ -23,7 +23,6 @@ from sqlalchemy import func, select
 from ...database import get_session
 from ...database.config import DatabaseConfig
 
-
 class APESInitializer:
     """Comprehensive system initialization following production patterns"""
 

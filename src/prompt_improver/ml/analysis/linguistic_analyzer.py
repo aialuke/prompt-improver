@@ -19,8 +19,8 @@ import textstat
 # Handle transformers import gracefully
 try:
     from transformers import (
-        AutoModelForTokenClassification,
-        AutoTokenizer,
+        auto_model_for_token_classification,
+        auto_tokenizer,
         pipeline,
         set_seed,
     )
@@ -28,13 +28,13 @@ try:
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     pipeline = None
-    AutoTokenizer = None
-    AutoModelForTokenClassification = None
+    auto_tokenizer = None
+    auto_model_for_token_classification = None
     set_seed = None
     TRANSFORMERS_AVAILABLE = False
 
 from ..models.model_manager import (
-    ModelConfig,
+    model_config,
     ModelManager,
     get_lightweight_ner_pipeline,
     get_memory_optimized_config,
@@ -43,7 +43,6 @@ from ..models.model_manager import (
 from ..utils.nltk_manager import get_nltk_manager, setup_nltk_for_production
 from .dependency_parser import DependencyParser
 from .ner_extractor import NERExtractor
-
 
 @dataclass
 class LinguisticConfig:
@@ -113,7 +112,6 @@ class LinguisticConfig:
         }
     )
 
-
 @dataclass
 class LinguisticFeatures:
     """Container for linguistic analysis results."""
@@ -152,7 +150,6 @@ class LinguisticFeatures:
     # Overall metrics
     overall_linguistic_quality: float = 0.0
     confidence: float = 0.0
-
 
 class LinguisticAnalyzer:
     """Advanced linguistic analysis for prompt quality assessment."""
@@ -226,7 +223,7 @@ class LinguisticAnalyzer:
                         )
                     else:
                         # Standard configuration
-                        model_config = ModelConfig(
+                        model_config = model_config(
                             model_name=self.config.ner_model,
                             task="ner",
                             use_quantization=self.config.enable_model_quantization,
@@ -799,7 +796,7 @@ class LinguisticAnalyzer:
             # Get process memory
             import psutil
 
-            process = psutil.Process()
+            process = psutil.process()
             memory_info["total_mb"] = process.memory_info().rss / 1024 / 1024
 
         except Exception as e:
@@ -814,9 +811,7 @@ class LinguisticAnalyzer:
         except:
             pass  # Ignore errors during destruction
 
-
 # Configuration helpers for testing and production
-
 
 def get_lightweight_config() -> LinguisticConfig:
     """Get configuration optimized for testing and resource-constrained environments.
@@ -838,7 +833,6 @@ def get_lightweight_config() -> LinguisticConfig:
         timeout_seconds=10,
         cache_size=100,  # Smaller cache for tests
     )
-
 
 def get_ultra_lightweight_config() -> LinguisticConfig:
     """Get configuration optimized for extreme memory constraints (<30MB).
@@ -865,7 +859,6 @@ def get_ultra_lightweight_config() -> LinguisticConfig:
         cache_size=50,  # Minimal cache
     )
 
-
 def get_production_config() -> LinguisticConfig:
     """Get configuration optimized for production use with memory efficiency.
 
@@ -891,7 +884,6 @@ def get_production_config() -> LinguisticConfig:
         cache_size=1000,
     )
 
-
 def get_memory_optimized_config(target_memory_mb: int) -> LinguisticConfig:
     """Get configuration optimized for a specific memory target.
 
@@ -911,7 +903,6 @@ def get_memory_optimized_config(target_memory_mb: int) -> LinguisticConfig:
     config = get_production_config()
     config.max_memory_threshold_mb = target_memory_mb
     return config
-
 
 def create_test_analyzer() -> LinguisticAnalyzer:
     """Create a LinguisticAnalyzer instance optimized for testing.

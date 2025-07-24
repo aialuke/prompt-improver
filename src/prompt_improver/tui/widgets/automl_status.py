@@ -2,17 +2,14 @@
 
 from datetime import datetime
 
-
 from rich.bar import Bar
 from rich.console import Console
 from rich.panel import Panel
 
 from rich.table import Table
 
-
 from textual.reactive import reactive
 from textual.widgets import Static
-
 
 class AutoMLStatusWidget(Static):
     """Widget displaying AutoML optimization status and progress."""

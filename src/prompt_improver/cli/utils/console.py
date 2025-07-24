@@ -8,7 +8,6 @@ from rich.text import Text
 from typing import Any, Dict, List, Optional
 import json
 
-
 class ConsoleManager:
     """Centralized console management for APES CLI."""
 
@@ -66,7 +65,6 @@ class ConsoleManager:
 
         self.console.print(table)
 
-
 def create_progress_bar(description: str = "Processing") -> Progress:
     """Create a standardized progress bar for CLI operations."""
     return Progress(
@@ -77,7 +75,6 @@ def create_progress_bar(description: str = "Processing") -> Progress:
         console=Console(),
         expand=True,
     )
-
 
 # Global console instance for backward compatibility
 console = ConsoleManager().console

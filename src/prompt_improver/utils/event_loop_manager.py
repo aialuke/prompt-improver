@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional, Type, Union
 
 logger = logging.getLogger(__name__)
 
-
 class EventLoopManager:
     """Manages asyncio event loop with uvloop integration and performance monitoring."""
 
@@ -250,10 +249,8 @@ class EventLoopManager:
         """
         return self._loop_type
 
-
 # Global instance
 _event_loop_manager = EventLoopManager()
-
 
 def get_event_loop_manager() -> EventLoopManager:
     """Get the global event loop manager instance.
@@ -262,7 +259,6 @@ def get_event_loop_manager() -> EventLoopManager:
         Global EventLoopManager instance
     """
     return _event_loop_manager
-
 
 def setup_uvloop(force: bool = False) -> bool:
     """Setup uvloop event loop policy when available.
@@ -274,7 +270,6 @@ def setup_uvloop(force: bool = False) -> bool:
         True if uvloop was successfully configured, False otherwise
     """
     return _event_loop_manager.setup_uvloop(force=force)
-
 
 async def benchmark_event_loop(
     latency_samples: int = 100, throughput_tasks: int = 1000

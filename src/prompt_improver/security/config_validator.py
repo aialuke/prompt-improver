@@ -7,7 +7,6 @@ from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
-
 class SecurityConfigValidator:
     """Validates configuration for security compliance."""
 
@@ -132,7 +131,6 @@ class SecurityConfigValidator:
 
         return audit_result
 
-
 def validate_security_configuration() -> bool:
     """Quick security validation check for startup."""
     validator = SecurityConfigValidator()
@@ -146,7 +144,6 @@ def validate_security_configuration() -> bool:
 
     logger.info("Security configuration validation passed")
     return True
-
 
 def generate_secure_env_template() -> str:
     """Generate a secure .env template with strong passwords."""

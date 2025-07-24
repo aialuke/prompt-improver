@@ -31,7 +31,6 @@ _startup_tasks: set[asyncio.Task] = set()
 _startup_complete = False
 _shutdown_event = asyncio.Event()
 
-
 async def init_startup_tasks(
     max_concurrent_tasks: int = 10,
     session_ttl: int = 3600,
@@ -214,7 +213,6 @@ async def init_startup_tasks(
             "errors": startup_errors + [str(e)],
         }
 
-
 async def health_monitor_coroutine(health_service) -> None:
     """Continuous health monitoring coroutine.
 
@@ -261,7 +259,6 @@ async def health_monitor_coroutine(health_service) -> None:
 
     logger.info("🏥 Health monitor stopped")
 
-
 async def cleanup_partial_startup(components: dict) -> None:
     """Clean up partially initialized components during startup failure.
 
@@ -296,7 +293,6 @@ async def cleanup_partial_startup(components: dict) -> None:
         logger.debug("✅ BackgroundTaskManager shutdown")
     except Exception as e:
         logger.error(f"❌ Error shutting down BackgroundTaskManager: {e}")
-
 
 async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
     """Gracefully shutdown all startup tasks and components.
@@ -374,7 +370,6 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
             "errors": shutdown_errors + [str(e)],
         }
 
-
 @asynccontextmanager
 async def startup_context(
     max_concurrent_tasks: int = 10,
@@ -407,7 +402,6 @@ async def startup_context(
     finally:
         await shutdown_startup_tasks()
 
-
 def is_startup_complete() -> bool:
     """Check if startup tasks have been completed successfully.
 
@@ -416,7 +410,6 @@ def is_startup_complete() -> bool:
     """
     return _startup_complete
 
-
 def get_startup_task_count() -> int:
     """Get the number of active startup tasks.
 
@@ -424,7 +417,6 @@ def get_startup_task_count() -> int:
         Number of active background tasks
     """
     return len(_startup_tasks)
-
 
 class StartupOrchestrator:
     """

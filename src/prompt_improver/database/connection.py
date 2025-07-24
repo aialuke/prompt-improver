@@ -49,7 +49,6 @@ except ImportError:
     SECURITY_MODULE_AVAILABLE = False
     logger.warning("Security module not available - using basic environment variable validation")
 
-
 @runtime_checkable
 class SessionProvider(Protocol):
     """Protocol for session providers to ensure consistent interface"""
@@ -62,11 +61,9 @@ class SessionProvider(Protocol):
         """Close the session provider"""
         ...
 
-
 # Type aliases for better clarity
 SyncSessionFactory = sessionmaker[Session]
 AsyncSessionFactory = async_sessionmaker[AsyncSession]
-
 
 class DatabaseManager:
     """Synchronous database manager for operations that don't need async.
@@ -113,7 +110,6 @@ class DatabaseManager:
     def close(self):
         """Close the database engine."""
         self.engine.dispose()
-
 
 class DatabaseSessionManager:
     """Modern async database session manager following SQLAlchemy 2.0 patterns"""
@@ -177,10 +173,8 @@ class DatabaseSessionManager:
         """Drop all tables (for testing)"""
         await connection.run_sync(SQLModel.metadata.drop_all)
 
-
 # Global session manager with Optional guard
 _global_sessionmanager: DatabaseSessionManager | None = None
-
 
 def _get_global_sessionmanager() -> DatabaseSessionManager:
     """Get or create the global session manager with proper error handling"""
@@ -236,7 +230,6 @@ def _get_global_sessionmanager() -> DatabaseSessionManager:
 
     return _global_sessionmanager
 
-
 def get_async_session_factory() -> AsyncSessionFactory:
     """Get the async session factory for other modules
 
@@ -244,7 +237,6 @@ def get_async_session_factory() -> AsyncSessionFactory:
         AsyncSessionFactory: The async session factory instance
     """
     return _get_global_sessionmanager().session_factory
-
 
 async def get_session() -> AsyncIterator[AsyncSession]:
     """Database session factory for async operations
@@ -255,7 +247,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     session_manager = _get_global_sessionmanager()
     async with session_manager.session() as session:
         yield session
-
 
 @contextlib.asynccontextmanager
 async def get_session_context() -> AsyncIterator[AsyncSession]:
@@ -273,9 +264,7 @@ async def get_session_context() -> AsyncIterator[AsyncSession]:
     async with session_manager.session() as session:
         yield session
 
-
 from prompt_improver.database.config import get_database_config
-
 
 def get_database_url(async_driver: bool = False) -> str:
     """Get database URL with driver selection"""

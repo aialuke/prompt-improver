@@ -16,7 +16,6 @@ from .error_handlers import (
     configure_structured_logging,
 )
 
-
 async def example_background_task(
     task_name: str, should_fail: bool = False
 ) -> dict[str, Any]:
@@ -31,7 +30,6 @@ async def example_background_task(
         "status": "completed",
         "result": f"Success for {task_name}",
     }
-
 
 async def example_with_class_based_boundary():
     """Example using the AsyncErrorBoundary class directly."""
@@ -70,7 +68,6 @@ async def example_with_class_based_boundary():
         if exception_info:
             print(f"🔍 Exception was handled: {exception_info['type']}")
 
-
 async def example_with_context_manager_factory():
     """Example using the async_error_boundary context manager factory."""
     print("\n=== Context Manager Factory Example ===")
@@ -90,7 +87,6 @@ async def example_with_context_manager_factory():
         result = await example_background_task("api_task", should_fail=False)
         logger.info("API call successful", api_result=result)
         print(f"✅ API Success: {result}")
-
 
 async def example_timeout_handling():
     """Example showing timeout handling."""
@@ -116,7 +112,6 @@ async def example_timeout_handling():
             print(f"✅ Task completed: {result}")
         except TimeoutError:
             print("⏰ Task timed out as expected")
-
 
 def example_pii_redaction():
     """Example showing PII redaction in logs."""
@@ -146,7 +141,6 @@ def example_pii_redaction():
     # Also test string-based PII redaction
     logger.info("Processing payment for user@example.com with card 4111-1111-1111-1111")
 
-
 async def example_correlation_id_tracking():
     """Example showing correlation ID tracking across operations."""
     print("\n=== Correlation ID Tracking Example ===")
@@ -172,7 +166,6 @@ async def example_correlation_id_tracking():
 
         logger.info("User workflow completed successfully")
 
-
 async def main():
     """Run all examples."""
     print("🚀 AsyncErrorBoundary and Structured Logging Examples")
@@ -186,7 +179,6 @@ async def main():
 
     print("\n" + "=" * 60)
     print("✅ All examples completed!")
-
 
 if __name__ == "__main__":
     asyncio.run(main())

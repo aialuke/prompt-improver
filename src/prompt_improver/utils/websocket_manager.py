@@ -17,7 +17,6 @@ from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
 
-
 class ConnectionManager:
     """Manages WebSocket connections for real-time experiment analytics"""
 
@@ -233,13 +232,8 @@ class ConnectionManager:
         self.connection_metadata.clear()
         self._background_tasks.clear()
 
-
 # Global connection manager instance
 connection_manager = ConnectionManager()
-
-# Backward compatibility alias
-WebSocketManager = ConnectionManager
-
 
 async def setup_redis_connection(
     redis_url: str = "redis://localhost:6379",
@@ -257,7 +251,6 @@ async def setup_redis_connection(
     except Exception as e:
         logger.error(f"Failed to connect to Redis: {e}")
         return None
-
 
 async def publish_experiment_update(
     experiment_id: str, update_data: dict[str, Any], redis_client: redis.Redis = None

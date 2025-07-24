@@ -36,7 +36,6 @@ from .pattern_significance_analyzer import (
 
 logger = logging.getLogger(__name__)
 
-
 class BayesianExperimentConfig:
     """Configuration for Bayesian experiment analysis."""
 
@@ -56,29 +55,26 @@ class BayesianExperimentConfig:
         self.prior_alpha = prior_alpha
         self.prior_beta = prior_beta
 
-
 class ExperimentType(Enum):
     """Types of experiments that can be orchestrated"""
 
     SIMPLE_AB = "simple_ab"
-    MULTIVARIATE = "multivariate"
-    FACTORIAL = "factorial"
+    multivariate = "multivariate"
+    factorial = "factorial"
     SEQUENTIAL = "sequential"
-    BANDITS = "bandits"
+    bandits = "bandits"
     CAUSAL_INFERENCE = "causal_inference"
-
 
 class ExperimentStatus(Enum):
     """Experiment lifecycle states"""
 
-    PLANNED = "planned"
-    ACTIVE = "active"
+    planned = "planned"
+    active = "active"
     PAUSED = "paused"
     COMPLETED = "completed"
-    STOPPED = "stopped"
-    ANALYZING = "analyzing"
+    stopped = "stopped"
+    analyzing = "analyzing"
     ARCHIVED = "archived"
-
 
 class StoppingRule(Enum):
     """Early stopping criteria"""
@@ -89,7 +85,6 @@ class StoppingRule(Enum):
     BAYESIAN_DECISION = "bayesian_decision"
     SAMPLE_SIZE_REACHED = "sample_size_reached"
     TIME_LIMIT = "time_limit"
-
 
 @dataclass
 class ExperimentArm:
@@ -104,7 +99,6 @@ class ExperimentArm:
     sample_size: int = 0
     metrics: dict[str, float] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class ExperimentConfiguration:
@@ -149,7 +143,6 @@ class ExperimentConfiguration:
     guardrail_metrics: list[str] = field(default_factory=list)
     quality_thresholds: dict[str, float] = field(default_factory=dict)
 
-
 @dataclass
 class ExperimentResult:
     """Comprehensive experiment analysis result"""
@@ -188,7 +181,6 @@ class ExperimentResult:
     analysis_duration_seconds: float = 0.0
     sample_sizes: dict[str, int] = field(default_factory=dict)
     experiment_duration_days: float = 0.0
-
 
 class ExperimentOrchestrator:
     """Advanced experiment orchestrator implementing 2025 best practices"""
@@ -1359,8 +1351,8 @@ class ExperimentOrchestrator:
             "STOP_WITH_CAUTION",
             "STOP_FOR_FUTILITY",
         ]:
-            return ExperimentStatus.ANALYZING
-        return ExperimentStatus.ACTIVE
+            return ExperimentStatus.analyzing
+        return ExperimentStatus.active
 
     async def _store_analysis_result(self, result: ExperimentResult):
         """Store analysis result in database"""
@@ -1476,7 +1468,7 @@ class ExperimentOrchestrator:
             experiment_id=experiment_id,
             analysis_id=analysis_id,
             timestamp=aware_utc_now(),
-            experiment_status=ExperimentStatus.ACTIVE,
+            experiment_status=ExperimentStatus.active,
             statistical_validation=placeholder_validation,
             stopping_recommendation="CONTINUE - Insufficient data",
             business_decision="WAIT - Collect more data",
@@ -1769,7 +1761,6 @@ class ExperimentOrchestrator:
             return "RECONSIDER: Weak evidence against treatment"
         else:
             return "REJECT: Strong evidence against treatment effectiveness"
-
 
 # Utility functions for external use
 async def quick_experiment_setup(

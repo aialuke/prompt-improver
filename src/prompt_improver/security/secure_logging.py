@@ -7,7 +7,6 @@ import logging
 import re
 from typing import Any, Optional
 
-
 class SecureLogger:
     """Secure logging wrapper that prevents information leakage."""
 

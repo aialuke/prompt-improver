@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier
 
-
 class AutoMLOrchestratorConnector(ComponentConnector):
     """Connector for AutoMLOrchestrator specialized component (Integration over Extension)."""
     
@@ -98,7 +97,6 @@ class AutoMLOrchestratorConnector(ComponentConnector):
             "logging_enabled": True
         }
 
-
 class InsightEngineConnector(ComponentConnector):
     """Connector for InsightEngine component."""
     
@@ -158,7 +156,6 @@ class InsightEngineConnector(ComponentConnector):
             "actionable_insights": 6,
             "insight_categories": ["performance", "efficiency", "quality"]
         }
-
 
 class RuleAnalyzerConnector(ComponentConnector):
     """Connector for RuleAnalyzer component."""
@@ -220,7 +217,6 @@ class RuleAnalyzerConnector(ComponentConnector):
             "top_performing_rules": ["rule_A", "rule_B", "rule_C"]
         }
 
-
 class ContextAwareWeighterConnector(ComponentConnector):
     """Connector for ContextAwareWeighter component."""
     
@@ -281,7 +277,6 @@ class ContextAwareWeighterConnector(ComponentConnector):
             "convergence_status": "stable"
         }
 
-
 class AdvancedPatternDiscoveryConnector(ComponentConnector):
     """Connector for AdvancedPatternDiscovery component."""
     
@@ -341,7 +336,6 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
             "false_positives": 3,
             "pattern_stability": 0.88
         }
-
 
 class Tier2ConnectorFactory:
     """Factory for creating Tier 2 component connectors."""

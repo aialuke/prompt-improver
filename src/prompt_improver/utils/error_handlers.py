@@ -4,7 +4,7 @@ This module provides standardized error handling decorators that implement the
 sophisticated error categorization and rollback patterns identified in
 ab_testing.py as the gold standard for error handling in the codebase.
 
-Features:
+features:
 - Categorized exception handling (Database I/O, Validation, User interruption, etc.)
 - Automatic rollback logic for database operations
 - Consistent return value structures
@@ -39,7 +39,6 @@ from typing import Any, Dict, Literal, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
-
 
 class PIIRedactionFilter(logging.Filter):
     """Filter to redact PII from log records."""
@@ -155,7 +154,6 @@ class PIIRedactionFilter(logging.Filter):
 
         return text
 
-
 class AsyncContextLogger:
     """Async-safe structured logger with correlation ID support."""
 
@@ -218,10 +216,8 @@ class AsyncContextLogger:
         extra = self._prepare_extra(**kwargs)
         self.logger.debug(msg, extra=extra)
 
-
 # Global async context logger instance
 async_logger = AsyncContextLogger(logger)
-
 
 class AsyncErrorBoundary:
     """Async context manager for wrapping background coroutines with centralized error handling."""
@@ -305,7 +301,6 @@ class AsyncErrorBoundary:
         """Get information about any exception that occurred."""
         return self.exception_info
 
-
 @asynccontextmanager
 async def async_error_boundary(
     operation_name: str,
@@ -338,7 +333,6 @@ async def async_error_boundary(
 
     async with boundary:
         yield boundary
-
 
 def configure_structured_logging(
     logger_name: str = __name__,
@@ -434,7 +428,6 @@ def configure_structured_logging(
         base_logger.addFilter(pii_filter)
 
     return AsyncContextLogger(base_logger)
-
 
 def handle_database_errors(
     rollback_session: bool = True,
@@ -637,7 +630,6 @@ def handle_database_errors(
 
     return decorator
 
-
 def handle_filesystem_errors(
     return_format: Literal["dict", "raise", "none"] = "dict",
     operation_name: str | None = None,
@@ -748,7 +740,6 @@ def handle_filesystem_errors(
         return wrapper
 
     return decorator
-
 
 def handle_validation_errors(
     return_format: Literal["dict", "raise", "none"] = "dict",
@@ -864,7 +855,6 @@ def handle_validation_errors(
         return wrapper
 
     return decorator
-
 
 def handle_network_errors(
     return_format: Literal["dict", "raise", "none"] = "dict",
@@ -1001,7 +991,6 @@ def handle_network_errors(
         return sync_wrapper
 
     return decorator
-
 
 # Convenience function for common error handling patterns
 def handle_common_errors(

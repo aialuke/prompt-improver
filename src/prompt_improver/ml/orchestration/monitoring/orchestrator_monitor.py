@@ -14,14 +14,12 @@ from enum import Enum
 
 from ..events.event_types import EventType, MLEvent
 
-
 class HealthStatus(Enum):
     """Health status levels."""
     HEALTHY = "healthy"
     WARNING = "warning"
     CRITICAL = "critical"
     UNKNOWN = "unknown"
-
 
 @dataclass
 class SystemMetrics:
@@ -36,7 +34,6 @@ class SystemMetrics:
     thread_count: int
     timestamp: datetime
 
-
 @dataclass
 class OrchestratorMetrics:
     """Orchestrator-specific metrics."""
@@ -49,7 +46,6 @@ class OrchestratorMetrics:
     average_workflow_duration: float
     resource_utilization: Dict[str, float]
     timestamp: datetime
-
 
 class OrchestratorMonitor:
     """
@@ -197,7 +193,7 @@ class OrchestratorMonitor:
             process_count = len(psutil.pids())
             
             # Thread count (current process)
-            current_process = psutil.Process()
+            current_process = psutil.process()
             thread_count = current_process.num_threads()
             
             # Create metrics object

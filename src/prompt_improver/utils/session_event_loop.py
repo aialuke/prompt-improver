@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-
 class SessionEventLoopWrapper:
     """Session-scoped wrapper for asyncio operations with performance monitoring."""
 
@@ -316,7 +315,6 @@ class SessionEventLoopWrapper:
             f")"
         )
 
-
 class SessionEventLoopManager:
     """Manager for session-scoped event loop wrappers."""
 
@@ -400,10 +398,8 @@ class SessionEventLoopManager:
 
         return benchmarks
 
-
 # Global session manager
 _session_manager = SessionEventLoopManager()
-
 
 def get_session_manager() -> SessionEventLoopManager:
     """Get the global session manager.
@@ -412,7 +408,6 @@ def get_session_manager() -> SessionEventLoopManager:
         Global SessionEventLoopManager instance
     """
     return _session_manager
-
 
 def get_session_wrapper(session_id: str) -> SessionEventLoopWrapper:
     """Get or create a session wrapper.

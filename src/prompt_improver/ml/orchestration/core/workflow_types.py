@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime, timezone
 
-
 class WorkflowStepStatus(Enum):
     """Status of individual workflow steps."""
     PENDING = "pending"
@@ -18,7 +17,6 @@ class WorkflowStepStatus(Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
     RETRYING = "retrying"
-
 
 @dataclass
 class WorkflowStep:
@@ -31,14 +29,13 @@ class WorkflowStep:
     timeout: Optional[int] = None
     retry_count: int = 0
     max_retries: int = 3
-    
+
     # Runtime state
     status: WorkflowStepStatus = WorkflowStepStatus.PENDING
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
     result: Optional[Any] = None
-
 
 @dataclass
 class WorkflowDefinition:
@@ -50,3 +47,9 @@ class WorkflowDefinition:
     global_timeout: Optional[int] = None
     parallel_execution: bool = False
     on_failure: str = "stop"  # "stop", "continue", "retry"
+
+    # Continuous training specific fields
+    max_iterations: Optional[int] = None
+    continuous: bool = False
+    retry_policy: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None

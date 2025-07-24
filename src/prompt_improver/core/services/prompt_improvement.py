@@ -41,7 +41,6 @@ from ...ml.core.ml_integration import MLModelService
 
 logger = logging.getLogger(__name__)
 
-
 class PromptImprovementService:
     """Service for prompt improvement with database integration
     Following 2025 best practices for async operations

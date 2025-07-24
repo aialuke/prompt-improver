@@ -46,7 +46,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class RuleAnalysisConfig:
     """Configuration for rule effectiveness analysis"""
@@ -71,7 +70,6 @@ class RuleAnalysisConfig:
     bayesian_chains: int = 2
     credible_interval: float = 0.95
 
-
 @dataclass
 class RuleMetrics:
     """Comprehensive metrics for a rule"""
@@ -87,7 +85,6 @@ class RuleMetrics:
     common_combinations: list[str]
     performance_trend: str | None = None
 
-
 @dataclass
 class RuleCombinationMetrics:
     """Metrics for rule combinations"""
@@ -98,7 +95,6 @@ class RuleCombinationMetrics:
     avg_improvement: float
     synergy_score: float  # How much better than individual rules
     contexts: list[str]
-
 
 @dataclass
 class TimeSeriesValidationResult:
@@ -113,7 +109,6 @@ class TimeSeriesValidationResult:
     seasonal_component: dict[str, float] | None
     change_points: list[int]
 
-
 @dataclass
 class BayesianModelResult:
     """Results from Bayesian performance modeling"""
@@ -126,7 +121,6 @@ class BayesianModelResult:
     rhat_statistic: float
     model_comparison_score: float | None
     hierarchical_effects: dict[str, float] | None
-
 
 class RuleEffectivenessAnalyzer:
     """Analyzer for rule effectiveness and optimization"""

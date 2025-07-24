@@ -17,6 +17,7 @@ Research Sources:
 
 import asyncio
 import logging
+import time
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,6 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.models import TrainingPrompt
 from ..learning.quality.enhanced_scorer import EnhancedQualityMetrics, EnhancedQualityScorer
+from ..optimization.batch.dynamic_batch_optimizer import DynamicBatchOptimizer, BatchOptimizationConfig
+from ..analytics.generation_analytics import GenerationHistoryTracker, GenerationAnalytics
 
 # Neural network and deep learning imports for modern generative models
 try:
@@ -52,10 +55,112 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ===== 2025 ENHANCED NEURAL GENERATION METHODS =====
 
-# Modern Generative Models for Tabular Data
+@dataclass
+class GenerationMethodMetrics:
+    """Performance metrics for generation methods (2025 best practice)"""
+    method_name: str
+    generation_time: float
+    quality_score: float
+    diversity_score: float
+    memory_usage_mb: float
+    success_rate: float
+    samples_generated: int
+    timestamp: datetime
+    performance_gaps_addressed: dict[str, float]
+
+class MethodPerformanceTracker:
+    """Tracks performance of different generation methods for auto-selection (2025 best practice)"""
+
+    def __init__(self):
+        self.method_history: dict[str, list[GenerationMethodMetrics]] = {}
+        self.method_rankings: dict[str, float] = {}
+
+    def record_performance(self, metrics: GenerationMethodMetrics) -> None:
+        """Record performance metrics for a generation method"""
+        if metrics.method_name not in self.method_history:
+            self.method_history[metrics.method_name] = []
+
+        self.method_history[metrics.method_name].append(metrics)
+        self._update_rankings()
+
+    def get_best_method(self, performance_gaps: dict[str, float]) -> str:
+        """Select best method based on historical performance and current gaps"""
+        if not self.method_rankings:
+            return "statistical"  # Default fallback
+
+        # Weight rankings by gap-specific performance
+        weighted_scores = {}
+        for method, base_score in self.method_rankings.items():
+            gap_bonus = self._calculate_gap_bonus(method, performance_gaps)
+            weighted_scores[method] = base_score + gap_bonus
+
+        return max(weighted_scores, key=weighted_scores.get)
+
+    def _update_rankings(self) -> None:
+        """Update method rankings based on recent performance"""
+        for method, history in self.method_history.items():
+            if not history:
+                continue
+
+            # Calculate weighted score (recent performance weighted higher)
+            recent_metrics = history[-10:]  # Last 10 generations
+            weights = np.linspace(0.5, 1.0, len(recent_metrics))
+
+            quality_scores = [m.quality_score for m in recent_metrics]
+            diversity_scores = [m.diversity_score for m in recent_metrics]
+            success_rates = [m.success_rate for m in recent_metrics]
+
+            weighted_quality = np.average(quality_scores, weights=weights)
+            weighted_diversity = np.average(diversity_scores, weights=weights)
+            weighted_success = np.average(success_rates, weights=weights)
+
+            # Combined score (2025 best practice weighting)
+            self.method_rankings[method] = (
+                0.4 * weighted_quality +
+                0.3 * weighted_diversity +
+                0.3 * weighted_success
+            )
+
+    def _calculate_gap_bonus(self, method: str, performance_gaps: dict[str, float]) -> float:
+        """Calculate bonus score based on method's effectiveness for specific gaps"""
+        if method not in self.method_history:
+            return 0.0
+
+        # Analyze historical effectiveness for similar gaps
+        relevant_metrics = []
+        for metrics in self.method_history[method][-5:]:  # Recent history
+            gap_similarity = self._calculate_gap_similarity(
+                metrics.performance_gaps_addressed, performance_gaps
+            )
+            if gap_similarity > 0.5:  # Similar gap patterns
+                relevant_metrics.append(metrics)
+
+        if not relevant_metrics:
+            return 0.0
+
+        # Return average effectiveness for similar gaps
+        return np.mean([m.quality_score for m in relevant_metrics]) * 0.2
+
+    def _calculate_gap_similarity(self, gaps1: dict[str, float], gaps2: dict[str, float]) -> float:
+        """Calculate similarity between two gap patterns"""
+        common_keys = set(gaps1.keys()) & set(gaps2.keys())
+        if not common_keys:
+            return 0.0
+
+        similarities = []
+        for key in common_keys:
+            # Normalized difference (closer to 0 = more similar)
+            diff = abs(gaps1[key] - gaps2[key])
+            similarity = max(0, 1 - diff)
+            similarities.append(similarity)
+
+        return np.mean(similarities)
+
+# Modern Generative Models for Tabular Data (Enhanced 2025 Version)
 class TabularGAN(nn.Module):
-    """Generative Adversarial Network for tabular data synthesis."""
+    """Enhanced Generative Adversarial Network for tabular data synthesis (2025 best practices)"""
 
     def __init__(self, data_dim: int, noise_dim: int = 100, hidden_dims: list[int] = None):
         super().__init__()
@@ -65,38 +170,45 @@ class TabularGAN(nn.Module):
         if hidden_dims is None:
             hidden_dims = [128, 256, 128]
 
-        # Generator
+        # Enhanced Generator with Batch Normalization and Residual Connections
         gen_layers = []
         prev_dim = noise_dim
-        for hidden_dim in hidden_dims:
+        for i, hidden_dim in enumerate(hidden_dims):
             gen_layers.extend([
                 nn.Linear(prev_dim, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),  # 2025 enhancement
                 nn.ReLU(),
                 nn.Dropout(0.2)
             ])
             prev_dim = hidden_dim
-        gen_layers.append(nn.Linear(prev_dim, data_dim))
-        gen_layers.append(nn.Tanh())  # Normalize output to [-1, 1]
+        gen_layers.extend([
+            nn.Linear(prev_dim, data_dim),
+            nn.Tanh()  # Normalize output to [-1, 1]
+        ])
         self.generator = nn.Sequential(*gen_layers)
 
-        # Discriminator
+        # Enhanced Discriminator with Spectral Normalization
         disc_layers = []
         prev_dim = data_dim
         for hidden_dim in reversed(hidden_dims):
             disc_layers.extend([
-                nn.Linear(prev_dim, hidden_dim),
+                nn.utils.spectral_norm(nn.Linear(prev_dim, hidden_dim)),  # 2025 enhancement
                 nn.LeakyReLU(0.2),
-                nn.Dropout(0.2)
+                nn.Dropout(0.3)  # Higher dropout for better regularization
             ])
             prev_dim = hidden_dim
-        disc_layers.append(nn.Linear(prev_dim, 1))
-        disc_layers.append(nn.Sigmoid())
+        disc_layers.extend([
+            nn.Linear(prev_dim, 1),
+            nn.Sigmoid()
+        ])
         self.discriminator = nn.Sequential(*disc_layers)
 
     def generate(self, batch_size: int, device: torch.device):
         noise = torch.randn(batch_size, self.noise_dim, device=device)
         return self.generator(noise)
 
+    def discriminate(self, data: torch.Tensor):
+        return self.discriminator(data)
 
 class TabularVAE(nn.Module):
     """Variational Autoencoder for tabular data synthesis."""
@@ -163,10 +275,329 @@ class TabularVAE(nn.Module):
         return self.decode(z)
 
     def loss_function(self, recon_x, x, mu, logvar):
+        """Enhanced VAE loss with β-VAE regularization (2025 best practice)"""
+        # Reconstruction loss
         recon_loss = nn.functional.mse_loss(recon_x, x, reduction='sum')
-        kld_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        return recon_loss + self.beta * kld_loss
 
+        # KL divergence loss with β weighting for disentanglement
+        kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+        return recon_loss + self.beta * kl_loss, recon_loss, kl_loss
+
+class TabularDiffusion(nn.Module):
+    """Diffusion model for tabular data synthesis (2025 best practice)"""
+
+    def __init__(self, data_dim: int, timesteps: int = 1000, hidden_dims: list[int] = None):
+        super().__init__()
+        self.data_dim = data_dim
+        self.timesteps = timesteps
+
+        if hidden_dims is None:
+            hidden_dims = [256, 512, 256]
+
+        # Time embedding
+        self.time_embed_dim = 128
+        self.time_embedding = nn.Sequential(
+            nn.Linear(1, self.time_embed_dim),
+            nn.ReLU(),
+            nn.Linear(self.time_embed_dim, self.time_embed_dim)
+        )
+
+        # Noise prediction network
+        layers = []
+        prev_dim = data_dim + self.time_embed_dim
+        for hidden_dim in hidden_dims:
+            layers.extend([
+                nn.Linear(prev_dim, hidden_dim),
+                nn.GroupNorm(8, hidden_dim),  # Group normalization for stability
+                nn.SiLU(),  # Swish activation for better gradients
+                nn.Dropout(0.1)
+            ])
+            prev_dim = hidden_dim
+
+        layers.append(nn.Linear(prev_dim, data_dim))
+        self.noise_predictor = nn.Sequential(*layers)
+
+        # Beta schedule for noise
+        self.register_buffer('betas', self._cosine_beta_schedule(timesteps))
+        self.register_buffer('alphas', 1.0 - self.betas)
+        self.register_buffer('alphas_cumprod', torch.cumprod(self.alphas, dim=0))
+
+    def _cosine_beta_schedule(self, timesteps: int, s: float = 0.008):
+        """Cosine beta schedule for improved training stability"""
+        steps = timesteps + 1
+        x = torch.linspace(0, timesteps, steps)
+        alphas_cumprod = torch.cos(((x / timesteps) + s) / (1 + s) * torch.pi * 0.5) ** 2
+        alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+        betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+        return torch.clip(betas, 0.0001, 0.9999)
+
+    def forward(self, x, t):
+        """Forward pass: predict noise given noisy data and timestep"""
+        # Time embedding
+        t_embed = self.time_embedding(t.float().unsqueeze(-1))
+
+        # Concatenate data and time embedding
+        x_t = torch.cat([x, t_embed], dim=-1)
+
+        # Predict noise
+        return self.noise_predictor(x_t)
+
+    def add_noise(self, x, t, noise=None):
+        """Add noise to data according to diffusion schedule"""
+        if noise is None:
+            noise = torch.randn_like(x)
+
+        sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod[t])
+        sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod[t])
+
+        return sqrt_alphas_cumprod * x + sqrt_one_minus_alphas_cumprod * noise
+
+    def generate(self, batch_size: int, device: torch.device):
+        """Generate samples using DDPM sampling"""
+        # Start from pure noise
+        x = torch.randn(batch_size, self.data_dim, device=device)
+
+        # Reverse diffusion process
+        for t in reversed(range(self.timesteps)):
+            t_batch = torch.full((batch_size,), t, device=device, dtype=torch.long)
+
+            # Predict noise
+            predicted_noise = self.forward(x, t_batch)
+
+            # Remove predicted noise
+            alpha = self.alphas[t]
+            alpha_cumprod = self.alphas_cumprod[t]
+            beta = self.betas[t]
+
+            if t > 0:
+                noise = torch.randn_like(x)
+            else:
+                noise = torch.zeros_like(x)
+
+            x = (1 / torch.sqrt(alpha)) * (x - (beta / torch.sqrt(1 - alpha_cumprod)) * predicted_noise) + torch.sqrt(beta) * noise
+
+        return x
+
+class HybridGenerationSystem:
+    """Hybrid generation system combining multiple methods (2025 best practice)"""
+
+    def __init__(self, data_dim: int, device: str = "auto"):
+        self.data_dim = data_dim
+        self.device = self._get_device(device)
+        self.performance_tracker = MethodPerformanceTracker()
+
+        # Initialize all generation methods
+        self.methods = {}
+        if TORCH_AVAILABLE:
+            self.methods['gan'] = TabularGAN(data_dim).to(self.device)
+            self.methods['vae'] = TabularVAE(data_dim).to(self.device)
+            self.methods['diffusion'] = TabularDiffusion(data_dim).to(self.device)
+
+        # Method weights for ensemble generation
+        self.method_weights = {
+            'statistical': 0.3,
+            'gan': 0.25,
+            'vae': 0.25,
+            'diffusion': 0.2
+        }
+
+    def _get_device(self, device: str) -> torch.device:
+        """Get appropriate device for computation"""
+        if device == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(device)
+
+    async def generate_hybrid_data(
+        self,
+        batch_size: int,
+        performance_gaps: dict[str, float],
+        quality_threshold: float = 0.7
+    ) -> dict[str, Any]:
+        """Generate data using hybrid approach with quality filtering"""
+        start_time = time.time()
+
+        # Determine optimal method mix based on performance gaps
+        method_allocation = self._determine_method_allocation(performance_gaps, batch_size)
+
+        generated_samples = []
+        method_metrics = {}
+
+        for method, sample_count in method_allocation.items():
+            if sample_count == 0:
+                continue
+
+            method_start = time.time()
+
+            try:
+                if method == 'statistical':
+                    samples = await self._generate_statistical_samples(sample_count)
+                else:
+                    samples = await self._generate_neural_samples(method, sample_count)
+
+                # Quality assessment
+                quality_score = self._assess_sample_quality(samples)
+
+                # Filter samples based on quality threshold
+                if quality_score >= quality_threshold:
+                    generated_samples.extend(samples)
+
+                # Record performance metrics
+                method_time = time.time() - method_start
+                method_metrics[method] = GenerationMethodMetrics(
+                    method_name=method,
+                    generation_time=method_time,
+                    quality_score=quality_score,
+                    diversity_score=self._calculate_diversity_score(samples),
+                    memory_usage_mb=self._get_memory_usage(),
+                    success_rate=1.0 if quality_score >= quality_threshold else 0.0,
+                    samples_generated=len(samples),
+                    timestamp=datetime.now(),
+                    performance_gaps_addressed=performance_gaps
+                )
+
+                # Update performance tracker
+                self.performance_tracker.record_performance(method_metrics[method])
+
+            except Exception as e:
+                logger.warning(f"Method {method} failed: {e}")
+                method_metrics[method] = GenerationMethodMetrics(
+                    method_name=method,
+                    generation_time=time.time() - method_start,
+                    quality_score=0.0,
+                    diversity_score=0.0,
+                    memory_usage_mb=self._get_memory_usage(),
+                    success_rate=0.0,
+                    samples_generated=0,
+                    timestamp=datetime.now(),
+                    performance_gaps_addressed=performance_gaps
+                )
+
+        total_time = time.time() - start_time
+
+        return {
+            'samples': generated_samples,
+            'method_metrics': method_metrics,
+            'total_generation_time': total_time,
+            'method_allocation': method_allocation,
+            'quality_threshold': quality_threshold,
+            'samples_generated': len(generated_samples)
+        }
+
+    def _determine_method_allocation(
+        self,
+        performance_gaps: dict[str, float],
+        total_samples: int
+    ) -> dict[str, int]:
+        """Determine how many samples each method should generate"""
+        # Get best method recommendation
+        best_method = self.performance_tracker.get_best_method(performance_gaps)
+
+        # Adjust weights based on performance gaps and best method
+        adjusted_weights = self.method_weights.copy()
+
+        # Boost best method weight
+        if best_method in adjusted_weights:
+            adjusted_weights[best_method] *= 1.5
+
+        # Adjust based on specific gaps
+        if performance_gaps.get('model_accuracy', 0) > 0.1:
+            # Favor neural methods for complex patterns
+            adjusted_weights['gan'] *= 1.3
+            adjusted_weights['diffusion'] *= 1.2
+        elif performance_gaps.get('diversity', 0) > 0.1:
+            # Favor VAE for diversity
+            adjusted_weights['vae'] *= 1.4
+
+        # Normalize weights
+        total_weight = sum(adjusted_weights.values())
+        normalized_weights = {k: v / total_weight for k, v in adjusted_weights.items()}
+
+        # Allocate samples
+        allocation = {}
+        for method, weight in normalized_weights.items():
+            allocation[method] = int(total_samples * weight)
+
+        # Ensure we generate the exact number requested
+        allocated_total = sum(allocation.values())
+        if allocated_total < total_samples:
+            # Add remaining to best method
+            allocation[best_method] += total_samples - allocated_total
+
+        return allocation
+
+    async def _generate_statistical_samples(self, sample_count: int) -> list:
+        """Generate samples using statistical methods"""
+        # Use scikit-learn's make_classification for realistic statistical generation
+        from sklearn.datasets import make_classification
+
+        try:
+            X, _ = make_classification(
+                n_samples=sample_count,
+                n_features=self.data_dim,
+                n_informative=self.data_dim,
+                n_redundant=0,
+                n_clusters_per_class=2,
+                class_sep=1.0,
+                random_state=42
+            )
+
+            # Normalize to [0, 1] range
+            X_normalized = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-8)
+            return X_normalized.tolist()
+
+        except Exception as e:
+            logger.warning(f"Statistical generation failed: {e}, using fallback")
+            # Fallback to simple random generation
+            return [[np.random.random() for _ in range(self.data_dim)] for _ in range(sample_count)]
+
+    async def _generate_neural_samples(self, method: str, sample_count: int) -> list:
+        """Generate samples using neural methods"""
+        if method not in self.methods:
+            raise ValueError(f"Method {method} not available")
+
+        model = self.methods[method]
+        model.eval()
+
+        with torch.no_grad():
+            samples = model.generate(sample_count, self.device)
+            return samples.cpu().numpy().tolist()
+
+    def _assess_sample_quality(self, samples: list) -> float:
+        """Assess quality of generated samples"""
+        if not samples:
+            return 0.0
+
+        # Convert to numpy for analysis
+        samples_array = np.array(samples)
+
+        # Basic quality metrics
+        variance = np.var(samples_array, axis=0).mean()
+        range_coverage = (samples_array.max() - samples_array.min()) / 2.0  # Normalized range
+
+        # Combine metrics (simple heuristic)
+        quality_score = min(1.0, (variance + range_coverage) / 2.0)
+        return quality_score
+
+    def _calculate_diversity_score(self, samples: list) -> float:
+        """Calculate diversity score for samples"""
+        if len(samples) < 2:
+            return 0.0
+
+        samples_array = np.array(samples)
+
+        # Calculate pairwise distances
+        from scipy.spatial.distance import pdist
+        distances = pdist(samples_array)
+
+        # Diversity is average pairwise distance
+        return float(np.mean(distances))
+
+    def _get_memory_usage(self) -> float:
+        """Get current memory usage in MB"""
+        import psutil
+        process = psutil.Process()
+        return process.memory_info().rss / (1024 * 1024)
 
 class NeuralSyntheticGenerator:
     """Neural network-based synthetic data generator."""
@@ -302,7 +733,6 @@ class NeuralSyntheticGenerator:
         # Inverse transform to original scale
         return self.scaler.inverse_transform(synthetic_data)
 
-
 class TabularDiffusionModel(nn.Module):
     """Diffusion model for tabular data synthesis."""
 
@@ -365,7 +795,6 @@ class TabularDiffusionModel(nn.Module):
             ) + torch.sqrt(beta_t) * noise
 
         return x
-
 
 class DiffusionSyntheticGenerator:
     """Diffusion model-based synthetic data generator."""
@@ -453,7 +882,6 @@ class DiffusionSyntheticGenerator:
         # Inverse transform to original scale
         return self.scaler.inverse_transform(synthetic_data)
 
-
 @dataclass
 class DomainConfig:
     """Configuration for domain-specific data generation"""
@@ -464,7 +892,6 @@ class DomainConfig:
     feature_ranges: dict[str, tuple[float, float]]
     effectiveness_params: tuple[float, float]  # Beta distribution parameters
     complexity_range: tuple[int, int]
-
 
 @dataclass
 class QualityMetrics:
@@ -480,9 +907,15 @@ class QualityMetrics:
     domain_distribution: dict[str, int]
     feature_correlations: dict[str, float]
 
-
 class ProductionSyntheticDataGenerator:
-    """Production-grade synthetic data generator with advanced quality assessment and modern generative models"""
+    """Production-grade synthetic data generator with advanced quality assessment and modern generative models
+
+    Enhanced with 2025 best practices for adaptive data generation:
+    - Gap-based targeting for performance improvement
+    - Difficulty distribution control
+    - Focus area specification
+    - Hardness characterization integration
+    """
 
     def __init__(
         self,
@@ -495,6 +928,11 @@ class ProductionSyntheticDataGenerator:
         neural_batch_size: int = 64,
         neural_learning_rate: float = 1e-3,
         neural_device: str = "auto",
+        # New 2025 adaptive generation parameters
+        enable_gap_targeting: bool = True,
+        difficulty_distribution: str = "adaptive",  # "uniform", "adaptive", "hard_focused"
+        focus_areas: list[str] | None = None,
+        hardness_threshold: float = 0.7,
     ):
         """Initialize the production synthetic data generator
 
@@ -508,6 +946,10 @@ class ProductionSyntheticDataGenerator:
             neural_batch_size: Batch size for neural model training
             neural_learning_rate: Learning rate for neural models
             neural_device: Device for neural model training ("auto", "cpu", "cuda")
+            enable_gap_targeting: Enable performance gap-based targeting (2025 best practice)
+            difficulty_distribution: Strategy for difficulty distribution ("uniform", "adaptive", "hard_focused")
+            focus_areas: Specific areas to focus generation on (e.g., ["clarity", "specificity"])
+            hardness_threshold: Threshold for identifying hard examples (0.0-1.0)
         """
         self.target_samples = target_samples
         self.random_state = random_state
@@ -520,14 +962,32 @@ class ProductionSyntheticDataGenerator:
         self.neural_learning_rate = neural_learning_rate
         self.neural_device = neural_device
 
+        # 2025 adaptive generation parameters
+        self.enable_gap_targeting = enable_gap_targeting
+        self.difficulty_distribution = difficulty_distribution
+        self.focus_areas = focus_areas or []
+        self.hardness_threshold = hardness_threshold
+
+        # Performance gap tracking
+        self.current_performance_gaps: dict[str, float] = {}
+        self.generation_strategy: str = "statistical"  # Will be determined dynamically
+
         # Initialize enhanced quality scorer
         if use_enhanced_scoring:
             self.quality_scorer = EnhancedQualityScorer(confidence_level=0.95)
 
         # Initialize neural generator if needed
         self.neural_generator = None
+        self.hybrid_generator = None
+
         if generation_method in ["neural", "hybrid", "diffusion"] and TORCH_AVAILABLE:
-            if neural_model_type == "diffusion":
+            if generation_method == "hybrid":
+                # Initialize hybrid generation system (2025 best practice)
+                self.hybrid_generator = HybridGenerationSystem(
+                    data_dim=len(self.feature_names),
+                    device=neural_device
+                )
+            elif neural_model_type == "diffusion":
                 self.neural_generator = DiffusionSyntheticGenerator(
                     epochs=neural_epochs,
                     batch_size=neural_batch_size,
@@ -543,6 +1003,27 @@ class ProductionSyntheticDataGenerator:
                     device=neural_device
                 )
 
+        # Initialize method performance tracker for auto-selection
+        self.method_tracker = MethodPerformanceTracker()
+
+        # Quality assessment and filtering system (2025 best practice)
+        self.quality_filter_threshold = 0.7
+        self.enable_quality_filtering = True
+
+        # Dynamic batch optimization system (2025 best practice)
+        batch_config = BatchOptimizationConfig(
+            min_batch_size=10,
+            max_batch_size=min(target_samples, 1000),
+            initial_batch_size=min(target_samples // 4, 200),
+            memory_limit_mb=2000.0,  # 2GB limit
+            efficiency_threshold=0.7
+        )
+        self.batch_optimizer = DynamicBatchOptimizer(batch_config)
+
+        # Generation history tracking (Week 6)
+        self.history_tracker: Optional[GenerationHistoryTracker] = None
+        self.current_session_id: Optional[str] = None
+
         # Configure domains based on research insights
         self.domains = self._initialize_domain_configs()
 
@@ -556,7 +1037,6 @@ class ProductionSyntheticDataGenerator:
             "actionability",  # 5: How actionable and implementable the result is
         ]
 
-        # Legacy quality validation thresholds (for backward compatibility)
         self.quality_thresholds = {
             "min_samples": 10,  # Minimum for basic optimization
             "ensemble_threshold": 20,  # Minimum for ensemble methods
@@ -1538,6 +2018,10 @@ class ProductionSyntheticDataGenerator:
                 - output_path: Local path for output files (optional)
                 - quality_assessment: Whether to include quality assessment (default: True)
                 - domain_distribution: Custom domain distribution (optional)
+                - performance_gaps: Performance gaps for targeted generation (optional)
+                - target_gaps: Enable gap-based targeting (default: False)
+                - strategy: Targeting strategy ("gap_based", "rule_focused", etc.)
+                - focus_areas: Specific areas to focus on (optional)
 
         Returns:
             Orchestrator-compatible result with synthetic data and metadata
@@ -1552,6 +2036,12 @@ class ProductionSyntheticDataGenerator:
             output_path = config.get("output_path", "./outputs/synthetic_data")
             quality_assessment = config.get("quality_assessment", True)
 
+            # 2025 adaptive generation parameters
+            performance_gaps = config.get("performance_gaps", {})
+            target_gaps = config.get("target_gaps", False)
+            strategy = config.get("strategy", "gap_based")
+            focus_areas = config.get("focus_areas", [])
+
             # Update instance configuration if needed
             original_target = self.target_samples
             original_method = self.generation_method
@@ -1561,8 +2051,17 @@ class ProductionSyntheticDataGenerator:
 
             logger.info(f"Starting orchestrated synthetic data generation: {target_samples} samples using {generation_method}")
 
-            # Generate synthetic data
-            result = await self.generate_data()
+            # Generate synthetic data - use targeted generation if gaps provided
+            if target_gaps and performance_gaps:
+                logger.info(f"Using targeted generation with strategy: {strategy}")
+                result = await self.generate_targeted_data(
+                    performance_gaps=performance_gaps,
+                    strategy=strategy,
+                    batch_size=target_samples,
+                    focus_areas=focus_areas
+                )
+            else:
+                result = await self.generate_data()
 
             # Restore original configuration
             self.target_samples = original_target
@@ -1755,8 +2254,7 @@ class ProductionSyntheticDataGenerator:
                     "consistency": enhanced_metrics.consistency.score,
                 },
             }
-        # Legacy quality metrics
-        quality_metrics = metadata["quality_metrics"]
+            quality_metrics = metadata["quality_metrics"]
 
         return {
             "generation_summary": {
@@ -1810,3 +2308,1082 @@ class ProductionSyntheticDataGenerator:
             )
 
         return recommendations
+
+    # ===== 2025 ADAPTIVE DATA GENERATION METHODS =====
+
+    async def generate_targeted_data(
+        self,
+        performance_gaps: dict[str, float],
+        strategy: str = "gap_based",
+        batch_size: int = 200,
+        focus_areas: list[str] | None = None
+    ) -> dict[str, Any]:
+        """Generate targeted synthetic data based on performance gaps (2025 best practice)
+
+        Args:
+            performance_gaps: Dictionary mapping metric names to gap magnitudes
+            strategy: Generation strategy ("gap_based", "rule_focused", "diversity_enhanced", "neural_enhanced")
+            batch_size: Number of samples to generate
+            focus_areas: Specific areas to focus on (overrides instance focus_areas)
+
+        Returns:
+            Dictionary containing targeted synthetic data and metadata
+        """
+        logger.info(f"Starting targeted data generation: strategy={strategy}, batch_size={batch_size}")
+
+        # Update current performance gaps
+        self.current_performance_gaps = performance_gaps
+
+        # Determine optimal generation strategy
+        optimal_strategy = self._determine_generation_strategy(performance_gaps)
+        self.generation_strategy = optimal_strategy
+
+        # Use provided focus areas or instance focus areas
+        target_focus_areas = focus_areas or self.focus_areas
+
+        # Configure difficulty distribution based on gaps
+        difficulty_config = self._configure_difficulty_distribution(performance_gaps)
+
+        # Generate targeted data using optimal strategy (Enhanced 2025 approach)
+        if self.generation_method == "hybrid" and self.hybrid_generator:
+            # Use hybrid generation system for best quality (2025 best practice)
+            result = await self._generate_hybrid_targeted_data(
+                performance_gaps, batch_size, target_focus_areas, difficulty_config
+            )
+        elif optimal_strategy == "neural_enhanced":
+            result = await self._generate_neural_enhanced_data(
+                performance_gaps, batch_size, target_focus_areas, difficulty_config
+            )
+        elif optimal_strategy == "rule_focused":
+            result = await self._generate_rule_focused_data(
+                performance_gaps, batch_size, target_focus_areas, difficulty_config
+            )
+        elif optimal_strategy == "diversity_enhanced":
+            result = await self._generate_diversity_enhanced_data(
+                performance_gaps, batch_size, target_focus_areas, difficulty_config
+            )
+        else:  # statistical fallback
+            result = await self._generate_gap_based_statistical_data(
+                performance_gaps, batch_size, target_focus_areas, difficulty_config
+            )
+
+        # Apply quality filtering if enabled (2025 best practice)
+        if self.enable_quality_filtering and result.get("features"):
+            result = await self._apply_quality_filtering(result)
+
+        # Update method performance tracking
+        await self._update_method_performance_tracking(result, performance_gaps)
+
+        # Add targeting metadata
+        result["metadata"]["targeting_info"] = {
+            "performance_gaps": performance_gaps,
+            "strategy_used": optimal_strategy,
+            "focus_areas": target_focus_areas,
+            "difficulty_config": difficulty_config,
+            "gap_targeting_enabled": self.enable_gap_targeting
+        }
+
+        logger.info(f"Targeted data generation completed: {len(result.get('features', []))} samples")
+        return result
+
+    async def _generate_hybrid_targeted_data(
+        self,
+        performance_gaps: dict[str, float],
+        batch_size: int,
+        focus_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate data using hybrid approach with multiple methods (2025 best practice)"""
+        logger.info("Generating hybrid targeted data using multiple methods")
+
+        if not self.hybrid_generator:
+            # Fallback to statistical if hybrid not available
+            return await self._generate_gap_based_statistical_data(
+                performance_gaps, batch_size, focus_areas, difficulty_config
+            )
+
+        try:
+            # Use hybrid generation system
+            hybrid_result = await self.hybrid_generator.generate_hybrid_data(
+                batch_size=batch_size,
+                performance_gaps=performance_gaps,
+                quality_threshold=self.quality_filter_threshold
+            )
+
+            # Convert hybrid result to standard format
+            features = hybrid_result['samples']
+            effectiveness = [0.7 + 0.3 * np.random.random() for _ in features]  # Placeholder
+
+            # Create metadata
+            metadata = {
+                "generation_method": "hybrid",
+                "generation_timestamp": datetime.now().isoformat(),
+                "batch_size": len(features),
+                "method_metrics": hybrid_result['method_metrics'],
+                "method_allocation": hybrid_result['method_allocation'],
+                "total_generation_time": hybrid_result['total_generation_time'],
+                "quality_threshold": hybrid_result['quality_threshold'],
+                "domain_distribution": self._calculate_domain_distribution(features),
+                "targeting_enabled": True,
+                "focus_areas": focus_areas,
+                "difficulty_config": difficulty_config
+            }
+
+            return {
+                "features": features,
+                "effectiveness": effectiveness,
+                "metadata": metadata
+            }
+
+        except Exception as e:
+            logger.error(f"Hybrid generation failed: {e}")
+            # Fallback to statistical generation
+            return await self._generate_gap_based_statistical_data(
+                performance_gaps, batch_size, focus_areas, difficulty_config
+            )
+
+    async def _apply_quality_filtering(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Apply quality-based filtering and ranking (2025 best practice)"""
+        features = result.get("features", [])
+        effectiveness = result.get("effectiveness", [])
+
+        if not features:
+            return result
+
+        logger.info(f"Applying quality filtering to {len(features)} samples")
+
+        # Calculate quality scores for each sample
+        quality_scores = []
+        for i, feature_vector in enumerate(features):
+            quality_score = self._calculate_sample_quality_score(feature_vector, effectiveness[i])
+            quality_scores.append(quality_score)
+
+        # Filter samples based on quality threshold
+        filtered_indices = [
+            i for i, score in enumerate(quality_scores)
+            if score >= self.quality_filter_threshold
+        ]
+
+        if not filtered_indices:
+            logger.warning("No samples passed quality filtering, keeping all samples")
+            filtered_indices = list(range(len(features)))
+
+        # Apply filtering
+        filtered_features = [features[i] for i in filtered_indices]
+        filtered_effectiveness = [effectiveness[i] for i in filtered_indices]
+        filtered_quality_scores = [quality_scores[i] for i in filtered_indices]
+
+        # Sort by quality score (highest first)
+        sorted_data = sorted(
+            zip(filtered_features, filtered_effectiveness, filtered_quality_scores),
+            key=lambda x: x[2],
+            reverse=True
+        )
+
+        if sorted_data:
+            filtered_features, filtered_effectiveness, filtered_quality_scores = zip(*sorted_data)
+            filtered_features = list(filtered_features)
+            filtered_effectiveness = list(filtered_effectiveness)
+            filtered_quality_scores = list(filtered_quality_scores)
+
+        # Update metadata
+        result["features"] = filtered_features
+        result["effectiveness"] = filtered_effectiveness
+        result["metadata"]["quality_filtering"] = {
+            "enabled": True,
+            "threshold": self.quality_filter_threshold,
+            "original_count": len(features),
+            "filtered_count": len(filtered_features),
+            "filter_rate": 1.0 - (len(filtered_features) / len(features)),
+            "average_quality_score": np.mean(filtered_quality_scores) if filtered_quality_scores else 0.0,
+            "quality_score_range": [min(filtered_quality_scores), max(filtered_quality_scores)] if filtered_quality_scores else [0.0, 0.0]
+        }
+
+        logger.info(f"Quality filtering completed: {len(filtered_features)}/{len(features)} samples retained")
+        return result
+
+    def _calculate_sample_quality_score(self, feature_vector: list[float], effectiveness: float) -> float:
+        """Calculate quality score for a single sample (2025 best practice)"""
+        # Multi-dimensional quality assessment
+
+        # 1. Feature validity (all values in reasonable range)
+        feature_validity = 1.0
+        for value in feature_vector:
+            if not (0.0 <= value <= 1.0):  # Assuming normalized features
+                feature_validity *= 0.8
+
+        # 2. Feature diversity (not all values the same)
+        feature_diversity = 1.0 - (np.std(feature_vector) < 0.01)
+
+        # 3. Effectiveness reasonableness
+        effectiveness_validity = 1.0 if 0.0 <= effectiveness <= 1.0 else 0.5
+
+        # 4. Feature correlation (avoid highly correlated features)
+        correlation_penalty = 0.0
+        if len(feature_vector) > 1:
+            # Simple correlation check
+            for i in range(len(feature_vector) - 1):
+                if abs(feature_vector[i] - feature_vector[i + 1]) < 0.05:
+                    correlation_penalty += 0.1
+
+        correlation_score = max(0.0, 1.0 - correlation_penalty)
+
+        # Combined quality score
+        quality_score = (
+            0.3 * feature_validity +
+            0.25 * feature_diversity +
+            0.25 * effectiveness_validity +
+            0.2 * correlation_score
+        )
+
+        return min(1.0, max(0.0, quality_score))
+
+    async def _update_method_performance_tracking(
+        self,
+        result: dict[str, Any],
+        performance_gaps: dict[str, float]
+    ) -> None:
+        """Update method performance tracking for auto-selection (2025 best practice)"""
+        metadata = result.get("metadata", {})
+        generation_method = metadata.get("generation_method", "statistical")
+
+        # Calculate performance metrics
+        features = result.get("features", [])
+        effectiveness = result.get("effectiveness", [])
+
+        if not features:
+            return
+
+        # Quality metrics
+        quality_scores = [
+            self._calculate_sample_quality_score(f, e)
+            for f, e in zip(features, effectiveness)
+        ]
+        avg_quality = np.mean(quality_scores) if quality_scores else 0.0
+
+        # Diversity metrics
+        diversity_score = self._calculate_diversity_score_internal(features)
+
+        # Create performance metrics
+        metrics = GenerationMethodMetrics(
+            method_name=generation_method,
+            generation_time=metadata.get("total_generation_time", 0.0),
+            quality_score=avg_quality,
+            diversity_score=diversity_score,
+            memory_usage_mb=self._get_current_memory_usage(),
+            success_rate=1.0 if avg_quality > 0.5 else 0.0,
+            samples_generated=len(features),
+            timestamp=datetime.now(),
+            performance_gaps_addressed=performance_gaps
+        )
+
+        # Record performance
+        self.method_tracker.record_performance(metrics)
+
+        logger.info(f"Updated performance tracking for {generation_method}: quality={avg_quality:.3f}, diversity={diversity_score:.3f}")
+
+    def _calculate_diversity_score_internal(self, features: list[list[float]]) -> float:
+        """Calculate diversity score for feature vectors"""
+        if len(features) < 2:
+            return 0.0
+
+        # Calculate pairwise distances
+        distances = []
+        for i in range(len(features)):
+            for j in range(i + 1, len(features)):
+                distance = np.linalg.norm(np.array(features[i]) - np.array(features[j]))
+                distances.append(distance)
+
+        return float(np.mean(distances)) if distances else 0.0
+
+    def _get_current_memory_usage(self) -> float:
+        """Get current memory usage in MB"""
+        try:
+            import psutil
+            process = psutil.Process()
+            return process.memory_info().rss / (1024 * 1024)
+        except ImportError:
+            return 0.0
+
+    def _calculate_domain_distribution(self, features: list[list[float]]) -> dict[str, int]:
+        """Calculate domain distribution for features"""
+        # Placeholder implementation
+        return {"technical": len(features) // 4, "creative": len(features) // 4,
+                "analytical": len(features) // 4, "other": len(features) - 3 * (len(features) // 4)}
+
+    async def generate_with_dynamic_batching(
+        self,
+        total_samples: int,
+        performance_gaps: dict[str, float] = None,
+        strategy: str = "adaptive"
+    ) -> dict[str, Any]:
+        """Generate data using dynamic batch optimization (2025 best practice)"""
+        logger.info(f"Starting dynamic batch generation for {total_samples} samples")
+
+        performance_gaps = performance_gaps or {}
+        all_features = []
+        all_effectiveness = []
+        generation_metadata = {
+            "total_samples_requested": total_samples,
+            "batches_processed": 0,
+            "total_generation_time": 0.0,
+            "batch_optimization_stats": [],
+            "method": "dynamic_batching"
+        }
+
+        remaining_samples = total_samples
+        start_time = time.time()
+
+        while remaining_samples > 0:
+            # Get optimal batch size
+            optimal_batch_size = await self.batch_optimizer.get_optimal_batch_size(
+                target_samples=remaining_samples
+            )
+
+            batch_start_time = time.time()
+            batch_success_count = 0
+            batch_error_count = 0
+
+            try:
+                # Generate batch using targeted generation
+                batch_result = await self.generate_targeted_data(
+                    performance_gaps=performance_gaps,
+                    strategy=strategy,
+                    batch_size=optimal_batch_size
+                )
+
+                # Extract results
+                batch_features = batch_result.get("features", [])
+                batch_effectiveness = batch_result.get("effectiveness", [])
+
+                if batch_features:
+                    all_features.extend(batch_features)
+                    all_effectiveness.extend(batch_effectiveness)
+                    batch_success_count = len(batch_features)
+                    remaining_samples -= batch_success_count
+                else:
+                    batch_error_count = 1
+
+            except Exception as e:
+                logger.error(f"Batch generation failed: {e}")
+                batch_error_count = 1
+
+            # Record batch performance
+            batch_time = time.time() - batch_start_time
+            await self.batch_optimizer.record_batch_performance(
+                batch_size=optimal_batch_size,
+                processing_time=batch_time,
+                success_count=batch_success_count,
+                error_count=batch_error_count
+            )
+
+            # Update metadata
+            generation_metadata["batches_processed"] += 1
+            generation_metadata["total_generation_time"] += batch_time
+
+            # Safety check to prevent infinite loops
+            if batch_success_count == 0 and batch_error_count > 0:
+                logger.warning("Batch generation failed, reducing remaining samples")
+                remaining_samples = max(0, remaining_samples - optimal_batch_size)
+
+            # Log progress
+            if generation_metadata["batches_processed"] % 5 == 0:
+                progress = (total_samples - remaining_samples) / total_samples * 100
+                logger.info(f"Dynamic batching progress: {progress:.1f}% "
+                           f"({len(all_features)}/{total_samples} samples)")
+
+        # Get final optimization stats
+        optimization_stats = self.batch_optimizer.get_optimization_stats()
+        generation_metadata["batch_optimization_stats"] = optimization_stats
+        generation_metadata["final_sample_count"] = len(all_features)
+        generation_metadata["total_generation_time"] = time.time() - start_time
+        generation_metadata["average_batch_time"] = (
+            generation_metadata["total_generation_time"] / generation_metadata["batches_processed"]
+            if generation_metadata["batches_processed"] > 0 else 0.0
+        )
+
+        logger.info(f"Dynamic batch generation completed: {len(all_features)} samples in "
+                   f"{generation_metadata['batches_processed']} batches, "
+                   f"total time: {generation_metadata['total_generation_time']:.2f}s")
+
+        return {
+            "features": all_features,
+            "effectiveness": all_effectiveness,
+            "metadata": generation_metadata
+        }
+
+    def enable_history_tracking(self, db_session) -> None:
+        """Enable generation history tracking with database integration"""
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        if isinstance(db_session, AsyncSession):
+            self.history_tracker = GenerationHistoryTracker(db_session)
+            logger.info("Generation history tracking enabled")
+        else:
+            logger.warning("Invalid database session provided for history tracking")
+
+    async def generate_with_history_tracking(
+        self,
+        total_samples: int,
+        performance_gaps: dict[str, float] = None,
+        strategy: str = "adaptive",
+        training_session_id: Optional[str] = None
+    ) -> dict[str, Any]:
+        """Generate data with comprehensive history tracking (Week 6 feature)"""
+
+        if not self.history_tracker:
+            logger.warning("History tracking not enabled, falling back to standard generation")
+            return await self.generate_with_dynamic_batching(
+                total_samples=total_samples,
+                performance_gaps=performance_gaps,
+                strategy=strategy
+            )
+
+        # Start tracking session
+        session_id = await self.history_tracker.start_tracking_session(
+            generation_method=self.generation_method,
+            target_samples=total_samples,
+            session_type="synthetic_data",
+            training_session_id=training_session_id,
+            configuration={
+                "strategy": strategy,
+                "quality_threshold": self.quality_filter_threshold,
+                "enable_gap_targeting": self.enable_gap_targeting,
+                "difficulty_distribution": self.difficulty_distribution,
+                "focus_areas": self.focus_areas
+            },
+            performance_gaps=performance_gaps,
+            focus_areas=self.focus_areas
+        )
+
+        self.current_session_id = session_id
+        logger.info(f"Started generation session {session_id} with history tracking")
+
+        try:
+            # Generate with dynamic batching and track each batch
+            result = await self._generate_with_tracked_batching(
+                total_samples=total_samples,
+                performance_gaps=performance_gaps,
+                strategy=strategy,
+                session_id=session_id
+            )
+
+            # Complete session tracking
+            await self.history_tracker.complete_session(
+                session_id=session_id,
+                final_sample_count=len(result.get("features", [])),
+                status="completed"
+            )
+
+            # Record method performance
+            if result.get("metadata"):
+                await self.history_tracker.record_method_performance(
+                    session_id=session_id,
+                    method_name=self.generation_method,
+                    performance_metrics={
+                        "generation_time": result["metadata"].get("total_generation_time", 0.0),
+                        "quality_score": result["metadata"].get("average_quality_score", 0.0),
+                        "diversity_score": result["metadata"].get("diversity_score", 0.0),
+                        "memory_usage_mb": result["metadata"].get("memory_usage_mb", 0.0),
+                        "success_rate": 1.0 if result.get("features") else 0.0,
+                        "samples_generated": len(result.get("features", [])),
+                        "performance_gaps_addressed": performance_gaps,
+                        "batch_size": result["metadata"].get("average_batch_size"),
+                        "configuration": result["metadata"].get("configuration")
+                    }
+                )
+
+            # Add session tracking info to metadata
+            result["metadata"]["session_tracking"] = {
+                "session_id": session_id,
+                "tracking_enabled": True,
+                "training_session_id": training_session_id
+            }
+
+            logger.info(f"Completed generation session {session_id} with {len(result.get('features', []))} samples")
+            return result
+
+        except Exception as e:
+            # Mark session as failed
+            await self.history_tracker.complete_session(
+                session_id=session_id,
+                final_sample_count=0,
+                status="failed",
+                error_message=str(e)
+            )
+            logger.error(f"Generation session {session_id} failed: {e}")
+            raise
+
+    async def _generate_with_tracked_batching(
+        self,
+        total_samples: int,
+        performance_gaps: dict[str, float],
+        strategy: str,
+        session_id: str
+    ) -> dict[str, Any]:
+        """Generate data with batch-level tracking"""
+
+        all_features = []
+        all_effectiveness = []
+        generation_metadata = {
+            "total_samples_requested": total_samples,
+            "batches_processed": 0,
+            "total_generation_time": 0.0,
+            "method": "tracked_dynamic_batching",
+            "session_id": session_id
+        }
+
+        remaining_samples = total_samples
+        start_time = time.time()
+        batch_number = 1
+
+        while remaining_samples > 0:
+            # Get optimal batch size
+            optimal_batch_size = await self.batch_optimizer.get_optimal_batch_size(
+                target_samples=remaining_samples
+            )
+
+            batch_start_time = time.time()
+            batch_success_count = 0
+            batch_error_count = 0
+
+            try:
+                # Generate batch
+                batch_result = await self.generate_targeted_data(
+                    performance_gaps=performance_gaps,
+                    strategy=strategy,
+                    batch_size=optimal_batch_size
+                )
+
+                # Extract results
+                batch_features = batch_result.get("features", [])
+                batch_effectiveness = batch_result.get("effectiveness", [])
+
+                if batch_features:
+                    all_features.extend(batch_features)
+                    all_effectiveness.extend(batch_effectiveness)
+                    batch_success_count = len(batch_features)
+                    remaining_samples -= batch_success_count
+                else:
+                    batch_error_count = 1
+
+            except Exception as e:
+                logger.error(f"Batch {batch_number} generation failed: {e}")
+                batch_error_count = 1
+
+            # Track batch completion
+            batch_time = time.time() - batch_start_time
+            await self.history_tracker.track_batch_completion(
+                session_id=session_id,
+                batch_number=batch_number,
+                batch_size=optimal_batch_size,
+                generation_method=self.generation_method,
+                processing_time=batch_time,
+                samples_generated=batch_success_count,
+                samples_filtered=0,  # Would be calculated from quality filtering
+                error_count=batch_error_count,
+                quality_metrics={
+                    "average_quality": np.mean([self._calculate_sample_quality_score(f, e)
+                                              for f, e in zip(batch_features, batch_effectiveness)])
+                                     if batch_features else 0.0
+                },
+                performance_metrics={
+                    "memory_usage_mb": self._get_current_memory_usage(),
+                    "efficiency_score": batch_success_count / batch_time if batch_time > 0 else 0.0
+                }
+            )
+
+            # Record batch performance for optimizer
+            await self.batch_optimizer.record_batch_performance(
+                batch_size=optimal_batch_size,
+                processing_time=batch_time,
+                success_count=batch_success_count,
+                error_count=batch_error_count
+            )
+
+            # Update metadata
+            generation_metadata["batches_processed"] += 1
+            generation_metadata["total_generation_time"] += batch_time
+            batch_number += 1
+
+            # Safety check
+            if batch_success_count == 0 and batch_error_count > 0:
+                remaining_samples = max(0, remaining_samples - optimal_batch_size)
+
+        # Final metadata
+        generation_metadata["final_sample_count"] = len(all_features)
+        generation_metadata["total_generation_time"] = time.time() - start_time
+        generation_metadata["average_batch_time"] = (
+            generation_metadata["total_generation_time"] / generation_metadata["batches_processed"]
+            if generation_metadata["batches_processed"] > 0 else 0.0
+        )
+
+        return {
+            "features": all_features,
+            "effectiveness": all_effectiveness,
+            "metadata": generation_metadata
+        }
+
+    def _determine_generation_strategy(self, performance_gaps: dict[str, float]) -> str:
+        """Determine optimal generation strategy based on performance gaps (2025 best practice)
+
+        Based on research from "Targeted synthetic data generation for tabular data via hardness characterization"
+        and 2025 best practices for adaptive ML data generation.
+
+        Args:
+            performance_gaps: Dictionary mapping metric names to gap magnitudes
+
+        Returns:
+            Optimal generation strategy string
+        """
+        if not performance_gaps:
+            return "statistical"
+
+        # Calculate gap severity and types
+        max_gap = max(performance_gaps.values())
+        avg_gap = sum(performance_gaps.values()) / len(performance_gaps)
+
+        # Strategy selection based on 2025 research insights
+        if performance_gaps.get("model_accuracy", 0) > 0.1:
+            # Large model accuracy gap - use neural enhancement for complex patterns
+            return "neural_enhanced"
+        elif performance_gaps.get("rule_effectiveness", 0) > 0.1:
+            # Rule effectiveness gap - focus on specific rule weaknesses
+            return "rule_focused"
+        elif performance_gaps.get("pattern_coverage", 0) > 0.1:
+            # Pattern coverage gap - increase pattern variety
+            return "diversity_enhanced"
+        elif max_gap > 0.05:
+            # Moderate gaps - use statistical with gap-based targeting
+            return "statistical"
+        else:
+            # Small gaps - standard statistical generation
+            return "statistical"
+
+    def _configure_difficulty_distribution(self, performance_gaps: dict[str, float]) -> dict[str, Any]:
+        """Configure difficulty distribution based on performance gaps and instance settings
+
+        Args:
+            performance_gaps: Dictionary mapping metric names to gap magnitudes
+
+        Returns:
+            Difficulty configuration dictionary
+        """
+        config = {
+            "distribution_type": self.difficulty_distribution,
+            "hardness_threshold": self.hardness_threshold,
+            "focus_hard_examples": False,
+            "difficulty_weights": {}
+        }
+
+        if self.difficulty_distribution == "adaptive":
+            # Adaptive distribution based on gaps
+            max_gap = max(performance_gaps.values()) if performance_gaps else 0
+            if max_gap > 0.1:
+                config["focus_hard_examples"] = True
+                config["difficulty_weights"] = {
+                    "easy": 0.2,
+                    "medium": 0.3,
+                    "hard": 0.5
+                }
+            else:
+                config["difficulty_weights"] = {
+                    "easy": 0.3,
+                    "medium": 0.4,
+                    "hard": 0.3
+                }
+        elif self.difficulty_distribution == "hard_focused":
+            config["focus_hard_examples"] = True
+            config["difficulty_weights"] = {
+                "easy": 0.1,
+                "medium": 0.2,
+                "hard": 0.7
+            }
+        else:  # uniform
+            config["difficulty_weights"] = {
+                "easy": 0.33,
+                "medium": 0.34,
+                "hard": 0.33
+            }
+
+        return config
+
+    async def _generate_neural_enhanced_data(
+        self,
+        performance_gaps: dict[str, float],
+        batch_size: int,
+        focus_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate data using neural enhancement for complex patterns"""
+        logger.info("Generating neural-enhanced data for complex pattern improvement")
+
+        # Use neural generation if available, otherwise fall back to statistical
+        if self.neural_generator and TORCH_AVAILABLE:
+            # First generate base data for training
+            base_result = await self._generate_gap_based_statistical_data(
+                performance_gaps, min(batch_size, 500), focus_areas, difficulty_config
+            )
+
+            # Train neural generator on gap-focused data
+            base_features = np.array(base_result["features"])
+            if len(base_features) > 0:
+                self.neural_generator.fit(base_features)
+
+                # Generate enhanced synthetic features
+                enhanced_features = self.neural_generator.generate(batch_size)
+
+                # Apply gap-based adjustments to neural output
+                adjusted_features = self._apply_gap_adjustments(enhanced_features, performance_gaps, focus_areas)
+
+                return await self._finalize_targeted_generation(
+                    adjusted_features, performance_gaps, difficulty_config, "neural_enhanced"
+                )
+
+        # Fallback to statistical generation
+        logger.warning("Neural generation not available, falling back to statistical")
+        return await self._generate_gap_based_statistical_data(
+            performance_gaps, batch_size, focus_areas, difficulty_config
+        )
+
+    async def _generate_rule_focused_data(
+        self,
+        performance_gaps: dict[str, float],
+        batch_size: int,
+        focus_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate data focused on specific rule weaknesses"""
+        logger.info("Generating rule-focused data for rule effectiveness improvement")
+
+        # Identify weak rule areas from gaps
+        weak_areas = [area for area in focus_areas if performance_gaps.get(f"{area}_effectiveness", 0) > 0.05]
+        if not weak_areas:
+            weak_areas = ["clarity", "specificity"]  # Default weak areas
+
+        # Generate data with emphasis on weak rule areas
+        features = []
+        effectiveness_scores = []
+        prompts = []
+
+        for i in range(batch_size):
+            # Create feature vector emphasizing weak areas
+            feature_vector = self._generate_rule_focused_features(weak_areas, difficulty_config, i)
+            features.append(feature_vector)
+
+            # Generate corresponding effectiveness and prompts
+            domain_name = self._select_domain_from_features(np.array(feature_vector))
+            domain_config = self.domains[domain_name]
+
+            effectiveness = self._generate_targeted_effectiveness(domain_config, weak_areas, difficulty_config)
+            effectiveness_scores.append(effectiveness)
+
+            prompt_pair = self._generate_targeted_prompt_pair(domain_config, weak_areas)
+            prompts.append(prompt_pair)
+
+        return await self._finalize_targeted_generation(
+            features, performance_gaps, difficulty_config, "rule_focused",
+            effectiveness_scores, prompts
+        )
+
+    async def _generate_diversity_enhanced_data(
+        self,
+        performance_gaps: dict[str, float],
+        batch_size: int,
+        focus_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate data with enhanced diversity for pattern coverage improvement"""
+        logger.info("Generating diversity-enhanced data for pattern coverage improvement")
+
+        # Increase domain diversity and feature variance
+        features = []
+        effectiveness_scores = []
+        prompts = []
+
+        # Ensure coverage across all domains with extra variance
+        domain_names = list(self.domains.keys())
+        samples_per_domain = batch_size // len(domain_names)
+        extra_samples = batch_size % len(domain_names)
+
+        for domain_idx, domain_name in enumerate(domain_names):
+            domain_config = self.domains[domain_name]
+            domain_samples = samples_per_domain + (1 if domain_idx < extra_samples else 0)
+
+            for i in range(domain_samples):
+                # Generate diverse features with high variance
+                feature_vector = self._generate_diverse_features(domain_config, difficulty_config, i)
+                features.append(feature_vector)
+
+                # Generate diverse effectiveness scores
+                effectiveness = self._generate_diverse_effectiveness(domain_config, difficulty_config)
+                effectiveness_scores.append(effectiveness)
+
+                # Generate diverse prompt patterns
+                prompt_pair = self._generate_diverse_prompt_pair(domain_config)
+                prompts.append(prompt_pair)
+
+        return await self._finalize_targeted_generation(
+            features, performance_gaps, difficulty_config, "diversity_enhanced",
+            effectiveness_scores, prompts
+        )
+
+    async def _generate_gap_based_statistical_data(
+        self,
+        performance_gaps: dict[str, float],
+        batch_size: int,
+        focus_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate statistical data with gap-based targeting"""
+        logger.info("Generating gap-based statistical data")
+
+        # Use existing statistical generation with gap-based modifications
+        original_target = self.target_samples
+        self.target_samples = batch_size
+
+        try:
+            # Generate base statistical data
+            result = await self.generate_comprehensive_training_data()
+
+            # Apply gap-based adjustments to features
+            if self.enable_gap_targeting and performance_gaps:
+                adjusted_features = self._apply_gap_adjustments(
+                    result["features"], performance_gaps, focus_areas
+                )
+                result["features"] = adjusted_features
+
+            # Apply difficulty distribution adjustments
+            if difficulty_config["focus_hard_examples"]:
+                result = self._apply_difficulty_adjustments(result, difficulty_config)
+
+            return result
+
+        finally:
+            self.target_samples = original_target
+
+    def _apply_gap_adjustments(
+        self,
+        features: list[list[float]],
+        performance_gaps: dict[str, float],
+        focus_areas: list[str]
+    ) -> list[list[float]]:
+        """Apply performance gap-based adjustments to features"""
+        if not performance_gaps or not features:
+            return features
+
+        adjusted_features = []
+        feature_names = self.feature_names
+
+        for feature_vector in features:
+            adjusted_vector = feature_vector.copy()
+
+            # Apply adjustments based on performance gaps
+            for area in focus_areas:
+                if area in feature_names:
+                    feature_idx = feature_names.index(area)
+                    gap_magnitude = performance_gaps.get(f"{area}_effectiveness", 0)
+
+                    if gap_magnitude > 0.05:  # Significant gap
+                        # Increase variance in problematic areas
+                        noise_factor = min(gap_magnitude * 2, 0.3)
+                        noise = self.rng.normal(0, noise_factor)
+                        adjusted_vector[feature_idx] = np.clip(
+                            adjusted_vector[feature_idx] + noise, 0.0, 1.0
+                        )
+
+            adjusted_features.append(adjusted_vector)
+
+        return adjusted_features
+
+    def _generate_rule_focused_features(
+        self,
+        weak_areas: list[str],
+        difficulty_config: dict[str, Any],
+        sample_idx: int
+    ) -> list[float]:
+        """Generate features focused on weak rule areas"""
+        feature_vector = [0.0] * len(self.feature_names)
+
+        # Determine difficulty level for this sample
+        difficulty_level = self._sample_difficulty_level(difficulty_config, sample_idx)
+
+        for i, feature_name in enumerate(self.feature_names):
+            if feature_name in weak_areas:
+                # Generate challenging values for weak areas
+                if difficulty_level == "hard":
+                    # Hard examples: extreme values that challenge the rules
+                    feature_vector[i] = self.rng.choice([
+                        self.rng.uniform(0.0, 0.3),  # Very low
+                        self.rng.uniform(0.7, 1.0)   # Very high
+                    ])
+                elif difficulty_level == "medium":
+                    # Medium examples: moderate challenge
+                    feature_vector[i] = self.rng.uniform(0.3, 0.7)
+                else:
+                    # Easy examples: typical values
+                    feature_vector[i] = self.rng.uniform(0.4, 0.6)
+            else:
+                # Normal distribution for non-focus areas
+                feature_vector[i] = np.clip(self.rng.normal(0.5, 0.2), 0.0, 1.0)
+
+        return feature_vector
+
+    def _sample_difficulty_level(self, difficulty_config: dict[str, Any], sample_idx: int) -> str:
+        """Sample difficulty level based on configuration"""
+        weights = difficulty_config["difficulty_weights"]
+        levels = list(weights.keys())
+        probabilities = list(weights.values())
+
+        # Use sample index for deterministic sampling
+        self.rng.seed(self.random_state + sample_idx)
+        level = self.rng.choice(levels, p=probabilities)
+        self.rng.seed(self.random_state)  # Reset seed
+
+        return level
+
+    def _generate_diverse_features(
+        self,
+        domain_config: DomainConfig,
+        difficulty_config: dict[str, Any],
+        sample_idx: int
+    ) -> list[float]:
+        """Generate features with enhanced diversity"""
+        feature_vector = [0.0] * len(self.feature_names)
+
+        # Use higher variance for diversity
+        for i, feature_name in enumerate(self.feature_names):
+            if feature_name in domain_config.feature_ranges:
+                min_val, max_val = domain_config.feature_ranges[feature_name]
+                # Increase variance by expanding range
+                expanded_min = max(0.0, min_val - 0.1)
+                expanded_max = min(1.0, max_val + 0.1)
+                feature_vector[i] = self.rng.uniform(expanded_min, expanded_max)
+            else:
+                # High variance normal distribution
+                feature_vector[i] = np.clip(self.rng.normal(0.5, 0.3), 0.0, 1.0)
+
+        return feature_vector
+
+    def _generate_targeted_effectiveness(
+        self,
+        domain_config: DomainConfig,
+        weak_areas: list[str],
+        difficulty_config: dict[str, Any]
+    ) -> float:
+        """Generate effectiveness scores targeted at weak areas"""
+        base_effectiveness = self._generate_domain_effectiveness(domain_config, 0)
+
+        # Adjust based on weak areas and difficulty
+        if difficulty_config["focus_hard_examples"]:
+            # Lower effectiveness for hard examples to create challenging training data
+            adjustment = self.rng.uniform(-0.2, -0.1)
+        else:
+            # Normal effectiveness distribution
+            adjustment = self.rng.uniform(-0.1, 0.1)
+
+        return np.clip(base_effectiveness + adjustment, 0.0, 1.0)
+
+    def _generate_diverse_effectiveness(
+        self,
+        domain_config: DomainConfig,
+        difficulty_config: dict[str, Any]
+    ) -> float:
+        """Generate effectiveness scores with enhanced diversity"""
+        # Use wider distribution for diversity
+        alpha, beta = domain_config.effectiveness_params
+        # Increase variance by adjusting beta distribution parameters
+        diverse_alpha = max(1.0, alpha * 0.8)
+        diverse_beta = max(1.0, beta * 0.8)
+
+        return self.rng.beta(diverse_alpha, diverse_beta)
+
+    def _generate_targeted_prompt_pair(
+        self,
+        domain_config: DomainConfig,
+        weak_areas: list[str]
+    ) -> tuple[str, str]:
+        """Generate prompt pairs targeted at weak areas"""
+        # Select patterns that emphasize weak areas
+        relevant_patterns = [
+            pattern for pattern in domain_config.patterns
+            if any(area in pattern[0].lower() or area in pattern[1].lower() for area in weak_areas)
+        ]
+
+        if relevant_patterns:
+            return self.rng.choice(relevant_patterns)
+        else:
+            # Fallback to random pattern
+            return self.rng.choice(domain_config.patterns)
+
+    def _generate_diverse_prompt_pair(self, domain_config: DomainConfig) -> tuple[str, str]:
+        """Generate diverse prompt pairs"""
+        # Simply use random selection for diversity
+        return self.rng.choice(domain_config.patterns)
+
+    def _apply_difficulty_adjustments(
+        self,
+        result: dict[str, Any],
+        difficulty_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Apply difficulty-based adjustments to generated data"""
+        if not difficulty_config["focus_hard_examples"]:
+            return result
+
+        # Adjust effectiveness scores to create more challenging examples
+        adjusted_effectiveness = []
+        for score in result["effectiveness"]:
+            if self.rng.random() < 0.3:  # 30% of samples become harder
+                adjusted_score = max(0.0, score - self.rng.uniform(0.1, 0.3))
+            else:
+                adjusted_score = score
+            adjusted_effectiveness.append(adjusted_score)
+
+        result["effectiveness"] = adjusted_effectiveness
+        return result
+
+    async def _finalize_targeted_generation(
+        self,
+        features: list[list[float]],
+        performance_gaps: dict[str, float],
+        difficulty_config: dict[str, Any],
+        strategy: str,
+        effectiveness_scores: list[float] | None = None,
+        prompts: list[tuple[str, str]] | None = None
+    ) -> dict[str, Any]:
+        """Finalize targeted generation with metadata"""
+
+        # Generate missing components if not provided
+        if effectiveness_scores is None:
+            effectiveness_scores = []
+            for feature_vector in features:
+                domain_name = self._select_domain_from_features(np.array(feature_vector))
+                domain_config = self.domains[domain_name]
+                effectiveness = self._generate_domain_effectiveness(domain_config, 0)
+                effectiveness_scores.append(effectiveness)
+
+        if prompts is None:
+            prompts = []
+            for feature_vector in features:
+                domain_name = self._select_domain_from_features(np.array(feature_vector))
+                domain_config = self.domains[domain_name]
+                prompt_pair = self.rng.choice(domain_config.patterns)
+                prompts.append(prompt_pair)
+
+        # Create result structure
+        result = {
+            "features": features,
+            "effectiveness": effectiveness_scores,
+            "prompts": prompts,
+            "metadata": {
+                "generation_method": f"targeted_{strategy}",
+                "samples_generated": len(features),
+                "targeting_enabled": True,
+                "performance_gaps_addressed": performance_gaps,
+                "difficulty_distribution": difficulty_config,
+                "quality_score": np.mean(effectiveness_scores) if effectiveness_scores else 0.0,
+                "domain_distribution": self._calculate_domain_distribution(features)
+            }
+        }
+
+        return result

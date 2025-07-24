@@ -1,4 +1,4 @@
-"""Clustering Optimization for High-Dimensional Linguistic Features.
+"""Clustering Optimization for High-Dimensional Linguistic features.
 
 Optimizes HDBSCAN clustering performance for 31-dimensional feature vectors
 following research-validated best practices for high-dimensional data processing.
@@ -14,6 +14,19 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import joblib
 import numpy as np
+from numpy.typing import NDArray
+
+# Import ML-specific types
+from ...types import (
+    features,
+    labels,
+    cluster_labels,
+    cluster_centers,
+    weights,
+    metrics_dict,
+    float_array,
+    int_array,
+)
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.manifold import TSNE
@@ -38,7 +51,6 @@ except ImportError:
     )
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class ClusteringConfig:
@@ -92,20 +104,18 @@ class ClusteringConfig:
     cache_dimensionality_reduction: bool = True
     cache_max_size: int = 100  # Maximum cached results
 
-
 @dataclass
 class ClusteringResult:
     """Structured result of clustering operation (merged from ContextClusteringEngine)."""
     
-    cluster_labels: np.ndarray
-    cluster_centers: Optional[np.ndarray]
+    cluster_labels: cluster_labels
+    cluster_centers: Optional[cluster_centers]
     n_clusters: int
     silhouette_score: float
     algorithm_used: str
     processing_time: float
     quality_metrics: Dict[str, float]
     metadata: Dict[str, Any]
-
 
 @dataclass
 class ClusteringMetrics:
@@ -123,11 +133,10 @@ class ClusteringMetrics:
     convergence_achieved: bool
     stability_score: float
 
-
 class ClusteringOptimizer:
     """High-performance clustering optimizer for linguistic features."""
 
-    def __init__(self, config: ClusteringConfig | None = None, training_loader=None):
+    def __init__(self, config: Optional[ClusteringConfig] = None, training_loader: Optional[Any] = None) -> None:
         """Initialize clustering optimizer.
 
         Args:
@@ -143,10 +152,10 @@ class ClusteringOptimizer:
         self.logger.info("Clustering optimizer integrated with training data pipeline")
 
         # Initialize components
-        self.scaler: StandardScaler | RobustScaler | None = None
-        self.dimensionality_reducer: PCA | umap.UMAP | None = None
-        self.feature_selector: SelectKBest | None = None
-        self.clusterer: hdbscan.HDBSCAN | None = None
+        self.scaler: Optional[Union[StandardScaler, RobustScaler]] = None
+        self.dimensionality_reducer: Optional[Union[PCA, Any]] = None  # umap.UMAP
+        self.feature_selector: Optional[SelectKBest] = None
+        self.clusterer: Optional[Any] = None  # hdbscan.HDBSCAN
 
         # Performance tracking
         self.performance_metrics: list[ClusteringMetrics] = []
@@ -198,14 +207,14 @@ class ClusteringOptimizer:
 
             # Validate input data
             if not features:
-                raise ValueError("Features are required for clustering optimization")
+                raise ValueError("features are required for clustering optimization")
 
             # Convert to numpy array if needed
             if isinstance(features, list):
                 features = np.array(features, dtype=float)
 
             if features.ndim != 2:
-                raise ValueError("Features must be a 2D array (samples x features)")
+                raise ValueError("features must be a 2D array (samples x features)")
 
             if features.shape[0] < 3:
                 raise ValueError("At least 3 samples required for clustering")
@@ -314,10 +323,10 @@ class ClusteringOptimizer:
 
     async def optimize_clustering(
         self,
-        features: np.ndarray,
-        labels: np.ndarray | None = None,
-        sample_weights: np.ndarray | None = None,
-    ) -> dict[str, Any]:
+        features: features,
+        labels: Optional[labels] = None,
+        sample_weights: Optional[weights] = None,
+    ) -> Dict[str, Any]:
         """Optimize clustering for high-dimensional features.
 
         Args:
@@ -335,7 +344,7 @@ class ClusteringOptimizer:
         if features.ndim != 2:
             return {
                 "status": "failed",
-                "error": f"Features must be 2D array, got {features.ndim}D with shape {features.shape}",
+                "error": f"features must be 2D array, got {features.ndim}D with shape {features.shape}",
                 "metrics": None,
                 "recommendations": [
                     "Ensure input data is 2D with shape (n_samples, n_features)",
@@ -1183,13 +1192,13 @@ class ClusteringOptimizer:
     ) -> dict[str, Any]:
         """Validate input parameters."""
         if features.ndim != 2:
-            return {"valid": False, "error": "Features must be 2D array"}
+            return {"valid": False, "error": "features must be 2D array"}
 
         if features.shape[0] < self.config.hdbscan_min_cluster_size * 2:
             return {"valid": False, "error": "Insufficient samples for clustering"}
 
         if labels is not None and len(labels) != features.shape[0]:
-            return {"valid": False, "error": "Labels length mismatch with features"}
+            return {"valid": False, "error": "labels length mismatch with features"}
 
         if sample_weights is not None and len(sample_weights) != features.shape[0]:
             return {
@@ -1198,7 +1207,7 @@ class ClusteringOptimizer:
             }
 
         if np.any(np.isnan(features)) or np.any(np.isinf(features)):
-            return {"valid": False, "error": "Features contain NaN or infinite values"}
+            return {"valid": False, "error": "features contain NaN or infinite values"}
 
         return {"valid": True}
 
@@ -1286,7 +1295,7 @@ class ClusteringOptimizer:
         try:
             import psutil
 
-            process = psutil.Process()
+            process = psutil.process()
             return process.memory_info().rss / 1024 / 1024  # Convert to MB
         except ImportError:
             return 0.0  # psutil not available
@@ -1444,7 +1453,7 @@ class ClusteringOptimizer:
 
         # Research Finding 6: Detailed Diagnostics for Analysis
         self.logger.info(
-            f"Clustering evaluation - Features: {n_features}D, Samples: {n_samples}"
+            f"Clustering evaluation - features: {n_features}D, Samples: {n_samples}"
         )
         self.logger.info(
             f"Adaptive noise threshold: {max_noise_threshold:.1%} (base: {base_noise_threshold:.1%})"
@@ -1453,7 +1462,6 @@ class ClusteringOptimizer:
         self.logger.info(f"Final decision: {status} - {message}")
 
         return status, message
-
 
     def get_algorithm_info(self) -> Dict[str, Any]:
         """Get information about available clustering algorithms (from ContextClusteringEngine)."""
@@ -1541,7 +1549,6 @@ class ClusteringOptimizer:
         except Exception as e:
             self.logger.error(f"Feature validation failed: {e}")
             return False
-
 
 # Factory function for easy integration
 def get_clustering_optimizer(

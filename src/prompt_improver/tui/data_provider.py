@@ -9,37 +9,36 @@ from typing import Any, Dict, List, Optional
 
 # Import services with fallback handling
 try:
-    from prompt_improver.performance.analytics.analytics import AnalyticsService
+    from prompt_improver.performance.analytics.analytics import analytics_service
 except ImportError:
-    AnalyticsService = None
+    analytics_service = None
 
 try:
-    from prompt_improver.performance.monitoring.health.service import HealthService
+    from prompt_improver.performance.monitoring.health.service import health_service
 except ImportError:
-    HealthService = None
+    health_service = None
 
 try:
-    from prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
+    from prompt_improver.performance.analytics.real_time_analytics import real_time_analytics_service
 except ImportError:
-    RealTimeAnalyticsService = None
+    real_time_analytics_service = None
 
 try:
-    from prompt_improver.ml.automl.orchestrator import AutoMLOrchestrator
+    from prompt_improver.ml.automl.orchestrator import auto_ml_orchestrator
 except ImportError:
-    AutoMLOrchestrator = None
+    auto_ml_orchestrator = None
 
 try:
     from prompt_improver.ml.evaluation.experiment_orchestrator import (
-        ExperimentOrchestrator,
+        experiment_orchestrator,
     )
 except ImportError:
-    ExperimentOrchestrator = None
+    experiment_orchestrator = None
 
 try:
-    from prompt_improver.core.services.manager import APESServiceManager
+    from prompt_improver.core.services.manager import apes_service_manager
 except ImportError:
-    APESServiceManager = None
-
+    apes_service_manager = None
 
 class APESDataProvider:
     """Data provider for APES dashboard widgets.
@@ -57,36 +56,36 @@ class APESDataProvider:
 
         # Try to initialize services that don't require parameters
         try:
-            if AnalyticsService:
-                self.analytics_service = AnalyticsService()
+            if analytics_service:
+                self.analytics_service = analytics_service()
         except Exception:
             pass
 
         try:
-            if HealthService:
-                self.health_service = HealthService()
+            if health_service:
+                self.health_service = health_service()
         except Exception:
             pass
 
         try:
-            if AutoMLOrchestrator:
-                self.automl_orchestrator = AutoMLOrchestrator()
+            if auto_ml_orchestrator:
+                self.automl_orchestrator = auto_ml_orchestrator()
         except Exception:
             pass
 
         try:
-            if ExperimentOrchestrator:
-                self.experiment_orchestrator = ExperimentOrchestrator()
+            if experiment_orchestrator:
+                self.experiment_orchestrator = experiment_orchestrator()
         except Exception:
             pass
 
         try:
-            if APESServiceManager:
-                self.service_manager = APESServiceManager()
+            if apes_service_manager:
+                self.service_manager = apes_service_manager()
         except Exception:
             pass
 
-        # Note: RealTimeAnalyticsService requires db_session, so we skip it for now
+        # Note: real_time_analytics_service requires db_session, so we skip it for now
 
         # Cache for performance
         self._cache: dict[str, dict[str, Any]] = {}

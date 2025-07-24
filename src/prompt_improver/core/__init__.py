@@ -3,11 +3,56 @@
 Core services, setup utilities, and system-wide functionality.
 """
 
-from .services import *
-from .setup import *
+# DI components - these are the new implementations that work independently
+from .interfaces.datetime_service import DateTimeServiceProtocol, MockDateTimeService
+from .services.datetime_service import DateTimeService
+from .di.container import DIContainer, get_datetime_service, get_container
+
+# Legacy services - import with proper error handling
+try:
+    from .services.prompt_improvement import PromptImprovementService
+    from .services.startup import (
+        StartupOrchestrator,
+        init_startup_tasks,
+        shutdown_startup_tasks,
+        startup_context,
+        is_startup_complete
+    )
+    from .services.manager import APESServiceManager
+    from .services.security import PromptDataProtection
+    from .setup.initializer import SystemInitializer
+    from .setup.migration import MigrationManager
+
+    # All legacy services imported successfully
+    LEGACY_SERVICES_AVAILABLE = True
+
+except ImportError as e:
+    # Set all legacy services to None if any import fails
+    PromptImprovementService = None
+    StartupOrchestrator = None
+    init_startup_tasks = None
+    shutdown_startup_tasks = None
+    startup_context = None
+    is_startup_complete = None
+    APESServiceManager = None
+    PromptDataProtection = None
+    SystemInitializer = None
+    MigrationManager = None
+
+    LEGACY_SERVICES_AVAILABLE = False
+
+    import warnings
+    warnings.warn(f"Legacy core services not available: {e}")
 
 __all__: list[str] = [
-    # Services
+    # DI Components (always available)
+    "DateTimeServiceProtocol",
+    "MockDateTimeService",
+    "DateTimeService",
+    "DIContainer",
+    "get_datetime_service",
+    "get_container",
+    # Legacy services (may be None if imports fail)
     "PromptImprovementService",
     "StartupOrchestrator",
     "init_startup_tasks",
@@ -16,7 +61,8 @@ __all__: list[str] = [
     "is_startup_complete",
     "APESServiceManager",
     "PromptDataProtection",
-    # Setup
     "SystemInitializer",
     "MigrationManager",
+    # Status flag
+    "LEGACY_SERVICES_AVAILABLE",
 ]

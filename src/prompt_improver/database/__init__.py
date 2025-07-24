@@ -29,7 +29,6 @@ from .models import (
 )
 from .utils import scalar
 
-
 def get_sessionmanager() -> DatabaseSessionManager:
     """Get the global database session manager.
 
@@ -41,9 +40,8 @@ def get_sessionmanager() -> DatabaseSessionManager:
     """
     return _get_global_sessionmanager()
 
-
 # Annotated type for use in FastAPI endpoints
-DBSession = Annotated[AsyncSession, Depends(get_session)]
+db_session = Annotated[AsyncSession, Depends(get_session)]
 
 __all__ = [
     # Models
@@ -69,7 +67,7 @@ __all__ = [
     "get_async_session_factory",
     "get_sessionmanager",
     # Annotated types for endpoints
-    "DBSession",
+    "db_session",
     # Configuration
     "DatabaseConfig",
     # Utilities

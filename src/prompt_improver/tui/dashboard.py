@@ -21,11 +21,10 @@ from .widgets.performance_metrics import PerformanceMetricsWidget
 from .widgets.service_control import ServiceControlWidget
 from .widgets.system_overview import SystemOverviewWidget
 
-
 class APESDashboard(App):
     """APES Interactive Dashboard - Rich TUI application for system monitoring.
 
-    Features:
+    features:
     - Real-time system monitoring
     - AutoML optimization tracking
     - A/B testing results
@@ -143,12 +142,10 @@ class APESDashboard(App):
         if self.update_timer:
             self.update_timer.stop()
 
-
 def run_dashboard(console: Console | None = None) -> None:
     """Run the APES dashboard application."""
     app = APESDashboard(console)
     app.run()
-
 
 if __name__ == "__main__":
     run_dashboard()

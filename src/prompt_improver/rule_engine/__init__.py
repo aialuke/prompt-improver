@@ -11,7 +11,6 @@ from .rules.role_based_prompting import RoleBasedPromptingRule
 from .rules.specificity import SpecificityRule
 from .rules.xml_structure_enhancement import XMLStructureRule
 
-
 @dataclass
 class AppliedRuleResult:
     """Represents the result of applying a single rule."""
@@ -19,7 +18,6 @@ class AppliedRuleResult:
     rule_id: str
     confidence: float
     improved_prompt: str
-
 
 @dataclass
 class RuleEngineResult:
@@ -29,7 +27,6 @@ class RuleEngineResult:
     applied_rules: list[AppliedRuleResult]
     total_confidence: float
     processing_time_ms: float | None = None
-
 
 class RuleEngine:
     """Orchestrates the application of prompt improvement rules.
@@ -107,7 +104,6 @@ class RuleEngine:
             applied_rules=applied_rules,
             total_confidence=total_confidence,
         )
-
 
 # Re-export main classes for convenience
 __all__ = [

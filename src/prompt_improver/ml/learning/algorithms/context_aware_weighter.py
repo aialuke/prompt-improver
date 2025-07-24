@@ -23,15 +23,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class WeightingStrategy(Enum):
     """Available feature weighting strategies."""
 
-    STATIC = "static"  # Fixed weights per domain
+    static = "static"  # Fixed weights per domain
     ADAPTIVE = "adaptive"  # Confidence-based adjustment
-    DYNAMIC = "dynamic"  # Feature importance-based
+    dynamic = "dynamic"  # Feature importance-based
     HYBRID = "hybrid"  # Combined approach
-
 
 @dataclass
 class WeightingConfig:
@@ -53,7 +51,6 @@ class WeightingConfig:
     # Performance settings
     enable_weight_caching: bool = True
     normalize_weights: bool = True
-
 
 class ContextAwareFeatureWeighter:
     """Adaptive feature weighting system that adjusts feature importance
@@ -257,13 +254,13 @@ class ContextAwareFeatureWeighter:
         base_weights = self._get_base_weights(domain_features)
 
         # Apply strategy-specific adjustments
-        if self.config.weighting_strategy == WeightingStrategy.STATIC:
+        if self.config.weighting_strategy == WeightingStrategy.static:
             weights = self._apply_static_weights(base_weights, feature_names)
         elif self.config.weighting_strategy == WeightingStrategy.ADAPTIVE:
             weights = self._apply_adaptive_weights(
                 base_weights, domain_features, feature_names
             )
-        elif self.config.weighting_strategy == WeightingStrategy.DYNAMIC:
+        elif self.config.weighting_strategy == WeightingStrategy.dynamic:
             weights = self._apply_dynamic_weights(
                 base_weights, domain_features, feature_names
             )

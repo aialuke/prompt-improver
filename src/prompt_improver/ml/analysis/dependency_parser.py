@@ -14,7 +14,6 @@ from nltk import pos_tag, sent_tokenize, word_tokenize
 from nltk.chunk import RegexpParser
 from nltk.tree import Tree
 
-
 @dataclass
 class DependencyRelation:
     """Container for a dependency relation."""
@@ -28,7 +27,6 @@ class DependencyRelation:
     relation: str
     confidence: float = 1.0
 
-
 @dataclass
 class SyntacticFeatures:
     """Container for syntactic analysis features."""
@@ -40,7 +38,6 @@ class SyntacticFeatures:
     subordination_count: int = 0
     passive_voice_count: int = 0
     complexity_score: float = 0.0
-
 
 class DependencyParser:
     """Dependency parser for syntactic analysis using NLTK.

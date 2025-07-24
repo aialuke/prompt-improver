@@ -21,7 +21,6 @@ except (ImportError, ModuleNotFoundError):
     def get_correlation_id():
         return None
 
-
 @dataclass
 class LogContext:
     """Structured context for enhanced logging"""
@@ -38,7 +37,6 @@ class LogContext:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values"""
         return {k: v for k, v in asdict(self).items() if v is not None}
-
 
 class StructuredLogger:
     """
@@ -137,7 +135,6 @@ class StructuredLogger:
         log_entry = self._build_log_entry("DEBUG", message, **kwargs)
         self.logger.debug(json.dumps(log_entry))
 
-
 def log_health_check(
     component_name: str,
     check_type: str = "health_check"
@@ -206,7 +203,6 @@ def log_health_check(
         return wrapper
     return decorator
 
-
 class HealthMetricsLogger:
     """
     Specialized logger for health metrics with aggregation support
@@ -271,10 +267,8 @@ class HealthMetricsLogger:
         self._metrics_buffer = []
         self._last_flush = time.time()
 
-
 # Global metrics loggers for each component
 health_metrics_loggers: Dict[str, HealthMetricsLogger] = {}
-
 
 def get_metrics_logger(component_name: str) -> HealthMetricsLogger:
     """Get or create a metrics logger for a component"""

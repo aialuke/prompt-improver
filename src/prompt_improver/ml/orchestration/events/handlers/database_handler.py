@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional
 
 from ..event_types import EventType, MLEvent
 
-
 class DatabaseEventHandler:
     """
     Handles database-related events in the ML pipeline orchestration.

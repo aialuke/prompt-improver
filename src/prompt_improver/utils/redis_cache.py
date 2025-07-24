@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 # Configure logging
 logger = logging.getLogger(__name__)
 
-
 class CircuitBreaker:
     """Lightweight circuit breaker for Redis operations."""
 
@@ -85,7 +84,6 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time = 0
         logger.info("Circuit breaker manually reset")
-
 
 class RedisConfig(BaseModel):
     """Redis configuration with validation and sane defaults."""
@@ -212,7 +210,6 @@ class RedisConfig(BaseModel):
 
 # Decorator to cache function results
 
-
 def cached(ttl=3600, key_func=None):
     """Decorator to cache function results in Redis with graceful fallback.
 
@@ -265,7 +262,6 @@ def cached(ttl=3600, key_func=None):
         return wrapper
     return decorator
 
-
 # Lazy import to prevent circular imports
 def _get_cache_metrics():
     """Lazy initialization of cache metrics."""
@@ -309,7 +305,6 @@ def get_cache_metrics():
         _cache_metrics = _get_cache_metrics()
     return _cache_metrics
 
-# Legacy metric accessors for backward compatibility
 def _get_legacy_metric(metric_name):
     """Get legacy metric with lazy loading."""
     metrics = get_cache_metrics()
@@ -360,7 +355,6 @@ _redis_delete_breaker = CircuitBreaker(failure_threshold=5, reset_timeout=60)
 _ongoing_operations: dict[str, asyncio.Future] = {}
 _operations_lock = None  # Will be initialized per event loop
 
-
 def _get_operations_lock():
     """Get or create the operations lock for current event loop."""
     global _operations_lock
@@ -373,7 +367,6 @@ def _get_operations_lock():
         # Different event loop, create new lock
         _operations_lock = asyncio.Lock()
         return _operations_lock
-
 
 class RedisCache:
     """Redis cache with automatic compression and Prometheus metrics."""
@@ -595,7 +588,6 @@ class RedisCache:
             return wrapper
         return decorator
 
-
 async def _execute_and_cache(fn, cache_key: str, expire: int | None, *args, **kwargs):
     """Execute function and cache the result."""
     try:
@@ -615,7 +607,6 @@ async def _execute_and_cache(fn, cache_key: str, expire: int | None, *args, **kw
     except Exception as e:
         logger.error(f"Function execution failed in singleflight: {e}")
         raise
-
 
 class CacheSubscriber:
     """Cache subscriber service to handle pattern.invalidate events."""
@@ -738,10 +729,8 @@ class CacheSubscriber:
             logger.error(f"Error invalidating keys with prefix '{prefix}': {e}")
             return 0
 
-
 # Global cache subscriber instance
 _cache_subscriber = None
-
 
 async def start_cache_subscriber():
     """Start the global cache subscriber service."""
@@ -750,13 +739,11 @@ async def start_cache_subscriber():
         _cache_subscriber = CacheSubscriber()
     await _cache_subscriber.start()
 
-
 async def stop_cache_subscriber():
     """Stop the global cache subscriber service."""
     global _cache_subscriber
     if _cache_subscriber:
         await _cache_subscriber.stop()
-
 
 # Convenience functions for module-level access
 get = RedisCache.get

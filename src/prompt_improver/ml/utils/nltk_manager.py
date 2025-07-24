@@ -11,7 +11,6 @@ from typing import Any, Dict, Optional, Set
 
 import nltk
 
-
 class NLTKResourceManager:
     """Manager for NLTK resources with automatic downloading and fallback handling.
 
@@ -240,10 +239,8 @@ class NLTKResourceManager:
                 return fallback_func()
             raise
 
-
 # Global instance for convenience
 _global_manager = None
-
 
 def get_nltk_manager(download_dir: str | None = None) -> NLTKResourceManager:
     """Get the global NLTK resource manager instance.
@@ -261,7 +258,6 @@ def get_nltk_manager(download_dir: str | None = None) -> NLTKResourceManager:
 
     return _global_manager
 
-
 def ensure_nltk_resources(resources: set[str] | None = None) -> dict[str, bool]:
     """Convenience function to ensure NLTK resources are available.
 
@@ -273,7 +269,6 @@ def ensure_nltk_resources(resources: set[str] | None = None) -> dict[str, bool]:
     """
     manager = get_nltk_manager()
     return manager.ensure_resources(resources)
-
 
 def setup_nltk_for_production() -> bool:
     """Convenience function to setup NLTK for production use.

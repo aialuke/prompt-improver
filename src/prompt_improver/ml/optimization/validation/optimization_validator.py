@@ -41,16 +41,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class ValidationMethod(Enum):
     """Validation methods available in 2025"""
 
-    CLASSICAL = "classical"  # Traditional t-tests
-    ROBUST = "robust"  # Bootstrap and permutation tests
+    classical = "classical"  # Traditional t-tests
+    robust = "robust"  # Bootstrap and permutation tests
     BAYESIAN = "bayesian"  # Bayesian model comparison
     CAUSAL = "causal"  # Causal inference validation
-    COMPREHENSIVE = "comprehensive"  # All methods combined
-
+    comprehensive = "comprehensive"  # All methods combined
 
 class EffectSizeMagnitude(Enum):
     """Effect size magnitude classification (2025 standards)"""
@@ -60,7 +58,6 @@ class EffectSizeMagnitude(Enum):
     MEDIUM = "medium"  # 0.3 - 0.5
     LARGE = "large"  # 0.5 - 0.8
     VERY_LARGE = "very_large"  # > 0.8
-
 
 @dataclass
 class EnhancedValidationConfig:
@@ -73,7 +70,7 @@ class EnhancedValidationConfig:
     validation_duration_hours: int = 24
 
     # 2025 enhancements
-    validation_method: ValidationMethod = ValidationMethod.COMPREHENSIVE
+    validation_method: ValidationMethod = ValidationMethod.comprehensive
     enable_bayesian_validation: bool = True
     enable_causal_inference: bool = True
     enable_robust_methods: bool = True
@@ -102,7 +99,6 @@ class EnhancedValidationConfig:
     # Robustness settings
     outlier_detection_threshold: float = 3.0
     min_consistency_score: float = 0.7
-
 
 @dataclass
 class ValidationResult:
@@ -143,11 +139,10 @@ class ValidationResult:
     recommendations: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
-
 class EnhancedOptimizationValidator:
     """Enhanced optimization validator implementing 2025 best practices
 
-    Features:
+    features:
     - Bayesian model comparison and evidence calculation
     - Robust statistical methods (bootstrap, permutation tests)
     - Causal inference validation
@@ -209,7 +204,7 @@ class EnhancedOptimizationValidator:
             try:
                 validation_method = ValidationMethod(validation_method_str)
             except ValueError:
-                validation_method = ValidationMethod.COMPREHENSIVE
+                validation_method = ValidationMethod.comprehensive
                 self.logger.warning(f"Unknown validation method '{validation_method_str}', using comprehensive")
 
             # Update configuration with orchestrator settings
@@ -628,7 +623,6 @@ class EnhancedOptimizationValidator:
         p_values = np.array(p_values)
         return float(np.std(p_values) / np.mean(p_values)) if np.mean(p_values) > 0 else 1.0
 
-
 # Supporting validator classes for 2025 features
 class RobustStatisticalValidator:
     """Robust statistical validation using bootstrap and permutation tests"""
@@ -718,7 +712,6 @@ class RobustStatisticalValidator:
             self.logger.error(f"Permutation test failed: {e}")
             return {"error": str(e)}
 
-
 class BayesianValidator:
     """Bayesian validation using PyMC"""
 
@@ -748,7 +741,6 @@ class BayesianValidator:
         except Exception as e:
             self.logger.error(f"Bayesian analysis failed: {e}")
             return {"error": str(e)}
-
 
 class CausalInferenceValidator:
     """Causal inference validation"""
@@ -787,7 +779,8 @@ class CausalInferenceValidator:
             self.logger.error(f"Causal validation failed: {e}")
             return {"error": str(e)}
 
-
 # Maintain backward compatibility
 OptimizationValidator = EnhancedOptimizationValidator
 ValidationConfig = EnhancedValidationConfig
+optimization_validator = EnhancedOptimizationValidator
+validation_config = EnhancedValidationConfig

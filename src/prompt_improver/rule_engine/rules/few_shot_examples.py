@@ -51,11 +51,10 @@ QUALITY_INDICATORS = [
     "progressive_difficulty",
 ]
 
-
 class FewShotExampleRule(BasePromptRule):
     """Enhanced few-shot example rule using research-validated optimization patterns.
 
-    Features:
+    features:
     - 2-5 optimal examples based on Brown et al. research
     - Diverse examples with balanced positive/negative cases
     - XML delimiters for clear structure

@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 
 from ..events.event_types import EventType, MLEvent
 
-
 @dataclass
 class DataPipelineConfig:
     """Configuration for data pipeline workflows."""
@@ -20,7 +19,6 @@ class DataPipelineConfig:
     max_batch_size: int = 10000
     data_validation_enabled: bool = True
     preprocessing_workers: int = 4
-
 
 class DataPipelineCoordinator:
     """

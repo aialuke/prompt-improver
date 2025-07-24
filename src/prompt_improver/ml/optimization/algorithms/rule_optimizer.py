@@ -41,7 +41,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class OptimizationConfig:
     """Configuration for rule optimization"""
@@ -65,7 +64,6 @@ class OptimizationConfig:
     gp_kernel_length_scale: float = 1.0
     gp_noise_level: float = 1e-5
 
-
 @dataclass
 class ParetoSolution:
     """A solution on the Pareto frontier"""
@@ -75,7 +73,6 @@ class ParetoSolution:
     dominance_rank: int
     crowding_distance: float
     feasible: bool = True
-
 
 @dataclass
 class MultiObjectiveResult:
@@ -89,7 +86,6 @@ class MultiObjectiveResult:
     best_compromise_solution: ParetoSolution | None
     trade_off_analysis: dict[str, Any]
 
-
 @dataclass
 class GaussianProcessResult:
     """Results from Gaussian process optimization"""
@@ -101,7 +97,6 @@ class GaussianProcessResult:
     acquisition_history: list[dict[str, Any]]
     model_confidence: float
     expected_improvement: float
-
 
 class RuleOptimizer:
     """Optimizer for individual rules and rule combinations"""

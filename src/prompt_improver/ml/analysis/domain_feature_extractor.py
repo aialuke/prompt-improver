@@ -14,23 +14,22 @@ from typing import Any
 
 try:
     import spacy
-    from spacy.language import Language
-    from spacy.matcher import Matcher, PhraseMatcher
-    from spacy.tokens import Doc, Span, Token
+    from spacy.language import language
+    from spacy.matcher import matcher, phrase_matcher
+    from spacy.tokens import doc, span, token
 
     SPACY_AVAILABLE = True
 except ImportError:
     spacy = None
-    Language = None
-    Matcher = None
-    PhraseMatcher = None
-    Doc = None
-    Span = None
-    Token = None
+    language = None
+    matcher = None
+    phrase_matcher = None
+    doc = None
+    span = None
+    token = None
     SPACY_AVAILABLE = False
 
 from .domain_detector import DomainClassificationResult, DomainDetector, PromptDomain
-
 
 @dataclass
 class DomainFeatures:
@@ -57,7 +56,6 @@ class DomainFeatures:
     feature_vector: list[float] = field(default_factory=list)
     feature_names: list[str] = field(default_factory=list)
 
-
 class BaseDomainExtractor(ABC):
     """Abstract base class for domain-specific feature extractors."""
 
@@ -74,7 +72,6 @@ class BaseDomainExtractor(ABC):
     @abstractmethod
     def get_feature_names(self) -> list[str]:
         """Get names of features extracted by this extractor."""
-
 
 class TechnicalDomainExtractor(BaseDomainExtractor):
     """Feature extractor for technical domains (software, data science, AI/ML, etc.)."""
@@ -275,7 +272,6 @@ class TechnicalDomainExtractor(BaseDomainExtractor):
 
         return base_features
 
-
 class CreativeDomainExtractor(BaseDomainExtractor):
     """Feature extractor for creative domains (writing, content creation, marketing)."""
 
@@ -474,7 +470,6 @@ class CreativeDomainExtractor(BaseDomainExtractor):
 
         return base_features
 
-
 class AcademicDomainExtractor(BaseDomainExtractor):
     """Feature extractor for academic domains (research, education, scientific writing)."""
 
@@ -668,7 +663,6 @@ class AcademicDomainExtractor(BaseDomainExtractor):
         ])
 
         return base_features
-
 
 class DomainFeatureExtractor:
     """Main coordinator for domain-specific feature extraction."""

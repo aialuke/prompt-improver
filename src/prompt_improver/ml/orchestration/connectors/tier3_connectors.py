@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 
 from .component_connector import ComponentConnector, ComponentMetadata, ComponentCapability, ComponentTier
 
-
 class ExperimentOrchestratorConnector(ComponentConnector):
     """Connector for ExperimentOrchestrator specialized component (Integration over Extension)."""
     
@@ -99,7 +98,6 @@ class ExperimentOrchestratorConnector(ComponentConnector):
             "total_participants": 1500
         }
 
-
 class AdvancedStatisticalValidatorConnector(ComponentConnector):
     """Connector for AdvancedStatisticalValidator component."""
     
@@ -161,7 +159,6 @@ class AdvancedStatisticalValidatorConnector(ComponentConnector):
             "model_evidence": 0.82
         }
 
-
 class DomainFeatureExtractorConnector(ComponentConnector):
     """Connector for DomainFeatureExtractor component."""
     
@@ -221,7 +218,6 @@ class DomainFeatureExtractorConnector(ComponentConnector):
             "selection_criteria": "mutual_information",
             "feature_importance": [0.9, 0.8, 0.7, 0.6, 0.5]
         }
-
 
 class Tier3ConnectorFactory:
     """Factory for creating Tier 3 component connectors."""

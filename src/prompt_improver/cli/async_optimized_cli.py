@@ -233,10 +233,8 @@ class AsyncCLIOptimizer:
             "performance_target_met": all(t < 1.0 for t in start_times + stop_times)
         }
 
-
 # Global instance for CLI commands
 _cli_optimizer = AsyncCLIOptimizer()
-
 
 def start_async_optimized(
     mcp_port: int = typer.Option(3000, "--mcp-port", "-p", help="MCP server port"),
@@ -257,7 +255,6 @@ def start_async_optimized(
         console.print(f"❌ Async start operation failed: {e}", style="red")
         return 1
 
-
 def stop_async_optimized(
     graceful: bool = typer.Option(True, "--graceful/--force", help="Graceful shutdown"),
     timeout: int = typer.Option(5, "--timeout", "-t", help="Shutdown timeout in seconds"),
@@ -272,7 +269,6 @@ def stop_async_optimized(
     except Exception as e:
         console.print(f"❌ Async stop operation failed: {e}", style="red")
         return 1
-
 
 def get_async_cli_metrics():
     """Get performance metrics for async CLI operations."""

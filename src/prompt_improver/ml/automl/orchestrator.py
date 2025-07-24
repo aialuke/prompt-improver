@@ -35,7 +35,6 @@ from .callbacks import AutoMLCallback
 
 logger = logging.getLogger(__name__)
 
-
 class AutoMLMode(Enum):
     """AutoML operation modes"""
 
@@ -43,7 +42,6 @@ class AutoMLMode(Enum):
     AUTOMATED_EXPERIMENT_DESIGN = "aed"
     CONTINUOUS_OPTIMIZATION = "continuous"
     MULTI_OBJECTIVE_PARETO = "pareto"
-
 
 @dataclass
 class AutoMLConfig:
@@ -71,7 +69,6 @@ class AutoMLConfig:
     auto_retraining_threshold: float = 0.05  # 5% performance degradation
     pareto_front_size: int = 10
 
-
 class AutoMLOrchestrator:
     """Central AutoML orchestrator implementing 2025 best practices
 
@@ -82,7 +79,7 @@ class AutoMLOrchestrator:
     - Model management
     - Continuous learning
 
-    Features:
+    features:
     - Callback-based integration following Optuna 2025 patterns
     - Real-time feedback loops
     - Multi-objective optimization with NSGA-II
@@ -591,7 +588,6 @@ class AutoMLOrchestrator:
             logger.info("Optimization stopped by user request")
             return {"status": "stopped", "message": "Optimization stopped successfully"}
         return {"status": "idle", "message": "No optimization running"}
-
 
 # Factory function for easy instantiation
 async def create_automl_orchestrator(

@@ -9,11 +9,9 @@ from .config_validator import SecurityConfigValidator, validate_security_configu
 
 logger = logging.getLogger(__name__)
 
-
 class SecureStartupError(Exception):
     """Raised when security validation fails during startup."""
     pass
-
 
 def enforce_secure_configuration(strict_mode: bool = True) -> None:
     """Enforce secure configuration requirements before allowing application startup.
@@ -48,7 +46,6 @@ def enforce_secure_configuration(strict_mode: bool = True) -> None:
     else:
         logger.info("✅ Security configuration validation passed")
 
-
 def check_environment_security() -> bool:
     """Check if environment is securely configured.
 
@@ -60,7 +57,6 @@ def check_environment_security() -> bool:
         return True
     except SecureStartupError:
         return False
-
 
 def get_secure_database_url() -> str:
     """Get database URL using secure environment configuration.
@@ -94,7 +90,6 @@ def get_secure_database_url() -> str:
     database = os.getenv("POSTGRES_DATABASE")
 
     return f"postgresql+psycopg://{username}:{password}@{host}:{port}/{database}"
-
 
 def setup_secure_logging() -> None:
     """Configure logging to prevent credential leakage."""
@@ -130,7 +125,6 @@ def setup_secure_logging() -> None:
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
 
-
 def initialize_secure_environment() -> None:
     """Initialize secure environment configuration."""
 
@@ -151,7 +145,6 @@ def initialize_secure_environment() -> None:
         logger.error("❌ Secure environment initialization failed")
         if strict_mode:
             sys.exit(1)
-
 
 # Auto-initialize when module is imported in production
 if os.getenv("ENVIRONMENT", "").lower() == "production":

@@ -22,15 +22,14 @@ class MockTimer:
     def __exit__(self, *args): pass
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, Summary, CollectorRegistry, REGISTRY
+    from prometheus_client import counter, gauge, histogram, summary, collector_registry, registry
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
-    Counter = Gauge = Histogram = Summary = MockMetric
-    CollectorRegistry = REGISTRY = None
+    counter = gauge = histogram = summary = MockMetric
+    collector_registry = registry = None
 
 logger = logging.getLogger(__name__)
-
 
 class MetricsRegistry:
     """
@@ -39,8 +38,8 @@ class MetricsRegistry:
     Prevents duplicate registrations and provides consistent metric management.
     """
 
-    def __init__(self, registry: Optional[CollectorRegistry] = None):
-        self.registry = registry or REGISTRY
+    def __init__(self, registry: Optional[collector_registry] = None):
+        self.registry = registry or registry
         self._metrics: Dict[str, Any] = {}
         self._lock = Lock()
 
@@ -49,11 +48,11 @@ class MetricsRegistry:
         name: str,
         description: str,
         labels: Optional[List[str]] = None,
-        registry: Optional[CollectorRegistry] = None
+        registry: Optional[collector_registry] = None
     ):
-        """Get existing or create new Counter metric."""
+        """Get existing or create new counter metric."""
         return self._get_or_create_metric(
-            Counter, name, description, labels, registry
+            counter, name, description, labels, registry
         )
 
     def get_or_create_gauge(
@@ -61,11 +60,11 @@ class MetricsRegistry:
         name: str,
         description: str,
         labels: Optional[List[str]] = None,
-        registry: Optional[CollectorRegistry] = None
+        registry: Optional[collector_registry] = None
     ):
-        """Get existing or create new Gauge metric."""
+        """Get existing or create new gauge metric."""
         return self._get_or_create_metric(
-            Gauge, name, description, labels, registry
+            gauge, name, description, labels, registry
         )
 
     def get_or_create_histogram(
@@ -74,15 +73,15 @@ class MetricsRegistry:
         description: str,
         labels: Optional[List[str]] = None,
         buckets: Optional[List[float]] = None,
-        registry: Optional[CollectorRegistry] = None
+        registry: Optional[collector_registry] = None
     ):
-        """Get existing or create new Histogram metric."""
+        """Get existing or create new histogram metric."""
         kwargs = {}
         if buckets:
             kwargs['buckets'] = buckets
 
         return self._get_or_create_metric(
-            Histogram, name, description, labels, registry, **kwargs
+            histogram, name, description, labels, registry, **kwargs
         )
 
     def get_or_create_summary(
@@ -90,11 +89,11 @@ class MetricsRegistry:
         name: str,
         description: str,
         labels: Optional[List[str]] = None,
-        registry: Optional[CollectorRegistry] = None
+        registry: Optional[collector_registry] = None
     ):
-        """Get existing or create new Summary metric."""
+        """Get existing or create new summary metric."""
         return self._get_or_create_metric(
-            Summary, name, description, labels, registry
+            summary, name, description, labels, registry
         )
 
     def _get_or_create_metric(
@@ -103,7 +102,7 @@ class MetricsRegistry:
         name: str,
         description: str,
         labels: Optional[List[str]] = None,
-        registry: Optional[CollectorRegistry] = None,
+        registry: Optional[collector_registry] = None,
         **kwargs
     ):
         """Internal method to get or create metrics safely."""
@@ -189,10 +188,8 @@ class MetricsRegistry:
             "prometheus_available": PROMETHEUS_AVAILABLE
         }
 
-
 # Global metrics registry instance
 _global_metrics_registry: Optional[MetricsRegistry] = None
-
 
 def get_metrics_registry() -> MetricsRegistry:
     """Get the global metrics registry instance."""
@@ -201,33 +198,27 @@ def get_metrics_registry() -> MetricsRegistry:
         _global_metrics_registry = MetricsRegistry()
     return _global_metrics_registry
 
-
 def set_metrics_registry(registry: MetricsRegistry):
     """Set the global metrics registry instance."""
     global _global_metrics_registry
     _global_metrics_registry = registry
 
-
 # Convenience functions for common metric types
 def get_counter(name: str, description: str, labels: Optional[List[str]] = None):
-    """Get or create a Counter metric."""
+    """Get or create a counter metric."""
     return get_metrics_registry().get_or_create_counter(name, description, labels)
 
-
 def get_gauge(name: str, description: str, labels: Optional[List[str]] = None):
-    """Get or create a Gauge metric."""
+    """Get or create a gauge metric."""
     return get_metrics_registry().get_or_create_gauge(name, description, labels)
 
-
 def get_histogram(name: str, description: str, labels: Optional[List[str]] = None, buckets: Optional[List[float]] = None):
-    """Get or create a Histogram metric."""
+    """Get or create a histogram metric."""
     return get_metrics_registry().get_or_create_histogram(name, description, labels, buckets)
 
-
 def get_summary(name: str, description: str, labels: Optional[List[str]] = None):
-    """Get or create a Summary metric."""
+    """Get or create a summary metric."""
     return get_metrics_registry().get_or_create_summary(name, description, labels)
-
 
 # Standard metric definitions used across the application
 class StandardMetrics:
@@ -271,7 +262,6 @@ class StandardMetrics:
     HTTP_REQUESTS_TOTAL = "http_requests_total"
     HTTP_REQUEST_DURATION = "http_request_duration_seconds"
     HTTP_ERRORS_TOTAL = "http_errors_total"
-
 
 def initialize_standard_metrics():
     """Initialize all standard metrics to prevent registration conflicts."""
@@ -343,7 +333,6 @@ def initialize_standard_metrics():
     )
 
     logger.info("Standard metrics initialized successfully")
-
 
 # Initialize standard metrics on module import
 if PROMETHEUS_AVAILABLE:

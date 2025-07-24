@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 
 from ..events.event_types import EventType, MLEvent
 
-
 @dataclass
 class EvaluationConfig:
     """Configuration for evaluation pipelines."""
@@ -25,7 +24,6 @@ class EvaluationConfig:
     def __post_init__(self):
         if self.evaluation_metrics is None:
             self.evaluation_metrics = ["accuracy", "precision", "recall", "f1_score"]
-
 
 class EvaluationPipelineManager:
     """

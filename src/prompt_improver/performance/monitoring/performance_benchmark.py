@@ -22,7 +22,6 @@ from ..optimization.performance_optimizer import (
 
 logger = logging.getLogger(__name__)
 
-
 class MCPPerformanceBenchmark:
     """Comprehensive benchmark suite for MCP operations."""
 
@@ -308,7 +307,6 @@ class MCPPerformanceBenchmark:
         ])
 
         return "\n".join(report_lines)
-
 
 # Convenience function for running benchmarks
 async def run_mcp_performance_benchmark(samples_per_operation: int = 50) -> Dict[str, PerformanceBaseline]:

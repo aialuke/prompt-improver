@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 from ..core.component_registry import ComponentTier, ComponentInfo, ComponentCapability
 
-
 @dataclass
 class ComponentDefinitions:
     """Central registry of all ML component definitions."""

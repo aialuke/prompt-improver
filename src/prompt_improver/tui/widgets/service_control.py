@@ -21,12 +21,11 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Button, DataTable, Static
 
-
 class ServiceControlWidget(Static):
     """
     Widget for controlling system services with 2025 best practices.
 
-    Features:
+    features:
     - Real-time service monitoring with async updates
     - Event-driven orchestrator integration
     - Comprehensive error handling and recovery

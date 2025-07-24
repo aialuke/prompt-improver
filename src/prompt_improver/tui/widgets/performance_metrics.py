@@ -34,12 +34,11 @@ try:
 except ImportError:
     SLO_INTEGRATION_AVAILABLE = False
 
-
 class PerformanceMetricsWidget(Static):
     """
     Enhanced Performance Metrics Widget with 2025 best practices.
 
-    Features:
+    features:
     - SLI/SLO monitoring and error budget tracking
     - Burn rate analysis and adaptive thresholds
     - Multi-dimensional metrics visualization

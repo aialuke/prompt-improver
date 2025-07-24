@@ -14,11 +14,10 @@ from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 
-
 class SessionStore:
     """In-memory session store with TTL and automatic cleanup.
 
-    Features:
+    features:
     - Thread-safe async operations with locks
     - TTL-based expiration for all sessions
     - Automatic cleanup task with configurable interval

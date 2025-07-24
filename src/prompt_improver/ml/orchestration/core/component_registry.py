@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 
 from ..config.orchestrator_config import OrchestratorConfig
 
-
 class ComponentTier(Enum):
     """Component tier classifications."""
     TIER_1_CORE = "tier1_core"  # Core ML Pipeline (11 components)
@@ -24,16 +23,14 @@ class ComponentTier(Enum):
     TIER_6_SECURITY = "tier6_security"  # Security & Advanced (7+ components)
     TIER_7_FEATURE_ENGINEERING = "tier7_feature_engineering"  # Feature Engineering Components (3 components)
 
-
 class ComponentStatus(Enum):
     """Component status states."""
     UNKNOWN = "unknown"
     HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    STARTING = "starting"
-    STOPPING = "stopping"
+    unhealthy = "unhealthy"
+    starting = "starting"
+    stopping = "stopping"
     ERROR = "error"
-
 
 @dataclass
 class ComponentCapability:
@@ -43,7 +40,6 @@ class ComponentCapability:
     input_types: List[str]
     output_types: List[str]
     parameters: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class ComponentInfo:
@@ -64,7 +60,6 @@ class ComponentInfo:
     last_health_check: Optional[datetime] = None
     error_message: Optional[str] = None
     registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
 
 class ComponentRegistry:
     """

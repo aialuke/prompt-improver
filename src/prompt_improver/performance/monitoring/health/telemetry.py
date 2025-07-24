@@ -30,7 +30,6 @@ except ImportError:
 HEALTH_CHECK_SPAN_NAME = "health_check"
 HEALTH_CHECK_KIND = "internal"
 
-
 class TelemetryProvider:
     """
     Manages OpenTelemetry instrumentation for health checks
@@ -132,10 +131,8 @@ class TelemetryProvider:
             callbacks=[]  # Will be set by SLA monitor
         )
 
-
 # Global telemetry provider
 _telemetry_provider: Optional[TelemetryProvider] = None
-
 
 def init_telemetry(
     service_name: str,
@@ -150,11 +147,9 @@ def init_telemetry(
     )
     return _telemetry_provider
 
-
 def get_telemetry() -> Optional[TelemetryProvider]:
     """Get global telemetry provider"""
     return _telemetry_provider
-
 
 @contextmanager
 def health_check_span(
@@ -204,7 +199,6 @@ def health_check_span(
         else:
             # Success
             span.set_status(Status(StatusCode.OK))
-
 
 def instrument_health_check(
     component_name: str,
@@ -300,7 +294,6 @@ def instrument_health_check(
         return wrapper
     return decorator
 
-
 class TelemetryContext:
     """
     Helper class for managing telemetry context in health checks
@@ -352,7 +345,6 @@ class TelemetryContext:
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.record_exception(exception)
-
 
 # Utility function for manual span creation
 def create_health_check_span(

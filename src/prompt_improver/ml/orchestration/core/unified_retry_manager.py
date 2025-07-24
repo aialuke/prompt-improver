@@ -36,7 +36,6 @@ except ImportError:
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
-
 class RetryStrategy(Enum):
     """Retry strategy types following 2025 best practices."""
     
@@ -46,14 +45,12 @@ class RetryStrategy(Enum):
     FIBONACCI_BACKOFF = "fibonacci_backoff"
     CUSTOM = "custom"
 
-
 class CircuitBreakerState(Enum):
     """Circuit breaker states."""
     
     CLOSED = "closed"      # Normal operation
     OPEN = "open"          # Blocking requests
     HALF_OPEN = "half_open"  # Testing recovery
-
 
 class RetryableErrorType(Enum):
     """Types of retryable errors."""
@@ -64,7 +61,6 @@ class RetryableErrorType(Enum):
     RATE_LIMIT = "rate_limit"
     RESOURCE_EXHAUSTION = "resource_exhaustion"
     DEPENDENCY_FAILURE = "dependency_failure"
-
 
 @dataclass
 class RetryConfig:
@@ -105,7 +101,6 @@ class RetryConfig:
     custom_delay_func: Optional[Callable[[int], float]] = None
     error_classifier: Optional[Callable[[Exception], RetryableErrorType]] = None
 
-
 @dataclass
 class RetryContext:
     """Context for retry operations with comprehensive tracking."""
@@ -125,11 +120,9 @@ class RetryContext:
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-
 class CircuitBreakerOpenError(Exception):
     """Exception raised when circuit breaker is open."""
     pass
-
 
 class CircuitBreaker:
     """Circuit breaker implementation with 2025 patterns."""
@@ -253,12 +246,11 @@ class CircuitBreaker:
             # Don't fail circuit breaker operation if observability fails
             logger.debug(f"Failed to record circuit breaker event in observability manager: {e}")
 
-
 class UnifiedRetryManager:
     """
     Unified Retry Manager implementing 2025 best practices.
     
-    Features:
+    features:
     - Multiple retry strategies
     - Circuit breaker integration
     - Comprehensive observability
@@ -691,14 +683,12 @@ class UnifiedRetryManager:
         """Remove alert rule."""
         self.observability_manager.remove_alert_rule(rule_name)
 
-
 class NoOpCircuitBreaker:
     """No-op circuit breaker for when circuit breaking is disabled."""
 
     async def call(self, operation: Callable[[], Coroutine[Any, Any, T]], context: RetryContext) -> T:
         """Execute operation without circuit breaker protection."""
         return await operation()
-
 
 class RetryExecutor:
     """Executor for retry operations within context manager."""
@@ -721,10 +711,8 @@ class RetryExecutor:
             operation, self.config, self.context, self.circuit_breaker
         )
 
-
 # Global instance for easy access
 _global_retry_manager: Optional[UnifiedRetryManager] = None
-
 
 def get_retry_manager() -> UnifiedRetryManager:
     """Get global retry manager instance."""
@@ -733,12 +721,10 @@ def get_retry_manager() -> UnifiedRetryManager:
         _global_retry_manager = UnifiedRetryManager()
     return _global_retry_manager
 
-
 def set_retry_manager(manager: UnifiedRetryManager):
     """Set global retry manager instance."""
     global _global_retry_manager
     _global_retry_manager = manager
-
 
 # Convenience decorators for 2025 patterns
 def retry(

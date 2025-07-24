@@ -33,7 +33,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class InsightConfig:
     """Configuration for insight generation"""
@@ -51,7 +50,6 @@ class InsightConfig:
     max_causal_variables: int = 15
     intervention_confidence_threshold: float = 0.8
 
-
 @dataclass
 class Insight:
     """Generated insight with supporting evidence"""
@@ -66,7 +64,6 @@ class Insight:
     recommendations: list[str]
     metadata: dict[str, Any] = field(default_factory=dict)
 
-
 @dataclass
 class CausalRelationship:
     """Discovered causal relationship"""
@@ -77,7 +74,6 @@ class CausalRelationship:
     confidence: float
     intervention_effect: float | None = None
     statistical_tests: dict[str, float] = field(default_factory=dict)
-
 
 class InsightGenerationEngine:
     """Engine for generating actionable insights from performance data"""

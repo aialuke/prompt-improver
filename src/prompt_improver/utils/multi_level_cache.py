@@ -77,7 +77,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 def trace_cache_operation(operation_name: str = None):
     """Decorator to add OpenTelemetry tracing to cache operations."""
     def decorator(func):
@@ -144,7 +143,6 @@ def trace_cache_operation(operation_name: str = None):
         return wrapper
     return decorator
 
-
 @dataclass
 class CacheEntry:
     """Cache entry with metadata."""
@@ -164,7 +162,6 @@ class CacheEntry:
         """Update access metadata."""
         self.last_accessed = datetime.utcnow()
         self.access_count += 1
-
 
 class LRUCache:
     """High-performance in-memory LRU cache for L1 caching."""
@@ -242,7 +239,6 @@ class LRUCache:
             "hit_rate": hit_rate,
             "utilization": len(self._cache) / self._max_size
         }
-
 
 class MultiLevelCache:
     """Multi-level cache system with L1 (memory) and L2 (Redis) tiers."""
@@ -437,7 +433,6 @@ class MultiLevelCache:
             }
         }
 
-
 class SpecializedCaches:
     """Specialized cache instances for different data types."""
 
@@ -489,10 +484,8 @@ class SpecializedCaches:
             "prompt_cache": self.prompt_cache.get_performance_stats()
         }
 
-
 # Global cache instances
 _global_caches: Optional[SpecializedCaches] = None
-
 
 def get_specialized_caches() -> SpecializedCaches:
     """Get the global specialized cache instances."""
@@ -501,12 +494,10 @@ def get_specialized_caches() -> SpecializedCaches:
         _global_caches = SpecializedCaches()
     return _global_caches
 
-
 def get_cache(cache_type: str = "prompt") -> MultiLevelCache:
     """Get a specialized cache by type."""
     caches = get_specialized_caches()
     return caches.get_cache_for_type(cache_type)
-
 
 # Convenience functions
 async def cached_get(
@@ -518,7 +509,6 @@ async def cached_get(
     """Get value with caching using specialized cache."""
     cache = get_cache(cache_type)
     return await cache.get(key, fallback_func, l2_ttl=ttl, l1_ttl=ttl//2)
-
 
 async def cached_set(
     key: str,

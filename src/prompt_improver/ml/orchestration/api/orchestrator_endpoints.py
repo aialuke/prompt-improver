@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 
 from ..events.event_types import EventType, MLEvent
 
-
 # Request/Response Models
 class WorkflowRequest(BaseModel):
     """Request model for workflow creation."""
@@ -22,7 +21,6 @@ class WorkflowRequest(BaseModel):
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Workflow parameters")
     priority: str = Field(default="normal", description="Workflow priority (low, normal, high)")
     timeout: Optional[int] = Field(default=None, description="Workflow timeout in seconds")
-
 
 class WorkflowResponse(BaseModel):
     """Response model for workflow operations."""
@@ -32,14 +30,12 @@ class WorkflowResponse(BaseModel):
     parameters: Dict[str, Any]
     current_step: Optional[str] = None
 
-
 class ComponentRegistrationRequest(BaseModel):
     """Request model for component registration."""
     component_name: str = Field(..., description="Name of the component")
     component_tier: str = Field(..., description="Component tier (tier_1_core, tier_2_optimization, etc.)")
     capabilities: List[str] = Field(..., description="List of component capabilities")
     resource_requirements: Dict[str, Any] = Field(default_factory=dict, description="Resource requirements")
-
 
 class HealthStatusResponse(BaseModel):
     """Response model for health status."""
@@ -49,7 +45,6 @@ class HealthStatusResponse(BaseModel):
     active_components: int
     last_check: str
     details: Dict[str, Any]
-
 
 class OrchestratorEndpoints:
     """

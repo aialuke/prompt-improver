@@ -17,11 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Training data integration
 from ..core.training_data_loader import TrainingDataLoader
 
-
-
-
 logger = logging.getLogger(__name__)
-
 
 class CausalMethod(Enum):
     """Causal inference methods"""
@@ -33,15 +29,13 @@ class CausalMethod(Enum):
     DOUBLY_ROBUST = "doubly_robust"
     SYNTHETIC_CONTROL = "synthetic_control"
 
-
 class TreatmentAssignment(Enum):
     """Treatment assignment mechanisms"""
 
-    RANDOMIZED = "randomized"
+    randomized = "randomized"
     QUASI_EXPERIMENTAL = "quasi_experimental"
-    OBSERVATIONAL = "observational"
+    observational = "observational"
     NATURAL_EXPERIMENT = "natural_experiment"
-
 
 @dataclass
 class CausalAssumption:
@@ -54,7 +48,6 @@ class CausalAssumption:
     violated: bool = False
     severity: str = "unknown"  # low, medium, high
     recommendations: list[str] = field(default_factory=list)
-
 
 @dataclass
 class CausalEffect:
@@ -73,7 +66,6 @@ class CausalEffect:
     robustness_score: float = 0.0
     assumptions_satisfied: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class CausalInferenceResult:
@@ -110,7 +102,6 @@ class CausalInferenceResult:
     internal_validity_score: float = 0.0
     external_validity_score: float = 0.0
     overall_quality_score: float = 0.0
-
 
 class CausalInferenceAnalyzer:
     """Advanced causal inference analyzer implementing 2025 best practices
@@ -193,7 +184,7 @@ class CausalInferenceAnalyzer:
             try:
                 assignment = TreatmentAssignment(assignment_str)
             except ValueError:
-                assignment = TreatmentAssignment.RANDOMIZED
+                assignment = TreatmentAssignment.randomized
                 logger.warning(f"Unknown assignment '{assignment_str}', using randomized")
 
             # Convert data to numpy arrays
@@ -294,7 +285,7 @@ class CausalInferenceAnalyzer:
         outcome_data: np.ndarray,
         treatment_data: np.ndarray,
         covariates: np.ndarray | None = None,
-        assignment_mechanism: TreatmentAssignment = TreatmentAssignment.RANDOMIZED,
+        assignment_mechanism: TreatmentAssignment = TreatmentAssignment.randomized,
         method: CausalMethod = CausalMethod.DIFFERENCE_IN_DIFFERENCES,
         time_periods: np.ndarray | None = None,
         instruments: np.ndarray | None = None,
@@ -511,7 +502,7 @@ class CausalInferenceAnalyzer:
             assumptions.append(overlap_assumption)
 
             # 2. Balance (for randomized experiments)
-            if assignment == TreatmentAssignment.RANDOMIZED:
+            if assignment == TreatmentAssignment.randomized:
                 balance_assumption = self._test_balance_assumption(data)
                 assumptions.append(balance_assumption)
 
@@ -865,7 +856,7 @@ class CausalInferenceAnalyzer:
         self, data: dict[str, np.ndarray], assignment: TreatmentAssignment
     ) -> CausalAssumption:
         """Test no unmeasured confounding assumption"""
-        if assignment == TreatmentAssignment.RANDOMIZED:
+        if assignment == TreatmentAssignment.randomized:
             # For randomized experiments, confounding is controlled by design
             return CausalAssumption(
                 name="no_unmeasured_confounding",
@@ -1115,24 +1106,24 @@ class CausalInferenceAnalyzer:
         try:
             # Two-stage least squares
             # Stage 1: Regress treatment on instruments
-            X1 = np.column_stack([np.ones(len(treatment)), instruments])
-            first_stage_coef = np.linalg.lstsq(X1, treatment, rcond=None)[0]
-            treatment_fitted = X1 @ first_stage_coef
+            x1 = np.column_stack([np.ones(len(treatment)), instruments])
+            first_stage_coef = np.linalg.lstsq(x1, treatment, rcond=None)[0]
+            treatment_fitted = x1 @ first_stage_coef
 
             # Stage 2: Regress outcome on fitted treatment
-            X2 = np.column_stack([np.ones(len(outcome)), treatment_fitted])
-            second_stage_coef = np.linalg.lstsq(X2, outcome, rcond=None)[0]
+            x2 = np.column_stack([np.ones(len(outcome)), treatment_fitted])
+            second_stage_coef = np.linalg.lstsq(x2, outcome, rcond=None)[0]
             iv_estimate = second_stage_coef[1]
 
             # Calculate standard errors (simplified)
-            residuals2 = outcome - X2 @ second_stage_coef
-            mse2 = np.sum(residuals2**2) / (len(outcome) - X2.shape[1])
-            var_cov_matrix2 = mse2 * np.linalg.inv(X2.T @ X2)
+            residuals2 = outcome - x2 @ second_stage_coef
+            mse2 = np.sum(residuals2**2) / (len(outcome) - x2.shape[1])
+            var_cov_matrix2 = mse2 * np.linalg.inv(x2.T @ x2)
             se = np.sqrt(var_cov_matrix2[1, 1])
 
             # T-test
             t_stat = iv_estimate / se
-            dof = len(outcome) - X2.shape[1]
+            dof = len(outcome) - x2.shape[1]
             p_value = 2 * (1 - stats.t.cdf(abs(t_stat), dof))
 
             # Confidence interval
@@ -1689,7 +1680,7 @@ class CausalInferenceAnalyzer:
         assessment = {
             "assignment_mechanism": assignment.value,
             "confounding_risk": "low"
-            if assignment == TreatmentAssignment.RANDOMIZED
+            if assignment == TreatmentAssignment.randomized
             else "high",
         }
 
@@ -2236,7 +2227,7 @@ class CausalInferenceAnalyzer:
                 return None
             
             # Extract outcomes (improvement scores)
-            outcomes = labels  # Labels are improvement scores
+            outcomes = labels  # labels are improvement scores
             
             # Create treatment indicator based on rule application patterns
             # For simplicity, use high vs low improvement scores as treatment
@@ -2460,7 +2451,7 @@ class CausalInferenceAnalyzer:
         return CausalInferenceResult(
             analysis_id=f"{analysis_type}_insufficient_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
             timestamp=datetime.utcnow(),
-            treatment_assignment=TreatmentAssignment.OBSERVATIONAL,
+            treatment_assignment=TreatmentAssignment.observational,
             average_treatment_effect=CausalEffect(
                 effect_name="Insufficient Data",
                 point_estimate=0.0,
@@ -2491,7 +2482,7 @@ class CausalInferenceAnalyzer:
         return CausalInferenceResult(
             analysis_id=f"{analysis_type}_no_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
             timestamp=datetime.utcnow(),
-            treatment_assignment=TreatmentAssignment.OBSERVATIONAL,
+            treatment_assignment=TreatmentAssignment.observational,
             average_treatment_effect=CausalEffect(
                 effect_name="No Data Available",
                 point_estimate=0.0,
@@ -2521,7 +2512,7 @@ class CausalInferenceAnalyzer:
         return CausalInferenceResult(
             analysis_id=f"{analysis_type}_error_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
             timestamp=datetime.utcnow(),
-            treatment_assignment=TreatmentAssignment.OBSERVATIONAL,
+            treatment_assignment=TreatmentAssignment.observational,
             average_treatment_effect=CausalEffect(
                 effect_name="Analysis Error",
                 point_estimate=0.0,
@@ -2543,7 +2534,6 @@ class CausalInferenceAnalyzer:
             overall_assumptions_satisfied=False,
             robustness_score=0.0
         )
-
 
 # Utility functions for external use
 def quick_causal_analysis(
@@ -2569,7 +2559,7 @@ def quick_causal_analysis(
 
         # Determine assignment mechanism
         assignment = (
-            TreatmentAssignment.RANDOMIZED
+            TreatmentAssignment.randomized
             if covariates is None
             else TreatmentAssignment.QUASI_EXPERIMENTAL
         )
