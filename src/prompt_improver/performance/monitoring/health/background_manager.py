@@ -85,8 +85,15 @@ class TaskPriority(Enum):
     LOW = 4
     BACKGROUND = 5
 
-# Import unified retry configuration
-from ....ml.orchestration.core.unified_retry_manager import RetryConfig, RetryStrategy
+# Import protocol interfaces to prevent circular imports (2025 best practice)
+from ....core.protocols.retry_protocols import (
+    RetryConfigProtocol,
+    RetryStrategy,
+    RetryableErrorType
+)
+# Import concrete implementation for creating retry configs
+from ....core.retry_implementations import BasicRetryConfig
+from ....core.retry_config import RetryConfig
 
 @dataclass
 class TaskMetrics:
@@ -322,7 +329,7 @@ class EnhancedBackgroundTaskManager:
             task_id=task_id,
             coroutine=coroutine,
             priority=priority,
-            retry_config=retry_config or RetryConfig(),
+            retry_config=retry_config or BasicRetryConfig(),
             circuit_breaker=circuit_breaker,
             timeout=timeout or self.default_timeout,
             tags=tags or {}
@@ -543,11 +550,11 @@ class EnhancedBackgroundTaskManager:
         task.status = TaskStatus.RETRYING
 
         # Convert task retry config to unified retry config
-        unified_config = RetryConfig(
+        unified_config = BasicRetryConfig(
             max_attempts=getattr(task.retry_config, 'max_attempts', 3),
             strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
-            initial_delay_ms=getattr(task.retry_config, 'initial_delay_ms', 1000),
-            max_delay_ms=getattr(task.retry_config, 'max_delay_ms', 60000),
+            base_delay=getattr(task.retry_config, 'initial_delay_ms', 1000) / 1000.0,  # Convert ms to seconds
+            max_delay=getattr(task.retry_config, 'max_delay_ms', 60000) / 1000.0,      # Convert ms to seconds
             jitter=getattr(task.retry_config, 'jitter', True)
         )
 
@@ -846,7 +853,7 @@ class EnhancedBackgroundTaskManager:
                     task_id=task_config.get("task_id"),
                     coroutine=task_config.get("coroutine"),
                     priority=TaskPriority(task_config.get("priority", TaskPriority.NORMAL.value)),
-                    retry_config=RetryConfig(**task_config.get("retry_config", {})),
+                    retry_config=BasicRetryConfig(**task_config.get("retry_config", {})),
                     timeout=task_config.get("timeout"),
                     circuit_breaker_key=task_config.get("circuit_breaker_key"),
                     tags=task_config.get("tags", {})

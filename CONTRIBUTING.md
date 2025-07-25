@@ -49,7 +49,7 @@ For external dependencies, implement minimal patches:
 # This implements graceful fallback to maintain test isolation
 redis_client = None
 try:
-    redis_client = redis.from_url(redis_url)
+    redis_client = coredis.Redis.from_url(redis_url)
     await redis_client.ping()
 except Exception:
     # Graceful fallback to in-memory for CI environments

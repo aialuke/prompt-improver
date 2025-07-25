@@ -678,7 +678,7 @@ class StreamingBatchProcessor:
             chunks_info=[],  # Would need to track this
             metrics=self.metrics,
             created_at=aware_utc_now(),
-            config=self.config.dict()
+            config=self.config.model_dump()
         )
         
         checkpoint_file = self.checkpoint_dir / f"{self.current_job_id}.checkpoint"

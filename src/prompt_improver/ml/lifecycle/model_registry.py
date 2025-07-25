@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import mlflow
 import numpy as np
@@ -33,13 +33,19 @@ logger = logging.getLogger(__name__)
 
 class ModelStatus(Enum):
     """Model lifecycle status."""
-    training = "training"
-    validation = "validation"
+    TRAINING = "training"
+    training = "training"  # Backward compatibility
+    VALIDATION = "validation"
+    validation = "validation"  # Backward compatibility
     PENDING_APPROVAL = "pending_approval"
-    approved = "approved"
-    deployed = "deployed"
-    deprecated = "deprecated"
-    archived = "archived"
+    APPROVED = "approved"
+    approved = "approved"  # Backward compatibility
+    DEPLOYED = "deployed"
+    deployed = "deployed"  # Backward compatibility
+    DEPRECATED = "deprecated"
+    deprecated = "deprecated"  # Backward compatibility
+    ARCHIVED = "archived"
+    archived = "archived"  # Backward compatibility
 
 class ModelTier(Enum):
     """Model deployment tiers."""
@@ -48,6 +54,14 @@ class ModelTier(Enum):
     production = "production"
     champion = "champion"
     challenger = "challenger"
+
+class ModelFormat(Enum):
+    """Supported model formats."""
+    SKLEARN = "sklearn"
+    PYTORCH = "pytorch"
+    TENSORFLOW = "tensorflow"
+    HUGGINGFACE = "huggingface"
+    MLFLOW_PYFUNC = "mlflow_pyfunc"
 
 @dataclass
 class ModelMetadata:
@@ -59,6 +73,7 @@ class ModelMetadata:
     created_by: str
     status: ModelStatus
     tier: Optional[ModelTier] = None
+    model_format: ModelFormat = ModelFormat.SKLEARN
     
     # Training metadata
     training_dataset_id: Optional[str] = None

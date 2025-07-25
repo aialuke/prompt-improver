@@ -46,11 +46,11 @@ class PromptStorageRequest(BaseModel):
 def get_pydantic_schema(model_class: type) -> dict[str, Any]:
     """Generate JSON schema for a Pydantic model."""
     try:
-        # Pydantic v2 approach
+        # Pydantic v2 approach (modern)
         if hasattr(model_class, "model_json_schema"):
             return model_class.model_json_schema()
-        # Fallback for older versions
-        return model_class.schema()
+        # Fallback for older versions (deprecated)
+        return model_class.model_json_schema()
     except (AttributeError, TypeError, ValueError) as e:
         print(f"Warning: Could not generate schema for {model_class.__name__}: {e}")
         return {}

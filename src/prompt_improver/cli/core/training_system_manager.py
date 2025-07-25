@@ -19,7 +19,7 @@ from ...database import get_sessionmanager
 from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from ...ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
-from ...performance.analytics.analytics import AnalyticsService
+from ...core.services.analytics_factory import get_analytics_interface
 from .rule_validation_service import RuleValidationService
 
 
@@ -42,7 +42,7 @@ class TrainingSystemManager:
         self._training_status = "stopped"
         self._training_session_id: Optional[str] = None
         self._orchestrator: Optional[MLPipelineOrchestrator] = None
-        self._analytics: Optional[AnalyticsService] = None
+        self._analytics: Optional[Any] = None
         self._data_generator: Optional[ProductionSyntheticDataGenerator] = None
         self._rule_validator: Optional[RuleValidationService] = None
 
@@ -216,7 +216,8 @@ class TrainingSystemManager:
         """Initialize analytics service for training metrics only."""
         self.logger.info("Initializing training analytics")
 
-        self._analytics = AnalyticsService()
+        analytics_factory = get_analytics_interface()
+        self._analytics = analytics_factory() if analytics_factory else None
         # Configure for training-specific metrics
 
         self.logger.info("Training analytics initialized")

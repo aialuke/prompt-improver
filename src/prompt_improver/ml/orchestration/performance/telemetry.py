@@ -64,9 +64,9 @@ class PerformanceThresholds:
     degraded: float
     critical: float
     
-    def classify(self, value: float, higher_is_better: bool = True) -> PerformanceLevel:
+    def classify(self, value: float, greater_is_better: bool = True) -> PerformanceLevel:
         """Classify a value based on thresholds."""
-        if higher_is_better:
+        if greater_is_better:
             if value >= self.excellent:
                 return PerformanceLevel.EXCELLENT
             elif value >= self.good:
@@ -407,9 +407,9 @@ class PerformanceTelemetrySystem:
                 threshold = self.thresholds[metric_name]
                 
                 # Determine if higher is better based on metric type
-                higher_is_better = metric.metric_type in [MetricType.THROUGHPUT]
+                greater_is_better = metric.metric_type in [MetricType.THROUGHPUT]
                 
-                level = threshold.classify(metric.value, higher_is_better)
+                level = threshold.classify(metric.value, greater_is_better)
                 
                 # Log performance issues
                 if level in [PerformanceLevel.DEGRADED, PerformanceLevel.CRITICAL]:

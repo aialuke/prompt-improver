@@ -437,8 +437,9 @@ class ModernABTestingService:
 
         # Sample from posterior distributions
         n_samples = 10000
-        control_samples = np.random.beta(control_alpha, control_beta, n_samples)
-        treatment_samples = np.random.beta(treatment_alpha, treatment_beta, n_samples)
+        rng = np.random.default_rng()
+        control_samples = rng.beta(control_alpha, control_beta, n_samples)
+        treatment_samples = rng.beta(treatment_alpha, treatment_beta, n_samples)
 
         # Calculate probability that treatment > control
         bayesian_probability = np.mean(treatment_samples > control_samples)
@@ -939,16 +940,16 @@ class ModernABTestingService:
         effect_size = config.get("effect_size", 0.1)  # 10% relative improvement
 
         # Generate synthetic data with realistic statistical properties
-        np.random.seed(42)  # For reproducible testing
+        rng = np.random.default_rng(42)  # For reproducible testing
 
         # Control group data
         control_visitors = sample_size_per_variant
-        control_conversions = np.random.binomial(control_visitors, baseline_conversion_rate)
+        control_conversions = rng.binomial(control_visitors, baseline_conversion_rate)
 
         # Treatment group data (with effect)
         treatment_conversion_rate = baseline_conversion_rate * (1 + effect_size)
         treatment_visitors = sample_size_per_variant
-        treatment_conversions = np.random.binomial(treatment_visitors, treatment_conversion_rate)
+        treatment_conversions = rng.binomial(treatment_visitors, treatment_conversion_rate)
 
         # Perform statistical analysis on synthetic data
         statistical_result = await self._perform_synthetic_statistical_analysis(

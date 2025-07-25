@@ -62,7 +62,8 @@ class DifferentialPrivacyService:
 
         # Laplace mechanism: scale = sensitivity / epsilon
         scale = sensitivity / epsilon
-        noise = np.random.laplace(0, scale)
+        rng = np.random.default_rng()
+        noise = rng.laplace(0, scale)
 
         return float(value + noise)
 
@@ -79,7 +80,8 @@ class DifferentialPrivacyService:
 
         # Gaussian mechanism: sigma = sqrt(2 * ln(1.25/delta)) * sensitivity / epsilon
         sigma = math.sqrt(2 * math.log(1.25 / delta)) * sensitivity / epsilon
-        noise = np.random.normal(0, sigma)
+        rng = np.random.default_rng()
+        noise = rng.normal(0, sigma)
 
         return float(value + noise)
 

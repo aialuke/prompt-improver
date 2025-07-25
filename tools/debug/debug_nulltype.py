@@ -53,15 +53,15 @@ def debug_model_fields():
     )
     
     print("PromptSession fields:")
-    for field_name, field_info in session.__fields__.items():
+    for field_name, field_info in PromptSession.model_fields.items():
         print(f"  {field_name}: {field_info}")
     
     print("\nRuleMetadata fields:")
-    for field_name, field_info in rule.__fields__.items():
+    for field_name, field_info in RuleMetadata.model_fields.items():
         print(f"  {field_name}: {field_info}")
     
     print("\nRulePerformance fields:")
-    for field_name, field_info in perf.__fields__.items():
+    for field_name, field_info in RulePerformance.model_fields.items():
         print(f"  {field_name}: {field_info}")
 
 if __name__ == "__main__":

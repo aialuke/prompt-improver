@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 from ...database.models import ABExperiment, RulePerformance
-from ...performance.analytics.real_time_analytics import RealTimeAnalyticsService, RealTimeMetrics
+from ...core.services.analytics_factory import get_analytics_router
 from .advanced_statistical_validator import (
     AdvancedStatisticalValidator,
     AdvancedValidationResult,

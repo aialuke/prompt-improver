@@ -618,9 +618,10 @@ class MLPerformanceHealthChecker(HealthChecker):
     async def _check_analytics_integration(self) -> Dict[str, Any]:
         """Check the health of analytics integration."""
         try:
-            from ....performance.analytics.analytics import AnalyticsService
+            from ....core.services.analytics_factory import get_analytics_interface
 
-            analytics = AnalyticsService()
+            analytics_factory = get_analytics_interface()
+            analytics = analytics_factory() if analytics_factory else None
 
             # Basic health check for analytics
             return {

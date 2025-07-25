@@ -68,10 +68,10 @@ from src.prompt_improver.ml.automl.orchestrator import (
     AutoMLOrchestrator,
 )
 from src.prompt_improver.database.connection import DatabaseManager, get_database_url
-from src.prompt_improver.services.ab_testing import ABTestingService
-from src.prompt_improver.services.prompt_improvement import PromptImprovementService
-from src.prompt_improver.services.real_time_analytics import RealTimeAnalyticsService
-from src.prompt_improver.utils.websocket_manager import WebSocketManager
+from src.prompt_improver.performance.testing.ab_testing_service import ABTestingService
+from src.prompt_improver.core.services.prompt_improvement import PromptImprovementService
+from src.prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
+from src.prompt_improver.utils.websocket_manager import ConnectionManager as WebSocketManager
 from src.prompt_improver.database.registry import clear_registry
 
 

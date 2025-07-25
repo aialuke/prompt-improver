@@ -13,7 +13,7 @@ from optuna.trial import TrialState
 
 if TYPE_CHECKING:
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
-    from ...performance.analytics.real_time_analytics import RealTimeAnalyticsService
+    from ...core.services.analytics_factory import get_analytics_router
     from .orchestrator import AutoMLOrchestrator
 
 logger = logging.getLogger(__name__)

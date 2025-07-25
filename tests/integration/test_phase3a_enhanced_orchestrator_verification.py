@@ -152,7 +152,7 @@ class Phase3AEnhancedVerificationTester:
             # Store execution data
             self.execution_times["enhanced_batch_processor"] = execution_time
             self.component_results["enhanced_batch_processor"] = {
-                "config": config.dict(),
+                "config": config.model_dump(),
                 "metrics_collected": metrics_collected,
                 "processing_time": processing_time,
                 "queue_depth": queue_depth,

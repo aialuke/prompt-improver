@@ -28,9 +28,10 @@ except Exception:
     get_background_task_manager = None
 
 try:
-    from ....ml.optimization.batch.batch_processor import batch_processor
+    from ....ml.optimization.batch.batch_processor import BatchProcessor
 
     BATCH_PROCESSOR_AVAILABLE = True
+    batch_processor = BatchProcessor
 except Exception as e:
     BATCH_PROCESSOR_AVAILABLE = False
     batch_processor = None

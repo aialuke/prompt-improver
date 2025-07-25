@@ -24,7 +24,7 @@ from numpy.typing import NDArray
 # Type aliases for common numpy array types (snake_case)
 float_array = NDArray[np.float64]
 int_array = NDArray[np.int64]
-bool_array = NDArray[np.bool_]
+bool_array = NDArray[np.bool]
 feature_array = NDArray[np.float64]  # Features are typically float arrays
 label_array = NDArray[np.int64]  # Labels are typically integer arrays
 

@@ -63,7 +63,8 @@ class AdversarialDefenseSystem:
         sigma = config.get("sigma", 0.1)
 
         # Add Gaussian noise
-        noise = np.random.normal(0, sigma, input_data.shape)
+        rng = np.random.default_rng()
+        noise = rng.normal(0, sigma, input_data.shape)
         defended_data = input_data + noise
 
         # Log defense application
@@ -274,7 +275,8 @@ class AdversarialAttackSimulator:
             labels = np.zeros(len(clean_data))
 
         # Simulate FGSM attack: Add small perturbation in direction of gradient
-        perturbation = np.random.uniform(-self.epsilon, self.epsilon, clean_data.shape)
+        rng = np.random.default_rng()
+        perturbation = rng.uniform(-self.epsilon, self.epsilon, clean_data.shape)
 
         # Ensure perturbation respects L_infinity constraint
         perturbation = np.clip(perturbation, -self.epsilon, self.epsilon)
@@ -484,7 +486,8 @@ class RobustnessEvaluator:
 
         # Use FGSM-like perturbation as default
         epsilon = 0.1
-        perturbation = np.random.uniform(-epsilon, epsilon, clean_data.shape)
+        rng = np.random.default_rng()
+        perturbation = rng.uniform(-epsilon, epsilon, clean_data.shape)
         perturbation = np.clip(perturbation, -epsilon, epsilon)
         adversarial_data = clean_data + perturbation
 
@@ -558,7 +561,8 @@ class RobustnessEvaluator:
                 epsilon = 0.1
 
             # Generate adversarial examples for this attack
-            perturbation = np.random.uniform(-epsilon, epsilon, clean_data.shape)
+            rng = np.random.default_rng()
+            perturbation = rng.uniform(-epsilon, epsilon, clean_data.shape)
             adversarial_data = clean_data + perturbation
 
             # Evaluate robustness against this attack

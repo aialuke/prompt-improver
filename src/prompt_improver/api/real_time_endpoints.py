@@ -20,19 +20,16 @@ from sqlmodel import select
 
 # Make Redis import optional with proper error handling
 try:
-    import redis.asyncio as redis
+    import coredis
 
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    redis = None
+    coredis = None
 
-from ..database import DBSession, get_async_session_factory
+from ..database import get_session
 from ..database.models import ABExperiment
-from ..performance.analytics.real_time_analytics import (
-    RealTimeAnalyticsService,
-    get_real_time_analytics_service,
-)
+from ..core.services.analytics_factory import get_analytics_router
 from ..utils.error_handlers import handle_database_errors
 from ..utils.websocket_manager import connection_manager, setup_redis_connection
 
@@ -160,7 +157,7 @@ async def handle_websocket_message(
 
 @real_time_router.get("/experiments/{experiment_id}/metrics")
 async def get_experiment_metrics(
-    experiment_id: str, db_session: DBSession
+    experiment_id: str, db_session: AsyncSession = Depends(get_session)
 ) -> JSONResponse:
     """Get current real-time metrics for an experiment
 
@@ -231,7 +228,7 @@ async def get_experiment_metrics(
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/start")
 async def start_monitoring(
-    experiment_id: str, db_session: DBSession, update_interval: int = 30
+    experiment_id: str, db_session: AsyncSession = Depends(get_session), update_interval: int = 30
 ) -> JSONResponse:
     """Start real-time monitoring for an experiment
 
@@ -271,7 +268,7 @@ async def start_monitoring(
         )
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/stop")
-async def stop_monitoring(experiment_id: str, db_session: DBSession) -> JSONResponse:
+async def stop_monitoring(experiment_id: str, db_session: AsyncSession = Depends(get_session)) -> JSONResponse:
     """Stop real-time monitoring for an experiment
 
     Args:
@@ -299,7 +296,7 @@ async def stop_monitoring(experiment_id: str, db_session: DBSession) -> JSONResp
         )
 
 @real_time_router.get("/monitoring/active")
-async def get_active_monitoring(db_session: DBSession) -> JSONResponse:
+async def get_active_monitoring(db_session: AsyncSession = Depends(get_session)) -> JSONResponse:
     """Get list of experiments currently being monitored
 
     Args:
@@ -337,7 +334,7 @@ async def get_active_monitoring(db_session: DBSession) -> JSONResponse:
 
 @real_time_router.get("/dashboard/config/{experiment_id}")
 async def get_dashboard_config(
-    experiment_id: str, db_session: DBSession
+    experiment_id: str, db_session: AsyncSession = Depends(get_session)
 ) -> JSONResponse:
     """Get dashboard configuration for an experiment
 

@@ -158,7 +158,7 @@ class OrchestratorEndpoints:
                     "workflow_stats": workflow_stats if workflow_engine else {},
                     "component_stats": component_stats if component_registry else {}
                 }
-            ).dict()
+            ).model_dump()
             
         except Exception as e:
             self.logger.error(f"Error getting orchestrator status: {e}")
@@ -193,7 +193,7 @@ class OrchestratorEndpoints:
                 created_at=datetime.utcnow().isoformat(),
                 parameters=request.parameters,
                 current_step="initialization"
-            ).dict()
+            ).model_dump()
             
         except Exception as e:
             self.logger.error(f"Error creating workflow: {e}")

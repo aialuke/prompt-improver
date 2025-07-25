@@ -19,6 +19,15 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar, Unio
 from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 
+# Import protocol interfaces to prevent circular imports (2025 best practice)
+from ....core.protocols.retry_protocols import (
+    RetryStrategy,
+    RetryableErrorType,
+    RetryConfigProtocol,
+    MetricsRegistryProtocol
+)
+from ....core.retry_config import RetryConfig as BaseRetryConfig
+
 # Use centralized metrics registry to prevent duplicates
 from ....performance.monitoring.metrics_registry import (
     get_metrics_registry,
@@ -36,53 +45,56 @@ except ImportError:
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
-class RetryStrategy(Enum):
-    """Retry strategy types following 2025 best practices."""
-    
-    EXPONENTIAL_BACKOFF = "exponential_backoff"
-    LINEAR_BACKOFF = "linear_backoff"
-    FIXED_DELAY = "fixed_delay"
-    FIBONACCI_BACKOFF = "fibonacci_backoff"
-    CUSTOM = "custom"
+# RetryStrategy is now imported from protocols
 
 class CircuitBreakerState(Enum):
     """Circuit breaker states."""
-    
+
     CLOSED = "closed"      # Normal operation
     OPEN = "open"          # Blocking requests
     HALF_OPEN = "half_open"  # Testing recovery
 
-class RetryableErrorType(Enum):
-    """Types of retryable errors."""
-    
-    TRANSIENT = "transient"
-    NETWORK = "network"
-    TIMEOUT = "timeout"
-    RATE_LIMIT = "rate_limit"
-    RESOURCE_EXHAUSTION = "resource_exhaustion"
-    DEPENDENCY_FAILURE = "dependency_failure"
+# RetryableErrorType is now imported from protocols
 
 @dataclass
 class RetryConfig:
-    """Unified retry configuration with 2025 best practices."""
-    
-    # Basic retry settings
+    """Extended retry configuration with ML orchestration specific features."""
+
+    # Basic retry settings (implementing RetryConfigProtocol)
     max_attempts: int = 3
     strategy: RetryStrategy = RetryStrategy.EXPONENTIAL_BACKOFF
-    
+
     # Delay settings
-    initial_delay_ms: int = 100
-    max_delay_ms: int = 30000  # 30 seconds max
-    multiplier: float = 2.0
+    base_delay: float = 0.1  # seconds (converted from initial_delay_ms)
+    max_delay: float = 30.0  # seconds (converted from max_delay_ms)
+
+    # Advanced settings
     jitter: bool = True
-    jitter_factor: float = 0.1  # 10% jitter
-    
+    jitter_factor: float = 0.1
+    backoff_multiplier: float = 2.0
+
+    # Conditional retry settings
+    retry_on_exceptions: List[type] = field(default_factory=lambda: [Exception])
+    retry_condition: Optional[Callable[[Exception], bool]] = None
+
+    # Timeout settings
+    operation_timeout: Optional[float] = None
+    total_timeout: Optional[float] = None
+
+    # Logging and monitoring
+    log_attempts: bool = True
+    log_level: str = "INFO"
+    track_metrics: bool = True
+
+    # ML-specific settings (additional to protocol)
+    initial_delay_ms: int = field(init=False)  # Computed from base_delay
+    max_delay_ms: int = field(init=False)      # Computed from max_delay
+
     # Circuit breaker settings
     enable_circuit_breaker: bool = True
-    failure_threshold: int = 5
-    recovery_timeout_ms: int = 60000  # 1 minute
     success_threshold: int = 3
-    
+    recovery_timeout_ms: int = 60000  # 1 minute
+
     # Error classification
     retryable_errors: List[RetryableErrorType] = field(default_factory=lambda: [
         RetryableErrorType.TRANSIENT,
@@ -90,33 +102,84 @@ class RetryConfig:
         RetryableErrorType.TIMEOUT,
         RetryableErrorType.RATE_LIMIT
     ])
-    
+
     # Observability
     enable_metrics: bool = True
     enable_tracing: bool = True
     operation_name: Optional[str] = None
-    
-    # Advanced settings
+
+    # Advanced ML settings
     timeout_ms: Optional[int] = None
     custom_delay_func: Optional[Callable[[int], float]] = None
     error_classifier: Optional[Callable[[Exception], RetryableErrorType]] = None
 
+    def __post_init__(self):
+        """Initialize computed fields"""
+        # Convert seconds to milliseconds for backward compatibility
+        self.initial_delay_ms = int(self.base_delay * 1000)
+        self.max_delay_ms = int(self.max_delay * 1000)
+
+    def calculate_delay(self, attempt: int) -> float:
+        """Calculate delay for a given attempt number (implementing protocol)"""
+        if attempt < 0:
+            return 0.0
+
+        if self.custom_delay_func:
+            return self.custom_delay_func(attempt)
+
+        if self.strategy == RetryStrategy.FIXED_DELAY:
+            delay = self.base_delay
+        elif self.strategy == RetryStrategy.LINEAR_BACKOFF:
+            delay = self.base_delay * (attempt + 1)
+        elif self.strategy == RetryStrategy.EXPONENTIAL_BACKOFF:
+            delay = self.base_delay * (self.backoff_multiplier ** attempt)
+        else:
+            delay = self.base_delay
+
+        # Apply max delay limit
+        delay = min(delay, self.max_delay)
+
+        # Apply jitter if enabled
+        if self.jitter and delay > 0:
+            import random
+            jitter_amount = delay * self.jitter_factor
+            delay += random.uniform(-jitter_amount, jitter_amount)
+            delay = max(0, delay)
+
+        return delay
+
+    def should_retry(self, exception: Exception, attempt: int) -> bool:
+        """Determine if an operation should be retried (implementing protocol)"""
+        # Check attempt limit
+        if attempt >= self.max_attempts - 1:
+            return False
+
+        # Check exception type
+        if not any(isinstance(exception, exc_type) for exc_type in self.retry_on_exceptions):
+            return False
+
+        # Check custom retry condition
+        if self.retry_condition and not self.retry_condition(exception):
+            return False
+
+        return True
+
 @dataclass
 class RetryContext:
     """Context for retry operations with comprehensive tracking."""
-    
+
     operation_name: str
     attempt: int = 0
     start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_error: Optional[Exception] = None
     total_delay_ms: float = 0.0
     circuit_breaker_triggered: bool = False
-    
+
     # Observability
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     correlation_id: Optional[str] = None
-    
+
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -126,7 +189,7 @@ class CircuitBreakerOpenError(Exception):
 
 class CircuitBreaker:
     """Circuit breaker implementation with 2025 patterns."""
-    
+
     def __init__(self, config: RetryConfig):
         self.config = config
         self.state = CircuitBreakerState.CLOSED
@@ -134,7 +197,7 @@ class CircuitBreaker:
         self.success_count = 0
         self.last_failure_time: Optional[datetime] = None
         self._lock = asyncio.Lock()
-        
+
         # Metrics using centralized registry
         self.metrics_registry = get_metrics_registry()
         self.circuit_breaker_state_gauge = self.metrics_registry.get_or_create_gauge(
@@ -147,19 +210,19 @@ class CircuitBreaker:
             'Circuit breaker events',
             ['operation', 'event']
         )
-    
+
     async def call(self, operation: Callable[[], Coroutine[Any, Any, T]], context: RetryContext) -> T:
         """Execute operation with circuit breaker protection."""
         if not self.config.enable_circuit_breaker:
             return await operation()
-        
+
         await self._check_state_transition()
-        
+
         if self.state == CircuitBreakerState.OPEN:
             context.circuit_breaker_triggered = True
             self._record_event(context.operation_name, "blocked")
             raise CircuitBreakerOpenError(f"Circuit breaker is OPEN for {context.operation_name}")
-        
+
         try:
             result = await operation()
             await self._on_success(context)
@@ -167,20 +230,20 @@ class CircuitBreaker:
         except Exception as e:
             await self._on_failure(context, e)
             raise
-    
+
     async def _check_state_transition(self):
         """Check if circuit breaker should transition states."""
         async with self._lock:
-            if (self.state == CircuitBreakerState.OPEN and 
+            if (self.state == CircuitBreakerState.OPEN and
                 self.last_failure_time and
-                datetime.now(timezone.utc) - self.last_failure_time > 
+                datetime.now(timezone.utc) - self.last_failure_time >
                 timedelta(milliseconds=self.config.recovery_timeout_ms)):
-                
+
                 self.state = CircuitBreakerState.HALF_OPEN
                 self.success_count = 0
                 logger.info("Circuit breaker transitioning to HALF_OPEN")
                 self._update_state_metric()
-    
+
     async def _on_success(self, context: RetryContext):
         """Handle successful operation."""
         async with self._lock:
@@ -193,18 +256,18 @@ class CircuitBreaker:
                     self._record_event(context.operation_name, "closed")
             elif self.state == CircuitBreakerState.CLOSED:
                 self.failure_count = 0
-            
+
             self._update_state_metric()
-    
+
     async def _on_failure(self, context: RetryContext, error: Exception):
         """Handle failed operation."""
         async with self._lock:
             self.failure_count += 1
             self.last_failure_time = datetime.now(timezone.utc)
-            
-            if (self.state == CircuitBreakerState.CLOSED and 
+
+            if (self.state == CircuitBreakerState.CLOSED and
                 self.failure_count >= self.config.failure_threshold):
-                
+
                 self.state = CircuitBreakerState.OPEN
                 logger.warning(f"Circuit breaker transitioning to OPEN for {context.operation_name}")
                 self._record_event(context.operation_name, "opened")
@@ -212,9 +275,9 @@ class CircuitBreaker:
                 self.state = CircuitBreakerState.OPEN
                 logger.warning(f"Circuit breaker returning to OPEN from HALF_OPEN for {context.operation_name}")
                 self._record_event(context.operation_name, "opened")
-            
+
             self._update_state_metric()
-    
+
     def _update_state_metric(self):
         """Update Prometheus state metric."""
         state_value = {
@@ -223,7 +286,7 @@ class CircuitBreaker:
             CircuitBreakerState.OPEN: 2
         }[self.state]
         self.circuit_breaker_state_gauge.labels(operation="unified").set(state_value)
-    
+
     def _record_event(self, operation_name: str, event: str):
         """Record circuit breaker event."""
         self.circuit_breaker_events.labels(operation=operation_name, event=event).inc()
@@ -249,7 +312,7 @@ class CircuitBreaker:
 class UnifiedRetryManager:
     """
     Unified Retry Manager implementing 2025 best practices.
-    
+
     features:
     - Multiple retry strategies
     - Circuit breaker integration
@@ -257,7 +320,7 @@ class UnifiedRetryManager:
     - Async-first design
     - Configurable error classification
     """
-    
+
     def __init__(self, default_config: Optional[RetryConfig] = None, observability_manager=None):
         self.default_config = default_config or RetryConfig()
         self.circuit_breakers: Dict[str, CircuitBreaker] = {}
@@ -274,7 +337,7 @@ class UnifiedRetryManager:
         self._setup_tracing()
 
         logger.info("UnifiedRetryManager initialized with 2025 best practices")
-    
+
     def _setup_metrics(self):
         """Setup Prometheus metrics using centralized registry."""
         self.metrics_registry = get_metrics_registry()
@@ -310,7 +373,7 @@ class UnifiedRetryManager:
             ['operation', 'strategy'],
             buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]
         )
-    
+
     def _setup_tracing(self):
         """Setup OpenTelemetry tracing."""
         if OPENTELEMETRY_AVAILABLE:

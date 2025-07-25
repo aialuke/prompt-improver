@@ -7,9 +7,10 @@ import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-# Import services with fallback handling
+# Import services with fallback handling - Updated to use modern analytics factory
 try:
-    from prompt_improver.performance.analytics.analytics import analytics_service
+    from prompt_improver.core.services.analytics_factory import get_analytics_interface
+    analytics_service = get_analytics_interface
 except ImportError:
     analytics_service = None
 
@@ -19,7 +20,8 @@ except ImportError:
     health_service = None
 
 try:
-    from prompt_improver.performance.analytics.real_time_analytics import real_time_analytics_service
+    from prompt_improver.core.services.analytics_factory import get_analytics_router
+    real_time_analytics_service = get_analytics_router
 except ImportError:
     real_time_analytics_service = None
 

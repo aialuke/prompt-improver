@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 import aiofiles
 
 from prompt_improver.database import get_session
-from prompt_improver.performance.analytics.analytics import AnalyticsService
+from prompt_improver.core.services.analytics_factory import get_analytics_interface
 from ..optimization.performance_optimizer import (
     get_performance_optimizer,
     PerformanceBaseline
@@ -28,7 +28,7 @@ class MCPPerformanceBenchmark:
     def __init__(self):
         self.optimizer = get_performance_optimizer()
         self._prompt_service = None  # Lazy loaded to avoid circular imports
-        self.analytics_service = AnalyticsService()
+        self.analytics_service = get_analytics_interface()
 
     @property
     def prompt_service(self):

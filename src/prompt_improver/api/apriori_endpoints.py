@@ -13,7 +13,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import DBSession
+from ..database import get_session
 from ..database.connection import DatabaseManager
 from ..database.models import (
     AprioriAnalysisRequest,
@@ -62,7 +62,7 @@ async def get_pattern_discovery() -> AdvancedPatternDiscovery:
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)
 async def run_apriori_analysis(
     request: AprioriAnalysisRequest,
-    db_session: DBSession,
+    db_session: AsyncSession = Depends(get_session),
     apriori_analyzer: AprioriAnalyzer = Depends(get_apriori_analyzer),
 ) -> AprioriAnalysisResponse:
     """Run Apriori association rule mining analysis.
@@ -83,7 +83,7 @@ async def run_apriori_analysis(
         HTTPException: If analysis fails or insufficient data
     """
     try:
-        logger.info(f"Starting Apriori analysis with config: {request.dict()}")
+        logger.info(f"Starting Apriori analysis with config: {request.model_dump()}")
 
         # Update analyzer configuration
         config = AprioriConfig(
@@ -141,8 +141,8 @@ async def run_apriori_analysis(
 @apriori_router.post("/discover-patterns", response_model=PatternDiscoveryResponse)
 async def comprehensive_pattern_discovery(
     request: PatternDiscoveryRequest,
-    db_session: DBSession,
     ml_service: Annotated[MLModelService, Depends(get_ml_service)],
+    db_session: AsyncSession = Depends(get_session),
 ) -> PatternDiscoveryResponse:
     """Run comprehensive pattern discovery combining traditional ML with Apriori analysis.
 
@@ -165,7 +165,7 @@ async def comprehensive_pattern_discovery(
         HTTPException: If pattern discovery fails
     """
     try:
-        logger.info(f"Starting comprehensive pattern discovery: {request.dict()}")
+        logger.info(f"Starting comprehensive pattern discovery: {request.model_dump()}")
 
         # Run enhanced pattern discovery
         results = await ml_service.discover_patterns(
@@ -211,7 +211,7 @@ async def comprehensive_pattern_discovery(
 
 @apriori_router.get("/rules", response_model=list[dict[str, Any]])
 async def get_association_rules(
-    db_session: DBSession,
+    db_session: AsyncSession = Depends(get_session),
     min_confidence: float = 0.6,
     min_lift: float = 1.0,
     pattern_category: str | None = None,
@@ -284,8 +284,8 @@ async def get_association_rules(
 @apriori_router.post("/contextualized-patterns")
 async def get_contextualized_patterns(
     context_items: list[str],
-    db_session: DBSession,
     ml_service: Annotated[MLModelService, Depends(get_ml_service)],
+    db_session: AsyncSession = Depends(get_session),
     min_confidence: float = 0.6,
 ) -> dict[str, Any]:
     """Get patterns relevant to a specific context using Apriori and ML analysis.
@@ -331,7 +331,7 @@ async def get_contextualized_patterns(
 
 @apriori_router.get("/discovery-runs", response_model=list[dict[str, Any]])
 async def get_discovery_runs(
-    db_session: DBSession, limit: int = 20, status_filter: str | None = None
+    db_session: AsyncSession = Depends(get_session), limit: int = 20, status_filter: str | None = None
 ) -> list[dict[str, Any]]:
     """Retrieve historical pattern discovery runs.
 
@@ -390,7 +390,7 @@ async def get_discovery_runs(
 
 @apriori_router.get("/insights/{discovery_run_id}")
 async def get_discovery_insights(
-    discovery_run_id: str, db_session: DBSession
+    discovery_run_id: str, db_session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
     """Get detailed insights for a specific discovery run.
 
@@ -479,7 +479,7 @@ async def get_discovery_insights(
 # Helper functions for database operations
 
 async def _store_apriori_analysis_metadata(
-    db_session: DBSession,
+    db_session: AsyncSession,
     discovery_run_id: str,
     request: AprioriAnalysisRequest,
     results: dict[str, Any],
@@ -511,7 +511,7 @@ async def _store_apriori_analysis_metadata(
         await db_session.rollback()
 
 async def _store_pattern_discovery_results(
-    db_session: DBSession, discovery_run_id: str, results: dict[str, Any]
+    db_session: AsyncSession, discovery_run_id: str, results: dict[str, Any]
 ) -> None:
     """Store comprehensive pattern discovery results"""
     try:

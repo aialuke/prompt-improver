@@ -565,7 +565,7 @@ if __name__ == "__main__":
         requirements = [
             "fastapi>=0.104.0",
             "uvicorn[standard]>=0.24.0",
-            "mlflow>=2.8.0",
+            "mlflow>=3.0.0",
             "numpy>=1.21.0",
             "pydantic>=2.0.0"
         ]

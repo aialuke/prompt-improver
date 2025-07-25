@@ -182,7 +182,7 @@ import orjson
 class OptimizedMultiLevelCache:
     def __init__(self):
         self.l1_cache = {}  # In-memory
-        self.redis_client = redis.Redis(
+        self.redis_client = coredis.Redis(
             host='localhost',
             port=6379,
             db=3,

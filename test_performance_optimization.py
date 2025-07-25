@@ -253,9 +253,9 @@ class PerformanceTestSuite:
             throughput_threshold = telemetry.thresholds['event_throughput']
 
             # Test different performance levels
-            excellent_level = throughput_threshold.classify(9000.0, higher_is_better=True)
-            good_level = throughput_threshold.classify(6000.0, higher_is_better=True)
-            critical_level = throughput_threshold.classify(100.0, higher_is_better=True)
+            excellent_level = throughput_threshold.classify(9000.0, greater_is_better=True)
+            good_level = throughput_threshold.classify(6000.0, greater_is_better=True)
+            critical_level = throughput_threshold.classify(100.0, greater_is_better=True)
 
             assert excellent_level == PerformanceLevel.EXCELLENT, "Should classify high throughput as excellent"
             assert good_level == PerformanceLevel.GOOD, "Should classify medium throughput as good"

@@ -69,8 +69,8 @@ class IntegrationTestRunner:
     def _check_redis(self) -> bool:
         """Check if Redis is running."""
         try:
-            import redis
-            r = redis.Redis(
+            import coredis
+            r = coredis.Redis(
                 host=os.getenv("REDIS_HOST", "localhost"),
                 port=int(os.getenv("REDIS_PORT", 6379))
             )

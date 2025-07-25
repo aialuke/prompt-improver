@@ -14,12 +14,11 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 import asyncpg
 
-# Skip aioredis import for Phase 0 compatibility (Python 3.13 issue)
-# import aioredis  # Disabled due to TimeoutError conflicts
+# Note: Using coredis instead of aioredis for better Python 3.13 compatibility
 AIOREDIS_AVAILABLE = False
 
-from ..database.connection import get_database_connection
-from ..utils.redis_cache import get_redis_connection
+from ..database.connection import get_session_context
+from ..utils.redis_cache import redis_client
 from ..performance.monitoring.performance_monitor import PerformanceMonitor
 
 logger = logging.getLogger(__name__)
@@ -187,20 +186,21 @@ class HealthChecker:
             start_time = time.time()
             
             # Test database connection
-            async with get_database_connection() as conn:
+            async with get_session_context() as session:
                 # Simple query to test connectivity
-                result = await conn.fetchval("SELECT 1")
+                result = await session.execute("SELECT 1")
+                await session.commit()
                 
                 # Check connection pool status
                 pool_info = {
-                    "active_connections": conn._pool.get_size() if hasattr(conn, '_pool') else 1,
+                    "active_connections": 1,  # Using session, not raw connection
                     "max_connections": 20  # TODO: Get from config
                 }
             
             duration_ms = (time.time() - start_time) * 1000
             
             return {
-                "healthy": result == 1,
+                "healthy": result is not None,
                 "response_time_ms": round(duration_ms, 2),
                 "pool_info": pool_info,
                 "timestamp": datetime.now(timezone.utc).isoformat()
@@ -219,11 +219,10 @@ class HealthChecker:
             start_time = time.time()
             
             # Test Redis connection
-            redis = await get_redis_connection()
-            await redis.ping()
+            await redis_client.ping()
             
             # Get Redis info
-            info = await redis.info()
+            info = await redis_client.info()
             
             duration_ms = (time.time() - start_time) * 1000
             

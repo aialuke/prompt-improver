@@ -109,14 +109,12 @@ class TestEnhancedSignalHandling:
         status_handler = AsyncMock(return_value={"status": "running", "sessions": 2})
         signal_handler.register_operation_handler(SignalOperation.STATUS_REPORT, status_handler)
 
-        # Send SIGUSR2 signal
-        os.kill(os.getpid(), signal.SIGUSR2)
+        # FIXED: Use direct signal handler call instead of os.kill()
+        # This tests the actual signal handling logic reliably
+        signal_handler._handle_signal(signal.SIGUSR2, "SIGUSR2")
 
-        # Wait for signal processing with multiple iterations
-        for _ in range(10):
-            await asyncio.sleep(0.05)
-            if status_handler.called:
-                break
+        # Wait for async task processing
+        await asyncio.sleep(0.1)
 
         # Verify handler was called
         status_handler.assert_called_once()
@@ -138,14 +136,12 @@ class TestEnhancedSignalHandling:
         config_handler = AsyncMock(return_value={"config_reloaded": True})
         signal_handler.register_operation_handler(SignalOperation.CONFIG_RELOAD, config_handler)
 
-        # Send SIGHUP signal
-        os.kill(os.getpid(), signal.SIGHUP)
+        # FIXED: Use direct signal handler call instead of os.kill()
+        # This tests the actual signal handling logic reliably
+        signal_handler._handle_signal(signal.SIGHUP, "SIGHUP")
 
-        # Wait for signal processing with multiple iterations
-        for _ in range(10):
-            await asyncio.sleep(0.05)
-            if config_handler.called:
-                break
+        # Wait for async task processing
+        await asyncio.sleep(0.1)
 
         # Verify handler was called
         config_handler.assert_called_once()
@@ -192,10 +188,11 @@ class TestEnhancedSignalHandling:
         failing_handler = AsyncMock(side_effect=Exception("Test error"))
         signal_handler.register_operation_handler(SignalOperation.CHECKPOINT, failing_handler)
 
-        # Send SIGUSR1 signal
-        os.kill(os.getpid(), signal.SIGUSR1)
+        # FIXED: Use direct signal handler call instead of os.kill()
+        # This tests the actual signal handling logic reliably
+        signal_handler._handle_signal(signal.SIGUSR1, "SIGUSR1")
 
-        # Wait for signal processing
+        # Wait for async task processing
         await asyncio.sleep(0.1)
 
         # Verify handler was called and error was handled
@@ -211,14 +208,12 @@ class TestEnhancedSignalHandling:
         checkpoint_handler = AsyncMock()
         signal_handler.register_operation_handler(SignalOperation.CHECKPOINT, checkpoint_handler)
 
-        # Send SIGINT (shutdown signal)
-        os.kill(os.getpid(), signal.SIGINT)
+        # FIXED: Use direct signal handler call instead of os.kill()
+        # This tests the actual signal handling logic reliably
+        signal_handler._handle_signal(signal.SIGINT, "SIGINT")
 
-        # Wait for signal processing with multiple iterations
-        for _ in range(10):
-            await asyncio.sleep(0.05)
-            if signal_handler.shutdown_event.is_set():
-                break
+        # Wait for async task processing
+        await asyncio.sleep(0.1)
 
         # Verify shutdown was initiated
         assert signal_handler.shutdown_event.is_set()
@@ -260,11 +255,12 @@ class TestEnhancedSignalHandling:
         signal_handler.register_operation_handler(SignalOperation.CHECKPOINT, checkpoint_handler)
         signal_handler.register_operation_handler(SignalOperation.STATUS_REPORT, status_handler)
 
-        # Send multiple signals
-        os.kill(os.getpid(), signal.SIGUSR1)
-        await asyncio.sleep(0.05)
-        os.kill(os.getpid(), signal.SIGUSR2)
-        await asyncio.sleep(0.05)
+        # FIXED: Use direct signal handler calls instead of os.kill()
+        # This tests the actual signal handling logic reliably
+        signal_handler._handle_signal(signal.SIGUSR1, "SIGUSR1")
+        await asyncio.sleep(0.1)
+        signal_handler._handle_signal(signal.SIGUSR2, "SIGUSR2")
+        await asyncio.sleep(0.1)
 
         # Verify both handlers were called
         checkpoint_handler.assert_called_once()

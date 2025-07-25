@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from ..database.connection import DatabaseManager
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
     from ..optimization.algorithms.rule_optimizer import OptimizationConfig, RuleOptimizer
-    from ...performance.analytics.real_time_analytics import RealTimeAnalyticsService
+    from ...core.services.analytics_factory import get_analytics_router
     from ..utils.model_manager import ModelManager
 
 from .callbacks import AutoMLCallback
@@ -93,7 +93,7 @@ class AutoMLOrchestrator:
         db_manager: "DatabaseManager",
         rule_optimizer: Optional["RuleOptimizer"] = None,
         experiment_orchestrator: Optional["ExperimentOrchestrator"] = None,
-        analytics_service: Optional["RealTimeAnalyticsService"] = None,
+        analytics_service: Optional[Any] = None,
         model_manager: Optional["ModelManager"] = None,
     ):
         """Initialize AutoML orchestrator with existing components
@@ -232,7 +232,7 @@ class AutoMLOrchestrator:
                     "best_params": self.study.best_params,
                     "execution_time": results["execution_time"],
                 })
-                
+
                 span.set_attribute("execution_time", results["execution_time"])
                 span.set_attribute("best_value", self.study.best_value)
                 span.set_attribute("trials_completed", len(self.study.trials))

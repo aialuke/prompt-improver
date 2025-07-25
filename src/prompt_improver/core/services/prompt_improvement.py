@@ -90,7 +90,7 @@ class PromptImprovementService:
             # Import here to avoid circular dependencies
             from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
             from ..optimization.rule_optimizer import RuleOptimizer
-            from ...performance.analytics.real_time_analytics import RealTimeAnalyticsService
+            from .analytics_factory import get_analytics_router
             from ..ml.models.model_manager import ModelManager
 
             # Initialize AutoML configuration following 2025 best practices
@@ -106,7 +106,8 @@ class PromptImprovementService:
             )
 
             # Initialize supporting services
-            analytics_service = RealTimeAnalyticsService()
+            analytics_router = get_analytics_router()
+            analytics_service = analytics_router() if analytics_router else None
             experiment_orchestrator = ExperimentOrchestrator()
             model_manager = ModelManager()
             rule_optimizer = RuleOptimizer()
@@ -1062,7 +1063,7 @@ class PromptImprovementService:
                     parameters_used=data.get("parameters_used"),
                 )
 
-                db_session.add(RulePerformance(**perf_record.dict()))
+                db_session.add(RulePerformance(**perf_record.model_dump()))
 
             await db_session.commit()
 
@@ -1097,7 +1098,7 @@ class PromptImprovementService:
                 improvement_areas=improvement_areas,
             )
 
-            feedback = UserFeedback(**feedback_data.dict())
+            feedback = UserFeedback(**feedback_data.model_dump())
             db_session.add(feedback)
             await db_session.commit()
             await db_session.refresh(feedback)

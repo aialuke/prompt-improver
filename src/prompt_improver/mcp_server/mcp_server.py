@@ -18,7 +18,7 @@ from prompt_improver.ml.optimization.batch.batch_processor import (
     BatchProcessorConfig,
     periodic_batch_processor_coroutine,
 )
-from prompt_improver.performance.analytics.analytics import AnalyticsService
+from prompt_improver.core.services.analytics_factory import get_analytics_interface
 from prompt_improver.performance.monitoring.health.background_manager import (
     get_background_task_manager,
 )
@@ -64,7 +64,7 @@ mcp = FastMCP(
 
 # Initialize services
 prompt_service = PromptImprovementService()
-analytics_service = AnalyticsService()
+analytics_service = get_analytics_interface()
 batch_processor = BatchProcessor(BatchProcessorConfig(
     batch_size=10,
     batch_timeout=30,
@@ -490,7 +490,7 @@ async def health_ready() -> dict[str, Any]:
         db_ready = health_check.get("status") == "healthy"
         permissions_valid = permission_check.get("security_compliant", False)
         performance_ready = (
-            event_loop_latency < 100 and 
+            event_loop_latency < 100 and
             db_check_time < 150  # Within Phase 0 <200ms SLA budget
         )
 
@@ -599,17 +599,17 @@ async def health_phase0() -> dict[str, Any]:
     """Comprehensive Phase 0 health check with all unified architecture components."""
     try:
         from ..database.mcp_connection_pool import get_mcp_connection_pool
-        
+
         overall_start = time.time()
         components = {}
-        
+
         # 1. MCP Connection Pool Health
         try:
             mcp_pool = get_mcp_connection_pool()
             pool_health = await mcp_pool.health_check()
             pool_permissions = await mcp_pool.test_permissions()
             pool_stats = await mcp_pool.get_pool_status()
-            
+
             components["mcp_connection_pool"] = {
                 "status": pool_health.get("status", "unknown"),
                 "health_check": pool_health,
@@ -620,42 +620,42 @@ async def health_phase0() -> dict[str, Any]:
             }
         except Exception as e:
             components["mcp_connection_pool"] = {
-                "status": "error", 
+                "status": "error",
                 "error": str(e)
             }
-        
+
         # 2. Rule Application Tools Check
         available_tools = [
-            "improve_prompt", "store_prompt", "get_session", "set_session", 
-            "touch_session", "delete_session", "benchmark_event_loop", 
+            "improve_prompt", "store_prompt", "get_session", "set_session",
+            "touch_session", "delete_session", "benchmark_event_loop",
             "run_performance_benchmark", "get_performance_status"
         ]
-        
+
         components["rule_application_tools"] = {
             "status": "healthy",
             "available_tools": available_tools,
             "tool_count": len(available_tools),
             "ml_training_tools_removed": True
         }
-        
+
         # 3. Event Loop Performance
         loop_start = time.time()
         loop = asyncio.get_running_loop()
         await asyncio.sleep(0)
         event_loop_latency = (time.time() - loop_start) * 1000
-        
+
         components["event_loop"] = {
             "status": "healthy" if event_loop_latency < 100 else "degraded",
             "latency_ms": event_loop_latency,
             "loop_type": str(type(loop).__name__),
             "sla_compliant": event_loop_latency < 50  # Half of 100ms budget
         }
-        
+
         # 4. Background Task Manager
         try:
             task_manager = get_background_task_manager()
             queue_size = task_manager.get_queue_size()
-            
+
             components["background_tasks"] = {
                 "status": "healthy" if queue_size < 100 else "warning",
                 "queue_size": queue_size,
@@ -666,7 +666,7 @@ async def health_phase0() -> dict[str, Any]:
                 "status": "error",
                 "error": str(e)
             }
-        
+
         # 5. Session Store
         try:
             session_stats = {
@@ -674,7 +674,7 @@ async def health_phase0() -> dict[str, Any]:
                 "max_size": session_store.maxsize if hasattr(session_store, 'maxsize') else 1000,
                 "ttl_seconds": session_store.ttl if hasattr(session_store, 'ttl') else 3600
             }
-            
+
             components["session_store"] = {
                 "status": "healthy",
                 "stats": session_stats
@@ -684,17 +684,17 @@ async def health_phase0() -> dict[str, Any]:
                 "status": "error",
                 "error": str(e)
             }
-        
+
         # 6. Overall Performance Assessment
         total_check_time = (time.time() - overall_start) * 1000
-        
+
         # Determine overall health
         healthy_components = sum(1 for comp in components.values() if comp.get("status") == "healthy")
         total_components = len(components)
         health_percentage = (healthy_components / total_components) * 100
-        
+
         overall_status = "healthy" if health_percentage >= 80 else "degraded" if health_percentage >= 60 else "unhealthy"
-        
+
         return {
             "status": overall_status,
             "phase": "0",
@@ -720,11 +720,11 @@ async def health_phase0() -> dict[str, Any]:
             },
             "timestamp": time.time()
         }
-        
+
     except Exception as e:
         return {
             "status": "error",
-            "phase": "0", 
+            "phase": "0",
             "error": str(e),
             "timestamp": time.time()
         }

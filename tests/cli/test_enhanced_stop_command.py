@@ -19,12 +19,12 @@ from prompt_improver.database.models import TrainingSession, TrainingIteration
 
 class TestAsyncSignalHandler:
     """Test the enhanced signal handling system."""
-    
+
     @pytest.fixture
     def signal_handler(self):
         """Create signal handler for testing."""
         return AsyncSignalHandler()
-    
+
     @pytest.mark.asyncio
     async def test_signal_handler_initialization(self, signal_handler):
         """Test signal handler initializes correctly."""
@@ -33,54 +33,54 @@ class TestAsyncSignalHandler:
         assert signal_handler.shutdown_in_progress is False
         assert len(signal_handler.shutdown_handlers) == 0
         assert len(signal_handler.cleanup_handlers) == 0
-    
+
     @pytest.mark.asyncio
     async def test_register_shutdown_handler(self, signal_handler):
         """Test registering shutdown handlers."""
         async def test_handler(context):
             return {"status": "success"}
-        
+
         signal_handler.register_shutdown_handler("test_handler", test_handler)
         assert "test_handler" in signal_handler.shutdown_handlers
         assert signal_handler.shutdown_handlers["test_handler"] == test_handler
-    
+
     @pytest.mark.asyncio
     async def test_register_cleanup_handler(self, signal_handler):
         """Test registering cleanup handlers."""
         async def test_cleanup():
             return {"cleaned": True}
-        
+
         signal_handler.register_cleanup_handler("test_cleanup", test_cleanup)
         assert "test_cleanup" in signal_handler.cleanup_handlers
         assert signal_handler.cleanup_handlers["test_cleanup"] == test_cleanup
-    
+
     @pytest.mark.asyncio
     async def test_graceful_shutdown_execution(self, signal_handler):
         """Test graceful shutdown execution with handlers."""
         # Register test handlers
         shutdown_results = []
         cleanup_results = []
-        
+
         async def shutdown_handler(context):
             shutdown_results.append(f"shutdown_{context.reason.value}")
             return {"status": "success"}
-        
+
         async def cleanup_handler():
             cleanup_results.append("cleanup_executed")
             return {"cleaned": True}
-        
+
         signal_handler.register_shutdown_handler("test_shutdown", shutdown_handler)
         signal_handler.register_cleanup_handler("test_cleanup", cleanup_handler)
-        
+
         # Create shutdown context
         signal_handler.shutdown_context = ShutdownContext(
             reason=ShutdownReason.USER_INTERRUPT,
             timeout=30
         )
-        
+
         # Execute graceful shutdown
         result = await signal_handler.execute_graceful_shutdown()
-        
+
         # Verify results
         assert result["status"] == "success"
         assert result["reason"] == "user_interrupt"
@@ -90,23 +90,23 @@ class TestAsyncSignalHandler:
         assert len(cleanup_results) == 1
         assert shutdown_results[0] == "shutdown_user_interrupt"
         assert cleanup_results[0] == "cleanup_executed"
-    
+
     @pytest.mark.asyncio
     async def test_force_shutdown_execution(self, signal_handler):
         """Test force shutdown with minimal cleanup."""
         # Register handlers
         async def critical_cleanup():
             return {"critical": "cleaned"}
-        
+
         async def database_cleanup():
             return {"database": "closed"}
-        
+
         signal_handler.register_cleanup_handler("critical_cleanup", critical_cleanup)
         signal_handler.register_cleanup_handler("database_cleanup", database_cleanup)
-        
+
         # Execute force shutdown
         result = await signal_handler._execute_force_shutdown()
-        
+
         # Verify results
         assert result["status"] == "force_shutdown"
         assert result["reason"] == "timeout_or_force"
@@ -116,18 +116,18 @@ class TestAsyncSignalHandler:
 
 class TestProgressPreservationManager:
     """Test the progress preservation system."""
-    
+
     @pytest.fixture
     def temp_backup_dir(self):
         """Create temporary backup directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
             yield Path(temp_dir)
-    
+
     @pytest.fixture
     def progress_manager(self, temp_backup_dir):
         """Create progress manager with temp directory."""
         return ProgressPreservationManager(backup_dir=temp_backup_dir)
-    
+
     @pytest.fixture
     def sample_progress_snapshot(self):
         """Create sample progress snapshot."""
@@ -142,50 +142,50 @@ class TestProgressPreservationManager:
             model_checkpoints=["checkpoint_1.pkl", "checkpoint_2.pkl"],
             improvement_score=0.05
         )
-    
+
     def test_progress_snapshot_serialization(self, sample_progress_snapshot):
         """Test progress snapshot to/from dict conversion."""
         # Convert to dict
         snapshot_dict = sample_progress_snapshot.to_dict()
-        
+
         # Verify dict structure
         assert snapshot_dict["session_id"] == "test_session_123"
         assert snapshot_dict["iteration"] == 5
         assert isinstance(snapshot_dict["timestamp"], str)
         assert snapshot_dict["performance_metrics"]["accuracy"] == 0.85
-        
+
         # Convert back from dict
         restored_snapshot = ProgressSnapshot.from_dict(snapshot_dict)
-        
+
         # Verify restoration
         assert restored_snapshot.session_id == sample_progress_snapshot.session_id
         assert restored_snapshot.iteration == sample_progress_snapshot.iteration
         assert restored_snapshot.performance_metrics == sample_progress_snapshot.performance_metrics
-    
+
     @pytest.mark.asyncio
     async def test_save_to_backup_file(self, progress_manager, sample_progress_snapshot):
         """Test saving progress to backup file."""
         # Save progress snapshot
         await progress_manager._save_to_backup_file(sample_progress_snapshot)
-        
+
         # Verify backup file was created
         backup_file = progress_manager.backup_dir / f"{sample_progress_snapshot.session_id}_progress.json"
         assert backup_file.exists()
-        
+
         # Verify backup file content
         with open(backup_file, 'r') as f:
             backup_data = json.load(f)
-        
+
         assert "snapshots" in backup_data
         assert len(backup_data["snapshots"]) == 1
         assert backup_data["snapshots"][0]["session_id"] == "test_session_123"
         assert backup_data["snapshots"][0]["iteration"] == 5
-    
+
     @pytest.mark.asyncio
     async def test_backup_file_rotation(self, progress_manager):
         """Test backup file rotation (keeping only last 50 snapshots)."""
         session_id = "test_session_rotation"
-        
+
         # Create 55 snapshots (more than the 50 limit)
         for i in range(55):
             snapshot = ProgressSnapshot(
@@ -200,39 +200,43 @@ class TestProgressPreservationManager:
                 improvement_score=0.0
             )
             await progress_manager._save_to_backup_file(snapshot)
-        
+
         # Verify only last 50 snapshots are kept
         backup_file = progress_manager.backup_dir / f"{session_id}_progress.json"
         with open(backup_file, 'r') as f:
             backup_data = json.load(f)
-        
+
         assert len(backup_data["snapshots"]) == 50
         # Should have iterations 5-54 (last 50)
         assert backup_data["snapshots"][0]["iteration"] == 5
         assert backup_data["snapshots"][-1]["iteration"] == 54
-    
+
     @pytest.mark.asyncio
     async def test_cleanup_old_backups(self, progress_manager):
         """Test cleanup of old backup files."""
         # Create some test backup files with different timestamps
         old_file = progress_manager.backup_dir / "old_session_progress.json"
         recent_file = progress_manager.backup_dir / "recent_session_progress.json"
-        
+
         # Create files
         old_file.write_text('{"snapshots": []}')
         recent_file.write_text('{"snapshots": []}')
-        
+
         # Modify timestamps to simulate old files
         import time
+        import os
         old_timestamp = time.time() - (35 * 24 * 3600)  # 35 days ago
         recent_timestamp = time.time() - (10 * 24 * 3600)  # 10 days ago
-        
-        old_file.touch(times=(old_timestamp, old_timestamp))
-        recent_file.touch(times=(recent_timestamp, recent_timestamp))
-        
+
+        # Create files first, then set timestamps (Python 3.13 compatible)
+        old_file.touch()
+        recent_file.touch()
+        os.utime(old_file, (old_timestamp, old_timestamp))
+        os.utime(recent_file, (recent_timestamp, recent_timestamp))
+
         # Run cleanup (keep files newer than 30 days)
         cleaned_count = await progress_manager.cleanup_old_backups(days_to_keep=30)
-        
+
         # Verify old file was cleaned up, recent file remains
         assert cleaned_count == 1
         assert not old_file.exists()
@@ -241,7 +245,7 @@ class TestProgressPreservationManager:
 
 class TestEnhancedStopCommand:
     """Test the enhanced stop command integration."""
-    
+
     @pytest.fixture
     def mock_training_manager(self):
         """Mock training system manager."""
@@ -252,7 +256,7 @@ class TestEnhancedStopCommand:
         ]
         manager.stop_training_system.return_value = True
         return manager
-    
+
     @pytest.fixture
     def mock_cli_orchestrator(self):
         """Mock CLI orchestrator."""
@@ -264,7 +268,7 @@ class TestEnhancedStopCommand:
         }
         orchestrator.force_stop_training.return_value = {"success": True}
         return orchestrator
-    
+
     @pytest.fixture
     def mock_progress_manager(self):
         """Mock progress preservation manager."""
@@ -273,12 +277,12 @@ class TestEnhancedStopCommand:
         manager.export_session_results.return_value = "/path/to/export.json"
         manager.cleanup_old_backups.return_value = 3
         return manager
-    
+
     @pytest.mark.asyncio
     async def test_graceful_stop_single_session(
-        self, 
-        mock_training_manager, 
-        mock_cli_orchestrator, 
+        self,
+        mock_training_manager,
+        mock_cli_orchestrator,
         mock_progress_manager
     ):
         """Test graceful stop of a single session."""
@@ -288,19 +292,19 @@ class TestEnhancedStopCommand:
         export_results = True
         export_format = "json"
         graceful = True
-        
+
         # Get active sessions
         active_sessions = await mock_training_manager.get_active_sessions()
         session = next((s for s in active_sessions if s.session_id == session_id), None)
-        
+
         assert session is not None
         assert session.session_id == "session_1"
-        
+
         # Create checkpoint
         if save_progress:
             checkpoint_id = await mock_progress_manager.create_checkpoint(session_id)
             assert checkpoint_id == "checkpoint_123"
-        
+
         # Stop training gracefully
         if graceful:
             result = await mock_cli_orchestrator.stop_training_gracefully(
@@ -308,10 +312,10 @@ class TestEnhancedStopCommand:
                 timeout=30,
                 save_progress=save_progress
             )
-            
+
             assert result["success"] is True
             assert result["progress_saved"] is True
-            
+
             # Export results
             if export_results:
                 export_path = await mock_progress_manager.export_session_results(
@@ -320,28 +324,28 @@ class TestEnhancedStopCommand:
                     include_iterations=True
                 )
                 assert export_path == "/path/to/export.json"
-        
+
         # Verify all mocks were called correctly
         mock_training_manager.get_active_sessions.assert_called_once()
         mock_progress_manager.create_checkpoint.assert_called_once_with(session_id)
         mock_cli_orchestrator.stop_training_gracefully.assert_called_once()
         mock_progress_manager.export_session_results.assert_called_once()
-    
+
     @pytest.mark.asyncio
     async def test_force_stop_all_sessions(
-        self, 
-        mock_training_manager, 
-        mock_cli_orchestrator, 
+        self,
+        mock_training_manager,
+        mock_cli_orchestrator,
         mock_progress_manager
     ):
         """Test force stop of all sessions."""
         graceful = False
         save_progress = True
-        
+
         # Get active sessions
         active_sessions = await mock_training_manager.get_active_sessions()
         assert len(active_sessions) == 2
-        
+
         # Force stop each session
         for session in active_sessions:
             # Save critical progress quickly
@@ -354,17 +358,17 @@ class TestEnhancedStopCommand:
                     workflow_state={"force_shutdown": True},
                     improvement_score=0.0
                 )
-            
+
             # Force stop
             await mock_cli_orchestrator.force_stop_training(session.session_id)
-        
+
         # Final cleanup
         cleaned_files = await mock_progress_manager.cleanup_old_backups(days_to_keep=30)
         assert cleaned_files == 3
-        
+
         success = await mock_training_manager.stop_training_system(graceful=graceful)
         assert success is True
-        
+
         # Verify calls
         assert mock_progress_manager.save_training_progress.call_count == 2
         assert mock_cli_orchestrator.force_stop_training.call_count == 2

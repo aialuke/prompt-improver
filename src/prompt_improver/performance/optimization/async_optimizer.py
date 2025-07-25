@@ -37,12 +37,8 @@ try:
 except ImportError:
     REDIS_AVAILABLE = False
 
-# try:
-#     import aioredis
-#     AIOREDIS_AVAILABLE = True
-# except ImportError:
-#     AIOREDIS_AVAILABLE = False
-AIOREDIS_AVAILABLE = False  # Disabled due to Python 3.13 compatibility
+# Note: Using coredis instead of aioredis for better Python 3.13 compatibility
+AIOREDIS_AVAILABLE = False
 
 # Database connection pooling
 try:

@@ -1,0 +1,79 @@
+{
+  "summary": {
+    "mlflow_version": "3.1.4",
+    "test_duration_seconds": 10.320311069488525,
+    "total_tests": 6,
+    "passed_tests": 5,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "success_rate": 0.8333333333333334,
+    "overall_status": "FAILED"
+  },
+  "test_results": {
+    "model_logging": {
+      "status": "PASSED",
+      "model_uri": "models:/m-1ce94f54df264688a7de4430947762ad",
+      "model_id": "m-1ce94f54df264688a7de4430947762ad",
+      "run_id": "7b8ae2edbf4c4e6199c007786db47213",
+      "metrics": {
+        "accuracy": 0.87,
+        "precision": 0.8700961538461539,
+        "recall": 0.87
+      }
+    },
+    "model_loading": {
+      "status": "PASSED",
+      "loading_methods": {
+        "model_uri": "PASSED",
+        "model_id": "PASSED",
+        "pyfunc": "PASSED"
+      },
+      "prediction_accuracy": true
+    },
+    "enhanced_registry": {
+      "status": "FAILED",
+      "error": "'ModelMetadata' object has no attribute 'changelog'"
+    },
+    "fastapi_inference": {
+      "status": "PASSED",
+      "batch_predictions": 20,
+      "single_prediction": 1,
+      "avg_latency_ms": 0.18492937088012695,
+      "throughput_rps": 5407.469863985045
+    },
+    "new_features": {
+      "status": "PASSED",
+      "features_tested": {
+        "metric_threshold_greater_is_better": "PASSED",
+        "enhanced_metadata": "FAILED: Should have model_id",
+        "improved_logging_performance": {
+          "status": "PASSED",
+          "avg_logging_time_seconds": 1.440079927444458,
+          "improvement_target": "40% faster than MLflow 2.x"
+        },
+        "model_aliases": "PASSED"
+      }
+    },
+    "performance": {
+      "status": "PASSED",
+      "performance_metrics": {
+        "inference_latency": {
+          "avg_ms": 0.19522905349731445,
+          "p95_ms": 0.24008750915527344,
+          "target": "< 100ms for small models"
+        },
+        "parallel_processing": {
+          "enabled": true,
+          "avg_registration_time": 2.2694380283355713,
+          "target": "40% improvement"
+        },
+        "memory_usage": {
+          "current_mb": 180.109375,
+          "target": "Optimized memory usage vs MLflow 2.x"
+        }
+      }
+    }
+  },
+  "timestamp": "2025-07-25T09:38:41.136690",
+  "tracking_uri": "file:///var/folders/0b/sgbn84951l98m8xvmzjrws_00000gn/T/mlflow_3x_test_m_voten4/mlruns"
+}

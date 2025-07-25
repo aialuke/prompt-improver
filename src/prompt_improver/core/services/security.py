@@ -16,7 +16,7 @@ from enum import Enum
 from rich.console import Console
 
 from ...database import get_sessionmanager
-from ...performance.analytics.analytics import AnalyticsService
+from .analytics_factory import get_analytics_interface
 
 class SecurityLevel(Enum):
     """Security levels for data classification."""
@@ -487,7 +487,8 @@ class PromptDataProtection:
         """Generate security audit report using existing analytics framework"""
         try:
             # Leverage existing analytics service for security reporting
-            analytics = AnalyticsService()
+            analytics_factory = get_analytics_interface()
+            analytics = analytics_factory() if analytics_factory else None
 
             # Get basic analytics data using correct session manager
             async with get_sessionmanager().session() as db_session:

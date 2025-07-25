@@ -39,7 +39,7 @@ Based on comprehensive research of 2025 industry standards, this document outlin
 
 ### Async/Await Best Practices
 - **Default to Async**: All I/O operations should be asynchronous by default
-- **Connection Pooling**: Use asyncpg pools for PostgreSQL, aioredis for Redis
+- **Connection Pooling**: Use asyncpg pools for PostgreSQL, coredis for Redis
 - **Batch Operations**: Group database operations to reduce round trips
 - **Streaming Responses**: Use async generators for large datasets
 
