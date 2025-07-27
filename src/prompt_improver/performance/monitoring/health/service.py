@@ -172,8 +172,8 @@ from .checkers import (
     SystemResourcesHealthChecker,
 )
 
-# Import RedisHealthMonitor from the correct module
-from .redis_monitor import RedisHealthMonitor
+# Import RedisHealthMonitor from the comprehensive implementation
+from ....cache.redis_health import RedisHealthMonitor
 
 # Import ML-specific health checkers
 try:

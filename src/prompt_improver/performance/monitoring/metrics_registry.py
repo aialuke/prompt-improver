@@ -12,6 +12,7 @@ from threading import Lock
 # Define MockMetric classes first (always available)
 class MockMetric:
     def inc(self, *args, **kwargs): pass
+    def dec(self, *args, **kwargs): pass
     def set(self, *args, **kwargs): pass
     def observe(self, *args, **kwargs): pass
     def labels(self, *args, **kwargs): return self
