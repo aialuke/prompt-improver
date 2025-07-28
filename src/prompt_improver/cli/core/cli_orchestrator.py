@@ -13,9 +13,6 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 
 from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from ...ml.orchestration.config.workflow_templates import WorkflowTemplates
-from ...database import get_sessionmanager
-
 
 class CLIOrchestrator:
     """

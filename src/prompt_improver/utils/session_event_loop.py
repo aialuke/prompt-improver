@@ -9,7 +9,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional, Set, TypeVar, Union
+from typing import Any, TypeVar
 
 from prompt_improver.utils.event_loop_manager import get_event_loop_manager
 

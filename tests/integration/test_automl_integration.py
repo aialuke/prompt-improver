@@ -9,15 +9,15 @@ from datetime import datetime
 from typing import Any, Dict
 
 import pytest
-from src.prompt_improver.automl.callbacks import create_standard_callbacks
-from src.prompt_improver.automl.orchestrator import (
+from prompt_improver.automl.callbacks import create_standard_callbacks
+from prompt_improver.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
     AutoMLOrchestrator,
 )
-from src.prompt_improver.database.connection import DatabaseManager
-from src.prompt_improver.optimization.rule_optimizer import RuleOptimizer
-from src.prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.database.connection import DatabaseManager
+from prompt_improver.optimization.rule_optimizer import RuleOptimizer
+from prompt_improver.services.prompt_improvement import PromptImprovementService
 
 logger = logging.getLogger(__name__)
 

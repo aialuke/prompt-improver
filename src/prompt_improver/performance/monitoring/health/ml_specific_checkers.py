@@ -3,11 +3,10 @@ ML-Specific Health Checkers for 2025 ML Pipeline Monitoring
 Provides comprehensive health monitoring for ML models, data quality, training, and performance
 """
 
-import asyncio
 import logging
-import time
+
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from .base import HealthChecker, HealthResult, HealthStatus
 from .metrics import instrument_health_check
@@ -259,7 +258,7 @@ class MLDataQualityChecker(HealthChecker):
     async def _check_training_data(self) -> Dict[str, Any]:
         """Check the health of training data loader."""
         try:
-            from ....ml.core.training_data_loader import TrainingDataLoader, get_training_data_stats
+            from ....ml.core.training_data_loader import get_training_data_stats
 
             # Get training data statistics
             stats = await get_training_data_stats()
@@ -411,10 +410,10 @@ class MLTrainingHealthChecker(HealthChecker):
                 try:
                     # Try to import each component
                     if component == "RuleOptimizer":
-                        from ....ml.optimization.algorithms.rule_optimizer import RuleOptimizer
+
                         available_components.append(component)
                     elif component == "ClusteringOptimizer":
-                        from ....ml.optimization.algorithms.clustering_optimizer import ClusteringOptimizer
+
                         available_components.append(component)
                     # Add other components as needed
                 except ImportError:
@@ -435,7 +434,6 @@ class MLTrainingHealthChecker(HealthChecker):
     async def _check_batch_processing(self) -> Dict[str, Any]:
         """Check the health of batch processing."""
         try:
-            from ....ml.optimization.batch.batch_processor import BatchProcessor
 
             # Basic health check for batch processor
             return {
@@ -465,13 +463,13 @@ class MLTrainingHealthChecker(HealthChecker):
                 try:
                     # Try to import each component
                     if component == "ContextLearner":
-                        from ....ml.learning.algorithms.context_learner import ContextLearner
+
                         available_components.append(component)
                     elif component == "InsightGenerationEngine":
-                        from ....ml.learning.algorithms.insight_engine import InsightGenerationEngine
+
                         available_components.append(component)
                     elif component == "FailureModeAnalyzer":
-                        from ....ml.learning.algorithms.failure_analyzer import FailureModeAnalyzer
+
                         available_components.append(component)
                 except ImportError:
                     pass
@@ -574,13 +572,13 @@ class MLPerformanceHealthChecker(HealthChecker):
                 try:
                     # Try to import each component
                     if component == "CausalInferenceAnalyzer":
-                        from ....ml.evaluation.causal_inference_analyzer import CausalInferenceAnalyzer
+
                         available_components.append(component)
                     elif component == "AdvancedStatisticalValidator":
-                        from ....ml.evaluation.advanced_statistical_validator import AdvancedStatisticalValidator
+
                         available_components.append(component)
                     elif component == "PatternSignificanceAnalyzer":
-                        from ....ml.evaluation.pattern_significance_analyzer import PatternSignificanceAnalyzer
+
                         available_components.append(component)
                 except ImportError:
                     pass
@@ -600,7 +598,6 @@ class MLPerformanceHealthChecker(HealthChecker):
     async def _check_performance_monitoring(self) -> Dict[str, Any]:
         """Check the health of performance monitoring."""
         try:
-            from ...performance_monitor import PerformanceMonitor
 
             # Basic health check for performance monitor
             return {

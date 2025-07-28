@@ -4,15 +4,13 @@ Provides real-time monitoring of AutoML optimization, A/B testing, and system he
 
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, Optional
 
 from rich.console import Console
-from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.timer import Timer
-from textual.widgets import Button, Footer, Header, Static, TabbedContent, TabPane
+from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from .data_provider import APESDataProvider
 from .widgets.ab_testing import ABTestingWidget

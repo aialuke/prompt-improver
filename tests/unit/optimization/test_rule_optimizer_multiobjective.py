@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pytest
 
-from src.prompt_improver.ml.optimization.algorithms.rule_optimizer import (
+from prompt_improver.ml.optimization.algorithms.rule_optimizer import (
     GaussianProcessResult,
     MultiObjectiveResult,
     OptimizationConfig,

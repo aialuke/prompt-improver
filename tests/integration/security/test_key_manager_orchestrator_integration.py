@@ -26,10 +26,10 @@ import numpy as np
 import pytest
 
 # Import real orchestrator components for authentic integration testing
-from src.prompt_improver.ml.orchestration.core.component_registry import ComponentRegistry, ComponentTier
-from src.prompt_improver.ml.orchestration.config.component_definitions import ComponentDefinitions
-from src.prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-from src.prompt_improver.security.key_manager import SecureKeyManager, FernetKeyManager
+from prompt_improver.ml.orchestration.core.component_registry import ComponentRegistry, ComponentTier
+from prompt_improver.ml.orchestration.config.component_definitions import ComponentDefinitions
+from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
+from prompt_improver.security.key_manager import SecureKeyManager, FernetKeyManager
 
 
 class TestKeyManagerComponentRegistration:

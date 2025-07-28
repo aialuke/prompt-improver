@@ -11,10 +11,9 @@ Key Features:
 - Thread-safe singleton management
 """
 
-import asyncio
 import logging
 import threading
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar
 from functools import wraps
 from dataclasses import dataclass
 from enum import Enum

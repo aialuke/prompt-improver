@@ -8,15 +8,13 @@ This module implements a sophisticated caching strategy with multiple cache leve
 Designed to achieve <200ms response times for all MCP operations.
 """
 
-import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from datetime import datetime, timedelta, UTC
+from typing import Any, Dict, Optional
 from collections import OrderedDict
-import hashlib
 from functools import wraps
 
 from prompt_improver.utils.redis_cache import RedisCache
@@ -156,11 +154,11 @@ class CacheEntry:
         """Check if the cache entry is expired."""
         if self.ttl_seconds is None:
             return False
-        return datetime.utcnow() > self.created_at + timedelta(seconds=self.ttl_seconds)
+        return datetime.now(UTC) > self.created_at + timedelta(seconds=self.ttl_seconds)
 
     def touch(self) -> None:
         """Update access metadata."""
-        self.last_accessed = datetime.utcnow()
+        self.last_accessed = datetime.now(UTC)
         self.access_count += 1
 
 class LRUCache:
@@ -196,7 +194,7 @@ class LRUCache:
             # Update existing entry
             entry = self._cache[key]
             entry.value = value
-            entry.created_at = datetime.utcnow()
+            entry.created_at = datetime.now(UTC)
             entry.ttl_seconds = ttl_seconds
             self._cache.move_to_end(key)
         else:
@@ -207,8 +205,8 @@ class LRUCache:
 
             entry = CacheEntry(
                 value=value,
-                created_at=datetime.utcnow(),
-                last_accessed=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                last_accessed=datetime.now(UTC),
                 ttl_seconds=ttl_seconds
             )
             self._cache[key] = entry

@@ -37,7 +37,7 @@ async def test_context_feature_extractor():
     print("="*60)
     
     try:
-        from src.prompt_improver.ml.learning.features.context_feature_extractor import (
+        from prompt_improver.ml.learning.features.context_feature_extractor import (
             ContextFeatureExtractor, 
             ContextFeatureConfig
         )
@@ -170,7 +170,7 @@ async def test_domain_feature_extractor():
     print("="*60)
     
     try:
-        from src.prompt_improver.ml.learning.features.domain_feature_extractor import (
+        from prompt_improver.ml.learning.features.domain_feature_extractor import (
             DomainFeatureExtractor,
             DomainFeatureConfig
         )
@@ -290,7 +290,7 @@ async def test_circuit_breaker_behavior():
     print("="*60)
     
     try:
-        from src.prompt_improver.ml.learning.features.context_feature_extractor import (
+        from prompt_improver.ml.learning.features.context_feature_extractor import (
             ContextFeatureExtractor,
             ContextFeatureConfig
         )
@@ -354,11 +354,11 @@ async def test_performance_comparison():
     print("="*60)
     
     try:
-        from src.prompt_improver.ml.learning.features.context_feature_extractor import (
+        from prompt_improver.ml.learning.features.context_feature_extractor import (
             ContextFeatureExtractor,
             ContextFeatureConfig
         )
-        from src.prompt_improver.ml.learning.features.domain_feature_extractor import (
+        from prompt_improver.ml.learning.features.domain_feature_extractor import (
             DomainFeatureExtractor,
             DomainFeatureConfig
         )

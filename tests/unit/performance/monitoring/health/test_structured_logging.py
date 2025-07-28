@@ -11,14 +11,14 @@ import asyncio
 import time
 from unittest.mock import patch
 
-from src.prompt_improver.performance.monitoring.health.structured_logging import (
+from prompt_improver.performance.monitoring.health.structured_logging import (
     StructuredLogger,
     log_health_check,
     HealthMetricsLogger,
     get_metrics_logger,
     LogContext
 )
-from src.prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
+from prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
 
 
 class TestStructuredLogger:
@@ -422,7 +422,7 @@ def test_correlation_id_integration():
     # Mock correlation ID context
     mock_correlation_id = "test-correlation-12345"
     
-    with patch('src.prompt_improver.performance.monitoring.health.structured_logging.get_correlation_id', 
+    with patch('prompt_improver.performance.monitoring.health.structured_logging.get_correlation_id', 
                return_value=mock_correlation_id):
         
         structured = StructuredLogger("test_correlation")

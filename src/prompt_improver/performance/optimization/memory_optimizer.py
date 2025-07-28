@@ -10,7 +10,7 @@ import psutil
 import time
 import weakref
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, WeakSet, Any
 import threading
 

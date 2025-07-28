@@ -12,17 +12,13 @@ Advanced async optimizer implementing 2025 best practices:
 import asyncio
 import logging
 import time
-import uuid
-import statistics
-import psutil
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from datetime import datetime, UTC
+from collections import defaultdict
 from enum import Enum
 import json
-import weakref
 
 import aiohttp
 import ssl
@@ -42,7 +38,6 @@ AIOREDIS_AVAILABLE = False
 
 # Database connection pooling
 try:
-    import asyncpg
     ASYNCPG_AVAILABLE = True
 except ImportError:
     ASYNCPG_AVAILABLE = False
@@ -50,7 +45,6 @@ except ImportError:
 # OpenTelemetry imports
 try:
     from opentelemetry import trace, metrics
-    from opentelemetry.trace import Status, StatusCode
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
@@ -260,7 +254,7 @@ class IntelligentCache:
         
         # Try local cache first
         if key in self.cache:
-            self.access_times[key] = datetime.utcnow()
+            self.access_times[key] = datetime.now(UTC)
             self.access_counts[key] += 1
             self.cache_stats["hits"] += 1
 
@@ -303,7 +297,7 @@ class IntelligentCache:
 
         # Store in local cache
         self.cache[key] = value
-        self.access_times[key] = datetime.utcnow()
+        self.access_times[key] = datetime.now(UTC)
         self.access_counts[key] = 1
         self.cache_stats["size"] = len(self.cache)
 
@@ -359,7 +353,7 @@ class IntelligentCache:
         if key not in self.access_times:
             return True
 
-        age = datetime.utcnow() - self.access_times[key]
+        age = datetime.now(UTC) - self.access_times[key]
         return age.total_seconds() > self.config.ttl_seconds
 
     def get_hit_rate(self) -> float:
@@ -469,7 +463,7 @@ class ConnectionPoolManager:
                         self._pool_metrics['http'] = {
                             'active_connections': conn_count,
                             'session_closed': self._http_session.closed,
-                            'last_check': datetime.utcnow().isoformat()
+                            'last_check': datetime.now(UTC).isoformat()
                         }
                     else:
                         # Mark as unhealthy if no session or session is closed
@@ -477,7 +471,7 @@ class ConnectionPoolManager:
                         self._pool_metrics['http'] = {
                             'active_connections': 0,
                             'session_closed': True,
-                            'last_check': datetime.utcnow().isoformat()
+                            'last_check': datetime.now(UTC).isoformat()
                         }
 
                     # Monitor database pools
@@ -489,7 +483,7 @@ class ConnectionPoolManager:
                                 self._pool_health[f'db_{name}'] = True
                                 self._pool_metrics[f'db_{name}'] = {
                                     'pool_size': pool_size,
-                                    'last_check': datetime.utcnow().isoformat()
+                                    'last_check': datetime.now(UTC).isoformat()
                                 }
                         except Exception as e:
                             self._pool_health[f'db_{name}'] = False
@@ -504,7 +498,7 @@ class ConnectionPoolManager:
                                 self._pool_health[f'redis_{name}'] = True
                                 self._pool_metrics[f'redis_{name}'] = {
                                     'status': 'healthy',
-                                    'last_check': datetime.utcnow().isoformat()
+                                    'last_check': datetime.now(UTC).isoformat()
                                 }
                         except Exception as e:
                             self._pool_health[f'redis_{name}'] = False

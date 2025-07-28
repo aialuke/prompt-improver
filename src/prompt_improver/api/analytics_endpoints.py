@@ -12,13 +12,11 @@ Key Features (2025 Standards):
 """
 
 import logging
-import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Union
-from enum import Enum
+from typing import Dict, List, Optional, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +40,6 @@ from ..ml.analytics.session_comparison_analyzer import (
     ComparisonMethod
 )
 from ..utils.websocket_manager import connection_manager
-from ..utils.error_handlers import handle_database_errors
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +52,6 @@ analytics_router = APIRouter(
     tags=["analytics-dashboard"]
 )
 
-
 # Pydantic models for API requests/responses
 
 class TimeRangeRequest(BaseModel):
@@ -64,7 +60,6 @@ class TimeRangeRequest(BaseModel):
     end_date: Optional[datetime] = None
     hours: Optional[int] = Field(default=24, ge=1, le=8760)  # Max 1 year
 
-
 class TrendAnalysisRequest(BaseModel):
     """Request for trend analysis"""
     time_range: TimeRangeRequest
@@ -72,14 +67,12 @@ class TrendAnalysisRequest(BaseModel):
     metric_type: MetricType = MetricType.PERFORMANCE
     session_ids: Optional[List[str]] = None
 
-
 class SessionComparisonRequest(BaseModel):
     """Request for session comparison"""
     session_a_id: str
     session_b_id: str
     dimension: ComparisonDimension = ComparisonDimension.PERFORMANCE
     method: ComparisonMethod = ComparisonMethod.T_TEST
-
 
 class DashboardMetricsResponse(BaseModel):
     """Response for dashboard metrics"""
@@ -89,7 +82,6 @@ class DashboardMetricsResponse(BaseModel):
     previous_period: Optional[Dict[str, Any]] = None
     changes: Optional[Dict[str, Any]] = None
 
-
 class TrendAnalysisResponse(BaseModel):
     """Response for trend analysis"""
     time_series: List[Dict[str, Any]]
@@ -98,7 +90,6 @@ class TrendAnalysisResponse(BaseModel):
     correlation_coefficient: float
     seasonal_patterns: Dict[str, Any]
     metadata: Dict[str, Any]
-
 
 class SessionComparisonResponse(BaseModel):
     """Response for session comparison"""
@@ -112,23 +103,19 @@ class SessionComparisonResponse(BaseModel):
     insights: List[str]
     recommendations: List[str]
 
-
 # Dependency injection
 
 async def get_analytics_interface(db_session: AsyncSession = Depends(get_session)) -> AnalyticsQueryInterface:
     """Get analytics query interface"""
     return AnalyticsQueryInterface(db_session)
 
-
 async def get_session_reporter(db_session: AsyncSession = Depends(get_session)) -> SessionSummaryReporter:
     """Get session summary reporter"""
     return SessionSummaryReporter(db_session)
 
-
 async def get_comparison_analyzer(db_session: AsyncSession = Depends(get_session)) -> SessionComparisonAnalyzer:
     """Get session comparison analyzer"""
     return SessionComparisonAnalyzer(db_session)
-
 
 async def get_current_user_role(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> UserRole:
     """Get current user role (simplified for demo - implement proper auth)"""
@@ -137,7 +124,6 @@ async def get_current_user_role(credentials: Optional[HTTPAuthorizationCredentia
         # Mock role extraction - replace with actual implementation
         return UserRole.ANALYST
     return UserRole.OPERATOR
-
 
 # API Endpoints
 
@@ -166,7 +152,6 @@ async def get_dashboard_metrics(
             status_code=500,
             detail="Failed to retrieve dashboard metrics"
         )
-
 
 @analytics_router.post("/trends/analysis", response_model=TrendAnalysisResponse)
 async def analyze_performance_trends(
@@ -225,7 +210,6 @@ async def analyze_performance_trends(
             detail="Failed to analyze performance trends"
         )
 
-
 @analytics_router.post("/sessions/compare", response_model=SessionComparisonResponse)
 async def compare_sessions(
     request: SessionComparisonRequest,
@@ -262,7 +246,6 @@ async def compare_sessions(
             status_code=500,
             detail="Failed to compare sessions"
         )
-
 
 @analytics_router.get("/sessions/{session_id}/summary")
 async def get_session_summary(
@@ -321,7 +304,6 @@ async def get_session_summary(
             detail="Failed to retrieve session summary"
         )
 
-
 @analytics_router.get("/sessions/{session_id}/export")
 async def export_session_report(
     session_id: str,
@@ -354,7 +336,6 @@ async def export_session_report(
             detail="Failed to export session report"
         )
 
-
 @analytics_router.get("/distribution/performance")
 async def get_performance_distribution(
     start_date: Optional[datetime] = Query(default=None),
@@ -381,7 +362,6 @@ async def get_performance_distribution(
             detail="Failed to retrieve performance distribution"
         )
 
-
 @analytics_router.get("/correlation/analysis")
 async def get_correlation_analysis(
     metrics: List[str] = Query(default=["performance", "efficiency", "duration"]),
@@ -407,7 +387,6 @@ async def get_correlation_analysis(
             status_code=500,
             detail="Failed to retrieve correlation analysis"
         )
-
 
 # WebSocket endpoints for real-time analytics
 
@@ -498,7 +477,6 @@ async def websocket_dashboard_endpoint(
     finally:
         await connection_manager.disconnect(websocket, "dashboard")
 
-
 @analytics_router.websocket("/live/session/{session_id}")
 async def websocket_session_endpoint(
     websocket: WebSocket,
@@ -558,7 +536,6 @@ async def websocket_session_endpoint(
     finally:
         await connection_manager.disconnect(websocket, f"session_{session_id}")
 
-
 # Background tasks for real-time updates
 
 async def broadcast_dashboard_updates():
@@ -580,7 +557,6 @@ async def broadcast_dashboard_updates():
     except Exception as e:
         logger.error(f"Error broadcasting dashboard updates: {e}")
 
-
 async def broadcast_session_update(session_id: str, update_data: Dict[str, Any]):
     """Broadcast session update to all connected clients monitoring this session"""
     try:
@@ -596,7 +572,6 @@ async def broadcast_session_update(session_id: str, update_data: Dict[str, Any])
 
     except Exception as e:
         logger.error(f"Error broadcasting session update: {e}")
-
 
 # Health and status endpoints
 
@@ -628,7 +603,6 @@ async def analytics_health_check():
             },
             status_code=503
         )
-
 
 @analytics_router.get("/dashboard/config")
 async def get_dashboard_config():

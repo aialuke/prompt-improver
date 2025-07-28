@@ -12,26 +12,26 @@ from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from src.prompt_improver.database import get_sessionmanager
-from src.prompt_improver.database.models import (
+from prompt_improver.database import get_sessionmanager
+from prompt_improver.database.models import (
     TrainingSession, RulePerformance, UserFeedback, ImprovementSession
 )
-from src.prompt_improver.ml.analysis.performance_gap_analyzer import (
+from prompt_improver.ml.analysis.performance_gap_analyzer import (
     PerformanceGapAnalyzer, PerformanceGap
 )
-from src.prompt_improver.ml.analysis.generation_strategy_analyzer import (
+from prompt_improver.ml.analysis.generation_strategy_analyzer import (
     GenerationStrategyAnalyzer, GenerationStrategy
 )
-from src.prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
+from prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
     DifficultyDistributionAnalyzer
 )
-from src.prompt_improver.ml.preprocessing.synthetic_data_generator import (
+from prompt_improver.ml.preprocessing.synthetic_data_generator import (
     ProductionSyntheticDataGenerator
 )
-from src.prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import (
+from prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import (
     AdaptiveTrainingCoordinator
 )
-from src.prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
+from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator
 )
 

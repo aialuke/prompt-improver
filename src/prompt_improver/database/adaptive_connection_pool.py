@@ -18,12 +18,11 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 from enum import Enum
 import statistics
 
 try:
-    import psycopg
     from psycopg_pool import AsyncConnectionPool
     PSYCOPG_AVAILABLE = True
 except ImportError:
@@ -31,7 +30,6 @@ except ImportError:
     AsyncConnectionPool = None
 
 from .config import DatabaseConfig
-
 
 class PoolState(Enum):
     """Connection pool operational states."""
@@ -41,7 +39,6 @@ class PoolState(Enum):
     SCALING_DOWN = "scaling_down"
     DEGRADED = "degraded"
     FAILED = "failed"
-
 
 @dataclass
 class ConnectionMetrics:
@@ -61,7 +58,6 @@ class ConnectionMetrics:
     last_scale_event: Optional[datetime] = None
     connection_times: deque = field(default_factory=lambda: deque(maxlen=1000))
     query_times: deque = field(default_factory=lambda: deque(maxlen=1000))
-
 
 class AdaptiveConnectionPool:
     """
@@ -449,7 +445,6 @@ class AdaptiveConnectionPool:
             'last_scale_event': self.metrics.last_scale_event.isoformat() if self.metrics.last_scale_event else None,
             'performance_window': list(self.performance_window)
         }
-
 
 class AdaptiveConnection:
     """Wrapper for database connections with performance tracking."""

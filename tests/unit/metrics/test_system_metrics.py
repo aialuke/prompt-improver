@@ -13,7 +13,7 @@ Validates performance targets, real-time collection, and integration.
 import asyncio
 import pytest
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch, MagicMock
 
 from prompt_improver.metrics.system_metrics import (
@@ -117,7 +117,7 @@ class TestConnectionAgeTracker:
     
     def test_connection_info_properties(self):
         """Test ConnectionInfo properties"""
-        created_time = datetime.utcnow()
+        created_time = datetime.now(UTC)
         conn_info = ConnectionInfo(
             connection_id="test_conn",
             created_at=created_time,
@@ -212,7 +212,7 @@ class TestConnectionAgeTracker:
         tracker.track_connection_created("conn_old", "redis", "pool2")
         
         # Simulate aging by modifying creation time
-        old_time = datetime.utcnow() - timedelta(hours=2)
+        old_time = datetime.now(UTC) - timedelta(hours=2)
         tracker._connections["conn_old"].created_at = old_time
         
         distribution = tracker.get_age_distribution()
@@ -249,7 +249,7 @@ class TestRequestQueueMonitor:
     def test_queue_sample_properties(self):
         """Test QueueSample properties"""
         sample = QueueSample(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             depth=25,
             capacity=100,
             queue_type="http"
@@ -341,7 +341,7 @@ class TestCacheEfficiencyMonitor:
     def test_cache_operation_creation(self):
         """Test CacheOperation creation"""
         operation = CacheOperation(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             cache_type="application",
             cache_name="user_cache",
             operation="hit",
@@ -472,7 +472,7 @@ class TestFeatureUsageAnalytics:
     def test_feature_usage_event_creation(self):
         """Test FeatureUsageEvent creation"""
         event = FeatureUsageEvent(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             feature_type="api_endpoint",
             feature_name="/api/users",
             user_context="user_123_hashed",
@@ -569,7 +569,7 @@ class TestFeatureUsageAnalytics:
         # Create events at different hours
         for hour in [9, 9, 14, 14, 14, 16]:  # 14 (2pm) should be peak
             event = FeatureUsageEvent(
-                timestamp=datetime.utcnow().replace(hour=hour, minute=0, second=0),
+                timestamp=datetime.now(UTC).replace(hour=hour, minute=0, second=0),
                 feature_type="api_endpoint",
                 feature_name="/api/search",
                 user_context="user_test",

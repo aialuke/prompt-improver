@@ -14,7 +14,7 @@ Key features:
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Optional, Type
+from typing import Any, Iterator
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase, registry

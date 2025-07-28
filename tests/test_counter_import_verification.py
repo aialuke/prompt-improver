@@ -12,7 +12,7 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 # Import the module to test
-from src.prompt_improver.learning.failure_analyzer import (
+from prompt_improver.learning.failure_analyzer import (
     FailureConfig,
     FailureModeAnalyzer,
 )
@@ -111,7 +111,7 @@ class TestCounterImportVerification(unittest.TestCase):
         # Read the failure_analyzer.py file
         import inspect
 
-        from src.prompt_improver.learning import failure_analyzer
+        from prompt_improver.learning import failure_analyzer
 
         # Get the source code
         source = inspect.getsource(failure_analyzer)
@@ -131,7 +131,7 @@ class TestCounterImportVerification(unittest.TestCase):
         # Read the failure_analyzer.py file to check import
         import inspect
 
-        from src.prompt_improver.learning import failure_analyzer
+        from prompt_improver.learning import failure_analyzer
 
         # Get the source code
         source = inspect.getsource(failure_analyzer)

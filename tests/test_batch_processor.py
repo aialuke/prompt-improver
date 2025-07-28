@@ -1,5 +1,5 @@
 import pytest
-from src.prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
+from prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
 
 
 @pytest.mark.asyncio

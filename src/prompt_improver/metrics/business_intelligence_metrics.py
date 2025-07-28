@@ -7,18 +7,14 @@ and cost per operation tracking with real-time business insights and ROI analysi
 
 import asyncio
 import logging
-import time
-from typing import Dict, Any, Optional, List, Union, Set, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-import json
 import statistics
 from collections import defaultdict, deque
-import uuid
 
 from ..performance.monitoring.metrics_registry import get_metrics_registry
-
 
 class FeatureCategory(Enum):
     """Categories of features for adoption tracking."""
@@ -33,7 +29,6 @@ class FeatureCategory(Enum):
     MONITORING = "monitoring"
     ADVANCED_FEATURES = "advanced_features"
 
-
 class UserTier(Enum):
     """User subscription tiers."""
     FREE = "free"
@@ -41,7 +36,6 @@ class UserTier(Enum):
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
     ADMIN = "admin"
-
 
 class CostType(Enum):
     """Types of operational costs."""
@@ -54,7 +48,6 @@ class CostType(Enum):
     MONITORING = "monitoring"
     INFRASTRUCTURE = "infrastructure"
 
-
 class ResourceType(Enum):
     """Types of resources for utilization tracking."""
     CPU = "cpu"
@@ -65,7 +58,6 @@ class ResourceType(Enum):
     DATABASE_CONNECTIONS = "database_connections"
     CACHE = "cache"
     QUEUE_CAPACITY = "queue_capacity"
-
 
 @dataclass
 class FeatureAdoptionMetric:
@@ -88,7 +80,6 @@ class FeatureAdoptionMetric:
     timestamp: datetime
     metadata: Dict[str, Any]
 
-
 @dataclass
 class UserEngagementMetric:
     """Metrics for user engagement patterns."""
@@ -110,7 +101,6 @@ class UserEngagementMetric:
     user_agent: Optional[str]
     referrer: Optional[str]
 
-
 @dataclass
 class CostTrackingMetric:
     """Metrics for cost per operation tracking."""
@@ -131,7 +121,6 @@ class CostTrackingMetric:
     cost_center: Optional[str]
     project_id: Optional[str]
 
-
 @dataclass
 class ResourceUtilizationMetric:
     """Metrics for resource utilization efficiency."""
@@ -151,7 +140,6 @@ class ResourceUtilizationMetric:
     timestamp: datetime
     forecast_next_hour: Optional[float]
     recommendations: List[str]
-
 
 class BusinessIntelligenceMetricsCollector:
     """
@@ -933,10 +921,8 @@ class BusinessIntelligenceMetricsCollector:
             }
         }
 
-
 # Global instance
 _bi_metrics_collector: Optional[BusinessIntelligenceMetricsCollector] = None
-
 
 def get_bi_metrics_collector(config: Optional[Dict[str, Any]] = None) -> BusinessIntelligenceMetricsCollector:
     """Get global business intelligence metrics collector instance."""
@@ -944,7 +930,6 @@ def get_bi_metrics_collector(config: Optional[Dict[str, Any]] = None) -> Busines
     if _bi_metrics_collector is None:
         _bi_metrics_collector = BusinessIntelligenceMetricsCollector(config)
     return _bi_metrics_collector
-
 
 # Convenience functions for recording metrics
 async def record_feature_usage(
@@ -987,7 +972,6 @@ async def record_feature_usage(
         metadata=metadata or {}
     )
     await collector.record_feature_adoption(metric)
-
 
 async def record_operational_cost(
     operation_type: str,

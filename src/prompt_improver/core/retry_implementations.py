@@ -15,7 +15,7 @@ Key Benefits:
 import logging
 import random
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional
+from typing import Callable, List, Optional
 
 from .protocols.retry_protocols import (
     RetryConfigProtocol,
@@ -25,7 +25,6 @@ from .protocols.retry_protocols import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class BasicRetryConfig:
@@ -157,7 +156,6 @@ class BasicRetryConfig:
         
         return True
 
-
 class StandardRetryConfigFactory:
     """
     Factory for creating standard retry configurations.
@@ -273,7 +271,6 @@ class StandardRetryConfigFactory:
         
         return self._STANDARD_CONFIGS[config_name]
 
-
 # Global factory instance for convenience
 _default_factory = StandardRetryConfigFactory()
 
@@ -301,7 +298,6 @@ def get_standard_retry_config(config_name: str) -> RetryConfigProtocol:
     Convenience function to get standard retry configurations.
     """
     return _default_factory.get_standard_config(config_name)
-
 
 # Backward compatibility aliases
 RetryConfig = BasicRetryConfig  # For existing code that imports RetryConfig

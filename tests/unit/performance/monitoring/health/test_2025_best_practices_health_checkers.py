@@ -9,12 +9,12 @@ import time
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
-from src.prompt_improver.performance.monitoring.health.base import HealthStatus, HealthResult
-from src.prompt_improver.performance.monitoring.health.enhanced_checkers import (
+from prompt_improver.performance.monitoring.health.base import HealthStatus, HealthResult
+from prompt_improver.performance.monitoring.health.enhanced_checkers import (
     EnhancedMLServiceHealthChecker,
-    EnhancedRedisHealthMonitor,
     EnhancedAnalyticsServiceHealthChecker
 )
+# Note: EnhancedRedisHealthMonitor removed - functionality consolidated into cache/redis_health.py
 
 
 class Test2025BestPracticesHealthCheckers:
@@ -50,23 +50,7 @@ class Test2025BestPracticesHealthCheckers:
         elif result.status == HealthStatus.FAILED:
             assert "error" in result.details
     
-    @pytest.mark.asyncio
-    async def test_redis_real_unavailable_behavior(self):
-        """
-        BEST PRACTICE: Test real Redis behavior without server
-        Expect WARNING/FAILED, not false positive HEALTHY
-        """
-        checker = EnhancedRedisHealthMonitor()
-        
-        # Test without mocking - real behavior in test environment
-        result = await checker.check()
-        
-        # 2025 Best Practice: Realistic expectations
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
-        assert result.response_time_ms > 0
-        
-        # Verify proper error handling
-        assert "error" in result.details or "fallback_data" in result.details
+    # test_redis_real_unavailable_behavior removed - Redis testing moved to cache tests
     
     @pytest.mark.asyncio
     async def test_analytics_real_unavailable_behavior(self):
@@ -87,35 +71,7 @@ class Test2025BestPracticesHealthCheckers:
         assert "error" in result.details
         assert "not available" in result.details.get("error", "").lower()
     
-    @pytest.mark.asyncio
-    async def test_threshold_enforcement_prevents_false_positives(self):
-        """
-        BEST PRACTICE: Test that thresholds prevent false positives
-        Services should report WARNING/FAILED when metrics exceed thresholds
-        """
-        redis_checker = EnhancedRedisHealthMonitor()
-        
-        # Mock scenario with metrics exceeding thresholds
-        async def mock_critical_metrics():
-            return {
-                "info_success": True,
-                "memory_usage_percent": 96,  # Critical: >95%
-                "connection_pool_info": {"connection_pool_usage_percent": 98},  # Critical: >95%
-                "performance_info": {"hit_ratio_percent": 60},  # Poor: <80%
-                "client_info": {"connected_clients": 200},
-                "redis_version": "7.0.0"
-            }
-        
-        with patch.object(redis_checker, '_info_check', mock_critical_metrics):
-            result = await redis_checker.check()
-        
-        # Should be WARNING or FAILED due to critical thresholds
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
-        assert len(result.details.get("warnings", [])) > 0
-        # Check for threshold-related warnings
-        warnings = result.details.get("warnings", [])
-        assert any("memory" in warning.lower() or "connection" in warning.lower() or "hit ratio" in warning.lower()
-                  for warning in warnings)
+    # test_threshold_enforcement_prevents_false_positives removed - Redis testing moved to cache tests
     
     @pytest.mark.asyncio
     async def test_circuit_breaker_prevents_cascade_failures(self):
@@ -194,7 +150,7 @@ class Test2025BestPracticesHealthCheckers:
         BEST PRACTICE: Test SLA monitoring with real performance data
         Should track and report SLA compliance accurately
         """
-        checker = EnhancedRedisHealthMonitor()
+        checker = EnhancedMLServiceHealthChecker()
         
         # Perform multiple health checks to build SLA data
         for i in range(10):
@@ -218,8 +174,8 @@ class Test2025BestPracticesHealthCheckers:
         BEST PRACTICE: Test configuration validation
         Should prevent invalid configurations that could cause false positives
         """
-        from src.prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
-        from src.prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration
+        from prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
+        from prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration
         
         # Test valid configuration
         valid_circuit_config = CircuitBreakerConfig(
@@ -248,7 +204,6 @@ class Test2025BestPracticesHealthCheckers:
         """
         checkers = [
             EnhancedMLServiceHealthChecker(),
-            EnhancedRedisHealthMonitor(),
             EnhancedAnalyticsServiceHealthChecker()
         ]
         
@@ -274,7 +229,6 @@ class Test2025BestPracticesHealthCheckers:
         """
         checkers = [
             ("ML Service", EnhancedMLServiceHealthChecker()),
-            ("Redis", EnhancedRedisHealthMonitor()),
             ("Analytics", EnhancedAnalyticsServiceHealthChecker())
         ]
         

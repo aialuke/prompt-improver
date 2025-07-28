@@ -62,17 +62,17 @@ import optuna
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.prompt_improver.ml.automl.orchestrator import (
+from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
     AutoMLOrchestrator,
 )
-from src.prompt_improver.database.connection import DatabaseManager, get_database_url
-from src.prompt_improver.performance.testing.ab_testing_service import ABTestingService
-from src.prompt_improver.core.services.prompt_improvement import PromptImprovementService
-from src.prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
-from src.prompt_improver.utils.websocket_manager import ConnectionManager as WebSocketManager
-from src.prompt_improver.database.registry import clear_registry
+from prompt_improver.database.connection import DatabaseManager, get_database_url
+from prompt_improver.performance.testing.ab_testing_service import ABTestingService
+from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+from prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
+from prompt_improver.utils.websocket_manager import ConnectionManager as WebSocketManager
+from prompt_improver.database.registry import clear_registry
 
 
 class TestAutoMLEndToEndWorkflow:
@@ -524,7 +524,7 @@ class TestAutoMLServiceIntegration:
     @pytest.fixture
     async def async_session(self):
         """Async session for A/B testing service."""
-        from src.prompt_improver.database.connection import get_session_context
+        from prompt_improver.database.connection import get_session_context
         
         async with get_session_context() as session:
             yield session

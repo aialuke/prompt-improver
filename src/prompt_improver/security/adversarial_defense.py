@@ -1,7 +1,6 @@
 """Real adversarial defense system for production use and integration testing."""
 
-import random
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import numpy as np
 
@@ -332,7 +331,6 @@ class RobustnessEvaluator:
             Orchestrator-compatible result with robustness metrics and metadata
         """
         from datetime import datetime
-        import asyncio
 
         start_time = datetime.now()
 
@@ -433,7 +431,6 @@ class RobustnessEvaluator:
                                         adversarial_data: np.ndarray, labels: np.ndarray,
                                         evaluation_mode: str) -> dict:
         """Async comprehensive robustness evaluation with 2025 security features."""
-        import asyncio
 
         # Simulate model predictions (async for scalability)
         clean_predictions = await self._simulate_predictions_async(clean_data)
@@ -541,7 +538,6 @@ class RobustnessEvaluator:
 
     async def _run_multi_attack_evaluation_async(self, clean_data: np.ndarray, labels: np.ndarray) -> dict:
         """Run evaluation against multiple attack types."""
-        import asyncio
 
         results = {}
 

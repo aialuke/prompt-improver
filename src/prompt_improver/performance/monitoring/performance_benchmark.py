@@ -4,12 +4,11 @@ This module provides tools to measure current performance baseline and validate
 optimization improvements against the <200ms target.
 """
 
-import asyncio
 import json
 import logging
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, UTC
+from typing import Any, Dict, Optional
 
 import aiofiles
 
@@ -186,7 +185,7 @@ class MCPPerformanceBenchmark:
     ) -> None:
         """Save benchmark results to file."""
         results = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "target_ms": 200,
             "baselines": {
                 name: baseline.to_dict()
@@ -232,7 +231,7 @@ class MCPPerformanceBenchmark:
 
         current_baselines = await self.optimizer.get_all_baselines()
         comparison = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "baseline_timestamp": baseline_data["timestamp"],
             "comparisons": {}
         }
@@ -272,7 +271,7 @@ class MCPPerformanceBenchmark:
             "=" * 80,
             "MCP PERFORMANCE BENCHMARK REPORT",
             "=" * 80,
-            f"Generated: {datetime.utcnow().isoformat()}",
+            f"Generated: {datetime.now(UTC).isoformat()}",
             f"Target: <200ms response time",
             "",
             "OPERATION PERFORMANCE SUMMARY:",

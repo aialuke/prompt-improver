@@ -18,8 +18,8 @@ from typing import Any, Dict, List
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
-from src.prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
+from prompt_improver.ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
+from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )
 from tests.test_batch_processor_performance import DatasetGenerator, PerformanceBenchmark

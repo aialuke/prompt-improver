@@ -13,23 +13,19 @@ Key Features (2025 Standards):
 
 import logging
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, desc, asc, func, text, case, literal_column
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy.sql import Select
-from sqlalchemy.dialects.postgresql import aggregate_order_by
+from sqlalchemy import select, and_, func, text, case, literal_column
 
-from .models import TrainingSession, TrainingIteration, GenerationSession, ImprovementSession
+from .models import TrainingSession, TrainingIteration
 from .query_optimizer import execute_optimized_query
 from ..utils.datetime_utils import naive_utc_now
 
 logger = logging.getLogger(__name__)
-
 
 class TimeGranularity(Enum):
     """Time granularity for analytics queries"""
@@ -37,7 +33,6 @@ class TimeGranularity(Enum):
     DAY = "day"
     WEEK = "week"
     MONTH = "month"
-
 
 class MetricType(Enum):
     """Types of metrics for analytics"""
@@ -47,14 +42,12 @@ class MetricType(Enum):
     DURATION = "duration"
     RESOURCE_USAGE = "resource_usage"
 
-
 @dataclass
 class TimeSeriesPoint:
     """Single point in time series data"""
     timestamp: datetime
     value: float
     metadata: Optional[Dict[str, Any]] = None
-
 
 @dataclass
 class AnalyticsQueryResult:
@@ -65,7 +58,6 @@ class AnalyticsQueryResult:
     cache_hit: bool
     metadata: Dict[str, Any]
 
-
 @dataclass
 class TrendAnalysisResult:
     """Result of trend analysis query"""
@@ -74,7 +66,6 @@ class TrendAnalysisResult:
     trend_strength: float  # 0.0 to 1.0
     correlation_coefficient: float
     seasonal_patterns: Dict[str, Any]
-
 
 class AnalyticsQueryInterface:
     """

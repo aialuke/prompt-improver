@@ -20,13 +20,13 @@ from pathlib import Path
 # Add the project root to the path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.prompt_improver.ml.learning.features.composite_feature_extractor import (
+from prompt_improver.ml.learning.features.composite_feature_extractor import (
     CompositeFeatureExtractor,
     FeatureExtractionConfig,
     ExtractionMode
 )
-from src.prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
-from src.prompt_improver.ml.orchestration.core.component_registry import ComponentTier
+from prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
+from prompt_improver.ml.orchestration.core.component_registry import ComponentTier
 
 # Configure logging
 logging.basicConfig(

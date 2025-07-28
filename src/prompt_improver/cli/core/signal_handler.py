@@ -16,13 +16,12 @@ from rich.console import Console
 
 # Import emergency operations manager
 try:
-    from .emergency_operations import EmergencyOperationsManager
+
     EMERGENCY_OPERATIONS_AVAILABLE = True
 except ImportError as e:
     EMERGENCY_OPERATIONS_AVAILABLE = False
     import logging
     logging.getLogger(__name__).debug(f"Emergency operations import failed: {e}")
-
 
 class ShutdownReason(Enum):
     """Enumeration of shutdown reasons for tracking and reporting."""
@@ -32,14 +31,12 @@ class ShutdownReason(Enum):
     ERROR = "error"  # Error during shutdown
     FORCE = "force"  # Force shutdown requested
 
-
 class SignalOperation(Enum):
     """Enumeration of signal-triggered operations."""
     CHECKPOINT = "checkpoint"  # SIGUSR1 - Create checkpoint
     STATUS_REPORT = "status_report"  # SIGUSR2 - Generate status report
     CONFIG_RELOAD = "config_reload"  # SIGHUP - Reload configuration
     SHUTDOWN = "shutdown"  # SIGTERM/SIGINT - Graceful shutdown
-
 
 @dataclass
 class ShutdownContext:
@@ -55,7 +52,6 @@ class ShutdownContext:
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
 
-
 @dataclass
 class SignalContext:
     """Context information for signal-triggered operations."""
@@ -68,7 +64,6 @@ class SignalContext:
     def __post_init__(self):
         if self.parameters is None:
             self.parameters = {}
-
 
 class AsyncSignalHandler:
     """
@@ -593,7 +588,6 @@ class AsyncSignalHandler:
         """Cleanup CoreDis connections during signal handler cleanup."""
         try:
             # Import here to avoid circular imports
-            from ...database.ha_connection_manager import HAConnectionManager
 
             # Get the HA connection manager instance if available
             # This is a best-effort cleanup for CoreDis connections
@@ -608,7 +602,6 @@ class AsyncSignalHandler:
         """Cleanup database connections during signal handler cleanup."""
         try:
             # Import here to avoid circular imports
-            from ...database import get_sessionmanager
 
             # This is a synchronous cleanup, so we can't await
             # The actual cleanup will be handled by the shutdown handlers

@@ -5,7 +5,6 @@ Implements complete replacement for 36-command legacy CLI.
 
 import asyncio
 import signal
-import sys
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
@@ -13,10 +12,7 @@ from typing import Optional
 
 from .core.training_system_manager import TrainingSystemManager
 from .core.cli_orchestrator import CLIOrchestrator
-from .core.system_state_reporter import SystemStateReporter
-from .core.signal_handler import AsyncSignalHandler, ShutdownContext, ShutdownReason
 from .core.progress_preservation import ProgressPreservationManager
-
 
 # Create clean CLI app with no legacy dependencies
 app = typer.Typer(
@@ -33,7 +29,6 @@ cli_orchestrator = CLIOrchestrator(console)
 # Global state for graceful shutdown
 current_training_session = None
 shutdown_requested = False
-
 
 def setup_signal_handlers():
     """
@@ -53,7 +48,6 @@ def setup_signal_handlers():
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-
 
 async def graceful_shutdown():
     """
@@ -96,7 +90,6 @@ async def graceful_shutdown():
         current_training_session = None
 
     console.print("👋 Shutdown complete", style="green")
-
 
 @app.command()
 def train(
@@ -245,7 +238,6 @@ def train(
 
     # Run the async training function
     asyncio.run(run_training())
-
 
 @app.command()
 def status(
@@ -429,7 +421,6 @@ def status(
     else:
         asyncio.run(show_status())
 
-
 @app.command()
 def stop(
     graceful: bool = typer.Option(True, "--graceful/--force", help="Graceful shutdown"),
@@ -586,11 +577,9 @@ def stop(
 
     asyncio.run(enhanced_stop_training())
 
-
 def main():
     """Main entry point for clean CLI."""
     app()
-
 
 if __name__ == "__main__":
     main()

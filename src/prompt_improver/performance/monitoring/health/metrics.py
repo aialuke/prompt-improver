@@ -5,7 +5,6 @@ PHASE 3: Health Check Consolidation - Metrics Integration
 import time
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
 
 class _Timer:
     """Context manager for timing code execution"""
@@ -241,7 +240,6 @@ def get_health_metrics_summary() -> dict:
         return {"prometheus_available": False}
 
     try:
-        from prometheus_client import REGISTRY, generate_latest
 
         # This would typically be called by the metrics endpoint
         return {"prometheus_available": True, "metrics_registered": True}

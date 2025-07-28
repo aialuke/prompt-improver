@@ -3,16 +3,16 @@ Enhanced Base Health Checker with 2025 features
 Integrates circuit breaker, SLA monitoring, structured logging, and OpenTelemetry
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Dict, Any, Optional
 import time
 import logging
 
-from .base import HealthChecker, HealthResult, HealthStatus
-from .circuit_breaker import circuit_breaker_registry, CircuitBreakerConfig, CircuitBreakerOpen
-from .structured_logging import StructuredLogger, log_health_check, get_metrics_logger
+from .base import HealthChecker, HealthResult
+from .circuit_breaker import circuit_breaker_registry, CircuitBreakerConfig
+from .structured_logging import StructuredLogger, get_metrics_logger
 from .sla_monitor import get_or_create_sla_monitor, SLAConfiguration
-from .telemetry import instrument_health_check, TelemetryContext
+from .telemetry import TelemetryContext
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class EnhancedHealthChecker(HealthChecker):
                             response_time_ms=0
                         )
                     # Return failed health result instead of raising
-                    from src.prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
+                    from prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
                     return HealthResult(
                         status=HealthStatus.FAILED,
                         component=self.name,
@@ -118,7 +118,7 @@ class EnhancedHealthChecker(HealthChecker):
                         response_time_ms=0
                     )
                 # Return failed health result instead of raising
-                from src.prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
+                from prompt_improver.performance.monitoring.health.base import HealthResult, HealthStatus
                 return HealthResult(
                     status=HealthStatus.FAILED,
                     component=self.name,

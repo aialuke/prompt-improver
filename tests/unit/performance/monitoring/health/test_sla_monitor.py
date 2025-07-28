@@ -8,7 +8,7 @@ import asyncio
 import time
 from typing import List, Tuple
 
-from src.prompt_improver.performance.monitoring.health.sla_monitor import (
+from prompt_improver.performance.monitoring.health.sla_monitor import (
     SLAMonitor,
     SLAConfiguration,
     SLATarget,

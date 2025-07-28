@@ -5,7 +5,7 @@ Provides secure session validation and user authentication for sensitive operati
 
 import functools
 import logging
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from .authentication import AuthenticationService
 from .input_validator import InputValidator, ValidationError

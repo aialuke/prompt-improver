@@ -3,8 +3,8 @@
 
 import asyncio
 import logging
-from src.prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from src.prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
+from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

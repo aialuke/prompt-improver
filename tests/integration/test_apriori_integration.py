@@ -17,19 +17,19 @@ from typing import Any, Dict, List
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-from src.prompt_improver.database.connection import DatabaseManager
-from src.prompt_improver.database.models import (
+from prompt_improver.database.connection import DatabaseManager
+from prompt_improver.database.models import (
     AprioriAssociationRule,
     AprioriPatternDiscovery,
     PromptSession,
     RulePerformance,
     UserFeedback,
 )
-from src.prompt_improver.services.advanced_pattern_discovery import (
+from prompt_improver.services.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
 )
-from src.prompt_improver.services.apriori_analyzer import AprioriAnalyzer, AprioriConfig
-from src.prompt_improver.services.ml_integration import MLModelService
+from prompt_improver.services.apriori_analyzer import AprioriAnalyzer, AprioriConfig
+from prompt_improver.services.ml_integration import MLModelService
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ import logging
 import time
 import warnings
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -1410,7 +1410,7 @@ class ProductionSyntheticDataGenerator:
                 "source": "enhanced_synthetic_v3",
                 "total_samples": len(features),
                 "domain_distribution": domain_counts,
-                "generation_timestamp": datetime.utcnow().isoformat(),
+                "generation_timestamp": datetime.now(UTC).isoformat(),
                 "random_state": self.random_state,
                 "feature_names": self.feature_names,
                 "quality_assessment_type": "enhanced"
@@ -1504,7 +1504,7 @@ class ProductionSyntheticDataGenerator:
                 "source": f"neural_{self.neural_model_type}_v1",
                 "total_samples": len(final_features),
                 "domain_distribution": domain_counts,
-                "generation_timestamp": datetime.utcnow().isoformat(),
+                "generation_timestamp": datetime.now(UTC).isoformat(),
                 "random_state": self.random_state,
                 "feature_names": self.feature_names,
                 "quality_assessment_type": "enhanced" if self.use_enhanced_scoring else "legacy",
@@ -1580,7 +1580,7 @@ class ProductionSyntheticDataGenerator:
                 "source": "hybrid_statistical_neural_v1",
                 "total_samples": len(combined_features),
                 "domain_distribution": combined_domain_counts,
-                "generation_timestamp": datetime.utcnow().isoformat(),
+                "generation_timestamp": datetime.now(UTC).isoformat(),
                 "random_state": self.random_state,
                 "feature_names": self.feature_names,
                 "quality_assessment_type": "enhanced" if self.use_enhanced_scoring else "legacy",
@@ -2026,7 +2026,7 @@ class ProductionSyntheticDataGenerator:
         Returns:
             Orchestrator-compatible result with synthetic data and metadata
         """
-        from datetime import datetime
+        from datetime import datetime, UTC
         start_time = datetime.now()
 
         try:
@@ -2189,7 +2189,7 @@ class ProductionSyntheticDataGenerator:
                 "source": "diffusion_tabular_v1",
                 "total_samples": len(final_features),
                 "domain_distribution": domain_counts,
-                "generation_timestamp": datetime.utcnow().isoformat(),
+                "generation_timestamp": datetime.now(UTC).isoformat(),
                 "random_state": self.random_state,
                 "feature_names": self.feature_names,
                 "quality_assessment_type": "enhanced" if self.use_enhanced_scoring else "legacy",

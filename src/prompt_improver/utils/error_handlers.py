@@ -33,8 +33,7 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from functools import wraps
-from re import Pattern
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

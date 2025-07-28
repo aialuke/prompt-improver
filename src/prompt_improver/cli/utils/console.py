@@ -4,9 +4,8 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
-from typing import Any, Dict, List, Optional
-import json
+
+from typing import Any, Dict, List
 
 class ConsoleManager:
     """Centralized console management for APES CLI."""

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .base import BasePromptRule
 from .rules.chain_of_thought import ChainOfThoughtRule
 from .rules.clarity import ClarityRule
 from .rules.few_shot_examples import FewShotExampleRule

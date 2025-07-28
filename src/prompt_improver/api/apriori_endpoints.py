@@ -8,7 +8,7 @@ prompt improvement insights.
 import logging
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,6 @@ apriori_router = APIRouter(
 async def get_apriori_analyzer() -> AprioriAnalyzer:
     """Dependency to get AprioriAnalyzer instance with proper database configuration"""
     # Use secure database configuration from environment variables
-    import os
     from ..database.config import get_database_config
 
     db_config = get_database_config()
@@ -49,7 +48,6 @@ async def get_apriori_analyzer() -> AprioriAnalyzer:
 async def get_pattern_discovery() -> AdvancedPatternDiscovery:
     """Dependency to get AdvancedPatternDiscovery instance with proper database configuration"""
     # Use secure database configuration from environment variables
-    import os
     from ..database.config import get_database_config
 
     db_config = get_database_config()

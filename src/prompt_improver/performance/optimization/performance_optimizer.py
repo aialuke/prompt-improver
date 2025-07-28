@@ -11,8 +11,8 @@ import statistics
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Any, AsyncGenerator, Dict, List, Optional
+from datetime import datetime, UTC
 
 import aiofiles
 from prometheus_client import Counter, Histogram, Gauge
@@ -224,7 +224,7 @@ class PerformanceOptimizer:
             max_duration_ms=max(durations),
             min_duration_ms=min(durations),
             success_rate=len(successful_measurements) / len(measurements),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
 
         self._baselines[operation_name] = baseline
@@ -342,7 +342,7 @@ class PerformanceOptimizer:
                 1 for baseline in self._baselines.values()
                 if baseline.meets_target()
             ),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
         # Add per-operation summary

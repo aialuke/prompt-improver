@@ -6,7 +6,7 @@ Enhanced Structured Logging for Health Monitoring
 import json
 import time
 import traceback
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 from functools import wraps
 import logging
 from contextlib import contextmanager
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Safe import for correlation context
 try:
-    from src.middleware.correlation_context import get_correlation_id
+    from middleware.correlation_context import get_correlation_id
 except (ImportError, ModuleNotFoundError):
     def get_correlation_id():
         return None

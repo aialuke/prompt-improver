@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Test imports
 try:
-    from src.prompt_improver.ml.optimization.batch import (
+    from prompt_improver.ml.optimization.batch import (
         BatchProcessor,
         BatchProcessorConfig,
         StreamingBatchProcessor,

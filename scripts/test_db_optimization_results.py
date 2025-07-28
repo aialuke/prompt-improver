@@ -7,7 +7,7 @@ Shows query caching and connection pooling performance improvements.
 import asyncio
 import time
 import json
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 async def simulate_database_optimization():
@@ -140,7 +140,7 @@ async def simulate_database_optimization():
     
     # Save results
     results = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "baseline": {
             "queries": baseline_queries,
             "avg_query_time_ms": baseline_avg_query_time,

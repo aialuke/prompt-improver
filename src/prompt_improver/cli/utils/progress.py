@@ -3,12 +3,11 @@ Progress reporting utilities for CLI operations.
 Unified progress reporting extracted from existing patterns in console.py, batch processors, training workflows, and TUI widgets.
 """
 
-import asyncio
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, Optional
 
 from rich.console import Console
 from rich.progress import (
@@ -21,7 +20,6 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-
 @dataclass
 class ProgressMetrics:
     """Metrics for progress tracking."""
@@ -32,7 +30,6 @@ class ProgressMetrics:
     error_count: int = 0
     retry_count: int = 0
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
 
 class ProgressReporter:
     """

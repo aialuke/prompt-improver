@@ -8,7 +8,7 @@ import asyncio
 import time
 from unittest.mock import AsyncMock
 
-from src.prompt_improver.performance.monitoring.health.circuit_breaker import (
+from prompt_improver.performance.monitoring.health.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitState,

@@ -6,14 +6,13 @@ Validates existing seeded rules, loads rule metadata, and ensures rule parameter
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_sessionmanager
 from ...database.models import RuleMetadata, RulePerformance
-
 
 class RuleValidationService:
     """

@@ -3,13 +3,11 @@ Implements Task 4: Security Framework from Phase 2.
 Enhanced with 2025 best practices for ML pipeline data protection.
 """
 
-import asyncio
 import json
 import logging
 import re
-import hashlib
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from datetime import datetime, timezone, UTC
+from typing import Any, Dict, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -421,7 +419,7 @@ class PromptDataProtection:
                 audit_data = {
                     "redactions": redaction_count,
                     "redaction_details": redaction_details,
-                    "audit_timestamp": datetime.utcnow().isoformat(),
+                    "audit_timestamp": datetime.now(UTC).isoformat(),
                     "security_level": "redacted" if redaction_count > 0 else "clean",
                 }
 
@@ -448,7 +446,7 @@ class PromptDataProtection:
                         "security_audit": {
                             "redactions": redaction_count,
                             "redaction_details": redaction_details,
-                            "audit_timestamp": datetime.utcnow().isoformat(),
+                            "audit_timestamp": datetime.now(UTC).isoformat(),
                             "security_level": "redacted"
                             if redaction_count > 0
                             else "clean",
@@ -469,7 +467,7 @@ class PromptDataProtection:
                             "final_prompt": "[Security audit only]",
                             "rules_applied": json.dumps([]),
                             "metadata": json.dumps(metadata_with_audit),
-                            "started_at": datetime.utcnow(),
+                            "started_at": datetime.now(UTC),
                             "status": "completed",
                         },
                     )
@@ -544,7 +542,7 @@ class PromptDataProtection:
 
                 security_report = {
                     "report_period_days": days,
-                    "generated_at": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.now(UTC).isoformat(),
                     "summary": {
                         "total_prompts_processed": total_prompts,
                         "total_sessions_audited": total_sessions,
@@ -584,7 +582,7 @@ class PromptDataProtection:
             return {
                 "error": str(e),
                 "report_period_days": days,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
             }
 
     async def validate_prompt_safety(self, prompt: str) -> dict[str, Any]:
@@ -966,7 +964,7 @@ class SecureMCPServer:
     async def log_security_event(self, event_type: str, details: dict[str, Any]):
         """Log security-related events"""
         security_event = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "details": details,
             "source": "mcp_server",

@@ -11,17 +11,13 @@ import logging
 import os
 import psutil
 import signal
-import stat
-import time
+
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Set, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List, Tuple
+from dataclasses import dataclass
 from enum import Enum
 import tempfile
-import pwd
-import grp
-
 
 class ProcessState(Enum):
     """Enumeration of process states for tracking."""
@@ -33,7 +29,6 @@ class ProcessState(Enum):
     UNKNOWN = "unknown"
     NOT_FOUND = "not_found"
 
-
 class PIDFileStatus(Enum):
     """Enumeration of PID file status."""
     VALID = "valid"
@@ -42,7 +37,6 @@ class PIDFileStatus(Enum):
     LOCKED = "locked"
     PERMISSION_DENIED = "permission_denied"
     NOT_FOUND = "not_found"
-
 
 @dataclass
 class ProcessInfo:
@@ -62,7 +56,6 @@ class ProcessInfo:
     parent_pid: Optional[int]
     children_pids: List[int]
 
-
 @dataclass
 class PIDFileInfo:
     """PID file metadata and validation information."""
@@ -78,7 +71,6 @@ class PIDFileInfo:
     owner_gid: int
     is_locked: bool
     validation_errors: List[str]
-
 
 class PIDManager:
     """
@@ -97,9 +89,22 @@ class PIDManager:
     def __init__(self, pid_dir: Optional[Path] = None, lock_timeout: float = 5.0):
         self.logger = logging.getLogger(__name__)
 
-        # PID directory setup with secure permissions
-        self.pid_dir = pid_dir or Path("/tmp/prompt_improver_pids")
-        self.pid_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
+        # PID directory setup with secure permissions using centralized config
+        if pid_dir is None:
+            try:
+                from ...core.config import get_config
+                config = get_config()
+                self.pid_dir = config.directory_paths.pid_dir
+                self.secure_permissions = config.directory_paths.secure_temp_permissions
+            except ImportError:
+                # Fallback if config not available
+                self.pid_dir = Path("/tmp/prompt_improver_pids")
+                self.secure_permissions = 0o755
+        else:
+            self.pid_dir = pid_dir
+            self.secure_permissions = 0o755
+            
+        self.pid_dir.mkdir(parents=True, exist_ok=True, mode=self.secure_permissions)
 
         # Ensure proper ownership and permissions
         self._secure_pid_directory()

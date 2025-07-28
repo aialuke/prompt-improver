@@ -19,6 +19,14 @@ from .connection import (
     get_session,
     get_session_context,
 )
+# Unified connection manager (consolidates 5 different connection patterns)
+from .unified_connection_manager import (
+    UnifiedConnectionManager,
+    ConnectionMode,
+    get_unified_connection_manager,
+    get_mcp_session,
+    get_ml_session,
+)
 from .models import (
     ABExperiment,
     ImprovementSession,

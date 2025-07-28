@@ -7,9 +7,8 @@ Based on research synthesis from:
 - Recency bias optimization techniques
 """
 
-import random
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 

@@ -3,18 +3,15 @@ Research-validated patterns for high-performance database operations.
 Enhanced with 2025 error handling best practices.
 """
 
-import asyncio
 import contextlib
 import logging
 import os
 import socket
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, TypeVar
 
 import aiofiles
 
-import psycopg
 from psycopg import (
     errors as psycopg_errors,
     sql,

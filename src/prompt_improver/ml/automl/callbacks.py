@@ -5,7 +5,7 @@ Implements 2025 best practices for callback-based ML framework integration
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import optuna
@@ -100,7 +100,7 @@ class AutoMLCallback:
                 "trial_params": trial.params,
                 "execution_time": self._get_trial_execution_time(trial),
                 "study_name": study.study_name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Report to orchestrator
@@ -130,7 +130,7 @@ class AutoMLCallback:
                 "study_name": study.study_name,
                 "trial_value": trial.value,
                 "trial_params": trial.params,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "optimization_mode": getattr(
                     self.orchestrator.config, "optimization_mode", "unknown"
                 ),
@@ -149,7 +149,7 @@ class AutoMLCallback:
                         "trial_number": trial.number,
                         "value": trial.value,
                         "params": trial.params,
-                        "timestamp": datetime.utcnow(),
+                        "timestamp": datetime.now(UTC),
                     }
 
         except Exception as e:
@@ -205,7 +205,7 @@ class AutoMLCallback:
                 ])
                 / max(len(study.trials), 1),
                 "trials_since_improvement": self.trials_since_improvement,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Store metrics for real-time access
@@ -263,7 +263,7 @@ class RealTimeAnalyticsCallback:
                         / max(len(study.trials), 1),
                     },
                 },
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Send to real-time analytics if method exists
@@ -340,7 +340,7 @@ class ExperimentCallback:
                 "parameters": trial.params,
                 "expected_improvement": trial.value,
                 "source": "automl_optimization",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Store for tracking
@@ -371,7 +371,7 @@ class ExperimentCallback:
                 "trial_number": trial.number,
                 "optimization_value": trial.value,
                 "active_experiments": len(self.active_experiments),
-                "last_update": datetime.utcnow().isoformat(),
+                "last_update": datetime.now(UTC).isoformat(),
             }
 
             # Store as user attribute
@@ -426,7 +426,7 @@ class ModelSelectionCallback:
                     "trial_number": trial.number,
                     "optimization_value": trial.value,
                     "parameters": model_params,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
                 self.model_manager.update_configuration(config_update)
@@ -446,7 +446,7 @@ class ModelSelectionCallback:
                 "trial_number": trial.number,
                 "performance_value": trial.value,
                 "model_parameters": model_params,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Store as trial user attribute

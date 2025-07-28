@@ -9,7 +9,6 @@ Key functions:
 """
 
 from datetime import UTC, datetime
-from typing import Optional
 
 def naive_utc_now() -> datetime:
     """Get current UTC time as a naive datetime object.

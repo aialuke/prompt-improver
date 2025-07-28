@@ -4,7 +4,7 @@ OpenTelemetry Integration for Distributed Tracing
 """
 
 import time
-from typing import Dict, Optional, Any, Callable
+from typing import Dict, Optional, Any
 from contextlib import contextmanager
 from functools import wraps
 import logging
@@ -177,7 +177,7 @@ def health_check_span(
 
         # Add correlation ID if available
         try:
-            from src.middleware.correlation_context import get_correlation_id
+            from middleware.correlation_context import get_correlation_id
             correlation_id = get_correlation_id()
             if correlation_id:
                 span.set_attribute("correlation.id", correlation_id)

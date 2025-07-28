@@ -9,7 +9,6 @@ duplicationtesting.md Phase 3 requirements.
 import time
 from datetime import datetime
 from typing import Any, Callable, Awaitable
-from collections.abc import Coroutine
 
 # Import the comprehensive health system
 from ..performance.monitoring.health import (

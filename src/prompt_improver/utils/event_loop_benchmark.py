@@ -8,7 +8,7 @@ import asyncio
 import logging
 import statistics
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from prompt_improver.utils.event_loop_manager import get_event_loop_manager
 from prompt_improver.utils.session_event_loop import get_session_wrapper

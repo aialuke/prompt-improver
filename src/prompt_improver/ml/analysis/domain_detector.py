@@ -44,31 +44,31 @@ class PromptDomain(Enum):
     # Creative domains
     CREATIVE_WRITING = "creative_writing"
     CONTENT_CREATION = "content_creation"
-    marketing = "marketing"
-    storytelling = "storytelling"
+    MARKETING = "marketing"
+    STORYTELLING = "storytelling"
 
     # Academic domains
-    research = "research"
-    education = "education"
+    RESEARCH = "research"
+    EDUCATION = "education"
     ACADEMIC_WRITING = "academic_writing"
-    scientific = "scientific"
+    SCIENTIFIC = "scientific"
 
     # Business domains
     BUSINESS_ANALYSIS = "business_analysis"
     PROJECT_MANAGEMENT = "project_management"
     CUSTOMER_SERVICE = "customer_service"
-    sales = "sales"
+    SALES = "sales"
 
     # Medical/Legal domains
-    medical = "medical"
-    legal = "legal"
-    healthcare = "healthcare"
+    MEDICAL = "medical"
+    LEGAL = "legal"
+    HEALTHCARE = "healthcare"
 
     # General domains
-    conversational = "conversational"
-    instructional = "instructional"
-    analytical = "analytical"
-    general = "general"
+    CONVERSATIONAL = "conversational"
+    INSTRUCTIONAL = "instructional"
+    ANALYTICAL = "analytical"
+    GENERAL = "general"
 
 @dataclass
 class DomainKeywords:

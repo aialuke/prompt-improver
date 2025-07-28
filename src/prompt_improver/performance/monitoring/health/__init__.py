@@ -9,6 +9,7 @@ from .checkers import (
                    MCPServerHealthChecker,
                    MLServiceHealthChecker,
                    QueueHealthChecker,
+                   RedisHealthChecker,
                    SystemResourcesHealthChecker,
 )
 
@@ -47,6 +48,7 @@ __all__ = [
     "AnalyticsServiceHealthChecker",
     "MLServiceHealthChecker",
     "QueueHealthChecker",
+    "RedisHealthChecker",
     "SystemResourcesHealthChecker",
     # Metrics
     "instrument_health_check",

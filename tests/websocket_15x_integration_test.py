@@ -489,11 +489,11 @@ async def main():
             async with session.get("http://localhost:8000/api/v1/experiments/real-time/health") as response:
                 if response.status != 200:
                     print("❌ FastAPI server not responding at localhost:8000")
-                    print("Please start the server first: uvicorn src.prompt_improver.api.main:app --reload")
+                    print("Please start the server first: uvicorn prompt_improver.api.main:app --reload")
                     return 1
     except aiohttp.ClientConnectorError:
         print("❌ Cannot connect to FastAPI server at localhost:8000")
-        print("Please start the server first: uvicorn src.prompt_improver.api.main:app --reload")
+        print("Please start the server first: uvicorn prompt_improver.api.main:app --reload")
         return 1
     
     # Run tests

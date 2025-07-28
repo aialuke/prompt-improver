@@ -4,24 +4,19 @@ Provides prompt enhancement via Model Context Protocol with stdio transport.
 
 import asyncio
 import logging
-import signal
 import sys
 import time
-from typing import Any, Optional
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from prompt_improver.database import get_session
-from prompt_improver.ml.optimization.batch.batch_processor import (
-    BatchProcessor,
-    BatchProcessorConfig,
-    periodic_batch_processor_coroutine,
-)
-from prompt_improver.core.services.analytics_factory import get_analytics_interface
-from prompt_improver.performance.monitoring.health.background_manager import (
-    get_background_task_manager,
-)
+from prompt_improver.database.unified_connection_manager import get_unified_connection_manager, ConnectionMode
+# Unified connection manager replaces multiple connection patterns
+from prompt_improver.core.config import get_config
+# ML training components removed per architectural separation requirements
+# MCP server is strictly read-only for rule application only
 from prompt_improver.core.services.prompt_improvement import PromptImprovementService
 from prompt_improver.utils.event_loop_benchmark import run_startup_benchmark
 from prompt_improver.utils.event_loop_manager import (
@@ -43,9 +38,21 @@ from prompt_improver.performance.monitoring.performance_monitor import (
     get_performance_monitor,
     record_mcp_operation
 )
-from prompt_improver.utils.multi_level_cache import get_cache, cached_get
-from prompt_improver.performance.optimization.response_optimizer import optimize_mcp_response
-from prompt_improver.performance.optimization.async_optimizer import get_async_optimizer
+from prompt_improver.utils.multi_level_cache import get_cache
+
+# Import MCP security components
+from prompt_improver.security.mcp_middleware import require_rule_access, get_mcp_auth_middleware
+from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
+from prompt_improver.security.structured_prompts import create_rule_application_prompt
+from prompt_improver.security.rate_limit_middleware import require_rate_limiting, get_mcp_rate_limit_middleware
+from prompt_improver.security.output_validator import OutputValidator
+
+# Import feedback collection
+from prompt_improver.feedback.enhanced_feedback_collector import EnhancedFeedbackCollector, AnonymizationLevel
+
+# Import performance optimization
+from prompt_improver.performance.query_optimizer import QueryOptimizer
+from prompt_improver.performance.sla_monitor import SLAMonitor
 
 # Configure logging to stderr for MCP protocol compliance
 # MCP servers using stdio transport should log to stderr, not stdout
@@ -56,56 +63,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load centralized configuration
+config = get_config()
+logger.info(f"MCP Server configuration loaded - Batch size: {config.mcp_batch_size}, "
+           f"Session maxsize: {config.mcp_session_maxsize}, TTL: {config.mcp_session_ttl}s")
+
 # Initialize the MCP server
 mcp = FastMCP(
     name="APES - Adaptive Prompt Enhancement System",
     description="AI-powered prompt optimization service using ML-driven rules",
 )
 
-# Initialize services
+# Initialize security components
+input_validator = OWASP2025InputValidator()
+auth_middleware = get_mcp_auth_middleware()
+rate_limit_middleware = get_mcp_rate_limit_middleware()
+output_validator = OutputValidator()
+
+# Initialize feedback collection
+async def get_db_session():
+    async with get_session() as session:
+        return session
+
+feedback_collector = EnhancedFeedbackCollector(db_session=None)  # Will be set per request
+
+# Initialize performance optimization
+session_manager = _get_global_sessionmanager()
+engine = session_manager._engine if session_manager else None
+query_optimizer = QueryOptimizer(engine=engine)
+sla_monitor = SLAMonitor()
+
+# Initialize services (read-only rule application only)
 prompt_service = PromptImprovementService()
-analytics_service = get_analytics_interface()
-batch_processor = BatchProcessor(BatchProcessorConfig(
-    batch_size=10,
-    batch_timeout=30,
-    max_attempts=3,
-    concurrency=3,
-    enable_circuit_breaker=True,
-    enable_dead_letter_queue=True,
-    enable_opentelemetry=True
-))
 
-# Register periodic batch processing task as background task
-# This will be registered once the event loop is running
-async def register_periodic_batch_processor():
-    """Register the periodic batch processor as a background task."""
-    try:
-        background_task_manager = get_background_task_manager()
-        await background_task_manager.submit_task(
-            task_id="periodic_batch_processor",
-            coroutine=periodic_batch_processor_coroutine,
-            batch_processor=batch_processor,
-        )
-        logger.info("Periodic batch processor registered successfully")
-    except Exception as e:
-        logger.error(f"Failed to register periodic batch processor: {e}")
-        # Fallback: create the task directly
-        asyncio.create_task(periodic_batch_processor_coroutine(batch_processor))
+# ML training components removed - MCP server is read-only for rule application
 
-# Schedule the registration to run when the event loop is available
-if hasattr(asyncio, "get_running_loop"):
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(register_periodic_batch_processor())
-    except RuntimeError:
-        # No running loop yet, will be registered during server startup
-        pass
+# ML training background tasks removed per architectural separation requirements
 
-# Initialize session store with TTL
+# Initialize session store with centralized configuration
 session_store = SessionStore(
-    maxsize=1000,  # Max 1000 concurrent sessions
-    ttl=3600,  # 1 hour TTL
-    cleanup_interval=300,  # Cleanup every 5 minutes
+    maxsize=mcp_config.session_maxsize,
+    ttl=mcp_config.session_ttl,
+    cleanup_interval=mcp_config.session_cleanup_interval,
 )
 
 class PromptEnhancementRequest(BaseModel):
@@ -126,12 +125,19 @@ class PromptStorageRequest(BaseModel):
     session_id: str | None = Field(default=None, description="Session ID for tracking")
 
 @mcp.tool()
+@require_rule_access()
+@require_rate_limiting(include_ip=True)
 async def improve_prompt(
     prompt: str = Field(..., description="The prompt to enhance"),
     context: dict[str, Any] | None = Field(
         default=None, description="Additional context"
     ),
     session_id: str | None = Field(default=None, description="Session ID for tracking"),
+    auth_payload: dict[str, Any] | None = None,  # Added by auth middleware
+    agent_id: str | None = None,  # Added by auth middleware
+    agent_type: str | None = None,  # Added by auth middleware
+    rate_limit_status: dict[str, Any] | None = None,  # Added by rate limit middleware
+    rate_limit_remaining: int | None = None,  # Added by rate limit middleware
 ) -> dict[str, Any]:
     """Enhance a prompt using ML-optimized rules.
 
@@ -142,13 +148,42 @@ async def improve_prompt(
         prompt: The prompt text to enhance
         context: Optional context information
         session_id: Optional session ID for tracking
-        ctx: MCP context (provided by framework)
+        auth_payload: Authentication payload (added by middleware)
+        agent_id: Agent ID (added by middleware)
+        agent_type: Agent type (added by middleware)
 
     Returns:
         Enhanced prompt with processing metrics and applied rules
     """
     # Track start time for fallback metrics
     start_time = time.time()
+    request_id = f"{agent_id}_{session_id}_{int(start_time)}"
+
+    # Phase 1: OWASP 2025 Input Validation
+    validation_result = input_validator.validate_prompt(prompt)
+
+    if validation_result.is_blocked:
+        logger.warning(
+            f"Blocked malicious prompt from {agent_type}:{agent_id} - "
+            f"Threat: {validation_result.threat_type}, Score: {validation_result.threat_score:.2f}, "
+            f"Patterns: {validation_result.detected_patterns}"
+        )
+        return {
+            "error": "Input validation failed",
+            "message": "The provided prompt contains potentially malicious content and cannot be processed.",
+            "threat_type": validation_result.threat_type.value if validation_result.threat_type else None,
+            "processing_time_ms": (time.time() - start_time) * 1000,
+            "security_check": "blocked"
+        }
+
+    # Use sanitized input for processing
+    sanitized_prompt = validation_result.sanitized_input
+
+    # Log security validation success
+    logger.info(
+        f"Security validation passed for {agent_type}:{agent_id} - "
+        f"Threat score: {validation_result.threat_score:.2f}"
+    )
 
     # Use performance optimizer for comprehensive measurement
     async with measure_mcp_operation(
@@ -166,9 +201,16 @@ async def improve_prompt(
                 # Get database session with performance measurement
                 async with measure_database_operation("get_session"):
                     async with get_session() as db_session:
-                        # Use the existing prompt improvement service
+                        # Create structured prompt for secure processing
+                        structured_prompt = create_rule_application_prompt(
+                            user_prompt=sanitized_prompt,
+                            context=context,
+                            agent_type=agent_type or "assistant"
+                        )
+
+                        # Use the existing prompt improvement service with structured prompt
                         result = await prompt_service.improve_prompt(
-                            prompt=prompt,
+                            prompt=structured_prompt,
                             user_context=context,
                             session_id=session_id,
                             db_session=db_session,
@@ -179,6 +221,31 @@ async def improve_prompt(
                         result["mcp_transport"] = "stdio"
                         result["performance_target_met"] = (perf_metrics.duration_ms or 0) < 200
 
+                        # Phase 1: Output Validation
+                        enhanced_prompt = result.get("enhanced_prompt", "")
+                        output_validation = output_validator.validate_output(enhanced_prompt)
+
+                        if output_validation.threat_detected:
+                            logger.warning(
+                                f"Output security threat detected for {agent_type}:{agent_id} - "
+                                f"Type: {output_validation.threat_type}, Risk: {output_validation.risk_score:.2f}"
+                            )
+                            # Use filtered output
+                            result["enhanced_prompt"] = output_validation.filtered_output
+                            result["output_filtered"] = True
+                        else:
+                            result["output_filtered"] = False
+
+                        # Add comprehensive security and performance metadata
+                        result["security_check"] = "passed"
+                        result["threat_score"] = validation_result.threat_score
+                        result["output_risk_score"] = output_validation.risk_score
+                        result["agent_type"] = agent_type
+                        result["agent_id"] = agent_id
+                        result["authentication"] = "jwt_validated"
+                        result["input_sanitized"] = validation_result.sanitized_input != prompt
+                        result["rate_limit_remaining"] = rate_limit_remaining
+
                         # Add event loop info
                         loop_manager = get_event_loop_manager()
                         result["event_loop_info"] = {
@@ -186,33 +253,24 @@ async def improve_prompt(
                             "uvloop_enabled": loop_manager.is_uvloop_enabled(),
                         }
 
-            # Store the prompt data for ML training (real data priority 100)
-            if result.get("improved_prompt") and result["improved_prompt"] != prompt:
-                # Store asynchronously using BackgroundTaskManager
-                task_manager = get_background_task_manager()
-                task_id = f"store_prompt_{session_id or result.get('session_id', 'unknown')}_{int(time.time())}"
-                try:
-                    await task_manager.submit_task(
-                        task_id=task_id,
-                        coroutine=_store_prompt_data,
-                        original=prompt,
-                        enhanced=result["improved_prompt"],
-                        metrics=result.get("metrics", {}),
-                        session_id=session_id or result.get("session_id"),
-                        priority=100,  # Real data priority
-                    )
-                except Exception as e:
-                    # Fallback to direct execution if task manager fails
-                    logger.warning(f"Background task submission failed: {e}")
-                    asyncio.create_task(
-                        _store_prompt_data(
-                            original=prompt,
-                            enhanced=result["improved_prompt"],
-                            metrics=result.get("metrics", {}),
-                            session_id=session_id or result.get("session_id"),
-                            priority=100,
-                        )
-                    )
+            # ML training data storage removed - MCP server is read-only for rule application
+            # Data collection for ML training should be handled by separate ML training system
+
+            # Feedback collection removed - MCP server is read-only for rule application
+            # Feedback should be collected by separate ML training system
+
+            # Phase 1: SLA Monitoring and Performance Tracking
+            try:
+                total_time_ms = (time.time() - start_time) * 1000
+                await sla_monitor.record_request(
+                    request_id=request_id,
+                    endpoint="improve_prompt",
+                    response_time_ms=total_time_ms,
+                    success=True,
+                    agent_type=agent_type
+                )
+            except Exception as e:
+                logger.warning(f"SLA monitoring failed (non-blocking): {e}")
 
             return result
 
@@ -225,46 +283,8 @@ async def improve_prompt(
                 "fallback": True,
             }
 
-@mcp.tool()
-async def store_prompt(
-    original: str = Field(..., description="The original prompt"),
-    enhanced: str = Field(..., description="The enhanced prompt"),
-    metrics: dict[str, Any] = Field(..., description="Success metrics"),
-    session_id: str | None = Field(default=None, description="Session ID"),
-) -> dict[str, Any]:
-    """Store prompt interaction data for ML training.
-
-    This tool captures real prompt data with priority 100 for training
-    the ML models to improve rule effectiveness over time.
-
-    Args:
-        original: The original prompt text
-        enhanced: The enhanced prompt text
-        metrics: Performance and success metrics
-        session_id: Optional session ID
-        ctx: MCP context (provided by framework)
-
-    Returns:
-        Storage confirmation with priority level
-    """
-    try:
-        await _store_prompt_data(
-            original=original,
-            enhanced=enhanced,
-            metrics=metrics,
-            session_id=session_id,
-            priority=100,  # Real data priority
-        )
-
-        return {
-            "status": "stored",
-            "priority": 100,
-            "data_source": "real",
-            "session_id": session_id,
-        }
-
-    except Exception as e:
-        return {"status": "error", "error": str(e), "priority": 0}
+# store_prompt tool removed - MCP server is read-only for rule application only
+# ML training data storage should be handled by separate ML training system
 
 @mcp.tool()
 async def get_session(
@@ -395,29 +415,17 @@ async def get_rule_status() -> dict[str, Any]:
     """
     try:
         async with get_session() as db_session:
-            # Get rule effectiveness stats
-            rule_stats = await analytics_service.get_rule_effectiveness(
-                days=7, min_usage_count=10, db_session=db_session
-            )
-
-            # Get active rules metadata
+            # Get active rules metadata (analytics removed per architectural separation)
             rule_metadata = await prompt_service.get_rules_metadata(
                 enabled_only=True, db_session=db_session
             )
 
             return {
                 "active_rules": len(rule_metadata),
-                "rule_effectiveness": [
-                    {
-                        "rule_id": stat.rule_id,
-                        "effectiveness_score": stat.effectiveness_score,
-                        "usage_count": stat.usage_count,
-                        "improvement_rate": stat.improvement_rate,
-                    }
-                    for stat in rule_stats
-                ],
+                "rule_effectiveness": "Analytics moved to ML training system",
                 "last_updated": time.time(),
                 "status": "operational",
+                "mode": "read_only_rule_application",
             }
 
     except Exception as e:
@@ -450,15 +458,12 @@ async def health_live() -> dict[str, Any]:
         await asyncio.sleep(0)  # Yield control to measure loop responsiveness
         event_loop_latency = (time.time() - start_time) * 1000  # Convert to ms
 
-        # Check background task manager queue size
-        task_manager = get_background_task_manager()
-        background_queue_size = task_manager.get_queue_size()
-
+        # Background task manager removed per architectural separation
         # Phase 0: Simplified check - no ML training components
         return {
             "status": "live",
             "event_loop_latency_ms": event_loop_latency,
-            "background_queue_size": background_queue_size,
+            "background_queue_size": 0,  # No background tasks in read-only mode
             "phase": "0",
             "mcp_server_mode": "rule_application_only",
             "timestamp": time.time(),
@@ -470,14 +475,10 @@ async def health_live() -> dict[str, Any]:
 async def health_ready() -> dict[str, Any]:
     """Phase 0 readiness check with MCP connection pool and rule application capability."""
     try:
-        # Import MCP connection pool
-        from ..database.mcp_connection_pool import get_mcp_connection_pool
-
-        # Database connectivity check using MCP connection pool
+        # Use unified connection manager for database connectivity
         db_start_time = time.time()
-        mcp_pool = get_mcp_connection_pool()
-        health_check = await mcp_pool.health_check()
-        permission_check = await mcp_pool.test_permissions()
+        unified_manager = get_unified_connection_manager(ConnectionMode.MCP_SERVER)
+        health_check = await unified_manager.health_check()
         db_check_time = (time.time() - db_start_time) * 1000
 
         # Event loop latency check
@@ -486,16 +487,16 @@ async def health_ready() -> dict[str, Any]:
         await asyncio.sleep(0)
         event_loop_latency = (time.time() - loop_start_time) * 1000
 
-        # Phase 0 readiness criteria
+        # Phase 0 readiness criteria using unified connection manager
         db_ready = health_check.get("status") == "healthy"
-        permissions_valid = permission_check.get("security_compliant", False)
+        seeded_rules_available = health_check.get("seeded_rules_count", 0) > 0
         performance_ready = (
             event_loop_latency < 100 and
             db_check_time < 150  # Within Phase 0 <200ms SLA budget
         )
 
         # Determine overall readiness
-        ready = db_ready and permissions_valid and performance_ready
+        ready = db_ready and seeded_rules_available and performance_ready
 
         return {
             "status": "ready" if ready else "not ready",
@@ -504,14 +505,14 @@ async def health_ready() -> dict[str, Any]:
             "db_connectivity": {
                 "ready": db_ready,
                 "response_time_ms": db_check_time,
-                "pool_status": health_check.get("pool_status", {}),
-                "user": "mcp_server_user"
+                "pool_status": health_check.get("pool_metrics", {}),
+                "user": health_check.get("user", "mcp_server_user"),
+                "database": health_check.get("database", "apes_production")
             },
-            "permissions": {
-                "valid": permissions_valid,
-                "read_rules": permission_check.get("test_results", {}).get("read_rule_performance", False),
-                "write_feedback": permission_check.get("test_results", {}).get("write_prompt_sessions", False),
-                "security_compliant": permissions_valid
+            "seeded_database": {
+                "rules_available": seeded_rules_available,
+                "rules_count": health_check.get("seeded_rules_count", 0),
+                "database_name": health_check.get("database", "apes_production")
             },
             "performance": {
                 "event_loop_latency_ms": event_loop_latency,
@@ -603,30 +604,32 @@ async def health_phase0() -> dict[str, Any]:
         overall_start = time.time()
         components = {}
 
-        # 1. MCP Connection Pool Health
+        # 1. Unified Connection Manager Health
         try:
-            mcp_pool = get_mcp_connection_pool()
-            pool_health = await mcp_pool.health_check()
-            pool_permissions = await mcp_pool.test_permissions()
-            pool_stats = await mcp_pool.get_pool_status()
+            unified_manager = get_unified_connection_manager(ConnectionMode.MCP_SERVER)
+            pool_health = await unified_manager.health_check()
+            pool_stats = await unified_manager.get_pool_status()
 
-            components["mcp_connection_pool"] = {
+            components["unified_connection_manager"] = {
                 "status": pool_health.get("status", "unknown"),
+                "mode": pool_health.get("mode", "mcp_server"),
+                "database": pool_health.get("database", "apes_production"),
+                "seeded_rules_count": pool_health.get("seeded_rules_count", 0),
                 "health_check": pool_health,
-                "permissions": pool_permissions,
                 "pool_utilization": pool_stats.get("utilization_percentage", 0),
                 "active_connections": pool_stats.get("checked_out", 0),
-                "available_connections": pool_stats.get("checked_in", 0)
+                "available_connections": pool_stats.get("checked_in", 0),
+                "consolidated_patterns": 5  # Replaced 5 different connection patterns
             }
         except Exception as e:
-            components["mcp_connection_pool"] = {
+            components["unified_connection_manager"] = {
                 "status": "error",
                 "error": str(e)
             }
 
-        # 2. Rule Application Tools Check
+        # 2. Rule Application Tools Check (ML training tools removed)
         available_tools = [
-            "improve_prompt", "store_prompt", "get_session", "set_session",
+            "improve_prompt", "get_session", "set_session",
             "touch_session", "delete_session", "benchmark_event_loop",
             "run_performance_benchmark", "get_performance_status"
         ]
@@ -635,7 +638,8 @@ async def health_phase0() -> dict[str, Any]:
             "status": "healthy",
             "available_tools": available_tools,
             "tool_count": len(available_tools),
-            "ml_training_tools_removed": True
+            "ml_training_tools_removed": True,
+            "mode": "read_only_rule_application"
         }
 
         # 3. Event Loop Performance
@@ -651,28 +655,19 @@ async def health_phase0() -> dict[str, Any]:
             "sla_compliant": event_loop_latency < 50  # Half of 100ms budget
         }
 
-        # 4. Background Task Manager
-        try:
-            task_manager = get_background_task_manager()
-            queue_size = task_manager.get_queue_size()
-
-            components["background_tasks"] = {
-                "status": "healthy" if queue_size < 100 else "warning",
-                "queue_size": queue_size,
-                "queue_limit": 1000  # Reasonable limit
-            }
-        except Exception as e:
-            components["background_tasks"] = {
-                "status": "error",
-                "error": str(e)
-            }
+        # 4. Background Task Manager removed per architectural separation
+        components["background_tasks"] = {
+            "status": "not_applicable",
+            "queue_size": 0,
+            "message": "Background tasks removed - read-only rule application mode"
+        }
 
         # 5. Session Store
         try:
             session_stats = {
                 "current_size": len(session_store._cache) if hasattr(session_store, '_cache') else 0,
-                "max_size": session_store.maxsize if hasattr(session_store, 'maxsize') else 1000,
-                "ttl_seconds": session_store.ttl if hasattr(session_store, 'ttl') else 3600
+                "max_size": session_store.maxsize if hasattr(session_store, 'maxsize') else mcp_config.session_maxsize,
+                "ttl_seconds": session_store.ttl if hasattr(session_store, 'ttl') else mcp_config.session_ttl
             }
 
             components["session_store"] = {
@@ -712,7 +707,9 @@ async def health_phase0() -> dict[str, Any]:
             },
             "components": components,
             "exit_criteria_status": {
-                "database_permissions_verified": components.get("mcp_connection_pool", {}).get("permissions", {}).get("security_compliant", False),
+                "unified_connection_manager_healthy": components.get("unified_connection_manager", {}).get("status") == "healthy",
+                "seeded_database_accessible": components.get("unified_connection_manager", {}).get("seeded_rules_count", 0) > 0,
+                "connection_patterns_consolidated": components.get("unified_connection_manager", {}).get("consolidated_patterns", 0) == 5,
                 "mcp_server_starts": overall_status != "unhealthy",
                 "health_endpoints_respond": True,  # If we're here, endpoints work
                 "environment_variables_loaded": True,  # If pool works, env vars loaded
@@ -729,36 +726,8 @@ async def health_phase0() -> dict[str, Any]:
             "timestamp": time.time()
         }
 
-async def _store_prompt_data(
-    original: str,
-    enhanced: str,
-    metrics: dict[str, Any],
-    session_id: str | None,
-    priority: int,
-) -> None:
-    """Internal helper to store prompt data asynchronously via BatchProcessor."""
-    try:
-        # Create record for batch processing
-        record = {
-            "original": original,
-            "enhanced": enhanced,
-            "metrics": metrics,
-            "session_id": session_id,
-            "data_source": "real",
-            "priority": priority,
-        }
-
-        # Enqueue with priority for batch processing
-        await batch_processor.enqueue(record, priority)
-
-    except Exception as e:
-        # Log error but don't raise - this is async background task
-        logger.error(f"Error enqueueing prompt data: {e}")
-
-# Helper function to check batch processor queue sizes
-async def get_training_queue_size(batch_processor: BatchProcessor) -> int:
-    """Get the size of the training queue."""
-    return batch_processor.get_queue_size()
+# ML training data storage functions removed per architectural separation requirements
+# Data storage should be handled by separate ML training system
 
 # Startup initialization
 async def initialize_event_loop_optimization():

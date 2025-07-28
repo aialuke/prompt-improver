@@ -3,7 +3,6 @@ Circuit Breaker Pattern Implementation for Health Checkers
 Following 2025 best practices for failure isolation
 """
 
-import asyncio
 import time
 from enum import Enum
 from typing import Optional, Callable, Any, Dict
@@ -18,6 +17,8 @@ class CircuitState(Enum):
     open = "open"      # Failing, reject all calls
     HALF_OPEN = "half_open"  # Testing if service recovered
 
+from ....core.config import get_config
+
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker behavior"""
@@ -29,6 +30,20 @@ class CircuitBreakerConfig:
     # 2025 addition: SLA-based thresholds
     response_time_threshold_ms: float = 1000  # Consider slow response as failure
     success_rate_threshold: float = 0.95  # Minimum success rate to stay closed
+
+    @classmethod
+    def from_global_config(cls) -> "CircuitBreakerConfig":
+        """Create configuration from global config system."""
+        config = get_config()
+        cb_config = config.circuit_breaker
+        return cls(
+            failure_threshold=cb_config.failure_threshold,
+            recovery_timeout=cb_config.recovery_timeout,
+            half_open_max_calls=cb_config.half_open_max_calls,
+            reset_timeout=cb_config.reset_timeout,
+            response_time_threshold_ms=cb_config.response_time_threshold_ms,
+            success_rate_threshold=cb_config.success_rate_threshold
+        )
 
 class CircuitBreaker:
     """

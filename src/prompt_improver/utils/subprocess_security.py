@@ -8,11 +8,10 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

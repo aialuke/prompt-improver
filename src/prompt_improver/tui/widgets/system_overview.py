@@ -12,16 +12,14 @@ Enhanced with 2025 best practices for ML orchestrator integration:
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from rich.bar import Bar
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.reactive import reactive
-from textual.widgets import Label, Static
+from textual.widgets import Static
 
 class SystemOverviewWidget(Static):
     """

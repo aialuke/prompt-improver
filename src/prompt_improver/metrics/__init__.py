@@ -171,19 +171,16 @@ if _legacy_available:
         'get_system_metrics_collector'
     ])
 
-
 # Convenience functions for quick setup
 async def initialize_all_metrics(config=None):
     """Initialize all metrics collectors and start the aggregation engine."""
     from .aggregation_engine import start_aggregation_engine
     await start_aggregation_engine(config)
 
-
 async def shutdown_all_metrics():
     """Shutdown all metrics collectors and stop the aggregation engine."""
     from .aggregation_engine import stop_aggregation_engine
     await stop_aggregation_engine()
-
 
 def get_metrics_summary():
     """Get a summary of all metrics collection statistics."""

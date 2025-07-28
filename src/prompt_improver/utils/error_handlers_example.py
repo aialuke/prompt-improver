@@ -5,8 +5,7 @@ and structured logging features in error_handlers.py.
 """
 
 import asyncio
-import logging
-from typing import Any, Dict
+from typing import Any
 
 from .error_handlers import (
     AsyncContextLogger,

@@ -7,14 +7,13 @@ This module implements 2025 best practices for response optimization:
 - Streaming responses for large data
 """
 
-import asyncio
 import gzip
 import json
 import logging
 import time
 import zlib
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 from datetime import datetime
 import lz4.frame
 

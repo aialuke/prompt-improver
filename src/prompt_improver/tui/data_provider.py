@@ -2,10 +2,8 @@
 Provides a unified interface for accessing system data.
 """
 
-import asyncio
-import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Import services with fallback handling - Updated to use modern analytics factory
 try:

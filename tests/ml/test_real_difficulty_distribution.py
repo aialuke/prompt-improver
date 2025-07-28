@@ -7,10 +7,10 @@ import pytest
 import numpy as np
 from typing import Dict, Any, List
 
-from src.prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
+from prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
     DifficultyDistributionAnalyzer, DifficultyProfile, FocusAreaTarget
 )
-from src.prompt_improver.ml.analysis.performance_gap_analyzer import (
+from prompt_improver.ml.analysis.performance_gap_analyzer import (
     PerformanceGap
 )
 

@@ -34,7 +34,7 @@ import fakeredis
 import coredis
 import lz4.frame
 
-from src.prompt_improver.utils.redis_cache import (
+from prompt_improver.utils.redis_cache import (
     RedisCache,
     get,
     set,
@@ -55,14 +55,14 @@ class TestRedisCache:
     async def real_redis(self, redis_client):
         """Use the real Redis client fixture for testing."""
         await redis_client.flushdb()
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", redis_client):
+        with patch("prompt_improver.utils.redis_cache.redis_client", redis_client):
             yield redis_client
 
     @pytest_asyncio.fixture(scope="function")
     async def reset_metrics(self):
         """Reset metrics for real behavior testing."""
         # Clear the global ongoing operations for clean test state
-        import src.prompt_improver.utils.redis_cache as cache_module
+        import prompt_improver.utils.redis_cache as cache_module
         cache_module._ongoing_operations.clear()
         cache_module._operations_lock = None  # Reset lock for new event loop
         yield
@@ -168,7 +168,7 @@ class TestRedisCache:
     async def test_redis_connection_error(self, real_redis, reset_metrics):
         """Test handling of Redis connection errors."""
         # Setup - patch redis_client to raise ConnectionError
-        with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
+        with patch("prompt_improver.utils.redis_cache.redis_client") as mock_client:
             mock_client.get.side_effect = coredis.ConnectionError("Connection failed")
 
             # Execute
@@ -207,14 +207,14 @@ class TestSingleflightPattern:
     async def real_redis(self, redis_client):
         """Use the real Redis client fixture for testing."""
         await redis_client.flushdb()
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", redis_client):
+        with patch("prompt_improver.utils.redis_cache.redis_client", redis_client):
             yield redis_client
 
     @pytest_asyncio.fixture(scope="function")
     async def reset_metrics(self):
         """Mock metrics for testing."""
         # Clear the global ongoing operations for clean test state
-        import src.prompt_improver.utils.redis_cache as cache_module
+        import prompt_improver.utils.redis_cache as cache_module
         cache_module._ongoing_operations.clear()
         cache_module._operations_lock = None  # Reset lock for new event loop
         yield
@@ -299,7 +299,7 @@ class TestSingleflightPattern:
 
         # Complete first call
         can_complete.set()
-        
+
         # Wait for both results
         result1 = await task1
         result2 = await task2
@@ -381,7 +381,7 @@ class TestModuleLevelFunctions:
     async def real_redis(self, redis_client):
         """Use the real Redis client fixture for testing."""
         await redis_client.flushdb()
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", redis_client):
+        with patch("prompt_improver.utils.redis_cache.redis_client", redis_client):
             yield redis_client
 
     @pytest.mark.asyncio
@@ -412,25 +412,25 @@ class TestErrorHandling:
         """Test handling of compression errors."""
         with patch("lz4.frame.compress") as mock_compress:
             mock_compress.side_effect = Exception("Compression failed")
-            
+
             result = await RedisCache.set("test_key", b"test_data")
             assert result is False
 
     @pytest.mark.asyncio
     async def test_redis_set_error_handling(self):
         """Test handling of Redis set errors."""
-        with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
+        with patch("prompt_improver.utils.redis_cache.redis_client") as mock_client:
             mock_client.set.side_effect = coredis.ConnectionError("Connection failed")
-            
+
             result = await RedisCache.set("test_key", b"test_data")
             assert result is False
 
     @pytest.mark.asyncio
     async def test_redis_delete_error_handling(self):
         """Test handling of Redis delete errors."""
-        with patch("src.prompt_improver.utils.redis_cache.redis_client") as mock_client:
+        with patch("prompt_improver.utils.redis_cache.redis_client") as mock_client:
             mock_client.delete.side_effect = coredis.ConnectionError("Connection failed")
-            
+
             result = await RedisCache.invalidate("test_key")
             assert result is False
 
@@ -444,10 +444,10 @@ class TestPerformanceCharacteristics:
         # Setup large, compressible data
         large_data = b"A" * 1000  # 1KB of repeated data
         compressed_data = lz4.frame.compress(large_data)
-        
+
         # Verify compression occurred
         assert len(compressed_data) < len(large_data)
-        
+
         # Verify decompression works
         decompressed = lz4.frame.decompress(compressed_data)
         assert decompressed == large_data
@@ -460,13 +460,13 @@ class TestPerformanceCharacteristics:
         mock_redis.set.return_value = True
         mock_redis.get.return_value = b"data"
         mock_redis.delete.return_value = 1
-        
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", mock_redis):
+
+        with patch("prompt_improver.utils.redis_cache.redis_client", mock_redis):
             # Perform operations
             await RedisCache.set("perf_test", b"data")
             await RedisCache.get("perf_test")
             await RedisCache.invalidate("perf_test")
-            
+
             # Just verify operations completed without error
             assert True  # Operations completed successfully
 
@@ -479,7 +479,7 @@ class TestIntegrationWorkflow:
     async def real_redis(self, redis_client):
         """Use the real Redis client fixture for testing."""
         await redis_client.flushdb()
-        with patch("src.prompt_improver.utils.redis_cache.redis_client", redis_client):
+        with patch("prompt_improver.utils.redis_cache.redis_client", redis_client):
             yield redis_client
 
     @pytest.mark.asyncio
@@ -487,7 +487,7 @@ class TestIntegrationWorkflow:
         """Test complete cache workflow with real-world usage patterns."""
         # Simulate expensive data processing function
         processing_calls = 0
-        
+
         @with_singleflight(cache_key_fn=lambda data_id: f"processed_data_{data_id}", expire=300)
         async def process_data(data_id: str):
             nonlocal processing_calls
@@ -529,7 +529,7 @@ class TestIntegrationWorkflow:
     async def test_concurrent_singleflight_different_keys(self, real_redis):
         """Test concurrent singleflight calls with different keys."""
         call_counts = {}
-        
+
         @with_singleflight(cache_key_fn=lambda key: f"concurrent_{key}")
         async def concurrent_function(key: str):
             if key not in call_counts:
@@ -564,11 +564,11 @@ class TestIntegrationWorkflow:
         """Test handling of corrupted data with real Redis."""
         # Store corrupted data directly
         await real_redis.set("corrupted_key", b"not_valid_lz4_data")
-        
+
         # Should return None and clean up the key
         value = await RedisCache.get("corrupted_key")
         assert value is None
-        
+
         # Verify key was cleaned up
         exists = await real_redis.exists("corrupted_key")
         assert exists == 0
@@ -578,14 +578,14 @@ class TestIntegrationWorkflow:
         """Test that cache state is isolated between tests."""
         # This should be a clean slate (assuming proper test isolation)
         # Note: In real test environment, isolation is handled by fixtures
-        
+
         # Set some data
         await RedisCache.set("isolation_test", b"test_value")
-        
+
         # Verify it exists
         value = await RedisCache.get("isolation_test")
         assert value == b"test_value"
-        
+
         # Clean up for next test
         await RedisCache.invalidate("isolation_test")
 
@@ -593,27 +593,27 @@ class TestIntegrationWorkflow:
     async def test_redis_cache_performance_characteristics(self, real_redis):
         """Test cache performance characteristics with real Redis."""
         import time
-        
+
         # Test write performance
         start_time = time.time()
         for i in range(100):
             await RedisCache.set(f"perf_key_{i}", f"value_{i}".encode())
         write_time = time.time() - start_time
-        
+
         # Test read performance
         start_time = time.time()
         for i in range(100):
             value = await RedisCache.get(f"perf_key_{i}")
             assert value == f"value_{i}".encode()
         read_time = time.time() - start_time
-        
+
         # Basic performance assertions (generous limits for CI)
         assert write_time < 5.0  # Should write 100 items in under 5 seconds
         assert read_time < 5.0   # Should read 100 items in under 5 seconds
-        
+
         # Read should generally be faster than write
         assert read_time <= write_time * 1.5  # Allow some variance
-        
+
         # Clean up performance test data
         for i in range(100):
             await RedisCache.invalidate(f"perf_key_{i}")

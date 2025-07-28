@@ -5,8 +5,7 @@ Implements 2025 best practices for workflow monitoring and graceful shutdown.
 
 import asyncio
 import logging
-import time
-from typing import Dict, Any, Optional, List, Set
+from typing import Dict, Any, Optional, Set
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from enum import Enum
@@ -15,15 +14,12 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 from ..core.cli_orchestrator import CLIOrchestrator
-from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator, PipelineState
-
 
 class WorkflowStopMode(Enum):
     """Workflow stopping modes."""
     GRACEFUL = "graceful"
     FORCE = "force"
     TIMEOUT = "timeout"
-
 
 @dataclass
 class WorkflowMonitorConfig:
@@ -34,7 +30,6 @@ class WorkflowMonitorConfig:
     max_poll_interval: float = 10.0  # Maximum poll interval for backoff
     backoff_multiplier: float = 1.2
     timeout_warning_threshold: float = 0.8  # Warn when 80% of timeout reached
-
 
 @dataclass
 class WorkflowCompletionResult:
@@ -47,7 +42,6 @@ class WorkflowCompletionResult:
     error: Optional[str] = None
     final_state: Optional[str] = None
     progress_data: Optional[Dict[str, Any]] = None
-
 
 class EnhancedWorkflowManager:
     """

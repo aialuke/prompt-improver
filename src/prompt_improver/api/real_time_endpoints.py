@@ -3,8 +3,8 @@ Provides WebSocket and REST endpoints for live experiment monitoring
 """
 
 import logging
-from datetime import datetime
-from typing import Annotated, Any, Dict, List, Optional
+from datetime import datetime, UTC
+from typing import Any, Optional
 
 from fastapi import (
     APIRouter,
@@ -29,8 +29,6 @@ except ImportError:
 
 from ..database import get_session
 from ..database.models import ABExperiment
-from ..core.services.analytics_factory import get_analytics_router
-from ..utils.error_handlers import handle_database_errors
 from ..utils.websocket_manager import connection_manager, setup_redis_connection
 
 logger = logging.getLogger(__name__)
@@ -106,7 +104,7 @@ async def handle_websocket_message(
         if message_type == "ping":
             # Respond to ping with pong
             await connection_manager.send_to_connection(
-                websocket, {"type": "pong", "timestamp": datetime.utcnow().isoformat()}
+                websocket, {"type": "pong", "timestamp": datetime.now(UTC).isoformat()}
             )
 
         elif message_type == "request_metrics":
@@ -123,7 +121,7 @@ async def handle_websocket_message(
                         "type": "metrics_update",
                         "experiment_id": experiment_id,
                         "metrics": metrics.__dict__,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     },
                 )
             else:
@@ -422,7 +420,7 @@ async def health_check() -> JSONResponse:
 
         return JSONResponse({
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "services": {
                 "websocket_manager": {
                     "status": "active",
@@ -440,7 +438,7 @@ async def health_check() -> JSONResponse:
             content={
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 

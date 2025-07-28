@@ -8,16 +8,16 @@ import asyncio
 import time
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from src.prompt_improver.performance.monitoring.health.base import HealthStatus
-from src.prompt_improver.performance.monitoring.health.enhanced_base import EnhancedHealthChecker
-from src.prompt_improver.performance.monitoring.health.enhanced_checkers import (
+from prompt_improver.performance.monitoring.health.base import HealthStatus
+from prompt_improver.performance.monitoring.health.enhanced_base import EnhancedHealthChecker
+from prompt_improver.performance.monitoring.health.enhanced_checkers import (
     EnhancedMLServiceHealthChecker,
     EnhancedMLOrchestratorHealthChecker,
-    EnhancedRedisHealthMonitor,
     EnhancedAnalyticsServiceHealthChecker
 )
-from src.prompt_improver.performance.monitoring.health.circuit_breaker import CircuitState, CircuitBreakerConfig
-from src.prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration
+# Note: EnhancedRedisHealthMonitor removed - functionality consolidated into cache/redis_health.py
+from prompt_improver.performance.monitoring.health.circuit_breaker import CircuitState, CircuitBreakerConfig
+from prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration
 
 # 2025 Best Practice: Test real behavior, expect realistic outcomes
 
@@ -76,7 +76,7 @@ class TestEnhancedHealthCheckerBase:
                 # Simulate the specified response time
                 await asyncio.sleep(self.response_time_ms / 1000)
                 
-                from src.prompt_improver.performance.monitoring.health.base import HealthResult
+                from prompt_improver.performance.monitoring.health.base import HealthResult
                 return HealthResult(
                     status=HealthStatus.HEALTHY,
                     component=self.name,
@@ -114,7 +114,7 @@ class TestEnhancedHealthCheckerBase:
         
         class MockHealthChecker(EnhancedHealthChecker):
             async def _execute_health_check(self):
-                from src.prompt_improver.performance.monitoring.health.base import HealthResult
+                from prompt_improver.performance.monitoring.health.base import HealthResult
                 return HealthResult(
                     status=HealthStatus.HEALTHY,
                     component=self.name,
@@ -291,77 +291,8 @@ class TestMLOrchestratorHealthChecker:
         assert result.details["component_health"]["healthy_percentage"] == 60
 
 
-class TestRedisHealthMonitor:
-    """Test Redis Health Monitor with real behavior - 2025 Best Practices"""
-
-    @pytest.mark.asyncio
-    async def test_redis_real_behavior_without_server(self):
-        """Test REAL behavior when Redis server is unavailable - should be WARNING/FAILED"""
-
-        checker = EnhancedRedisHealthMonitor()
-
-        # Test real behavior - Redis likely unavailable in test environment
-        result = await checker.check()
-
-        # 2025 Best Practice: Expect realistic outcomes
-        # Redis unavailable should result in WARNING (fallback) or FAILED
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
-
-        # Should have response time recorded even for failures (may be 0 for immediate failures)
-        assert result.response_time_ms >= 0
-
-        # Should contain error information or fallback data
-        assert "error" in result.details or "fallback_data" in result.details
-    
-    @pytest.mark.asyncio
-    async def test_redis_enhanced_monitoring_thresholds(self):
-        """Test enhanced monitoring correctly applies thresholds"""
-
-        checker = EnhancedRedisHealthMonitor()
-
-        # Mock high usage scenario that should trigger warnings
-        async def mock_high_usage_info():
-            return {
-                "info_success": True,
-                "memory_usage_percent": 92,  # Above 90% threshold
-                "connection_pool_info": {"connection_pool_usage_percent": 85},  # Above 80%
-                "performance_info": {"hit_ratio_percent": 75},  # Below 80%
-                "client_info": {"connected_clients": 100},
-                "redis_version": "7.0.0"
-            }
-
-        with patch.object(checker, '_info_check', mock_high_usage_info):
-            result = await checker.check()
-
-        # Should be WARNING due to threshold violations
-        assert result.status == HealthStatus.WARNING
-        assert "warnings" in result.details
-        assert len(result.details["warnings"]) > 0
-    
-    @pytest.mark.asyncio
-    async def test_redis_high_connection_pool_usage_warning(self):
-        """Test SLA monitoring detects high connection pool usage"""
-        
-        checker = EnhancedRedisHealthMonitor()
-        
-        # Mock high connection pool usage that should trigger WARNING
-        async def mock_high_usage_info():
-            return {
-                "info_success": True,
-                "memory_usage_percent": 75,  # Below warning threshold
-                "connection_pool_info": {"connection_pool_usage_percent": 95},  # Above 95% - CRITICAL
-                "performance_info": {"hit_ratio_percent": 85},  # Good hit ratio
-                "client_info": {"connected_clients": 95},
-                "redis_version": "7.0.0"
-            }
-
-        with patch.object(checker, '_info_check', mock_high_usage_info):
-            result = await checker.check()
-
-        # Should be WARNING due to high connection pool usage (95% > 80% threshold)
-        assert result.status == HealthStatus.WARNING
-        assert "warnings" in result.details
-        assert any("connection pool" in warning.lower() for warning in result.details["warnings"])
+# TestRedisHealthMonitor removed - functionality consolidated into cache/redis_health.py
+# Redis health monitoring tests should be in test_redis_health.py or cache tests
 
 
 class TestAnalyticsServiceHealthChecker:
@@ -435,9 +366,9 @@ class TestAnalyticsServiceHealthChecker:
 async def test_integrated_health_monitoring_scenario():
     """Integration test simulating a realistic monitoring scenario"""
     
-    # Create multiple health checkers
+    # Create health checkers (Redis monitoring moved to cache tests)
     ml_checker = EnhancedMLServiceHealthChecker()
-    redis_checker = EnhancedRedisHealthMonitor()
+    analytics_checker = EnhancedAnalyticsServiceHealthChecker()
     
     # Simulate mixed health states over time
     results = []
@@ -447,33 +378,33 @@ async def test_integrated_health_monitoring_scenario():
         ml_result = await ml_checker.check()
         results.append(("ml_service", ml_result))
 
-        # Redis health check
-        redis_result = await redis_checker.check()
-        results.append(("redis", redis_result))
+        # Analytics health check
+        analytics_result = await analytics_checker.check()
+        results.append(("analytics", analytics_result))
 
         # Small delay between checks
         await asyncio.sleep(0.01)
 
     # Analyze results
     ml_results = [r for service, r in results if service == "ml_service"]
-    redis_results = [r for service, r in results if service == "redis"]
+    analytics_results = [r for service, r in results if service == "analytics"]
 
     # Verify health checks completed
     assert len(ml_results) == 5
-    assert len(redis_results) == 5
+    assert len(analytics_results) == 5
 
     # In test environment, expect realistic outcomes (not all HEALTHY)
     # ML service likely unavailable - should be WARNING or FAILED
     assert all(r.status in [HealthStatus.WARNING, HealthStatus.FAILED] for r in ml_results)
-    # Redis likely unavailable - should be WARNING or FAILED
-    assert all(r.status in [HealthStatus.WARNING, HealthStatus.FAILED] for r in redis_results)
+    # Analytics likely unavailable - should be FAILED
+    assert all(r.status == HealthStatus.FAILED for r in analytics_results)
     
     # Verify SLA monitoring worked (may include previous test runs)
     ml_sla_report = ml_checker.sla_monitor.get_sla_report()
-    redis_sla_report = redis_checker.sla_monitor.get_sla_report()
+    analytics_sla_report = analytics_checker.sla_monitor.get_sla_report()
 
     assert ml_sla_report["total_checks"] >= 5  # At least our 5 checks
-    assert redis_sla_report["total_checks"] >= 5  # At least our 5 checks
+    assert analytics_sla_report["total_checks"] >= 5  # At least our 5 checks
     # Availability will be low due to service unavailability in test environment
     assert 0 <= ml_sla_report["overall_availability"] <= 1.0
-    assert 0 <= redis_sla_report["overall_availability"] <= 1.0
+    assert 0 <= analytics_sla_report["overall_availability"] <= 1.0

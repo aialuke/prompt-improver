@@ -9,25 +9,25 @@ from datetime import datetime, timedelta
 import numpy as np
 import pytest
 import sqlalchemy
-from src.prompt_improver.database.models import ABExperiment, RulePerformance, PromptSession, RuleMetadata
-from src.prompt_improver.evaluation.advanced_statistical_validator import (
+from prompt_improver.database.models import ABExperiment, RulePerformance, PromptSession, RuleMetadata
+from prompt_improver.evaluation.advanced_statistical_validator import (
     AdvancedStatisticalValidator,
 )
-from src.prompt_improver.evaluation.causal_inference_analyzer import (
+from prompt_improver.evaluation.causal_inference_analyzer import (
     CausalInferenceAnalyzer,
     TreatmentAssignment,
 )
-from src.prompt_improver.evaluation.experiment_orchestrator import (
+from prompt_improver.evaluation.experiment_orchestrator import (
     ExperimentArm,
     ExperimentConfiguration,
     ExperimentOrchestrator,
     ExperimentType,
     StoppingRule,
 )
-from src.prompt_improver.evaluation.pattern_significance_analyzer import (
+from prompt_improver.evaluation.pattern_significance_analyzer import (
     PatternSignificanceAnalyzer,
 )
-from src.prompt_improver.services.real_time_analytics import RealTimeAnalyticsService
+from prompt_improver.services.real_time_analytics import RealTimeAnalyticsService
 
 
 class TestAdvancedABTestingComplete:
@@ -673,9 +673,9 @@ class TestAdvancedABTestingComplete:
 
         # Test analysis with insufficient data (real scenario)
         # Re-create orchestrator with fresh session for next test
-        from src.prompt_improver.evaluation.advanced_statistical_validator import AdvancedStatisticalValidator
-        from src.prompt_improver.evaluation.pattern_significance_analyzer import PatternSignificanceAnalyzer
-        from src.prompt_improver.evaluation.causal_inference_analyzer import CausalInferenceAnalyzer
+        from prompt_improver.evaluation.advanced_statistical_validator import AdvancedStatisticalValidator
+        from prompt_improver.evaluation.pattern_significance_analyzer import PatternSignificanceAnalyzer
+        from prompt_improver.evaluation.causal_inference_analyzer import CausalInferenceAnalyzer
         
         # Create new orchestrator with fresh session
         fresh_orchestrator = ExperimentOrchestrator(

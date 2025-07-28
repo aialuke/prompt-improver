@@ -3,9 +3,8 @@
 import logging
 import os
 import sys
-from typing import Optional
 
-from .config_validator import SecurityConfigValidator, validate_security_configuration
+from .config_validator import SecurityConfigValidator
 
 logger = logging.getLogger(__name__)
 

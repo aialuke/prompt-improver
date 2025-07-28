@@ -8,7 +8,7 @@ Create Date: 2025-07-13 22:44:47.052077
 
 import json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Union
 
 import sqlalchemy as sa
@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.execute("DELETE FROM rule_metadata WHERE rule_version = '1.0.0'")
 
     # Insert correct rules with proper IDs
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     correct_rules = [
         {
             "rule_id": "clarity_enhancement",

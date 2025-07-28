@@ -12,9 +12,9 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, UTC
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import stats
@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database.models import ABExperiment, ABExperimentCreate, RulePerformance
 from ...utils.datetime_utils import aware_utc_now
-from ...utils.error_handlers import handle_database_errors
 
 logger = logging.getLogger(__name__)
 
@@ -839,7 +838,7 @@ class ModernABTestingService:
         Returns:
             Orchestrator-compatible result with comprehensive A/B testing data
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         # Add realistic processing delay for statistical analysis
         await asyncio.sleep(0.03)  # 30ms delay to simulate complex statistical computations
@@ -866,7 +865,7 @@ class ModernABTestingService:
             ab_testing_data = await self._collect_comprehensive_ab_testing_data()
 
             # Calculate execution metadata
-            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
             return {
                 "orchestrator_compatible": True,
@@ -920,7 +919,7 @@ class ModernABTestingService:
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "ab_testing_summary": {}},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "component_version": "2025.1.0",
                     "framework": "ModernABTestingService"

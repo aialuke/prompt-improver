@@ -4,23 +4,21 @@ Implements session state detection, workflow reconstruction, and resume coordina
 """
 
 import asyncio
-import json
+
 import logging
-import os
-import time
+
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-from .progress_preservation import ProgressPreservationManager, ProgressSnapshot
+from .progress_preservation import ProgressPreservationManager
 from .training_system_manager import TrainingSystemManager
 from ...database import get_session_context
-from ...database.models import TrainingSession, TrainingIteration
+from ...database.models import TrainingSession
 from sqlalchemy import select, update, and_, or_
 from sqlalchemy.orm import selectinload
-
 
 class SessionState(Enum):
     """Enumeration of training session states for resume detection."""
@@ -31,7 +29,6 @@ class SessionState(Enum):
     CORRUPTED = "corrupted"
     RECOVERABLE = "recoverable"
     UNRECOVERABLE = "unrecoverable"
-
 
 @dataclass
 class SessionResumeContext:
@@ -46,7 +43,6 @@ class SessionResumeContext:
     estimated_loss_minutes: float
     recovery_confidence: float  # 0.0 to 1.0
 
-
 @dataclass
 class WorkflowState:
     """Reconstructed workflow state for resume operations."""
@@ -58,7 +54,6 @@ class WorkflowState:
     workflow_parameters: Dict[str, Any]
     execution_context: Dict[str, Any]
     performance_metrics: Dict[str, Any]
-
 
 class SessionResumeManager:
     """

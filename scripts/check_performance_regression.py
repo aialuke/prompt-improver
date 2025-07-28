@@ -44,7 +44,7 @@ class PerformanceRegessionChecker:
         # Test 1: Import performance
         start_time = time.time()
         try:
-            from src.prompt_improver.mcp_server import mcp_server
+            from prompt_improver.mcp_server import mcp_server
 
             metrics["import_time"] = time.time() - start_time
         except (ImportError, AttributeError, OSError):

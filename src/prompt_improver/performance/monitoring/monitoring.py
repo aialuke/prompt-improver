@@ -13,10 +13,9 @@ Advanced real-time monitoring with 2025 best practices:
 import asyncio
 import time
 import uuid
-import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any, Dict, List, Optional, Callable, Union
 from enum import Enum
 from collections import defaultdict, deque
@@ -25,13 +24,10 @@ import statistics
 # OpenTelemetry imports
 try:
     from opentelemetry import trace, metrics
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-    from opentelemetry.instrumentation.auto_instrumentation import sitecustomize
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.b3 import B3MultiFormat
     OPENTELEMETRY_AVAILABLE = True
@@ -72,8 +68,6 @@ except ImportError:
 
 # Enhanced observability imports
 try:
-    import prometheus_client
-    from prometheus_client import Counter, Histogram, Gauge, Summary
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -90,7 +84,7 @@ from sqlalchemy import text
 from ...database import get_sessionmanager
 from ...database.models import RulePerformance
 from ..analytics.analytics import AnalyticsService
-from ...utils.error_handlers import handle_common_errors, handle_database_errors
+from ...utils.error_handlers import handle_database_errors
 
 class TraceLevel(Enum):
     """Trace level for distributed tracing."""
@@ -816,7 +810,7 @@ class EnhancedRealTimeMonitor:
                     await self.emit_alert(alert)
 
             # Check error rate anomalies
-            recent_errors = len([e for e in self.error_history if (datetime.utcnow() - e.get("timestamp", datetime.utcnow())).seconds < 300])
+            recent_errors = len([e for e in self.error_history if (datetime.now(UTC) - e.get("timestamp", datetime.now(UTC))).seconds < 300])
             if recent_errors > 10:  # More than 10 errors in 5 minutes
                 alert = EnhancedAlert(
                     alert_id=str(uuid.uuid4()),
@@ -834,7 +828,7 @@ class EnhancedRealTimeMonitor:
 
     async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrator-compatible interface for real-time monitoring (2025 pattern)"""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         try:
             # Create trace context for orchestrated analysis
@@ -883,7 +877,7 @@ class EnhancedRealTimeMonitor:
                 }
 
                 # Calculate execution metadata
-                execution_time = (datetime.utcnow() - start_time).total_seconds()
+                execution_time = (datetime.now(UTC) - start_time).total_seconds()
                 span.set_attribute("execution.duration_seconds", execution_time)
 
                 return {
@@ -910,7 +904,7 @@ class EnhancedRealTimeMonitor:
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "monitoring_summary": {}},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "component_version": "2025.1.0"
                 }
@@ -929,13 +923,13 @@ class EnhancedRealTimeMonitor:
                 # Simulate some errors
                 if random.random() < 0.02:  # 2% error rate
                     self.error_history.append({
-                        "timestamp": datetime.utcnow(),
+                        "timestamp": datetime.now(UTC),
                         "service": random.choice(["api", "database", "analytics"]),
                         "error_type": "timeout"
                     })
 
                 self.request_history.append({
-                    "timestamp": datetime.utcnow(),
+                    "timestamp": datetime.now(UTC),
                     "response_time": response_time
                 })
 

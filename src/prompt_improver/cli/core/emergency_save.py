@@ -8,17 +8,15 @@ import json
 import logging
 import os
 import shutil
-import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 
-from .progress_preservation import ProgressPreservationManager, ProgressSnapshot
+from .progress_preservation import ProgressPreservationManager
 from ...database import get_session_context
-from ...database.models import TrainingSession, TrainingIteration
-
+from ...database.models import TrainingSession
 
 @dataclass
 class EmergencySaveContext:
@@ -31,7 +29,6 @@ class EmergencySaveContext:
     atomic: bool = True
     validate: bool = True
 
-
 @dataclass
 class EmergencySaveResult:
     """Result of emergency save operation."""
@@ -43,7 +40,6 @@ class EmergencySaveResult:
     duration_seconds: float
     validation_results: Dict[str, Any]
     error_message: Optional[str] = None
-
 
 class EmergencySaveManager:
     """

@@ -16,7 +16,7 @@ Transform any prompt improvement tool into an intelligent system that continuous
 
 ## 🧪 Integration Testing Standards (2025)
 
-This project follows **2025 Integration Testing Best Practices** as outlined in our comprehensive [Integration Testing Guidelines](2025_integration_testing_guidelines.md).
+This project follows **2025 Integration Testing Best Practices** with comprehensive real behavior testing and modern test pyramid approaches.
 
 ### Key Principles Implemented
 
@@ -247,7 +247,7 @@ python_functions = test_*
 
 ## 📚 Documentation
 
-- [Integration Testing Guidelines](2025_integration_testing_guidelines.md) - Complete 2025 standards
+- [Test Suite Documentation](tests/README.md) - Complete 2025 testing standards
 - [Test Suite Documentation](tests/README.md) - Detailed testing guide
 - [API Documentation](docs/api/) - Service interfaces
 - [Architecture Guide](docs/architecture/) - System design

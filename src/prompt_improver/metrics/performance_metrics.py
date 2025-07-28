@@ -7,18 +7,15 @@ cache effectiveness, and external API dependency performance with real-time anal
 
 import asyncio
 import logging
-import time
 import psutil
-from typing import Dict, Any, Optional, List, Union, Set, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-import json
 import statistics
 from collections import defaultdict, deque
 
 from ..performance.monitoring.metrics_registry import get_metrics_registry
-
 
 class PipelineStage(Enum):
     """Request processing pipeline stages."""
@@ -33,7 +30,6 @@ class PipelineStage(Enum):
     RESPONSE_FORMATTING = "response_formatting"
     EGRESS = "egress"
 
-
 class DatabaseOperation(Enum):
     """Types of database operations."""
     SELECT = "select"
@@ -47,7 +43,6 @@ class DatabaseOperation(Enum):
     INDEX_SCAN = "index_scan"
     FULL_TABLE_SCAN = "full_table_scan"
 
-
 class CacheType(Enum):
     """Types of cache systems."""
     APPLICATION = "application"
@@ -59,7 +54,6 @@ class CacheType(Enum):
     DATABASE_QUERY = "database_query"
     API_RESPONSE = "api_response"
 
-
 class ExternalAPIType(Enum):
     """Types of external APIs."""
     ML_INFERENCE = "ml_inference"
@@ -69,7 +63,6 @@ class ExternalAPIType(Enum):
     STORAGE = "storage"
     NOTIFICATION = "notification"
     THIRD_PARTY = "third_party"
-
 
 @dataclass
 class RequestPipelineMetric:
@@ -90,7 +83,6 @@ class RequestPipelineMetric:
     method: str
     queue_time_ms: Optional[float]
     retry_count: int
-
 
 @dataclass
 class DatabasePerformanceMetric:
@@ -115,7 +107,6 @@ class DatabasePerformanceMetric:
     timestamp: datetime
     transaction_id: Optional[str]
 
-
 @dataclass
 class CachePerformanceMetric:
     """Metrics for cache operations."""
@@ -134,7 +125,6 @@ class CachePerformanceMetric:
     timestamp: datetime
     user_id: Optional[str]
     session_id: Optional[str]
-
 
 @dataclass
 class ExternalAPIMetric:
@@ -158,7 +148,6 @@ class ExternalAPIMetric:
     ttfb_ms: Optional[float]  # Time to first byte
     timestamp: datetime
     request_id: str
-
 
 class PerformanceMetricsCollector:
     """
@@ -928,10 +917,8 @@ class PerformanceMetricsCollector:
             }
         }
 
-
 # Global instance
 _performance_metrics_collector: Optional[PerformanceMetricsCollector] = None
-
 
 def get_performance_metrics_collector(config: Optional[Dict[str, Any]] = None) -> PerformanceMetricsCollector:
     """Get global performance metrics collector instance."""
@@ -939,7 +926,6 @@ def get_performance_metrics_collector(config: Optional[Dict[str, Any]] = None) -
     if _performance_metrics_collector is None:
         _performance_metrics_collector = PerformanceMetricsCollector(config)
     return _performance_metrics_collector
-
 
 # Convenience functions for recording metrics
 async def record_pipeline_stage_timing(

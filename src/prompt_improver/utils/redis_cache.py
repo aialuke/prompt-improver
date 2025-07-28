@@ -8,16 +8,14 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import time
 from functools import wraps
-from typing import Any, Optional, Union
 
 import lz4.frame
 import coredis
 from coredis import exceptions as coredis_exceptions
 import yaml
-from prometheus_client import Counter, Histogram, REGISTRY
+from prometheus_client import Counter, REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # Configure logging

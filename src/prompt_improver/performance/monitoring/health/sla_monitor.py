@@ -4,13 +4,11 @@ Service Level Agreement (SLA) Monitoring for Health Checks
 """
 
 import time
-import asyncio
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 import statistics
 from collections import deque
-from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,6 +35,25 @@ class SLATarget:
     # Alert configuration
     alert_on_breach: bool = True
     alert_cooldown_seconds: int = 300  # Don't re-alert for 5 minutes
+    
+    @classmethod
+    def from_global_config(cls, name: str, description: str, target_value: float, unit: str) -> "SLATarget":
+        """Create SLA target with values from global config."""
+        config = get_config()
+        sla_config = config.sla_monitoring
+        return cls(
+            name=name,
+            description=description,
+            target_value=target_value,
+            unit=unit,
+            measurement_window_seconds=sla_config.measurement_window_seconds,
+            warning_threshold=sla_config.warning_threshold,
+            critical_threshold=sla_config.critical_threshold,
+            alert_on_breach=True,
+            alert_cooldown_seconds=sla_config.alert_cooldown_seconds
+        )
+
+from ....core.config import get_config
 
 @dataclass
 class SLAConfiguration:
@@ -57,6 +74,21 @@ class SLAConfiguration:
 
     # Custom SLA targets
     custom_targets: List[SLATarget] = field(default_factory=list)
+    
+    @classmethod
+    def from_global_config(cls, service_name: str) -> "SLAConfiguration":
+        """Create configuration from global config system."""
+        config = get_config()
+        sla_config = config.sla_monitoring
+        return cls(
+            service_name=service_name,
+            response_time_p50_ms=sla_config.response_time_p50_ms,
+            response_time_p95_ms=sla_config.response_time_p95_ms,
+            response_time_p99_ms=sla_config.response_time_p99_ms,
+            availability_target=sla_config.availability_target,
+            error_rate_threshold=sla_config.error_rate_threshold,
+            custom_targets=[]
+        )
 
 class SLAMeasurement:
     """Tracks measurements for a specific SLA target"""

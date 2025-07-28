@@ -12,13 +12,13 @@ import time
 from unittest.mock import patch, MagicMock
 from typing import List, Dict, Any
 
-from src.prompt_improver.performance.monitoring.health.enhanced_checkers import (
+from prompt_improver.performance.monitoring.health.enhanced_checkers import (
     EnhancedMLServiceHealthChecker,
     EnhancedRedisHealthMonitor
 )
-from src.prompt_improver.performance.monitoring.health.base import HealthStatus
-from src.prompt_improver.performance.monitoring.health.circuit_breaker import CircuitState
-from src.prompt_improver.performance.monitoring.health.sla_monitor import SLAStatus
+from prompt_improver.performance.monitoring.health.base import HealthStatus
+from prompt_improver.performance.monitoring.health.circuit_breaker import CircuitState
+from prompt_improver.performance.monitoring.health.sla_monitor import SLAStatus
 
 
 class TestIntegratedHealthMonitoring:
@@ -50,7 +50,7 @@ class TestIntegratedHealthMonitoring:
                 raise ConnectionError("ML service connection failed")
         
         # Phase 1: Normal operation (should be healthy)
-        with patch('src.prompt_improver.ml.services.ml_integration.get_ml_service', mock_get_ml_service):
+        with patch('prompt_improver.ml.services.ml_integration.get_ml_service', mock_get_ml_service):
             for i in range(5):
                 result = await checker.check()
                 assert result.status == HealthStatus.HEALTHY
@@ -232,7 +232,7 @@ class TestIntegratedHealthMonitoring:
         """Test that circuit breakers prevent failure cascades"""
         
         # Create health checkers with fast-opening circuit breakers
-        from src.prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
+        from prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
         
         fast_circuit_config = CircuitBreakerConfig(
             failure_threshold=2,  # Open after 2 failures
@@ -328,7 +328,7 @@ class TestIntegratedHealthMonitoring:
         """Test that health monitoring components validate configurations"""
         
         # Test circuit breaker config validation
-        from src.prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
+        from prompt_improver.performance.monitoring.health.circuit_breaker import CircuitBreakerConfig
         
         config = CircuitBreakerConfig(
             failure_threshold=5,
@@ -341,7 +341,7 @@ class TestIntegratedHealthMonitoring:
         assert config.response_time_threshold_ms == 1000
         
         # Test SLA config validation
-        from src.prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration, SLATarget
+        from prompt_improver.performance.monitoring.health.sla_monitor import SLAConfiguration, SLATarget
         
         sla_config = SLAConfiguration(
             service_name="test_service",

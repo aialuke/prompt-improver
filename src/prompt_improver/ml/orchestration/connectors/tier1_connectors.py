@@ -13,7 +13,7 @@ from .component_connector import ComponentConnector, ComponentMetadata, Componen
 
 class TrainingDataLoaderConnector(ComponentConnector):
     """Connector for TrainingDataLoader component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="training_data_loader",
@@ -42,15 +42,15 @@ class TrainingDataLoaderConnector(ComponentConnector):
             resource_requirements={"memory": "2GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the TrainingDataLoader component."""
         # In real implementation, this would import and initialize the actual component
-        # from src.prompt_improver.ml.core.training_data_loader import TrainingDataLoader
+        # from prompt_improver.ml.core.training_data_loader import TrainingDataLoader
         # self.component_instance = TrainingDataLoader()
         self.logger.info("TrainingDataLoader connector initialized")
         await asyncio.sleep(0.1)  # Simulate initialization
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute TrainingDataLoader capability."""
         if capability_name == "load_training_data":
@@ -61,7 +61,7 @@ class TrainingDataLoaderConnector(ComponentConnector):
             return await self._split_dataset(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _load_training_data(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Load training data."""
         await asyncio.sleep(0.2)  # Simulate data loading
@@ -71,7 +71,7 @@ class TrainingDataLoaderConnector(ComponentConnector):
             "data_format": "structured",
             "loaded_at": "2025-01-20T10:00:00Z"
         }
-    
+
     async def _validate_data_quality(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Validate data quality."""
         await asyncio.sleep(0.1)
@@ -81,7 +81,7 @@ class TrainingDataLoaderConnector(ComponentConnector):
             "outliers": 0.02,
             "validation_passed": True
         }
-    
+
     async def _split_dataset(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Split dataset."""
         await asyncio.sleep(0.1)
@@ -94,7 +94,7 @@ class TrainingDataLoaderConnector(ComponentConnector):
 
 class MLModelServiceConnector(ComponentConnector):
     """Connector for MLModelService component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="ml_model_service",
@@ -123,12 +123,12 @@ class MLModelServiceConnector(ComponentConnector):
             resource_requirements={"memory": "4GB", "cpu": "4 cores", "gpu": "1"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the MLModelService component."""
         self.logger.info("MLModelService connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute MLModelService capability."""
         if capability_name == "train_model":
@@ -139,7 +139,7 @@ class MLModelServiceConnector(ComponentConnector):
             return await self._predict(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _train_model(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Train ML model."""
         await asyncio.sleep(0.5)  # Simulate training
@@ -150,7 +150,7 @@ class MLModelServiceConnector(ComponentConnector):
             "epochs": parameters.get("epochs", 10),
             "model_size": "50MB"
         }
-    
+
     async def _evaluate_model(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Evaluate model."""
         await asyncio.sleep(0.2)
@@ -161,7 +161,7 @@ class MLModelServiceConnector(ComponentConnector):
             "f1_score": 0.87,
             "test_loss": 0.18
         }
-    
+
     async def _predict(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Make predictions."""
         await asyncio.sleep(0.1)
@@ -173,7 +173,7 @@ class MLModelServiceConnector(ComponentConnector):
 
 class RuleOptimizerConnector(ComponentConnector):
     """Connector for RuleOptimizer component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="rule_optimizer",
@@ -196,12 +196,12 @@ class RuleOptimizerConnector(ComponentConnector):
             resource_requirements={"memory": "1GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the RuleOptimizer component."""
         self.logger.info("RuleOptimizer connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute RuleOptimizer capability."""
         if capability_name == "optimize_rules":
@@ -210,7 +210,7 @@ class RuleOptimizerConnector(ComponentConnector):
             return await self._validate_rules(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _optimize_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize rules."""
         await asyncio.sleep(0.3)
@@ -220,7 +220,7 @@ class RuleOptimizerConnector(ComponentConnector):
             "optimization_iterations": 50,
             "convergence_achieved": True
         }
-    
+
     async def _validate_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Validate rules."""
         await asyncio.sleep(0.2)
@@ -233,7 +233,7 @@ class RuleOptimizerConnector(ComponentConnector):
 
 class MultiArmedBanditConnector(ComponentConnector):
     """Connector for MultiArmedBandit component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="multi_armed_bandit",
@@ -256,12 +256,12 @@ class MultiArmedBanditConnector(ComponentConnector):
             resource_requirements={"memory": "512MB", "cpu": "1 core"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the MultiArmedBandit component."""
         self.logger.info("MultiArmedBandit connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute MultiArmedBandit capability."""
         if capability_name == "thompson_sampling":
@@ -270,7 +270,7 @@ class MultiArmedBanditConnector(ComponentConnector):
             return await self._ucb_selection(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _thompson_sampling(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Thompson Sampling."""
         await asyncio.sleep(0.1)
@@ -280,7 +280,7 @@ class MultiArmedBanditConnector(ComponentConnector):
             "exploration_factor": 0.3,
             "expected_reward": 0.82
         }
-    
+
     async def _ucb_selection(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """UCB Selection."""
         await asyncio.sleep(0.1)
@@ -293,7 +293,7 @@ class MultiArmedBanditConnector(ComponentConnector):
 
 class AprioriAnalyzerConnector(ComponentConnector):
     """Connector for AprioriAnalyzer component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="apriori_analyzer",
@@ -316,12 +316,12 @@ class AprioriAnalyzerConnector(ComponentConnector):
             resource_requirements={"memory": "2GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the AprioriAnalyzer component."""
         self.logger.info("AprioriAnalyzer connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute AprioriAnalyzer capability."""
         if capability_name == "mine_association_rules":
@@ -330,7 +330,7 @@ class AprioriAnalyzerConnector(ComponentConnector):
             return await self._analyze_patterns(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _mine_association_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Mine association rules."""
         await asyncio.sleep(0.3)
@@ -343,7 +343,7 @@ class AprioriAnalyzerConnector(ComponentConnector):
                 {"rule": "B -> C", "support": 0.25, "confidence": 0.85}
             ]
         }
-    
+
     async def _analyze_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze patterns."""
         await asyncio.sleep(0.2)
@@ -356,7 +356,7 @@ class AprioriAnalyzerConnector(ComponentConnector):
 
 class ContextLearnerConnector(ComponentConnector):
     """Connector for ContextLearner component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="context_learner",
@@ -385,12 +385,12 @@ class ContextLearnerConnector(ComponentConnector):
             resource_requirements={"memory": "512MB", "cpu": "1 core"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize the ContextLearner component."""
         self.logger.info("ContextLearner connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute ContextLearner capability."""
         if capability_name == "learn_context_patterns":
@@ -401,7 +401,7 @@ class ContextLearnerConnector(ComponentConnector):
             return await self._cluster_contexts(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _learn_context_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Learn context patterns."""
         await asyncio.sleep(0.3)
@@ -411,7 +411,7 @@ class ContextLearnerConnector(ComponentConnector):
             "silhouette_score": 0.75,
             "processing_time": "0.3s"
         }
-    
+
     async def _extract_features(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Extract features."""
         await asyncio.sleep(0.2)
@@ -421,7 +421,7 @@ class ContextLearnerConnector(ComponentConnector):
             "extraction_method": "composite",
             "quality_score": 0.92
         }
-    
+
     async def _cluster_contexts(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Cluster contexts."""
         await asyncio.sleep(0.2)
@@ -437,14 +437,14 @@ class ContextLearnerConnector(ComponentConnector):
 
 # Additional Tier 1 connectors would be implemented similarly:
 # - BatchProcessorConnector
-# - ProductionRegistryConnector  
+# - ProductionRegistryConnector
 # - ClusteringOptimizerConnector
 # - FailureAnalyzerConnector
 # - DimensionalityReducerConnector
 
 class Tier1ConnectorFactory:
     """Factory for creating Tier 1 component connectors."""
-    
+
     @staticmethod
     def create_connector(component_name: str, event_bus=None) -> ComponentConnector:
         """Create a connector for the specified Tier 1 component."""
@@ -456,24 +456,24 @@ class Tier1ConnectorFactory:
             "apriori_analyzer": AprioriAnalyzerConnector,
             "context_learner": ContextLearnerConnector,
         }
-        
+
         if component_name not in connectors:
             raise ValueError(f"Unknown Tier 1 component: {component_name}")
-        
+
         return connectors[component_name](event_bus)
-    
+
     @staticmethod
     def list_available_components() -> List[str]:
         """List all available Tier 1 components."""
         return [
             "training_data_loader",
-            "ml_model_service", 
+            "ml_model_service",
             "rule_optimizer",
             "multi_armed_bandit",
             "apriori_analyzer",
             "batch_processor",
             "production_registry",
-            "context_learner", 
+            "context_learner",
             "clustering_optimizer",
             "failure_analyzer",
             "dimensionality_reducer"

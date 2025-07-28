@@ -12,12 +12,12 @@ from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
 
 # Import components under test
-from src.prompt_improver.security.input_validator import InputValidator, ValidationError
-from src.prompt_improver.ml.analytics.session_comparison_analyzer import SessionComparisonAnalyzer
-from src.prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
-from src.prompt_improver.performance.testing.ab_testing_service import ABTestingService
-from src.prompt_improver.security.adversarial_defense import AdversarialDefenseSystem
-from src.prompt_improver.security.differential_privacy import DifferentialPrivacyService
+from prompt_improver.security.input_validator import InputValidator, ValidationError
+from prompt_improver.ml.analytics.session_comparison_analyzer import SessionComparisonAnalyzer
+from prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
+from prompt_improver.performance.testing.ab_testing_service import ABTestingService
+from prompt_improver.security.adversarial_defense import AdversarialDefenseSystem
+from prompt_improver.security.differential_privacy import DifferentialPrivacyService
 
 
 class TestNumPy2Compatibility:
@@ -144,7 +144,7 @@ class TestNumPy2Compatibility:
         metrics_b = [0.9, 0.92, 0.89, 0.91, 0.88]
         
         # Test statistical comparison
-        from src.prompt_improver.ml.analytics.session_comparison_analyzer import ComparisonMethod
+        from prompt_improver.ml.analytics.session_comparison_analyzer import ComparisonMethod
         result = await analyzer._perform_statistical_comparison(
             metrics_a, metrics_b, ComparisonMethod.T_TEST
         )
@@ -348,7 +348,7 @@ class TestNumPy2Compatibility:
         metrics_a = rng.uniform(0.7, 0.9, 20).tolist()
         metrics_b = rng.uniform(0.75, 0.95, 20).tolist()
         
-        from src.prompt_improver.ml.analytics.session_comparison_analyzer import ComparisonMethod
+        from prompt_improver.ml.analytics.session_comparison_analyzer import ComparisonMethod
         comparison_result = await analyzer._perform_statistical_comparison(
             metrics_a, metrics_b, ComparisonMethod.T_TEST
         )

@@ -12,18 +12,15 @@ Advanced health monitoring with 2025 best practices:
 
 import asyncio
 import time
-import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 from collections import defaultdict, deque
 
 # Enhanced observability imports
 try:
-    import prometheus_client
-    from prometheus_client import Counter, Histogram, Gauge, Summary
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -258,7 +255,6 @@ class EnhancedHealthService:
             if REDIS_MONITOR_AVAILABLE and RedisHealthMonitor is not None:
                 try:
                     # Load Redis configuration
-                    import yaml
 
                     from ...utils.redis_cache import redis_config
 
@@ -387,7 +383,7 @@ class EnhancedHealthService:
         include_predictions: bool = True
     ) -> Dict[str, Any]:
         """Run enhanced health checks with 2025 features."""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         # Check cache first if enabled
         if use_cache and self.enable_caching:
@@ -426,14 +422,14 @@ class EnhancedHealthService:
                     component=checker.name,
                     error=str(result),
                     message=f"Health check failed: {result}",
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(UTC)
                 )
 
             all_results[checker.name] = result
 
             # Update cache
             if self.enable_caching:
-                self.cached_results[checker.name] = (result, datetime.utcnow())
+                self.cached_results[checker.name] = (result, datetime.now(UTC))
 
         # Update health history and metrics
         self._update_health_history(all_results)
@@ -450,7 +446,7 @@ class EnhancedHealthService:
         overall_status = self._calculate_overall_health(all_results)
 
         # Prepare enhanced result
-        execution_time = (datetime.utcnow() - start_time).total_seconds()
+        execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
         return {
             "overall_status": overall_status.value,
@@ -553,21 +549,21 @@ class EnhancedHealthService:
                 dependency.health_metrics.success_count += 1
                 dependency.health_metrics.consecutive_successes += 1
                 dependency.health_metrics.consecutive_failures = 0
-                dependency.health_metrics.last_success_time = datetime.utcnow()
+                dependency.health_metrics.last_success_time = datetime.now(UTC)
 
             except Exception as e:
                 # Circuit breaker is open or check failed
                 dependency.health_metrics.failure_count += 1
                 dependency.health_metrics.consecutive_failures += 1
                 dependency.health_metrics.consecutive_successes = 0
-                dependency.health_metrics.last_failure_time = datetime.utcnow()
+                dependency.health_metrics.last_failure_time = datetime.now(UTC)
 
                 result = HealthResult(
                     status=HealthStatus.FAILED,
                     component=checker.name,
                     error=str(e),
                     message=f"Circuit breaker protection: {e}",
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(UTC)
                 )
         else:
             # Run check normally
@@ -577,26 +573,26 @@ class EnhancedHealthService:
                     dependency.health_metrics.success_count += 1
                     dependency.health_metrics.consecutive_successes += 1
                     dependency.health_metrics.consecutive_failures = 0
-                    dependency.health_metrics.last_success_time = datetime.utcnow()
+                    dependency.health_metrics.last_success_time = datetime.now(UTC)
             except Exception as e:
                 if dependency:
                     dependency.health_metrics.failure_count += 1
                     dependency.health_metrics.consecutive_failures += 1
                     dependency.health_metrics.consecutive_successes = 0
-                    dependency.health_metrics.last_failure_time = datetime.utcnow()
+                    dependency.health_metrics.last_failure_time = datetime.now(UTC)
 
                 result = HealthResult(
                     status=HealthStatus.FAILED,
                     component=checker.name,
                     error=str(e),
                     message=f"Health check failed: {e}",
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(UTC)
                 )
 
         # Update total checks
         if dependency:
             dependency.health_metrics.total_checks += 1
-            dependency.last_check_time = datetime.utcnow()
+            dependency.last_check_time = datetime.now(UTC)
 
         # Update Prometheus metrics
         if PROMETHEUS_AVAILABLE and ENHANCED_HEALTH_CHECK_COUNTER:
@@ -609,7 +605,7 @@ class EnhancedHealthService:
     def _get_cached_results(self) -> Dict[str, HealthResult]:
         """Get valid cached health check results."""
         cached_results = {}
-        current_time = datetime.utcnow()
+        current_time = datetime.now(UTC)
 
         for component, (result, cache_time) in list(self.cached_results.items()):
             dependency = self.dependencies.get(component)
@@ -627,7 +623,7 @@ class EnhancedHealthService:
         """Update health history for trend analysis."""
         for component, result in results.items():
             self.health_history[component].append({
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
                 "status": result.status,
                 "response_time": getattr(result, 'response_time', None)
             })
@@ -921,7 +917,7 @@ class EnhancedHealthService:
 
     async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrator-compatible interface for health monitoring (2025 pattern)"""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         try:
             # Extract configuration
@@ -938,7 +934,7 @@ class EnhancedHealthService:
             )
 
             # Calculate execution metadata
-            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
             return {
                 "orchestrator_compatible": True,
@@ -961,7 +957,7 @@ class EnhancedHealthService:
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "overall_status": "failed"},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "component_version": "2025.1.0"
                 }

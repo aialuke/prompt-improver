@@ -10,11 +10,11 @@ import asyncio
 import numpy as np
 from typing import Dict, Any
 
-from src.prompt_improver.ml.orchestration.core.component_registry import (
+from prompt_improver.ml.orchestration.core.component_registry import (
     ComponentRegistry, ComponentTier, ComponentInfo
 )
-from src.prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-from src.prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
+from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
+from prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
 
 
 class TestModernizedComponentRegistry:
@@ -89,7 +89,7 @@ class TestModernizedComponentRegistry:
         )
         
         # Import the config class
-        from src.prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
+        from prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
         
         config = DimensionalityConfig(target_dimensions=10, enable_neural_methods=True)
         dim_reducer_instance = dim_reducer_component.component_class(config=config)
@@ -118,7 +118,7 @@ class TestModernizedComponentRegistry:
             "dimensionality_reducer", ComponentTier.TIER_1_CORE
         )
         
-        from src.prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
+        from prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
         
         config = DimensionalityConfig(
             target_dimensions=5,
@@ -187,7 +187,7 @@ class TestModernizedComponentRegistry:
             "dimensionality_reducer", ComponentTier.TIER_1_CORE
         )
         
-        from src.prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
+        from prompt_improver.ml.optimization.algorithms.dimensionality_reducer import DimensionalityConfig
         
         config = DimensionalityConfig(target_dimensions=5)
         dim_reducer_instance = dim_reducer_component.component_class(config=config)

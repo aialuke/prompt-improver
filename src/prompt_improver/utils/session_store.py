@@ -6,9 +6,7 @@ and automatic cleanup of expired sessions.
 
 import asyncio
 import logging
-import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from cachetools import TTLCache
 

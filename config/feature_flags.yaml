@@ -1,0 +1,436 @@
+# Feature Flag Configuration for Technical Debt Cleanup
+# Schema version and metadata
+version: "1.0.0"
+schema_version: "2025.1"
+updated_at: "2025-01-25T00:00:00Z"
+description: "Feature flags for managing 6-phase technical debt cleanup rollout"
+
+# Global configuration
+global:
+  default_rollout_percentage: 10.0
+  sticky_bucketing: true
+  evaluation_timeout_ms: 100
+  metrics_enabled: true
+  hot_reload_enabled: true
+
+# Phase-based feature flags for technical debt cleanup
+flags:
+  # Phase 1: Configuration Externalization (Week 1)
+  phase1_config_externalization:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+    rollout:
+      strategy: "percentage"
+      percentage: 25.0
+      sticky: true
+    targeting_rules:
+      - name: "development_environment"
+        condition: "environment == 'development'"
+        variant: "on"
+        priority: 100
+      - name: "admin_users"
+        condition: "user_type == 'admin'"
+        variant: "on"
+        priority: 90
+    metadata:
+      phase: 1
+      description: "Remove hardcoded values and implement centralized configuration"
+      jira_ticket: "DEBT-001"
+      owner: "platform-team"
+      estimated_risk: "low"
+      dependencies: []
+      success_metrics:
+        - "zero_hardcoded_values"
+        - "config_hot_reload_working"
+        - "startup_validation_passing"
+
+  phase1_pydantic_settings:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+    rollout:
+      strategy: "percentage"
+      percentage: 30.0
+      sticky: true
+    targeting_rules:
+      - name: "config_service_users"
+        condition: "custom_attributes.get('service') == 'config'"
+        variant: "on"
+        priority: 100
+    metadata:
+      phase: 1
+      description: "Type-safe configuration with Pydantic Settings"
+      parent_flag: "phase1_config_externalization"
+      
+  phase1_environment_configs:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      dev: "development"
+      staging: "staging"
+      prod: "production"
+      off: false
+    rollout:
+      strategy: "percentage"
+      percentage: 20.0
+      sticky: true
+    metadata:
+      phase: 1
+      description: "Environment-specific configurations"
+
+  # Phase 2: Health Check Implementation (Week 2)
+  phase2_health_checks:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      partial: "basic_only"
+    rollout:
+      strategy: "percentage"
+      percentage: 15.0
+      sticky: true
+    targeting_rules:
+      - name: "health_check_services"
+        condition: "custom_attributes.get('service_type') == 'health'"
+        variant: "on"
+        priority: 100
+      - name: "monitoring_team"
+        condition: "user_type == 'monitoring'"
+        variant: "on"
+        priority: 90
+    metadata:
+      phase: 2
+      description: "Replace placeholder health checks with real implementations"
+      dependencies: ["phase1_config_externalization"]
+      estimated_risk: "medium"
+      success_metrics:
+        - "ml_model_health_tracking"
+        - "external_api_monitoring"
+        - "database_health_enhanced"
+
+  phase2_ml_model_health:
+    state: "disabled"  # Will enable after phase2_health_checks is fully rolled out
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      monitoring_only: "metrics_only"
+    metadata:
+      phase: 2
+      description: "ML model health checks with drift detection"
+      parent_flag: "phase2_health_checks"
+
+  phase2_external_api_health:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      circuit_breaker: "with_breaker"
+    metadata:
+      phase: 2
+      description: "External API health checks with circuit breaker"
+      parent_flag: "phase2_health_checks"
+
+  # Phase 3: Metrics & Observability (Week 3)
+  phase3_metrics_observability:
+    state: "disabled"  # Will enable after phase 2 completion
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      otel_only: "opentelemetry_only"
+    rollout:
+      strategy: "percentage"
+      percentage: 10.0
+      sticky: true
+    targeting_rules:
+      - name: "observability_team"
+        condition: "user_type == 'observability'"
+        variant: "on"
+        priority: 100
+    metadata:
+      phase: 3
+      description: "Comprehensive metrics tracking with OpenTelemetry"
+      dependencies: ["phase2_health_checks"]
+      estimated_risk: "medium"
+      success_metrics:
+        - "opentelemetry_integration"
+        - "custom_metrics_implemented"
+        - "slo_sla_monitoring"
+
+  phase3_opentelemetry:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      traces_only: "tracing_only"
+      metrics_only: "metrics_only"
+    metadata:
+      phase: 3
+      description: "OpenTelemetry distributed tracing and metrics"
+      parent_flag: "phase3_metrics_observability"
+
+  phase3_custom_metrics:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      business_only: "business_metrics_only"
+    metadata:
+      phase: 3
+      description: "Custom business and technical metrics"
+      parent_flag: "phase3_metrics_observability"
+
+  # Phase 4: Code Quality & Refactoring (Week 4)
+  phase4_code_quality:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      agent_review_only: "review_only"
+    rollout:
+      strategy: "percentage"
+      percentage: 5.0
+      sticky: true
+    targeting_rules:
+      - name: "development_team"
+        condition: "user_type == 'developer'"
+        variant: "on"
+        priority: 100
+    metadata:
+      phase: 4
+      description: "Code quality improvements and refactoring"
+      dependencies: ["phase3_metrics_observability"]
+      estimated_risk: "high"
+      success_metrics:
+        - "zero_todo_fixme_items"
+        - "100_percent_type_coverage"
+        - "functions_under_20_lines"
+        - "zero_circular_dependencies"
+
+  phase4_agent_code_review:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      high_priority_only: "high_priority"
+    metadata:
+      phase: 4
+      description: "Agent-assisted code review implementation"
+      parent_flag: "phase4_code_quality"
+
+  phase4_architecture_improvements:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      dependency_injection_only: "di_only"
+    metadata:
+      phase: 4
+      description: "Architecture improvements and dependency injection"
+      parent_flag: "phase4_code_quality"
+
+  # Phase 5: Agent Integration Testing (Week 5)
+  phase5_agent_integration:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      validation_only: "validation_mode"
+    rollout:
+      strategy: "percentage"
+      percentage: 5.0
+      sticky: true
+    targeting_rules:
+      - name: "qa_team"
+        condition: "user_type == 'qa'"
+        variant: "on"
+        priority: 100
+    metadata:
+      phase: 5
+      description: "Validate all subagent coordination"
+      dependencies: ["phase4_code_quality"]
+      estimated_risk: "medium"
+      success_metrics:
+        - "ml_orchestrator_validation"
+        - "security_architect_validation"
+        - "performance_engineer_validation"
+        - "database_specialist_validation"
+
+  phase5_subagent_validation:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      ml_only: "ml_orchestrator_only"
+      security_only: "security_only"
+      performance_only: "performance_only"
+      database_only: "database_only"
+    metadata:
+      phase: 5
+      description: "Individual subagent validation testing"
+      parent_flag: "phase5_agent_integration"
+
+  phase5_integration_scenarios:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      collaboration_only: "multi_agent_only"
+    metadata:
+      phase: 5
+      description: "Multi-agent collaboration and conflict resolution"
+      parent_flag: "phase5_agent_integration"
+
+  # Phase 6: Final Validation & Documentation (Week 6)
+  phase6_final_validation:
+    state: "disabled"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      validation_only: "validation_mode"
+      docs_only: "documentation_only"
+    rollout:
+      strategy: "percentage"
+      percentage: 5.0
+      sticky: true
+    targeting_rules:
+      - name: "validation_team"
+        condition: "user_type == 'validation'"
+        variant: "on"
+        priority: 100
+    metadata:
+      phase: 6
+      description: "Final system validation and documentation"
+      dependencies: ["phase5_agent_integration"]
+      estimated_risk: "low"
+      success_metrics:
+        - "all_phases_validated"
+        - "documentation_complete"
+        - "performance_benchmarks_met"
+        - "production_readiness_achieved"
+
+  # Cross-cutting feature flags
+  rollback_mechanism:
+    state: "enabled"
+    default_variant: "on"
+    variants:
+      on: true
+      off: false
+      instant_only: "instant_rollback"
+    targeting_rules:
+      - name: "production_environment"
+        condition: "environment == 'production'"
+        variant: "on"
+        priority: 100
+    metadata:
+      description: "Emergency rollback capability for all phases"
+      critical: true
+
+  canary_deployment:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      percentage_5: 5.0
+      percentage_10: 10.0
+      percentage_25: 25.0
+    rollout:
+      strategy: "percentage"
+      percentage: 100.0  # Always evaluate, but variants control actual percentage
+      sticky: true
+    metadata:
+      description: "Canary deployment controls for gradual rollouts"
+
+  performance_monitoring:
+    state: "enabled"
+    default_variant: "on"
+    variants:
+      on: true
+      off: false
+      basic: "basic_metrics"
+      detailed: "detailed_metrics"
+    targeting_rules:
+      - name: "production_environment"
+        condition: "environment == 'production'"
+        variant: "detailed"
+        priority: 100
+    metadata:
+      description: "Performance monitoring for all technical debt phases"
+      critical: true
+
+  ab_testing:
+    state: "rollout"
+    default_variant: "off"
+    variants:
+      on: true
+      off: false
+      control: "control_group"
+      treatment: "treatment_group"
+    rollout:
+      strategy: "percentage"
+      percentage: 50.0
+      sticky: true
+    metadata:
+      description: "A/B testing framework for critical path changes"
+
+# Environment-specific overrides
+environments:
+  development:
+    global_rollout_percentage: 100.0  # Full rollout in dev
+    flags:
+      phase1_config_externalization:
+        state: "enabled"
+        rollout:
+          percentage: 100.0
+      phase2_health_checks:
+        state: "rollout" 
+        rollout:
+          percentage: 50.0
+  
+  staging:
+    global_rollout_percentage: 50.0
+    flags:
+      phase1_config_externalization:
+        state: "enabled"
+        rollout:
+          percentage: 75.0
+  
+  production:
+    global_rollout_percentage: 10.0
+    flags:
+      rollback_mechanism:
+        state: "enabled"
+      performance_monitoring:
+        state: "enabled"
+
+# Notification and alerting configuration
+alerts:
+  flag_evaluation_errors:
+    threshold: 10  # errors per minute
+    channels: ["slack", "email"]
+  
+  rollout_percentage_exceeded:
+    threshold: 0.05  # 5% variance
+    channels: ["slack"]
+  
+  configuration_reload_failed:
+    threshold: 1
+    channels: ["slack", "pagerduty"]

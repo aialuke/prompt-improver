@@ -6,8 +6,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 from uuid import uuid4
 
 import coredis

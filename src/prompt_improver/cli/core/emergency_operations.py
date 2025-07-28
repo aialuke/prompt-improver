@@ -3,7 +3,6 @@ Emergency Operations for Signal-Triggered Actions
 Implements emergency operations triggered by signals: checkpoint creation, status reporting, and configuration reload.
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -12,11 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from .signal_handler import SignalContext, SignalOperation
+from .signal_handler import SignalContext
 from .progress_preservation import ProgressPreservationManager
 from ...database import get_session_context
 from ...database.models import TrainingSession
-
 
 class EmergencyOperationsManager:
     """
@@ -315,7 +313,6 @@ class EmergencyOperationsManager:
             
             # Try to check CoreDis connection status
             try:
-                from ...database.ha_connection_manager import HAConnectionManager
                 # This is a best-effort check
                 status["connections"]["coredis"] = "available"
             except Exception:

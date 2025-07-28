@@ -9,7 +9,7 @@ import pytest
 import asyncio
 from typing import Dict, Any, List
 
-from src.prompt_improver.ml.optimization.algorithms.rule_optimizer import RuleOptimizer, OptimizationConfig
+from prompt_improver.ml.optimization.algorithms.rule_optimizer import RuleOptimizer, OptimizationConfig
 
 
 class TestRuleOptimizerIntegrationFix:

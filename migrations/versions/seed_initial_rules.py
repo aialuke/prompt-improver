@@ -7,7 +7,7 @@ Create Date: 2025-01-12
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, UTC
 
 import sqlalchemy as sa
 from alembic import context, op
@@ -63,7 +63,7 @@ def data_upgrades():
     )
 
     # Initial rule configurations based on research synthesis
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     initial_rules = [
         {
             "rule_id": "clarity_enhancement",

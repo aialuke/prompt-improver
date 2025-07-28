@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 import os
-import signal
+
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
@@ -18,9 +18,8 @@ from ...database.models import (
     TrainingSession, TrainingIteration, RulePerformance,
     RuleMetadata, DiscoveredPattern
 )
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-
 
 @dataclass
 class ProgressSnapshot:
@@ -46,7 +45,6 @@ class ProgressSnapshot:
         """Create from dictionary."""
         data['timestamp'] = datetime.fromisoformat(data['timestamp'])
         return cls(**data)
-
 
 class ProgressPreservationManager:
     """

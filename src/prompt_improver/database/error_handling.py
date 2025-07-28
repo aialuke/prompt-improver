@@ -7,11 +7,10 @@ integrated with the unified retry manager.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
-import psycopg
 from psycopg import errors as psycopg_errors
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
@@ -331,7 +330,6 @@ class RetryManager:
 
     def _create_retry_config(self, operation_name: str, config_override: Optional[Dict[str, Any]] = None):
         """Create retry configuration with database-specific settings."""
-        from ..ml.orchestration.core.unified_retry_manager import RetryConfig
 
         # Start with default database config
         config = get_default_database_retry_config()

@@ -5,7 +5,7 @@ PHASE 3: Health Check Consolidation - Component Checkers
 import asyncio
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
+from typing import Any, Union
 
 from .base import HealthChecker, HealthResult, HealthStatus
 
@@ -642,3 +642,120 @@ class SystemResourcesHealthChecker(HealthChecker):
                 "error": str(e),
                 "enhanced_monitoring": False,
             }
+
+class RedisHealthChecker(HealthChecker):
+    """Comprehensive Redis health checker using the advanced monitoring system"""
+
+    def __init__(self):
+        super().__init__("redis")
+
+    async def check(self) -> HealthResult:
+        """Check Redis health using comprehensive monitoring"""
+        try:
+            # Import our comprehensive Redis health monitor
+            from ....cache.redis_health import get_redis_health_summary
+
+            # Get comprehensive health summary
+            health_data = await get_redis_health_summary()
+
+            # Map status to HealthStatus enum
+            status_mapping = {
+                "healthy": HealthStatus.HEALTHY,
+                "warning": HealthStatus.WARNING,
+                "critical": HealthStatus.WARNING,  # Map critical to warning for compatibility
+                "failed": HealthStatus.FAILED
+            }
+
+            redis_status = health_data.get("status", "failed")
+            health_status = status_mapping.get(redis_status, HealthStatus.FAILED)
+
+            # Build message with key metrics
+            message_parts = [
+                f"Redis {redis_status}",
+                f"{health_data.get(response_time_ms, 0):.1f}ms latency",
+                f"{health_data.get(memory_usage_mb, 0):.1f}MB memory",
+                f"{health_data.get(hit_rate_percentage, 0):.1f}% hit rate"
+            ]
+
+            if health_data.get("issues"):
+                message_parts.extend(health_data["issues"][:2])  # First 2 issues only
+
+            message = ", ".join(message_parts)
+
+            # Create detailed information
+            details = {
+                "redis_metrics": {
+                    "memory_usage_mb": health_data.get("memory_usage_mb", 0),
+                    "hit_rate_percentage": health_data.get("hit_rate_percentage", 0),
+                    "connected_clients": health_data.get("connected_clients", 0),
+                    "total_commands": health_data.get("total_commands", 0),
+                    "fragmentation_ratio": health_data.get("fragmentation_ratio", 1.0),
+                    "response_time_ms": health_data.get("response_time_ms", 0)
+                },
+                "issues": health_data.get("issues", []),
+                "timestamp": health_data.get("timestamp")
+            }
+
+            return HealthResult(
+                status=health_status,
+                component=self.name, 
+                message=message,
+                details=details
+            )
+
+        except ImportError as e:
+            # Fallback to basic Redis check if comprehensive monitor not available
+            return await self._basic_redis_check()
+        except Exception as e:
+            return HealthResult(
+                status=HealthStatus.FAILED,
+                component=self.name,
+                error=str(e),
+                message=f"Redis health check failed: {e}"
+            )
+
+    async def _basic_redis_check(self) -> HealthResult:
+        """Basic Redis connectivity check as fallback"""
+        try:
+            from ....utils.redis_cache import redis_client
+            import time
+
+            # Test basic connectivity
+            start_time = time.time()
+            await redis_client.ping()
+            response_time_ms = (time.time() - start_time) * 1000
+
+            # Get basic info
+            info = await redis_client.info()
+
+            message = f"Redis basic check OK, {response_time_ms:.1f}ms latency"
+
+            # Determine status based on latency
+            if response_time_ms > 100:
+                status = HealthStatus.WARNING
+                message += " (high latency)"
+            else:
+                status = HealthStatus.HEALTHY
+
+            details = {
+                "response_time_ms": round(response_time_ms, 2),
+                "redis_version": info.get("redis_version"),
+                "connected_clients": info.get("connected_clients", 0),
+                "used_memory_human": info.get("used_memory_human"),
+                "fallback_check": True
+            }
+
+            return HealthResult(
+                status=status,
+                component=self.name,
+                message=message,
+                details=details
+            )
+
+        except Exception as e:
+            return HealthResult(
+                status=HealthStatus.FAILED,
+                component=self.name,
+                error=str(e),
+                message=f"Redis connectivity failed: {e}"
+            )

@@ -10,9 +10,9 @@ import logging
 from typing import Dict, Any, Optional
 
 from .cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from .connection_pool_optimizer import ConnectionPoolOptimizer, get_connection_pool_optimizer
-from .query_optimizer import OptimizedQueryExecutor, get_query_executor
-from .performance_monitor import DatabasePerformanceMonitor, get_performance_monitor
+from .connection_pool_optimizer import get_connection_pool_optimizer
+from .query_optimizer import get_query_executor
+from .performance_monitor import get_performance_monitor
 from ..ml.orchestration.events.event_bus import get_event_bus
 
 logger = logging.getLogger(__name__)

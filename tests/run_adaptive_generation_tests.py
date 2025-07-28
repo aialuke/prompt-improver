@@ -14,8 +14,8 @@ from typing import Dict, Any, List
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.prompt_improver.database import get_sessionmanager
-from src.prompt_improver.database.models import (
+from prompt_improver.database import get_sessionmanager
+from prompt_improver.database.models import (
     TrainingSession, RulePerformance, UserFeedback, ImprovementSession
 )
 
@@ -66,7 +66,7 @@ async def test_performance_gap_analysis():
     """Test real performance gap analysis."""
     print("\n=== Testing Performance Gap Analysis ===")
     
-    from src.prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
+    from prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
     
     try:
         gap_analyzer = PerformanceGapAnalyzer()
@@ -105,8 +105,8 @@ async def test_strategy_determination():
     """Test generation strategy determination."""
     print("\n=== Testing Strategy Determination ===")
     
-    from src.prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
-    from src.prompt_improver.ml.analysis.generation_strategy_analyzer import GenerationStrategyAnalyzer
+    from prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
+    from prompt_improver.ml.analysis.generation_strategy_analyzer import GenerationStrategyAnalyzer
     
     try:
         gap_analyzer = PerformanceGapAnalyzer()
@@ -139,10 +139,10 @@ async def test_difficulty_distribution():
     """Test difficulty distribution analysis."""
     print("\n=== Testing Difficulty Distribution ===")
     
-    from src.prompt_improver.ml.analysis.performance_gap_analyzer import (
+    from prompt_improver.ml.analysis.performance_gap_analyzer import (
         PerformanceGapAnalyzer, PerformanceGap
     )
-    from src.prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
+    from prompt_improver.ml.analysis.difficulty_distribution_analyzer import (
         DifficultyDistributionAnalyzer
     )
     
@@ -193,8 +193,8 @@ async def test_targeted_data_generation():
     """Test targeted synthetic data generation."""
     print("\n=== Testing Targeted Data Generation ===")
     
-    from src.prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
-    from src.prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+    from prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
+    from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
     
     try:
         gap_analyzer = PerformanceGapAnalyzer()
@@ -249,9 +249,9 @@ async def test_adaptive_training_integration():
     """Test adaptive training integration."""
     print("\n=== Testing Adaptive Training Integration ===")
     
-    from src.prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-    from src.prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
-    from src.prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import AdaptiveTrainingCoordinator
+    from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+    from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+    from prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import AdaptiveTrainingCoordinator
     
     try:
         # Create components

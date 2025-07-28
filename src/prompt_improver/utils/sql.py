@@ -1,4 +1,4 @@
-from typing import Type, TypeVar, cast
+from typing import TypeVar, cast
 
 from sqlalchemy import Executable
 from sqlalchemy.ext.asyncio import AsyncSession

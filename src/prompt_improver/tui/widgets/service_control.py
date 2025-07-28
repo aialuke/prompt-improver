@@ -10,16 +10,15 @@ Enhanced with 2025 best practices for ML orchestrator integration:
 
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 from textual import on
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Button, DataTable, Static
+from textual.widgets import Button, Static
 
 class ServiceControlWidget(Static):
     """

@@ -6,11 +6,12 @@ This module uses a centralized registry to prevent SQLAlchemy
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import sqlmodel
-from sqlalchemy import Column, JSON, Index, String, Text, UniqueConstraint
+from sqlalchemy import Column, Index, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
 # Import centralized registry first to patch SQLModel
@@ -32,7 +33,7 @@ class PromptSession(SQLModel, table=True):
     original_prompt: str
     improved_prompt: str
     user_context: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     quality_score: float | None = Field(default=None)
     improvement_score: float | None = Field(default=None)
@@ -60,8 +61,8 @@ class ABExperiment(SQLModel, table=True):
     )
     experiment_name: str = Field(max_length=100)
     description: str | None = Field(default=None)
-    control_rules: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSON))
-    treatment_rules: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSON))
+    control_rules: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSONB))
+    treatment_rules: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSONB))
     target_metric: str = Field(default="improvement_score", max_length=50)
     sample_size_per_group: int | None = Field(default=None)
     current_sample_size: int = Field(default=0)
@@ -70,12 +71,12 @@ class ABExperiment(SQLModel, table=True):
         default="running", max_length=20
     )  # planning, running, completed, stopped
     results: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     started_at: datetime = Field(default_factory=naive_utc_now)
     completed_at: datetime | None = Field(default=None)
     experiment_metadata: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     __table_args__ = (
@@ -99,10 +100,10 @@ class RuleMetadata(SQLModel, table=True):
     priority: int = Field(default=100)
     rule_version: str = Field(default="1.0.0")
     default_parameters: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     parameter_constraints: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     created_at: datetime = Field(default_factory=naive_utc_now)
     updated_at: datetime | None = Field(default=None)
@@ -126,16 +127,16 @@ class RulePerformance(SQLModel, table=True):
     confidence_level: Optional[float] = Field(default=None)
     execution_time_ms: Optional[int] = Field(default=None)
     rule_parameters: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     prompt_characteristics: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     before_metrics: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     after_metrics: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     created_at: Optional[datetime] = Field(default_factory=naive_utc_now)
     updated_at: Optional[datetime] = Field(default=None)
@@ -152,7 +153,7 @@ class DiscoveredPattern(SQLModel, table=True):
     id: int = Field(primary_key=True)
     pattern_id: str = Field(unique=True, index=True)
     avg_effectiveness: float = Field(ge=0.0, le=1.0)
-    parameters: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSON))
+    parameters: dict[str, Any] = Field(sa_column=sqlmodel.Column(JSONB))
     support_count: int = Field(ge=0)
     pattern_type: str = Field(default="ml_discovered")
     discovery_run_id: str | None = Field(default=None, index=True)
@@ -175,7 +176,7 @@ class UserFeedback(SQLModel, table=True):
     rating: int = Field(ge=1, le=5)
     feedback_text: str | None = Field(default=None)
     improvement_areas: list[str] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     is_processed: bool = Field(default=False)
     ml_optimized: bool = Field(default=False)
@@ -215,16 +216,15 @@ class ImprovementSession(SQLModel, table=True):
     original_prompt: str
     final_prompt: str
     rules_applied: list[str] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     user_context: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     improvement_metrics: dict[str, float] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     created_at: datetime = Field(default_factory=naive_utc_now)
-
 
 class TrainingSession(SQLModel, table=True):
     """Table for tracking ML training sessions with continuous adaptive learning"""
@@ -254,7 +254,7 @@ class TrainingSession(SQLModel, table=True):
     current_performance: float | None = Field(default=None)
     best_performance: float | None = Field(default=None)
     performance_history: list[float] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Training metrics
@@ -272,12 +272,12 @@ class TrainingSession(SQLModel, table=True):
     # Workflow tracking
     active_workflow_id: str | None = Field(default=None)
     workflow_history: list[str] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Progress preservation
     checkpoint_data: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     last_checkpoint_at: datetime | None = Field(default=None)
 
@@ -289,7 +289,6 @@ class TrainingSession(SQLModel, table=True):
 
     # Relationships
     iterations: list["TrainingIteration"] = Relationship(back_populates="session")
-
 
 # Pydantic models for API requests/responses
 class ImprovementSessionCreate(SQLModel):
@@ -331,7 +330,6 @@ class UserFeedbackCreate(SQLModel):
     feedback_text: str | None = None
     improvement_areas: list[str] | None = None
 
-
 class TrainingSessionCreate(SQLModel):
     """Model for creating training sessions"""
 
@@ -341,7 +339,6 @@ class TrainingSessionCreate(SQLModel):
     improvement_threshold: float = 0.02
     timeout_seconds: int = 3600
     auto_init_enabled: bool = True
-
 
 class TrainingSessionUpdate(SQLModel):
     """Model for updating training sessions"""
@@ -366,7 +363,6 @@ class TrainingSessionUpdate(SQLModel):
     completed_at: datetime | None = None
     last_activity_at: datetime | None = None
 
-
 class TrainingIteration(SQLModel, table=True):
     """Individual training iteration tracking for progress preservation"""
 
@@ -378,19 +374,19 @@ class TrainingIteration(SQLModel, table=True):
     iteration: int
     workflow_id: str | None = Field(default=None)
 
-    # Performance metrics for this iteration
+    # Performance metrics for this iteration (JSONB for better GIN index support)
     performance_metrics: dict[str, Any] = Field(
-        default_factory=dict, sa_column=sqlmodel.Column(JSON)
+        default_factory=dict, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Rule optimizations performed in this iteration
     rule_optimizations: dict[str, Any] = Field(
-        default_factory=dict, sa_column=sqlmodel.Column(JSON)
+        default_factory=dict, sa_column=sqlmodel.Column(JSONB)
     )
 
     # ML insights discovered in this iteration
     discovered_patterns: dict[str, Any] = Field(
-        default_factory=dict, sa_column=sqlmodel.Column(JSON)
+        default_factory=dict, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Training metrics
@@ -400,7 +396,7 @@ class TrainingIteration(SQLModel, table=True):
 
     # Checkpoint data for this iteration
     checkpoint_data: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Error tracking
@@ -418,11 +414,61 @@ class TrainingIteration(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("session_id", "iteration", name="unique_session_iteration"),
         Index("idx_training_iterations_session", "session_id"),
-        Index("idx_training_iterations_performance", "performance_metrics", postgresql_using="gin"),
+        Index("idx_training_iterations_performance", "performance_metrics", postgresql_using="gin", postgresql_ops={"performance_metrics": "jsonb_path_ops"}),
         Index("idx_training_iterations_workflow", "workflow_id"),
         {"extend_existing": True},
     )
 
+# Phase 4: Pre-Computed ML Intelligence Cache Tables
+class RuleIntelligenceCache(SQLModel, table=True):
+    """Pre-computed rule effectiveness scores for fast MCP serving"""
+
+    __tablename__: str = "rule_intelligence_cache"
+    __table_args__ = {"extend_existing": True}
+
+    id: int = Field(primary_key=True)
+    cache_key: str = Field(unique=True, index=True, max_length=255)
+    rule_id: str = Field(index=True, max_length=50)
+    rule_name: str = Field(max_length=100)
+
+    # Pre-computed effectiveness scores
+    effectiveness_score: float = Field(ge=0.0, le=1.0)
+    characteristic_match_score: float = Field(ge=0.0, le=1.0)
+    historical_performance_score: float = Field(ge=0.0, le=1.0)
+    ml_prediction_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    recency_score: float = Field(ge=0.0, le=1.0)
+    total_score: float = Field(ge=0.0, le=1.0)
+
+    # ML insights (JSONB for flexibility)
+    pattern_insights: dict[str, Any] | None = Field(
+        default=None, sa_column=sqlmodel.Column(JSONB)
+    )
+    optimization_recommendations: list[str] | None = Field(
+        default=None, sa_column=sqlmodel.Column(JSONB)
+    )
+    performance_trend: str | None = Field(default=None, max_length=20)  # improving, stable, declining
+
+    # Metadata
+    confidence_level: float = Field(ge=0.0, le=1.0)
+    sample_size: int = Field(default=0, ge=0)
+    prompt_characteristics_hash: str = Field(max_length=64, index=True)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=naive_utc_now)
+    updated_at: datetime = Field(default_factory=naive_utc_now)
+    computed_at: datetime = Field(default_factory=naive_utc_now)
+    expires_at: datetime = Field(default_factory=lambda: naive_utc_now() + timedelta(hours=6))
+    last_accessed: datetime | None = Field(default=None)
+    access_count: int = Field(default=0)
+
+    __table_args__ = (
+        Index("idx_rule_intelligence_cache_key", "cache_key"),
+        Index("idx_rule_intelligence_rule_id", "rule_id"),
+        Index("idx_rule_intelligence_expires_at", "expires_at"),
+        Index("idx_rule_intelligence_total_score", "total_score"),
+        Index("idx_rule_intelligence_characteristics_hash", "prompt_characteristics_hash"),
+        {"extend_existing": True},
+    )
 
 # NEW: Apriori Association Rules Schema
 class AprioriAssociationRule(SQLModel, table=True):
@@ -480,13 +526,13 @@ class AprioriPatternDiscovery(SQLModel, table=True):
 
     # Discovery results summary
     top_patterns_summary: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     pattern_insights: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     quality_metrics: dict[str, float] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Status tracking
@@ -553,10 +599,10 @@ class PatternEvaluation(SQLModel, table=True):
 
     # Validation results
     cross_validation_results: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     a_b_test_results: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Status and feedback
@@ -584,40 +630,40 @@ class AdvancedPatternResults(SQLModel, table=True):
     discovery_run_id: str = Field(unique=True, index=True)
 
     # Algorithm configuration
-    algorithms_used: list[str] = Field(sa_column=sqlmodel.Column(JSON))
-    discovery_modes: list[str] = Field(sa_column=sqlmodel.Column(JSON))
+    algorithms_used: list[str] = Field(sa_column=sqlmodel.Column(JSONB))
+    discovery_modes: list[str] = Field(sa_column=sqlmodel.Column(JSONB))
 
     # Pattern discovery results
     parameter_patterns: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     sequence_patterns: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     performance_patterns: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     semantic_patterns: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     apriori_patterns: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Cross-validation and ensemble results
     cross_validation: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     ensemble_analysis: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Unified insights
     unified_recommendations: list[dict[str, Any]] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
     business_insights: dict[str, Any] | None = Field(
-        default=None, sa_column=sqlmodel.Column(JSON)
+        default=None, sa_column=sqlmodel.Column(JSONB)
     )
 
     # Execution metadata
@@ -740,7 +786,7 @@ class TrainingPrompt(SQLModel, table=True):
 
     # Core training data fields
     prompt_text: str = Field(max_length=10000, index=True)
-    enhancement_result: Dict[str, Any] = Field(sa_column=sqlmodel.Column(JSON))
+    enhancement_result: Dict[str, Any] = Field(sa_column=sqlmodel.Column(JSONB))
 
     # Data source and priority (audit trail pattern)
     data_source: str = Field(default="synthetic", index=True)  # synthetic, user, api
@@ -766,7 +812,6 @@ class TrainingPrompt(SQLModel, table=True):
         {"extend_existing": True},
     )
 
-
 # ===================================
 # WEEK 6: GENERATION MODELS (2025 Best Practices)
 # ===================================
@@ -786,8 +831,8 @@ class GenerationSession(SQLModel, table=True):
     target_samples: int
     batch_size: Optional[int] = None
     quality_threshold: float = Field(default=0.7)
-    performance_gaps: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
-    focus_areas: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    performance_gaps: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
+    focus_areas: Optional[List[str]] = Field(default=None, sa_column=Column(JSONB))
 
     # Session status and timing
     status: str = Field(default="running")
@@ -803,13 +848,12 @@ class GenerationSession(SQLModel, table=True):
     generation_efficiency: Optional[float] = None
 
     # Metadata
-    configuration: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    configuration: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
     error_message: Optional[str] = None
     created_at: datetime = Field(default_factory=naive_utc_now)
     updated_at: datetime = Field(default_factory=naive_utc_now)
 
     __table_args__ = {"extend_existing": True}
-
 
 class GenerationBatch(SQLModel, table=True):
     """Tracks individual batch processing within generation sessions"""
@@ -841,16 +885,15 @@ class GenerationBatch(SQLModel, table=True):
 
     # Quality metrics
     average_quality_score: Optional[float] = None
-    quality_score_range: Optional[List[float]] = Field(default=None, sa_column=Column(JSON))
+    quality_score_range: Optional[List[float]] = Field(default=None, sa_column=Column(JSONB))
     diversity_score: Optional[float] = None
 
     # Metadata
-    batch_metadata: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    batch_metadata: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
     error_details: Optional[str] = None
     created_at: datetime = Field(default_factory=naive_utc_now)
 
     __table_args__ = {"extend_existing": True}
-
 
 class GenerationMethodPerformance(SQLModel, table=True):
     """Tracks performance metrics for different generation methods"""
@@ -870,15 +913,14 @@ class GenerationMethodPerformance(SQLModel, table=True):
     samples_generated: int
 
     # Context
-    performance_gaps_addressed: Optional[Dict[str, float]] = Field(default=None, sa_column=Column(JSON))
+    performance_gaps_addressed: Optional[Dict[str, float]] = Field(default=None, sa_column=Column(JSONB))
     batch_size: Optional[int] = None
-    configuration: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    configuration: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
 
     # Tracking
     recorded_at: datetime = Field(default_factory=naive_utc_now, index=True)
 
     __table_args__ = {"extend_existing": True}
-
 
 class SyntheticDataSample(SQLModel, table=True):
     """Stores individual synthetic data samples"""
@@ -891,19 +933,19 @@ class SyntheticDataSample(SQLModel, table=True):
     batch_id: str = Field(foreign_key="generation_batches.batch_id", index=True)
 
     # Sample data
-    feature_vector: Dict[str, Any] = Field(sa_column=Column(JSON))
+    feature_vector: Dict[str, Any] = Field(sa_column=Column(JSONB))
     effectiveness_score: Optional[float] = None
     quality_score: Optional[float] = Field(default=None, index=True)
 
     # Classification
     domain_category: Optional[str] = Field(default=None, index=True)
     difficulty_level: Optional[str] = None
-    focus_areas: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    focus_areas: Optional[List[str]] = Field(default=None, sa_column=Column(JSONB))
 
     # Generation metadata
     generation_method: Optional[str] = None
     generation_strategy: Optional[str] = None
-    targeting_info: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    targeting_info: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
 
     # Lifecycle
     status: str = Field(default="active", index=True)
@@ -911,7 +953,6 @@ class SyntheticDataSample(SQLModel, table=True):
     archived_at: Optional[datetime] = None
 
     __table_args__ = {"extend_existing": True}
-
 
 class GenerationQualityAssessment(SQLModel, table=True):
     """Tracks quality assessment results for generated data"""
@@ -941,15 +982,14 @@ class GenerationQualityAssessment(SQLModel, table=True):
     outliers_detected: Optional[int] = None
 
     # Assessment details
-    assessment_results: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
-    recommendations: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    assessment_results: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
+    recommendations: Optional[List[str]] = Field(default=None, sa_column=Column(JSONB))
 
     # Metadata
     assessed_at: datetime = Field(default_factory=naive_utc_now)
     assessment_duration_seconds: Optional[float] = None
 
     __table_args__ = {"extend_existing": True}
-
 
 class GenerationAnalytics(SQLModel, table=True):
     """Stores aggregated analytics and trends for generation performance"""
@@ -972,7 +1012,7 @@ class GenerationAnalytics(SQLModel, table=True):
     average_efficiency_score: Optional[float] = None
 
     # Method performance
-    method_performance_summary: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    method_performance_summary: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
     best_performing_method: Optional[str] = None
     worst_performing_method: Optional[str] = None
 

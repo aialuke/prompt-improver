@@ -6,20 +6,15 @@ and authentication patterns with real-time aggregation and conversion tracking.
 """
 
 import asyncio
-import logging
-import time
-from typing import Dict, Any, Optional, List, Union, Set, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-import json
 import statistics
 from collections import defaultdict, deque
-from urllib.parse import urlparse
-import uuid
 
-from ..performance.monitoring.metrics_registry import get_metrics_registry
-
+# Use consolidated common utilities
+from ..core.common import get_logger, MetricsMixin, ConfigMixin
 
 class EndpointCategory(Enum):
     """Categories of API endpoints."""
@@ -32,7 +27,6 @@ class EndpointCategory(Enum):
     BATCH_PROCESSING = "batch_processing"
     CONFIGURATION = "configuration"
 
-
 class HTTPMethod(Enum):
     """HTTP methods."""
     GET = "GET"
@@ -43,7 +37,6 @@ class HTTPMethod(Enum):
     HEAD = "HEAD"
     OPTIONS = "OPTIONS"
 
-
 class UserJourneyStage(Enum):
     """Stages in user journey."""
     ONBOARDING = "onboarding"
@@ -53,7 +46,6 @@ class UserJourneyStage(Enum):
     CHURNED = "churned"
     REACTIVATED = "reactivated"
 
-
 class AuthenticationMethod(Enum):
     """Authentication methods."""
     JWT_TOKEN = "jwt_token"
@@ -62,7 +54,6 @@ class AuthenticationMethod(Enum):
     SESSION_COOKIE = "session_cookie"
     BASIC_AUTH = "basic_auth"
     ANONYMOUS = "anonymous"
-
 
 @dataclass
 class APIUsageMetric:
@@ -86,7 +77,6 @@ class APIUsageMetric:
     authentication_method: AuthenticationMethod
     api_version: Optional[str]
 
-
 @dataclass
 class UserJourneyMetric:
     """Metrics for user journey tracking."""
@@ -104,7 +94,6 @@ class UserJourneyMetric:
     timestamp: datetime
     metadata: Dict[str, Any]
 
-
 @dataclass
 class RateLimitMetric:
     """Metrics for rate limiting effectiveness."""
@@ -120,7 +109,6 @@ class RateLimitMetric:
     timestamp: datetime
     user_tier: Optional[str]
     override_applied: bool
-
 
 @dataclass
 class AuthenticationMetric:
@@ -138,35 +126,41 @@ class AuthenticationMetric:
     geo_location: Optional[str]
     device_fingerprint: Optional[str]
 
-
-class APIMetricsCollector:
+class APIMetricsCollector(MetricsMixin, ConfigMixin):
     """
     Collects and aggregates API usage business metrics.
     
     Provides real-time tracking of endpoint popularity, user behavior patterns,
     and system effectiveness metrics with conversion and journey analytics.
+    
+    Uses consolidated MetricsMixin and ConfigMixin for common patterns.
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize API metrics collector."""
-        self.config = config or {}
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
+        
+        # Use provided config or fall back to centralized config
+        self.local_config = config or {}
+        
+        # Initialize logger using consolidated utility
+        self.logger = get_logger(__name__)
         
         # Metrics storage with size limits
-        self.api_usage_metrics: deque = deque(maxlen=self.config.get("max_api_metrics", 20000))
-        self.journey_metrics: deque = deque(maxlen=self.config.get("max_journey_metrics", 10000))
-        self.rate_limit_metrics: deque = deque(maxlen=self.config.get("max_rate_limit_metrics", 5000))
-        self.auth_metrics: deque = deque(maxlen=self.config.get("max_auth_metrics", 10000))
+        self.api_usage_metrics: deque = deque(maxlen=self.local_config.get("max_api_metrics", 20000))
+        self.journey_metrics: deque = deque(maxlen=self.local_config.get("max_journey_metrics", 10000))
+        self.rate_limit_metrics: deque = deque(maxlen=self.local_config.get("max_rate_limit_metrics", 5000))
+        self.auth_metrics: deque = deque(maxlen=self.local_config.get("max_auth_metrics", 10000))
         
         # Real-time tracking
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
         self.user_journey_states: Dict[str, UserJourneyStage] = {}
         self.endpoint_popularity_cache: Dict[str, int] = defaultdict(int)
         
-        # Configuration
-        self.aggregation_window_minutes = self.config.get("aggregation_window_minutes", 5)
-        self.retention_hours = self.config.get("retention_hours", 72)
-        self.journey_timeout_minutes = self.config.get("journey_timeout_minutes", 30)
+        # Configuration with fallbacks to centralized config
+        self.aggregation_window_minutes = self.local_config.get("aggregation_window_minutes", 5)
+        self.retention_hours = self.local_config.get("retention_hours", 72)
+        self.journey_timeout_minutes = self.local_config.get("journey_timeout_minutes", 30)
         
         # Collection statistics
         self.collection_stats = {
@@ -178,8 +172,7 @@ class APIMetricsCollector:
             "last_aggregation": None
         }
         
-        # Prometheus metrics integration
-        self.metrics_registry = get_metrics_registry()
+        # Initialize Prometheus metrics using MetricsMixin
         self._initialize_prometheus_metrics()
         
         # Background processing
@@ -876,10 +869,8 @@ class APIMetricsCollector:
             }
         }
 
-
 # Global instance
 _api_metrics_collector: Optional[APIMetricsCollector] = None
-
 
 def get_api_metrics_collector(config: Optional[Dict[str, Any]] = None) -> APIMetricsCollector:
     """Get global API metrics collector instance."""
@@ -887,7 +878,6 @@ def get_api_metrics_collector(config: Optional[Dict[str, Any]] = None) -> APIMet
     if _api_metrics_collector is None:
         _api_metrics_collector = APIMetricsCollector(config)
     return _api_metrics_collector
-
 
 # Convenience functions for recording metrics
 async def record_api_request(
@@ -932,7 +922,6 @@ async def record_api_request(
         api_version=api_version
     )
     await collector.record_api_usage(metric)
-
 
 async def record_user_journey_event(
     user_id: str,

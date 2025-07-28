@@ -20,7 +20,7 @@ import coredis
 import numpy as np
 
 # Import the components we're testing
-from src.prompt_improver.performance.analytics.real_time_analytics import (
+from prompt_improver.performance.analytics.real_time_analytics import (
     EnhancedRealTimeAnalyticsService,
     RealTimeAnalyticsService,
     AnalyticsEvent,
@@ -28,13 +28,13 @@ from src.prompt_improver.performance.analytics.real_time_analytics import (
     RealTimeMetrics,
     get_real_time_analytics_service
 )
-from src.prompt_improver.performance.optimization.async_optimizer import (
+from prompt_improver.performance.optimization.async_optimizer import (
     IntelligentCache,
     CacheConfig,
     AsyncOptimizer,
     get_async_optimizer
 )
-from src.prompt_improver.performance.testing.canary_testing import (
+from prompt_improver.performance.testing.canary_testing import (
     CanaryTestingService,
     CanaryMetrics
 )
@@ -112,7 +112,7 @@ class TestCoredisAnalyticsMigration:
         )
         
         # Create mock window
-        from src.prompt_improver.performance.analytics.real_time_analytics import StreamWindow
+        from prompt_improver.performance.analytics.real_time_analytics import StreamWindow
         window = StreamWindow(
             window_id="window_test_001",
             start_time=datetime.utcnow(),
@@ -146,13 +146,13 @@ class TestCoredisAnalyticsMigration:
     @pytest.mark.asyncio
     async def test_websocket_broadcast_with_redis(self):
         """Test WebSocket broadcast functionality with Redis"""
-        with patch('src.prompt_improver.performance.analytics.real_time_analytics.publish_experiment_update') as mock_publish:
+        with patch('prompt_improver.performance.analytics.real_time_analytics.publish_experiment_update') as mock_publish:
             service = EnhancedRealTimeAnalyticsService(
                 db_session=self.mock_db_session,
                 redis_client=self.mock_redis_client
             )
             
-            from src.prompt_improver.performance.analytics.real_time_analytics import StreamWindow
+            from prompt_improver.performance.analytics.real_time_analytics import StreamWindow
             window = StreamWindow(
                 window_id="window_test_002",
                 start_time=datetime.utcnow(),
@@ -176,7 +176,7 @@ class TestCoredisAnalyticsMigration:
     async def test_get_singleton_service_with_coredis(self):
         """Test singleton service getter with coredis client"""
         # Clear any existing singleton
-        from src.prompt_improver.performance.analytics import real_time_analytics
+        from prompt_improver.performance.analytics import real_time_analytics
         real_time_analytics._real_time_service = None
         
         service = await get_real_time_analytics_service(
@@ -206,7 +206,7 @@ class TestCoredisOptimizerMigration:
         cache = IntelligentCache(config)
         
         # Mock the Redis initialization
-        with patch('src.prompt_improver.performance.optimization.async_optimizer.coredis.Redis') as mock_redis_constructor:
+        with patch('prompt_improver.performance.optimization.async_optimizer.coredis.Redis') as mock_redis_constructor:
             mock_redis_constructor.return_value = self.mock_redis_client
             # Ensure ping returns a proper awaitable
             self.mock_redis_client.ping = AsyncMock(return_value=True)
@@ -279,7 +279,7 @@ class TestCoredisOptimizerMigration:
     @pytest.mark.asyncio 
     async def test_async_optimizer_with_coredis_cache(self):
         """Test AsyncOptimizer works with coredis-based intelligent cache"""
-        from src.prompt_improver.performance.optimization.async_optimizer import AsyncOperationConfig
+        from prompt_improver.performance.optimization.async_optimizer import AsyncOperationConfig
         
         config = AsyncOperationConfig(enable_intelligent_caching=True)
         optimizer = AsyncOptimizer(config)
@@ -464,7 +464,7 @@ class TestCoredisIntegrationScenarios:
         assert len(service.event_buffer) == 10
         
         # Simulate window processing
-        from src.prompt_improver.performance.analytics.real_time_analytics import StreamWindow
+        from prompt_improver.performance.analytics.real_time_analytics import StreamWindow
         window = StreamWindow(
             window_id="integration_window_001",
             start_time=datetime.utcnow() - timedelta(seconds=30),
@@ -544,7 +544,7 @@ class TestCoredisIntegrationScenarios:
         self.mock_redis_client.setex.side_effect = coredis.exceptions.ConnectionError("Redis connection failed")
         
         # Test window storage with Redis failure
-        from src.prompt_improver.performance.analytics.real_time_analytics import StreamWindow
+        from prompt_improver.performance.analytics.real_time_analytics import StreamWindow
         window = StreamWindow(
             window_id="error_test_window",
             start_time=datetime.utcnow(),
@@ -567,7 +567,7 @@ class TestCoredisIntegrationScenarios:
         cache = IntelligentCache(config)
         
         # Mock coredis.Redis to return our mock client
-        with patch('src.prompt_improver.performance.optimization.async_optimizer.coredis.Redis') as mock_redis_constructor:
+        with patch('prompt_improver.performance.optimization.async_optimizer.coredis.Redis') as mock_redis_constructor:
             mock_redis_constructor.return_value = self.mock_redis_client
             self.mock_redis_client.ping = AsyncMock(return_value=True)
             
@@ -598,8 +598,8 @@ if __name__ == "__main__":
         # Test 1: Import verification
         try:
             import coredis
-            from src.prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
-            from src.prompt_improver.performance.optimization.async_optimizer import IntelligentCache
+            from prompt_improver.performance.analytics.real_time_analytics import RealTimeAnalyticsService
+            from prompt_improver.performance.optimization.async_optimizer import IntelligentCache
             print("✅ All imports successful")
         except ImportError as e:
             print(f"❌ Import error: {e}")
@@ -619,7 +619,7 @@ if __name__ == "__main__":
         
         # Test 3: Cache initialization
         try:
-            from src.prompt_improver.performance.optimization.async_optimizer import CacheConfig
+            from prompt_improver.performance.optimization.async_optimizer import CacheConfig
             config = CacheConfig()
             cache = IntelligentCache(config)
             print("✅ Cache initialization successful")

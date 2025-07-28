@@ -9,7 +9,7 @@ import statistics
 from typing import List
 from datetime import datetime, timedelta
 
-from src.prompt_improver.performance.monitoring.health.sla_monitor import (
+from prompt_improver.performance.monitoring.health.sla_monitor import (
     SLAMonitor,
     SLAConfiguration,
     SLATarget,

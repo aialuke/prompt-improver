@@ -9,16 +9,12 @@ Enhanced with 2025 best practices:
 - Real-time alerting and health status
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union
 import logging
 
-from rich.bar import Bar
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 

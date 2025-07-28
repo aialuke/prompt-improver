@@ -6,7 +6,7 @@ for all metrics across the application.
 """
 
 import logging
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List
 from threading import Lock
 
 # Define MockMetric classes first (always available)

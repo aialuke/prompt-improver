@@ -22,10 +22,9 @@ import contextlib
 import logging
 import os
 from collections.abc import AsyncIterator, Iterator
-from typing import Annotated, Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-from fastapi import Depends
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -36,8 +35,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
-
-from .config import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from .component_connector import ComponentConnector, ComponentMetadata, Componen
 
 class ExperimentOrchestratorConnector(ComponentConnector):
     """Connector for ExperimentOrchestrator specialized component (Integration over Extension)."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="experiment_orchestrator",
@@ -50,11 +50,11 @@ class ExperimentOrchestratorConnector(ComponentConnector):
     async def _initialize_component(self) -> None:
         """Initialize ExperimentOrchestrator - registered as component, no modifications."""
         # NOTE: Integration over Extension - no modifications to existing orchestrator
-        # from src.prompt_improver.ml.evaluation.experiment_orchestrator import ExperimentOrchestrator
+        # from prompt_improver.ml.evaluation.experiment_orchestrator import ExperimentOrchestrator
         # self.component_instance = ExperimentOrchestrator()
         self.logger.info("ExperimentOrchestrator connector initialized (specialized component)")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute ExperimentOrchestrator capability through component interface."""
         if capability_name == "coordinate_ab_testing":
@@ -65,7 +65,7 @@ class ExperimentOrchestratorConnector(ComponentConnector):
             return await self._experiment_lifecycle(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _coordinate_ab_testing(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Coordinate A/B testing through existing orchestrator."""
         await asyncio.sleep(0.3)
@@ -77,7 +77,7 @@ class ExperimentOrchestratorConnector(ComponentConnector):
             "p_value": 0.03,
             "winner": "variant_b"
         }
-    
+
     async def _statistical_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Statistical validation."""
         await asyncio.sleep(0.2)
@@ -87,7 +87,7 @@ class ExperimentOrchestratorConnector(ComponentConnector):
             "effect_size": 0.15,
             "power_analysis": 0.8
         }
-    
+
     async def _experiment_lifecycle(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Experiment lifecycle management."""
         await asyncio.sleep(0.1)
@@ -100,7 +100,7 @@ class ExperimentOrchestratorConnector(ComponentConnector):
 
 class AdvancedStatisticalValidatorConnector(ComponentConnector):
     """Connector for AdvancedStatisticalValidator component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="advanced_statistical_validator",
@@ -123,12 +123,12 @@ class AdvancedStatisticalValidatorConnector(ComponentConnector):
             resource_requirements={"memory": "1GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize AdvancedStatisticalValidator component."""
         self.logger.info("AdvancedStatisticalValidator connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute AdvancedStatisticalValidator capability."""
         if capability_name == "advanced_hypothesis_testing":
@@ -137,7 +137,7 @@ class AdvancedStatisticalValidatorConnector(ComponentConnector):
             return await self._bayesian_validation(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _advanced_hypothesis_testing(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Advanced hypothesis testing."""
         await asyncio.sleep(0.2)
@@ -148,7 +148,7 @@ class AdvancedStatisticalValidatorConnector(ComponentConnector):
             "effect_size": 0.42,
             "confidence_interval": [0.15, 0.69]
         }
-    
+
     async def _bayesian_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Bayesian validation."""
         await asyncio.sleep(0.2)
@@ -161,7 +161,7 @@ class AdvancedStatisticalValidatorConnector(ComponentConnector):
 
 class DomainFeatureExtractorConnector(ComponentConnector):
     """Connector for DomainFeatureExtractor component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="domain_feature_extractor",
@@ -184,12 +184,12 @@ class DomainFeatureExtractorConnector(ComponentConnector):
             resource_requirements={"memory": "2GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize DomainFeatureExtractor component."""
         self.logger.info("DomainFeatureExtractor connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute DomainFeatureExtractor capability."""
         if capability_name == "extract_features":
@@ -198,7 +198,7 @@ class DomainFeatureExtractorConnector(ComponentConnector):
             return await self._feature_selection(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _extract_features(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Extract features."""
         await asyncio.sleep(0.3)
@@ -208,7 +208,7 @@ class DomainFeatureExtractorConnector(ComponentConnector):
             "extraction_method": "transformer_based",
             "feature_quality": 0.88
         }
-    
+
     async def _feature_selection(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Feature selection."""
         await asyncio.sleep(0.2)
@@ -221,7 +221,7 @@ class DomainFeatureExtractorConnector(ComponentConnector):
 
 class Tier3ConnectorFactory:
     """Factory for creating Tier 3 component connectors."""
-    
+
     @staticmethod
     def create_connector(component_name: str, event_bus=None) -> ComponentConnector:
         """Create a connector for the specified Tier 3 component."""
@@ -230,12 +230,12 @@ class Tier3ConnectorFactory:
             "advanced_statistical_validator": AdvancedStatisticalValidatorConnector,
             "domain_feature_extractor": DomainFeatureExtractorConnector,
         }
-        
+
         if component_name not in connectors:
             raise ValueError(f"Unknown Tier 3 component: {component_name}")
-        
+
         return connectors[component_name](event_bus)
-    
+
     @staticmethod
     def list_available_components() -> List[str]:
         """List all available Tier 3 components."""

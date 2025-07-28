@@ -11,22 +11,20 @@ Advanced performance monitoring with 2025 best practices:
 """
 
 import asyncio
-import json
+
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable, Union
+from typing import Any, Dict, List, Optional, Callable
 from collections import deque, defaultdict
 import statistics
-import math
 
 # Enhanced observability imports
 try:
-    import prometheus_client
-    from prometheus_client import Counter, Histogram, Gauge, Summary
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False

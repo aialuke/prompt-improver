@@ -9,8 +9,8 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, UTC
+from typing import Any, Dict, List, Tuple
 import statistics
 
 import aiofiles
@@ -20,7 +20,6 @@ from ..optimization.performance_optimizer import get_performance_optimizer
 from ..monitoring.performance_monitor import get_performance_monitor
 from ...utils.multi_level_cache import get_specialized_caches
 from ..optimization.response_optimizer import get_response_optimizer
-from ..optimization.async_optimizer import get_async_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +346,7 @@ class PerformanceValidator:
             p99_response_time_ms=p99_response_time,
             success_rate=success_rate,
             sample_count=sample_count,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             optimizations_applied=optimizations,
             improvement_details=improvement_details
         )
@@ -371,7 +370,7 @@ class PerformanceValidator:
     ):
         """Generate comprehensive validation report."""
         report = {
-            "validation_timestamp": datetime.utcnow().isoformat(),
+            "validation_timestamp": datetime.now(UTC).isoformat(),
             "target_response_time_ms": self.target_response_time_ms,
             "overall_summary": self._calculate_overall_summary(validation_results),
             "test_results": {

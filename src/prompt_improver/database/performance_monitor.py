@@ -4,7 +4,7 @@ Comprehensive monitoring for Phase 2 <50ms query time and 90% cache hit ratio re
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from .psycopg_client import TypeSafePsycopgClient, get_psycopg_client
@@ -218,7 +218,7 @@ class DatabasePerformanceMonitor:
         client_stats = await client.get_performance_stats()
 
         snapshot = DatabasePerformanceSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             cache_hit_ratio=cache_hit_ratio,
             active_connections=active_connections,
             total_queries=client_stats["total_queries"],
@@ -275,7 +275,7 @@ class DatabasePerformanceMonitor:
 
     async def get_performance_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get performance summary for the last N hours"""
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
         recent_snapshots = [s for s in self._snapshots if s.timestamp >= cutoff_time]
 
         if not recent_snapshots:
@@ -380,7 +380,7 @@ class DatabasePerformanceMonitor:
             from ..ml.orchestration.events.event_types import EventType, MLEvent
             from datetime import timedelta
 
-            current_time = datetime.utcnow()
+            current_time = datetime.now(UTC)
 
             # Check cache hit ratio (target: >90%)
             if snapshot.cache_hit_ratio < 90.0:

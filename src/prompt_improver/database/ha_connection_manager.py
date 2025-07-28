@@ -13,7 +13,7 @@ Features:
 
 import asyncio
 import logging
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 import time
@@ -27,9 +27,7 @@ from psycopg_pool import AsyncConnectionPool
 from .config import DatabaseConfig
 from ..utils.redis_cache import RedisConfig
 
-
 logger = logging.getLogger(__name__)
-
 
 class DatabaseRole(Enum):
     """Database role enumeration."""
@@ -37,14 +35,12 @@ class DatabaseRole(Enum):
     REPLICA = "replica"
     UNKNOWN = "unknown"
 
-
 class ConnectionState(Enum):
     """Connection state enumeration."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     FAILED = "failed"
     RECOVERING = "recovering"
-
 
 @dataclass
 class ConnectionMetrics:
@@ -57,7 +53,6 @@ class ConnectionMetrics:
     failover_count: int
     health_check_failures: int
 
-
 @dataclass
 class DatabaseEndpoint:
     """Database endpoint configuration."""
@@ -67,7 +62,6 @@ class DatabaseEndpoint:
     priority: int = 100  # Lower number = higher priority
     max_connections: int = 20
     state: ConnectionState = ConnectionState.HEALTHY
-
 
 class HAConnectionManager:
     """High Availability connection manager with automatic failover.

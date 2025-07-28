@@ -12,13 +12,11 @@ Advanced canary deployment with 2025 best practices:
 
 import asyncio
 import json
-import os
-import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any, Callable
+from typing import Dict, List, Optional, Any, Callable
 from collections import defaultdict, deque
 import statistics
 
@@ -28,7 +26,6 @@ from rich.console import Console
 # OpenTelemetry imports
 try:
     from opentelemetry import trace, metrics
-    from opentelemetry.trace import Status, StatusCode
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
@@ -46,12 +43,10 @@ except ImportError:
 
 # Service mesh integration
 try:
-    import istio_client
     ISTIO_AVAILABLE = True
 except ImportError:
     ISTIO_AVAILABLE = False
 
-from prompt_improver.database import get_sessionmanager
 from prompt_improver.utils.redis_cache import redis_client
 
 console = Console()
@@ -388,7 +383,7 @@ class EnhancedCanaryTestingService:
             canary_name=deployment_name,
             trigger=trigger,
             reason=reason,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             metrics_snapshot=metrics
         )
 
@@ -526,7 +521,7 @@ class EnhancedCanaryTestingService:
             error_rate=error_rate,
             p95_response_time_ms=p95_response_time_ms,
             p99_response_time_ms=p99_response_time_ms,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             availability=availability,
             throughput_rps=throughput_rps,
             cpu_utilization=max(0, min(100, cpu_utilization)),
@@ -568,7 +563,7 @@ class EnhancedCanaryTestingService:
                 name=deployment_name,
                 percentage=initial_percentage,
                 enabled=True,
-                start_time=datetime.utcnow(),
+                start_time=datetime.now(UTC),
                 deployment_strategy=strategy,
                 phase=CanaryPhase.INITIALIZING,
                 sli_targets=sli_targets or self._get_default_sli_targets(),
@@ -595,7 +590,7 @@ class EnhancedCanaryTestingService:
             self.active_deployments[deployment_name] = {
                 "canary_group": canary_group,
                 "monitoring_task": monitoring_task,
-                "start_time": datetime.utcnow(),
+                "start_time": datetime.now(UTC),
                 "target_percentage": target_percentage,
                 "ramp_duration_minutes": ramp_duration_minutes
             }
@@ -679,7 +674,7 @@ class EnhancedCanaryTestingService:
 
     async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrator-compatible interface for canary testing (2025 pattern)"""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         # Add realistic processing delay for enhanced features
         await asyncio.sleep(0.02)  # 20ms delay to simulate deployment setup and monitoring
@@ -707,7 +702,7 @@ class EnhancedCanaryTestingService:
             canary_data = await self._collect_comprehensive_canary_data()
 
             # Calculate execution metadata
-            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
             return {
                 "orchestrator_compatible": True,
@@ -757,7 +752,7 @@ class EnhancedCanaryTestingService:
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "canary_summary": {}},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "component_version": "2025.1.0"
                 }

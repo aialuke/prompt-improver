@@ -9,7 +9,7 @@ Target: 50% reduction in database load.
 import asyncio
 import time
 import statistics
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Dict, Any
 import json
 
@@ -26,7 +26,7 @@ class DatabaseOptimizationBenchmark:
     
     def __init__(self):
         self.results = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "baseline": {},
             "optimized": {},
             "improvement": {},

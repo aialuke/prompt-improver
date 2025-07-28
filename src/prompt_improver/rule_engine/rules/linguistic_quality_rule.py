@@ -5,7 +5,7 @@ readability, syntactic complexity, entity richness, and structural clarity.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from ...ml.analysis.linguistic_analyzer import LinguisticAnalyzer, LinguisticConfig
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult

@@ -9,9 +9,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-from src.prompt_improver.core.services.security import PromptDataProtection
-from src.prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from src.prompt_improver.ml.orchestration.core.component_registry import ComponentTier
+from prompt_improver.core.services.security import PromptDataProtection
+from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+from prompt_improver.ml.orchestration.core.component_registry import ComponentTier
 
 
 class TestPromptDataProtectionIntegration:

@@ -260,7 +260,3 @@ Use <thinking> tags for complex reasoning, planning, and analysis:
 This enables more deliberate and structured problem-solving.
 ```
 ---
-
-## Task Master AI Instructions
-**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
-@./.taskmaster/CLAUDE.md

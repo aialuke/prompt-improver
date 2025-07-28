@@ -31,11 +31,24 @@ dependencies = [
   # Performance Monitoring
   "evidently>=0.4.0",
   "prometheus-client>=0.19.0",
+  # OpenTelemetry Distributed Tracing & Metrics
+  "opentelemetry-api>=1.21.0",
+  "opentelemetry-sdk>=1.21.0",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.21.0",
+  "opentelemetry-instrumentation>=0.42b0",
+  "opentelemetry-instrumentation-asyncpg>=0.42b0",
+  "opentelemetry-instrumentation-httpx>=0.42b0",
+  "opentelemetry-instrumentation-requests>=0.42b0",
+  "opentelemetry-instrumentation-fastapi>=0.42b0",
+  "opentelemetry-instrumentation-redis>=0.42b0",
+  "opentelemetry-semantic-conventions>=0.42b0",
   "sqlmodel>=0.0.24",
   "asyncpg>=0.30.0",
   "psycopg[binary]>=3.1.0",
   "psycopg_pool>=3.1.0",
   "pydantic-settings>=2.10.1",
+  "watchdog>=4.0.0",  # File system event monitoring for configuration hot-reload
   "greenlet>=3.2.3",
   "mcp>=1.10.1",
   "psutil>=5.8.0",  # Required for system resource monitoring in health checks
@@ -350,6 +363,8 @@ docstring-code-line-length = 72
 [tool.pytest.ini_options]
 minversion = "8.2.0"
 
+# Test markers moved to comprehensive section below
+
 # Enhanced testing configuration with coverage and performance monitoring
 addopts = [
     "-ra",
@@ -425,3 +440,73 @@ filterwarnings = [
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.importlinter]
+# Import Linter configuration for architectural boundary enforcement
+root_packages = ["prompt_improver"]
+
+[[tool.importlinter.contracts]]
+name = "Clean Architecture Layers"
+type = "layers"
+layers = [
+    "prompt_improver.core",
+    "prompt_improver.shared", 
+    "prompt_improver.domain | prompt_improver.ml | prompt_improver.rule_engine",
+    "prompt_improver.application",
+    "prompt_improver.infrastructure | prompt_improver.database | prompt_improver.performance | prompt_improver.security",
+    "prompt_improver.presentation | prompt_improver.api | prompt_improver.cli | prompt_improver.mcp_server"
+]
+
+[[tool.importlinter.contracts]]
+name = "Core Module Independence"
+type = "independence"
+modules = ["prompt_improver.core"]
+
+[[tool.importlinter.contracts]]
+name = "Domain Independence"
+type = "independence" 
+modules = [
+    "prompt_improver.domain",
+    "prompt_improver.ml",
+    "prompt_improver.rule_engine"
+]
+
+[[tool.importlinter.contracts]]
+name = "No Circular Dependencies"
+type = "forbidden"
+source_modules = ["prompt_improver"]
+forbidden_modules = ["prompt_improver"]
+ignore_imports = [
+    "prompt_improver -> prompt_improver.core",
+    "prompt_improver -> prompt_improver.shared"
+]
+
+[[tool.importlinter.contracts]]
+name = "Infrastructure Boundaries"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.domain",
+    "prompt_improver.ml",
+    "prompt_improver.rule_engine"
+]
+forbidden_modules = [
+    "prompt_improver.database",
+    "prompt_improver.api",
+    "prompt_improver.cli",
+    "prompt_improver.mcp_server",
+    "prompt_improver.performance.monitoring"
+]
+
+[[tool.importlinter.contracts]]
+name = "Presentation Layer Isolation"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.api",
+    "prompt_improver.cli", 
+    "prompt_improver.mcp_server"
+]
+forbidden_modules = [
+    "prompt_improver.database",
+    "prompt_improver.ml.lifecycle",
+    "prompt_improver.performance.monitoring.health"
+]

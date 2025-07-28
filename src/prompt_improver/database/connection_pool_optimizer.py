@@ -13,15 +13,26 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional
 from enum import Enum
 
-import psutil
-from psycopg_pool import AsyncConnectionPool
-
 from .psycopg_client import TypeSafePsycopgClient, get_psycopg_client
 from ..performance.monitoring.metrics_registry import get_metrics_registry
+from ..core.config import get_config
+
+@dataclass
+class ConnectionInfo:
+    """Connection information for age tracking"""
+    connection_id: str
+    created_at: datetime
+    last_used: datetime
+    use_count: int = 0
+    
+    @property
+    def age_seconds(self) -> float:
+        """Connection age in seconds"""
+        return (datetime.now(UTC) - self.created_at).total_seconds()
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +71,46 @@ class ConnectionPoolOptimizer:
         self.client = client
         self.metrics_registry = get_metrics_registry()
         
-        # Pool configuration
-        self.min_pool_size = 5
-        self.max_pool_size = 50
-        self.target_utilization = 0.7  # 70% target utilization
+        # Load configuration from centralized system
+        try:
+            self.config = get_config()
+            self.db_config = self.config.database
+            
+            # Pool configuration from centralized config system
+            self.min_pool_size = self.db_config.pool_min_size
+            self.max_pool_size = self.db_config.pool_max_size
+            self.target_utilization = getattr(self.db_config, 'pool_target_utilization', 0.7)  # Default 70%
+            
+            # Performance thresholds from config
+            self.high_utilization_threshold = getattr(self.db_config, 'pool_high_utilization_threshold', 0.9)  # 90%
+            self.low_utilization_threshold = getattr(self.db_config, 'pool_low_utilization_threshold', 0.3)   # 30%
+            self.stress_threshold = getattr(self.db_config, 'pool_stress_threshold', 0.8)  # 80%
+            self.underutilized_threshold = getattr(self.db_config, 'pool_underutilized_threshold', 0.4)  # 40%
+            
+            logger.info(f"Pool optimizer initialized with config: min={self.min_pool_size}, max={self.max_pool_size}")
+            
+        except Exception as e:
+            # Fallback to hardcoded values if config is not available
+            logger.warning(f"Failed to load centralized config, using defaults: {e}")
+            self.config = None
+            self.db_config = None
+            self.min_pool_size = 5
+            self.max_pool_size = 50
+            self.target_utilization = 0.7
+            self.high_utilization_threshold = 0.9
+            self.low_utilization_threshold = 0.3
+            self.stress_threshold = 0.8
+            self.underutilized_threshold = 0.4
+        
+        # Connection age tracking
+        self._connection_registry: Dict[str, ConnectionInfo] = {}
+        self._connection_id_counter = 0
         
         # Monitoring state
         self._metrics_history: List[PoolMetrics] = []
         self._pool_state = PoolState.healthy
         self._monitoring = False
-        self._last_optimization = datetime.utcnow()
+        self._last_optimization = datetime.now(UTC)
         
         # Performance tracking
         self._connection_reuse_count = 0
@@ -127,7 +168,7 @@ class ConnectionPoolOptimizer:
             efficiency = (self._connection_reuse_count / (self._connection_reuse_count + self._total_connections_created)) * 100
         
         metrics = PoolMetrics(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             pool_size=pool_size,
             available_connections=available,
             active_connections=active,
@@ -155,7 +196,7 @@ class ConnectionPoolOptimizer:
         current_metrics = await self.collect_pool_metrics()
         
         # Don't optimize too frequently
-        if datetime.utcnow() - self._last_optimization < timedelta(minutes=5):
+        if datetime.now(UTC) - self._last_optimization < timedelta(minutes=5):
             return {"status": "skipped", "reason": "optimization cooldown"}
         
         utilization = current_metrics.active_connections / current_metrics.pool_size if current_metrics.pool_size > 0 else 0
@@ -193,7 +234,7 @@ class ConnectionPoolOptimizer:
                 # Note: In production, you'd need to implement pool resizing logic
                 # This is a placeholder for the actual implementation
                 logger.info(f"Optimizing pool size: {current_metrics.pool_size} -> {new_pool_size}")
-                self._last_optimization = datetime.utcnow()
+                self._last_optimization = datetime.now(UTC)
                 
                 return {
                     "status": "optimized",
@@ -359,6 +400,7 @@ class ConnectionPoolOptimizer:
                 "avg_utilization_percent": round(avg_utilization * 100, 1),
                 "recommended_pool_size": self._calculate_optimal_pool_size(avg_utilization)
             },
+            "connection_age": self.get_connection_age_stats(),
             "trends": {
                 "utilization_trend": self._calculate_utilization_trend(),
                 "efficiency_trend": self._calculate_efficiency_trend()
@@ -429,6 +471,14 @@ class ConnectionPoolOptimizer:
                     health_result = await self.monitor_connection_health()
                     if health_result.get("health_score", 100) < 80:
                         logger.warning(f"Connection pool health degraded: {health_result}")
+                    
+                    # Log connection age statistics periodically
+                    age_stats = self.get_connection_age_stats()
+                    if age_stats["connections_over_max_lifetime"] > 0:
+                        logger.warning(
+                            f"{age_stats['connections_over_max_lifetime']} connections exceed max lifetime "
+                            f"({self.db_config.pool_max_lifetime}s)"
+                        )
                 
                 await asyncio.sleep(interval_seconds)
                 
@@ -439,6 +489,114 @@ class ConnectionPoolOptimizer:
     def stop_monitoring(self):
         """Stop continuous monitoring"""
         self._monitoring = False
+    
+    def _track_connection_usage(self, connection_id: str = None):
+        """Track connection creation and usage for age monitoring"""
+        if connection_id is None:
+            self._connection_id_counter += 1
+            connection_id = f"conn_{self._connection_id_counter}_{int(time.time())}"
+        
+        now = datetime.now(UTC)
+        
+        if connection_id in self._connection_registry:
+            # Update existing connection
+            conn_info = self._connection_registry[connection_id]
+            conn_info.last_used = now
+            conn_info.use_count += 1
+            self._connection_reuse_count += 1
+        else:
+            # Track new connection
+            self._connection_registry[connection_id] = ConnectionInfo(
+                connection_id=connection_id,
+                created_at=now,
+                last_used=now
+            )
+            self._total_connections_created += 1
+        
+        # Clean up old connection records to prevent memory leaks  
+        max_registry_size = getattr(self.db_config, 'pool_registry_size', 1000) if self.db_config else 1000
+        if len(self._connection_registry) > max_registry_size:
+            self._cleanup_old_connections()
+    
+    def _cleanup_old_connections(self):
+        """Remove old connection records to prevent memory leaks"""
+        max_age_hours = getattr(self.db_config, 'pool_max_connection_age_hours', 24) if self.db_config else 24
+        cutoff_time = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        
+        # Remove connections older than cutoff
+        old_connections = [
+            conn_id for conn_id, conn_info in self._connection_registry.items()
+            if conn_info.created_at < cutoff_time
+        ]
+        
+        for conn_id in old_connections:
+            del self._connection_registry[conn_id]
+        
+        if old_connections:
+            logger.debug(f"Cleaned up {len(old_connections)} old connection records")
+    
+    def get_connection_age_stats(self) -> Dict[str, Any]:
+        """Get detailed connection age statistics"""
+        if not self._connection_registry:
+            return {
+                "total_connections": 0,
+                "avg_age_seconds": 0,
+                "max_age_seconds": 0,
+                "min_age_seconds": 0,
+                "connections_over_max_lifetime": 0
+            }
+        
+        ages = [conn.age_seconds for conn in self._connection_registry.values()]
+        max_lifetime = self.db_config.pool_max_lifetime if self.db_config else 1800
+        
+        return {
+            "total_connections": len(self._connection_registry),
+            "avg_age_seconds": sum(ages) / len(ages),
+            "max_age_seconds": max(ages),
+            "min_age_seconds": min(ages),
+            "connections_over_max_lifetime": len([age for age in ages if age > max_lifetime]),
+            "oldest_connections": [
+                {
+                    "id": conn.connection_id,
+                    "age_seconds": conn.age_seconds,
+                    "use_count": conn.use_count
+                }
+                for conn in sorted(self._connection_registry.values(), 
+                                 key=lambda x: x.age_seconds, reverse=True)[:5]
+            ]
+        }
+    
+    async def reload_config(self):
+        """Reload configuration from centralized system"""
+        try:
+            # Reload config to get latest values
+            from ..core.config import reload_config
+            self.config = reload_config()
+            self.db_config = self.config.database
+            
+            # Update pool configuration
+            old_min = self.min_pool_size
+            old_max = self.max_pool_size
+            old_target = self.target_utilization
+            
+            self.min_pool_size = self.db_config.pool_min_size
+            self.max_pool_size = self.db_config.pool_max_size
+            self.target_utilization = getattr(self.db_config, 'pool_target_utilization', 0.7)
+            
+            # Update thresholds
+            self.high_utilization_threshold = getattr(self.db_config, 'pool_high_utilization_threshold', 0.9)
+            self.low_utilization_threshold = getattr(self.db_config, 'pool_low_utilization_threshold', 0.3)
+            self.stress_threshold = getattr(self.db_config, 'pool_stress_threshold', 0.8)
+            self.underutilized_threshold = getattr(self.db_config, 'pool_underutilized_threshold', 0.4)
+            
+            logger.info(
+                f"Pool optimizer config reloaded - "
+                f"Pool size: {old_min}-{old_max} -> {self.min_pool_size}-{self.max_pool_size}, "
+                f"Target utilization: {old_target} -> {self.target_utilization}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to reload pool optimizer config: {e}")
 
 # Global optimizer instance
 _pool_optimizer: Optional[ConnectionPoolOptimizer] = None

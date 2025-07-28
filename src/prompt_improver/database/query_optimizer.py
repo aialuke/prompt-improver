@@ -4,18 +4,16 @@ This module implements 2025 best practices for PostgreSQL query optimization
 including prepared statements, connection pooling enhancements, and query caching.
 """
 
-import asyncio
 import logging
 import psutil
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, UTC
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import Executable
 
 from prompt_improver.database.psycopg_client import get_psycopg_client
 from ..performance.optimization.performance_optimizer import measure_database_operation
@@ -103,7 +101,7 @@ class PreparedStatementCache:
             "usage_statistics": dict(self._usage_count),
             "most_used_queries": sorted(self._usage_count.items(), key=lambda x: x[1], reverse=True)[:5],
             "cache_efficiency": "high" if len(self._statements) / self._max_size > 0.7 else "medium" if len(self._statements) / self._max_size > 0.3 else "low",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
     async def _analyze_query_optimization(self, **kwargs) -> Dict[str, Any]:
@@ -121,7 +119,7 @@ class PreparedStatementCache:
             "query_complexity_distribution": query_complexity,
             "optimization_recommendations": self._generate_optimization_recommendations(),
             "cache_hit_potential": sum(self._usage_count.values()) / len(self._usage_count) if self._usage_count else 0,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
     async def _analyze_cache_efficiency(self, **kwargs) -> Dict[str, Any]:
@@ -152,7 +150,7 @@ class PreparedStatementCache:
             "cold_queries_count": len(cold_queries),
             "efficiency_score": min(1.0, (len(hot_queries) / len(self._usage_count)) * 2) if self._usage_count else 0,
             "recommendations": self._generate_cache_recommendations(hot_queries, cold_queries),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
     def _calculate_query_complexity(self, query: str) -> str:
@@ -276,7 +274,7 @@ class OptimizedQueryExecutor:
                         execution_time_ms=cache_time,
                         rows_returned=len(cached_result) if isinstance(cached_result, list) else 1,
                         cache_hit=True,
-                        timestamp=datetime.utcnow()
+                        timestamp=datetime.now(UTC)
                     )
                     self._performance_metrics.append(query_metrics)
                     
@@ -332,7 +330,7 @@ class OptimizedQueryExecutor:
                     execution_time_ms=execution_time,
                     rows_returned=len(rows),
                     cache_hit=False,
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(UTC)
                 )
                 self._performance_metrics.append(query_metrics)
 
@@ -377,7 +375,7 @@ class OptimizedQueryExecutor:
 
         recent_metrics = [
             m for m in self._performance_metrics
-            if m.timestamp > datetime.utcnow() - timedelta(hours=1)
+            if m.timestamp > datetime.now(UTC) - timedelta(hours=1)
         ]
 
         if not recent_metrics:

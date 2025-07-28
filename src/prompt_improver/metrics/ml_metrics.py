@@ -8,16 +8,14 @@ feature flag effectiveness, and ML pipeline throughput with real-time aggregatio
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, List, Union, Set
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-import json
 import statistics
 from collections import defaultdict, deque
 
-from ..performance.monitoring.metrics_registry import get_metrics_registry, StandardMetrics
-
+from ..performance.monitoring.metrics_registry import get_metrics_registry
 
 class PromptCategory(Enum):
     """Categories for prompt improvements."""
@@ -30,7 +28,6 @@ class PromptCategory(Enum):
     CHAIN_OF_THOUGHT = "chain_of_thought"
     XML_ENHANCEMENT = "xml_enhancement"
 
-
 class ModelInferenceStage(Enum):
     """Stages of model inference pipeline."""
     INPUT_PREPROCESSING = "input_preprocessing"
@@ -38,7 +35,6 @@ class ModelInferenceStage(Enum):
     MODEL_FORWARD = "model_forward"
     POSTPROCESSING = "postprocessing"
     OUTPUT_VALIDATION = "output_validation"
-
 
 @dataclass
 class PromptImprovementMetric:
@@ -57,7 +53,6 @@ class PromptImprovementMetric:
     quality_metrics: Dict[str, float]
     feature_flags_used: List[str]
 
-
 @dataclass
 class ModelInferenceMetric:
     """Metrics for model inference operations."""
@@ -75,7 +70,6 @@ class ModelInferenceMetric:
     timestamp: datetime
     request_id: str
 
-
 @dataclass
 class FeatureFlagMetric:
     """Metrics for feature flag usage and effectiveness."""
@@ -91,7 +85,6 @@ class FeatureFlagMetric:
     timestamp: datetime
     experiment_variant: Optional[str]
 
-
 @dataclass
 class MLPipelineMetric:
     """Metrics for ML pipeline processing."""
@@ -106,7 +99,6 @@ class MLPipelineMetric:
     retry_count: int
     data_quality_score: float
     timestamp: datetime
-
 
 class MLMetricsCollector:
     """
@@ -741,10 +733,8 @@ class MLMetricsCollector:
             }
         }
 
-
 # Global instance
 _ml_metrics_collector: Optional[MLMetricsCollector] = None
-
 
 def get_ml_metrics_collector(config: Optional[Dict[str, Any]] = None) -> MLMetricsCollector:
     """Get global ML metrics collector instance."""
@@ -752,7 +742,6 @@ def get_ml_metrics_collector(config: Optional[Dict[str, Any]] = None) -> MLMetri
     if _ml_metrics_collector is None:
         _ml_metrics_collector = MLMetricsCollector(config)
     return _ml_metrics_collector
-
 
 async def record_prompt_improvement(
     category: PromptCategory,
@@ -786,7 +775,6 @@ async def record_prompt_improvement(
         feature_flags_used=feature_flags_used or []
     )
     await collector.record_prompt_improvement(metric)
-
 
 async def record_model_inference(
     model_name: str,

@@ -1,7 +1,6 @@
 """Real authorization service implementation for production use and integration testing."""
 
 from enum import Enum
-from typing import Any, Dict, List, Set
 
 class Permission(Enum):
     """Permission enum for fine-grained access control."""

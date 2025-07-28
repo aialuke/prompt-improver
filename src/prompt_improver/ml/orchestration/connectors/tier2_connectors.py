@@ -13,7 +13,7 @@ from .component_connector import ComponentConnector, ComponentMetadata, Componen
 
 class AutoMLOrchestratorConnector(ComponentConnector):
     """Connector for AutoMLOrchestrator specialized component (Integration over Extension)."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="automl_orchestrator",
@@ -50,11 +50,11 @@ class AutoMLOrchestratorConnector(ComponentConnector):
     async def _initialize_component(self) -> None:
         """Initialize AutoMLOrchestrator - registered as component, no modifications."""
         # NOTE: Integration over Extension - no modifications to existing orchestrator
-        # from src.prompt_improver.ml.automl.orchestrator import AutoMLOrchestrator  
+        # from prompt_improver.ml.automl.orchestrator import AutoMLOrchestrator
         # self.component_instance = AutoMLOrchestrator()
         self.logger.info("AutoMLOrchestrator connector initialized (specialized component)")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute AutoMLOrchestrator capability through component interface."""
         if capability_name == "coordinate_automl_workflow":
@@ -65,7 +65,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
             return await self._manage_callbacks(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _coordinate_automl_workflow(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Coordinate AutoML workflow through existing orchestrator."""
         await asyncio.sleep(0.5)  # Simulate AutoML coordination
@@ -76,7 +76,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
             "optimization_time": "45min",
             "models_evaluated": ["RandomForest", "XGBoost", "LightGBM"]
         }
-    
+
     async def _hyperparameter_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute hyperparameter optimization."""
         await asyncio.sleep(0.3)
@@ -86,7 +86,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
             "trials_completed": 50,
             "optimization_method": "optuna_tpe"
         }
-    
+
     async def _manage_callbacks(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Manage ML optimization callbacks."""
         await asyncio.sleep(0.1)
@@ -99,7 +99,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
 
 class InsightEngineConnector(ComponentConnector):
     """Connector for InsightEngine component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="insight_engine",
@@ -122,12 +122,12 @@ class InsightEngineConnector(ComponentConnector):
             resource_requirements={"memory": "3GB", "cpu": "3 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize InsightEngine component."""
         self.logger.info("InsightEngine connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute InsightEngine capability."""
         if capability_name == "causal_discovery":
@@ -136,7 +136,7 @@ class InsightEngineConnector(ComponentConnector):
             return await self._generate_insights(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _causal_discovery(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Discover causal relationships."""
         await asyncio.sleep(0.4)
@@ -146,7 +146,7 @@ class InsightEngineConnector(ComponentConnector):
             "causal_strength": 0.78,
             "discovery_method": "pc_algorithm"
         }
-    
+
     async def _generate_insights(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Generate insights."""
         await asyncio.sleep(0.3)
@@ -159,7 +159,7 @@ class InsightEngineConnector(ComponentConnector):
 
 class RuleAnalyzerConnector(ComponentConnector):
     """Connector for RuleAnalyzer component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="rule_analyzer",
@@ -182,12 +182,12 @@ class RuleAnalyzerConnector(ComponentConnector):
             resource_requirements={"memory": "2GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize RuleAnalyzer component."""
         self.logger.info("RuleAnalyzer connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute RuleAnalyzer capability."""
         if capability_name == "bayesian_modeling":
@@ -196,7 +196,7 @@ class RuleAnalyzerConnector(ComponentConnector):
             return await self._analyze_rule_effectiveness(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _bayesian_modeling(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Bayesian modeling."""
         await asyncio.sleep(0.3)
@@ -206,7 +206,7 @@ class RuleAnalyzerConnector(ComponentConnector):
             "credible_intervals": {"param1": [0.2, 0.8], "param2": [0.1, 0.6]},
             "model_fit": 0.87
         }
-    
+
     async def _analyze_rule_effectiveness(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze rule effectiveness."""
         await asyncio.sleep(0.2)
@@ -219,7 +219,7 @@ class RuleAnalyzerConnector(ComponentConnector):
 
 class ContextAwareWeighterConnector(ComponentConnector):
     """Connector for ContextAwareWeighter component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="context_aware_weighter",
@@ -242,12 +242,12 @@ class ContextAwareWeighterConnector(ComponentConnector):
             resource_requirements={"memory": "1GB", "cpu": "2 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize ContextAwareWeighter component."""
         self.logger.info("ContextAwareWeighter connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute ContextAwareWeighter capability."""
         if capability_name == "weight_features":
@@ -256,7 +256,7 @@ class ContextAwareWeighterConnector(ComponentConnector):
             return await self._adaptive_weighting(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _weight_features(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Weight features."""
         await asyncio.sleep(0.2)
@@ -266,7 +266,7 @@ class ContextAwareWeighterConnector(ComponentConnector):
             "context_influence": 0.72,
             "feature_importance": [0.8, 0.6, 0.9, 0.4, 0.7]
         }
-    
+
     async def _adaptive_weighting(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Adaptive weighting."""
         await asyncio.sleep(0.2)
@@ -279,7 +279,7 @@ class ContextAwareWeighterConnector(ComponentConnector):
 
 class AdvancedPatternDiscoveryConnector(ComponentConnector):
     """Connector for AdvancedPatternDiscovery component."""
-    
+
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
             name="advanced_pattern_discovery",
@@ -302,12 +302,12 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
             resource_requirements={"memory": "3GB", "cpu": "4 cores"}
         )
         super().__init__(metadata, event_bus)
-    
+
     async def _initialize_component(self) -> None:
         """Initialize AdvancedPatternDiscovery component."""
         self.logger.info("AdvancedPatternDiscovery connector initialized")
         await asyncio.sleep(0.1)
-    
+
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute AdvancedPatternDiscovery capability."""
         if capability_name == "discover_patterns":
@@ -316,7 +316,7 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
             return await self._pattern_validation(parameters)
         else:
             raise ValueError(f"Unknown capability: {capability_name}")
-    
+
     async def _discover_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Discover patterns."""
         await asyncio.sleep(0.4)
@@ -326,7 +326,7 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
             "pattern_confidence": 0.84,
             "novel_patterns": 7
         }
-    
+
     async def _pattern_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Validate patterns."""
         await asyncio.sleep(0.2)
@@ -339,7 +339,7 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
 
 class Tier2ConnectorFactory:
     """Factory for creating Tier 2 component connectors."""
-    
+
     @staticmethod
     def create_connector(component_name: str, event_bus=None) -> ComponentConnector:
         """Create a connector for the specified Tier 2 component."""
@@ -350,19 +350,19 @@ class Tier2ConnectorFactory:
             "context_aware_weighter": ContextAwareWeighterConnector,
             "advanced_pattern_discovery": AdvancedPatternDiscoveryConnector,
         }
-        
+
         if component_name not in connectors:
             raise ValueError(f"Unknown Tier 2 component: {component_name}")
-        
+
         return connectors[component_name](event_bus)
-    
+
     @staticmethod
     def list_available_components() -> List[str]:
         """List all available Tier 2 components."""
         return [
             "automl_orchestrator",  # Specialized component - Integration over Extension
             "insight_engine",
-            "rule_analyzer", 
+            "rule_analyzer",
             "context_aware_weighter",
             "optimization_validator",
             "advanced_pattern_discovery",

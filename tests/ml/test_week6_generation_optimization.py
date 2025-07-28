@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.prompt_improver.ml.preprocessing.synthetic_data_generator import (
+from prompt_improver.ml.preprocessing.synthetic_data_generator import (
     ProductionSyntheticDataGenerator,
     HybridGenerationSystem,
     MethodPerformanceTracker,
@@ -25,17 +25,17 @@ from src.prompt_improver.ml.preprocessing.synthetic_data_generator import (
     TabularVAE,
     TabularDiffusion
 )
-from src.prompt_improver.ml.optimization.batch.dynamic_batch_optimizer import (
+from prompt_improver.ml.optimization.batch.dynamic_batch_optimizer import (
     DynamicBatchOptimizer,
     BatchOptimizationConfig,
     BatchPerformanceMetrics
 )
-from src.prompt_improver.ml.analytics.generation_analytics import (
+from prompt_improver.ml.analytics.generation_analytics import (
     GenerationHistoryTracker,
     GenerationAnalytics
 )
-from src.prompt_improver.database.services.generation_service import GenerationDatabaseService
-from src.prompt_improver.database.models import (
+from prompt_improver.database.services.generation_service import GenerationDatabaseService
+from prompt_improver.database.models import (
     GenerationSession,
     GenerationBatch,
     SyntheticDataSample

@@ -7,9 +7,8 @@ Based on research synthesis from:
 - Quantifiable metrics and concrete language patterns
 """
 
-import asyncio
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from ...ml.preprocessing.llm_transformer import LLMTransformerService
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult

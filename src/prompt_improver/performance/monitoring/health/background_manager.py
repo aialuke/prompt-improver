@@ -14,17 +14,14 @@ import logging
 import time
 import uuid
 import heapq
-import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set
 
 # Observability imports
 try:
-    import prometheus_client
-    from prometheus_client import Counter, Histogram, Gauge, Summary
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -382,7 +379,7 @@ class EnhancedBackgroundTaskManager:
         """Retry failed tasks using unified retry manager."""
         while not self._shutdown_event.is_set():
             try:
-                current_time = datetime.utcnow()
+                current_time = datetime.now(UTC)
 
                 # Check for tasks ready for retry
                 for task in list(self.tasks.values()):
@@ -406,7 +403,7 @@ class EnhancedBackgroundTaskManager:
     async def _start_task(self, task: EnhancedBackgroundTask):
         """Start execution of a task."""
         task.status = TaskStatus.RUNNING
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(UTC)
         self.running_tasks.add(task.task_id)
 
         # Update metrics
@@ -452,7 +449,7 @@ class EnhancedBackgroundTaskManager:
 
     async def _execute_enhanced_task(self, task: EnhancedBackgroundTask, **kwargs) -> None:
         """Execute an enhanced background task with retry and circuit breaker support."""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         try:
             # Apply timeout
@@ -467,7 +464,7 @@ class EnhancedBackgroundTaskManager:
             # Task completed successfully
             task.result = result
             task.status = TaskStatus.COMPLETED
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(UTC)
 
             # Update metrics
             task.metrics.execution_count += 1
@@ -495,7 +492,7 @@ class EnhancedBackgroundTaskManager:
             await self._handle_task_failure(task, "Task timeout", start_time, **kwargs)
         except asyncio.CancelledError:
             task.status = TaskStatus.CANCELLED
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(UTC)
             self.logger.info(f"Task {task.task_id} was cancelled")
             raise
         except Exception as e:
@@ -517,7 +514,7 @@ class EnhancedBackgroundTaskManager:
     async def _handle_task_failure(self, task: EnhancedBackgroundTask, error_msg: str, start_time: datetime, **kwargs):
         """Handle task failure with retry logic."""
         task.error = error_msg
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(UTC)
 
         # Update metrics
         task.metrics.execution_count += 1
@@ -564,7 +561,7 @@ class EnhancedBackgroundTaskManager:
         delay_ms = retry_manager._calculate_delay(task.retry_count - 1, unified_config)
         delay = delay_ms / 1000.0
 
-        task.next_retry_at = datetime.utcnow() + timedelta(seconds=delay)
+        task.next_retry_at = datetime.now(UTC) + timedelta(seconds=delay)
 
         # Update statistics
         self.stats["total_retries"] += 1
@@ -833,7 +830,7 @@ class EnhancedBackgroundTaskManager:
         Returns:
             Orchestrator-compatible result with task management analysis and metadata
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
 
         try:
             # Extract configuration from orchestrator
@@ -899,7 +896,7 @@ class EnhancedBackgroundTaskManager:
             }
 
             # Calculate execution metadata
-            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
             return {
                 "orchestrator_compatible": True,
@@ -921,7 +918,7 @@ class EnhancedBackgroundTaskManager:
                 "orchestrator_compatible": True,
                 "component_result": {"error": f"Validation error: {str(e)}", "task_management_summary": {}},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "error_type": "validation",
                     "component_version": "2025.1.0"
@@ -933,7 +930,7 @@ class EnhancedBackgroundTaskManager:
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "task_management_summary": {}},
                 "local_metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                    "execution_time": (datetime.now(UTC) - start_time).total_seconds(),
                     "error": True,
                     "component_version": "2025.1.0"
                 }

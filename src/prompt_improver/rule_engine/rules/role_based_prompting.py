@@ -8,7 +8,7 @@ Based on research synthesis from:
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..base import BasePromptRule, RuleCheckResult, TransformationResult
 

@@ -15,7 +15,7 @@ import asyncio
 import json
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 import sys
 import os
@@ -51,7 +51,7 @@ class Phase1MetricsValidator:
         self.registry = get_metrics_registry()
         self.collector = SystemMetricsCollector(self.config, self.registry)
         self.results = {
-            "validation_timestamp": datetime.utcnow().isoformat(),
+            "validation_timestamp": datetime.now(UTC).isoformat(),
             "performance_results": {},
             "functionality_results": {},
             "integration_results": {},
@@ -428,7 +428,7 @@ class Phase1MetricsValidator:
         test_feature_usage = 15
         
         # 1. Connection Age Accuracy
-        conn_start_time = datetime.utcnow()
+        conn_start_time = datetime.now(UTC)
         for i in range(test_connections):
             self.collector.connection_tracker.track_connection_created(
                 f"accuracy_conn_{i}", "database", "accuracy_pool"
@@ -586,7 +586,7 @@ class Phase1MetricsValidator:
     def save_results(self, output_path: str = None) -> None:
         """Save validation results to file"""
         if output_path is None:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             output_path = f"phase1_metrics_validation_results_{timestamp}.json"
         
         with open(output_path, 'w') as f:

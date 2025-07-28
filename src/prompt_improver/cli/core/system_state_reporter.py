@@ -3,16 +3,12 @@ System State Reporter for Week 4 Smart Initialization
 Provides comprehensive system state reporting with component status, data metrics, and recommendations.
 """
 
-import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.columns import Columns
-from rich.text import Text
-
 
 class SystemStateReporter:
     """

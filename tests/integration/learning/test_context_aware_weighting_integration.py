@@ -9,8 +9,8 @@ from typing import Any, Dict, List
 
 import numpy as np
 import pytest
-from src.prompt_improver.learning.context_aware_weighter import WeightingStrategy
-from src.prompt_improver.learning.context_learner import (
+from prompt_improver.learning.context_aware_weighter import WeightingStrategy
+from prompt_improver.learning.context_learner import (
     ContextConfig,
     ContextSpecificLearner,
 )

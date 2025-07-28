@@ -1,0 +1,59 @@
+ARCHITECTURAL COMPLIANCE REPORT
+Generated: 2025-07-27T20:18:26.379873
+==================================================
+
+COMPLIANCE SCORE: 54.0/100
+Total files analyzed: 382
+Total violations: 9
+
+VIOLATIONS BY SEVERITY:
+  ERROR: 4
+  WARNING: 2
+  INFO: 3
+
+DETAILED VIOLATIONS:
+[ERROR] layer_dependency_direction
+  File: prompt_improver.mcp_server.mcp_server
+  Message: Layer violation: interface -> external
+  Details: {'from_module': 'prompt_improver.mcp_server.mcp_server', 'from_layer': 'interface', 'to_module': 'prompt_improver.feedback.enhanced_feedback_collector', 'to_layer': 'external', 'violation_type': 'layer_breach', 'severity': 'critical'}
+
+[ERROR] layer_dependency_direction
+  File: prompt_improver.mcp_server.services.concrete_services
+  Message: Layer violation: interface -> external
+  Details: {'from_module': 'prompt_improver.mcp_server.services.concrete_services', 'from_layer': 'interface', 'to_module': 'prompt_improver.feedback.enhanced_feedback_collector', 'to_layer': 'external', 'violation_type': 'layer_breach', 'severity': 'critical'}
+
+[ERROR] layer_dependency_direction
+  File: prompt_improver.performance.validation.performance_validation
+  Message: Layer violation: application -> interface
+  Details: {'from_module': 'prompt_improver.performance.validation.performance_validation', 'from_layer': 'application', 'to_module': 'prompt_improver.mcp_server.mcp_server', 'to_layer': 'interface', 'violation_type': 'layer_breach', 'severity': 'critical'}
+
+[ERROR] layer_dependency_direction
+  File: prompt_improver.ml.lifecycle.lifecycle_monitoring
+  Message: Layer violation: domain -> application
+  Details: {'from_module': 'prompt_improver.ml.lifecycle.lifecycle_monitoring', 'from_layer': 'domain', 'to_module': 'prompt_improver.performance.monitoring.health.enhanced_base', 'to_layer': 'application', 'violation_type': 'layer_breach', 'severity': 'critical'}
+
+[WARNING] high_coupling_limit
+  File: prompt_improver.mcp_server.mcp_server
+  Message: Module has 28 dependencies (limit: 15)
+  Details: {'dependency_count': 28, 'limit': 15}
+
+[WARNING] high_coupling_limit
+  File: prompt_improver.mcp_server.services.concrete_services
+  Message: Module has 15 dependencies (limit: 15)
+  Details: {'dependency_count': 15, 'limit': 15}
+
+[INFO] interface_protocol_usage
+  File: prompt_improver.utils.redis_cache
+  Message: Module with 6 dependents should have protocol interface
+  Details: {'dependent_count': 6, 'dependents': ['prompt_improver.database.query_optimizer', 'prompt_improver.mcp_server.mcp_server', 'prompt_improver.utils.multi_level_cache', 'prompt_improver.mcp_server.services.concrete_services', 'prompt_improver.performance.testing.canary_testing', 'prompt_improver.main']}
+
+[INFO] interface_protocol_usage
+  File: prompt_improver.utils.datetime_utils
+  Message: Module with 26 dependents should have protocol interface
+  Details: {'dependent_count': 26, 'dependents': ['prompt_improver.ml.lifecycle.model_serving_infrastructure', 'prompt_improver.ml.optimization.batch.enhanced_batch_processor', 'prompt_improver.ml.lifecycle.enhanced_model_registry', 'prompt_improver.ml.lifecycle.model_registry', 'prompt_improver.ml.automl.orchestrator', 'prompt_improver.ml.evaluation.experiment_orchestrator', 'prompt_improver.ml.lifecycle.automated_deployment_pipeline', 'prompt_improver.ml.lifecycle.model_deployment', 'prompt_improver.database.error_handling', 'prompt_improver.core.services.prompt_improvement', 'prompt_improver.mcp_server.ml_data_collector', 'prompt_improver.ml.lifecycle.experiment_tracker', 'prompt_improver.ml.lifecycle.ml_platform_integration', 'prompt_improver.ml.lifecycle.lifecycle_monitoring', 'prompt_improver.ml.optimization.batch.batch_processor', 'prompt_improver.ml.core.ml_integration', 'prompt_improver.utils.websocket_manager', 'prompt_improver.ml.lifecycle.performance_validation', 'prompt_improver.ml.models.production_registry', 'prompt_improver.core.setup.migration', 'prompt_improver.security.authentication', 'prompt_improver.mcp_server.services.concrete_services', 'prompt_improver.feedback.enhanced_feedback_collector', 'prompt_improver.database.psycopg_client', 'prompt_improver.ml.lifecycle.enhanced_experiment_orchestrator', 'prompt_improver.database.models']}
+
+[INFO] interface_protocol_usage
+  File: prompt_improver.database
+  Message: Module with 7 dependents should have protocol interface
+  Details: {'dependent_count': 7, 'dependents': ['prompt_improver.mcp_server.mcp_server', 'prompt_improver.performance.monitoring.performance_benchmark', 'prompt_improver.mcp_server.services.concrete_services', 'prompt_improver.performance.validation.performance_validation', 'prompt_improver.ml.optimization.batch.batch_processor', 'prompt_improver.performance.testing.canary_testing', 'prompt_improver.ml.core.ml_integration']}
+

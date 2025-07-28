@@ -8,21 +8,20 @@ import json
 import logging
 import os
 import psutil
-import signal
+
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from enum import Enum
 
 from .progress_preservation import ProgressPreservationManager
-from .session_resume import SessionResumeManager, SessionState
+from .session_resume import SessionResumeManager
 from .emergency_save import EmergencySaveManager
 from ...database import get_session_context
 from ...database.models import TrainingSession, TrainingIteration
-from sqlalchemy import select, update, and_, or_
-
+from sqlalchemy import select, update, and_
 
 class CrashType(Enum):
     """Enumeration of crash types for classification and recovery strategy."""
@@ -35,14 +34,12 @@ class CrashType(Enum):
     UNKNOWN_CRASH = "unknown_crash"
     GRACEFUL_EXIT = "graceful_exit"
 
-
 class CrashSeverity(Enum):
     """Enumeration of crash severity levels."""
     LOW = "low"           # Minimal data loss, easy recovery
     MEDIUM = "medium"     # Some data loss, moderate recovery effort
     HIGH = "high"         # Significant data loss, complex recovery
     CRITICAL = "critical" # Major data loss, manual intervention required
-
 
 @dataclass
 class CrashContext:
@@ -58,7 +55,6 @@ class CrashContext:
     estimated_data_loss: Dict[str, Any]
     recovery_confidence: float
 
-
 @dataclass
 class RecoveryResult:
     """Result of crash recovery operation."""
@@ -71,7 +67,6 @@ class RecoveryResult:
     recovery_duration_seconds: float
     final_system_state: Dict[str, Any]
     recommendations: List[str]
-
 
 class CrashRecoveryManager:
     """

@@ -3,7 +3,6 @@ Clean Training System Manager - Independent of MCP Server
 Implements pure training-focused lifecycle management for the 3-command CLI.
 """
 
-import asyncio
 import logging
 import math
 import sys
@@ -21,7 +20,6 @@ from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from ...ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
 from ...core.services.analytics_factory import get_analytics_interface
 from .rule_validation_service import RuleValidationService
-
 
 class TrainingSystemManager:
     """

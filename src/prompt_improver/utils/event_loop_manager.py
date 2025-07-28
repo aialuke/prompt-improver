@@ -6,9 +6,8 @@ integration when available, along with performance monitoring and optimization.
 
 import asyncio
 import logging
-import sys
 import time
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

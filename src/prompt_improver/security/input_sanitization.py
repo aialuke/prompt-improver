@@ -9,7 +9,6 @@ Implements 2025 OWASP security best practices including:
 - Event-driven security alerts
 """
 
-import asyncio
 import html
 import logging
 import math

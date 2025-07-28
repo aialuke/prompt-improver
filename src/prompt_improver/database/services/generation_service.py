@@ -6,8 +6,8 @@ performance tracking, and analytics with bulk operations support.
 
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import timedelta
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,6 @@ from ..models import (
 from ...utils.datetime_utils import naive_utc_now
 
 logger = logging.getLogger(__name__)
-
 
 class GenerationDatabaseService:
     """Database service for generation metadata and analytics"""
