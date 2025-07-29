@@ -42,7 +42,7 @@ from prompt_improver.ml.orchestration.config.orchestrator_config import Orchestr
 from prompt_improver.performance.monitoring.performance_benchmark import MCPPerformanceBenchmark
 from prompt_improver.performance.testing.ab_testing_service import ABTestingService
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from prompt_improver.utils.health_checks import HealthChecker
+from prompt_improver.performance.monitoring.health.checkers import HealthChecker
 
 logger = logging.getLogger(__name__)
 

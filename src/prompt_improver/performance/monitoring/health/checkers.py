@@ -28,7 +28,7 @@ except Exception:
     get_background_task_manager = None
 
 try:
-    from ....ml.optimization.batch.batch_processor import BatchProcessor
+    from ....ml.optimization.batch import UnifiedBatchProcessor as BatchProcessor
 
     BATCH_PROCESSOR_AVAILABLE = True
     batch_processor = BatchProcessor
@@ -563,10 +563,10 @@ class SystemResourcesHealthChecker(HealthChecker):
     async def _check_event_loop_performance(self) -> dict[str, Any]:
         """Check event loop type and performance metrics using event loop manager."""
         try:
-            from prompt_improver.utils.event_loop_manager import get_event_loop_manager
+            from prompt_improver.utils.unified_loop_manager import get_unified_loop_manager
 
             # Get event loop manager and run performance check
-            manager = get_event_loop_manager()
+            manager = get_unified_loop_manager()
 
             # Get loop information
             loop_info = manager.get_loop_info()
@@ -698,7 +698,7 @@ class RedisHealthChecker(HealthChecker):
 
             return HealthResult(
                 status=health_status,
-                component=self.name, 
+                component=self.name,
                 message=message,
                 details=details
             )
@@ -717,7 +717,7 @@ class RedisHealthChecker(HealthChecker):
     async def _basic_redis_check(self) -> HealthResult:
         """Basic Redis connectivity check as fallback"""
         try:
-            from ....utils.redis_cache import redis_client
+            # Redis functionality moved to AppConfig
             import time
 
             # Test basic connectivity

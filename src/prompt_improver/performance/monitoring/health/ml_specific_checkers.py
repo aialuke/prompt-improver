@@ -289,7 +289,7 @@ class MLDataQualityChecker(HealthChecker):
     async def _check_synthetic_data(self) -> Dict[str, Any]:
         """Check the health of synthetic data generator."""
         try:
-            from ....ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+            from ....ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 
             generator = ProductionSyntheticDataGenerator()
 

@@ -13,8 +13,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_session
-from ..database.connection import DatabaseManager
+from ..database import get_session, get_unified_manager, ManagerMode
 from ..database.models import (
     AprioriAnalysisRequest,
     AprioriAnalysisResponse,
@@ -34,27 +33,15 @@ apriori_router = APIRouter(
 )
 
 async def get_apriori_analyzer() -> AprioriAnalyzer:
-    """Dependency to get AprioriAnalyzer instance with proper database configuration"""
-    # Use secure database configuration from environment variables
-    from ..database.config import get_database_config
-
-    db_config = get_database_config()
-    # Use the secure database URL from config
-    database_url = db_config.database_url_sync
-
-    db_manager = DatabaseManager(database_url)
+    """Dependency to get AprioriAnalyzer instance with unified manager"""
+    # Use unified connection manager for sync operations
+    db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
     return AprioriAnalyzer(db_manager=db_manager)
 
 async def get_pattern_discovery() -> AdvancedPatternDiscovery:
-    """Dependency to get AdvancedPatternDiscovery instance with proper database configuration"""
-    # Use secure database configuration from environment variables
-    from ..database.config import get_database_config
-
-    db_config = get_database_config()
-    # Use the secure database URL from config
-    database_url = db_config.database_url_sync
-
-    db_manager = DatabaseManager(database_url)
+    """Dependency to get AdvancedPatternDiscovery instance with unified manager"""
+    # Use unified connection manager for sync operations
+    db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
     return AdvancedPatternDiscovery(db_manager=db_manager)
 
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)

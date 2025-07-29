@@ -884,15 +884,15 @@ def handle_network_errors(
             operation = operation_name or func.__name__
 
             # Use unified retry manager for network operations
-            from ..ml.orchestration.core.unified_retry_manager import (
+            from ..core.retry_manager import (
                 get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
             )
 
             retry_config = RetryConfig(
                 max_attempts=retry_count + 1,
                 strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
-                initial_delay_ms=int(retry_delay * 1000),
-                multiplier=backoff_multiplier,
+                base_delay=retry_delay,
+                backoff_multiplier=backoff_multiplier,
                 jitter=True,
                 retryable_errors=[RetryableErrorType.NETWORK, RetryableErrorType.TIMEOUT],
                 operation_name=operation

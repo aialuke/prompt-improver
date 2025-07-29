@@ -416,8 +416,6 @@ if PYDANTIC_AVAILABLE:
         
         # Security
         secret_key: str = Field(description="Secret key for encryption", repr=False)
-        jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
-        jwt_expiration_minutes: PositiveInt = Field(default=60, description="JWT expiration")
         
         # Rate limiting
         rate_limit_requests: PositiveInt = Field(default=100, description="Requests per window")

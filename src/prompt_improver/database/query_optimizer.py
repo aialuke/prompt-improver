@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.psycopg_client import get_psycopg_client
 from ..performance.optimization.performance_optimizer import measure_database_operation
-from prompt_improver.utils.redis_cache import RedisCache
+from prompt_improver.core.config import AppConfig  # Redis functionality RedisCache
 
 logger = logging.getLogger(__name__)
 

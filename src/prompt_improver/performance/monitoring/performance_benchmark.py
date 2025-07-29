@@ -12,7 +12,13 @@ from typing import Any, Dict, Optional
 
 import aiofiles
 
-from prompt_improver.database import get_session
+# Lazy import to avoid circular dependency
+# from prompt_improver.database import get_session
+
+def _get_database_session():
+    """Lazy import of database session to avoid circular imports."""
+    from prompt_improver.database import get_session
+    return get_session
 from prompt_improver.core.services.analytics_factory import get_analytics_interface
 from ..optimization.performance_optimizer import (
     get_performance_optimizer,

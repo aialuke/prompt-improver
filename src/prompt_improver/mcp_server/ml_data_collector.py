@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from prompt_improver.database.utils import fetch_all_rows
 
 logger = logging.getLogger(__name__)
 
@@ -57,44 +58,44 @@ class MLDataPackage:
 
 class MCPMLDataCollector:
     """MCP ML Data Collector.
-    
+
     Responsible for:
     - Collecting rule application results
     - Gathering user feedback
     - Formatting data for ML pipeline consumption
     - Maintaining data quality metrics
     - Providing clean handoff to existing ML system
-    
+
     NOT responsible for:
     - ML analysis or pattern recognition
     - Rule generation or optimization
     - Performance analytics or predictions
     """
-    
+
     def __init__(self, db_session: AsyncSession):
         """Initialize MCP ML data collector.
-        
+
         Args:
             db_session: Database session for data storage
         """
         self.db_session = db_session
-        
+
         # Data collection configuration
         self.batch_size = 100
         self.collection_interval_seconds = 300  # 5 minutes
         self.data_retention_days = 90
-        
+
         # Data quality tracking
-        self.quality_metrics = {
-            "total_collected": 0,
-            "successful_collections": 0,
-            "failed_collections": 0,
+        self.quality_metrics: Dict[str, float] = {
+            "total_collected": 0.0,
+            "successful_collections": 0.0,
+            "failed_collections": 0.0,
             "data_completeness_rate": 0.0,
             "collection_latency_ms": 0.0
         }
-        
+
         # Background collection task
-        self._collection_task: Optional[asyncio.Task] = None
+        self._collection_task: Optional[asyncio.Task[None]] = None
         self._running = False
 
     async def start_collection(self) -> None:
@@ -102,7 +103,7 @@ class MCPMLDataCollector:
         if self._running:
             logger.warning("Data collection already running")
             return
-        
+
         self._running = True
         self._collection_task = asyncio.create_task(self._collection_loop())
         logger.info("Started MCP ML data collection")
@@ -110,14 +111,14 @@ class MCPMLDataCollector:
     async def stop_collection(self) -> None:
         """Stop background data collection."""
         self._running = False
-        
+
         if self._collection_task:
             self._collection_task.cancel()
             try:
                 await self._collection_task
             except asyncio.CancelledError:
                 pass
-        
+
         logger.info("Stopped MCP ML data collection")
 
     async def collect_rule_application(
@@ -134,7 +135,7 @@ class MCPMLDataCollector:
         session_id: str
     ) -> str:
         """Collect rule application data for ML pipeline.
-        
+
         Args:
             rule_id: Applied rule identifier
             prompt_text: Original prompt
@@ -146,7 +147,7 @@ class MCPMLDataCollector:
             applied_rules: All rules applied in combination
             user_agent: User agent string
             session_id: Session identifier
-            
+
         Returns:
             Rule application ID for feedback correlation
         """
@@ -165,16 +166,16 @@ class MCPMLDataCollector:
                 session_id=session_id,
                 timestamp=aware_utc_now()
             )
-            
+
             # Store in database for ML pipeline consumption
             application_id = await self._store_rule_application(application_data)
-            
+
             # Update quality metrics
             self.quality_metrics["total_collected"] += 1
             self.quality_metrics["successful_collections"] += 1
-            
+
             return application_id
-            
+
         except Exception as e:
             logger.error(f"Failed to collect rule application data: {e}")
             self.quality_metrics["failed_collections"] += 1
@@ -190,7 +191,7 @@ class MCPMLDataCollector:
         improvement_suggestions: Optional[List[str]] = None
     ) -> str:
         """Collect user feedback for ML pipeline.
-        
+
         Args:
             rule_application_id: Associated rule application ID
             user_rating: User rating (1-5 scale)
@@ -198,7 +199,7 @@ class MCPMLDataCollector:
             satisfaction_score: Satisfaction rating (0-1 scale)
             feedback_text: Optional feedback text
             improvement_suggestions: Optional improvement suggestions
-            
+
         Returns:
             Feedback ID
         """
@@ -214,12 +215,12 @@ class MCPMLDataCollector:
                 improvement_suggestions=improvement_suggestions or [],
                 timestamp=aware_utc_now()
             )
-            
+
             # Store in database for ML pipeline consumption
             feedback_id = await self._store_user_feedback(feedback_data)
-            
+
             return feedback_id
-            
+
         except Exception as e:
             logger.error(f"Failed to collect user feedback: {e}")
             raise
@@ -230,31 +231,31 @@ class MCPMLDataCollector:
         min_samples: int = 10
     ) -> Optional[MLDataPackage]:
         """Prepare data package for ML pipeline consumption.
-        
+
         Args:
             hours_back: Hours of data to include
             min_samples: Minimum samples required
-            
+
         Returns:
             MLDataPackage for ML pipeline or None if insufficient data
         """
         try:
             start_time = aware_utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
             start_time = start_time.replace(hour=start_time.hour - hours_back)
-            
+
             # Collect rule applications
             rule_applications = await self._get_rule_applications(start_time)
-            
+
             # Collect user feedback
             user_feedback = await self._get_user_feedback(start_time)
-            
+
             if len(rule_applications) < min_samples:
                 logger.info(f"Insufficient data for ML package: {len(rule_applications)} < {min_samples}")
                 return None
-            
+
             # Calculate data quality metrics
             data_quality = self._calculate_data_quality(rule_applications, user_feedback)
-            
+
             # Create ML data package
             ml_package = MLDataPackage(
                 rule_applications=rule_applications,
@@ -266,10 +267,10 @@ class MCPMLDataCollector:
                 data_quality_metrics=data_quality,
                 total_samples=len(rule_applications)
             )
-            
+
             logger.info(f"Prepared ML data package with {len(rule_applications)} applications and {len(user_feedback)} feedback items")
             return ml_package
-            
+
         except Exception as e:
             logger.error(f"Failed to prepare ML data package: {e}")
             return None
@@ -280,14 +281,14 @@ class MCPMLDataCollector:
             try:
                 # Prepare data package for ML pipeline
                 ml_package = await self.prepare_ml_data_package()
-                
+
                 if ml_package:
                     # Signal ML pipeline (this would trigger existing ML system)
                     await self._signal_ml_pipeline(ml_package)
-                
+
                 # Wait for next collection interval
                 await asyncio.sleep(self.collection_interval_seconds)
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -295,124 +296,121 @@ class MCPMLDataCollector:
                 await asyncio.sleep(60)  # Wait before retrying
 
     async def _store_rule_application(self, data: RuleApplicationData) -> str:
-        """Store rule application data in database."""
+        """Store rule application data in database using existing schema."""
         application_id = f"app_{int(time.time() * 1000)}"
-        
+
+        # Use prompt_improvement_sessions table which exists for MCP feedback collection
         query = text("""
-            INSERT INTO rule_performance (
-                application_id, rule_id, prompt_text, enhanced_prompt,
-                improvement_score, confidence_level, response_time_ms,
-                prompt_characteristics, applied_rules, user_agent,
-                session_id, created_at
+            INSERT INTO prompt_improvement_sessions (
+                original_prompt, enhanced_prompt, applied_rules,
+                response_time_ms, agent_type, session_timestamp,
+                anonymized_user_hash, created_at
             ) VALUES (
-                :application_id, :rule_id, :prompt_text, :enhanced_prompt,
-                :improvement_score, :confidence_level, :response_time_ms,
-                :prompt_characteristics, :applied_rules, :user_agent,
-                :session_id, :created_at
-            )
+                :original_prompt, :enhanced_prompt, :applied_rules,
+                :response_time_ms, :agent_type, :session_timestamp,
+                :anonymized_user_hash, :created_at
+            ) RETURNING id
         """)
-        
-        await self.db_session.execute(query, {
-            "application_id": application_id,
-            "rule_id": data.rule_id,
-            "prompt_text": data.prompt_text,
+
+        result = await self.db_session.execute(query, {
+            "original_prompt": data.prompt_text,
             "enhanced_prompt": data.enhanced_prompt,
-            "improvement_score": data.improvement_score,
-            "confidence_level": data.confidence_level,
-            "response_time_ms": data.response_time_ms,
-            "prompt_characteristics": data.prompt_characteristics,
             "applied_rules": data.applied_rules,
-            "user_agent": data.user_agent,
-            "session_id": data.session_id,
+            "response_time_ms": int(data.response_time_ms),
+            "agent_type": data.user_agent,
+            "session_timestamp": data.timestamp,
+            "anonymized_user_hash": data.session_id,  # Use session_id as hash
             "created_at": data.timestamp
         })
-        
+
         await self.db_session.commit()
-        return application_id
+        row = result.first()
+        return str(row[0]) if row else application_id
 
     async def _store_user_feedback(self, data: UserFeedbackData) -> str:
-        """Store user feedback data in database."""
+        """Store user feedback data in database using existing schema."""
+        # Use user_feedback table which exists in the schema
         query = text("""
-            INSERT INTO feedback_collection (
-                feedback_id, rule_application_id, user_rating,
-                effectiveness_score, satisfaction_score, feedback_text,
-                improvement_suggestions, created_at
+            INSERT INTO user_feedback (
+                session_id, user_rating, feedback_text,
+                improvement_areas, applied_rules, created_at
             ) VALUES (
-                :feedback_id, :rule_application_id, :user_rating,
-                :effectiveness_score, :satisfaction_score, :feedback_text,
-                :improvement_suggestions, :created_at
-            )
+                :session_id, :user_rating, :feedback_text,
+                :improvement_areas, :applied_rules, :created_at
+            ) RETURNING id
         """)
-        
-        await self.db_session.execute(query, {
-            "feedback_id": data.feedback_id,
-            "rule_application_id": data.rule_application_id,
-            "user_rating": data.user_rating,
-            "effectiveness_score": data.effectiveness_score,
-            "satisfaction_score": data.satisfaction_score,
+
+        result = await self.db_session.execute(query, {
+            "session_id": data.rule_application_id,
+            "user_rating": int(data.user_rating),
             "feedback_text": data.feedback_text,
-            "improvement_suggestions": data.improvement_suggestions,
+            "improvement_areas": data.improvement_suggestions,
+            "applied_rules": [data.rule_application_id],  # Store as array
             "created_at": data.timestamp
         })
-        
+
         await self.db_session.commit()
-        return data.feedback_id
+        row = result.first()
+        return str(row[0]) if row else data.feedback_id
 
     async def _get_rule_applications(self, start_time: datetime) -> List[RuleApplicationData]:
-        """Get rule applications from database."""
+        """Get rule applications from database using existing schema."""
         query = text("""
-            SELECT * FROM rule_performance
+            SELECT id, original_prompt, enhanced_prompt, applied_rules,
+                   response_time_ms, agent_type, anonymized_user_hash,
+                   session_timestamp, created_at
+            FROM prompt_improvement_sessions
             WHERE created_at >= :start_time
             ORDER BY created_at DESC
         """)
-        
-        result = await self.db_session.execute(query, {"start_time": start_time})
-        rows = result.fetchall()
-        
-        applications = []
+
+        rows = await fetch_all_rows(self.db_session, query, {"start_time": start_time})
+
+        applications: List[RuleApplicationData] = []
         for row in rows:
-            row_dict = dict(row._mapping)
+            # Use proper row attribute access instead of protected _mapping
             applications.append(RuleApplicationData(
-                rule_id=row_dict["rule_id"],
-                prompt_text=row_dict["prompt_text"],
-                enhanced_prompt=row_dict["enhanced_prompt"],
-                improvement_score=row_dict["improvement_score"],
-                confidence_level=row_dict["confidence_level"],
-                response_time_ms=row_dict["response_time_ms"],
-                prompt_characteristics=row_dict["prompt_characteristics"],
-                applied_rules=row_dict["applied_rules"],
-                user_agent=row_dict["user_agent"],
-                session_id=row_dict["session_id"],
-                timestamp=row_dict["created_at"]
+                rule_id=str(row.id),  # Use session ID as rule ID
+                prompt_text=row.original_prompt,
+                enhanced_prompt=row.enhanced_prompt,
+                improvement_score=0.8,  # Default score since not stored
+                confidence_level=0.9,   # Default confidence since not stored
+                response_time_ms=float(row.response_time_ms),
+                prompt_characteristics={},  # Empty since not stored in this table
+                applied_rules=row.applied_rules if row.applied_rules else [],
+                user_agent=row.agent_type or "unknown",
+                session_id=row.anonymized_user_hash or str(row.id),
+                timestamp=row.created_at
             ))
-        
+
         return applications
 
     async def _get_user_feedback(self, start_time: datetime) -> List[UserFeedbackData]:
-        """Get user feedback from database."""
+        """Get user feedback from database using existing schema."""
         query = text("""
-            SELECT * FROM feedback_collection
+            SELECT id, session_id, user_rating, feedback_text,
+                   improvement_areas, applied_rules, created_at
+            FROM user_feedback
             WHERE created_at >= :start_time
             ORDER BY created_at DESC
         """)
-        
-        result = await self.db_session.execute(query, {"start_time": start_time})
-        rows = result.fetchall()
-        
-        feedback_list = []
+
+        rows = await fetch_all_rows(self.db_session, query, {"start_time": start_time})
+
+        feedback_list: List[UserFeedbackData] = []
         for row in rows:
-            row_dict = dict(row._mapping)
+            # Use proper row attribute access instead of protected _mapping
             feedback_list.append(UserFeedbackData(
-                feedback_id=row_dict["feedback_id"],
-                rule_application_id=row_dict["rule_application_id"],
-                user_rating=row_dict["user_rating"],
-                effectiveness_score=row_dict["effectiveness_score"],
-                satisfaction_score=row_dict["satisfaction_score"],
-                feedback_text=row_dict["feedback_text"],
-                improvement_suggestions=row_dict["improvement_suggestions"],
-                timestamp=row_dict["created_at"]
+                feedback_id=str(row.id),
+                rule_application_id=row.session_id,
+                user_rating=float(row.user_rating),
+                effectiveness_score=float(row.user_rating) / 5.0,  # Convert 1-5 to 0-1 scale
+                satisfaction_score=float(row.user_rating) / 5.0,   # Convert 1-5 to 0-1 scale
+                feedback_text=row.feedback_text,
+                improvement_suggestions=row.improvement_areas if row.improvement_areas else [],
+                timestamp=row.created_at
             ))
-        
+
         return feedback_list
 
     def _calculate_data_quality(
@@ -423,20 +421,20 @@ class MCPMLDataCollector:
         """Calculate data quality metrics."""
         if not applications:
             return {"completeness": 0.0, "feedback_rate": 0.0, "avg_confidence": 0.0}
-        
+
         # Completeness (non-null required fields)
         complete_applications = sum(
             1 for app in applications
-            if app.prompt_text and app.enhanced_prompt and app.improvement_score is not None
+            if app.prompt_text and app.enhanced_prompt and app.improvement_score > 0
         )
         completeness = complete_applications / len(applications)
-        
+
         # Feedback rate
         feedback_rate = len(feedback) / len(applications) if applications else 0.0
-        
+
         # Average confidence
         avg_confidence = sum(app.confidence_level for app in applications) / len(applications)
-        
+
         return {
             "completeness": completeness,
             "feedback_rate": feedback_rate,
@@ -445,40 +443,26 @@ class MCPMLDataCollector:
 
     async def _signal_ml_pipeline(self, ml_package: MLDataPackage) -> None:
         """Signal ML pipeline with new data package.
-        
+
         This is where MCP hands off data to the existing ML system.
         MCP's responsibility ends here - no ML operations performed.
+
+        For now, we just log the package availability since the ML pipeline
+        will read directly from the existing tables.
         """
         try:
-            # Store ML package for existing ML system consumption
             package_id = f"ml_package_{int(time.time())}"
-            
-            query = text("""
-                INSERT INTO ml_data_packages (
-                    package_id, rule_applications_count, feedback_count,
-                    collection_start, collection_end, data_quality_metrics,
-                    created_at, processed
-                ) VALUES (
-                    :package_id, :applications_count, :feedback_count,
-                    :collection_start, :collection_end, :quality_metrics,
-                    :created_at, false
-                )
-            """)
-            
-            await self.db_session.execute(query, {
-                "package_id": package_id,
-                "applications_count": len(ml_package.rule_applications),
-                "feedback_count": len(ml_package.user_feedback),
-                "collection_start": ml_package.collection_period["start"],
-                "collection_end": ml_package.collection_period["end"],
-                "quality_metrics": ml_package.data_quality_metrics,
-                "created_at": aware_utc_now()
-            })
-            
-            await self.db_session.commit()
-            
-            logger.info(f"Signaled ML pipeline with package {package_id}")
-            
+
+            logger.info(
+                f"ML data package {package_id} ready: "
+                f"{len(ml_package.rule_applications)} applications, "
+                f"{len(ml_package.user_feedback)} feedback items, "
+                f"quality: {ml_package.data_quality_metrics}"
+            )
+
+            # The ML pipeline can read directly from prompt_improvement_sessions
+            # and user_feedback tables using the time range in ml_package.collection_period
+
         except Exception as e:
             logger.error(f"Failed to signal ML pipeline: {e}")
 

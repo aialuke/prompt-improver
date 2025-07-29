@@ -99,7 +99,7 @@ class EnvironmentConfig(BaseModel):
         return self.environment == "development"
 
 class DatabaseConfig(BaseModel):
-    """PostgreSQL database configuration with connection pooling."""
+    """PostgreSQL database configuration with connection pooling and JSONB optimization."""
     
     # Connection settings
     host: str = Field(
@@ -292,13 +292,17 @@ class DatabaseConfig(BaseModel):
     
     @property
     def database_url(self) -> str:
-        """Generate async PostgreSQL connection URL."""
-        return f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Generate async PostgreSQL connection URL with JSONB optimization."""
+        base_url = f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        # Add JSONB optimizations for 2025 best practices
+        return f"{base_url}?options=-c%20default_text_search_config=pg_catalog.english"
     
     @property
     def database_url_sync(self) -> str:
-        """Generate sync PostgreSQL connection URL."""
-        return f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Generate sync PostgreSQL connection URL with JSONB optimization."""
+        base_url = f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        # Add JSONB optimizations for 2025 best practices
+        return f"{base_url}?options=-c%20default_text_search_config=pg_catalog.english"
 
 class RedisConfig(BaseModel):
     """Redis configuration for caching and rate limiting."""
@@ -581,19 +585,6 @@ class APIConfig(BaseModel):
         validation_alias="API_SSL_KEY_PATH"
     )
     
-    # Authentication
-    jwt_secret_key: Optional[str] = Field(
-        default=None,
-        description="JWT secret key",
-        validation_alias="JWT_SECRET_KEY"
-    )
-    jwt_expiry_hours: int = Field(
-        default=24,
-        description="JWT token expiry in hours",
-        validation_alias="JWT_EXPIRY_HOURS",
-        ge=1,
-        le=168
-    )
 
 class MCPConfig(BaseModel):
     """MCP Server specific configuration for batch processing and session management."""
@@ -953,6 +944,18 @@ class AppConfig(BaseSettings):
     - Production-ready validation
     """
     
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        env_ignore_empty=True,
+        env_nested_delimiter="__"  # Enable nested parsing: DATABASE__HOST -> database.host
+    )
+    
+    # Nested Configuration Models (2025 Best Practice - Post-initialization)
+    # These are initialized after the main config to avoid environment parsing conflicts
+    
     # Environment Settings (flattened for easier env var access)
     env_environment: str = Field(
         default="development",
@@ -1042,8 +1045,6 @@ class AppConfig(BaseSettings):
     api_enable_https: bool = Field(default=False, validation_alias="API_ENABLE_HTTPS")
     api_ssl_cert_path: Optional[Path] = Field(default=None, validation_alias="API_SSL_CERT_PATH")
     api_ssl_key_path: Optional[Path] = Field(default=None, validation_alias="API_SSL_KEY_PATH")
-    api_jwt_secret_key: Optional[str] = Field(default=None, validation_alias="JWT_SECRET_KEY")
-    api_jwt_expiry_hours: int = Field(default=24, validation_alias="JWT_EXPIRY_HOURS", ge=1, le=168)
     
     # MCP Settings (flattened)
     mcp_batch_size: int = Field(default=10, validation_alias="MCP_BATCH_SIZE", ge=1, le=100)
@@ -1152,8 +1153,6 @@ class AppConfig(BaseSettings):
         if self.is_production:
             if not self.env_secret_key:
                 raise ValueError("SECRET_KEY is required in production")
-            if not self.api_jwt_secret_key:
-                raise ValueError("JWT_SECRET_KEY is required in production")
             if self.env_debug:
                 logger.warning("Debug mode enabled in production - consider disabling")
         
@@ -1287,8 +1286,6 @@ class AppConfig(BaseSettings):
             enable_https=self.api_enable_https,
             ssl_cert_path=self.api_ssl_cert_path,
             ssl_key_path=self.api_ssl_key_path,
-            jwt_secret_key=self.api_jwt_secret_key,
-            jwt_expiry_hours=self.api_jwt_expiry_hours
         )
     
     @property
@@ -1667,6 +1664,94 @@ def get_config_summary() -> Dict[str, Any]:
             "model_serving": config.ml_model_serving_enabled,
         }
     }
+
+# =============================================================================
+# Compatibility Layer for Migration
+# =============================================================================
+
+def get_database_config() -> DatabaseConfig:
+    """Get database configuration instance (compatibility function)."""
+    config = get_config()
+    return config.database
+
+def get_redis_config() -> RedisConfig:
+    """Get Redis configuration instance (compatibility function)."""
+    config = get_config()
+    return config.redis
+
+# Legacy function aliases for smooth migration
+def get_config_manager():
+    """Get configuration manager (legacy compatibility)."""
+    return _config_manager
+
+# =============================================================================
+# Redis Cache Configuration Integration
+# =============================================================================
+
+class LegacyRedisConfig(BaseModel):
+    """Legacy Redis configuration for compatibility with utils.redis_cache."""
+    
+    host: str = Field(default="localhost", description="Redis server hostname")
+    port: int = Field(default=6379, ge=1, le=65535, description="Redis server port")
+    cache_db: int = Field(default=0, ge=0, le=15, description="Redis database number for cache")
+    pool_size: int = Field(default=10, ge=1, description="Connection pool size")
+    max_connections: int = Field(default=50, ge=1, description="Maximum connections")
+    connect_timeout: int = Field(default=5, ge=0, description="Connection timeout in seconds")
+    socket_timeout: int = Field(default=5, ge=0, description="Socket timeout in seconds")
+    socket_keepalive: bool = Field(default=True, description="Enable socket keep-alive")
+    socket_keepalive_options: dict = Field(default_factory=dict, description="Socket keep-alive options")
+    use_ssl: bool = Field(default=False, description="Use SSL connection")
+    monitoring_enabled: bool = Field(default=True, description="Enable monitoring")
+    
+    @classmethod
+    def from_core_config(cls, redis_config: RedisConfig) -> 'LegacyRedisConfig':
+        """Create legacy config from core Redis config."""
+        return cls(
+            host=redis_config.host,
+            port=redis_config.port,
+            cache_db=redis_config.database,
+            pool_size=min(redis_config.max_connections, 10),
+            max_connections=redis_config.max_connections,
+            connect_timeout=redis_config.connection_timeout,
+            socket_timeout=redis_config.socket_timeout,
+            socket_keepalive=True,
+            socket_keepalive_options={},
+            use_ssl=False,  # Add to core config if needed
+            monitoring_enabled=True
+        )
+    
+    @classmethod
+    def load_from_yaml(cls, path: str) -> 'LegacyRedisConfig':
+        """Load from YAML (compatibility method)."""
+        config = get_config()
+        return cls.from_core_config(config.redis)
+    
+    def validate_config(self) -> None:
+        """Validate configuration (compatibility method)."""
+        pass  # Validation is handled by Pydantic in core config
+
+# =============================================================================
+# Database Configuration Extensions
+# =============================================================================
+
+# Additional database configuration methods for compatibility
+def extend_database_config():
+    """Extend DatabaseConfig with additional methods for compatibility."""
+    
+    def psycopg_connection_string(self) -> str:
+        """Generate psycopg3 connection string for direct psycopg.connect() usage."""
+        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+    
+    def database_url_sync(self) -> str:
+        """Generate synchronous PostgreSQL connection URL for migrations."""
+        return self.database_url
+    
+    # Add methods to DatabaseConfig class
+    DatabaseConfig.psycopg_connection_string = property(psycopg_connection_string)
+    DatabaseConfig.database_url_sync = property(database_url_sync)
+
+# Apply extensions
+extend_database_config()
 
 # Example usage and testing
 if __name__ == "__main__":

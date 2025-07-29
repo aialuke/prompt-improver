@@ -16,8 +16,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from prompt_improver.ml.preprocessing.synthetic_data_generator import (
+from prompt_improver.ml.preprocessing.orchestrator import (
     ProductionSyntheticDataGenerator,
+    QualityMetrics,
+)
+from prompt_improver.ml.preprocessing.generators import (
     HybridGenerationSystem,
     MethodPerformanceTracker,
     GenerationMethodMetrics,

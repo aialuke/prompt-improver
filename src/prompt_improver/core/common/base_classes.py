@@ -62,41 +62,41 @@ class BaseConfigModel(BaseModel):
         use_enum_values = True  # Use enum values in output
     
     @classmethod
-    def validate_port(cls, v: int, field_name: str = "port") -> int:
+    def validate_port(cls, v: Any, field_name: str = "port") -> int:
         """Common port validation."""
         if not isinstance(v, int) or v < 1 or v > 65535:
             raise ValueError(f"{field_name} must be between 1 and 65535, got {v}")
         return v
     
     @classmethod
-    def validate_timeout(cls, v: Union[int, float], field_name: str = "timeout") -> Union[int, float]:
+    def validate_timeout(cls, v: Any, field_name: str = "timeout") -> Union[int, float]:
         """Common timeout validation."""
         if not isinstance(v, (int, float)) or v <= 0:
             raise ValueError(f"{field_name} must be positive, got {v}")
         return v
     
     @classmethod
-    def validate_ratio(cls, v: float, field_name: str = "ratio") -> float:
+    def validate_ratio(cls, v: Any, field_name: str = "ratio") -> float:
         """Common ratio validation."""
         if not isinstance(v, (int, float)) or v < 0 or v > 1:
             raise ValueError(f"{field_name} must be between 0 and 1, got {v}")
-        return v
+        return float(v)
     
     @classmethod
-    def validate_percentage(cls, v: float, field_name: str = "percentage") -> float:
+    def validate_percentage(cls, v: Any, field_name: str = "percentage") -> float:
         """Common percentage validation."""
         if not isinstance(v, (int, float)) or v < 0 or v > 100:
             raise ValueError(f"{field_name} must be between 0 and 100, got {v}")
-        return v
+        return float(v)
 
-class BaseService(LoggerMixin, ConfigMixin, MetricsMixin, ABC):
+class BaseService(ConfigMixin, MetricsMixin, ABC):
     """
     Base service class with common patterns.
     
     Consolidates common service initialization and lifecycle patterns.
     """
     
-    def __init__(self, name: str, **kwargs):
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.name = name
         self.state = ServiceState.INITIALIZING
@@ -154,24 +154,25 @@ class BaseService(LoggerMixin, ConfigMixin, MetricsMixin, ABC):
     
     def get_status(self) -> Dict[str, Any]:
         """Get service status information."""
+        uptime = self.get_uptime()
         return {
             "name": self.name,
             "state": self.state.value,
-            "uptime_seconds": self.get_uptime().total_seconds() if self.get_uptime() else None,
+            "uptime_seconds": uptime.total_seconds() if uptime is not None else None,
             "error_count": self.error_count,
             "last_error": self.last_error,
             "config_status": self.config_status.success if hasattr(self, 'config_status') else None,
             "metrics_available": self.metrics_available
         }
 
-class BaseHealthChecker(LoggerMixin, MetricsMixin, ABC):
+class BaseHealthChecker(MetricsMixin, ABC):
     """
     Base health checker class with common patterns.
     
     Consolidates duplicate health checking patterns across monitoring modules.
     """
     
-    def __init__(self, name: str, timeout: float = 5.0, critical: bool = True, **kwargs):
+    def __init__(self, name: str, timeout: float = 5.0, critical: bool = True, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.name = name
         self.timeout = timeout
@@ -300,10 +301,10 @@ class BaseMonitor(BaseService):
     Consolidates duplicate monitoring initialization and operation patterns.
     """
     
-    def __init__(self, name: str, check_interval: float = 30.0, **kwargs):
+    def __init__(self, name: str, check_interval: float = 30.0, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
         self.check_interval = check_interval
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.monitoring_task: Optional[asyncio.Task[None]] = None
         self.health_checkers: Dict[str, BaseHealthChecker] = {}
         self.monitoring_enabled = True
     
@@ -372,12 +373,13 @@ class BaseMonitor(BaseService):
                 critical=True
             )
         
+        uptime = self.get_uptime()
         return HealthCheckResult(
             status=HealthStatus.HEALTHY,
             message="Monitor is running normally",
             details={
                 "checkers_count": len(self.health_checkers),
-                "uptime_seconds": self.get_uptime().total_seconds() if self.get_uptime() else 0
+                "uptime_seconds": uptime.total_seconds() if uptime is not None else 0
             },
             timestamp=datetime.now(UTC),
             duration_ms=0,
@@ -403,7 +405,7 @@ class BaseMonitor(BaseService):
     
     async def get_all_health_results(self) -> Dict[str, HealthCheckResult]:
         """Get health check results for all registered checkers."""
-        results = {}
+        results: Dict[str, HealthCheckResult] = {}
         
         for name, checker in self.health_checkers.items():
             try:

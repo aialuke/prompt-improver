@@ -45,10 +45,10 @@ except ImportError:
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ....database.connection import DatabaseManager
+from ....database import get_unified_manager, ManagerMode
 from ....database.models import RuleMetadata, RulePerformance
 from .apriori_analyzer import AprioriAnalyzer, AprioriConfig
-from ....utils.redis_cache import cached
+# Caching functionality moved to AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class AdvancedPatternDiscovery:
     - Statistical validation with confidence intervals
     """
 
-    def __init__(self, db_manager: DatabaseManager | None = None):
+    def __init__(self, db_manager = None):
         """Initialize AdvancedPatternDiscovery with lazy initialization support.
         
         Args:
@@ -121,7 +121,7 @@ class AdvancedPatternDiscovery:
         self._configure_hdbscan_performance()
 
         # Lazy initialization attributes
-        self._db_manager = db_manager
+        self._db_manager = db_manager or get_unified_manager(ManagerMode.ML_TRAINING)
         self._apriori_analyzer = None
         self._training_loader = None
         self._db_manager_lock = threading.Lock()
@@ -131,13 +131,13 @@ class AdvancedPatternDiscovery:
         logger.info("AdvancedPatternDiscovery initialized with lazy loading strategy")
 
     @property
-    def db_manager(self) -> DatabaseManager | None:
+    def db_manager(self):
         """Get DatabaseManager instance with lazy initialization."""
         if self._db_manager is None:
             with self._db_manager_lock:
                 if self._db_manager is None:
                     try:
-                        self._db_manager = DatabaseManager()
+                        self._db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
                         logger.info("DatabaseManager created via lazy initialization")
                     except Exception as e:
                         logger.error(f"Failed to create DatabaseManager: {e}")
@@ -2166,7 +2166,7 @@ class AdvancedPatternDiscovery:
 # Singleton instance for easy access
 _advanced_pattern_discovery = None
 
-async def get_advanced_pattern_discovery(db_manager: DatabaseManager | None = None) -> AdvancedPatternDiscovery:
+async def get_advanced_pattern_discovery(db_manager = None) -> AdvancedPatternDiscovery:
     """Get singleton AdvancedPatternDiscovery instance with lazy initialization support.
     
     Args:

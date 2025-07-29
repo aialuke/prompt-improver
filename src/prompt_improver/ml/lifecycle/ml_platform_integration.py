@@ -43,7 +43,7 @@ from .model_serving_infrastructure import (
 )
 
 # Phase 1 Integrations
-from prompt_improver.ml.optimization.batch.enhanced_batch_processor import EnhancedBatchProcessor
+from prompt_improver.ml.optimization.batch import UnifiedBatchProcessor
 from prompt_improver.performance.testing.ab_testing_service import ABTestingService
 from prompt_improver.database.optimization_integration import DatabaseOptimizationManager
 from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor
@@ -184,7 +184,7 @@ class MLPlatformIntegration:
         self.model_server: Optional[ProductionModelServer] = None
         
         # Phase 1 Integration Components
-        self.batch_processor: Optional[EnhancedBatchProcessor] = None
+        self.batch_processor: Optional[UnifiedBatchProcessor] = None
         self.ab_testing_service: Optional[ABTestingService] = None
         self.database_manager: Optional[DatabaseOptimizationManager] = None
         self.performance_monitor: Optional[PerformanceMonitor] = None
@@ -288,7 +288,7 @@ class MLPlatformIntegration:
         try:
             # Enhanced Batch Processor (Phase 1)
             logger.info("Initializing Enhanced Batch Processor integration...")
-            self.batch_processor = EnhancedBatchProcessor()
+            self.batch_processor = UnifiedBatchProcessor()
             
             # A/B Testing Service (Phase 1)
             logger.info("Initializing A/B Testing Service integration...")

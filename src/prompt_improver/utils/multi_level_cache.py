@@ -17,7 +17,23 @@ from typing import Any, Dict, Optional
 from collections import OrderedDict
 from functools import wraps
 
-from prompt_improver.utils.redis_cache import RedisCache
+from prompt_improver.core.config import AppConfig
+
+# Temporary fallback: disable Redis cache to fix circular imports
+class RedisCache:
+    """Temporary fallback Redis cache implementation."""
+
+    async def get(self, key: str) -> Optional[bytes]:
+        """Fallback get - always returns None (cache miss)."""
+        return None
+
+    async def set(self, key: str, value: bytes, expire: Optional[int] = None) -> bool:
+        """Fallback set - always returns True but doesn't store."""
+        return True
+
+    async def delete(self, key: str) -> bool:
+        """Fallback delete - always returns True."""
+        return True
 
 # Import performance optimizer with graceful fallback to avoid circular imports
 try:

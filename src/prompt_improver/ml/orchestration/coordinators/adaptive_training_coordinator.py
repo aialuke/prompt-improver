@@ -18,9 +18,9 @@ from ..core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from ...analysis.performance_gap_analyzer import PerformanceGapAnalyzer, GapAnalysisResult
 from ...analysis.generation_strategy_analyzer import GenerationStrategyAnalyzer, StrategyRecommendation
 from ...analysis.difficulty_distribution_analyzer import DifficultyDistributionAnalyzer, DifficultyProfile
-from ...preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from ...preprocessing.orchestrator import ProductionSyntheticDataGenerator
 from ...analytics.generation_analytics import GenerationHistoryTracker, GenerationAnalytics
-from ...optimization.batch.dynamic_batch_optimizer import DynamicBatchOptimizer, BatchOptimizationConfig
+from ...optimization.batch import UnifiedBatchProcessor, UnifiedBatchConfig, ProcessingStrategy
 
 
 @dataclass
@@ -69,7 +69,7 @@ class AdaptiveTrainingCoordinator:
         # Week 6 enhancements
         self.generation_tracker: Optional[GenerationHistoryTracker] = None
         self.generation_analytics: Optional[GenerationAnalytics] = None
-        self.batch_optimizer: Optional[DynamicBatchOptimizer] = None
+        self.batch_optimizer: Optional[UnifiedBatchProcessor] = None
 
         # Initialize Week 6 features if database session provided
         if db_session:
@@ -77,15 +77,13 @@ class AdaptiveTrainingCoordinator:
             self.generation_analytics = GenerationAnalytics(db_session)
             self.data_generator.enable_history_tracking(db_session)
 
-            # Configure dynamic batch optimization
-            batch_config = BatchOptimizationConfig(
-                min_batch_size=50,
-                max_batch_size=1000,
-                initial_batch_size=200,
-                memory_limit_mb=4000.0,  # 4GB for training
-                efficiency_threshold=0.75
+            # Configure unified batch processing
+            batch_config = UnifiedBatchConfig(
+                strategy=ProcessingStrategy.OPTIMIZED,
+                max_memory_mb=4000.0,  # 4GB for training
+                enable_optimization=True
             )
-            self.batch_optimizer = DynamicBatchOptimizer(batch_config)
+            self.batch_optimizer = UnifiedBatchProcessor(batch_config)
 
         # Training state
         self.active_sessions: Dict[str, AdaptiveTrainingIteration] = {}

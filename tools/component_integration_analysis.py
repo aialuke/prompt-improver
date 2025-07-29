@@ -142,7 +142,7 @@ async def analyze_by_tier(expected: Set[str], actual: Set[str], missing: Set[str
             "MultiLevelCache", "ResourceManager", "HealthService", "MLResourceManagerHealthChecker",
             "RedisHealthMonitor", "DatabasePerformanceMonitor", "DatabaseConnectionOptimizer",
             "PreparedStatementCache", "TypeSafePsycopgClient", "APESServiceManager",
-            "UnifiedRetryManager", "SecureKeyManager", "FernetKeyManager", "RobustnessEvaluator",
+            "UnifiedRetryManager", "UnifiedKeyManager", "RobustnessEvaluator",
             "RetryManager", "ABTestingWidget", "ServiceControlWidget", "SystemOverviewWidget"
         ],
         "Tier 5 (Infrastructure & Model Management)": [

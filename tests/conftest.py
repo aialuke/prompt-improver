@@ -163,7 +163,7 @@ async def real_db_session(test_db_engine):
 @pytest.fixture(scope="function")
 async def test_db_engine():
     """Create test database engine using existing PostgreSQL configuration with retry logic."""
-    from prompt_improver.database.config import DatabaseConfig
+    from prompt_improver.core.config import AppConfig
     from tests.database_helpers import (
         create_test_engine_with_retry,
         cleanup_test_database,
@@ -171,7 +171,7 @@ async def test_db_engine():
     )
     import uuid
 
-    config = DatabaseConfig()
+    config = AppConfig().database
     postgres_ready = await wait_for_postgres_async(
         host=config.postgres_host,
         port=config.postgres_port,
@@ -272,10 +272,7 @@ async def test_db_session(test_db_engine):
                 pass
 
 
-@pytest.fixture
-async def mock_db_session(test_db_session):
-    """Alias for backward compatibility with tests expecting mock_db_session."""
-    return test_db_session
+# Removed backward compatibility alias - use test_db_session directly
 
 
 @pytest.fixture
@@ -738,7 +735,7 @@ def sample_prompt_sessions():
     ]
 
 
-# Legacy fixture for backward compatibility
+# Modern fixture for rule metadata testing
 @pytest.fixture
 def sample_rule_metadata():
     """Sample rule metadata for testing with unique IDs per test."""

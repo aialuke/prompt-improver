@@ -94,7 +94,7 @@ class TypeSafePsycopgClient:
         self.metrics = QueryMetrics()
 
         # 2025 Enhancement: Use unified retry manager
-        from ..ml.orchestration.core.unified_retry_manager import get_retry_manager
+        from ..core.retry_manager import get_retry_manager
         self.retry_manager = get_retry_manager()
         self.retry_config = get_default_database_retry_config()
 

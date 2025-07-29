@@ -1,0 +1,120 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+CHANGELOG*
+LICENSE*
+
+# Development and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment and configuration
+.env*
+.local
+config/local_*
+
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing artifacts
+.tox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+test-results/
+reports/
+
+# ML and data artifacts
+mlruns/
+.mlflow/
+*.pkl
+*.joblib
+*.model
+*.h5
+*.ckpt
+*.pth
+experiments/
+models/
+checkpoints/
+wandb/
+data/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Database files
+*.sqlite3
+*.db
+*.db-journal
+
+# Logs
+logs/
+*.log
+dev-debug.log
+
+# Temporary files
+tmp/
+temp/
+*.bak
+*.backup
+*.old
+*.save
+*.orig
+*.rej
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Security and secrets
+secrets/
+*.pem
+*.key
+*.crt

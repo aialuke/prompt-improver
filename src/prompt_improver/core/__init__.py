@@ -8,7 +8,7 @@ from .interfaces.datetime_service import DateTimeServiceProtocol, MockDateTimeSe
 from .services.datetime_service import DateTimeService
 from .di.container import DIContainer, get_datetime_service, get_container
 
-# Legacy services - import with proper error handling
+# Core services - import with proper error handling
 try:
     from .services.prompt_improvement import PromptImprovementService
     from .services.startup import (
@@ -52,7 +52,7 @@ __all__: list[str] = [
     "DIContainer",
     "get_datetime_service",
     "get_container",
-    # Legacy services (may be None if imports fail)
+    # Services (may be None if imports fail)
     "PromptImprovementService",
     "StartupOrchestrator",
     "init_startup_tasks",

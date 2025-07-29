@@ -58,7 +58,10 @@ class PerformanceValidator:
     def __init__(self):
         self.benchmark = MCPPerformanceBenchmark()
         self.optimizer = get_performance_optimizer()
-        self.monitor = get_performance_monitor()
+        self.monitor = get_performance_monitor(
+            enable_anomaly_detection=True,
+            enable_adaptive_thresholds=True
+        )
         self.target_response_time_ms = 200
 
     async def run_comprehensive_validation(

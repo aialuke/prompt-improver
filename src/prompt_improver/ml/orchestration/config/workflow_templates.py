@@ -229,7 +229,7 @@ class WorkflowTemplates:
                 WorkflowStep(
                     step_id="generate_targeted_data",
                     name="Generate Targeted Synthetic Data",
-                    component_name="synthetic_data_generator",
+                    component_name="synthetic_data_orchestrator",
                     parameters={
                         "target_gaps": True,
                         "batch_size": 200,

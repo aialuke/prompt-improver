@@ -1,7 +1,7 @@
 """
 Key Manager Orchestrator Integration Tests
 
-Tests integration of SecureKeyManager and FernetKeyManager components with the 
+Tests integration of UnifiedKeyManager component with the 
 ML orchestrator system, ensuring they work correctly as Tier 6 security components
 in the ML pipeline. Follows 2025 best practices with real behavior testing.
 
@@ -29,7 +29,7 @@ import pytest
 from prompt_improver.ml.orchestration.core.component_registry import ComponentRegistry, ComponentTier
 from prompt_improver.ml.orchestration.config.component_definitions import ComponentDefinitions
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
-from prompt_improver.security.key_manager import SecureKeyManager, FernetKeyManager
+from prompt_improver.security.key_manager import UnifiedKeyManager, get_key_manager
 
 
 class TestKeyManagerComponentRegistration:
@@ -119,7 +119,7 @@ class TestKeyManagerComponentRegistration:
         secure_key_comp = await component_registry.get_component("secure_key_manager")
         fernet_comp = await component_registry.get_component("fernet_key_manager")
         
-        # FernetKeyManager should depend on SecureKeyManager
+        # UnifiedKeyManager provides both key management and encryption functionality
         fernet_deps = getattr(fernet_comp, 'dependencies', [])
         assert "secure_key_manager" in fernet_deps or "SecureKeyManager" in str(fernet_deps)
 
@@ -135,11 +135,11 @@ class TestOrchestoratedKeyOperations:
     @pytest.fixture
     def key_managers(self, temp_key_dir):
         """Create key managers for testing"""
-        # SecureKeyManager uses in-memory storage, no key_directory parameter
-        secure_manager = SecureKeyManager()
+        # UnifiedKeyManager combines both secure key management and Fernet encryption
+        unified_manager = UnifiedKeyManager()
         return {
-            "secure": secure_manager,
-            "fernet": FernetKeyManager(key_manager=secure_manager)
+            "secure": unified_manager,
+            "fernet": unified_manager
         }
 
     def test_orchestrated_key_lifecycle(self, key_managers):
@@ -303,10 +303,10 @@ class TestMLPipelineIntegration:
     def integrated_setup(self, temp_key_dir):
         """Set up integrated ML pipeline with key management"""
         config = OrchestratorConfig(debug_mode=True)
-        secure_manager = SecureKeyManager()
+        unified_manager = UnifiedKeyManager()
         return {
-            "key_manager": secure_manager,
-            "fernet_manager": FernetKeyManager(key_manager=secure_manager),
+            "key_manager": unified_manager,
+            "fernet_manager": unified_manager,
             "component_registry": ComponentRegistry(config)
         }
 
@@ -498,10 +498,10 @@ class TestSecurityComplianceIntegration:
     @pytest.fixture
     def audit_setup(self, temp_key_dir):
         """Set up components with audit capabilities"""
-        secure_manager = SecureKeyManager()
+        unified_manager = UnifiedKeyManager()
         return {
-            "key_manager": secure_manager,
-            "fernet_manager": FernetKeyManager(key_manager=secure_manager),
+            "key_manager": unified_manager,
+            "fernet_manager": unified_manager,
             "operations_log": []
         }
 
@@ -643,10 +643,10 @@ class TestIntegratedPerformance:
     def perf_setup(self, temp_key_dir):
         """Set up performance testing environment"""
         config = OrchestratorConfig(debug_mode=True)
-        secure_manager = SecureKeyManager()
+        unified_manager = UnifiedKeyManager()
         return {
-            "key_manager": secure_manager,
-            "fernet_manager": FernetKeyManager(key_manager=secure_manager),
+            "key_manager": unified_manager,
+            "fernet_manager": unified_manager,
             "registry": ComponentRegistry(config)
         }
 

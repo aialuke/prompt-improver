@@ -10,7 +10,7 @@ from typing import Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision: str = "training_prompt_v1"
@@ -25,7 +25,7 @@ def upgrade() -> None:
         'training_prompts',
         sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('prompt_text', sa.String(10000), nullable=False, index=True),
-        sa.Column('enhancement_result', JSON, nullable=False),
+        sa.Column('enhancement_result', JSONB, nullable=False),
         sa.Column('data_source', sa.String(50), nullable=False, index=True),
         sa.Column('training_priority', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),

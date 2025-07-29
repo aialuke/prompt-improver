@@ -9,13 +9,13 @@ from .core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from .core.workflow_execution_engine import WorkflowExecutionEngine
 from .core.resource_manager import ResourceManager
 from .core.component_registry import ComponentRegistry
-from .core.unified_retry_manager import UnifiedRetryManager, get_retry_manager
+from ...core.retry_manager import RetryManager, get_retry_manager
 
 __all__ = [
     "MLPipelineOrchestrator",
     "WorkflowExecutionEngine",
     "ResourceManager",
     "ComponentRegistry",
-    "UnifiedRetryManager",
+    "RetryManager",
     "get_retry_manager"
 ]

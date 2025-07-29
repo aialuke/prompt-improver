@@ -1026,9 +1026,9 @@ export default function() {{
 
         # Check for stateless design indicators
         stateless_indicators = [
-            "src/prompt_improver/database/connection.py",  # Connection pooling
-            "src/prompt_improver/utils/redis_cache.py",    # External state storage
-            "config/database_config.yaml"                  # External database
+            "src/prompt_improver/database/unified_connection_manager.py",  # Connection pooling
+            "src/prompt_improver/core/config.py",    # Centralized config
+            ".env"                                    # Environment-based configuration
         ]
 
         stateless_score = sum(1 for indicator in stateless_indicators if Path(indicator).exists())

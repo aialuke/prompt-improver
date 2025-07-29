@@ -5,7 +5,7 @@ from .workflow_execution_engine import WorkflowExecutionEngine
 from .resource_manager import ResourceManager
 from .component_registry import ComponentRegistry
 from .workflow_types import WorkflowDefinition, WorkflowStep, WorkflowStepStatus
-from .unified_retry_manager import UnifiedRetryManager, RetryConfig, RetryStrategy, get_retry_manager
+from ....core.retry_manager import RetryManager, RetryConfig, RetryStrategy, get_retry_manager
 
 __all__ = [
     "MLPipelineOrchestrator",
@@ -15,7 +15,7 @@ __all__ = [
     "WorkflowDefinition",
     "WorkflowStep",
     "WorkflowStepStatus",
-    "UnifiedRetryManager",
+    "RetryManager",
     "RetryConfig",
     "RetryStrategy",
     "get_retry_manager"

@@ -1,5 +1,5 @@
 # Multi-stage development container optimized for 2025 with multi-architecture support
-ARG PYTHON_VERSION=3.12
+ARG PYTHON_VERSION=3.11
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 FROM --platform=$BUILDPLATFORM python:${PYTHON_VERSION}-slim-bookworm AS base
@@ -67,7 +67,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Network utilities
     telnet \
     netcat-openbsd \
-    # Node.js prerequisites  
+    # Node.js prerequisites
     ca-certificates \
     gnupg \
     lsb-release \

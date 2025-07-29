@@ -20,8 +20,8 @@ from pathlib import Path
 AIOREDIS_AVAILABLE = False
 
 from ..core.config import get_config
-from ..database.connection import get_session_context
-from ..utils.redis_cache import redis_client
+from ..database import get_session_context
+from ..core.config import AppConfig  # Redis config via AppConfig redis_client
 from ..performance.monitoring.performance_monitor import PerformanceMonitor
 
 # ML Health Monitoring Imports

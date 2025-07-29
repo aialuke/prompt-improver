@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Import internal configuration modules
 from prompt_improver.security.config_validator import SecurityConfigValidator
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class ConfigurationValidator:
         """Initialize validator with optional environment override."""
         self.environment = environment or os.getenv("ENVIRONMENT", "development")
         self.security_validator = SecurityConfigValidator()
-        self.db_config = DatabaseConfig()
+        self.db_config = AppConfig().database
         
     async def validate_all(self) -> ConfigurationValidationReport:
         """Perform comprehensive configuration validation."""

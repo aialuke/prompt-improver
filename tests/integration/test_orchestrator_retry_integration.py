@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from prompt_improver.ml.orchestration.core.unified_retry_manager import (
-    UnifiedRetryManager, RetryConfig, RetryStrategy, get_retry_manager
+from prompt_improver.core.retry_manager import (
+    RetryManager as UnifiedRetryManager, RetryConfig, RetryStrategy, get_retry_manager
 )
 from prompt_improver.ml.orchestration.integration.component_invoker import ComponentInvoker
 from prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
@@ -249,7 +249,7 @@ class TestOrchestratorRetryIntegration:
         
         assert loaded_component is not None
         assert loaded_component.name == "unified_retry_manager"
-        assert loaded_component.component_class.__name__ == "UnifiedRetryManager"
+        assert loaded_component.component_class.__name__ == "RetryManager"
         
         # Test initialization
         success = await component_loader.initialize_component("unified_retry_manager")

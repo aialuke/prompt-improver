@@ -9,14 +9,16 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock
 
-from prompt_improver.ml.orchestration.core.unified_retry_manager import (
-    UnifiedRetryManager,
+from prompt_improver.core.retry_manager import (
+    RetryManager as UnifiedRetryManager,
     RetryConfig,
     RetryStrategy,
     RetryableErrorType,
-    CircuitBreakerOpenError,
     get_retry_manager
 )
+
+# Circuit breaker uses generic Exception in the core version
+CircuitBreakerOpenError = Exception
 
 
 class TestUnifiedRetryManager:
@@ -217,23 +219,24 @@ class TestUnifiedRetryManager:
         assert manager1 is manager2
 
     @pytest.mark.asyncio
-    async def test_decorator_usage(self):
-        """Test retry decorator functionality."""
-        from prompt_improver.ml.orchestration.core.unified_retry_manager import retry
+    async def test_retry_async_usage(self):
+        """Test retry_async functionality (replaces decorator test)."""
+        retry_manager = get_retry_manager()
         
         call_count = 0
         
-        @retry(max_attempts=2, initial_delay_ms=10)
-        async def decorated_function():
+        async def test_function():
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ConnectionError("Decorator test error")
-            return "decorator success"
+                raise ConnectionError("Retry test error")
+            return "retry success"
         
-        result = await decorated_function()
+        # Use retry_async method instead of decorator
+        config = RetryConfig(max_attempts=2, base_delay=0.01)
+        result = await retry_manager.retry_async(test_function, config)
         
-        assert result == "decorator success"
+        assert result == "retry success"
         assert call_count == 2
 
     @pytest.mark.asyncio

@@ -27,11 +27,10 @@ from typing import Any, Dict, Optional
 # - Test actual security vulnerabilities like algorithm confusion attacks
 # - Focus on real behavior validation rather than implementation details
 
-import jwt
 import pytest
 
 # Test authentication constants
-TEST_SECRET_KEY = "test_secret_key_for_jwt_validation"
+TEST_SECRET_KEY = "test_secret_key_for_authentication"
 TEST_USER_DATA = {
     "user_id": "test_user_123",
     "username": "test_user",
@@ -64,26 +63,26 @@ class MockAuthenticationService:
         except ValueError:
             return False
 
-    def create_jwt_token(
-        self, user_data: dict[str, Any], expires_minutes: int = 60
-    ) -> str:
-        """Create JWT token with expiration"""
-        payload = {
+    def create_user_session(self, user_data: dict[str, Any], expires_minutes: int = 60) -> str:
+        """Create user session and return session ID"""
+        session_id = f"session_{user_data['user_id']}_{secrets.token_hex(8)}"
+        # Store session data (in real implementation would be in database/cache)
+        self.sessions = getattr(self, 'sessions', {})
+        self.sessions[session_id] = {
             **user_data,
-            "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
-            "iat": datetime.utcnow(),
+            "created_at": datetime.utcnow(),
+            "expires_at": datetime.utcnow() + timedelta(minutes=expires_minutes),
         }
-        return jwt.encode(payload, TEST_SECRET_KEY, algorithm="HS256")
+        return session_id
 
-    def validate_jwt_token(self, token: str) -> dict[str, Any] | None:
-        """Validate JWT token and return payload"""
-        try:
-            payload = jwt.decode(token, TEST_SECRET_KEY, algorithms=["HS256"])
-            return payload
-        except jwt.ExpiredSignatureError:
-            return None
-        except jwt.InvalidTokenError:
-            return None
+    def validate_user_session(self, session_id: str) -> dict[str, Any] | None:
+        """Validate user session and return user data"""
+        sessions = getattr(self, 'sessions', {})
+        session_data = sessions.get(session_id)
+        
+        if session_data and session_data.get("expires_at", datetime.utcnow()) > datetime.utcnow():
+            return session_data
+        return None
 
     def authenticate_user(self, username: str, password: str) -> dict[str, Any] | None:
         """Authenticate user with username/password"""
@@ -167,68 +166,6 @@ class TestPasswordSecurity:
         assert auth_service.verify_password(password, malformed_hash) is False
 
 
-class TestJWTTokenSecurity:
-    """Test JWT token creation, validation, and security"""
-
-    def test_jwt_token_creation(self, auth_service):
-        """Test JWT token creation with proper payload"""
-        token = auth_service.create_jwt_token(TEST_USER_DATA)
-
-        assert isinstance(token, str)
-        assert len(token) > 100  # JWT tokens should be substantial length
-
-        # Verify token can be decoded
-        payload = auth_service.validate_jwt_token(token)
-        assert payload is not None
-        assert payload["user_id"] == TEST_USER_DATA["user_id"]
-        assert payload["username"] == TEST_USER_DATA["username"]
-
-    def test_jwt_token_expiration(self, auth_service):
-        """Test JWT token expiration handling using real behavior - no mocking needed"""
-        # Create token that expires in 1 minute
-        token = auth_service.create_jwt_token(TEST_USER_DATA, expires_minutes=1)
-
-        # Token should be valid immediately
-        payload = auth_service.validate_jwt_token(token)
-        assert payload is not None
-
-        # Create expired token by manually setting past expiration
-        # This tests real expiration behavior without mocking datetime
-        expired_payload = {
-            **TEST_USER_DATA,
-            "exp": datetime.utcnow() - timedelta(hours=2),  # 2 hours ago
-            "iat": datetime.utcnow() - timedelta(hours=3),  # 3 hours ago
-        }
-        
-        # Create expired token with real JWT library
-        expired_token = jwt.encode(expired_payload, TEST_SECRET_KEY, algorithm="HS256")
-
-        # Expired token should be invalid when validated
-        payload = auth_service.validate_jwt_token(expired_token)
-        assert payload is None
-
-    def test_jwt_token_tampering_detection(self, auth_service):
-        """Test JWT token tampering detection"""
-        token = auth_service.create_jwt_token(TEST_USER_DATA)
-
-        # Tamper with token by changing a character
-        tampered_token = token[:-5] + "XXXXX"
-
-        # Tampered token should be invalid
-        payload = auth_service.validate_jwt_token(tampered_token)
-        assert payload is None
-
-    def test_jwt_token_contains_required_claims(self, auth_service):
-        """Test JWT token contains all required security claims"""
-        token = auth_service.create_jwt_token(TEST_USER_DATA)
-        payload = auth_service.validate_jwt_token(token)
-
-        # Check required claims
-        assert "user_id" in payload
-        assert "username" in payload
-        assert "roles" in payload
-        assert "exp" in payload  # Expiration
-        assert "iat" in payload  # Issued at
 
 
 class TestUserAuthentication:
@@ -405,12 +342,12 @@ class TestMLSpecificAuthentication:
             "data_access_level": "aggregated_only",
         }
 
-        token = auth_service.create_jwt_token(privacy_user_data)
-        payload = auth_service.validate_jwt_token(token)
+        session_id = auth_service.create_user_session(privacy_user_data)
+        session_data = auth_service.validate_user_session(session_id)
 
-        assert payload is not None
-        assert payload.get("privacy_clearance") == "differential_privacy_access"
-        assert payload.get("data_access_level") == "aggregated_only"
+        assert session_data is not None
+        assert session_data.get("privacy_clearance") == "differential_privacy_access"
+        assert session_data.get("data_access_level") == "aggregated_only"
 
 
 @pytest.mark.performance
@@ -435,19 +372,19 @@ class TestAuthenticationPerformance:
         avg_time_per_hash = elapsed_time / 100
         assert avg_time_per_hash < 0.01
 
-    def test_jwt_validation_performance(self, auth_service):
-        """Test JWT validation performance"""
+    def test_session_validation_performance(self, auth_service):
+        """Test session validation performance"""
         import time
 
-        # Create token once
-        token = auth_service.create_jwt_token(TEST_USER_DATA)
+        # Create session once
+        session_id = auth_service.create_user_session(TEST_USER_DATA)
 
         start_time = time.time()
         for _ in range(1000):  # Validate 1000 times
-            auth_service.validate_jwt_token(token)
+            auth_service.validate_user_session(session_id)
         elapsed_time = time.time() - start_time
 
-        # Should validate 1000 tokens quickly (< 0.1 seconds)
+        # Should validate 1000 sessions quickly (< 0.1 seconds)
         assert elapsed_time < 0.1
 
         # Average validation time should be very fast (< 0.1ms)

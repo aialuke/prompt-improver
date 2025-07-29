@@ -194,7 +194,7 @@ async def test_targeted_data_generation():
     print("\n=== Testing Targeted Data Generation ===")
     
     from prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGapAnalyzer
-    from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+    from prompt_improver.ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
     
     try:
         gap_analyzer = PerformanceGapAnalyzer()
@@ -250,7 +250,7 @@ async def test_adaptive_training_integration():
     print("\n=== Testing Adaptive Training Integration ===")
     
     from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-    from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+    from prompt_improver.ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
     from prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import AdaptiveTrainingCoordinator
     
     try:

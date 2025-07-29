@@ -1,9 +1,7 @@
-version: '3.9'
-
 services:
-  # PostgreSQL 16 Database
+  # PostgreSQL 15 Database (aligned with production)
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15
     container_name: prompt_improver_postgres_test
     restart: unless-stopped
     environment:
@@ -154,13 +152,13 @@ services:
       DB_NAME: prompt_improver_test
       DB_USER: test_user
       DB_PASSWORD: test_password
-      
+
       # Redis
       REDIS_URL: redis://:test_redis_password@redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: test_redis_password
-      
+
       # MinIO
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: test_minio_user
@@ -170,7 +168,7 @@ services:
       MINIO_BUCKET_ARTIFACTS: test-artifacts
       MINIO_BUCKET_EMBEDDINGS: test-embeddings
       MINIO_BUCKET_CACHE: test-cache
-      
+
       # Application settings
       ENV: test
       LOG_LEVEL: DEBUG

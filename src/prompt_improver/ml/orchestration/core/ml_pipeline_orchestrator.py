@@ -431,7 +431,7 @@ class MLPipelineOrchestrator:
                                 # Integrate retry manager with component invoker and workflow engine
                                 self.component_invoker.set_retry_manager(self.retry_manager)
                                 self.workflow_engine.set_retry_manager(self.retry_manager)
-                                self.logger.info("UnifiedRetryManager integrated with orchestrator, component invoker, and workflow engine")
+                                self.logger.info("RetryManager integrated with orchestrator, component invoker, and workflow engine")
 
                         # Set input sanitizer reference for orchestrator use
                         elif component_name == "input_sanitizer":
@@ -558,7 +558,7 @@ class MLPipelineOrchestrator:
             # Fallback to direct execution
             return await operation()
 
-        from .unified_retry_manager import RetryConfig
+        from ....core.retry_manager import RetryConfig
 
         # Create retry configuration
         config = RetryConfig(

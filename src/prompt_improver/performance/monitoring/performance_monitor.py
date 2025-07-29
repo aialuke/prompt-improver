@@ -1043,29 +1043,10 @@ class EnhancedPerformanceMonitor:
                 business_value=random.uniform(1, 10)
             )
 
-# Maintain backward compatibility
-class PerformanceMonitor(EnhancedPerformanceMonitor):
-    """Backward compatible performance monitor."""
-
-    def __init__(self, thresholds: Optional[PerformanceThresholds] = None):
-        super().__init__(
-            slos=None,  # Use defaults
-            thresholds=thresholds,
-            enable_anomaly_detection=False,
-            enable_adaptive_thresholds=False
-        )
-
-        # Initialize backward compatibility attributes
-        self._total_requests = 0
-        self._total_errors = 0
-        self._total_response_time = 0.0
-
-        # Initialize trend analyzer for backward compatibility
-        self.trend_analyzer = PerformanceTrendAnalyzer(window_size=self.trend_window_size)
-
+    # Backward compatibility methods
     def add_alert_handler(self, handler: Callable[[PerformanceAlert], None]):
-        """Add an alert handler function."""
-        self._alert_handlers.append(handler)
+        """Add an alert handler function (backward compatibility)."""
+        self.alert_callback = handler
 
     async def record_operation(
         self,
@@ -1074,146 +1055,68 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
         is_error: bool = False,
         metadata: Optional[Dict[str, Any]] = None
     ):
-        """Record a performance measurement."""
-        if not self._monitoring_enabled:
-            return
-
-        # Update counters
-        self._total_requests += 1
-        self._total_response_time += response_time_ms
-        if is_error:
-            self._total_errors += 1
-
-        # Add to trend analyzer
-        self.trend_analyzer.add_measurement(response_time_ms, is_error)
-
-        # Check for threshold violations
-        await self._check_thresholds(operation_name, response_time_ms, is_error, metadata)
-
-    async def _check_thresholds(
-        self,
-        operation_name: str,
-        response_time_ms: float,
-        is_error: bool,
-        metadata: Optional[Dict[str, Any]]
-    ):
-        """Check if any thresholds are violated and generate alerts."""
-        alerts_to_generate = []
-
-        # Response time thresholds
-        if response_time_ms >= self.thresholds.response_time_critical_ms:
-            alert = PerformanceAlert(
-                alert_id=f"response_time_critical_{int(time.time())}",
-                alert_type="response_time",
-                severity="critical",
-                message=f"Response time {response_time_ms:.2f}ms exceeds critical threshold {self.thresholds.response_time_critical_ms}ms",
-                operation_name=operation_name,
-                actual_value=response_time_ms,
-                threshold_value=self.thresholds.response_time_critical_ms,
-                timestamp=datetime.now(timezone.utc),
-                metadata=metadata or {}
-            )
-            alerts_to_generate.append(alert)
-
-        elif response_time_ms >= self.thresholds.response_time_warning_ms:
-            alert = PerformanceAlert(
-                alert_id=f"response_time_warning_{int(time.time())}",
-                alert_type="response_time",
-                severity="warning",
-                message=f"Response time {response_time_ms:.2f}ms exceeds warning threshold {self.thresholds.response_time_warning_ms}ms",
-                operation_name=operation_name,
-                actual_value=response_time_ms,
-                threshold_value=self.thresholds.response_time_warning_ms,
-                timestamp=datetime.now(timezone.utc),
-                metadata=metadata or {}
-            )
-            alerts_to_generate.append(alert)
-
-        # Error rate threshold (calculated over recent requests)
-        if self._total_requests >= 10:  # Only check after sufficient samples
-            current_error_rate = (self._total_errors / self._total_requests) * 100
-
-            if current_error_rate >= self.thresholds.error_rate_critical_percent:
-                alert = PerformanceAlert(
-                    alert_id=f"error_rate_critical_{int(time.time())}",
-                    alert_type="error_rate",
-                    severity="critical",
-                    message=f"Error rate {current_error_rate:.2f}% exceeds critical threshold {self.thresholds.error_rate_critical_percent}%",
-                    operation_name=operation_name,
-                    actual_value=current_error_rate,
-                    threshold_value=self.thresholds.error_rate_critical_percent,
-                    timestamp=datetime.now(timezone.utc),
-                    metadata=metadata or {}
-                )
-                alerts_to_generate.append(alert)
-
-        # Process alerts
-        for alert in alerts_to_generate:
-            await self._process_alert(alert)
-
-    async def _process_alert(self, alert: PerformanceAlert):
-        """Process and handle a performance alert."""
-        # Store alert
-        self._active_alerts[alert.alert_id] = alert
-        self._alert_history.append(alert)
-
-        # Keep alert history manageable
-        if len(self._alert_history) > 1000:
-            self._alert_history = self._alert_history[-1000:]
-
-        # Log alert
-        log_level = logging.CRITICAL if alert.severity == "critical" else logging.WARNING
-        logger.log(log_level, f"Performance Alert: {alert.message}")
-
-        # Call alert handlers
-        for handler in self._alert_handlers:
-            try:
-                await handler(alert) if asyncio.iscoroutinefunction(handler) else handler(alert)
-            except Exception as e:
-                logger.error(f"Alert handler failed: {e}")
+        """Record a performance measurement (backward compatibility wrapper)."""
+        await self.record_performance_measurement(
+            operation_name=operation_name,
+            response_time_ms=response_time_ms,
+            is_error=is_error,
+            business_value=0.0,
+            metadata=metadata
+        )
 
     def get_current_performance_status(self) -> Dict[str, Any]:
-        """Get current performance status and metrics."""
-        trend_analysis = self.trend_analyzer.get_trend_analysis()
-
-        # Calculate current metrics
+        """Get current performance status (backward compatibility)."""
+        dashboard = self.get_slo_dashboard()
+        current_metrics = self.performance_history[-1] if self.performance_history else None
+        
+        # Calculate legacy-style metrics
+        total_requests = len(self.response_times)
+        total_errors = sum(self.error_events)
         avg_response_time = (
-            self._total_response_time / self._total_requests
-            if self._total_requests > 0 else 0
+            sum(self.response_times) / total_requests if total_requests > 0 else 0
         )
-        error_rate = (
-            (self._total_errors / self._total_requests) * 100
-            if self._total_requests > 0 else 0
-        )
-
-        # Calculate uptime
+        error_rate = (total_errors / total_requests * 100) if total_requests > 0 else 0
         uptime_seconds = (datetime.now(timezone.utc) - self._last_reset_time).total_seconds()
 
         return {
             "monitoring_enabled": self._monitoring_enabled,
             "uptime_seconds": uptime_seconds,
-            "total_requests": self._total_requests,
-            "total_errors": self._total_errors,
+            "total_requests": total_requests,
+            "total_errors": total_errors,
             "avg_response_time_ms": avg_response_time,
             "error_rate_percent": error_rate,
             "active_alerts_count": len(self._active_alerts),
-            "trend_analysis": trend_analysis,
+            "trend_analysis": {
+                "status": "analyzed" if current_metrics else "insufficient_data",
+                "p95_response_time_ms": current_metrics.response_time_p95 if current_metrics else 0,
+                "p99_response_time_ms": current_metrics.response_time_p99 if current_metrics else 0,
+                "performance_grade": dashboard.get("overall_health", "unknown").upper()[0] if dashboard.get("overall_health") else "N/A"
+            },
             "thresholds": {
                 "response_time_warning_ms": self.thresholds.response_time_warning_ms,
                 "response_time_critical_ms": self.thresholds.response_time_critical_ms,
                 "error_rate_warning_percent": self.thresholds.error_rate_warning_percent,
                 "error_rate_critical_percent": self.thresholds.error_rate_critical_percent
             },
-            "performance_grade": trend_analysis.get("performance_grade", "N/A"),
-            "meets_200ms_target": avg_response_time < 200
+            "performance_grade": dashboard.get("overall_health", "unknown").upper()[0] if dashboard.get("overall_health") else "N/A",
+            "meets_200ms_target": avg_response_time < 200,
+            # Enhanced capabilities available
+            "slo_compliance": dashboard.get("slos", {}),
+            "error_budget_status": dashboard.get("error_budgets", {}),
+            "enhanced_features_enabled": {
+                "anomaly_detection": self.enable_anomaly_detection,
+                "adaptive_thresholds": self.enable_adaptive_thresholds,
+                "sli_slo_framework": True,
+                "multi_dimensional_metrics": True
+            }
         }
 
     def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get all active performance alerts."""
+        """Get all active performance alerts (backward compatibility)."""
         return [alert.to_dict() for alert in self._active_alerts.values()]
 
     def get_alert_history(self, hours: int = 24) -> List[Dict[str, Any]]:
-        """Get alert history for the specified time period."""
+        """Get alert history for the specified time period (backward compatibility)."""
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_alerts = [
             alert for alert in self._alert_history
@@ -1222,35 +1125,70 @@ class PerformanceMonitor(EnhancedPerformanceMonitor):
         return [alert.to_dict() for alert in recent_alerts]
 
     def reset_counters(self):
-        """Reset performance counters."""
-        self._total_requests = 0
-        self._total_errors = 0
-        self._total_response_time = 0.0
+        """Reset performance counters (backward compatibility)."""
+        self.response_times.clear()
+        self.error_events.clear()
+        self.performance_history.clear()
         self._last_reset_time = datetime.now(timezone.utc)
         self._active_alerts.clear()
+        # Clear SLO state
+        self._initialize_slo_tracking()
+
+# Performance Monitor Class (using EnhancedPerformanceMonitor directly)
+PerformanceMonitor = EnhancedPerformanceMonitor
 
 # Global performance monitor instance
-_global_monitor: Optional[PerformanceMonitor] = None
+_global_monitor: Optional[EnhancedPerformanceMonitor] = None
 
-def get_performance_monitor() -> PerformanceMonitor:
-    """Get the global performance monitor instance."""
+def get_performance_monitor(
+    enable_anomaly_detection: bool = True,
+    enable_adaptive_thresholds: bool = True,
+    thresholds: Optional[PerformanceThresholds] = None
+) -> EnhancedPerformanceMonitor:
+    """Get the global enhanced performance monitor instance with modern capabilities enabled.
+    
+    Args:
+        enable_anomaly_detection: Enable ML-based anomaly detection
+        enable_adaptive_thresholds: Enable adaptive threshold adjustment
+        thresholds: Custom performance thresholds
+        
+    Returns:
+        Enhanced performance monitor with modern capabilities
+    """
     global _global_monitor
     if _global_monitor is None:
-        _global_monitor = PerformanceMonitor()
+        _global_monitor = EnhancedPerformanceMonitor(
+            slos=None,  # Use defaults
+            thresholds=thresholds,
+            enable_anomaly_detection=enable_anomaly_detection,
+            enable_adaptive_thresholds=enable_adaptive_thresholds
+        )
     return _global_monitor
 
-# Convenience functions
+# Convenience functions with enhanced features enabled
 async def record_mcp_operation(
     operation_name: str,
     response_time_ms: float,
     is_error: bool = False,
     **metadata
 ):
-    """Record an MCP operation performance measurement."""
-    monitor = get_performance_monitor()
-    await monitor.record_operation(operation_name, response_time_ms, is_error, metadata)
+    """Record an MCP operation performance measurement with enhanced monitoring."""
+    monitor = get_performance_monitor(
+        enable_anomaly_detection=True,
+        enable_adaptive_thresholds=True
+    )
+    await monitor.record_performance_measurement(
+        operation_name=operation_name,
+        response_time_ms=response_time_ms,
+        is_error=is_error,
+        business_value=0.0,
+        metadata=metadata
+    )
 
 def add_performance_alert_handler(handler: Callable):
-    """Add a performance alert handler."""
-    monitor = get_performance_monitor()
+    """Add a performance alert handler with enhanced monitoring capabilities."""
+    monitor = get_performance_monitor(
+        enable_anomaly_detection=True,
+        enable_adaptive_thresholds=True
+    )
     monitor.add_alert_handler(handler)

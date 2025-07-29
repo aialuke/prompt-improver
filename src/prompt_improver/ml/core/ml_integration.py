@@ -37,9 +37,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
-from ...database.connection import DatabaseManager, DatabaseSessionManager
+# Lazy import to avoid circular dependency
+# from ...database import get_unified_manager, ManagerMode
+
+def _get_database_manager():
+    """Lazy import of database manager to avoid circular imports."""
+    from ...database import get_unified_manager, ManagerMode
+    return get_unified_manager, ManagerMode
 from ...database.models import MLModelPerformance, RuleMetadata, RulePerformance
-from ...utils.redis_cache import redis_client
+from ...core.config import AppConfig  # Redis functionality redis_client
 from ...security.input_validator import InputValidator, ValidationError
 # AdvancedPatternDiscovery imported lazily to break circular imports
 from ..models.production_registry import (
@@ -246,7 +252,7 @@ class MLModelService:
     - Business insight generation from discovered patterns
     """
 
-    def __init__(self, db_manager: DatabaseSessionManager | None = None, orchestrator_event_bus=None):
+    def __init__(self, db_manager=None, orchestrator_event_bus=None):
         # Enhanced in-memory model registry with TTL
         self.model_registry = InMemoryModelRegistry(
             max_cache_size_mb=500, default_ttl_minutes=60
@@ -280,35 +286,24 @@ class MLModelService:
         # Initialize advanced pattern discovery with proper sync database manager
         # Lazy import to break circular dependency
         from ..learning.patterns.advanced_pattern_discovery import AdvancedPatternDiscovery
-        
+
         if db_manager:
-            # Create sync DatabaseManager for AdvancedPatternDiscovery from async DatabaseSessionManager
-            # Extract database URL and convert to sync format
-            import os
-
-            database_url = os.getenv("DATABASE_URL")
-            if not database_url:
-                raise ValueError(
-                    "DATABASE_URL environment variable is required for ML integration. "
-                    "Please set DATABASE_URL with your database connection string."
-                )
-
-            # Convert async to sync psycopg3 format if needed
-            database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
-
-            sync_db_manager = DatabaseManager(database_url)
+            # Use unified manager for sync operations
+            sync_db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
             self.pattern_discovery = AdvancedPatternDiscovery(
                 db_manager=sync_db_manager
             )
         else:
-            self.pattern_discovery = AdvancedPatternDiscovery(db_manager=None)
+            # Use unified manager as default
+            sync_db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
+            self.pattern_discovery = AdvancedPatternDiscovery(db_manager=sync_db_manager)
 
-        self.db_manager = db_manager
+        self.db_manager = db_manager or get_unified_manager(ManagerMode.ASYNC_MODERN)
 
         logger.info(
             "Enhanced ML Model Service initialized with production registry support"
         )
-    
+
     async def _emit_orchestrator_event(self, event_type_name: str, data: Dict[str, Any]) -> None:
         """Emit event to orchestrator if event bus is available (backward compatible)."""
         if self.orchestrator_event_bus:
@@ -316,7 +311,7 @@ class MLModelService:
                 # Import here to avoid circular imports
                 from ..orchestration.events.event_types import EventType, MLEvent
                 from datetime import datetime, timezone
-                
+
                 # Map string event type to enum
                 event_type_map = {
                     "TRAINING_STARTED": EventType.TRAINING_STARTED,
@@ -326,7 +321,7 @@ class MLModelService:
                     "OPTIMIZATION_STARTED": EventType.OPTIMIZATION_STARTED,
                     "OPTIMIZATION_COMPLETED": EventType.OPTIMIZATION_COMPLETED,
                 }
-                
+
                 event_type = event_type_map.get(event_type_name)
                 if event_type:
                     await self.orchestrator_event_bus.emit(MLEvent(
@@ -2251,8 +2246,10 @@ class MLModelService:
 _ml_service: MLModelService | None = None
 
 async def get_ml_service() -> MLModelService:
-    """Get or create global ML service instance."""
+    """Get or create global ML service instance with unified manager."""
     global _ml_service
     if _ml_service is None:
-        _ml_service = MLModelService()
+        # Pass unified manager for async operations
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
+        _ml_service = MLModelService(db_manager=db_manager)
     return _ml_service

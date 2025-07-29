@@ -21,7 +21,7 @@ from rich.progress import (
 from sqlalchemy import func, select
 
 from ...database import get_session
-from ...database.config import DatabaseConfig
+from ...core.config import AppConfig
 
 class APESInitializer:
     """Comprehensive system initialization following production patterns"""
@@ -247,7 +247,7 @@ class APESInitializer:
 
         # Check if we can connect to existing database
         try:
-            config = DatabaseConfig()
+            config = AppConfig().database
             # Try to connect to check if database exists
             from sqlalchemy import text
 
@@ -536,7 +536,7 @@ class APESInitializer:
                 )
 
                 # Import and initialize the advanced generator
-                from .synthetic_data_generator import ProductionSyntheticDataGenerator
+                from ...ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 
                 # Generate 1000+ high-quality synthetic samples
                 generator = ProductionSyntheticDataGenerator(

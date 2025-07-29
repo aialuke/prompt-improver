@@ -7,7 +7,17 @@ Note: OptimizationValidator has been moved to ml.optimization.validation for enh
 from .async_optimizer import AsyncBatchProcessor, ConnectionPoolManager
 from .performance_optimizer import get_performance_optimizer, PerformanceOptimizer
 from .response_optimizer import ResponseOptimizer, FastJSONSerializer, CompressionResult
-from ...ml.optimization.batch.batch_processor import BatchProcessor, BatchProcessorConfig
+
+# Lazy import to avoid circular dependency with ml module
+def get_batch_processor():
+    """Lazy import of batch processor to avoid circular imports."""
+    from ...ml.optimization.batch import UnifiedBatchProcessor as BatchProcessor
+    return BatchProcessor
+
+def get_batch_config():
+    """Lazy import of batch config to avoid circular imports."""
+    from ...ml.optimization.batch import UnifiedBatchConfig as BatchProcessorConfig
+    return BatchProcessorConfig
 
 __all__ = [
     "AsyncBatchProcessor",
@@ -17,6 +27,6 @@ __all__ = [
     "ResponseOptimizer",
     "FastJSONSerializer",
     "CompressionResult",
-    "BatchProcessor",
-    "BatchProcessorConfig",
+    "get_batch_processor",
+    "get_batch_config",
 ]

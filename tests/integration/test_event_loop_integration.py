@@ -16,14 +16,8 @@ import time
 import pytest
 import uvloop
 
-from prompt_improver.utils.event_loop_benchmark import run_full_benchmark_suite
-from prompt_improver.utils.event_loop_manager import (
-    get_event_loop_manager,
-    setup_uvloop,
-)
-from prompt_improver.utils.session_event_loop import (
-    SessionEventLoopWrapper,
-    get_session_manager,
+from prompt_improver.utils.unified_loop_manager import (
+    get_unified_loop_manager,
 )
 
 
@@ -42,18 +36,18 @@ def event_loop_policy():
 
 
 @pytest.fixture(scope="function")
-def session_manager():
-    """Return a session manager instance for testing.
+def unified_manager():
+    """Return a unified loop manager instance for testing.
 
     Uses function scope for better test isolation.
     """
-    return get_session_manager()
+    return get_unified_loop_manager()
 
 
 async def test_uvloop_integration():
     """Verify uvloop is used if available and correctly configured."""
-    manager = get_event_loop_manager()
-    uvloop_enabled = setup_uvloop()
+    manager = get_unified_loop_manager()
+    uvloop_enabled = manager.setup_uvloop()
 
     # Test manager state
     assert manager.is_uvloop_enabled() == uvloop_enabled, (
@@ -75,51 +69,63 @@ async def test_uvloop_integration():
         print(f"uvloop not enabled - using {loop_info['loop_type']}")
 
 
-async def test_session_wrapper_operations(session_manager):
+async def test_session_wrapper_operations(unified_manager):
     """Verify session wrapper correctly tracks and manages operations."""
-    wrapper = session_manager.get_session_wrapper("test_session_1")
+    # Test running a simple operation with session tracking
+    await unified_manager.run_with_session_tracking(
+        "test_session_1", 
+        asyncio.sleep(0.1),
+        timeout=5.0
+    )
 
-    # Test running a simple operation
-    await wrapper.run_with_timeout(asyncio.sleep(0.1), operation_name="simple_sleep")
-
-    metrics = wrapper.get_metrics()
+    session_info = unified_manager.get_session_wrapper("test_session_1")
+    metrics = session_info["metrics"]
     assert metrics["operations_count"] == 1, "Should have one operation recorded"
     assert metrics["error_count"] == 0, "Should have no error recorded"
     assert metrics["avg_time_ms"] > 0, "Average time should be greater than 0"
 
 
-async def test_session_concurrent_tasks(session_manager):
+async def test_session_concurrent_tasks(unified_manager):
     """Verify session wrapper handles concurrent tasks."""
     session_id = "test_session_2"
-    wrapper = session_manager.get_session_wrapper(session_id)
-
-    tasks = [wrapper.create_task(asyncio.sleep(0.1)) for _ in range(5)]
+    
+    # Run multiple operations concurrently for the same session
+    tasks = [
+        unified_manager.run_with_session_tracking(
+            session_id, 
+            asyncio.sleep(0.1),
+            timeout=5.0
+        ) for _ in range(5)
+    ]
 
     await asyncio.gather(*tasks)
 
-    assert len(wrapper.get_active_tasks()) == 0, "All tasks should be completed"
-    metrics = wrapper.get_metrics()
+    session_info = unified_manager.get_session_wrapper(session_id)
+    metrics = session_info["metrics"]
     assert metrics["operations_count"] == 5, "Should record five operations"
 
 
 async def test_benchmark_utilities():
-    """Run the full benchmark suite and verify results."""
-    results = await run_full_benchmark_suite()
+    """Run the unified benchmark suite and verify results."""
+    manager = get_unified_loop_manager()
+    results = await manager.benchmark_unified_performance(
+        latency_samples=50,
+        throughput_tasks=100,
+        session_count=3
+    )
 
-    assert "comprehensive_benchmark" in results, (
-        "Missing comprehensive benchmark results"
-    )
-    assert "prompt_simulation" in results, "Missing prompt simulation results"
-    assert "session_benchmark" in results, "Missing session benchmark results"
+    assert "loop_info" in results, "Missing loop info"
+    assert "global_latency" in results, "Missing global latency results"
+    assert "global_throughput" in results, "Missing global throughput results"
+    assert "session_benchmarks" in results, "Missing session benchmark results"
 
-    assert results["comprehensive_benchmark"]["meets_target"], (
-        "Comprehensive benchmark should meet target latency"
+    # Check that latency meets target (should be much less than 200ms)
+    assert results["global_latency"]["avg_ms"] < 200, (
+        "Global latency should meet target"
     )
-    assert results["prompt_simulation"]["meets_target"], (
-        "Prompt simulation should meet target latency"
-    )
-    assert results["session_benchmark"]["meets_target"], (
-        "Session benchmark should meet target latency"
+    # Check that throughput is reasonable
+    assert results["global_throughput"]["throughput_per_second"] > 10, (
+        "Throughput should be reasonable"
     )
 
 
@@ -146,7 +152,7 @@ def test_event_loop_latency_benchmark(benchmark):
 @pytest.mark.benchmark(
     group="session_management", min_time=0.1, max_time=0.5, min_rounds=5
 )
-def test_session_wrapper_benchmark(benchmark, session_manager):
+def test_session_wrapper_benchmark(benchmark, unified_manager):
     """Benchmark session wrapper performance.
 
     Tests session creation and operation performance.
@@ -154,14 +160,13 @@ def test_session_wrapper_benchmark(benchmark, session_manager):
 
     def create_and_use_session():
         """Create session and perform operations."""
-        wrapper = session_manager.get_session_wrapper(
-            f"benchmark_session_{id(wrapper)}"
-        )
+        session_id = f"benchmark_session_{time.time()}"
+        session_info = unified_manager.get_session_wrapper(session_id)
 
         # Simulate session operations
-        metrics = wrapper.get_metrics()
+        metrics = session_info["metrics"]
         assert metrics["operations_count"] >= 0
-        return wrapper
+        return session_info
 
     result = benchmark(create_and_use_session)
     assert result is not None
@@ -174,7 +179,7 @@ async def test_performance_regression_check():
     - Event loop latency < 200ms
     - Session operations complete quickly
     """
-    manager = get_event_loop_manager()
+    manager = get_unified_loop_manager()
 
     # Test event loop latency
     latency_metrics = await manager.benchmark_loop_latency(samples=50)
@@ -183,10 +188,10 @@ async def test_performance_regression_check():
     )
 
     # Test session wrapper performance
-    session_wrapper = get_session_manager().get_session_wrapper("perf_test")
-
+    session_id = "perf_test"
+    
     start_time = time.perf_counter()
-    async with session_wrapper.performance_context("performance_test"):
+    async with manager.session_context(session_id):
         await asyncio.sleep(0.01)  # Simulate work
     end_time = time.perf_counter()
 

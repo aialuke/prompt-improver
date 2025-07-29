@@ -10,17 +10,16 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from ...ml.optimization.batch.batch_processor import (
-    BatchProcessor,
-    BatchProcessorConfig,
-    periodic_batch_processor_coroutine,
+from ...ml.optimization.batch import (
+    UnifiedBatchProcessor as BatchProcessor,
+    UnifiedBatchConfig as BatchProcessorConfig,
 )
 from ...performance.monitoring.health.background_manager import (
-    BackgroundTaskManager,
+    EnhancedBackgroundTaskManager,
     init_background_task_manager,
     shutdown_background_task_manager,
 )
-from ...performance.monitoring.health.service import get_health_service
+# Lazy import to avoid circular dependency - imported in functions where needed
 from ...utils.session_store import SessionStore
 
 # Module logger
@@ -40,7 +39,7 @@ async def init_startup_tasks(
     """Initialize and start all core system components.
 
     This function orchestrates the startup of:
-    1. BackgroundTaskManager - For managing async background tasks
+    1. EnhancedEnhancedBackgroundTaskManager - For managing async background tasks
     2. SessionStore cleanup - For automatic session cleanup
     3. Periodic batch processor - For training data processing
     4. Health monitor - For system health monitoring
@@ -70,19 +69,19 @@ async def init_startup_tasks(
     startup_errors = []
 
     try:
-        # Step 1: Initialize BackgroundTaskManager
-        logger.info("📋 Initializing BackgroundTaskManager...")
+        # Step 1: Initialize EnhancedBackgroundTaskManager
+        logger.info("📋 Initializing EnhancedBackgroundTaskManager...")
         try:
             background_manager = await init_background_task_manager(
                 max_concurrent_tasks=max_concurrent_tasks
             )
             components["background_manager"] = background_manager
             logger.info(
-                f"✅ BackgroundTaskManager started (max_tasks: {max_concurrent_tasks})"
+                f"✅ EnhancedBackgroundTaskManager started (max_tasks: {max_concurrent_tasks})"
             )
         except Exception as e:
-            startup_errors.append(f"BackgroundTaskManager failed: {e}")
-            logger.error(f"❌ BackgroundTaskManager startup failed: {e}")
+            startup_errors.append(f"EnhancedBackgroundTaskManager failed: {e}")
+            logger.error(f"❌ EnhancedBackgroundTaskManager startup failed: {e}")
             raise
 
         # Step 2: Initialize SessionStore with cleanup
@@ -143,19 +142,20 @@ async def init_startup_tasks(
         # Step 5: Initialize Health Monitor
         logger.info("🏥 Initializing Health Monitor...")
         try:
-            health_service = get_health_service()
+            from ...performance.monitoring.health.unified_health_system import get_unified_health_monitor
+            health_monitor = get_unified_health_monitor()
 
             # Start health monitoring task
             task_id = await background_manager.submit_task(
                 "health_monitor",
                 health_monitor_coroutine,
-                health_service=health_service,
+                health_monitor=health_monitor,
             )
             # Get the actual asyncio task from the background manager
             bg_task = background_manager.tasks.get(task_id)
             if bg_task and bg_task.asyncio_task:
                 _startup_tasks.add(bg_task.asyncio_task)
-            components["health_service"] = health_service
+            components["health_monitor"] = health_monitor
             logger.info("✅ Health Monitor started")
         except Exception as e:
             startup_errors.append(f"Health Monitor failed: {e}")
@@ -290,9 +290,9 @@ async def cleanup_partial_startup(components: dict) -> None:
     # Shutdown background manager if initialized
     try:
         await shutdown_background_task_manager(timeout=10.0)
-        logger.debug("✅ BackgroundTaskManager shutdown")
+        logger.debug("✅ EnhancedBackgroundTaskManager shutdown")
     except Exception as e:
-        logger.error(f"❌ Error shutting down BackgroundTaskManager: {e}")
+        logger.error(f"❌ Error shutting down EnhancedBackgroundTaskManager: {e}")
 
 async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
     """Gracefully shutdown all startup tasks and components.
@@ -339,13 +339,13 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
                 logger.warning("⚠️ Some background tasks did not cancel within timeout")
                 shutdown_errors.append("Background task cancellation timeout")
 
-        # Shutdown BackgroundTaskManager
+        # Shutdown EnhancedBackgroundTaskManager
         try:
             await shutdown_background_task_manager(timeout=timeout / 2)
-            logger.info("✅ BackgroundTaskManager shutdown")
+            logger.info("✅ EnhancedBackgroundTaskManager shutdown")
         except Exception as e:
-            shutdown_errors.append(f"BackgroundTaskManager shutdown failed: {e}")
-            logger.error(f"❌ BackgroundTaskManager shutdown error: {e}")
+            shutdown_errors.append(f"EnhancedBackgroundTaskManager shutdown failed: {e}")
+            logger.error(f"❌ EnhancedBackgroundTaskManager shutdown error: {e}")
 
         shutdown_time = (time.time() - shutdown_start_time) * 1000
         _startup_complete = False

@@ -12,13 +12,13 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from prompt_improver.cli.core.crash_recovery import (
-    CrashRecoveryManager, CrashType, CrashSeverity, CrashContext, RecoveryResult
+from prompt_improver.cli.core.unified_process_manager import (
+    UnifiedProcessManager, CrashType, CrashSeverity, CrashContext, RecoveryResult
 )
 from prompt_improver.database.models import TrainingSession, TrainingIteration
 
 
-class TestCrashRecoveryManager:
+class TestUnifiedProcessManager:
     """Test crash recovery manager functionality."""
 
     @pytest.fixture
@@ -30,7 +30,7 @@ class TestCrashRecoveryManager:
     @pytest.fixture
     def crash_recovery_manager(self, temp_backup_dir):
         """Create crash recovery manager for testing."""
-        return CrashRecoveryManager(backup_dir=temp_backup_dir)
+        return UnifiedProcessManager(backup_dir=temp_backup_dir)
 
     @pytest.fixture
     def mock_crash_context(self):
@@ -50,16 +50,16 @@ class TestCrashRecoveryManager:
 
     def test_crash_recovery_manager_initialization(self, temp_backup_dir):
         """Test crash recovery manager initialization."""
-        manager = CrashRecoveryManager(backup_dir=temp_backup_dir)
+        manager = UnifiedProcessManager(backup_dir=temp_backup_dir)
 
         # Verify initialization
         assert manager.backup_dir == temp_backup_dir
         assert manager.backup_dir.exists()
         assert len(manager.detected_crashes) == 0
         assert len(manager.recovery_history) == 0
-        assert manager.progress_manager is not None
-        assert manager.session_resume_manager is not None
-        assert manager.emergency_save_manager is not None
+        assert manager.pid_dir is not None
+        assert manager.coordination_lock is not None
+        assert manager.recovery_lock is not None
 
     def test_crash_type_and_severity_enums(self):
         """Test crash type and severity enumerations."""
@@ -193,7 +193,7 @@ class TestCrashRecoveryManager:
     async def test_system_level_crash_detection(self, crash_recovery_manager):
         """Test detection of system-level crashes."""
         # Mock database session and query results
-        with patch('prompt_improver.cli.core.crash_recovery.get_session_context') as mock_session:
+        with patch('prompt_improver.database.get_session') as mock_session:
             mock_db_session = AsyncMock()
             mock_session.return_value.__aenter__.return_value = mock_db_session
 
@@ -253,7 +253,7 @@ class TestCrashRecoveryManager:
     async def test_database_recovery_operations(self, crash_recovery_manager, mock_crash_context):
         """Test database consistency check and repair operations."""
         # Mock database session and query results
-        with patch('prompt_improver.cli.core.crash_recovery.get_session_context') as mock_session:
+        with patch('prompt_improver.database.get_session') as mock_session:
             mock_db_session = AsyncMock()
             mock_session.return_value.__aenter__.return_value = mock_db_session
 

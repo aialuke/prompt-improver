@@ -1,0 +1,1059 @@
+{
+  "summary": {
+    "total_modules": 394,
+    "total_imports": 601,
+    "circular_chains": 0,
+    "severity_breakdown": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  },
+  "circular_chains": [],
+  "import_graph": {
+    "prompt_improver.__main__": [
+      "prompt_improver.cli"
+    ],
+    "prompt_improver.metrics.api_metrics": [
+      "prompt_improver.core.common",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.metrics.ml_metrics": [
+      "prompt_improver.metrics.base_metrics_collector"
+    ],
+    "prompt_improver.metrics.system_metrics": [
+      "prompt_improver.metrics.base_metrics_collector",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.metrics.base_metrics_collector": [
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.metrics.application_instrumentation": [
+      "prompt_improver.metrics.integration_middleware",
+      "prompt_improver.ml.core.ml_integration",
+      "prompt_improver.api",
+      "prompt_improver.core.config",
+      "prompt_improver.metrics.ml_metrics",
+      "prompt_improver.database",
+      "prompt_improver.core.services.prompt_improvement",
+      "prompt_improver.metrics.business_intelligence_metrics",
+      "prompt_improver.metrics.performance_metrics"
+    ],
+    "prompt_improver.metrics.dashboard_exports": [
+      "prompt_improver.metrics.aggregation_engine",
+      "prompt_improver.metrics.ml_metrics",
+      "prompt_improver.metrics.business_intelligence_metrics",
+      "prompt_improver.metrics.performance_metrics",
+      "prompt_improver.metrics.api_metrics"
+    ],
+    "prompt_improver.metrics.aggregation_engine": [
+      "prompt_improver.metrics.ml_metrics",
+      "prompt_improver.performance.monitoring.metrics_registry",
+      "prompt_improver.metrics.business_intelligence_metrics",
+      "prompt_improver.metrics.performance_metrics",
+      "prompt_improver.metrics.api_metrics"
+    ],
+    "prompt_improver.metrics.performance_metrics": [
+      "prompt_improver.metrics.base_metrics_collector"
+    ],
+    "prompt_improver.metrics.integration_middleware": [
+      "prompt_improver.metrics.business_intelligence_metrics",
+      "prompt_improver.metrics.ml_metrics",
+      "prompt_improver.metrics.performance_metrics",
+      "prompt_improver.metrics.api_metrics"
+    ],
+    "prompt_improver.metrics.business_intelligence_metrics": [
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.database.models": [
+      "prompt_improver.database.registry",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.database.performance_monitor": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.database.query_optimizer": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.database": [
+      "prompt_improver.utils"
+    ],
+    "prompt_improver.database.error_handling": [
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.database.unified_connection_manager": [
+      "prompt_improver.database.registry",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.database.connection_pool_optimizer": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.core.config",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.database.optimization_integration": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.database.cache_layer",
+      "prompt_improver.database.connection_pool_optimizer",
+      "prompt_improver.database.performance_monitor",
+      "prompt_improver.database.query_optimizer",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.events.event_bus"
+    ],
+    "prompt_improver.database.cache_layer": [
+      "prompt_improver.core.config",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.database.analytics_query_interface": [
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.query_optimizer"
+    ],
+    "prompt_improver.database.mcp_connection_pool": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.database.psycopg_client": [
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.database.error_handling"
+    ],
+    "prompt_improver.core.config_migration_example": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.core.performance_analyzer": [
+      "prompt_improver.core.types"
+    ],
+    "prompt_improver.core.config_validator": [
+      "prompt_improver.security.config_validator",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.core.retry_manager": [
+      "prompt_improver.core.protocols.retry_protocols",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.cache.redis_health": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.cache.redis_health_example": [
+      "prompt_improver.cache.redis_health"
+    ],
+    "prompt_improver.security.key_manager": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.security.rate_limit_middleware": [
+      "prompt_improver.security.redis_rate_limiter"
+    ],
+    "prompt_improver.security.secure_startup": [
+      "prompt_improver.security.config_validator"
+    ],
+    "prompt_improver.security.input_sanitization": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.security.memory_guard": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.security.input_validator": [
+      "prompt_improver.security.input_sanitization"
+    ],
+    "prompt_improver.tui.dashboard": [
+      "prompt_improver.tui.widgets.service_control",
+      "prompt_improver.tui.widgets.performance_metrics",
+      "prompt_improver.tui.widgets.automl_status",
+      "prompt_improver.tui.widgets.system_overview",
+      "prompt_improver.tui.widgets.ab_testing",
+      "prompt_improver.tui.data_provider"
+    ],
+    "prompt_improver.tui.data_provider": [
+      "prompt_improver.performance.monitoring.health.unified_health_system",
+      "prompt_improver.ml.automl.orchestrator",
+      "prompt_improver.ml.evaluation.experiment_orchestrator",
+      "prompt_improver.core.services.manager",
+      "prompt_improver.core.services.analytics_factory"
+    ],
+    "prompt_improver.utils.multi_level_cache": [
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.utils.error_handlers_example": [
+      "prompt_improver.utils.error_handlers"
+    ],
+    "prompt_improver.utils.error_handlers": [
+      "prompt_improver.core.retry_manager"
+    ],
+    "prompt_improver.utils.websocket_manager": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.cli.clean_cli": [
+      "prompt_improver.cli.core.progress_preservation",
+      "prompt_improver.cli.core.cli_orchestrator",
+      "prompt_improver.cli.core.training_system_manager"
+    ],
+    "prompt_improver.feedback.enhanced_feedback_collector": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.api.real_time_endpoints": [
+      "prompt_improver.utils.websocket_manager",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator",
+      "prompt_improver.database",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.api.health": [
+      "prompt_improver.cache.redis_health",
+      "prompt_improver.database.connection_pool_optimizer",
+      "prompt_improver.ml.core.ml_integration",
+      "prompt_improver.database.health",
+      "prompt_improver.core.config",
+      "prompt_improver.database.health.table_bloat_detector",
+      "prompt_improver.monitoring.external_api_health",
+      "prompt_improver.ml.health.drift_detector",
+      "prompt_improver.ml.health.resource_monitor",
+      "prompt_improver.ml.health.model_performance_tracker",
+      "prompt_improver.database.health.query_performance_analyzer",
+      "prompt_improver.database",
+      "prompt_improver.ml.health.ml_health_monitor",
+      "prompt_improver.database.health.index_health_assessor",
+      "prompt_improver.performance.monitoring.performance_monitor"
+    ],
+    "prompt_improver.api.analytics_endpoints": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.utils.websocket_manager",
+      "prompt_improver.core.di.container",
+      "prompt_improver.core.events.ml_event_bus",
+      "prompt_improver.database.analytics_query_interface",
+      "prompt_improver.database"
+    ],
+    "prompt_improver.api.apriori_endpoints": [
+      "prompt_improver.ml.core.ml_integration",
+      "prompt_improver.ml.learning.patterns.advanced_pattern_discovery",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.learning.patterns.apriori_analyzer",
+      "prompt_improver.database"
+    ],
+    "prompt_improver.rule_engine.prompt_analyzer": [
+      "prompt_improver.rule_engine.models"
+    ],
+    "prompt_improver.rule_engine.intelligent_rule_selector": [
+      "prompt_improver.utils.multi_level_cache",
+      "prompt_improver.rule_engine.models"
+    ],
+    "prompt_improver.rule_engine.rule_cache": [
+      "prompt_improver.rule_engine.models",
+      "prompt_improver.rule_engine.intelligent_rule_selector"
+    ],
+    "prompt_improver.rule_engine.rule_combination_optimizer": [
+      "prompt_improver.rule_engine.models",
+      "prompt_improver.rule_engine.intelligent_rule_selector"
+    ],
+    "prompt_improver.monitoring.external_api_health": [
+      "prompt_improver.performance.monitoring.health.circuit_breaker",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.mcp_server.server": [
+      "prompt_improver.security.rate_limit_middleware",
+      "prompt_improver.performance.monitoring.health.unified_health_system",
+      "prompt_improver.performance.optimization.response_optimizer",
+      "prompt_improver.utils.session_store",
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.core.config",
+      "prompt_improver.utils.unified_loop_manager",
+      "prompt_improver.utils.multi_level_cache",
+      "prompt_improver.security.structured_prompts",
+      "prompt_improver.security.output_validator",
+      "prompt_improver.performance.sla_monitor",
+      "prompt_improver.security.owasp_input_validator",
+      "prompt_improver.core.services.prompt_improvement",
+      "prompt_improver.database",
+      "prompt_improver.performance.monitoring.performance_monitor"
+    ],
+    "prompt_improver.mcp_server.ml_data_collector": [
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.utils"
+    ],
+    "prompt_improver.performance.optimization.async_optimizer": [
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.core.retry_manager"
+    ],
+    "prompt_improver.performance.optimization.response_optimizer": [
+      "prompt_improver.performance.optimization.performance_optimizer"
+    ],
+    "prompt_improver.performance.baseline.performance_validation_suite": [
+      "prompt_improver.performance.baseline.load_testing_integration",
+      "prompt_improver.performance.baseline.enhanced_dashboard_integration",
+      "prompt_improver.performance.baseline.baseline_collector",
+      "prompt_improver.performance.baseline.models",
+      "prompt_improver.performance.baseline.statistical_analyzer",
+      "prompt_improver.performance.baseline.regression_detector",
+      "prompt_improver.performance.baseline.automation"
+    ],
+    "prompt_improver.performance.baseline.baseline_collector": [
+      "prompt_improver.performance.baseline.models",
+      "prompt_improver.database",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.performance.baseline.load_testing_integration": [
+      "prompt_improver.performance.baseline.models",
+      "prompt_improver.performance.baseline.baseline_collector"
+    ],
+    "prompt_improver.performance.baseline.enhanced_dashboard_integration": [
+      "prompt_improver.performance.baseline.models",
+      "prompt_improver.performance.baseline.statistical_analyzer",
+      "prompt_improver.performance.baseline.regression_detector",
+      "prompt_improver.performance.baseline.baseline_collector"
+    ],
+    "prompt_improver.performance.testing.canary_testing": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.performance.testing.ab_testing_service": [
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.performance.monitoring.performance_benchmark": [
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.utils.session_store",
+      "prompt_improver.core.services.prompt_improvement",
+      "prompt_improver.core.services.analytics_factory",
+      "prompt_improver.database"
+    ],
+    "prompt_improver.performance.monitoring.monitoring": [
+      "prompt_improver.database",
+      "prompt_improver.database.models",
+      "prompt_improver.utils.error_handlers",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.performance.monitoring.performance_monitor": [
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.performance.monitoring.metrics_registry": [
+      "prompt_improver.performance.monitoring.real_metrics"
+    ],
+    "prompt_improver.performance.validation.performance_validation": [
+      "prompt_improver.performance.optimization.response_optimizer",
+      "prompt_improver.performance.monitoring.performance_benchmark",
+      "prompt_improver.database",
+      "prompt_improver.performance.optimization.performance_optimizer",
+      "prompt_improver.performance.monitoring.performance_monitor",
+      "prompt_improver.utils.multi_level_cache"
+    ],
+    "prompt_improver.performance.monitoring.health.enhanced_checkers": [
+      "prompt_improver.performance.monitoring.health.telemetry",
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.performance.monitoring.health.sla_monitor",
+      "prompt_improver.performance.monitoring.health.circuit_breaker",
+      "prompt_improver.performance.monitoring.health.enhanced_base"
+    ],
+    "prompt_improver.performance.monitoring.health.sla_monitor": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.performance.monitoring.health.background_manager": [
+      "prompt_improver.core.protocols.retry_protocols",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.performance.monitoring.health.health_config": [
+      "prompt_improver.performance.monitoring.health.unified_health_system"
+    ],
+    "prompt_improver.performance.monitoring.health.checkers": [
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.cache.redis_health",
+      "prompt_improver.utils.unified_loop_manager",
+      "prompt_improver.ml.optimization.batch",
+      "prompt_improver.performance.monitoring.health.background_manager"
+    ],
+    "prompt_improver.performance.monitoring.health.example_usage": [
+      "prompt_improver.performance.monitoring.health.health_config",
+      "prompt_improver.performance.monitoring.health.unified_health_system",
+      "prompt_improver.performance.monitoring.health.plugin_adapters",
+      "prompt_improver.core.protocols.health_protocol"
+    ],
+    "prompt_improver.performance.monitoring.health.circuit_breaker": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.performance.monitoring.health.ml_orchestration_checkers": [
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.performance.monitoring.health.metrics"
+    ],
+    "prompt_improver.performance.monitoring.health.plugin_adapters": [
+      "prompt_improver.performance.monitoring.health.unified_health_system",
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.performance.monitoring.health.ml_specific_checkers",
+      "prompt_improver.performance.monitoring.health.checkers",
+      "prompt_improver.performance.monitoring.health.enhanced_checkers",
+      "prompt_improver.core.protocols.health_protocol",
+      "prompt_improver.performance.monitoring.health.ml_orchestration_checkers"
+    ],
+    "prompt_improver.performance.monitoring.health.enhanced_base": [
+      "prompt_improver.performance.monitoring.health.telemetry",
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.performance.monitoring.health.sla_monitor",
+      "prompt_improver.performance.monitoring.health.circuit_breaker",
+      "prompt_improver.performance.monitoring.health.structured_logging"
+    ],
+    "prompt_improver.performance.monitoring.health.unified_health_system": [
+      "prompt_improver.core.protocols.health_protocol",
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.performance.monitoring.health.enhanced_base"
+    ],
+    "prompt_improver.performance.monitoring.health.ml_specific_checkers": [
+      "prompt_improver.performance.monitoring.health.base",
+      "prompt_improver.ml.core.ml_integration",
+      "prompt_improver.performance.monitoring.health.metrics",
+      "prompt_improver.ml.models.production_registry",
+      "prompt_improver.ml.preprocessing.orchestrator",
+      "prompt_improver.ml.core.training_data_loader",
+      "prompt_improver.core.services.analytics_factory"
+    ],
+    "prompt_improver.monitoring.opentelemetry.metrics": [
+      "prompt_improver.monitoring.opentelemetry.setup"
+    ],
+    "prompt_improver.monitoring.opentelemetry.tracing": [
+      "prompt_improver.monitoring.opentelemetry.setup"
+    ],
+    "prompt_improver.monitoring.opentelemetry.instrumentation": [
+      "prompt_improver.monitoring.opentelemetry.metrics",
+      "prompt_improver.monitoring.opentelemetry.tracing",
+      "prompt_improver.monitoring.opentelemetry.setup"
+    ],
+    "prompt_improver.monitoring.opentelemetry.integration": [
+      "prompt_improver.performance.monitoring.health.telemetry",
+      "prompt_improver.monitoring.opentelemetry.metrics",
+      "prompt_improver.monitoring.opentelemetry.setup",
+      "prompt_improver.performance.monitoring.metrics_registry",
+      "prompt_improver.monitoring.opentelemetry.context",
+      "prompt_improver.monitoring.opentelemetry.tracing",
+      "prompt_improver.monitoring.opentelemetry.instrumentation"
+    ],
+    "prompt_improver.monitoring.opentelemetry.example_config": [
+      "prompt_improver.monitoring.opentelemetry.setup"
+    ],
+    "prompt_improver.monitoring.slo.monitor": [
+      "prompt_improver.monitoring.slo.framework",
+      "prompt_improver.monitoring.slo.calculator"
+    ],
+    "prompt_improver.monitoring.slo.example_usage": [
+      "prompt_improver.monitoring.slo.framework",
+      "prompt_improver.monitoring.slo.feature_flag_integration",
+      "prompt_improver.monitoring.slo.reporting",
+      "prompt_improver.monitoring.slo.integration",
+      "prompt_improver.monitoring.slo.monitor"
+    ],
+    "prompt_improver.monitoring.slo.integration": [
+      "prompt_improver.monitoring.slo.framework",
+      "prompt_improver.monitoring.slo.monitor"
+    ],
+    "prompt_improver.monitoring.slo.feature_flag_integration": [
+      "prompt_improver.monitoring.slo.framework",
+      "prompt_improver.monitoring.slo.monitor"
+    ],
+    "prompt_improver.monitoring.slo.calculator": [
+      "prompt_improver.monitoring.slo.framework"
+    ],
+    "prompt_improver.monitoring.slo.reporting": [
+      "prompt_improver.monitoring.slo.monitor"
+    ],
+    "prompt_improver.rule_engine.rules.clarity": [
+      "prompt_improver.rule_engine.base",
+      "prompt_improver.ml.preprocessing.llm_transformer"
+    ],
+    "prompt_improver.rule_engine.rules.specificity": [
+      "prompt_improver.rule_engine.base",
+      "prompt_improver.ml.preprocessing.llm_transformer"
+    ],
+    "prompt_improver.rule_engine.rules.role_based_prompting": [
+      "prompt_improver.rule_engine.base"
+    ],
+    "prompt_improver.rule_engine.rules.chain_of_thought": [
+      "prompt_improver.rule_engine.base"
+    ],
+    "prompt_improver.rule_engine.rules.xml_structure_enhancement": [
+      "prompt_improver.rule_engine.base"
+    ],
+    "prompt_improver.rule_engine.rules.few_shot_examples": [
+      "prompt_improver.rule_engine.base"
+    ],
+    "prompt_improver.rule_engine.rules.linguistic_quality_rule": [
+      "prompt_improver.rule_engine.base",
+      "prompt_improver.ml.analysis.linguistic_analyzer"
+    ],
+    "prompt_improver.ml.background.intelligence_processor": [
+      "prompt_improver.performance.monitoring.health.circuit_breaker",
+      "prompt_improver.ml.optimization.algorithms.rule_optimizer",
+      "prompt_improver.ml.learning.patterns.advanced_pattern_discovery",
+      "prompt_improver.rule_engine.models"
+    ],
+    "prompt_improver.ml.core.ml_integration": [
+      "prompt_improver.ml.learning.patterns.advanced_pattern_discovery",
+      "prompt_improver.security.input_validator",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.models",
+      "prompt_improver.core.config",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.models.production_registry",
+      "prompt_improver.database"
+    ],
+    "prompt_improver.ml.core.training_data_loader": [
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.analysis.generation_strategy_analyzer": [
+      "prompt_improver.ml.analysis.performance_gap_analyzer"
+    ],
+    "prompt_improver.ml.analysis.domain_feature_extractor": [
+      "prompt_improver.ml.analysis.domain_detector"
+    ],
+    "prompt_improver.ml.analysis.performance_gap_analyzer": [
+      "prompt_improver.database.models"
+    ],
+    "prompt_improver.ml.analysis.difficulty_distribution_analyzer": [
+      "prompt_improver.ml.analysis.performance_gap_analyzer"
+    ],
+    "prompt_improver.ml.analysis.linguistic_analyzer": [
+      "prompt_improver.ml.analysis.dependency_parser",
+      "prompt_improver.ml.utils.nltk_manager",
+      "prompt_improver.ml.models.model_manager",
+      "prompt_improver.ml.analysis.ner_extractor"
+    ],
+    "prompt_improver.ml.health.integration_manager": [
+      "prompt_improver.ml.health.drift_detector",
+      "prompt_improver.ml.health.ml_health_monitor",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.ml.health.model_performance_tracker"
+    ],
+    "prompt_improver.ml.health.drift_detector": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.health.example_usage": [
+      "prompt_improver.ml.health.ml_health_monitor",
+      "prompt_improver.ml.health.integration_manager",
+      "prompt_improver.ml.health.resource_monitor"
+    ],
+    "prompt_improver.ml.health.resource_monitor": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.health.model_performance_tracker": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.health.ml_health_monitor": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.tests.test_type_safety": [
+      "prompt_improver.ml.optimization.algorithms.clustering_optimizer",
+      "prompt_improver.ml.types",
+      "prompt_improver.ml.models.model_manager"
+    ],
+    "prompt_improver.ml.tests.test_ml_integration": [
+      "prompt_improver.ml.optimization.algorithms.clustering_optimizer",
+      "prompt_improver.ml.types",
+      "prompt_improver.ml.core.training_data_loader",
+      "prompt_improver.ml.optimization.algorithms.dimensionality_reducer",
+      "prompt_improver.ml.learning.features.linguistic_feature_extractor",
+      "prompt_improver.ml.models.model_manager"
+    ],
+    "prompt_improver.ml.lifecycle.enhanced_experiment_orchestrator": [
+      "prompt_improver.ml.types",
+      "prompt_improver.ml.lifecycle.enhanced_model_registry",
+      "prompt_improver.ml.lifecycle.experiment_tracker",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.lifecycle.model_deployment": [
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.ml.lifecycle.model_registry"
+    ],
+    "prompt_improver.ml.lifecycle.model_serving_infrastructure": [
+      "prompt_improver.ml.lifecycle.enhanced_model_registry",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.lifecycle.experiment_tracker": [
+      "prompt_improver.ml.types",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.ml.lifecycle.model_registry"
+    ],
+    "prompt_improver.ml.lifecycle.ml_platform_integration": [
+      "prompt_improver.ml.lifecycle.enhanced_model_registry",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.performance.monitoring.performance_monitor",
+      "prompt_improver.ml.lifecycle.enhanced_experiment_orchestrator",
+      "prompt_improver.ml.optimization.batch",
+      "prompt_improver.ml.lifecycle.model_serving_infrastructure",
+      "prompt_improver.performance.testing.ab_testing_service",
+      "prompt_improver.database.optimization_integration",
+      "prompt_improver.ml.lifecycle.automated_deployment_pipeline"
+    ],
+    "prompt_improver.ml.lifecycle.enhanced_model_registry": [
+      "prompt_improver.ml.types",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.lifecycle.performance_validation": [
+      "prompt_improver.ml.lifecycle.ml_platform_integration",
+      "prompt_improver.ml.lifecycle.enhanced_model_registry",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.ml.lifecycle.enhanced_experiment_orchestrator",
+      "prompt_improver.ml.lifecycle.model_serving_infrastructure",
+      "prompt_improver.ml.lifecycle.automated_deployment_pipeline"
+    ],
+    "prompt_improver.ml.lifecycle.model_registry": [
+      "prompt_improver.ml.types",
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.lifecycle.lifecycle_monitoring": [
+      "prompt_improver.performance.monitoring.health.enhanced_base",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.performance.monitoring.performance_monitor"
+    ],
+    "prompt_improver.ml.lifecycle.automated_deployment_pipeline": [
+      "prompt_improver.ml.lifecycle.enhanced_model_registry",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.models.production_registry": [
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.automl.orchestrator": [
+      "prompt_improver.ml.optimization.algorithms.rule_optimizer",
+      "prompt_improver.ml.evaluation.experiment_orchestrator",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.ml.automl.callbacks",
+      "prompt_improver.database",
+      "prompt_improver.core.services.analytics_factory"
+    ],
+    "prompt_improver.ml.automl.callbacks": [
+      "prompt_improver.core.services.analytics_factory",
+      "prompt_improver.ml.evaluation.experiment_orchestrator",
+      "prompt_improver.ml.automl.shared_types"
+    ],
+    "prompt_improver.ml.evaluation.causal_inference_analyzer": [
+      "prompt_improver.ml.core.training_data_loader"
+    ],
+    "prompt_improver.ml.evaluation.experiment_orchestrator": [
+      "prompt_improver.ml.evaluation.causal_inference_analyzer",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.evaluation.advanced_statistical_validator",
+      "prompt_improver.ml.evaluation.pattern_significance_analyzer",
+      "prompt_improver.core.services.analytics_factory",
+      "prompt_improver.performance.testing.ab_testing_service"
+    ],
+    "prompt_improver.ml.preprocessing.llm_transformer": [
+      "prompt_improver.ml.models.model_manager",
+      "prompt_improver.ml.core.ml_integration"
+    ],
+    "prompt_improver.ml.preprocessing.orchestrator": [
+      "prompt_improver.ml.preprocessing.generators.statistical_generator",
+      "prompt_improver.ml.learning.quality.enhanced_scorer",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.analytics.generation_analytics",
+      "prompt_improver.ml.preprocessing.generators.gan_generator",
+      "prompt_improver.ml.optimization.batch",
+      "prompt_improver.ml.preprocessing.generators.neural_generator"
+    ],
+    "prompt_improver.ml.analytics.session_summary_reporter": [
+      "prompt_improver.ml.analytics.performance_improvement_calculator",
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.analytics.generation_analytics": [
+      "prompt_improver.database.services.generation_service",
+      "prompt_improver.database.models"
+    ],
+    "prompt_improver.ml.analytics.performance_improvement_calculator": [
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.ml.analytics.session_comparison_analyzer": [
+      "prompt_improver.ml.analytics.performance_improvement_calculator",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.analytics.session_summary_reporter"
+    ],
+    "prompt_improver.ml.preprocessing.generators.neural_generator": [
+      "prompt_improver.ml.preprocessing.generators.gan_generator"
+    ],
+    "prompt_improver.ml.preprocessing.generators.gan_generator": [
+      "prompt_improver.ml.preprocessing.generators.statistical_generator"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier4_connectors": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.database.query_optimizer",
+      "prompt_improver.database.performance_monitor",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier3_connectors": [
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier6_connectors": [
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.connectors.component_connector": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier2_connectors": [
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier5_connectors": [
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.connectors.tier1_connectors": [
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.training_workflow_coordinator": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.core.workflow_types"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator": [
+      "prompt_improver.ml.analysis.generation_strategy_analyzer",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.analysis.performance_gap_analyzer",
+      "prompt_improver.ml.analytics.generation_analytics",
+      "prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator",
+      "prompt_improver.ml.preprocessing.orchestrator",
+      "prompt_improver.ml.optimization.batch",
+      "prompt_improver.database",
+      "prompt_improver.ml.analysis.difficulty_distribution_analyzer"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.data_pipeline_coordinator": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.evaluation_pipeline_manager": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.deployment_controller": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.coordinators.optimization_controller": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.optimization.algorithms.rule_optimizer"
+    ],
+    "prompt_improver.ml.orchestration.core.retry_observability": [
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.ml.orchestration.core.component_registry": [
+      "prompt_improver.ml.orchestration.config.component_definitions",
+      "prompt_improver.ml.orchestration.config.orchestrator_config",
+      "prompt_improver.ml.orchestration.shared.component_types"
+    ],
+    "prompt_improver.ml.orchestration.core.resource_manager": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.k8s.resource_integration",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator": [
+      "prompt_improver.ml.orchestration.core.component_registry",
+      "prompt_improver.ml.orchestration.integration.direct_component_loader",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.ml.orchestration.core.workflow_execution_engine",
+      "prompt_improver.security.input_sanitization",
+      "prompt_improver.ml.orchestration.integration.component_invoker",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.events.event_bus",
+      "prompt_improver.ml.orchestration.core.resource_manager",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.ml.orchestration.core.workflow_execution_engine": [
+      "prompt_improver.ml.orchestration.core.workflow_types",
+      "prompt_improver.core.retry_manager",
+      "prompt_improver.ml.orchestration.config.workflow_templates",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.ml.orchestration.config.component_definitions": [
+      "prompt_improver.ml.orchestration.shared.component_types"
+    ],
+    "prompt_improver.ml.orchestration.config.workflow_templates": [
+      "prompt_improver.ml.orchestration.core.workflow_types"
+    ],
+    "prompt_improver.ml.orchestration.integration.direct_component_loader": [
+      "prompt_improver.ml.orchestration.core.component_registry"
+    ],
+    "prompt_improver.ml.orchestration.integration.component_invoker": [
+      "prompt_improver.ml.orchestration.integration.direct_component_loader",
+      "prompt_improver.core.retry_manager"
+    ],
+    "prompt_improver.ml.orchestration.api.orchestrator_endpoints": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.monitoring.alert_manager": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.monitoring.pipeline_health_monitor": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.monitoring.component_health_monitor",
+      "prompt_improver.ml.orchestration.monitoring.orchestrator_monitor"
+    ],
+    "prompt_improver.ml.orchestration.monitoring.orchestrator_monitor": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.monitoring.component_health_monitor": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.connectors.component_connector"
+    ],
+    "prompt_improver.ml.orchestration.monitoring.workflow_metrics_collector": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.events.event_bus": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.ml.orchestration.events.adaptive_event_bus": [
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.ml.orchestration.events.handlers.training_handler": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.events.handlers.database_handler": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.events.handlers.optimization_handler": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.events.handlers.deployment_handler": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.orchestration.events.handlers.evaluation_handler": [
+      "prompt_improver.ml.orchestration.events.event_types"
+    ],
+    "prompt_improver.ml.optimization.algorithms.dimensionality_reducer": [
+      "prompt_improver.ml.types",
+      "prompt_improver.ml.core.training_data_loader"
+    ],
+    "prompt_improver.ml.optimization.algorithms.clustering_optimizer": [
+      "prompt_improver.ml.types",
+      "prompt_improver.ml.core.training_data_loader"
+    ],
+    "prompt_improver.ml.learning.patterns.apriori_analyzer": [
+      "prompt_improver.database",
+      "prompt_improver.utils.error_handlers"
+    ],
+    "prompt_improver.ml.learning.patterns.advanced_pattern_discovery": [
+      "prompt_improver.database",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.core.training_data_loader",
+      "prompt_improver.ml.learning.patterns.apriori_analyzer"
+    ],
+    "prompt_improver.ml.learning.features.composite_feature_extractor": [
+      "prompt_improver.ml.learning.features.linguistic_feature_extractor",
+      "prompt_improver.ml.learning.features.domain_feature_extractor",
+      "prompt_improver.ml.learning.features.context_feature_extractor"
+    ],
+    "prompt_improver.ml.learning.features.context_feature_extractor": [
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.security",
+      "prompt_improver.security.input_sanitization"
+    ],
+    "prompt_improver.ml.learning.features.linguistic_feature_extractor": [
+      "prompt_improver.ml.learning.features.english_nltk_manager",
+      "prompt_improver.ml.analysis.linguistic_analyzer",
+      "prompt_improver.security.input_sanitization"
+    ],
+    "prompt_improver.ml.learning.features.domain_feature_extractor": [
+      "prompt_improver.ml.analysis.domain_detector",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.security",
+      "prompt_improver.security.input_sanitization"
+    ],
+    "prompt_improver.ml.learning.algorithms.context_learner": [
+      "prompt_improver.ml.optimization.algorithms.clustering_optimizer",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.security",
+      "prompt_improver.ml.learning.features",
+      "prompt_improver.ml.learning.clustering"
+    ],
+    "prompt_improver.ml.learning.algorithms.context_aware_weighter": [
+      "prompt_improver.ml.analysis.domain_detector",
+      "prompt_improver.ml.analysis.domain_feature_extractor"
+    ],
+    "prompt_improver.ml.learning.algorithms.context_performance_monitor": [
+      "prompt_improver.security"
+    ],
+    "prompt_improver.ml.learning.algorithms.analysis_orchestrator": [
+      "prompt_improver.ml.core.training_data_loader",
+      "prompt_improver.ml.learning.algorithms.pattern_detector",
+      "prompt_improver.ml.learning.algorithms.failure_classifier"
+    ],
+    "prompt_improver.ml.learning.algorithms.failure_analyzer": [
+      "prompt_improver.ml.core.training_data_loader"
+    ],
+    "prompt_improver.cli.core.emergency_save": [
+      "prompt_improver.database",
+      "prompt_improver.database.models",
+      "prompt_improver.cli.core.progress_preservation"
+    ],
+    "prompt_improver.cli.core.training_system_manager": [
+      "prompt_improver.cli.core.rule_validation_service",
+      "prompt_improver.database.models",
+      "prompt_improver.ml.preprocessing.orchestrator",
+      "prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator",
+      "prompt_improver.database",
+      "prompt_improver.core.services.analytics_factory",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.cli.core.session_resume": [
+      "prompt_improver.database",
+      "prompt_improver.cli.core.training_system_manager",
+      "prompt_improver.database.models",
+      "prompt_improver.cli.core.progress_preservation"
+    ],
+    "prompt_improver.cli.core.enhanced_workflow_manager": [
+      "prompt_improver.cli.core.cli_orchestrator"
+    ],
+    "prompt_improver.cli.core.emergency_operations": [
+      "prompt_improver.database",
+      "prompt_improver.cli.core.signal_handler",
+      "prompt_improver.database.models",
+      "prompt_improver.cli.core.progress_preservation"
+    ],
+    "prompt_improver.cli.core.cli_orchestrator": [
+      "prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator",
+      "prompt_improver.ml.orchestration.config.orchestrator_config"
+    ],
+    "prompt_improver.cli.core.rule_validation_service": [
+      "prompt_improver.database",
+      "prompt_improver.database.models"
+    ],
+    "prompt_improver.cli.core.progress_preservation": [
+      "prompt_improver.database",
+      "prompt_improver.database.models"
+    ],
+    "prompt_improver.cli.utils.console": [
+      "prompt_improver.cli.utils.console_utils"
+    ],
+    "prompt_improver.shared.di.container": [
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.shared.interfaces.emergency": [
+      "prompt_improver.shared.types.signals"
+    ],
+    "prompt_improver.tui.widgets.performance_metrics": [
+      "prompt_improver.performance.monitoring.performance_monitor"
+    ],
+    "prompt_improver.core.di.container": [
+      "prompt_improver.performance.monitoring.health.unified_health_system",
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.interfaces.datetime_service",
+      "prompt_improver.ml.lifecycle.model_registry",
+      "prompt_improver.performance.monitoring.metrics_registry",
+      "prompt_improver.core.protocols.retry_protocols",
+      "prompt_improver.core.events.ml_event_bus",
+      "prompt_improver.core.services.datetime_service",
+      "prompt_improver.core.services.ml_service"
+    ],
+    "prompt_improver.core.setup.initializer": [
+      "prompt_improver.database",
+      "prompt_improver.database.models",
+      "prompt_improver.core.config",
+      "prompt_improver.ml.preprocessing.orchestrator"
+    ],
+    "prompt_improver.core.setup.migration": [
+      "prompt_improver.database",
+      "prompt_improver.utils.datetime_utils"
+    ],
+    "prompt_improver.core.common.base_classes": [
+      "prompt_improver.core.common.config_utils",
+      "prompt_improver.core.common.logging_utils",
+      "prompt_improver.core.common.metrics_utils"
+    ],
+    "prompt_improver.core.common.error_handling": [
+      "prompt_improver.core.common.logging_utils"
+    ],
+    "prompt_improver.core.common.metrics_utils": [
+      "prompt_improver.core.common.logging_utils",
+      "prompt_improver.performance.monitoring.metrics_registry"
+    ],
+    "prompt_improver.core.common.config_utils": [
+      "prompt_improver.core.common.logging_utils",
+      "prompt_improver.core.config"
+    ],
+    "prompt_improver.core.services.startup": [
+      "prompt_improver.ml.optimization.batch",
+      "prompt_improver.performance.monitoring.health.background_manager",
+      "prompt_improver.utils.session_store",
+      "prompt_improver.performance.monitoring.health.unified_health_system"
+    ],
+    "prompt_improver.core.services.ml_service": [
+      "prompt_improver.core.services.ml_model_service",
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.services.ml_training_service",
+      "prompt_improver.core.services.ml_analysis_service",
+      "prompt_improver.core.services.ml_health_service"
+    ],
+    "prompt_improver.core.services.prompt_improvement": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.utils.datetime_utils",
+      "prompt_improver.database.models",
+      "prompt_improver.core.di.container",
+      "prompt_improver.rule_engine.base",
+      "prompt_improver.core.events.ml_event_bus",
+      "prompt_improver.database",
+      "prompt_improver.performance.testing.ab_testing_service"
+    ],
+    "prompt_improver.core.services.ml_training_service": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.events.ml_event_bus"
+    ],
+    "prompt_improver.core.services.ml_model_service": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.events.ml_event_bus"
+    ],
+    "prompt_improver.core.services.security": [
+      "prompt_improver.database",
+      "prompt_improver.core.services.analytics_factory"
+    ],
+    "prompt_improver.core.services.analytics_factory": [
+      "prompt_improver.ml.analytics.session_summary_reporter",
+      "prompt_improver.api.analytics_endpoints",
+      "prompt_improver.database.analytics_query_interface"
+    ],
+    "prompt_improver.core.services.ml_health_service": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.events.ml_event_bus"
+    ],
+    "prompt_improver.core.services.ml_analysis_service": [
+      "prompt_improver.core.interfaces.ml_interface",
+      "prompt_improver.core.events.ml_event_bus"
+    ],
+    "prompt_improver.core.services.datetime_service": [
+      "prompt_improver.core.interfaces.datetime_service"
+    ],
+    "prompt_improver.core.services.manager": [
+      "prompt_improver.database",
+      "prompt_improver.ml.orchestration.events.event_types",
+      "prompt_improver.utils.subprocess_security",
+      "prompt_improver.performance.monitoring.health.unified_health_system"
+    ],
+    "prompt_improver.core.interfaces.ml_interface": [
+      "prompt_improver.core.events.ml_event_bus"
+    ],
+    "prompt_improver.database.health.query_performance_analyzer": [
+      "prompt_improver.database.psycopg_client"
+    ],
+    "prompt_improver.database.health.index_health_assessor": [
+      "prompt_improver.database.psycopg_client"
+    ],
+    "prompt_improver.database.health.table_bloat_detector": [
+      "prompt_improver.database.psycopg_client"
+    ],
+    "prompt_improver.database.health.connection_pool_monitor": [
+      "prompt_improver.database.psycopg_client"
+    ],
+    "prompt_improver.database.health.database_health_monitor": [
+      "prompt_improver.database.psycopg_client",
+      "prompt_improver.database.health.connection_pool_monitor",
+      "prompt_improver.database.health.table_bloat_detector",
+      "prompt_improver.database.health.query_performance_analyzer",
+      "prompt_improver.core.common",
+      "prompt_improver.database.health.index_health_assessor"
+    ],
+    "prompt_improver.database.services.generation_service": [
+      "prompt_improver.database.models",
+      "prompt_improver.utils.datetime_utils"
+    ]
+  }
+}

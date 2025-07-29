@@ -40,13 +40,13 @@ from prompt_improver.database import get_session_context
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )
-from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from prompt_improver.ml.preprocessing.generators.statistical_generator import StatisticalDataGenerator
 from prompt_improver.ml.lifecycle.model_registry import ModelRegistry
 from prompt_improver.ml.lifecycle.experiment_tracker import ExperimentTracker
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.performance.monitoring.performance_benchmark import PerformanceBenchmark
-from prompt_improver.utils.health_checks import HealthChecker, HealthStatus
+from prompt_improver.performance.monitoring.health.unified_health_system import UnifiedHealthSystem
 
 logger = logging.getLogger(__name__)
 

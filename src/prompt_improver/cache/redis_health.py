@@ -28,7 +28,7 @@ import re
 import coredis
 
 # Import the Redis client from existing cache utilities
-from ..utils.redis_cache import redis_client, CACHE_ERRORS
+from ..core.config import AppConfig  # Redis config via AppConfig redis_client, CACHE_ERRORS
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,6 @@
         "POSTGRES_DATABASE": "apes_production",
         "POSTGRES_USERNAME": "mcp_server_user",
         "POSTGRES_PASSWORD": "${MCP_POSTGRES_PASSWORD}",
-        "MCP_JWT_SECRET_KEY": "${MCP_JWT_SECRET_KEY}",
         "MCP_RATE_LIMIT_REDIS_URL": "redis://localhost:6379/2",
         "MCP_CACHE_REDIS_URL": "redis://localhost:6379/3",
         "MCP_LOG_LEVEL": "INFO",

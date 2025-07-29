@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class DatabaseDiagnostics:
     
     def __init__(self, config: Optional[DatabaseConfig] = None):
         """Initialize diagnostics with database configuration."""
-        self.config = config or DatabaseConfig()
+        self.config = config or AppConfig().database
         self.results = []
         
     async def run_comprehensive_check(self) -> Dict[str, any]:

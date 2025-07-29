@@ -17,7 +17,7 @@ from prompt_improver.rule_engine.intelligent_rule_selector import (
 )
 from prompt_improver.rule_engine.prompt_analyzer import PromptCharacteristics
 from prompt_improver.ml.background.intelligence_processor import MLIntelligenceProcessor
-from prompt_improver.database.connection import DatabaseManager
+from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
 
 
 class TestArchitecturalCorrection:
@@ -26,7 +26,7 @@ class TestArchitecturalCorrection:
     @pytest.fixture
     async def db_session(self):
         """Create test database session."""
-        db_manager = DatabaseManager()
+        db_manager = get_database_manager_adapter()
         async with db_manager.get_session() as session:
             yield session
 

@@ -10,7 +10,7 @@ This comprehensive test suite validates all Phase 4 refactoring work including:
 - Performance impact assessment of refactoring changes
 - Integration testing with actual data and real services
 
-No mocks - validates the entire refactored system works end-to-end with production-like scenarios.
+No mocks - validates the entire system works end-to-end with production-like scenarios.
 """
 
 import asyncio
@@ -37,7 +37,7 @@ from prompt_improver.core.boundaries import (
     ArchitecturalLayer, create_boundary_enforcer
 )
 
-# Component imports for testing refactored functionality
+# Component imports for testing current functionality
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
 from prompt_improver.core.services.datetime_service import DateTimeService
 from prompt_improver.database import create_async_session
@@ -93,7 +93,7 @@ class Phase4RefactoringTestSuite:
         self.boundary_enforcer: Optional[BoundaryEnforcer] = None
         self.baseline_metrics = {}
         
-        # Performance thresholds for refactored system
+        # Performance thresholds for current system
         self.di_resolution_threshold = 0.01  # 10ms max for DI resolution
         self.architecture_compliance_threshold = 100  # 100% compliance required
         self.performance_degradation_threshold = 0.05  # Max 5% performance loss
@@ -115,7 +115,7 @@ class Phase4RefactoringTestSuite:
             ("Module Decoupling Verification", self.test_module_decoupling_verification),
             ("Performance Impact Assessment", self.test_performance_impact_assessment),
             ("Integration Workflow Testing", self.test_integration_workflow_testing),
-            ("Load Testing Refactored System", self.test_load_testing_refactored_system),
+            ("System Load Performance Testing", self.test_system_load_performance),
             ("Regression Testing", self.test_regression_testing)
         ]
         
@@ -162,7 +162,7 @@ class Phase4RefactoringTestSuite:
         return self.results
     
     async def test_dependency_injection_equivalence(self) -> bool:
-        """Test that refactored DI container produces identical outputs to original implementations"""
+        """Test that current DI container produces identical outputs to original implementations"""
         print("Testing dependency injection equivalence and performance...")
         
         try:
@@ -661,7 +661,7 @@ class Phase4RefactoringTestSuite:
             # Test 5: Module Consolidation Verification
             print("  • Verifying module consolidation...")
             
-            # Check that refactored modules exist and are importable
+            # Check that current modules exist and are importable
             consolidated_modules = [
                 "prompt_improver.core.di.container",
                 "prompt_improver.core.boundaries", 
@@ -989,7 +989,7 @@ class Phase4RefactoringTestSuite:
             gc.collect()
             baseline_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
             
-            # Create refactored system components
+            # Create current system components
             main_container = DIContainer(name="memory_test")
             main_container.register_singleton(DateTimeServiceProtocol, DateTimeService)
             main_container.register_factory(MetricsRegistry, lambda: MetricsRegistry(), ServiceLifetime.SINGLETON)
@@ -1155,12 +1155,12 @@ class Phase4RefactoringTestSuite:
             return False
     
     async def test_integration_workflow_testing(self) -> bool:
-        """Test all refactored components work together"""
+        """Test all current components work together"""
         print("Testing integration workflow...")
         
         try:
-            # Test 1: End-to-End Workflow with Refactored Components
-            print("  • Testing end-to-end workflow with refactored components...")
+            # Test 1: End-to-End Workflow with Current Components
+            print("  • Testing end-to-end workflow with current components...")
             
             # Create main application container
             app_container = DIContainer(name="integration_test")
@@ -1214,7 +1214,7 @@ class Phase4RefactoringTestSuite:
                     random_state=42
                 )
                 
-                # Test ML workflow with refactored components
+                # Test ML workflow with current components
                 ml_start = datetime_service.now()
                 
                 # Train a simple model (simulating ML pipeline)
@@ -1366,9 +1366,9 @@ class Phase4RefactoringTestSuite:
             print(f"  ❌ Integration workflow test failed: {e}")
             return False
     
-    async def test_load_testing_refactored_system(self) -> bool:
-        """Test refactored code under production-like load"""
-        print("Testing load testing of refactored system...")
+    async def test_system_load_performance(self) -> bool:
+        """Test current system under production-like load"""
+        print("Testing system load performance...")
         
         try:
             # Test 1: Concurrent Service Resolution
@@ -1614,7 +1614,7 @@ class Phase4RefactoringTestSuite:
             )
             
             if success:
-                print("  ✓ Load testing of refactored system passed")
+                print("  ✓ System load performance testing passed")
             else:
                 print(f"  ⚠ Load testing issues detected (score: {load_test_score:.1f})")
             
@@ -1657,7 +1657,7 @@ class Phase4RefactoringTestSuite:
             # Test 2: Module Import Compatibility
             print("  • Testing module import compatibility...")
             
-            # Test that all refactored modules can still be imported
+            # Test that all current modules can still be imported
             import_tests = [
                 "prompt_improver.core.di.container",
                 "prompt_improver.core.boundaries",

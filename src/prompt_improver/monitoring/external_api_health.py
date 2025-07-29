@@ -24,7 +24,7 @@ from cryptography.x509.oid import NameOID
 
 from ..core.config import get_config
 from ..performance.monitoring.health.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, circuit_breaker_registry
-from ..utils.redis_cache import redis_client
+from ..core.config import AppConfig  # Redis config via AppConfig redis_client
 
 logger = logging.getLogger(__name__)
 

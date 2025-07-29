@@ -25,7 +25,7 @@ from prompt_improver.utils.datetime_utils import aware_utc_now
 tracer = trace.get_tracer(__name__)
 
 if TYPE_CHECKING:
-    from ..database.connection import DatabaseManager
+    from ...database import UnifiedConnectionManager
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
     from ..optimization.algorithms.rule_optimizer import OptimizationConfig, RuleOptimizer
     from ...core.services.analytics_factory import get_analytics_router
@@ -157,10 +157,9 @@ class AutoMLOrchestrator:
 
         # Real-time analytics callback
         if self.analytics_service and self.config.enable_real_time_feedback:
-            from .callbacks import RealTimeAnalyticsCallback
-
-            analytics_callback = RealTimeAnalyticsCallback(self.analytics_service)
-            callbacks.append(analytics_callback)
+            analytics_callback = self._create_analytics_callback()
+            if analytics_callback:
+                callbacks.append(analytics_callback)
 
         # AutoML coordination callback
         automl_callback = AutoMLCallback(
@@ -172,6 +171,15 @@ class AutoMLOrchestrator:
 
         self.callbacks = callbacks
         return callbacks
+
+    def _create_analytics_callback(self):
+        """Create analytics callback with lazy import to avoid circular dependency."""
+        try:
+            from .callbacks import RealTimeAnalyticsCallback
+            return RealTimeAnalyticsCallback(self.analytics_service)
+        except ImportError as e:
+            self.logger.warning(f"Could not import RealTimeAnalyticsCallback: {e}")
+            return None
 
     async def start_optimization(
         self,
@@ -591,7 +599,7 @@ class AutoMLOrchestrator:
 
 # Factory function for easy instantiation
 async def create_automl_orchestrator(
-    config: AutoMLConfig | None = None, db_manager: Optional["DatabaseManager"] = None
+    config: AutoMLConfig | None = None, db_manager: Optional["UnifiedConnectionManager"] = None
 ) -> AutoMLOrchestrator:
     """Factory function to create AutoML orchestrator with proper component initialization
 
@@ -606,9 +614,9 @@ async def create_automl_orchestrator(
         config = AutoMLConfig()
 
     if db_manager is None:
-        from ..database.connection import DatabaseManager
+        from ...database import get_sessionmanager
 
-        db_manager = DatabaseManager()
+        db_manager = get_sessionmanager()
 
     # Initialize components if needed
     from ..optimization.algorithms.rule_optimizer import RuleOptimizer

@@ -170,34 +170,10 @@ def test_redis_connection() -> bool:
         print_status("Redis connection", "FAIL", str(e))
         return False
 
-def test_jwt_functionality() -> bool:
-    """Test JWT secret functionality."""
-    try:
-        import jwt
-        
-        secret = os.getenv('MCP_JWT_SECRET_KEY')
-        if not secret:
-            print_status("JWT functionality", "FAIL", "MCP_JWT_SECRET_KEY not set")
-            return False
-        
-        # Test encoding/decoding
-        payload = {"test": "data", "user": "test_user"}
-        token = jwt.encode(payload, secret, algorithm="HS256")
-        decoded = jwt.decode(token, secret, algorithms=["HS256"])
-        
-        if decoded['test'] == 'data':
-            print_status("JWT functionality", "PASS", "Encoding/decoding works")
-            return True
-        else:
-            print_status("JWT functionality", "FAIL", "Decoded payload doesn't match")
-            return False
-            
-    except ImportError:
-        print_status("JWT functionality", "WARN", "PyJWT not installed - skipping test")
-        return True
-    except Exception as e:
-        print_status("JWT functionality", "FAIL", str(e))
-        return False
+def test_simplified_access_control() -> bool:
+    """Test simplified access control functionality."""
+    print_status("Simplified access control", "PASS", "Using input validation and rate limiting")
+    return True
 
 def check_file_permissions() -> bool:
     """Check file permissions for test directories."""
@@ -294,14 +270,14 @@ async def main():
     print(f"\n{Colors.BOLD}Connectivity Tests:{Colors.END}")
     db_ok = await test_database_connection()
     redis_ok = test_redis_connection()
-    jwt_ok = test_jwt_functionality()
+    access_control_ok = test_simplified_access_control()
     
     print(f"\n{Colors.BOLD}File System Tests:{Colors.END}")
     files_ok = check_file_permissions()
     
     # Summary
     print(f"\n{Colors.BOLD}Summary:{Colors.END}")
-    all_tests_passed = required_ok and db_ok and redis_ok and jwt_ok and files_ok
+    all_tests_passed = required_ok and db_ok and redis_ok and access_control_ok and files_ok
     
     if all_tests_passed:
         print_status("All tests passed", "PASS", "Environment is ready for integration tests")

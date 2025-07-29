@@ -103,7 +103,7 @@ def setup_secure_logging() -> None:
             # Database URL patterns
             (r'postgresql://([^:]+):([^@]+)@', r'postgresql://\1:***REDACTED***@'),
             (r'postgresql\+psycopg://([^:]+):([^@]+)@', r'postgresql+psycopg://\1:***REDACTED***@'),
-            # JWT tokens
+            # Authentication tokens
             (r'Bearer\s+([A-Za-z0-9\-._~+/]+)', r'Bearer ***REDACTED***'),
             # API keys
             (r'api[_-]?key["\s]*[:=]["\s]*([^"\s]+)', r'api_key=***REDACTED***'),

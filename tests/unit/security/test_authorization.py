@@ -33,7 +33,7 @@ import pytest
 import psycopg
 from psycopg.rows import dict_row
 
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
 from prompt_improver.database.psycopg_client import TypeSafePsycopgClient
 
 
@@ -402,7 +402,7 @@ class RealAuthorizationService:
 @pytest.fixture
 async def auth_service():
     """Create authorization service with test data"""
-    db_config = DatabaseConfig()
+    db_config = AppConfig().database
     db_interface = PostgreSQLAuthorizationDB(db_config.psycopg_connection_string)
     service = RealAuthorizationService(db_interface)
 

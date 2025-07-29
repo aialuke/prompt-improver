@@ -207,7 +207,7 @@ class ComponentInvoker:
 
         try:
             # Import retry configuration
-            from ..core.unified_retry_manager import RetryConfig
+            from ....core.retry_manager import RetryConfig
 
             # Create retry configuration
             retry_config = RetryConfig(

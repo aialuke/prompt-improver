@@ -17,7 +17,7 @@ from rich.console import Console
 from ...database import get_sessionmanager
 from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
-from ...ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from ...ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 from ...core.services.analytics_factory import get_analytics_interface
 from .rule_validation_service import RuleValidationService
 
@@ -91,7 +91,7 @@ class TrainingSystemManager:
                     "database_connections",
                     "ml_orchestrator",
                     "analytics_service",
-                    "synthetic_data_generator"
+                    "synthetic_data_orchestrator"
                 ],
                 "health_status": health_status,
                 "resource_usage": await self._get_resource_usage(),

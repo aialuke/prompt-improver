@@ -68,7 +68,7 @@ class TestCoredisAnalyticsMigration:
         
     @pytest.mark.asyncio
     async def test_analytics_service_initialization(self):
-        """Test backward compatible RealTimeAnalyticsService with coredis"""
+        """Test modernized RealTimeAnalyticsService with coredis"""
         service = RealTimeAnalyticsService(
             db_session=self.mock_db_session,
             redis_client=self.mock_redis_client

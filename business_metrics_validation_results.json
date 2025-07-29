@@ -1,0 +1,229 @@
+{
+  "timestamp": "2025-07-29T12:08:54.563732+00:00",
+  "tests_passed": 8,
+  "tests_failed": 1,
+  "test_results": {
+    "metrics_initialization": {
+      "status": "PASSED",
+      "message": "All metrics collectors initialized successfully"
+    },
+    "ml_metrics_collection": {
+      "status": "PASSED",
+      "message": "ML metrics collected successfully",
+      "stats": {
+        "prompt_improvements_tracked": 1,
+        "model_inferences_tracked": 1,
+        "feature_flags_tracked": 0,
+        "pipeline_operations_tracked": 0,
+        "last_aggregation": null,
+        "current_metrics_count": {
+          "prompt_improvements": 1,
+          "model_inferences": 1,
+          "feature_flags": 0,
+          "pipeline_operations": 0
+        },
+        "is_running": false,
+        "config": {
+          "aggregation_window_minutes": 5,
+          "retention_hours": 24
+        }
+      }
+    },
+    "api_metrics_collection": {
+      "status": "PASSED",
+      "message": "API metrics collected successfully",
+      "stats": {
+        "api_calls_tracked": 1,
+        "journey_events_tracked": 1,
+        "rate_limit_events_tracked": 0,
+        "auth_events_tracked": 0,
+        "active_sessions_count": 0,
+        "last_aggregation": null,
+        "current_metrics_count": {
+          "api_usage": 1,
+          "user_journey": 1,
+          "rate_limiting": 0,
+          "authentication": 0
+        },
+        "endpoint_popularity_cache_size": 1,
+        "is_running": false,
+        "config": {
+          "aggregation_window_minutes": 5,
+          "retention_hours": 72,
+          "journey_timeout_minutes": 30
+        }
+      }
+    },
+    "performance_metrics_collection": {
+      "status": "PASSED",
+      "message": "Performance metrics collected successfully",
+      "stats": {
+        "pipeline_stages_tracked": 1,
+        "database_queries_tracked": 0,
+        "cache_operations_tracked": 0,
+        "external_api_calls_tracked": 0,
+        "active_requests_count": 0,
+        "slow_queries_detected": 0,
+        "cache_misses_detected": 0,
+        "last_aggregation": null,
+        "current_metrics_count": {
+          "pipeline_stages": 1,
+          "database_operations": 0,
+          "cache_operations": 0,
+          "external_api_calls": 0
+        },
+        "pipeline_stage_cache_size": 1,
+        "database_query_cache_size": 0,
+        "is_running": false,
+        "config": {
+          "aggregation_window_minutes": 5,
+          "retention_hours": 48,
+          "slow_query_threshold_ms": 1000,
+          "cache_efficiency_threshold": 0.8
+        }
+      }
+    },
+    "business_intelligence_metrics": {
+      "status": "PASSED",
+      "message": "BI metrics collected successfully",
+      "stats": {
+        "feature_adoptions_tracked": 1,
+        "user_engagements_tracked": 0,
+        "cost_events_tracked": 1,
+        "utilization_events_tracked": 0,
+        "active_user_sessions": 0,
+        "total_cost_tracked": 0.05,
+        "cost_alerts_triggered": 0,
+        "last_aggregation": null,
+        "current_metrics_count": {
+          "feature_adoptions": 1,
+          "user_engagements": 0,
+          "cost_trackings": 1,
+          "resource_utilizations": 0
+        },
+        "feature_cache_size": 1,
+        "cost_accumulator_size": 1,
+        "is_running": false,
+        "config": {
+          "aggregation_window_minutes": 15,
+          "retention_days": 30,
+          "roi_calculation_enabled": true,
+          "cost_alert_threshold": 1000.0
+        }
+      }
+    },
+    "metrics_aggregation": {
+      "status": "PASSED",
+      "message": "Metrics aggregation working successfully",
+      "insights_sample": "{'ml_insights': {'total_improvements': 1, 'overall_success_rate': 1.0, 'category_breakdown': {'clarity': {'count': 1, 'success_rate': 1.0, 'avg_improvement_ratio': 1.5, 'avg_processing_time_ms': 1500...."
+    },
+    "dashboard_export": {
+      "status": "PASSED",
+      "message": "Dashboard export working successfully",
+      "executive_summary_keys": [
+        "dashboard_id",
+        "title",
+        "description",
+        "generated_at",
+        "time_range",
+        "widgets",
+        "metadata"
+      ],
+      "ml_performance_keys": [
+        "dashboard_id",
+        "title",
+        "description",
+        "generated_at",
+        "time_range",
+        "widgets",
+        "metadata"
+      ],
+      "real_time_keys": [
+        "dashboard_id",
+        "title",
+        "description",
+        "generated_at",
+        "time_range",
+        "widgets",
+        "metadata"
+      ]
+    },
+    "instrumentation_decorators": {
+      "status": "FAILED",
+      "message": "Failed to validate instrumentation decorators: BusinessMetricsValidator.validate_instrumentation_decorators.<locals>.test_ml_function() got an unexpected keyword argument 'user_id'. Did you mean '_user_id'?"
+    },
+    "real_business_scenario": {
+      "status": "PASSED",
+      "message": "Complete business scenario tracked successfully",
+      "scenario_metrics": {
+        "ml_stats": {
+          "prompt_improvements_tracked": 3,
+          "model_inferences_tracked": 2,
+          "feature_flags_tracked": 0,
+          "pipeline_operations_tracked": 0,
+          "last_aggregation": "2025-07-29 12:09:05.359005+00:00",
+          "current_metrics_count": {
+            "prompt_improvements": 3,
+            "model_inferences": 2,
+            "feature_flags": 0,
+            "pipeline_operations": 0
+          },
+          "is_running": true,
+          "config": {
+            "aggregation_window_minutes": 5,
+            "retention_hours": 24
+          }
+        },
+        "api_stats": {
+          "api_calls_tracked": 2,
+          "journey_events_tracked": 2,
+          "rate_limit_events_tracked": 0,
+          "auth_events_tracked": 0,
+          "active_sessions_count": 1,
+          "last_aggregation": "2025-07-29 12:09:05.359402+00:00",
+          "current_metrics_count": {
+            "api_usage": 2,
+            "user_journey": 2,
+            "rate_limiting": 0,
+            "authentication": 0
+          },
+          "endpoint_popularity_cache_size": 2,
+          "is_running": true,
+          "config": {
+            "aggregation_window_minutes": 5,
+            "retention_hours": 72,
+            "journey_timeout_minutes": 30
+          }
+        },
+        "bi_stats": {
+          "feature_adoptions_tracked": 2,
+          "user_engagements_tracked": 0,
+          "cost_events_tracked": 2,
+          "utilization_events_tracked": 0,
+          "active_user_sessions": 0,
+          "total_cost_tracked": 0.08,
+          "cost_alerts_triggered": 0,
+          "last_aggregation": null,
+          "current_metrics_count": {
+            "feature_adoptions": 2,
+            "user_engagements": 0,
+            "cost_trackings": 2,
+            "resource_utilizations": 0
+          },
+          "feature_cache_size": 2,
+          "cost_accumulator_size": 2,
+          "is_running": false,
+          "config": {
+            "aggregation_window_minutes": 15,
+            "retention_days": 30,
+            "roi_calculation_enabled": true,
+            "cost_alert_threshold": 1000.0
+          }
+        }
+      }
+    }
+  },
+  "total_tests": 9,
+  "success_rate": 88.88888888888889,
+  "overall_status": "FAILED"
+}

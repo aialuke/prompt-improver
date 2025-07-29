@@ -53,8 +53,8 @@ from prompt_improver.database.models import (
 )
 
 # Import other Pydantic models
-from prompt_improver.utils.redis_cache import RedisConfig
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
+from prompt_improver.core.config import AppConfig
 
 
 class TestPydanticModelImports:
@@ -598,8 +598,8 @@ def test_import_all_models():
     )
     
     # Test configuration models
-    from prompt_improver.database.config import DatabaseConfig
-    from prompt_improver.utils.redis_cache import RedisConfig
+    from prompt_improver.core.config import AppConfig
+    from prompt_improver.core.config import AppConfig
     
     # Test that all models have the expected Pydantic methods
     models_to_test = [

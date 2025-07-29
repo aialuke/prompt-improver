@@ -13,9 +13,10 @@ except ImportError:
     analytics_service = None
 
 try:
-    from prompt_improver.performance.monitoring.health.service import health_service
+    from prompt_improver.performance.monitoring.health.unified_health_system import get_unified_health_monitor
+    health_monitor = get_unified_health_monitor  # Function that returns the monitor instance
 except ImportError:
-    health_service = None
+    health_monitor = None
 
 try:
     from prompt_improver.core.services.analytics_factory import get_analytics_router
@@ -48,7 +49,7 @@ class APESDataProvider:
     def __init__(self):
         # Initialize services with fallback handling
         self.analytics_service = None
-        self.health_service = None
+        self.health_monitor = None
         self.real_time_analytics = None
         self.automl_orchestrator = None
         self.experiment_orchestrator = None
@@ -62,8 +63,8 @@ class APESDataProvider:
             pass
 
         try:
-            if health_service:
-                self.health_service = health_service()
+            if health_monitor:
+                self.health_monitor = health_monitor()
         except Exception:
             pass
 
@@ -95,8 +96,8 @@ class APESDataProvider:
         """Initialize all services."""
         try:
             # Initialize services that need async setup
-            if self.health_service and hasattr(self.health_service, "initialize"):
-                await self.health_service.initialize()
+            if self.health_monitor and hasattr(self.health_monitor, "initialize"):
+                await self.health_monitor.initialize()
             if self.real_time_analytics and hasattr(
                 self.real_time_analytics, "initialize"
             ):
@@ -112,10 +113,15 @@ class APESDataProvider:
 
         try:
             # Get system health
-            if self.health_service and hasattr(
-                self.health_service, "get_health_status"
+            if self.health_monitor and hasattr(
+                self.health_monitor, "get_overall_health"
             ):
-                health_data = await self.health_service.get_health_status()
+                health_result = await self.health_monitor.get_overall_health()
+                health_data = {
+                    "status": health_result.status.value,
+                    "message": health_result.message,
+                    "details": health_result.details
+                }
             else:
                 health_data = {
                     "status": "unknown",
@@ -371,7 +377,7 @@ class APESDataProvider:
                         "uptime": "2h 15m",
                     },
                     "analytics": {"status": "running", "pid": 1235, "uptime": "2h 15m"},
-                    "health_service": {
+                    "health_monitor": {
                         "status": "running",
                         "pid": 1236,
                         "uptime": "2h 15m",

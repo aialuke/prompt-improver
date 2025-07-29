@@ -46,7 +46,7 @@ from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPip
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.performance.monitoring.performance_benchmark import PerformanceBenchmark
 from prompt_improver.performance.validation.performance_validation import PerformanceValidator
-from prompt_improver.utils.health_checks import HealthChecker, HealthStatus
+from prompt_improver.performance.monitoring.health.unified_health_system import UnifiedHealthSystem
 from prompt_improver.performance.testing.ab_testing_service import ABTestingService
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
 from prompt_improver.database.query_optimizer import get_query_executor

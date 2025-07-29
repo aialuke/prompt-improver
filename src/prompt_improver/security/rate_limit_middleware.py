@@ -1,7 +1,6 @@
-"""Rate limiting middleware for MCP server with JWT integration.
+"""Rate limiting middleware for MCP server.
 
-Provides rate limiting middleware that integrates with JWT authentication
-to enforce tier-based rate limits with burst handling.
+Provides rate limiting middleware with tier-based rate limits and burst handling.
 """
 
 import logging
@@ -11,7 +10,13 @@ from typing import Any, Callable, Dict, Optional
 from functools import wraps
 
 from .redis_rate_limiter import SlidingWindowRateLimiter, RateLimitResult, RateLimitStatus
-from .mcp_authentication import RateLimitTier
+from enum import Enum
+
+class RateLimitTier(str, Enum):
+    """Rate limiting tiers with different request allowances."""
+    BASIC = "basic"          # 60 req/min, burst 90
+    PROFESSIONAL = "professional"  # 300 req/min, burst 450
+    ENTERPRISE = "enterprise"      # 1000+ req/min, burst 1500
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +30,7 @@ class RateLimitExceeded(Exception):
         super().__init__(message)
 
 class MCPRateLimitMiddleware:
-    """Rate limiting middleware for MCP server with JWT tier integration."""
+    """Rate limiting middleware for MCP server with tier-based limits."""
     
     def __init__(self, redis_url: Optional[str] = None):
         """Initialize rate limiting middleware.
@@ -72,8 +77,8 @@ class MCPRateLimitMiddleware:
         """Check rate limit for agent with tier-based configuration.
         
         Args:
-            agent_id: Agent identifier from JWT token
-            rate_limit_tier: Rate limit tier from JWT token
+            agent_id: Agent identifier for rate limiting
+            rate_limit_tier: Rate limit tier for the request
             additional_identifier: Optional additional identifier (e.g., IP address)
             
         Returns:

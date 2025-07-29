@@ -36,7 +36,7 @@ from prompt_improver.database.query_optimizer import get_query_executor
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )
-from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from prompt_improver.ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.performance.monitoring.performance_benchmark import PerformanceBenchmark

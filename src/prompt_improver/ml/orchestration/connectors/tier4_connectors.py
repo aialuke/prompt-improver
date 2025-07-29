@@ -678,7 +678,7 @@ class TypeSafePsycopgClientConnector(ComponentConnector):
         }
 
 class RetryManagerConnector(ComponentConnector):
-    """Connector for UnifiedRetryManager component."""
+    """Connector for RetryManager component."""
 
     def __init__(self, event_bus=None):
         metadata = ComponentMetadata(
@@ -722,22 +722,22 @@ class RetryManagerConnector(ComponentConnector):
         super().__init__(metadata, event_bus)
 
     async def _initialize_component(self) -> None:
-        """Initialize UnifiedRetryManager component."""
+        """Initialize RetryManager component."""
         try:
-            from ..core.unified_retry_manager import UnifiedRetryManager, RetryConfig
+            from ....core.retry_manager import RetryManager, RetryConfig
 
-            # Create unified retry manager with orchestrator-optimized config
+            # Create retry manager with orchestrator-optimized config
             default_config = RetryConfig(
                 max_attempts=3,
-                initial_delay_ms=100,
-                max_delay_ms=30000,
+                base_delay=0.1,
+                max_delay=30.0,
                 enable_circuit_breaker=True,
                 enable_metrics=True,
                 enable_tracing=True
             )
 
-            self.component = UnifiedRetryManager(default_config)
-            self.logger.info("UnifiedRetryManager connector initialized")
+            self.component = RetryManager(default_config)
+            self.logger.info("RetryManager connector initialized")
 
             # Emit initialization event
             if self.event_bus:
@@ -757,7 +757,7 @@ class RetryManagerConnector(ComponentConnector):
                     # Don't fail initialization if event emission fails
                     self.logger.debug(f"Failed to emit initialization event: {e}")
         except Exception as e:
-            self.logger.error(f"Failed to initialize UnifiedRetryManager: {e}")
+            self.logger.error(f"Failed to initialize RetryManager: {e}")
             raise
 
     async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -778,19 +778,19 @@ class RetryManagerConnector(ComponentConnector):
     async def _execute_with_retry(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute operation with retry logic."""
         if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("UnifiedRetryManager component not initialized")
+            raise RuntimeError("RetryManager component not initialized")
 
         operation_name = parameters.get("operation_name", "unknown_operation")
         retry_config_params = parameters.get("retry_config", {})
 
         # Create retry config from parameters
-        from ..core.unified_retry_manager import RetryConfig, RetryStrategy
+        from ....core.retry_manager import RetryConfig, RetryStrategy
 
         retry_config = RetryConfig(
             max_attempts=retry_config_params.get("max_attempts", 3),
-            strategy=RetryStrategy(retry_config_params.get("strategy", "exponential_backoff")),
-            initial_delay_ms=retry_config_params.get("initial_delay_ms", 100),
-            max_delay_ms=retry_config_params.get("max_delay_ms", 30000),
+            strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
+            base_delay=retry_config_params.get("base_delay", 0.1),
+            max_delay=retry_config_params.get("max_delay", 30.0),
             enable_circuit_breaker=retry_config_params.get("enable_circuit_breaker", True),
             operation_name=operation_name
         )
@@ -818,7 +818,7 @@ class RetryManagerConnector(ComponentConnector):
     async def _circuit_breaker_status(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Get circuit breaker status."""
         if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("UnifiedRetryManager component not initialized")
+            raise RuntimeError("RetryManager component not initialized")
 
         operation_name = parameters.get("operation_name", "default")
         status = await self.component.get_circuit_breaker_status(operation_name)
@@ -833,7 +833,7 @@ class RetryManagerConnector(ComponentConnector):
     async def _retry_metrics_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze retry metrics and patterns."""
         if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("UnifiedRetryManager component not initialized")
+            raise RuntimeError("RetryManager component not initialized")
 
         # This would integrate with actual metrics collection in a real implementation
         analysis = {
@@ -852,7 +852,7 @@ class RetryManagerConnector(ComponentConnector):
     async def _reset_circuit_breaker(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Reset circuit breaker for operation."""
         if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("UnifiedRetryManager component not initialized")
+            raise RuntimeError("RetryManager component not initialized")
 
         operation_name = parameters.get("operation_name")
         if not operation_name:
@@ -874,7 +874,7 @@ class RetryManagerConnector(ComponentConnector):
     async def _configure_retry_strategy(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Configure retry strategy."""
         if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("UnifiedRetryManager component not initialized")
+            raise RuntimeError("RetryManager component not initialized")
 
         # Update default configuration
         config_updates = parameters.get("config", {})

@@ -1,4 +1,4 @@
-from prompt_improver.utils.redis_cache import (
+from prompt_improver.core.config import AppConfig  # Redis functionality (
     start_cache_subscriber,
     stop_cache_subscriber,
 )

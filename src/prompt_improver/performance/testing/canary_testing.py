@@ -47,7 +47,7 @@ try:
 except ImportError:
     ISTIO_AVAILABLE = False
 
-from prompt_improver.utils.redis_cache import redis_client
+from prompt_improver.core.config import AppConfig  # Redis functionality redis_client
 
 console = Console()
 
@@ -301,11 +301,18 @@ class EnhancedCanaryTestingService:
 
     def _load_config(self) -> dict:
         """Load canary testing configuration from Redis config"""
-        config_file = "config/redis_config.yaml"
+        # config_file = "config/redis_config.yaml"  # YAML config deprecated
         try:
-            with open(config_file) as f:
-                config = yaml.safe_load(f)
-                return config.get('feature_flags', {}).get('pattern_cache', {})
+            # Use the new nested config structure instead of YAML
+            from prompt_improver.core.config import AppConfig
+            config = AppConfig()
+            # Return default canary config since YAML config is deprecated
+            return {
+                'enabled': True,
+                'rollout_percentage': 0,
+                'ab_testing': {'enabled': True},
+                'canary': {'enabled': True, 'initial_percentage': 5}
+            }
         except FileNotFoundError:
             console.print(f"❌ Config file not found: {config_file}", style="red")
             return {}
@@ -787,11 +794,18 @@ class CanaryTestingService(EnhancedCanaryTestingService):
 
     def _load_config(self) -> dict:
         """Load canary testing configuration from Redis config"""
-        config_file = "config/redis_config.yaml"
+        # config_file = "config/redis_config.yaml"  # YAML config deprecated
         try:
-            with open(config_file) as f:
-                config = yaml.safe_load(f)
-                return config.get('feature_flags', {}).get('pattern_cache', {})
+            # Use the new nested config structure instead of YAML
+            from prompt_improver.core.config import AppConfig
+            config = AppConfig()
+            # Return default canary config since YAML config is deprecated
+            return {
+                'enabled': True,
+                'rollout_percentage': 0,
+                'ab_testing': {'enabled': True},
+                'canary': {'enabled': True, 'initial_percentage': 5}
+            }
         except FileNotFoundError:
             console.print(f"❌ Config file not found: {config_file}", style="red")
             return {}

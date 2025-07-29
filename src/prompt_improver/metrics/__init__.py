@@ -14,7 +14,19 @@ Core Components:
 
 All metrics integrate with existing monitoring infrastructure and provide
 real-time business insights with sub-second latency.
+
+Uses modern 2025 Python patterns with composition over inheritance.
 """
+
+# Base metrics infrastructure
+from .base_metrics_collector import (
+    BaseMetricsCollector,
+    MetricsConfig,
+    PrometheusMetricsMixin,
+    MetricsStorageMixin,
+    create_metrics_collector,
+    get_or_create_collector
+)
 
 # ML-specific metrics
 from .ml_metrics import (
@@ -85,11 +97,11 @@ from .dashboard_exports import (
     export_real_time_monitoring
 )
 
-# Legacy system metrics (maintained for compatibility)
+# System metrics components
 try:
     from .system_metrics import (
         SystemMetricsCollector,
-        ConnectionAgeTracker, 
+        ConnectionAgeTracker,
         RequestQueueMonitor,
         CacheEfficiencyMonitor,
         FeatureUsageAnalytics,
@@ -101,14 +113,22 @@ except ImportError:
     _legacy_available = False
 
 __all__ = [
+    # Base metrics infrastructure
+    'BaseMetricsCollector',
+    'MetricsConfig',
+    'PrometheusMetricsMixin',
+    'MetricsStorageMixin',
+    'create_metrics_collector',
+    'get_or_create_collector',
+
     # ML metrics
     'MLMetricsCollector',
     'PromptCategory',
-    'ModelInferenceStage', 
+    'ModelInferenceStage',
     'get_ml_metrics_collector',
     'record_prompt_improvement',
     'record_model_inference',
-    
+
     # API metrics
     'APIMetricsCollector',
     'EndpointCategory',
@@ -118,7 +138,7 @@ __all__ = [
     'get_api_metrics_collector',
     'record_api_request',
     'record_user_journey_event',
-    
+
     # Performance metrics
     'PerformanceMetricsCollector',
     'PipelineStage',
@@ -127,7 +147,7 @@ __all__ = [
     'ExternalAPIType',
     'get_performance_metrics_collector',
     'record_pipeline_stage_timing',
-    
+
     # Business intelligence metrics
     'BusinessIntelligenceMetricsCollector',
     'FeatureCategory',
@@ -137,7 +157,7 @@ __all__ = [
     'get_bi_metrics_collector',
     'record_feature_usage',
     'record_operational_cost',
-    
+
     # Aggregation engine
     'RealTimeAggregationEngine',
     'AggregationWindow',
@@ -147,7 +167,7 @@ __all__ = [
     'start_aggregation_engine',
     'stop_aggregation_engine',
     'get_business_insights',
-    
+
     # Dashboard exports
     'DashboardExporter',
     'ExportFormat',
@@ -164,7 +184,7 @@ if _legacy_available:
     __all__.extend([
         'SystemMetricsCollector',
         'ConnectionAgeTracker',
-        'RequestQueueMonitor', 
+        'RequestQueueMonitor',
         'CacheEfficiencyMonitor',
         'FeatureUsageAnalytics',
         'MetricsConfig',
@@ -185,41 +205,41 @@ async def shutdown_all_metrics():
 def get_metrics_summary():
     """Get a summary of all metrics collection statistics."""
     summary = {}
-    
+
     try:
         ml_collector = get_ml_metrics_collector()
         summary["ml_metrics"] = ml_collector.get_collection_stats()
     except Exception:
         summary["ml_metrics"] = {"error": "Not available"}
-    
+
     try:
         api_collector = get_api_metrics_collector()
         summary["api_metrics"] = api_collector.get_collection_stats()
     except Exception:
         summary["api_metrics"] = {"error": "Not available"}
-    
+
     try:
         performance_collector = get_performance_metrics_collector()
         summary["performance_metrics"] = performance_collector.get_collection_stats()
     except Exception:
         summary["performance_metrics"] = {"error": "Not available"}
-    
+
     try:
         bi_collector = get_bi_metrics_collector()
         summary["bi_metrics"] = bi_collector.get_collection_stats()
     except Exception:
         summary["bi_metrics"] = {"error": "Not available"}
-    
+
     try:
         aggregation_engine = get_aggregation_engine()
         summary["aggregation_engine"] = aggregation_engine.get_processing_stats()
     except Exception:
         summary["aggregation_engine"] = {"error": "Not available"}
-    
+
     try:
         dashboard_exporter = get_dashboard_exporter()
         summary["dashboard_exports"] = dashboard_exporter.get_export_stats()
     except Exception:
         summary["dashboard_exports"] = {"error": "Not available"}
-    
+
     return summary

@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 # revision identifiers, used by Alembic.
@@ -27,13 +28,13 @@ def upgrade() -> None:
         sa.Column('session_id', sa.String(), nullable=False),
         sa.Column('iteration', sa.Integer(), nullable=False),
         sa.Column('workflow_id', sa.String(), nullable=True),
-        sa.Column('performance_metrics', sa.JSON(), nullable=False),
-        sa.Column('rule_optimizations', sa.JSON(), nullable=False),
-        sa.Column('discovered_patterns', sa.JSON(), nullable=False),
+        sa.Column('performance_metrics', JSONB, nullable=False),
+        sa.Column('rule_optimizations', JSONB, nullable=False),
+        sa.Column('discovered_patterns', JSONB, nullable=False),
         sa.Column('synthetic_data_generated', sa.Integer(), nullable=False),
         sa.Column('duration_seconds', sa.Float(), nullable=False),
         sa.Column('improvement_score', sa.Float(), nullable=False),
-        sa.Column('checkpoint_data', sa.JSON(), nullable=True),
+        sa.Column('checkpoint_data', JSONB, nullable=True),
         sa.Column('error_message', sa.String(), nullable=True),
         sa.Column('retry_count', sa.Integer(), nullable=False),
         sa.Column('started_at', sa.DateTime(), nullable=False),

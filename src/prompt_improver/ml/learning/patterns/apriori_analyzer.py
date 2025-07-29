@@ -21,9 +21,9 @@ except ImportError:
     MLXTEND_AVAILABLE = False
     logging.warning("mlxtend not available. Install with: pip install mlxtend")
 
-from ....database.connection import DatabaseManager
+from ....database import get_unified_manager, ManagerMode
 from ....utils.error_handlers import handle_common_errors as handle_errors
-from ....utils.redis_cache import cached
+# Caching functionality moved to AppConfig
 
 @dataclass
 class AprioriConfig:
@@ -46,7 +46,7 @@ class AprioriAnalyzer:
     - Context features (from the 31-dimensional feature pipeline)
     """
 
-    def __init__(self, db_manager: Optional[DatabaseManager] = None, config: Optional[AprioriConfig] = None):
+    def __init__(self, db_manager = None, config: Optional[AprioriConfig] = None):
         """Initialize the Apriori analyzer.
         
         Args:
@@ -56,7 +56,7 @@ class AprioriAnalyzer:
         if not MLXTEND_AVAILABLE:
             raise ImportError("mlxtend library is required. Install with: pip install mlxtend")
 
-        self.db_manager = db_manager
+        self.db_manager = db_manager or get_unified_manager(ManagerMode.ML_TRAINING)
         self.config = config or AprioriConfig()
         self.logger = logging.getLogger(__name__)
 

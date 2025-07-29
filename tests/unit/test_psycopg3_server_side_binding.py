@@ -17,7 +17,7 @@ from typing import AsyncGenerator
 import pytest
 from pydantic import BaseModel
 
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
 from prompt_improver.database.psycopg_client import TypeSafePsycopgClient
 
 
@@ -37,7 +37,7 @@ class TestServerSideBinding:
         """Create a mock client that validates server-side binding behavior."""
         try:
             # Try to create real client first to test real behavior
-            config = DatabaseConfig()
+            config = AppConfig().database
             client = TypeSafePsycopgClient(config)
             
             # Test if we can connect to validate real behavior is possible

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Performance benchmark comparing original vs refactored ML components.
+"""Performance benchmark comparing original vs current ML components.
 
 This script measures initialization time, memory usage, and processing speed
-for both the original monolithic implementation and the new refactored components.
+for both the original monolithic implementation and the current ML components.
 """
 
 import asyncio
@@ -46,11 +46,11 @@ def create_sample_data(size: int = 50) -> List[Dict[str, Any]]:
         for i in range(size)
     ]
 
-async def benchmark_refactored_components():
-    """Benchmark the new refactored components."""
-    print("🔄 Benchmarking Refactored Components...")
+async def benchmark_ml_components():
+    """Benchmark the current ML components."""
+    print("🔄 Benchmarking Current ML Components...")
     
-    # Import refactored components
+    # Import current ML components
     from prompt_improver.ml.learning.features import (
         CompositeFeatureExtractor,
         FeatureExtractionConfig
@@ -226,8 +226,8 @@ def benchmark_original_components():
     
     return results
 
-def print_comparison(original_results: Dict, refactored_results: Dict):
-    """Print detailed comparison between original and refactored implementations."""
+def print_comparison(baseline_results: Dict, current_results: Dict):
+    """Print detailed comparison between baseline and current implementations."""
     print("\n" + "="*80)
     print("📊 PERFORMANCE COMPARISON RESULTS")
     print("="*80)
@@ -236,52 +236,52 @@ def print_comparison(original_results: Dict, refactored_results: Dict):
     print("\n🚀 INITIALIZATION PERFORMANCE")
     print("-" * 40)
     orig_init = original_results['initialization']
-    refact_init = refactored_results['initialization']
+    current_init = current_results['initialization']
     
-    time_improvement = ((orig_init['time_seconds'] - refact_init['time_seconds']) / orig_init['time_seconds']) * 100
-    memory_improvement = ((orig_init['memory_mb'] - refact_init['memory_mb']) / orig_init['memory_mb']) * 100
+    time_improvement = ((orig_init['time_seconds'] - current_init['time_seconds']) / orig_init['time_seconds']) * 100
+    memory_improvement = ((orig_init['memory_mb'] - current_init['memory_mb']) / orig_init['memory_mb']) * 100
     
     print(f"Original:    {orig_init['time_seconds']:.3f}s, {orig_init['memory_mb']:.1f}MB")
-    print(f"Refactored:  {refact_init['time_seconds']:.3f}s, {refact_init['memory_mb']:.1f}MB")
+    print(f"Current:     {current_init['time_seconds']:.3f}s, {current_init['memory_mb']:.1f}MB")
     print(f"Improvement: {time_improvement:+.1f}% time, {memory_improvement:+.1f}% memory")
     
     # Feature Extraction Comparison
     print("\n🔍 FEATURE EXTRACTION PERFORMANCE")
     print("-" * 40)
     orig_feat = original_results['feature_extraction']
-    refact_feat = refactored_results['feature_extraction']
+    current_feat = current_results['feature_extraction']
     
-    feat_time_improvement = ((orig_feat['time_seconds'] - refact_feat['time_seconds']) / orig_feat['time_seconds']) * 100
+    feat_time_improvement = ((orig_feat['time_seconds'] - current_feat['time_seconds']) / orig_feat['time_seconds']) * 100
     
     print(f"Original:    {orig_feat['time_seconds']:.3f}s ({orig_feat['time_per_text']:.3f}s per text)")
-    print(f"Refactored:  {refact_feat['time_seconds']:.3f}s ({refact_feat['time_per_text']:.3f}s per text)")
+    print(f"Current:     {current_feat['time_seconds']:.3f}s ({current_feat['time_per_text']:.3f}s per text)")
     print(f"Improvement: {feat_time_improvement:+.1f}% faster")
     
     # Learning Performance Comparison
     print("\n🧠 LEARNING PERFORMANCE")
     print("-" * 40)
     orig_learn = original_results['learning']
-    refact_learn = refactored_results['learning']
+    current_learn = current_results['learning']
     
-    learn_time_improvement = ((orig_learn['time_seconds'] - refact_learn['time_seconds']) / orig_learn['time_seconds']) * 100
+    learn_time_improvement = ((orig_learn['time_seconds'] - current_learn['time_seconds']) / orig_learn['time_seconds']) * 100
     
     print(f"Original:    {orig_learn['time_seconds']:.3f}s, {orig_learn['clusters_found']} clusters")
-    print(f"Refactored:  {refact_learn['time_seconds']:.3f}s, {refact_learn['clusters_found']} clusters")
+    print(f"Current:     {current_learn['time_seconds']:.3f}s, {current_learn['clusters_found']} clusters")
     print(f"Improvement: {learn_time_improvement:+.1f}% faster")
-    print(f"Quality:     Original: {orig_learn['silhouette_score']:.3f}, Refactored: {refact_learn['silhouette_score']:.3f}")
+    print(f"Quality:     Original: {orig_learn['silhouette_score']:.3f}, Current: {current_learn['silhouette_score']:.3f}")
     
     # Memory Efficiency Comparison
     print("\n💾 MEMORY EFFICIENCY")
     print("-" * 40)
     orig_mem = original_results['memory_efficiency']
-    refact_mem = refactored_results['memory_efficiency']
+    current_mem = current_results['memory_efficiency']
     
-    mem_efficiency_improvement = ((orig_mem['memory_after_cleanup_mb'] - refact_mem['memory_after_cleanup_mb']) / orig_mem['memory_after_cleanup_mb']) * 100
+    mem_efficiency_improvement = ((orig_mem['memory_after_cleanup_mb'] - current_mem['memory_after_cleanup_mb']) / orig_mem['memory_after_cleanup_mb']) * 100
     
     print(f"Original:    {orig_mem['memory_after_cleanup_mb']:.1f}MB after operations")
-    print(f"Refactored:  {refact_mem['memory_after_cleanup_mb']:.1f}MB after operations")
+    print(f"Current:     {current_mem['memory_after_cleanup_mb']:.1f}MB after operations")
     print(f"Improvement: {mem_efficiency_improvement:+.1f}% more efficient")
-    print(f"Cache mgmt:  Original: {orig_mem['cache_cleared']}, Refactored: {refact_mem['cache_cleared']}")
+    print(f"Cache mgmt:  Original: {orig_mem['cache_cleared']}, Current: {current_mem['cache_cleared']}")
     
     # Overall Summary
     print("\n🎯 OVERALL IMPROVEMENTS")
@@ -298,11 +298,11 @@ async def main():
     """Run the complete performance benchmark."""
     print("🚀 ML Component Performance Benchmark")
     print("=" * 50)
-    print("Comparing original monolithic vs refactored specialized components\n")
+    print("Comparing original monolithic vs current specialized components\n")
     
     try:
-        # Benchmark refactored components
-        refactored_results = await benchmark_refactored_components()
+        # Benchmark current ML components
+        current_results = await benchmark_ml_components()
         
         print("\n" + "-" * 50)
         
@@ -310,11 +310,11 @@ async def main():
         original_results = benchmark_original_components()
         
         # Print detailed comparison
-        print_comparison(original_results, refactored_results)
+        print_comparison(original_results, current_results)
         
         print("\n✅ Benchmark completed successfully!")
         print("\n📝 Key Takeaways:")
-        print("   • Refactored components show significant performance improvements")
+        print("   • Current ML components show significant performance improvements")
         print("   • Memory usage is more efficient with specialized components")
         print("   • Code complexity reduced by ~90% while maintaining functionality")
         print("   • Individual components are now easily testable and maintainable")

@@ -3,7 +3,7 @@ Comprehensive System Metrics Implementation - Phase 1 Missing Metrics
 
 Provides real-time tracking of:
 1. Connection Age Tracking - Real connection lifecycle with timestamps and age distribution
-2. Request Queue Depths - HTTP, database, ML inference, and Redis queue monitoring  
+2. Request Queue Depths - HTTP, database, ML inference, and Redis queue monitoring
 3. Cache Hit Rates - Application-level, ML model, configuration, and session cache effectiveness
 4. Feature Usage Analytics - Feature flag adoption, API utilization, ML model usage distribution
 
@@ -22,15 +22,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, UTC
 from functools import wraps
 from threading import Lock, RLock
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional, Callable, Generator
 import logging
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..performance.monitoring.metrics_registry import (
-    get_metrics_registry, 
+    get_metrics_registry,
     MetricsRegistry,
+)
 
+from .base_metrics_collector import (
+    PrometheusMetricsMixin
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +47,7 @@ class MetricsConfig(BaseModel):
     connection_age_bucket_minutes: int = Field(default=5, ge=1, le=60)     # 1-60 minute buckets
     max_tracked_connections: int = Field(default=10000, ge=100, le=100000) # Memory safety
 
-    # Queue depth monitoring  
+    # Queue depth monitoring
     queue_depth_sample_interval_ms: int = Field(default=100, ge=10, le=5000)  # 10ms-5s
     queue_depth_history_size: int = Field(default=1000, ge=100, le=10000)     # Memory limit
     queue_alert_threshold_ratio: float = Field(default=0.8, ge=0.1, le=1.0)  # 80% capacity
@@ -64,8 +67,9 @@ class MetricsConfig(BaseModel):
     batch_collection_enabled: bool = Field(default=True)                          # Batch efficiency
     async_collection_enabled: bool = Field(default=True)                          # Async operations
 
-    @validator('connection_age_retention_hours')
-    def validate_retention(cls, v):
+    @field_validator('connection_age_retention_hours')
+    @classmethod
+    def validate_retention(cls, v: int) -> int:
         if v < 1 or v > 168:  # 1 hour to 1 week
             raise ValueError("Connection age retention must be between 1 and 168 hours")
         return v
@@ -79,7 +83,7 @@ class ConnectionInfo:
     last_used: datetime
     connection_type: str  # 'database', 'redis', 'http', 'websocket'
     pool_name: str
-    source_info: Dict[str, Any] = field(default_factory=dict)
+    source_info: dict[str, Any] = field(default_factory=dict)
 
     @property
     def age_seconds(self) -> float:
@@ -97,7 +101,7 @@ class ConnectionAgeTracker:
     def __init__(self, config: MetricsConfig, registry: MetricsRegistry):
         self.config = config
         self.registry = registry
-        self._connections: Dict[str, ConnectionInfo] = {}
+        self._connections: dict[str, ConnectionInfo] = {}
         self._connection_lock = RLock()
 
         # Prometheus metrics
@@ -121,10 +125,10 @@ class ConnectionAgeTracker:
         )
 
         # Age distribution buckets for analysis
-        self._age_buckets = defaultdict(lambda: defaultdict(int))
+        self._age_buckets: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    def track_connection_created(self, connection_id: str, connection_type: str, 
-                               pool_name: str, source_info: Optional[Dict] = None) -> None:
+    def track_connection_created(self, connection_id: str, connection_type: str,
+                               pool_name: str, source_info: Optional[dict[str, Any]] = None) -> None:
         """Track new connection creation"""
         start_time = time.perf_counter()
 
@@ -211,14 +215,14 @@ class ConnectionAgeTracker:
         except Exception as e:
             logger.warning(f"Failed to track connection destruction: {e}")
 
-    def get_age_distribution(self) -> Dict[str, Dict[str, List[float]]]:
+    def get_age_distribution(self) -> dict[str, dict[str, list[float]]]:
         """Get current age distribution analysis"""
-        distribution = defaultdict(lambda: defaultdict(list))
+        distribution: defaultdict[str, defaultdict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
 
         try:
             with self._connection_lock:
                 for conn_info in self._connections.values():
-                    key = f"{conn_info.connection_type}:{conn_info.pool_name}"
+                    # Remove unused variable 'key' and directly use the distribution
                     distribution[conn_info.connection_type][conn_info.pool_name].append(
                         conn_info.age_seconds
                     )
@@ -246,8 +250,8 @@ class ConnectionAgeTracker:
             self._connections.pop(connection_id, None)
 
     @contextmanager
-    def track_connection_lifecycle(self, connection_id: str, connection_type: str, 
-                                 pool_name: str, source_info: Optional[Dict] = None):
+    def track_connection_lifecycle(self, connection_id: str, connection_type: str,
+                                 pool_name: str, source_info: Optional[dict[str, Any]] = None) -> Generator[None, None, None]:
         """Context manager for automatic connection lifecycle tracking"""
         self.track_connection_created(connection_id, connection_type, pool_name, source_info)
         try:
@@ -275,7 +279,7 @@ class RequestQueueMonitor:
     def __init__(self, config: MetricsConfig, registry: MetricsRegistry):
         self.config = config
         self.registry = registry
-        self._queue_samples: Dict[str, deque] = defaultdict(
+        self._queue_samples: dict[str, deque[QueueSample]] = defaultdict(
             lambda: deque(maxlen=self.config.queue_depth_history_size)
         )
         self._queue_lock = Lock()
@@ -307,7 +311,7 @@ class RequestQueueMonitor:
             ['queue_type', 'queue_name']
         )
 
-    def sample_queue_depth(self, queue_type: str, queue_name: str, 
+    def sample_queue_depth(self, queue_type: str, queue_name: str,
                           current_depth: int, capacity: int) -> None:
         """Sample current queue depth"""
         start_time = time.perf_counter()
@@ -357,7 +361,7 @@ class RequestQueueMonitor:
             if duration_ms > self.config.metrics_collection_overhead_ms:
                 logger.debug(f"Queue sampling overhead: {duration_ms:.2f}ms")
 
-    def get_queue_statistics(self, queue_type: str, queue_name: str) -> Dict[str, Any]:
+    def get_queue_statistics(self, queue_type: str, queue_name: str) -> dict[str, Any]:
         """Get queue depth statistics"""
         queue_key = f"{queue_type}:{queue_name}"
 
@@ -522,15 +526,15 @@ class CacheEfficiencyMonitor:
     def __init__(self, config: MetricsConfig, registry: MetricsRegistry):
         self.config = config
         self.registry = registry
-        self._cache_operations: Dict[str, deque] = defaultdict(
+        self._cache_operations: dict[str, deque[CacheOperation]] = defaultdict(
             lambda: deque(maxlen=10000)  # Keep last 10k operations per cache
         )
         self._cache_lock = RLock()
 
         # Rolling window counters
-        self._hit_counters: Dict[str, int] = defaultdict(int)
-        self._miss_counters: Dict[str, int] = defaultdict(int)
-        self._window_start: Dict[str, datetime] = defaultdict(lambda: datetime.now(UTC))
+        self._hit_counters: dict[str, int] = defaultdict(int)
+        self._miss_counters: dict[str, int] = defaultdict(int)
+        self._window_start: dict[str, datetime] = defaultdict(lambda: datetime.now(UTC))
 
         # Prometheus metrics
         self._cache_hit_rate_gauge = self.registry.get_or_create_gauge(
@@ -558,22 +562,22 @@ class CacheEfficiencyMonitor:
             ['cache_type', 'cache_name']
         )
 
-    def record_cache_hit(self, cache_type: str, cache_name: str, 
+    def record_cache_hit(self, cache_type: str, cache_name: str,
                         key_hash: str, response_time_ms: float) -> None:
         """Record cache hit"""
         self._record_cache_operation(cache_type, cache_name, 'hit', key_hash, response_time_ms)
 
-    def record_cache_miss(self, cache_type: str, cache_name: str, 
+    def record_cache_miss(self, cache_type: str, cache_name: str,
                          key_hash: str, response_time_ms: float) -> None:
         """Record cache miss"""
         self._record_cache_operation(cache_type, cache_name, 'miss', key_hash, response_time_ms)
 
-    def record_cache_set(self, cache_type: str, cache_name: str, 
+    def record_cache_set(self, cache_type: str, cache_name: str,
                         key_hash: str, response_time_ms: float) -> None:
         """Record cache set operation"""
         self._record_cache_operation(cache_type, cache_name, 'set', key_hash, response_time_ms)
 
-    def record_cache_delete(self, cache_type: str, cache_name: str, 
+    def record_cache_delete(self, cache_type: str, cache_name: str,
                            key_hash: str, response_time_ms: float) -> None:
         """Record cache delete operation"""
         self._record_cache_operation(cache_type, cache_name, 'delete', key_hash, response_time_ms)
@@ -693,7 +697,7 @@ class CacheEfficiencyMonitor:
         self._miss_counters[cache_key] = 0
         self._window_start[cache_key] = datetime.now(UTC)
 
-    def get_cache_statistics(self, cache_type: str, cache_name: str) -> Dict[str, Any]:
+    def get_cache_statistics(self, cache_type: str, cache_name: str) -> dict[str, Any]:
         """Get comprehensive cache statistics"""
         cache_key = f"{cache_type}:{cache_name}"
 
@@ -730,7 +734,7 @@ class CacheEfficiencyMonitor:
             return {"error": str(e)}
 
     @contextmanager
-    def track_cache_operation(self, cache_type: str, cache_name: str, key_hash: str):
+    def track_cache_operation(self, cache_type: str, cache_name: str, key_hash: str) -> Generator[Any, None, None]:
         """Context manager for automatic cache operation tracking"""
         start_time = time.perf_counter()
         hit = False
@@ -751,7 +755,7 @@ class CacheEfficiencyMonitor:
             else:
                 self.record_cache_miss(cache_type, cache_name, key_hash, response_time_ms)
 
-# Feature Usage Analytics  
+# Feature Usage Analytics
 @dataclass
 class FeatureUsageEvent:
     """Feature usage event tracking"""
@@ -762,7 +766,7 @@ class FeatureUsageEvent:
     usage_pattern: str  # 'direct_call', 'batch_operation', 'background_task'
     performance_ms: float
     success: bool
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 class FeatureUsageAnalytics:
     """Tracks feature flag adoption, API utilization, ML model usage distribution"""
@@ -770,14 +774,14 @@ class FeatureUsageAnalytics:
     def __init__(self, config: MetricsConfig, registry: MetricsRegistry):
         self.config = config
         self.registry = registry
-        self._usage_events: Dict[str, deque] = defaultdict(
+        self._usage_events: dict[str, deque[FeatureUsageEvent]] = defaultdict(
             lambda: deque(maxlen=50000)  # Keep last 50k events per feature type
         )
         self._usage_lock = RLock()
 
         # Usage pattern detection
         self._pattern_detection_enabled = config.usage_pattern_detection
-        self._usage_patterns: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._usage_patterns: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Prometheus metrics
         self._feature_usage_counter = self.registry.get_or_create_counter(
@@ -811,10 +815,10 @@ class FeatureUsageAnalytics:
             ['feature_type', 'feature_name']
         )
 
-    def record_feature_usage(self, feature_type: str, feature_name: str, 
+    def record_feature_usage(self, feature_type: str, feature_name: str,
                            user_context: str, usage_pattern: str = 'direct_call',
                            performance_ms: float = 0.0, success: bool = True,
-                           metadata: Optional[Dict] = None) -> None:
+                           metadata: Optional[dict[str, Any]] = None) -> None:
         """Record feature usage event"""
         start_time = time.perf_counter()
 
@@ -837,7 +841,7 @@ class FeatureUsageAnalytics:
 
                 # Update pattern tracking
                 if self._pattern_detection_enabled:
-                    pattern_key = f"{feature_key}:{usage_pattern}"
+                    # Remove unused variable pattern_key
                     self._usage_patterns[feature_key][usage_pattern] += 1
 
             # Update Prometheus metrics
@@ -906,7 +910,7 @@ class FeatureUsageAnalytics:
         except Exception as e:
             logger.debug(f"Failed to update feature metrics: {e}")
 
-    def get_feature_analytics(self, feature_type: str, feature_name: str) -> Dict[str, Any]:
+    def get_feature_analytics(self, feature_type: str, feature_name: str) -> dict[str, Any]:
         """Get comprehensive feature analytics"""
         feature_key = f"{feature_type}:{feature_name}"
 
@@ -951,7 +955,7 @@ class FeatureUsageAnalytics:
             logger.warning(f"Failed to get feature analytics: {e}")
             return {"error": str(e)}
 
-    def _calculate_adoption_trend(self, events: List[FeatureUsageEvent]) -> str:
+    def _calculate_adoption_trend(self, events: list[FeatureUsageEvent]) -> str:
         """Calculate adoption trend over time"""
         if len(events) < 10:
             return "insufficient_data"
@@ -975,13 +979,13 @@ class FeatureUsageAnalytics:
         except Exception:
             return "unknown"
 
-    def _get_peak_usage_hour(self, events: List[FeatureUsageEvent]) -> int:
+    def _get_peak_usage_hour(self, events: list[FeatureUsageEvent]) -> int:
         """Get peak usage hour of day"""
         if not events:
             return 0
 
         try:
-            hour_counts = defaultdict(int)
+            hour_counts: defaultdict[int, int] = defaultdict(int)
             for event in events:
                 hour_counts[event.timestamp.hour] += 1
 
@@ -989,12 +993,12 @@ class FeatureUsageAnalytics:
         except Exception:
             return 0
 
-    def get_top_features(self, feature_type: Optional[str] = None, limit: int = None) -> List[Dict[str, Any]]:
+    def get_top_features(self, feature_type: Optional[str] = None, limit: Optional[int] = None) -> list[dict[str, Any]]:
         """Get top features by usage"""
         limit = limit or self.config.feature_usage_top_n
 
         try:
-            feature_usage = []
+            feature_usage: list[dict[str, Any]] = []
 
             with self._usage_lock:
                 for feature_key, events in self._usage_events.items():
@@ -1017,7 +1021,7 @@ class FeatureUsageAnalytics:
 
             # Sort by usage and return top N
             feature_usage.sort(key=lambda x: x["usage_count"], reverse=True)
-            top_features = feature_usage[:limit]
+            top_features: list[dict[str, Any]] = feature_usage[:limit]
 
             # Update ranking metrics
             for rank, feature in enumerate(top_features, 1):
@@ -1033,16 +1037,16 @@ class FeatureUsageAnalytics:
             return []
 
     @contextmanager
-    def track_feature_usage(self, feature_type: str, feature_name: str, 
+    def track_feature_usage(self, feature_type: str, feature_name: str,
                            user_context: str, usage_pattern: str = 'direct_call',
-                           metadata: Optional[Dict] = None):
+                           metadata: Optional[dict[str, Any]] = None) -> Generator[None, None, None]:
         """Context manager for automatic feature usage tracking"""
         start_time = time.perf_counter()
         success = True
 
         try:
             yield
-        except Exception as e:
+        except Exception:
             success = False
             raise
         finally:
@@ -1058,8 +1062,13 @@ class FeatureUsageAnalytics:
             )
 
 # Main System Metrics Collector
-class SystemMetricsCollector:
-    """Main collector orchestrating all system metrics"""
+class SystemMetricsCollector(PrometheusMetricsMixin):
+    """
+    Main collector orchestrating all system metrics.
+
+    Uses composition pattern with specialized component collectors
+    and modern 2025 Python patterns.
+    """
 
     def __init__(self, config: Optional[MetricsConfig] = None, registry: Optional[MetricsRegistry] = None):
         self.config = config or MetricsConfig()
@@ -1071,14 +1080,16 @@ class SystemMetricsCollector:
         self.cache_monitor = CacheEfficiencyMonitor(self.config, self.registry)
         self.feature_analytics = FeatureUsageAnalytics(self.config, self.registry)
 
-        # Overall system metrics
-        self._system_health_gauge = self.registry.get_or_create_gauge(
+        # Set metrics_registry for mixin compatibility
+        self.metrics_registry = self.registry
+
+        # Overall system metrics using mixin
+        self._system_health_gauge = self.create_gauge(
             'system_metrics_health_score',
-            'Overall system metrics health score (0.0 to 1.0)',
-            []
+            'Overall system metrics health score (0.0 to 1.0)'
         )
 
-        self._metrics_collection_performance = self.registry.get_or_create_histogram(
+        self._metrics_collection_performance = self.create_histogram(
             'metrics_collection_duration_ms',
             'Metrics collection performance in milliseconds',
             ['collector_type'],
@@ -1090,7 +1101,7 @@ class SystemMetricsCollector:
     def get_system_health_score(self) -> float:
         """Calculate overall system health score"""
         try:
-            scores = []
+            scores: list[float] = []
 
             # Connection health (based on age distribution)
             age_dist = self.connection_tracker.get_age_distribution()
@@ -1119,7 +1130,7 @@ class SystemMetricsCollector:
             logger.warning(f"Failed to calculate system health score: {e}")
             return 0.0
 
-    def _calculate_connection_health_score(self, age_distribution: Dict) -> float:
+    def _calculate_connection_health_score(self, age_distribution: dict[str, dict[str, list[float]]]) -> float:
         """Calculate connection health score"""
         if not age_distribution:
             return 1.0  # No connections is healthy
@@ -1128,8 +1139,8 @@ class SystemMetricsCollector:
             total_connections = 0
             old_connections = 0
 
-            for conn_type, pools in age_distribution.items():
-                for pool_name, ages in pools.items():
+            for _, pools in age_distribution.items():
+                for _, ages in pools.items():
                     total_connections += len(ages)
                     # Consider connections older than 1 hour as "old"
                     old_connections += len([age for age in ages if age > 3600])
@@ -1170,9 +1181,10 @@ class SystemMetricsCollector:
         except Exception:
             return 0.5
 
-    def collect_all_metrics(self) -> Dict[str, Any]:
+    def collect_all_metrics(self) -> dict[str, Any]:
         """Collect metrics from all components"""
         start_time = time.perf_counter()
+        metrics: dict[str, Any] = {}
 
         try:
             metrics = {
@@ -1189,7 +1201,8 @@ class SystemMetricsCollector:
             return {"error": str(e)}
         finally:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            metrics["collection_performance_ms"] = duration_ms
+            if metrics:  # Only update if metrics dict exists
+                metrics["collection_performance_ms"] = duration_ms
 
             self._metrics_collection_performance.labels(
                 collector_type="system_wide"
@@ -1231,9 +1244,9 @@ def get_system_metrics_collector(config: Optional[MetricsConfig] = None,
 # Convenience decorators for easy integration
 def track_connection_lifecycle(connection_type: str, pool_name: str):
     """Decorator for automatic connection lifecycle tracking"""
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             collector = get_system_metrics_collector()
             connection_id = f"{func.__name__}_{id(args)}_{time.time()}"
 
@@ -1244,11 +1257,11 @@ def track_connection_lifecycle(connection_type: str, pool_name: str):
         return wrapper
     return decorator
 
-def track_feature_usage(feature_type: str, feature_name: str, user_context_func: Callable = None):
+def track_feature_usage(feature_type: str, feature_name: str, user_context_func: Optional[Callable[..., str]] = None):
     """Decorator for automatic feature usage tracking"""
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             collector = get_system_metrics_collector()
             user_context = user_context_func(*args, **kwargs) if user_context_func else "system"
 
@@ -1259,11 +1272,11 @@ def track_feature_usage(feature_type: str, feature_name: str, user_context_func:
         return wrapper
     return decorator
 
-def track_cache_operation(cache_type: str, cache_name: str, key_func: Callable = None):
+def track_cache_operation(cache_type: str, cache_name: str, key_func: Optional[Callable[..., str]] = None):
     """Decorator for automatic cache operation tracking"""
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             collector = get_system_metrics_collector()
             key_hash = key_func(*args, **kwargs) if key_func else str(hash(str(args) + str(kwargs)))
 

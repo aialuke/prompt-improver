@@ -16,7 +16,7 @@ import tempfile
 # Import the actual components
 from prompt_improver.database.query_optimizer import PreparedStatementCache
 from prompt_improver.database.psycopg_client import TypeSafePsycopgClient, get_psycopg_client
-from prompt_improver.database.config import DatabaseConfig
+from prompt_improver.core.config import AppConfig
 
 # Import orchestrator components
 from prompt_improver.ml.orchestration.connectors.tier4_connectors import (
@@ -46,7 +46,7 @@ class RealDatabaseTestBase:
     async def setup_real_database(self):
         """Set up real database connection for testing."""
         # Use test database configuration - use default DatabaseConfig and override if needed
-        self.test_config = DatabaseConfig()
+        self.test_config = AppConfig().database
         # Override with test settings if available
         if os.getenv("TEST_DB_HOST"):
             self.test_config.postgres_host = os.getenv("TEST_DB_HOST", "localhost")
@@ -571,7 +571,7 @@ class TestEdgeCasesAndErrorHandling:
             os.environ["POSTGRES_PORT"] = "9999"
             
             # Create client with invalid configuration
-            invalid_config = DatabaseConfig()
+            invalid_config = AppConfig().database
             client = TypeSafePsycopgClient(config=invalid_config)
             
             # Test connection failure handling

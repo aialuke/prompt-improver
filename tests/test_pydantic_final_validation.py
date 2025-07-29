@@ -230,14 +230,14 @@ def test_analytics_models():
 def test_configuration_models():
     """Test configuration models"""
     import os
-    from prompt_improver.database.config import DatabaseConfig
-    from prompt_improver.utils.redis_cache import RedisConfig
+    from prompt_improver.core.config import AppConfig
+    from prompt_improver.core.config import AppConfig
     
     # Set required environment variable for DatabaseConfig
     os.environ['POSTGRES_PASSWORD'] = 'test_password'
     
     # Test DatabaseConfig (BaseSettings reads from environment)
-    db_config = DatabaseConfig()
+    db_config = AppConfig().database
     
     assert db_config.postgres_host == "localhost"  # default value
     assert db_config.pool_size == 5  # default value 

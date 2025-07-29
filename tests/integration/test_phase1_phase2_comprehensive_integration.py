@@ -49,11 +49,11 @@ from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )
 from prompt_improver.ml.core.training_data_loader import TrainingDataLoader
-from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from prompt_improver.ml.preprocessing.generators.statistical_generator import StatisticalDataGenerator
 from prompt_improver.performance.monitoring.performance_benchmark import PerformanceBenchmark
 from prompt_improver.performance.validation.performance_validation import PerformanceValidator
 from prompt_improver.security.secure_logging import SecureLoggingHandler
-from prompt_improver.utils.health_checks import HealthChecker, HealthStatus
+from prompt_improver.performance.monitoring.health.unified_health_system import UnifiedHealthSystem
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 
@@ -300,9 +300,8 @@ class TestPhase1Phase2Integration:
         
         try:
             # Generate synthetic ML data (Phase 1: ML Platform)
-            generator = ProductionSyntheticDataGenerator(
+            generator = StatisticalDataGenerator(
                 target_samples=1000,
-                generation_method="statistical",
                 use_enhanced_scoring=True
             )
             

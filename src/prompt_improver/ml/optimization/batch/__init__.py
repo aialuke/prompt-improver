@@ -1,36 +1,44 @@
-"""Batch Processing Components with Enhanced Streaming Capabilities
+"""Unified Batch Processing with 2025 Best Practices
 
-Tools for processing ML training data in batches with optimization.
-Includes enhanced streaming processor for 10x performance improvement on large datasets.
+Modern batch processing system with pluggable strategies, automatic optimization,
+and comprehensive 2025 design patterns including Strategy, Factory, and Protocol-based design.
+
+Features:
+- Unified interface for all batch processing needs
+- Automatic strategy selection based on data characteristics  
+- Memory-efficient streaming for large datasets
+- Dynamic batch size optimization
+- Circuit breaker and retry patterns
+- Modern asyncio with TaskGroup
+- Clean, legacy-free implementation
 """
 
-from .batch_processor import (
-    BatchProcessor, 
-    BatchProcessorConfig,
-    periodic_batch_processor_coroutine
-)
-
-from .enhanced_batch_processor import (
-    StreamingBatchProcessor,
-    StreamingBatchConfig,
-    ChunkingStrategy,
-    ProcessingStatus,
-    ProcessingMetrics,
-    MemoryMonitor,
-    ChunkProcessor
+# Unified processor with all functionality integrated
+from .unified_batch_processor import (
+    UnifiedBatchProcessor,
+    UnifiedBatchConfig,
+    ProcessingStrategy,
+    ProcessingResult,
+    DataCharacteristics,
+    UnifiedMetrics,
+    # Factory functions
+    create_batch_processor,
+    create_streaming_processor,
+    create_optimized_processor,
+    batch_processor
 )
 
 __all__ = [
-    # Original batch processor
-    "BatchProcessor",
-    "BatchProcessorConfig", 
-    "periodic_batch_processor_coroutine",
-    # Enhanced streaming processor
-    "StreamingBatchProcessor",
-    "StreamingBatchConfig",
-    "ChunkingStrategy",
-    "ProcessingStatus",
-    "ProcessingMetrics",
-    "MemoryMonitor",
-    "ChunkProcessor"
+    # Unified processor (RECOMMENDED)
+    "UnifiedBatchProcessor",
+    "UnifiedBatchConfig", 
+    "ProcessingStrategy",
+    "ProcessingResult",
+    "DataCharacteristics",
+    "UnifiedMetrics",
+    # Factory functions
+    "create_batch_processor",
+    "create_streaming_processor",
+    "create_optimized_processor",
+    "batch_processor",
 ]

@@ -88,9 +88,8 @@ from ....core.protocols.retry_protocols import (
     RetryStrategy,
     RetryableErrorType
 )
-# Import concrete implementation for creating retry configs
-from ....core.retry_implementations import BasicRetryConfig
-from ....core.retry_config import RetryConfig
+# Import modern retry manager
+from ....core.retry_manager import RetryManager, get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
 
 @dataclass
 class TaskMetrics:
@@ -167,7 +166,7 @@ CIRCUIT_BREAKER_STATE = metrics_registry.get_or_create_gauge(
 
 @dataclass
 class BackgroundTask:
-    """Legacy task class for backward compatibility."""
+    """Background task definition."""
 
     task_id: str
     coroutine: Callable
@@ -178,6 +177,7 @@ class BackgroundTask:
     error: str | None = None
     result: Any | None = None
     asyncio_task: asyncio.Task | None = None
+
 
 class EnhancedBackgroundTaskManager:
     """Enhanced background task manager with 2025 best practices."""
@@ -326,7 +326,7 @@ class EnhancedBackgroundTaskManager:
             task_id=task_id,
             coroutine=coroutine,
             priority=priority,
-            retry_config=retry_config or BasicRetryConfig(),
+            retry_config=retry_config or RetryConfig(),
             circuit_breaker=circuit_breaker,
             timeout=timeout or self.default_timeout,
             tags=tags or {}
@@ -547,19 +547,17 @@ class EnhancedBackgroundTaskManager:
         task.status = TaskStatus.RETRYING
 
         # Convert task retry config to unified retry config
-        unified_config = BasicRetryConfig(
+        unified_config = RetryConfig(
             max_attempts=getattr(task.retry_config, 'max_attempts', 3),
             strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
-            base_delay=getattr(task.retry_config, 'initial_delay_ms', 1000) / 1000.0,  # Convert ms to seconds
-            max_delay=getattr(task.retry_config, 'max_delay_ms', 60000) / 1000.0,      # Convert ms to seconds
+            base_delay=getattr(task.retry_config, 'base_delay', 1.0),
+            max_delay=getattr(task.retry_config, 'max_delay', 60.0),
             jitter=getattr(task.retry_config, 'jitter', True)
         )
 
         # Use unified retry manager to calculate delay
-        from ....ml.orchestration.core.unified_retry_manager import get_retry_manager
         retry_manager = get_retry_manager()
-        delay_ms = retry_manager._calculate_delay(task.retry_count - 1, unified_config)
-        delay = delay_ms / 1000.0
+        delay = retry_manager._calculate_delay(task.retry_count, unified_config)
 
         task.next_retry_at = datetime.now(UTC) + timedelta(seconds=delay)
 
@@ -850,7 +848,7 @@ class EnhancedBackgroundTaskManager:
                     task_id=task_config.get("task_id"),
                     coroutine=task_config.get("coroutine"),
                     priority=TaskPriority(task_config.get("priority", TaskPriority.NORMAL.value)),
-                    retry_config=BasicRetryConfig(**task_config.get("retry_config", {})),
+                    retry_config=RetryConfig(**task_config.get("retry_config", {})),
                     timeout=task_config.get("timeout"),
                     circuit_breaker_key=task_config.get("circuit_breaker_key"),
                     tags=task_config.get("tags", {})
@@ -936,71 +934,30 @@ class EnhancedBackgroundTaskManager:
                 }
             }
 
-# Maintain backward compatibility
-class BackgroundTaskManager(EnhancedBackgroundTaskManager):
-    """Backward compatible task manager."""
-
-    def __init__(self, max_concurrent_tasks: int = 10):
-        super().__init__(max_concurrent_tasks=max_concurrent_tasks, enable_metrics=False)
-        self.legacy_tasks: Dict[str, BackgroundTask] = {}
-
-    async def submit_task(self, task_id: str, coroutine: Callable, **kwargs) -> str:
-        """Legacy task submission method."""
-        # Create legacy task
-        legacy_task = BackgroundTask(
-            task_id=task_id,
-            coroutine=coroutine
-        )
-        self.legacy_tasks[task_id] = legacy_task
-
-        # Submit as enhanced task with normal priority
-        return await self.submit_enhanced_task(
-            task_id=task_id,
-            coroutine=coroutine,
-            priority=TaskPriority.NORMAL,
-            **kwargs
-        )
-
-    def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Legacy task status method."""
-        enhanced_status = self.get_enhanced_task_status(task_id)
-        if not enhanced_status:
-            return None
-
-        # Convert to legacy format
-        return {
-            "task_id": task_id,
-            "status": enhanced_status["status"],
-            "created_at": enhanced_status["created_at"],
-            "started_at": enhanced_status["started_at"],
-            "completed_at": enhanced_status["completed_at"],
-            "result": enhanced_status["result"],
-            "error": enhanced_status["error"]
-        }
 
 # Global instance for easy access
-_background_task_manager: BackgroundTaskManager | None = None
+_background_task_manager: EnhancedBackgroundTaskManager | None = None
 
-def get_background_task_manager() -> BackgroundTaskManager:
+def get_background_task_manager() -> EnhancedBackgroundTaskManager:
     """Get the global background task manager instance."""
     global _background_task_manager
     if _background_task_manager is None:
-        _background_task_manager = BackgroundTaskManager()
+        _background_task_manager = EnhancedBackgroundTaskManager()
     return _background_task_manager
 
 async def init_background_task_manager(
     max_concurrent_tasks: int = 10,
-) -> BackgroundTaskManager:
+) -> EnhancedBackgroundTaskManager:
     """Initialize and start the global background task manager.
 
     Args:
         max_concurrent_tasks: Maximum number of concurrent tasks.
 
     Returns:
-        The initialized BackgroundTaskManager instance.
+        The initialized EnhancedBackgroundTaskManager instance.
     """
     global _background_task_manager
-    _background_task_manager = BackgroundTaskManager(max_concurrent_tasks)
+    _background_task_manager = EnhancedBackgroundTaskManager(max_concurrent_tasks)
     await _background_task_manager.start()
     return _background_task_manager
 

@@ -18,7 +18,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from ..utils.redis_cache import RedisCache
+from ..core.config import AppConfig  # Redis config via AppConfig RedisCache
 from ..performance.monitoring.metrics_registry import get_metrics_registry, StandardMetrics
 
 logger = logging.getLogger(__name__)

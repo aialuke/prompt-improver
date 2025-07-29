@@ -5,12 +5,12 @@ Component definitions for all 50+ ML components across 6 tiers.
 from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
-from ..core.component_registry import ComponentTier, ComponentInfo, ComponentCapability
+from ..shared.component_types import ComponentTier, ComponentInfo, ComponentCapability
 
 @dataclass
 class ComponentDefinitions:
     """Central registry of all ML component definitions."""
-    
+
     # Tier 1: Core ML Pipeline Components (11 components)
     tier1_core_components: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
         "training_data_loader": {
@@ -22,7 +22,7 @@ class ComponentDefinitions:
         },
         "ml_integration": {
             "description": "Core ML service processing engine",
-            "file_path": "ml/core/ml_integration.py", 
+            "file_path": "ml/core/ml_integration.py",
             "capabilities": ["model_training", "prediction", "inference"],
             "dependencies": ["training_data_loader", "model_manager"],
             "resource_requirements": {"memory": "2GB", "cpu": "2 cores", "gpu": "optional"}
@@ -49,9 +49,9 @@ class ComponentDefinitions:
             "resource_requirements": {"memory": "1GB", "cpu": "1 core"}
         },
         "batch_processor": {
-            "description": "Batch training processing coordinator",
-            "file_path": "ml/optimization/batch/batch_processor.py",
-            "capabilities": ["batch_processing", "parallel_execution", "job_scheduling"],
+            "description": "Unified batch processing coordinator with pluggable strategies",
+            "file_path": "ml/optimization/batch/unified_batch_processor.py",
+            "capabilities": ["batch_processing", "parallel_execution", "job_scheduling", "strategy_selection", "performance_optimization"],
             "dependencies": ["ml_integration", "resource_manager"],
             "resource_requirements": {"memory": "2GB", "cpu": "4 cores"}
         },
@@ -63,7 +63,7 @@ class ComponentDefinitions:
             "resource_requirements": {"memory": "512MB", "cpu": "1 core", "disk": "1GB"}
         },
         "context_learner": {
-            "description": "Refactored context-specific learning algorithms",
+            "description": "Context-specific learning algorithms",
             "file_path": "ml/learning/algorithms/context_learner.py",
             "capabilities": ["contextual_learning", "adaptive_learning", "context_detection", "feature_extraction", "clustering"],
             "dependencies": ["training_data_loader", "domain_detector"],
@@ -108,9 +108,9 @@ class ComponentDefinitions:
                 "model_types": ["autoencoder", "vae", "transformer", "diffusion"]
             }
         },
-        "synthetic_data_generator": {
-            "description": "Production synthetic data generator with modern generative models",
-            "file_path": "ml/preprocessing/synthetic_data_generator.py",
+        "synthetic_data_orchestrator": {
+            "description": "Production synthetic data orchestrator with modern generative models",
+            "file_path": "ml/preprocessing/orchestrator.py",
             "capabilities": [
                 "statistical_generation", "neural_generation", "hybrid_generation",
                 "gan_synthesis", "vae_synthesis", "diffusion_synthesis",
@@ -125,7 +125,7 @@ class ComponentDefinitions:
             }
         }
     })
-    
+
     # Tier 2: Optimization & Learning Components (8 components)
     tier2_optimization_components: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
         "insight_engine": {
@@ -305,7 +305,7 @@ class ComponentDefinitions:
             "resource_requirements": {"memory": "256MB", "cpu": "1 core"}
         }
     })
-    
+
     # Tier 3: Evaluation & Analysis Components (10 components)
     tier3_evaluation_components: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
         "experiment_orchestrator": {
@@ -405,8 +405,8 @@ class ComponentDefinitions:
             "resource_requirements": {"memory": "1GB", "cpu": "1 core"}
         }
     })
-    
-    # Tier 4: Performance & Testing Components (8 components)  
+
+    # Tier 4: Performance & Testing Components (8 components)
     tier4_performance_components: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
         "advanced_ab_testing": {
             "description": "Enhanced A/B testing with advanced analytics",
@@ -558,7 +558,7 @@ class ComponentDefinitions:
             }
         }
     })
-    
+
     # Tier 6: Security & Encryption Components (2 components)
     tier6_security_components: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
         "secure_key_manager": {
@@ -581,7 +581,7 @@ class ComponentDefinitions:
             }
         },
         "fernet_key_manager": {
-            "description": "Fernet encryption wrapper using SecureKeyManager for ML data protection",
+            "description": "Fernet encryption wrapper using UnifiedKeyManager for ML data protection",
             "file_path": "security/key_manager.py",
             "capabilities": ["fernet_encryption", "data_encryption", "secure_encryption", "orchestrator_compatible", "round_trip_testing"],
             "dependencies": ["secure_key_manager"],
@@ -692,7 +692,7 @@ class ComponentDefinitions:
             }
         }
     })
-    
+
     def get_all_component_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get all component definitions across all tiers."""
         all_components = {}
@@ -702,7 +702,7 @@ class ComponentDefinitions:
         all_components.update(self.tier4_performance_components)
         all_components.update(self.tier6_security_components)
         return all_components
-    
+
     def get_tier_components(self, tier: ComponentTier) -> Dict[str, Dict[str, Any]]:
         """Get components for a specific tier."""
         if tier == ComponentTier.TIER_1_CORE:
@@ -717,7 +717,7 @@ class ComponentDefinitions:
             return self.tier6_security_components
         else:
             return {}  # Other tiers not yet implemented
-    
+
     def create_component_info(self, name: str, definition: Dict[str, Any], tier: ComponentTier) -> ComponentInfo:
         """Create ComponentInfo from definition."""
         capabilities = []
@@ -728,7 +728,7 @@ class ComponentDefinitions:
                 input_types=["data"],
                 output_types=["result"]
             ))
-        
+
         return ComponentInfo(
             name=name,
             tier=tier,

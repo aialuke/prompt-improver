@@ -322,7 +322,6 @@ class ConfigSchemaManager:
             "FEATURE_FLAG_ADVANCED_CACHING": "true",
             "FEATURE_FLAG_EXPERIMENTAL_RULES": "false",
             "SECURITY_ENABLE_RATE_LIMITING": "true",
-            "SECURITY_JWT_EXPIRY_HOURS": "12",
             "SECURITY_PASSWORD_MIN_LENGTH": "12"
         }
         

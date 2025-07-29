@@ -75,6 +75,24 @@ from .ml_protocol import (
     MLPlatformProtocol
 )
 
+# New unified protocols for component integration
+from .connection_protocol import (
+    ConnectionMode,
+    ConnectionManagerProtocol
+)
+
+# Migrated from retry_protocol.py to retry_protocols.py (comprehensive version)
+from .retry_protocols import (
+    RetryStrategy as SimpleRetryStrategy,
+    RetryManagerProtocol as SimpleRetryManagerProtocol
+)
+
+from .health_protocol import (
+    HealthStatus as SimpleHealthStatus,
+    HealthCheckResult as SimpleHealthCheckResult,
+    HealthMonitorProtocol
+)
+
 __all__ = [
     # Retry protocols (existing)
     "RetryStrategy",
@@ -136,5 +154,14 @@ __all__ = [
     'ModelServingProtocol',
     'AutoMLProtocol',
     'MLMonitoringProtocol',
-    'MLPlatformProtocol'
+    'MLPlatformProtocol',
+    
+    # New unified protocols for component integration
+    'ConnectionMode',
+    'ConnectionManagerProtocol',
+    'SimpleRetryStrategy',
+    'SimpleRetryManagerProtocol',
+    'SimpleHealthStatus',
+    'SimpleHealthCheckResult', 
+    'HealthMonitorProtocol'
 ]

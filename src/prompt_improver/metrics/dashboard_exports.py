@@ -20,7 +20,7 @@ import pandas as pd
 
 from .aggregation_engine import get_aggregation_engine
 from .ml_metrics import get_ml_metrics_collector
-from .api_metrics import get_api_metrics_collector  
+from .api_metrics import get_api_metrics_collector
 from .performance_metrics import get_performance_metrics_collector
 from .business_intelligence_metrics import get_bi_metrics_collector
 
@@ -88,30 +88,30 @@ class Dashboard:
 class DashboardExporter:
     """
     Dashboard export functionality for business metrics.
-    
+
     Provides comprehensive data export capabilities with multiple formats,
     real-time streaming, and visualization-ready data preparation.
     """
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize dashboard exporter."""
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
-        
+
         # Component collectors
         self.aggregation_engine = get_aggregation_engine()
         self.ml_collector = get_ml_metrics_collector()
         self.api_collector = get_api_metrics_collector()
         self.performance_collector = get_performance_metrics_collector()
         self.bi_collector = get_bi_metrics_collector()
-        
+
         # Dashboard configurations
         self.dashboards: Dict[str, Dashboard] = {}
         self.dashboard_cache: Dict[str, Dict[str, Any]] = {}
         self.cache_ttl_seconds = self.config.get("cache_ttl_seconds", 300)  # 5 minutes
-        
+
         # Export statistics
-        self.export_stats = {
+        self.export_stats: Dict[str, Any] = {
             "exports_generated": 0,
             "dashboard_views": 0,
             "cache_hits": 0,
@@ -120,7 +120,7 @@ class DashboardExporter:
             "popular_dashboards": defaultdict(int),
             "export_formats_used": defaultdict(int)
         }
-        
+
         # Time range mappings
         self.time_range_hours = {
             TimeRange.LAST_HOUR: 1,
@@ -130,10 +130,10 @@ class DashboardExporter:
             TimeRange.LAST_30_DAYS: 720,
             TimeRange.LAST_90_DAYS: 2160
         }
-        
+
         # Initialize default dashboards
         self._initialize_default_dashboards()
-    
+
     def _initialize_default_dashboards(self):
         """Initialize default dashboard configurations."""
         # Executive Summary Dashboard
@@ -212,7 +212,7 @@ class DashboardExporter:
             tags=["executive", "summary", "kpi"],
             permissions={"view": ["admin", "executive"], "edit": ["admin"]}
         )
-        
+
         # ML Performance Dashboard
         self.dashboards["ml_performance"] = Dashboard(
             dashboard_id="ml_performance",
@@ -265,7 +265,7 @@ class DashboardExporter:
             tags=["ml", "performance", "ai"],
             permissions={"view": ["admin", "ml_engineer", "data_scientist"], "edit": ["admin", "ml_engineer"]}
         )
-        
+
         # Real-time Monitoring Dashboard
         self.dashboards["real_time_monitoring"] = Dashboard(
             dashboard_id="real_time_monitoring",
@@ -318,7 +318,7 @@ class DashboardExporter:
             tags=["monitoring", "real-time", "alerts"],
             permissions={"view": ["admin", "operator", "support"], "edit": ["admin"]}
         )
-    
+
     async def export_dashboard(
         self,
         dashboard_id: str,
@@ -334,20 +334,20 @@ class DashboardExporter:
             cache_key = f"{dashboard_id}_{export_format.value}_{time_range.value}"
             if filters:
                 cache_key += f"_{hash(json.dumps(filters, sort_keys=True))}"
-            
+
             cached_data = self._get_cached_data(cache_key)
             if cached_data:
                 self.export_stats["cache_hits"] += 1
                 return cached_data
-            
+
             self.export_stats["cache_misses"] += 1
-            
+
             # Get dashboard configuration
             if dashboard_id not in self.dashboards:
                 raise ValueError(f"Dashboard {dashboard_id} not found")
-            
+
             dashboard = self.dashboards[dashboard_id]
-            
+
             # Determine time range
             if time_range == TimeRange.CUSTOM:
                 if not custom_start or not custom_end:
@@ -358,7 +358,7 @@ class DashboardExporter:
                 hours = self.time_range_hours[time_range]
                 end_time = datetime.now(timezone.utc)
                 start_time = end_time - timedelta(hours=hours)
-            
+
             # Collect data for all widgets
             dashboard_data = {
                 "dashboard_id": dashboard_id,
@@ -378,32 +378,32 @@ class DashboardExporter:
                     "refresh_interval": dashboard.refresh_interval_seconds
                 }
             }
-            
+
             # Collect data for each widget
             for widget in dashboard.widgets:
                 widget_data = await self._collect_widget_data(
                     widget, start_time, end_time, filters
                 )
                 dashboard_data["widgets"][widget.widget_id] = widget_data
-            
+
             # Format data according to export format
             formatted_data = await self._format_export_data(dashboard_data, export_format)
-            
+
             # Cache the result
             self._cache_data(cache_key, formatted_data)
-            
+
             # Update statistics
             self.export_stats["exports_generated"] += 1
             self.export_stats["last_export_time"] = datetime.now(timezone.utc)
             self.export_stats["popular_dashboards"][dashboard_id] += 1
             self.export_stats["export_formats_used"][export_format.value] += 1
-            
+
             return formatted_data
-        
+
         except Exception as e:
             self.logger.error(f"Error exporting dashboard {dashboard_id}: {e}")
             raise
-    
+
     async def _collect_widget_data(
         self,
         widget: DashboardWidget,
@@ -415,11 +415,11 @@ class DashboardExporter:
         try:
             data_source = widget.data_source
             query_params = widget.query_params.copy()
-            
+
             # Apply filters
             if filters:
                 query_params.update(filters)
-            
+
             # Collect data based on data source
             if data_source == "user_engagement":
                 data = await self._get_user_engagement_data(start_time, end_time, query_params)
@@ -445,7 +445,7 @@ class DashboardExporter:
                 data = await self._get_api_request_rate_data(start_time, end_time, query_params)
             else:
                 data = {"error": f"Unknown data source: {data_source}"}
-            
+
             return {
                 "widget_id": widget.widget_id,
                 "widget_type": widget.widget_type,
@@ -455,7 +455,7 @@ class DashboardExporter:
                 "visualization_config": widget.visualization_config,
                 "last_updated": datetime.now(timezone.utc).isoformat()
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error collecting data for widget {widget.widget_id}: {e}")
             return {
@@ -463,75 +463,81 @@ class DashboardExporter:
                 "error": str(e),
                 "last_updated": datetime.now(timezone.utc).isoformat()
             }
-    
+
     async def _get_user_engagement_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get user engagement data."""
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             engagement_data = await self.bi_collector.get_user_journey_analytics(int(hours))
-            
+
             if engagement_data.get("status") == "no_data":
                 return {"value": 0, "trend": "stable"}
-            
+
             # Extract active users count
+            stage_analytics = engagement_data.get("stage_analytics", {})
             total_users = sum(
                 stage_data.get("unique_users", 0)
-                for stage_data in engagement_data.get("stage_analytics", {}).values()
+                for stage_data in stage_analytics.values()
+                if isinstance(stage_data, dict)
             )
-            
+
             return {
                 "value": total_users,
                 "trend": "up",  # Could be calculated from historical data
                 "breakdown": engagement_data.get("stage_analytics", {}),
                 "active_sessions": engagement_data.get("active_sessions", 0)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting user engagement data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_aggregated_success_rate(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get aggregated success rate across all systems."""
         try:
             # Get success rates from different components
             hours = (end_time - start_time).total_seconds() / 3600
-            
+
             ml_data = await self.ml_collector.get_prompt_improvement_summary(int(hours))
             api_data = await self.api_collector.get_endpoint_analytics(int(hours))
             performance_data = await self.performance_collector.get_pipeline_performance_summary(int(hours))
-            
-            success_rates = []
-            
+
+            success_rates: List[float] = []
+
             if ml_data.get("status") != "no_data":
-                success_rates.append(ml_data.get("overall_success_rate", 0))
-            
+                ml_rate = ml_data.get("overall_success_rate", 0)
+                if isinstance(ml_rate, (int, float)):
+                    success_rates.append(float(ml_rate))
+
             if api_data.get("status") != "no_data":
                 # Calculate API success rate
                 endpoint_analytics = api_data.get("endpoint_analytics", {})
-                if endpoint_analytics:
+                if endpoint_analytics and isinstance(endpoint_analytics, dict):
                     api_success_rates = [
-                        analytics.get("success_rate", 0)
+                        float(analytics.get("success_rate", 0))
                         for analytics in endpoint_analytics.values()
+                        if isinstance(analytics, dict) and isinstance(analytics.get("success_rate", 0), (int, float))
                     ]
                     if api_success_rates:
                         success_rates.append(statistics.mean(api_success_rates))
-            
+
             if performance_data.get("status") != "no_data":
                 stage_performance = performance_data.get("stage_performance", {})
-                if stage_performance:
+                if stage_performance and isinstance(stage_performance, dict):
                     perf_success_rates = [
-                        stage.get("success_rate", 0)
+                        float(stage.get("success_rate", 0))
                         for stage in stage_performance.values()
+                        if isinstance(stage, dict) and isinstance(stage.get("success_rate", 0), (int, float))
                     ]
                     if perf_success_rates:
                         success_rates.append(statistics.mean(perf_success_rates))
-            
-            overall_success_rate = statistics.mean(success_rates) if success_rates else 0
-            
+
+            overall_success_rate = statistics.mean(success_rates) if success_rates else 0.0
+
             return {
                 "value": overall_success_rate,
                 "components": {
@@ -546,11 +552,11 @@ class DashboardExporter:
                     ]) if performance_data.get("stage_performance") else 0
                 }
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting aggregated success rate: {e}")
             return {"error": str(e)}
-    
+
     async def _get_cost_tracking_data(
         self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -559,20 +565,20 @@ class DashboardExporter:
             days = (end_time - start_time).days
             if days < 1:
                 days = 1
-            
+
             cost_data = await self.bi_collector.get_cost_efficiency_report(days)
-            
+
             if cost_data.get("status") == "no_data":
                 return {"value": 0, "currency": "USD", "trend": "stable"}
-            
+
             aggregation = params.get("aggregation", "sum")
             total_cost = cost_data.get("total_cost", 0)
-            
+
             if aggregation == "daily_average":
                 value = cost_data.get("daily_average", 0)
             else:
                 value = total_cost
-            
+
             return {
                 "value": value,
                 "currency": "USD",
@@ -580,59 +586,59 @@ class DashboardExporter:
                 "trend": "up",  # Could be calculated from historical data
                 "period_total": total_cost
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting cost tracking data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_api_response_time_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get API response time trend data."""
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             api_data = await self.api_collector.get_endpoint_analytics(int(hours))
-            
+
             if api_data.get("status") == "no_data":
                 return {"series": [], "average": 0}
-            
+
             endpoint_analytics = api_data.get("endpoint_analytics", {})
-            
+
             # Calculate time series data (simplified - in practice, you'd get actual time series)
             time_series = []
             interval_minutes = 60  # 1 hour intervals
             current_time = start_time
-            
+
             while current_time < end_time:
                 # Calculate average response time for this interval
                 avg_response_time = statistics.mean([
                     analytics.get("avg_response_time_ms", 0)
                     for analytics in endpoint_analytics.values()
                 ]) if endpoint_analytics else 0
-                
+
                 time_series.append({
                     "timestamp": current_time.isoformat(),
                     "value": avg_response_time
                 })
-                
+
                 current_time += timedelta(minutes=interval_minutes)
-            
+
             overall_average = statistics.mean([
                 analytics.get("avg_response_time_ms", 0)
                 for analytics in endpoint_analytics.values()
             ]) if endpoint_analytics else 0
-            
+
             return {
                 "series": time_series,
                 "average": overall_average,
                 "unit": "milliseconds",
                 "endpoints_count": len(endpoint_analytics)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting API response time data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_feature_adoption_data(
         self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -640,51 +646,55 @@ class DashboardExporter:
         try:
             days = max(1, (end_time - start_time).days)
             adoption_data = await self.bi_collector.get_feature_adoption_report(days)
-            
+
             if adoption_data.get("status") == "no_data":
                 return {"features": []}
-            
+
             category_analysis = adoption_data.get("category_analysis", {})
             top_n = params.get("top_n", 10)
-            
+
             # Flatten and sort features by user count
-            all_features = []
+            all_features: List[Dict[str, Any]] = []
             for category, category_data in category_analysis.items():
-                for feature_data in category_data.get("top_features", []):
-                    all_features.append({
-                        "feature": feature_data["name"],
-                        "category": category,
-                        "users": feature_data["users"],
-                        "usage_count": feature_data["usage"],
-                        "adoption_rate": category_data.get("adoption_rate", 0)
-                    })
-            
+                if isinstance(category_data, dict):
+                    top_features_list = category_data.get("top_features", [])
+                    if isinstance(top_features_list, list):
+                        for feature_data in top_features_list:
+                            if isinstance(feature_data, dict):
+                                all_features.append({
+                                    "feature": feature_data.get("name", ""),
+                                    "category": category,
+                                    "users": feature_data.get("users", 0),
+                                    "usage_count": feature_data.get("usage", 0),
+                                    "adoption_rate": category_data.get("adoption_rate", 0)
+                                })
+
             # Sort by user count and take top N
-            top_features = sorted(all_features, key=lambda x: x["users"], reverse=True)[:top_n]
-            
+            top_features = sorted(all_features, key=lambda x: int(x.get("users", 0)), reverse=True)[:top_n]
+
             return {
                 "features": top_features,
                 "total_categories": len(category_analysis),
                 "total_adoption_events": adoption_data.get("total_adoption_events", 0)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting feature adoption data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_ml_prompt_success_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get ML prompt success rate data."""
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             ml_data = await self.ml_collector.get_prompt_improvement_summary(int(hours))
-            
+
             if ml_data.get("status") == "no_data":
                 return {"series": [], "categories": []}
-            
+
             category_breakdown = ml_data.get("category_breakdown", {})
-            
+
             # Create time series data for each category
             series_data = []
             for category, data in category_breakdown.items():
@@ -694,30 +704,30 @@ class DashboardExporter:
                     "count": data.get("count", 0),
                     "avg_improvement": data.get("avg_improvement_ratio", 0)
                 })
-            
+
             return {
                 "series": series_data,
                 "overall_success_rate": ml_data.get("overall_success_rate", 0),
                 "total_improvements": ml_data.get("total_improvements", 0)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting ML prompt success data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_ml_inference_latency_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get ML inference latency data."""
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             ml_data = await self.ml_collector.get_model_performance_summary(int(hours))
-            
+
             if ml_data.get("status") == "no_data":
                 return {"distribution": [], "percentiles": {}}
-            
+
             model_breakdown = ml_data.get("model_breakdown", {})
-            
+
             # Create latency distribution data
             latency_data = []
             for model_name, model_data in model_breakdown.items():
@@ -727,27 +737,33 @@ class DashboardExporter:
                     "inference_count": model_data.get("inference_count", 0),
                     "tokens_per_second": model_data.get("tokens_per_second", 0)
                 })
-            
+
             # Calculate overall percentiles (simplified)
-            all_latencies = [data["avg_latency"] for data in latency_data if data["avg_latency"] > 0]
-            percentiles = {}
+            all_latencies: List[float] = []
+            for data in latency_data:
+                if isinstance(data, dict):
+                    avg_latency = data.get("avg_latency", 0)
+                    if isinstance(avg_latency, (int, float)) and avg_latency > 0:
+                        all_latencies.append(float(avg_latency))
+
+            percentiles: Dict[str, float] = {}
             if all_latencies:
                 percentiles = {
                     "p50": statistics.median(all_latencies),
                     "p90": statistics.quantiles(all_latencies, n=10)[8] if len(all_latencies) >= 10 else max(all_latencies),
                     "p99": statistics.quantiles(all_latencies, n=100)[98] if len(all_latencies) >= 100 else max(all_latencies)
                 }
-            
+
             return {
                 "distribution": latency_data,
                 "percentiles": percentiles,
                 "total_inferences": ml_data.get("total_inferences", 0)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting ML inference latency data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_feature_flags_data(
         self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -755,18 +771,18 @@ class DashboardExporter:
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             flag_data = await self.bi_collector.get_feature_flag_effectiveness(int(hours))
-            
+
             if flag_data.get("status") == "no_data":
                 return {"flags": []}
-            
+
             flag_breakdown = flag_data.get("flag_breakdown", {})
             show_active = params.get("show_active", False)
-            
+
             flags_list = []
             for flag_name, flag_data in flag_breakdown.items():
                 if show_active and flag_data.get("adoption_rate", 0) == 0:
                     continue
-                
+
                 flags_list.append({
                     "flag": flag_name,
                     "adoption_rate": flag_data.get("adoption_rate", 0),
@@ -774,56 +790,64 @@ class DashboardExporter:
                     "success_rate": flag_data.get("success_rate", 0),
                     "total_exposures": flag_data.get("total_exposures", 0)
                 })
-            
+
             return {
                 "flags": flags_list,
                 "total_exposures": flag_data.get("total_flag_exposures", 0)
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting feature flags data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_system_health_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, start_time: datetime, end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get system health score."""
         try:
             # Calculate composite health score from all components
             hours = (end_time - start_time).total_seconds() / 3600
-            
+
             # Get data from all collectors
             ml_data = await self.ml_collector.get_prompt_improvement_summary(int(hours))
             api_data = await self.api_collector.get_endpoint_analytics(int(hours))
             performance_data = await self.performance_collector.get_pipeline_performance_summary(int(hours))
-            
+
             # Calculate health scores
-            health_components = []
-            
+            health_components: List[float] = []
+
             if ml_data.get("status") != "no_data":
-                ml_health = ml_data.get("overall_success_rate", 0) * 100
-                health_components.append(ml_health)
-            
+                ml_rate = ml_data.get("overall_success_rate", 0)
+                if isinstance(ml_rate, (int, float)):
+                    ml_health = float(ml_rate) * 100
+                    health_components.append(ml_health)
+
             if api_data.get("status") != "no_data":
                 endpoint_analytics = api_data.get("endpoint_analytics", {})
-                if endpoint_analytics:
-                    api_health = statistics.mean([
-                        analytics.get("success_rate", 0) * 100
+                if endpoint_analytics and isinstance(endpoint_analytics, dict):
+                    api_rates = [
+                        float(analytics.get("success_rate", 0)) * 100
                         for analytics in endpoint_analytics.values()
-                    ])
-                    health_components.append(api_health)
-            
+                        if isinstance(analytics, dict) and isinstance(analytics.get("success_rate", 0), (int, float))
+                    ]
+                    if api_rates:
+                        api_health = statistics.mean(api_rates)
+                        health_components.append(api_health)
+
             if performance_data.get("status") != "no_data":
                 stage_performance = performance_data.get("stage_performance", {})
-                if stage_performance:
-                    perf_health = statistics.mean([
-                        stage.get("success_rate", 0) * 100
+                if stage_performance and isinstance(stage_performance, dict):
+                    perf_rates = [
+                        float(stage.get("success_rate", 0)) * 100
                         for stage in stage_performance.values()
-                    ])
-                    health_components.append(perf_health)
-            
-            overall_health = statistics.mean(health_components) if health_components else 50
-            
+                        if isinstance(stage, dict) and isinstance(stage.get("success_rate", 0), (int, float))
+                    ]
+                    if perf_rates:
+                        perf_health = statistics.mean(perf_rates)
+                        health_components.append(perf_health)
+
+            overall_health = statistics.mean(health_components) if health_components else 50.0
+
             return {
                 "value": overall_health,
                 "status": "healthy" if overall_health > 80 else "warning" if overall_health > 60 else "critical",
@@ -833,27 +857,27 @@ class DashboardExporter:
                     "performance": health_components[2] if len(health_components) > 2 else 50
                 }
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting system health data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_alerts_data(
-        self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
+        self, _start_time: datetime, _end_time: datetime, _params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Get alerts data."""
         try:
             # Get active alerts from aggregation engine
             active_alerts = await self.aggregation_engine.get_active_alerts()
-            
+
             # Group by severity
             severity_counts = defaultdict(int)
             alert_details = []
-            
+
             for alert in active_alerts:
                 severity = alert.get("severity", "info")
                 severity_counts[severity] += 1
-                
+
                 alert_details.append({
                     "title": alert.get("title", ""),
                     "severity": severity,
@@ -862,17 +886,17 @@ class DashboardExporter:
                     "threshold": alert.get("threshold_value", 0),
                     "timestamp": alert.get("timestamp", "")
                 })
-            
+
             return {
                 "total_alerts": len(active_alerts),
                 "severity_breakdown": dict(severity_counts),
                 "alerts": alert_details[:10]  # Top 10 recent alerts
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting alerts data: {e}")
             return {"error": str(e)}
-    
+
     async def _get_api_request_rate_data(
         self, start_time: datetime, end_time: datetime, params: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -880,41 +904,41 @@ class DashboardExporter:
         try:
             hours = (end_time - start_time).total_seconds() / 3600
             api_data = await self.api_collector.get_endpoint_analytics(int(hours))
-            
+
             if api_data.get("status") == "no_data":
                 return {"series": [], "total_requests": 0}
-            
+
             total_requests = api_data.get("total_requests", 0)
             requests_per_hour = total_requests / hours if hours > 0 else 0
             requests_per_second = requests_per_hour / 3600
-            
+
             # Generate time series data (simplified)
             interval_minutes = int(params.get("interval", "1m").rstrip("m"))
             time_series = []
             current_time = start_time
-            
+
             while current_time < end_time:
                 # Simulate request rate (in practice, you'd get actual data)
                 rate = requests_per_second + (requests_per_second * 0.1 * (hash(str(current_time)) % 21 - 10) / 10)
-                
+
                 time_series.append({
                     "timestamp": current_time.isoformat(),
                     "value": max(0, rate)
                 })
-                
+
                 current_time += timedelta(minutes=interval_minutes)
-            
+
             return {
                 "series": time_series,
                 "total_requests": total_requests,
                 "avg_rate_per_second": requests_per_second,
                 "peak_rate": max(point["value"] for point in time_series) if time_series else 0
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting API request rate data: {e}")
             return {"error": str(e)}
-    
+
     async def _format_export_data(
         self, dashboard_data: Dict[str, Any], export_format: ExportFormat
     ) -> Union[Dict[str, Any], str, bytes]:
@@ -922,48 +946,48 @@ class DashboardExporter:
         try:
             if export_format == ExportFormat.JSON:
                 return dashboard_data
-            
+
             elif export_format == ExportFormat.CSV:
                 return self._format_csv_export(dashboard_data)
-            
+
             elif export_format == ExportFormat.PROMETHEUS:
                 return self._format_prometheus_export(dashboard_data)
-            
+
             elif export_format == ExportFormat.GRAFANA:
                 return self._format_grafana_export(dashboard_data)
-            
+
             elif export_format == ExportFormat.TABLEAU:
                 return self._format_tableau_export(dashboard_data)
-            
+
             elif export_format == ExportFormat.EXCEL:
                 return await self._format_excel_export(dashboard_data)
-            
+
             elif export_format == ExportFormat.PARQUET:
                 return await self._format_parquet_export(dashboard_data)
-            
+
             else:
                 raise ValueError(f"Unsupported export format: {export_format}")
-        
+
         except Exception as e:
             self.logger.error(f"Error formatting export data: {e}")
             raise
-    
+
     def _format_csv_export(self, dashboard_data: Dict[str, Any]) -> str:
         """Format dashboard data as CSV."""
         output = io.StringIO()
         writer = csv.writer(output)
-        
+
         # Write header
         writer.writerow(["Dashboard", "Widget", "Metric", "Value", "Timestamp"])
-        
+
         # Write data
         dashboard_id = dashboard_data["dashboard_id"]
         for widget_id, widget_data in dashboard_data["widgets"].items():
             if "data" in widget_data and not isinstance(widget_data["data"], dict) or "error" in widget_data["data"]:
                 continue
-            
+
             data = widget_data["data"]
-            
+
             # Handle different data structures
             if "value" in data:
                 writer.writerow([
@@ -982,38 +1006,38 @@ class DashboardExporter:
                         point.get("value", ""),
                         point.get("timestamp", "")
                     ])
-        
+
         return output.getvalue()
-    
+
     def _format_prometheus_export(self, dashboard_data: Dict[str, Any]) -> str:
         """Format dashboard data as Prometheus metrics."""
         metrics = []
         timestamp = int(time.time() * 1000)
-        
+
         for widget_id, widget_data in dashboard_data["widgets"].items():
             if "data" in widget_data and "error" not in widget_data["data"]:
                 data = widget_data["data"]
                 metric_name = f"dashboard_{widget_id.replace('-', '_')}"
-                
+
                 if "value" in data:
                     labels = f'{{dashboard="{dashboard_data["dashboard_id"]}",widget="{widget_id}"}}'
                     metrics.append(f"{metric_name}{labels} {data['value']} {timestamp}")
-                
+
                 elif "series" in data:
                     for i, point in enumerate(data["series"]):
                         labels = f'{{dashboard="{dashboard_data["dashboard_id"]}",widget="{widget_id}",series_index="{i}"}}'
                         metrics.append(f"{metric_name}{labels} {point.get('value', 0)} {timestamp}")
-        
+
         return "\n".join(metrics)
-    
+
     def _format_grafana_export(self, dashboard_data: Dict[str, Any]) -> Dict[str, Any]:
         """Format dashboard data for Grafana."""
         panels = []
-        
+
         for i, (widget_id, widget_data) in enumerate(dashboard_data["widgets"].items()):
             if "error" in widget_data.get("data", {}):
                 continue
-            
+
             panel = {
                 "id": i + 1,
                 "title": widget_data["title"],
@@ -1030,7 +1054,7 @@ class DashboardExporter:
                 }]
             }
             panels.append(panel)
-        
+
         return {
             "dashboard": {
                 "id": None,
@@ -1046,7 +1070,7 @@ class DashboardExporter:
                 "refresh": "30s"
             }
         }
-    
+
     def _format_tableau_export(self, dashboard_data: Dict[str, Any]) -> Dict[str, Any]:
         """Format dashboard data for Tableau."""
         # Tableau workbook structure
@@ -1057,11 +1081,11 @@ class DashboardExporter:
                 "worksheets": []
             }
         }
-        
-        for widget_id, widget_data in dashboard_data["widgets"].items():
+
+        for _widget_id, widget_data in dashboard_data["widgets"].items():
             if "error" in widget_data.get("data", {}):
                 continue
-            
+
             worksheet = {
                 "name": widget_data["title"],
                 "data": widget_data["data"],
@@ -1071,15 +1095,15 @@ class DashboardExporter:
                 }
             }
             workbook["workbook"]["worksheets"].append(worksheet)
-        
+
         return workbook
-    
+
     async def _format_excel_export(self, dashboard_data: Dict[str, Any]) -> bytes:
         """Format dashboard data as Excel file."""
         try:
             # Create Excel workbook with pandas
             excel_buffer = io.BytesIO()
-            
+
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 # Create summary sheet
                 summary_data = {
@@ -1090,15 +1114,15 @@ class DashboardExporter:
                 }
                 summary_df = pd.DataFrame(summary_data)
                 summary_df.to_excel(writer, sheet_name="Summary", index=False)
-                
+
                 # Create sheet for each widget
                 for widget_id, widget_data in dashboard_data["widgets"].items():
                     if "error" in widget_data.get("data", {}):
                         continue
-                    
+
                     data = widget_data["data"]
                     sheet_name = widget_id[:31]  # Excel sheet name limit
-                    
+
                     if "series" in data:
                         df = pd.DataFrame(data["series"])
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -1108,23 +1132,23 @@ class DashboardExporter:
                     elif "value" in data:
                         df = pd.DataFrame([{"Metric": widget_data["title"], "Value": data["value"]}])
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
+
             return excel_buffer.getvalue()
-        
+
         except Exception as e:
             self.logger.error(f"Error creating Excel export: {e}")
             raise
-    
+
     async def _format_parquet_export(self, dashboard_data: Dict[str, Any]) -> bytes:
         """Format dashboard data as Parquet file."""
         try:
             # Flatten all widget data into a single DataFrame
             all_data = []
-            
+
             for widget_id, widget_data in dashboard_data["widgets"].items():
                 if "error" in widget_data.get("data", {}):
                     continue
-                
+
                 data = widget_data["data"]
                 base_record = {
                     "dashboard_id": dashboard_data["dashboard_id"],
@@ -1132,7 +1156,7 @@ class DashboardExporter:
                     "widget_title": widget_data["title"],
                     "widget_type": widget_data["widget_type"]
                 }
-                
+
                 if "series" in data:
                     for point in data["series"]:
                         record = {**base_record, **point}
@@ -1144,7 +1168,7 @@ class DashboardExporter:
                 elif "value" in data:
                     record = {**base_record, "value": data["value"]}
                     all_data.append(record)
-            
+
             if all_data:
                 df = pd.DataFrame(all_data)
                 parquet_buffer = io.BytesIO()
@@ -1152,11 +1176,11 @@ class DashboardExporter:
                 return parquet_buffer.getvalue()
             else:
                 return b""
-        
+
         except Exception as e:
             self.logger.error(f"Error creating Parquet export: {e}")
             raise
-    
+
     def _map_widget_type_to_grafana(self, widget_type: str) -> str:
         """Map widget type to Grafana panel type."""
         mapping = {
@@ -1166,7 +1190,7 @@ class DashboardExporter:
             "alert": "stat"
         }
         return mapping.get(widget_type, "graph")
-    
+
     def _map_widget_type_to_tableau(self, widget_type: str) -> str:
         """Map widget type to Tableau visualization type."""
         mapping = {
@@ -1176,26 +1200,26 @@ class DashboardExporter:
             "alert": "text"
         }
         return mapping.get(widget_type, "line")
-    
+
     def _get_cached_data(self, cache_key: str) -> Optional[Any]:
         """Get data from cache if available and not expired."""
         if cache_key not in self.dashboard_cache:
             return None
-        
+
         cache_entry = self.dashboard_cache[cache_key]
         if datetime.now(timezone.utc) - cache_entry["timestamp"] > timedelta(seconds=self.cache_ttl_seconds):
             del self.dashboard_cache[cache_key]
             return None
-        
+
         return cache_entry["data"]
-    
+
     def _cache_data(self, cache_key: str, data: Any):
         """Cache data with timestamp."""
         self.dashboard_cache[cache_key] = {
             "data": data,
             "timestamp": datetime.now(timezone.utc)
         }
-        
+
         # Clean up old cache entries if cache is too large
         if len(self.dashboard_cache) > 100:
             oldest_key = min(
@@ -1203,11 +1227,11 @@ class DashboardExporter:
                 key=lambda k: self.dashboard_cache[k]["timestamp"]
             )
             del self.dashboard_cache[oldest_key]
-    
+
     async def get_available_dashboards(self) -> List[Dict[str, Any]]:
         """Get list of available dashboards."""
         dashboards_list = []
-        
+
         for dashboard_id, dashboard in self.dashboards.items():
             dashboards_list.append({
                 "id": dashboard_id,
@@ -1220,9 +1244,9 @@ class DashboardExporter:
                 "created_at": dashboard.created_at.isoformat(),
                 "updated_at": dashboard.updated_at.isoformat()
             })
-        
+
         return dashboards_list
-    
+
     def get_export_stats(self) -> Dict[str, Any]:
         """Get export statistics."""
         return {
@@ -1230,7 +1254,7 @@ class DashboardExporter:
             "cache_size": len(self.dashboard_cache),
             "available_dashboards": len(self.dashboards),
             "cache_hit_rate": (
-                self.export_stats["cache_hits"] / 
+                self.export_stats["cache_hits"] /
                 (self.export_stats["cache_hits"] + self.export_stats["cache_misses"])
                 if (self.export_stats["cache_hits"] + self.export_stats["cache_misses"]) > 0 else 0
             )

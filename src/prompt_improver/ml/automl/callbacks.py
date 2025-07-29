@@ -13,8 +13,7 @@ from optuna.trial import TrialState
 
 if TYPE_CHECKING:
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
-    from ...core.services.analytics_factory import get_analytics_router
-    from .orchestrator import AutoMLOrchestrator
+    from .shared_types import AutoMLOrchestratorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -231,11 +230,11 @@ class RealTimeAnalyticsCallback:
     Streams optimization progress to WebSocket connections
     """
 
-    def __init__(self, analytics_service: "RealTimeAnalyticsService"):
+    def __init__(self, analytics_service):
         """Initialize real-time analytics callback
 
         Args:
-            analytics_service: Real-time analytics service for WebSocket streaming
+            analytics_service: Analytics service for WebSocket streaming (from get_analytics_router)
         """
         self.analytics_service = analytics_service
         logger.info("Real-time analytics callback initialized")
@@ -470,9 +469,11 @@ def create_standard_callbacks(orchestrator: "AutoMLOrchestrator") -> list:
     # Always include main AutoML callback
     callbacks.append(AutoMLCallback(orchestrator))
 
-    # Add real-time analytics if available
-    if orchestrator.analytics_service:
-        callbacks.append(RealTimeAnalyticsCallback(orchestrator.analytics_service))
+    # Add real-time analytics using modern factory pattern
+    from ...core.services.analytics_factory import get_analytics_router
+    analytics_router = get_analytics_router()
+    if analytics_router:
+        callbacks.append(RealTimeAnalyticsCallback(analytics_router))
 
     # Add experiment callback if available
     if orchestrator.experiment_orchestrator:

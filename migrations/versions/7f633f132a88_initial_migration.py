@@ -11,6 +11,7 @@ from typing import Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision: str = "7f633f132a88"
@@ -29,9 +30,9 @@ def upgrade() -> None:
         sa.Column("original_prompt", sa.Text(), nullable=False),
         sa.Column("improved_prompt", sa.Text(), nullable=False),
         sa.Column("user_rating", sa.Integer(), nullable=False),
-        sa.Column("applied_rules", sa.JSON(), nullable=False),
-        sa.Column("user_context", sa.JSON(), nullable=True),
-        sa.Column("improvement_areas", sa.JSON(), nullable=True),
+        sa.Column("applied_rules", JSONB, nullable=False),
+        sa.Column("user_context", JSONB, nullable=True),
+        sa.Column("improvement_areas", JSONB, nullable=True),
         sa.Column("user_notes", sa.Text(), nullable=True),
         sa.Column("session_id", sa.String(length=100), nullable=True),
         sa.Column("ml_optimized", sa.Boolean(), nullable=False, server_default="false"),

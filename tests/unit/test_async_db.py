@@ -1,12 +1,12 @@
 import pytest
 import asyncio
 from sqlalchemy import text
-from prompt_improver.database.connection import DatabaseSessionManager
+from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
 
 @pytest.mark.asyncio
 async def test_async_db_interaction():
     db_url = "postgresql+asyncpg://user:password@localhost/test_async_db"
-    db_manager = DatabaseSessionManager(database_url=db_url)
+    db_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
     
     async with db_manager.session() as session:
         result = await session.execute(text("SELECT version();"))

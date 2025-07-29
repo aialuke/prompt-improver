@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 def old_database_setup():
     """Example of old database configuration usage."""
     # OLD WAY - importing specific config
-    from prompt_improver.database.config import DatabaseConfig
+    from prompt_improver.core.config import AppConfig
     
-    db_config = DatabaseConfig()
+    db_config = AppConfig().database
     database_url = db_config.database_url
     pool_settings = {
         'min_size': db_config.pool_min_size,
@@ -232,10 +232,10 @@ def migration_checklist():
     print("\n=== Code Changes Required ===")
     
     examples = [
-        "# OLD: from prompt_improver.database.config import DatabaseConfig",
+        "# OLD: from prompt_improver.core.config import AppConfig",
         "# NEW: from prompt_improver.core.config import get_config",
         "",
-        "# OLD: db_config = DatabaseConfig()",
+        "# OLD: db_config = AppConfig().database",
         "# NEW: config = get_config()",
         "",
         "# OLD: url = db_config.database_url",

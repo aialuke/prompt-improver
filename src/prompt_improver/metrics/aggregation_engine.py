@@ -8,7 +8,7 @@ and intelligent alerting with distributed processing capabilities.
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, DefaultDict, Deque
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
@@ -100,34 +100,34 @@ class Correlation:
 class RealTimeAggregationEngine:
     """
     Real-time metrics aggregation engine.
-    
+
     Provides unified aggregation across all metric types, real-time processing,
     intelligent alerting, and cross-metric correlation analysis.
     """
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the aggregation engine."""
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
-        
+
         # Component collectors
         self.ml_collector = get_ml_metrics_collector()
         self.api_collector = get_api_metrics_collector()
         self.performance_collector = get_performance_metrics_collector()
         self.bi_collector = get_bi_metrics_collector()
-        
+
         # Aggregated data storage
-        self.aggregated_metrics: Dict[str, deque] = defaultdict(
+        self.aggregated_metrics: Dict[str, Deque[AggregatedMetric]] = defaultdict(
             lambda: deque(maxlen=self.config.get("max_aggregated_metrics", 10000))
         )
-        self.alerts: deque = deque(maxlen=self.config.get("max_alerts", 1000))
-        self.correlations: deque = deque(maxlen=self.config.get("max_correlations", 500))
-        
+        self.alerts: Deque[Alert] = deque(maxlen=self.config.get("max_alerts", 1000))
+        self.correlations: Deque[Correlation] = deque(maxlen=self.config.get("max_correlations", 500))
+
         # Real-time processing
-        self.processing_queue = asyncio.Queue(maxsize=self.config.get("queue_size", 10000))
-        self.correlation_cache: Dict[str, Dict[str, float]] = defaultdict(dict)
+        self.processing_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=self.config.get("queue_size", 10000))
+        self.correlation_cache: DefaultDict[str, Dict[str, float]] = defaultdict(dict)
         self.alert_rules: List[Dict[str, Any]] = []
-        
+
         # Configuration
         self.aggregation_intervals = {
             AggregationWindow.REAL_TIME: 60,      # 1 minute
@@ -137,7 +137,7 @@ class RealTimeAggregationEngine:
             AggregationWindow.DAILY: 86400,       # 24 hours
             AggregationWindow.WEEKLY: 604800      # 7 days
         }
-        
+
         self.retention_periods = {
             AggregationWindow.REAL_TIME: timedelta(hours=1),
             AggregationWindow.SHORT_TERM: timedelta(hours=6),
@@ -146,15 +146,15 @@ class RealTimeAggregationEngine:
             AggregationWindow.DAILY: timedelta(days=30),
             AggregationWindow.WEEKLY: timedelta(days=365)
         }
-        
+
         # Processing configuration
         self.enable_correlations = self.config.get("enable_correlations", True)
         self.enable_alerting = self.config.get("enable_alerting", True)
         self.correlation_min_samples = self.config.get("correlation_min_samples", 50)
         self.correlation_threshold = self.config.get("correlation_threshold", 0.7)
-        
+
         # Statistics
-        self.processing_stats = {
+        self.processing_stats: Dict[str, Any] = {
             "metrics_processed": 0,
             "aggregations_created": 0,
             "alerts_generated": 0,
@@ -163,53 +163,53 @@ class RealTimeAggregationEngine:
             "last_processing_time": None,
             "queue_size": 0
         }
-        
+
         # Prometheus integration
         self.metrics_registry = get_metrics_registry()
         self._initialize_prometheus_metrics()
-        
+
         # Background tasks
         self.is_running = False
-        self.processing_tasks: List[asyncio.Task] = []
-        self.aggregation_tasks: List[asyncio.Task] = []
+        self.processing_tasks: List[asyncio.Task[None]] = []
+        self.aggregation_tasks: List[asyncio.Task[None]] = []
         self.thread_pool = ThreadPoolExecutor(max_workers=self.config.get("thread_pool_size", 4))
-        
+
         # Initialize default alert rules
         self._initialize_default_alert_rules()
-    
-    def _initialize_prometheus_metrics(self):
+
+    def _initialize_prometheus_metrics(self) -> None:
         """Initialize Prometheus metrics for the aggregation engine."""
         self.processing_rate = self.metrics_registry.get_or_create_gauge(
             "aggregation_processing_rate_per_second",
             "Rate of metrics processing per second",
             ["window"]
         )
-        
+
         self.queue_depth = self.metrics_registry.get_or_create_gauge(
             "aggregation_queue_depth",
             "Current depth of processing queue",
             []
         )
-        
+
         self.aggregation_latency = self.metrics_registry.get_or_create_histogram(
             "aggregation_processing_latency_seconds",
             "Time taken to process aggregations",
             ["window"],
             buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5]
         )
-        
+
         self.active_alerts = self.metrics_registry.get_or_create_gauge(
             "aggregation_active_alerts",
             "Number of active alerts by severity",
             ["severity"]
         )
-        
+
         self.correlation_strength = self.metrics_registry.get_or_create_gauge(
             "aggregation_correlation_strength",
             "Strength of detected correlations",
             ["correlation_type", "metric_a", "metric_b"]
         )
-    
+
     def _initialize_default_alert_rules(self):
         """Initialize default alerting rules."""
         self.alert_rules = [
@@ -230,7 +230,7 @@ class RealTimeAggregationEngine:
                 "severity": AlertSeverity.CRITICAL,
                 "window": AggregationWindow.REAL_TIME
             },
-            
+
             # API Performance alerts
             {
                 "name": "api_response_time_high",
@@ -248,7 +248,7 @@ class RealTimeAggregationEngine:
                 "severity": AlertSeverity.CRITICAL,
                 "window": AggregationWindow.SHORT_TERM
             },
-            
+
             # Performance alerts
             {
                 "name": "database_slow_queries_high",
@@ -266,7 +266,7 @@ class RealTimeAggregationEngine:
                 "severity": AlertSeverity.WARNING,
                 "window": AggregationWindow.MEDIUM_TERM
             },
-            
+
             # Business Intelligence alerts
             {
                 "name": "cost_per_hour_high",
@@ -285,73 +285,73 @@ class RealTimeAggregationEngine:
                 "window": AggregationWindow.LONG_TERM
             }
         ]
-    
-    async def start(self):
+
+    async def start(self) -> None:
         """Start the aggregation engine."""
         if self.is_running:
             return
-        
+
         self.is_running = True
-        
+
         # Start all metric collectors
         await self.ml_collector.start_aggregation()
         await self.api_collector.start_collection()
         await self.performance_collector.start_collection()
         await self.bi_collector.start_collection()
-        
+
         # Start processing tasks
         num_processors = self.config.get("num_processors", 2)
         for i in range(num_processors):
             task = asyncio.create_task(self._process_metrics_loop(f"processor_{i}"))
             self.processing_tasks.append(task)
-        
+
         # Start aggregation tasks for different windows
         for window in AggregationWindow:
             task = asyncio.create_task(self._aggregation_loop(window))
             self.aggregation_tasks.append(task)
-        
+
         # Start correlation and alerting tasks
         if self.enable_correlations:
             correlation_task = asyncio.create_task(self._correlation_loop())
             self.processing_tasks.append(correlation_task)
-        
+
         if self.enable_alerting:
             alerting_task = asyncio.create_task(self._alerting_loop())
             self.processing_tasks.append(alerting_task)
-        
+
         # Start cleanup task
         cleanup_task = asyncio.create_task(self._cleanup_loop())
         self.processing_tasks.append(cleanup_task)
-        
+
         self.logger.info("Started real-time aggregation engine")
-    
-    async def stop(self):
+
+    async def stop(self) -> None:
         """Stop the aggregation engine."""
         if not self.is_running:
             return
-        
+
         self.is_running = False
-        
+
         # Stop all tasks
         all_tasks = self.processing_tasks + self.aggregation_tasks
         for task in all_tasks:
             task.cancel()
-        
+
         # Wait for tasks to complete
         await asyncio.gather(*all_tasks, return_exceptions=True)
-        
+
         # Stop metric collectors
         await self.ml_collector.stop_aggregation()
         await self.api_collector.stop_collection()
         await self.performance_collector.stop_collection()
         await self.bi_collector.stop_collection()
-        
+
         # Shutdown thread pool
         self.thread_pool.shutdown(wait=True)
-        
+
         self.logger.info("Stopped real-time aggregation engine")
-    
-    async def _process_metrics_loop(self, processor_id: str):
+
+    async def _process_metrics_loop(self, processor_id: str) -> None:
         """Main metrics processing loop."""
         try:
             while self.is_running:
@@ -361,90 +361,90 @@ class RealTimeAggregationEngine:
                         self.processing_queue.get(),
                         timeout=1.0
                     )
-                    
+
                     start_time = time.time()
-                    
+
                     # Process the metric
                     await self._process_single_metric(metric_data)
-                    
+
                     # Update statistics
                     processing_time = time.time() - start_time
                     self.processing_stats["metrics_processed"] += 1
                     self.processing_stats["last_processing_time"] = datetime.now(timezone.utc)
-                    
+
                     # Update Prometheus metrics
                     self.aggregation_latency.labels(
                         window="processing"
                     ).observe(processing_time)
-                    
+
                 except asyncio.TimeoutError:
                     continue  # No metrics to process
                 except Exception as e:
                     self.processing_stats["processing_errors"] += 1
                     self.logger.error(f"Error in processor {processor_id}: {e}")
-        
+
         except asyncio.CancelledError:
             pass
         except Exception as e:
             self.logger.error(f"Fatal error in processor {processor_id}: {e}")
-    
-    async def _aggregation_loop(self, window: AggregationWindow):
+
+    async def _aggregation_loop(self, window: AggregationWindow) -> None:
         """Aggregation loop for specific time window."""
         try:
             interval = self.aggregation_intervals[window]
-            
+
             while self.is_running:
                 start_time = time.time()
-                
+
                 try:
                     await self._perform_aggregation(window)
-                    
+
                     processing_time = time.time() - start_time
                     self.aggregation_latency.labels(
                         window=window.value
                     ).observe(processing_time)
-                    
+
                 except Exception as e:
                     self.logger.error(f"Error in aggregation for {window.value}: {e}")
-                
+
                 await asyncio.sleep(interval)
-        
+
         except asyncio.CancelledError:
             pass
-    
-    async def _process_single_metric(self, metric_data: Dict[str, Any]):
+
+    async def _process_single_metric(self, metric_data: Dict[str, Any]) -> None:
         """Process a single metric data point."""
         try:
             metric_type = metric_data.get("type")
             timestamp = metric_data.get("timestamp", datetime.now(timezone.utc))
-            
+
             # Queue for real-time processing
             await self.processing_queue.put({
                 "data": metric_data,
                 "timestamp": timestamp,
                 "type": metric_type
             })
-            
+
             # Update queue depth metric
             self.processing_stats["queue_size"] = self.processing_queue.qsize()
             self.queue_depth.set(self.processing_stats["queue_size"])
-        
+
         except Exception as e:
             self.logger.error(f"Error processing metric: {e}")
-    
-    async def _perform_aggregation(self, window: AggregationWindow):
+
+    async def _perform_aggregation(self, window: AggregationWindow) -> None:
         """Perform aggregation for a specific time window."""
         try:
             current_time = datetime.now(timezone.utc)
             window_seconds = self.aggregation_intervals[window]
             window_start = current_time - timedelta(seconds=window_seconds)
-            
+
             # Collect metrics from all collectors
             ml_data = await self._collect_ml_metrics(window_start, current_time)
             api_data = await self._collect_api_metrics(window_start, current_time)
             performance_data = await self._collect_performance_metrics(window_start, current_time)
             bi_data = await self._collect_bi_metrics(window_start, current_time)
-            
+
             # Aggregate each metric type
             for metric_name, values in ml_data.items():
                 if values:
@@ -452,44 +452,44 @@ class RealTimeAggregationEngine:
                         metric_name, "ml", values, window, current_time
                     )
                     self.aggregated_metrics[f"ml_{metric_name}_{window.value}"].append(aggregated)
-            
+
             for metric_name, values in api_data.items():
                 if values:
                     aggregated = await self._calculate_aggregation(
                         metric_name, "api", values, window, current_time
                     )
                     self.aggregated_metrics[f"api_{metric_name}_{window.value}"].append(aggregated)
-            
+
             for metric_name, values in performance_data.items():
                 if values:
                     aggregated = await self._calculate_aggregation(
                         metric_name, "performance", values, window, current_time
                     )
                     self.aggregated_metrics[f"performance_{metric_name}_{window.value}"].append(aggregated)
-            
+
             for metric_name, values in bi_data.items():
                 if values:
                     aggregated = await self._calculate_aggregation(
                         metric_name, "bi", values, window, current_time
                     )
                     self.aggregated_metrics[f"bi_{metric_name}_{window.value}"].append(aggregated)
-            
+
             self.processing_stats["aggregations_created"] += 1
-            
+
             # Update processing rate
             metrics_count = sum(len(data) for data in [ml_data, api_data, performance_data, bi_data])
             rate = metrics_count / window_seconds if window_seconds > 0 else 0
             self.processing_rate.labels(window=window.value).set(rate)
-        
+
         except Exception as e:
             self.logger.error(f"Error performing aggregation for {window.value}: {e}")
-    
+
     async def _collect_ml_metrics(self, start_time: datetime, end_time: datetime) -> Dict[str, List[float]]:
         """Collect ML metrics for aggregation."""
         try:
             # Get recent ML metrics
-            metrics_data = defaultdict(list)
-            
+            metrics_data: DefaultDict[str, List[float]] = defaultdict(list)
+
             # Collect from prompt improvement metrics
             for metric in self.ml_collector.prompt_metrics:
                 if start_time <= metric.timestamp <= end_time:
@@ -497,7 +497,7 @@ class RealTimeAggregationEngine:
                     metrics_data["prompt_processing_time"].append(metric.processing_time_ms)
                     metrics_data["prompt_improvement_ratio"].append(metric.improvement_ratio)
                     metrics_data["prompt_confidence_score"].append(metric.confidence_score)
-            
+
             # Collect from inference metrics
             for metric in self.ml_collector.inference_metrics:
                 if start_time <= metric.timestamp <= end_time:
@@ -505,18 +505,18 @@ class RealTimeAggregationEngine:
                     metrics_data["model_memory_usage"].append(metric.memory_usage_mb)
                     if metric.confidence_distribution:
                         metrics_data["model_confidence"].extend(metric.confidence_distribution)
-            
+
             return dict(metrics_data)
-        
+
         except Exception as e:
             self.logger.error(f"Error collecting ML metrics: {e}")
             return {}
-    
+
     async def _collect_api_metrics(self, start_time: datetime, end_time: datetime) -> Dict[str, List[float]]:
         """Collect API metrics for aggregation."""
         try:
-            metrics_data = defaultdict(list)
-            
+            metrics_data: DefaultDict[str, List[float]] = defaultdict(list)
+
             # Collect API usage metrics
             for metric in self.api_collector.api_usage_metrics:
                 if start_time <= metric.timestamp <= end_time:
@@ -526,58 +526,61 @@ class RealTimeAggregationEngine:
                     metrics_data["success_rate"].append(1.0 if 200 <= metric.status_code < 400 else 0.0)
                     metrics_data["rate_limited_ratio"].append(1.0 if metric.rate_limited else 0.0)
                     metrics_data["cache_hit_ratio"].append(1.0 if metric.cache_hit else 0.0)
-            
+
             return dict(metrics_data)
-        
+
         except Exception as e:
             self.logger.error(f"Error collecting API metrics: {e}")
             return {}
-    
+
     async def _collect_performance_metrics(self, start_time: datetime, end_time: datetime) -> Dict[str, List[float]]:
         """Collect performance metrics for aggregation."""
         try:
-            metrics_data = defaultdict(list)
-            
-            # Collect pipeline metrics
-            for metric in self.performance_collector.pipeline_metrics:
-                if start_time <= metric.start_time <= end_time:
+            metrics_data: DefaultDict[str, List[float]] = defaultdict(list)
+
+            # Collect pipeline metrics using public interface
+            pipeline_metrics = self.performance_collector.get_metrics_by_type("pipeline")
+            for metric in pipeline_metrics:
+                if hasattr(metric, 'start_time') and start_time <= metric.start_time <= end_time:
                     metrics_data["pipeline_duration"].append(metric.duration_ms)
                     metrics_data["pipeline_memory_usage"].append(metric.memory_usage_mb)
                     metrics_data["pipeline_cpu_usage"].append(metric.cpu_usage_percent)
                     metrics_data["pipeline_success_rate"].append(1.0 if metric.success else 0.0)
                     if metric.queue_time_ms:
                         metrics_data["pipeline_queue_time"].append(metric.queue_time_ms)
-            
-            # Collect database metrics
-            for metric in self.performance_collector.database_metrics:
-                if start_time <= metric.timestamp <= end_time:
+
+            # Collect database metrics using public interface
+            database_metrics = self.performance_collector.get_metrics_by_type("database")
+            for metric in database_metrics:
+                if hasattr(metric, 'timestamp') and start_time <= metric.timestamp <= end_time:
                     metrics_data["database_query_time"].append(metric.execution_time_ms)
                     metrics_data["database_rows_affected"].append(metric.rows_affected)
                     metrics_data["database_lock_time"].append(metric.lock_time_ms)
                     metrics_data["database_connection_utilization"].append(
-                        metric.active_connections / metric.connection_pool_size
-                        if metric.connection_pool_size > 0 else 0
+                        float(metric.active_connections / metric.connection_pool_size)
+                        if metric.connection_pool_size > 0 else 0.0
                     )
-            
-            # Collect cache metrics
-            for metric in self.performance_collector.cache_metrics:
-                if start_time <= metric.timestamp <= end_time:
+
+            # Collect cache metrics using public interface
+            cache_metrics = self.performance_collector.get_metrics_by_type("cache")
+            for metric in cache_metrics:
+                if hasattr(metric, 'timestamp') and start_time <= metric.timestamp <= end_time:
                     metrics_data["cache_response_time"].append(metric.response_time_ms)
                     metrics_data["cache_hit_rate"].append(1.0 if metric.hit else 0.0)
                     if metric.serialization_time_ms:
                         metrics_data["cache_serialization_time"].append(metric.serialization_time_ms)
-            
+
             return dict(metrics_data)
-        
+
         except Exception as e:
             self.logger.error(f"Error collecting performance metrics: {e}")
             return {}
-    
+
     async def _collect_bi_metrics(self, start_time: datetime, end_time: datetime) -> Dict[str, List[float]]:
         """Collect business intelligence metrics for aggregation."""
         try:
-            metrics_data = defaultdict(list)
-            
+            metrics_data: DefaultDict[str, List[float]] = defaultdict(list)
+
             # Collect feature adoption metrics
             for metric in self.bi_collector.adoption_metrics:
                 if start_time <= metric.timestamp <= end_time:
@@ -585,7 +588,7 @@ class RealTimeAggregationEngine:
                     metrics_data["feature_success_rate"].append(1.0 if metric.success else 0.0)
                     metrics_data["feature_usage_count"].append(metric.usage_count)
                     metrics_data["first_time_usage"].append(1.0 if metric.first_use else 0.0)
-            
+
             # Collect engagement metrics
             for metric in self.bi_collector.engagement_metrics:
                 if start_time <= metric.timestamp <= end_time:
@@ -595,20 +598,20 @@ class RealTimeAggregationEngine:
                         metric.successful_actions / max(metric.actions_performed, 1)
                     )
                     metrics_data["time_to_first_action"].append(metric.time_to_first_action_seconds)
-            
+
             # Collect cost metrics
             for metric in self.bi_collector.cost_metrics:
                 if start_time <= metric.timestamp <= end_time:
                     metrics_data["operational_cost"].append(metric.cost_amount)
                     metrics_data["resource_units_consumed"].append(metric.resource_units_consumed)
                     metrics_data["cost_per_unit"].append(metric.resource_unit_cost)
-            
+
             return dict(metrics_data)
-        
+
         except Exception as e:
             self.logger.error(f"Error collecting BI metrics: {e}")
             return {}
-    
+
     async def _calculate_aggregation(
         self,
         metric_name: str,
@@ -621,23 +624,23 @@ class RealTimeAggregationEngine:
         try:
             if not values:
                 raise ValueError("No values to aggregate")
-            
+
             # Convert to numpy array for efficient computation
             np_values = np.array(values)
-            
+
             # Calculate statistics
             count = len(values)
             min_value = float(np.min(np_values))
             max_value = float(np.max(np_values))
             avg_value = float(np.mean(np_values))
             stddev = float(np.std(np_values))
-            
+
             # Calculate percentiles
             percentile_50 = float(np.percentile(np_values, 50))
             percentile_90 = float(np.percentile(np_values, 90))
             percentile_95 = float(np.percentile(np_values, 95))
             percentile_99 = float(np.percentile(np_values, 99))
-            
+
             return AggregatedMetric(
                 metric_name=metric_name,
                 metric_type=metric_type,
@@ -656,11 +659,11 @@ class RealTimeAggregationEngine:
                 tags={"window": window.value, "type": metric_type},
                 source_metrics=[f"{metric_type}_{metric_name}"]
             )
-        
+
         except Exception as e:
             self.logger.error(f"Error calculating aggregation for {metric_name}: {e}")
             raise
-    
+
     async def _correlation_loop(self):
         """Background correlation detection loop."""
         try:
@@ -671,14 +674,14 @@ class RealTimeAggregationEngine:
             pass
         except Exception as e:
             self.logger.error(f"Error in correlation loop: {e}")
-    
+
     async def _detect_correlations(self):
         """Detect correlations between different metrics."""
         try:
             current_time = datetime.now(timezone.utc)
             window_duration = timedelta(hours=1)  # 1-hour correlation window
             window_start = current_time - window_duration
-            
+
             # Define metric pairs to check for correlations
             correlation_pairs = [
                 ("api_response_time", "database_query_time", CorrelationType.PERFORMANCE_COST),
@@ -687,15 +690,15 @@ class RealTimeAggregationEngine:
                 ("operational_cost", "resource_units_consumed", CorrelationType.COST_EFFICIENCY),
                 ("cache_hit_rate", "api_response_time", CorrelationType.PERFORMANCE_COST)
             ]
-            
+
             for metric_a, metric_b, correlation_type in correlation_pairs:
                 await self._calculate_correlation(
                     metric_a, metric_b, correlation_type, window_start, current_time
                 )
-        
+
         except Exception as e:
             self.logger.error(f"Error detecting correlations: {e}")
-    
+
     async def _calculate_correlation(
         self,
         metric_a: str,
@@ -710,12 +713,10 @@ class RealTimeAggregationEngine:
             values_a = []
             values_b = []
             timestamps = []
-            
+
             # Collect values from aggregated metrics
             window_key = AggregationWindow.SHORT_TERM.value
-            key_a = f"*_{metric_a}_{window_key}"
-            key_b = f"*_{metric_b}_{window_key}"
-            
+
             # Find matching aggregated metrics
             for key, metrics_deque in self.aggregated_metrics.items():
                 if metric_a in key and window_key in key:
@@ -723,37 +724,37 @@ class RealTimeAggregationEngine:
                         if start_time <= metric.timestamp <= end_time:
                             values_a.append(metric.value)
                             timestamps.append(metric.timestamp)
-                
+
                 if metric_b in key and window_key in key:
                     for metric in metrics_deque:
                         if start_time <= metric.timestamp <= end_time and metric.timestamp in timestamps:
                             values_b.append(metric.value)
-            
+
             # Ensure we have enough samples and matching timestamps
             if len(values_a) < self.correlation_min_samples or len(values_b) < self.correlation_min_samples:
                 return
-            
+
             if len(values_a) != len(values_b):
                 # Align timestamps and values
                 min_length = min(len(values_a), len(values_b))
                 values_a = values_a[:min_length]
                 values_b = values_b[:min_length]
-            
+
             # Calculate Pearson correlation coefficient
             correlation_matrix = np.corrcoef(values_a, values_b)
             correlation_coefficient = correlation_matrix[0, 1]
-            
+
             # Check if correlation is significant
             if abs(correlation_coefficient) >= self.correlation_threshold:
                 # Calculate confidence level (simplified)
                 sample_size = len(values_a)
                 confidence_level = min(0.99, 1.0 - (1.0 / sample_size))
-                
+
                 # Generate insights
                 insights = self._generate_correlation_insights(
                     metric_a, metric_b, correlation_coefficient, correlation_type
                 )
-                
+
                 correlation = Correlation(
                     metric_a=metric_a,
                     metric_b=metric_b,
@@ -765,25 +766,25 @@ class RealTimeAggregationEngine:
                     timestamp=end_time,
                     insights=insights
                 )
-                
+
                 self.correlations.append(correlation)
                 self.processing_stats["correlations_detected"] += 1
-                
+
                 # Update Prometheus metric
                 self.correlation_strength.labels(
                     correlation_type=correlation_type.value,
                     metric_a=metric_a,
                     metric_b=metric_b
                 ).set(abs(correlation_coefficient))
-                
+
                 self.logger.info(
                     f"Detected {correlation_type.value} correlation: "
                     f"{metric_a} <-> {metric_b} (r={correlation_coefficient:.3f})"
                 )
-        
+
         except Exception as e:
             self.logger.error(f"Error calculating correlation between {metric_a} and {metric_b}: {e}")
-    
+
     def _generate_correlation_insights(
         self,
         metric_a: str,
@@ -793,35 +794,35 @@ class RealTimeAggregationEngine:
     ) -> List[str]:
         """Generate insights from correlation analysis."""
         insights = []
-        
+
         correlation_strength = "strong" if abs(correlation) > 0.8 else "moderate"
         direction = "positive" if correlation > 0 else "negative"
-        
+
         insights.append(f"{correlation_strength.title()} {direction} correlation detected")
-        
+
         if correlation_type == CorrelationType.PERFORMANCE_COST:
             if correlation > 0:
                 insights.append("Higher performance metrics correlate with increased costs")
                 insights.append("Consider optimization opportunities to improve cost efficiency")
             else:
                 insights.append("Performance improvements are reducing costs effectively")
-        
+
         elif correlation_type == CorrelationType.USAGE_ADOPTION:
             if correlation > 0:
                 insights.append("Feature usage correlates with user engagement")
                 insights.append("Focus on promoting high-correlation features")
             else:
                 insights.append("Investigate potential usability issues with this feature")
-        
+
         elif correlation_type == CorrelationType.ERROR_PERFORMANCE:
             if correlation > 0:
                 insights.append("Error rates increase with performance degradation")
                 insights.append("Monitor performance metrics as leading indicators")
             else:
                 insights.append("Error handling may be impacting performance")
-        
+
         return insights
-    
+
     async def _alerting_loop(self):
         """Background alerting loop."""
         try:
@@ -832,18 +833,18 @@ class RealTimeAggregationEngine:
             pass
         except Exception as e:
             self.logger.error(f"Error in alerting loop: {e}")
-    
+
     async def _check_alert_rules(self):
         """Check all alert rules against current metrics."""
         try:
             current_time = datetime.now(timezone.utc)
-            
+
             for rule in self.alert_rules:
                 await self._evaluate_alert_rule(rule, current_time)
-        
+
         except Exception as e:
             self.logger.error(f"Error checking alert rules: {e}")
-    
+
     async def _evaluate_alert_rule(self, rule: Dict[str, Any], current_time: datetime):
         """Evaluate a single alert rule."""
         try:
@@ -852,11 +853,10 @@ class RealTimeAggregationEngine:
             comparison = rule["comparison"]
             severity = rule["severity"]
             window = rule["window"]
-            
+
             # Get recent aggregated value for this metric
-            window_key = f"*_{metric_name}_{window.value}"
             current_value = None
-            
+
             for key, metrics_deque in self.aggregated_metrics.items():
                 if metric_name in key and window.value in key:
                     if metrics_deque:
@@ -864,10 +864,10 @@ class RealTimeAggregationEngine:
                         latest_metric = metrics_deque[-1]
                         current_value = latest_metric.value
                         break
-            
+
             if current_value is None:
                 return  # No data available
-            
+
             # Evaluate condition
             alert_triggered = False
             if comparison == "above" and current_value > threshold:
@@ -876,17 +876,17 @@ class RealTimeAggregationEngine:
                 alert_triggered = True
             elif comparison == "equals" and abs(current_value - threshold) < 0.001:
                 alert_triggered = True
-            
+
             if alert_triggered:
                 # Check if we already have an active alert for this rule
                 existing_alert = None
                 for alert in self.alerts:
-                    if (alert.metric_name == metric_name and 
-                        not alert.resolved and 
+                    if (alert.metric_name == metric_name and
+                        not alert.resolved and
                         alert.comparison == comparison):
                         existing_alert = alert
                         break
-                
+
                 if not existing_alert:
                     # Create new alert
                     alert = Alert(
@@ -904,35 +904,35 @@ class RealTimeAggregationEngine:
                         resolved=False,
                         resolution_timestamp=None
                     )
-                    
+
                     self.alerts.append(alert)
                     self.processing_stats["alerts_generated"] += 1
-                    
+
                     # Update Prometheus metric
                     self._update_alert_metrics()
-                    
+
                     self.logger.warning(f"Alert triggered: {alert.title}")
-        
+
         except Exception as e:
             self.logger.error(f"Error evaluating alert rule: {e}")
-    
+
     def _update_alert_metrics(self):
         """Update Prometheus alert metrics."""
         try:
             # Count active alerts by severity
-            severity_counts = defaultdict(int)
+            severity_counts: DefaultDict[str, int] = defaultdict(int)
             for alert in self.alerts:
                 if not alert.resolved:
                     severity_counts[alert.severity.value] += 1
-            
+
             # Update metrics
             for severity in AlertSeverity:
                 count = severity_counts[severity.value]
                 self.active_alerts.labels(severity=severity.value).set(count)
-        
+
         except Exception as e:
             self.logger.error(f"Error updating alert metrics: {e}")
-    
+
     async def _cleanup_loop(self):
         """Background cleanup loop."""
         try:
@@ -943,12 +943,12 @@ class RealTimeAggregationEngine:
             pass
         except Exception as e:
             self.logger.error(f"Error in cleanup loop: {e}")
-    
+
     async def _cleanup_old_data(self):
         """Clean up old aggregated data."""
         try:
             current_time = datetime.now(timezone.utc)
-            
+
             # Clean up aggregated metrics based on retention periods
             for key, metrics_deque in list(self.aggregated_metrics.items()):
                 # Determine window from key
@@ -957,23 +957,23 @@ class RealTimeAggregationEngine:
                     if w.value in key:
                         window = w
                         break
-                
+
                 if window and window in self.retention_periods:
                     cutoff_time = current_time - self.retention_periods[window]
-                    
+
                     # Filter out old metrics
                     original_size = len(metrics_deque)
                     new_deque = deque(
                         (m for m in metrics_deque if m.timestamp > cutoff_time),
                         maxlen=metrics_deque.maxlen
                     )
-                    
+
                     self.aggregated_metrics[key] = new_deque
-                    
+
                     cleaned_count = original_size - len(new_deque)
                     if cleaned_count > 0:
                         self.logger.debug(f"Cleaned {cleaned_count} old metrics from {key}")
-            
+
             # Clean up old alerts (keep for 7 days)
             alert_cutoff = current_time - timedelta(days=7)
             original_alert_count = len(self.alerts)
@@ -981,7 +981,7 @@ class RealTimeAggregationEngine:
                 (a for a in self.alerts if a.timestamp > alert_cutoff),
                 maxlen=self.alerts.maxlen
             )
-            
+
             # Clean up old correlations (keep for 30 days)
             correlation_cutoff = current_time - timedelta(days=30)
             original_correlation_count = len(self.correlations)
@@ -989,20 +989,20 @@ class RealTimeAggregationEngine:
                 (c for c in self.correlations if c.timestamp > correlation_cutoff),
                 maxlen=self.correlations.maxlen
             )
-            
+
             cleaned_alerts = original_alert_count - len(self.alerts)
             cleaned_correlations = original_correlation_count - len(self.correlations)
-            
+
             if cleaned_alerts > 0 or cleaned_correlations > 0:
                 self.logger.debug(
                     f"Cleaned up {cleaned_alerts} alerts and {cleaned_correlations} correlations"
                 )
-        
+
         except Exception as e:
             self.logger.error(f"Error in cleanup: {e}")
-    
+
     # Public API methods
-    
+
     async def get_aggregated_metrics(
         self,
         metric_pattern: Optional[str] = None,
@@ -1013,51 +1013,51 @@ class RealTimeAggregationEngine:
         try:
             cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
             results = {}
-            
+
             for key, metrics_deque in self.aggregated_metrics.items():
                 # Filter by pattern
                 if metric_pattern and metric_pattern not in key:
                     continue
-                
+
                 # Filter by window
                 if window and window.value not in key:
                     continue
-                
+
                 # Filter by time
                 recent_metrics = [
                     asdict(m) for m in metrics_deque
                     if m.timestamp > cutoff_time
                 ]
-                
+
                 if recent_metrics:
                     results[key] = recent_metrics
-            
+
             return results
-        
+
         except Exception as e:
             self.logger.error(f"Error getting aggregated metrics: {e}")
             return {}
-    
+
     async def get_active_alerts(self, severity: Optional[AlertSeverity] = None) -> List[Dict[str, Any]]:
         """Get active alerts, optionally filtered by severity."""
         try:
             active_alerts = []
-            
+
             for alert in self.alerts:
                 if alert.resolved:
                     continue
-                
+
                 if severity and alert.severity != severity:
                     continue
-                
+
                 active_alerts.append(asdict(alert))
-            
+
             return active_alerts
-        
+
         except Exception as e:
             self.logger.error(f"Error getting active alerts: {e}")
             return []
-    
+
     async def get_correlations(
         self,
         correlation_type: Optional[CorrelationType] = None,
@@ -1066,22 +1066,22 @@ class RealTimeAggregationEngine:
         """Get detected correlations, optionally filtered."""
         try:
             filtered_correlations = []
-            
+
             for correlation in self.correlations:
                 if correlation_type and correlation.correlation_type != correlation_type:
                     continue
-                
+
                 if abs(correlation.correlation_coefficient) < min_strength:
                     continue
-                
+
                 filtered_correlations.append(asdict(correlation))
-            
+
             return filtered_correlations
-        
+
         except Exception as e:
             self.logger.error(f"Error getting correlations: {e}")
             return []
-    
+
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get current processing statistics."""
         return {
@@ -1117,17 +1117,17 @@ async def stop_aggregation_engine():
 async def get_business_insights(hours: int = 24) -> Dict[str, Any]:
     """Get comprehensive business insights from all metrics."""
     engine = get_aggregation_engine()
-    
+
     # Get recent data from all sources
     ml_insights = await engine.ml_collector.get_prompt_improvement_summary(hours)
     api_insights = await engine.api_collector.get_endpoint_analytics(hours)
     performance_insights = await engine.performance_collector.get_pipeline_performance_summary(hours)
     bi_insights = await engine.bi_collector.get_feature_adoption_report(hours // 24 if hours >= 24 else 1)
-    
+
     # Get correlations and alerts
     correlations = await engine.get_correlations()
     alerts = await engine.get_active_alerts()
-    
+
     return {
         "ml_insights": ml_insights,
         "api_insights": api_insights,

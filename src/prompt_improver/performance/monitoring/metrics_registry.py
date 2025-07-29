@@ -2,195 +2,100 @@
 Centralized Metrics Registry for Prometheus.
 
 Prevents duplicate metric registration and provides a single source of truth
-for all metrics across the application.
+for all metrics across the application. Uses real metrics collection instead
+of mock objects, with fallback to in-memory collection when Prometheus unavailable.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any, Optional, List
 from threading import Lock
+from typing import Any
 
-# Define MockMetric classes first (always available)
-class MockMetric:
-    def inc(self, *args, **kwargs): pass
-    def dec(self, *args, **kwargs): pass
-    def set(self, *args, **kwargs): pass
-    def observe(self, *args, **kwargs): pass
-    def labels(self, *args, **kwargs): return self
-    def time(self): return MockTimer()
-
-class MockTimer:
-    def __enter__(self): return self
-    def __exit__(self, *args): pass
-
+# Prometheus availability detection
 try:
-    from prometheus_client import counter, gauge, histogram, summary, collector_registry, registry
+    import prometheus_client
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
-    counter = gauge = histogram = summary = MockMetric
-    collector_registry = registry = None
+
+# Import real metrics implementation
+from .real_metrics import get_real_metrics_registry
 
 logger = logging.getLogger(__name__)
 
 class MetricsRegistry:
     """
-    Centralized registry for all Prometheus metrics.
+    Centralized registry for all metrics.
 
-    Prevents duplicate registrations and provides consistent metric management.
+    Uses real metrics collection with Prometheus when available,
+    falls back to in-memory collection that maintains real behavior.
     """
 
-    def __init__(self, registry: Optional[collector_registry] = None):
-        self.registry = registry or registry
-        self._metrics: Dict[str, Any] = {}
+    def __init__(self, registry: Any = None) -> None:
+        self._real_registry = get_real_metrics_registry()
         self._lock = Lock()
+        logger.info("Initialized MetricsRegistry with real metrics backend")
 
     def get_or_create_counter(
         self,
         name: str,
         description: str,
-        labels: Optional[List[str]] = None,
-        registry: Optional[collector_registry] = None
-    ):
+        labels: list[str] | None = None,
+        registry: Any = None
+    ) -> Any:
         """Get existing or create new counter metric."""
-        return self._get_or_create_metric(
-            counter, name, description, labels, registry
-        )
+        return self._real_registry.get_or_create_counter(name, description, labels, registry)
 
     def get_or_create_gauge(
         self,
         name: str,
         description: str,
-        labels: Optional[List[str]] = None,
-        registry: Optional[collector_registry] = None
-    ):
+        labels: list[str] | None = None,
+        registry: Any = None
+    ) -> Any:
         """Get existing or create new gauge metric."""
-        return self._get_or_create_metric(
-            gauge, name, description, labels, registry
-        )
+        return self._real_registry.get_or_create_gauge(name, description, labels, registry)
 
     def get_or_create_histogram(
         self,
         name: str,
         description: str,
-        labels: Optional[List[str]] = None,
-        buckets: Optional[List[float]] = None,
-        registry: Optional[collector_registry] = None
-    ):
+        labels: list[str] | None = None,
+        buckets: list[float] | None = None,
+        registry: Any = None
+    ) -> Any:
         """Get existing or create new histogram metric."""
-        kwargs = {}
-        if buckets:
-            kwargs['buckets'] = buckets
-
-        return self._get_or_create_metric(
-            histogram, name, description, labels, registry, **kwargs
-        )
+        return self._real_registry.get_or_create_histogram(name, description, labels, buckets, registry)
 
     def get_or_create_summary(
         self,
         name: str,
         description: str,
-        labels: Optional[List[str]] = None,
-        registry: Optional[collector_registry] = None
-    ):
+        labels: list[str] | None = None,
+        registry: Any = None
+    ) -> Any:
         """Get existing or create new summary metric."""
-        return self._get_or_create_metric(
-            summary, name, description, labels, registry
-        )
+        # For now, use histogram as summary fallback since our real metrics doesn't implement summary yet
+        return self._real_registry.get_or_create_histogram(name, description, labels, None, registry)
 
-    def _get_or_create_metric(
-        self,
-        metric_class,
-        name: str,
-        description: str,
-        labels: Optional[List[str]] = None,
-        registry: Optional[collector_registry] = None,
-        **kwargs
-    ):
-        """Internal method to get or create metrics safely."""
-        if not PROMETHEUS_AVAILABLE:
-            return MockMetric()
+    def get_metrics_summary(self) -> dict[str, Any]:
+        """Get summary of all metrics."""
+        return self._real_registry.get_metrics_summary()
 
-        with self._lock:
-            # Check if metric already exists
-            if name in self._metrics:
-                logger.debug(f"Returning existing metric: {name}")
-                return self._metrics[name]
+    def get_all_metrics(self) -> dict[str, Any]:
+        """Get all registered metrics."""
+        return self._real_registry.get_metrics_summary()
 
-            try:
-                # Create new metric
-                metric_registry = registry or self.registry
-
-                if labels:
-                    metric = metric_class(name, description, labels, registry=metric_registry, **kwargs)
-                else:
-                    metric = metric_class(name, description, registry=metric_registry, **kwargs)
-
-                self._metrics[name] = metric
-                logger.debug(f"Created new metric: {name}")
-                return metric
-
-            except ValueError as e:
-                if "Duplicated timeseries" in str(e) or "already registered" in str(e):
-                    # Metric exists in registry but not in our cache
-                    # Try to find it in the registry
-                    existing_metric = self._find_existing_metric(name)
-                    if existing_metric:
-                        self._metrics[name] = existing_metric
-                        logger.debug(f"Found existing metric in registry: {name}")
-                        return existing_metric
-
-                    # If we can't find it, create a mock to prevent errors
-                    logger.warning(f"Metric {name} already exists but couldn't be retrieved. Using mock.")
-                    mock_metric = MockMetric()
-                    self._metrics[name] = mock_metric
-                    return mock_metric
-                else:
-                    logger.error(f"Failed to create metric {name}: {e}")
-                    raise
-
-    def _find_existing_metric(self, name: str):
-        """Try to find existing metric in the registry."""
-        if not PROMETHEUS_AVAILABLE or not self.registry:
-            return None
-
-        try:
-            # Look through registered collectors
-            for collector in self.registry._collector_to_names.keys():
-                if hasattr(collector, '_name') and collector._name == name:
-                    return collector
-                # Some metrics might have different attribute names
-                if hasattr(collector, 'describe'):
-                    for metric_family in collector.describe():
-                        if metric_family.name == name:
-                            return collector
-        except Exception as e:
-            logger.debug(f"Error finding existing metric {name}: {e}")
-
-        return None
-
-    def get_metric(self, name: str):
-        """Get existing metric by name."""
-        return self._metrics.get(name)
-
-    def list_metrics(self) -> List[str]:
-        """List all registered metric names."""
-        return list(self._metrics.keys())
-
-    def clear_metrics(self):
-        """Clear all metrics (for testing)."""
-        with self._lock:
-            self._metrics.clear()
-
-    def get_metrics_info(self) -> Dict[str, Any]:
-        """Get information about registered metrics."""
-        return {
-            "total_metrics": len(self._metrics),
-            "metric_names": list(self._metrics.keys()),
-            "prometheus_available": PROMETHEUS_AVAILABLE
-        }
+    def clear_metrics(self) -> None:
+        """Clear all metrics (useful for testing)."""
+        # For real metrics, we reset the global registry
+        global _global_metrics_registry
+        _global_metrics_registry = None
+        logger.debug("Reset metrics registry")
 
 # Global metrics registry instance
-_global_metrics_registry: Optional[MetricsRegistry] = None
+_global_metrics_registry: MetricsRegistry | None = None
 
 def get_metrics_registry() -> MetricsRegistry:
     """Get the global metrics registry instance."""
@@ -199,25 +104,25 @@ def get_metrics_registry() -> MetricsRegistry:
         _global_metrics_registry = MetricsRegistry()
     return _global_metrics_registry
 
-def set_metrics_registry(registry: MetricsRegistry):
+def set_metrics_registry(registry: MetricsRegistry) -> None:
     """Set the global metrics registry instance."""
     global _global_metrics_registry
     _global_metrics_registry = registry
 
 # Convenience functions for common metric types
-def get_counter(name: str, description: str, labels: Optional[List[str]] = None):
+def get_counter(name: str, description: str, labels: list[str] | None = None) -> Any:
     """Get or create a counter metric."""
     return get_metrics_registry().get_or_create_counter(name, description, labels)
 
-def get_gauge(name: str, description: str, labels: Optional[List[str]] = None):
+def get_gauge(name: str, description: str, labels: list[str] | None = None) -> Any:
     """Get or create a gauge metric."""
     return get_metrics_registry().get_or_create_gauge(name, description, labels)
 
-def get_histogram(name: str, description: str, labels: Optional[List[str]] = None, buckets: Optional[List[float]] = None):
+def get_histogram(name: str, description: str, labels: list[str] | None = None, buckets: list[float] | None = None) -> Any:
     """Get or create a histogram metric."""
     return get_metrics_registry().get_or_create_histogram(name, description, labels, buckets)
 
-def get_summary(name: str, description: str, labels: Optional[List[str]] = None):
+def get_summary(name: str, description: str, labels: list[str] | None = None) -> Any:
     """Get or create a summary metric."""
     return get_metrics_registry().get_or_create_summary(name, description, labels)
 
@@ -336,5 +241,5 @@ def initialize_standard_metrics():
     logger.info("Standard metrics initialized successfully")
 
 # Initialize standard metrics on module import
-if PROMETHEUS_AVAILABLE:
-    initialize_standard_metrics()
+# Always initialize since we now use real metrics with fallback
+initialize_standard_metrics()

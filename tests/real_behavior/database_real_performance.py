@@ -36,11 +36,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # Import actual database components
 sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
-from prompt_improver.database.connection import DatabaseConnection
+from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
 from prompt_improver.database.performance_monitor import DatabasePerformanceMonitor
-from prompt_improver.database.query_optimizer import QueryOptimizer
+from prompt_improver.database.query_optimizer import OptimizedQueryExecutor, DatabaseConnectionOptimizer
 from prompt_improver.database.models import TrainingPrompt, RulePerformance, ABExperiment
-from prompt_improver.utils.redis_cache import RedisCache
+# RedisCache functionality moved to AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class DatabaseRealPerformanceTestSuite:
         self.results: List[DatabasePerformanceResult] = []
         self.db_connection = None
         self.performance_monitor = DatabasePerformanceMonitor()
-        self.query_optimizer = QueryOptimizer()
+        self.query_optimizer = OptimizedQueryExecutor()
         self.redis_cache = None
         
     async def run_all_tests(self) -> List[DatabasePerformanceResult]:
@@ -116,9 +116,8 @@ class DatabaseRealPerformanceTestSuite:
         """Setup test database with production-like schema and data."""
         logger.info("Setting up test database with production schema...")
         
-        # Create test database connection
-        db_url = os.getenv('TEST_DATABASE_URL', 'postgresql://postgres:password@localhost:5432/test_db')
-        self.db_connection = DatabaseConnection(db_url)
+        # Create test database connection using modern adapter
+        self.db_connection = get_database_manager_adapter()
         await self.db_connection.initialize()
         
         # Setup Redis cache for testing

@@ -13,8 +13,8 @@ from .algorithms.dimensionality_reducer import AdvancedDimensionalityReducer as 
 # Validation
 from .validation.optimization_validator import OptimizationValidator
 
-# Batch processing
-from .batch.batch_processor import BatchProcessor, BatchProcessorConfig
+# Unified batch processing
+from .batch import UnifiedBatchProcessor as BatchProcessor, UnifiedBatchConfig as BatchProcessorConfig
 
 __all__ = [
     # Algorithms

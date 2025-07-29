@@ -13,7 +13,13 @@ from enum import Enum
 
 from rich.console import Console
 
-from ...database import get_sessionmanager
+# Lazy import to avoid circular dependency
+# from ...database import get_sessionmanager
+
+def _get_sessionmanager():
+    """Lazy import of sessionmanager to avoid circular imports."""
+    from ...database import get_sessionmanager
+    return get_sessionmanager
 from .analytics_factory import get_analytics_interface
 
 class SecurityLevel(Enum):
@@ -317,6 +323,7 @@ class PromptDataProtection:
     ):
         """Enhanced audit logging with 2025 security standards."""
         try:
+            get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
                 from sqlalchemy import text
 
@@ -400,6 +407,7 @@ class PromptDataProtection:
         """Audit log redactions using existing database structure"""
         try:
             # Use existing database connection from Phase 1
+            get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
                 # Store audit info in existing improvement_sessions table
 
@@ -489,6 +497,7 @@ class PromptDataProtection:
             analytics = analytics_factory() if analytics_factory else None
 
             # Get basic analytics data using correct session manager
+            get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
                 # Get sessions with security audit data (using correct field name)
                 from sqlalchemy import text
@@ -785,6 +794,7 @@ class PromptDataProtection:
                 raise ValueError("No sensitive patterns configured")
 
             # Test database connectivity
+            get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
                 from sqlalchemy import text
                 await db_session.execute(text("SELECT 1"))
@@ -810,6 +820,7 @@ class PromptDataProtection:
             processing_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
 
             # Test database connectivity
+            get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
                 from sqlalchemy import text
                 await db_session.execute(text("SELECT 1"))

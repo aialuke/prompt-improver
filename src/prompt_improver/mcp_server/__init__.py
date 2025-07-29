@@ -1,5 +1,5 @@
-"""MCP Server module for APES."""
+"""MCP Server module for APES - Modernized Architecture."""
 
-from .mcp_server import improve_prompt, mcp
+from .server import APESMCPServer, main
 
-__all__ = ["improve_prompt", "mcp"]
+__all__ = ["APESMCPServer", "main"]

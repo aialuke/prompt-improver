@@ -1,7 +1,7 @@
 """
 Key Manager Security Tests
 
-Tests SecureKeyManager and FernetKeyManager components for local ML deployment,
+Tests UnifiedKeyManager components for local ML deployment,
 ensuring secure key management, encryption/decryption operations, key rotation,
 and orchestrator integration following 2025 best practices.
 
@@ -27,19 +27,19 @@ import pytest
 from cryptography.fernet import Fernet
 
 # Import the REAL key management components for authentic testing
-from prompt_improver.security.key_manager import SecureKeyManager, FernetKeyManager
+from prompt_improver.security.key_manager import UnifiedKeyManager, get_key_manager
 
 
-class TestSecureKeyManager:
-    """Test SecureKeyManager with real cryptographic operations"""
+class TestUnifiedKeyManager:
+    """Test UnifiedKeyManager with real cryptographic operations"""
 
     @pytest.fixture
     def key_manager(self):
-        """Create SecureKeyManager for testing"""
-        return SecureKeyManager()
+        """Create UnifiedKeyManager for testing"""
+        return UnifiedKeyManager()
 
     def test_key_manager_initialization(self, key_manager):
-        """Test SecureKeyManager initializes correctly"""
+        """Test UnifiedKeyManager initializes correctly"""
         assert key_manager is not None
         assert hasattr(key_manager, 'rotate_key')
         assert hasattr(key_manager, 'get_current_key')
@@ -255,16 +255,16 @@ class TestSecureKeyManager:
             Fernet(key)  # Should not raise exception
 
 
-class TestFernetKeyManager:
-    """Test FernetKeyManager with real encryption/decryption operations"""
+class TestUnifiedKeyManagerEncryption:
+    """Test UnifiedKeyManager encryption/decryption operations"""
 
     @pytest.fixture
     def fernet_manager(self):
-        """Create FernetKeyManager for in-memory testing"""
-        return FernetKeyManager()
+        """Create UnifiedKeyManager for encryption testing"""
+        return UnifiedKeyManager()
 
     def test_fernet_manager_initialization(self, fernet_manager):
-        """Test FernetKeyManager initializes correctly"""
+        """Test UnifiedKeyManager encryption initializes correctly"""
         assert fernet_manager is not None
         assert hasattr(fernet_manager, 'encrypt')
         assert hasattr(fernet_manager, 'decrypt')
@@ -522,7 +522,7 @@ class TestKeyManagerEdgeCases:
 
     def test_empty_string_encryption(self):
         """Test encryption of empty strings"""
-        fernet_manager = FernetKeyManager()
+        fernet_manager = UnifiedKeyManager()
         
         empty_data = ""
         encrypted_data, key_id = fernet_manager.encrypt(empty_data.encode('utf-8'))
@@ -536,7 +536,7 @@ class TestKeyManagerEdgeCases:
 
     def test_unicode_and_special_characters(self):
         """Test handling of Unicode and special characters"""
-        fernet_manager = FernetKeyManager()
+        fernet_manager = UnifiedKeyManager()
         
         special_cases = [
             "Hello, 世界! 🌍",
@@ -557,7 +557,7 @@ class TestKeyManagerEdgeCases:
     def test_memory_error_handling(self):
         """Test handling of memory-related errors in in-memory storage"""
         # Create key manager
-        key_manager = SecureKeyManager()
+        key_manager = UnifiedKeyManager()
         
         # Test that normal operations work
         key, key_id = key_manager.get_current_key()
@@ -574,7 +574,7 @@ class TestKeyManagerEdgeCases:
 
     def test_invalid_orchestrator_operations(self):
         """Test handling of invalid orchestrator operations"""
-        key_manager = SecureKeyManager()
+        key_manager = UnifiedKeyManager()
         
         # Test invalid operation
         result = key_manager.run_orchestrated_analysis(
@@ -588,7 +588,7 @@ class TestKeyManagerEdgeCases:
 
     def test_malformed_parameters(self):
         """Test handling of malformed parameters"""
-        fernet_manager = FernetKeyManager()
+        fernet_manager = UnifiedKeyManager()
         
         # Test encryption with invalid parameters
         invalid_cases = [
@@ -615,7 +615,7 @@ class TestKeyManagerPerformance:
 
     def test_key_generation_performance(self):
         """Test key generation performance"""
-        key_manager = SecureKeyManager()
+        key_manager = UnifiedKeyManager()
         
         start_time = time.time()
         
@@ -639,7 +639,7 @@ class TestKeyManagerPerformance:
 
     def test_encryption_performance_scaling(self):
         """Test encryption performance with different data sizes"""
-        fernet_manager = FernetKeyManager()
+        fernet_manager = UnifiedKeyManager()
         
         # Test different data sizes
         sizes = [100, 1000, 10000, 50000]  # 100B to 50KB
@@ -669,7 +669,7 @@ class TestKeyManagerPerformance:
         """Test concurrent encryption operations"""
         import threading
         
-        fernet_manager = FernetKeyManager()
+        fernet_manager = UnifiedKeyManager()
         results = []
         errors = []
         

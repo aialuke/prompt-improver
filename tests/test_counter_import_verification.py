@@ -12,9 +12,9 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 # Import the module to test
-from prompt_improver.learning.failure_analyzer import (
+from prompt_improver.ml.learning.algorithms import (
     FailureConfig,
-    FailureModeAnalyzer,
+    FailureAnalyzer as FailureModeAnalyzer,
 )
 
 if TYPE_CHECKING:

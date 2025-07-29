@@ -23,7 +23,7 @@ import numpy as np
 from pydantic import BaseModel, Field, field_validator
 
 from ....security.input_sanitization import InputSanitizer
-from ....utils.redis_cache import RedisCache
+# RedisCache functionality now via AppConfig
 from .english_nltk_manager import get_english_nltk_manager
 
 # Modern async imports
@@ -160,7 +160,7 @@ class LinguisticFeatureExtractor:
         self,
         config: Optional[FeatureExtractionConfig] = None,
         input_sanitizer: Optional[InputSanitizer] = None,
-        redis_cache: Optional[RedisCache] = None
+        redis_cache = None  # Redis functionality moved to AppConfig
     ):
         """Initialize with dependency injection and configuration."""
         self.config = config or FeatureExtractionConfig()

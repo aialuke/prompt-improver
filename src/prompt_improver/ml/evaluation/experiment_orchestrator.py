@@ -191,7 +191,7 @@ class ExperimentOrchestrator:
         statistical_validator: AdvancedStatisticalValidator | None = None,
         pattern_analyzer: PatternSignificanceAnalyzer | None = None,
         causal_analyzer: CausalInferenceAnalyzer | None = None,
-        real_time_service: RealTimeAnalyticsService | None = None,
+        real_time_service: Any | None = None,
     ):
         """Initialize experiment orchestrator
 
@@ -200,7 +200,7 @@ class ExperimentOrchestrator:
             statistical_validator: Advanced statistical validator
             pattern_analyzer: Pattern significance analyzer
             causal_analyzer: Causal inference analyzer
-            real_time_service: Real-time analytics service
+            real_time_service: Real-time analytics service (deprecated - use analytics_router instead)
         """
         self.db_session = db_session
 

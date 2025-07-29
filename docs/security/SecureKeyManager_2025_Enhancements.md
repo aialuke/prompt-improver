@@ -174,7 +174,7 @@ All security enhancements have been validated through comprehensive integration 
 
 ### Basic Usage
 ```python
-from prompt_improver.security.key_manager import SecureKeyManager, SecurityLevel
+from prompt_improver.security.key_manager import UnifiedKeyManager, SecurityLevel
 
 # Enhanced security configuration
 config = KeyRotationConfig(
@@ -183,7 +183,7 @@ config = KeyRotationConfig(
     zero_trust_mode=True
 )
 
-key_manager = SecureKeyManager(config)
+key_manager = UnifiedKeyManager(config)
 key_bytes, key_id = key_manager.get_current_key()
 ```
 

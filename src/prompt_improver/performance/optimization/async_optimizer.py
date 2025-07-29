@@ -819,7 +819,7 @@ class AsyncOptimizer:
         **kwargs
     ) -> Any:
         """Execute operation with unified retry logic."""
-        from ...ml.orchestration.core.unified_retry_manager import get_retry_manager, RetryConfig, RetryStrategy
+        from ...core.retry_manager import get_retry_manager, RetryConfig, RetryStrategy
 
         max_retries = max_retries or self.config.retry_attempts
 
@@ -827,7 +827,7 @@ class AsyncOptimizer:
         retry_config = RetryConfig(
             max_attempts=max_retries + 1,
             strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
-            initial_delay_ms=int(self.config.retry_delay * 1000),
+            base_delay=self.config.retry_delay,
             jitter=True,
             operation_name=f"async_optimizer_{operation.__name__}"
         )

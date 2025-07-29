@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from .config import DatabaseConfig
+from ..core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class MCPConnectionPool:
     """
     
     def __init__(self, mcp_user_password: Optional[str] = None):
-        self.config = DatabaseConfig()
+        self.config = AppConfig().database
         
         # Get MCP-specific environment variables
         self.mcp_user_password = mcp_user_password or os.getenv("MCP_POSTGRES_PASSWORD")
