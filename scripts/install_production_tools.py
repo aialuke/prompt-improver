@@ -117,8 +117,8 @@ class ProductionToolsInstaller:
         python_tools = [
             "safety",
             "bandit[toml]",
-            "pip-audit",
-            "semgrep"
+            "pip-audit"
+            # "semgrep"  # REMOVED: Conflicts with OpenTelemetry dependencies
         ]
         
         for tool in python_tools:

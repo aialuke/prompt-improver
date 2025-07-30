@@ -19,6 +19,8 @@ def _get_database_session():
     """Lazy import of database session to avoid circular imports."""
     from prompt_improver.database import get_session
     return get_session
+
+# get_session will be loaded lazily when needed
 from prompt_improver.core.services.analytics_factory import get_analytics_interface
 from ..optimization.performance_optimizer import (
     get_performance_optimizer,
@@ -32,16 +34,16 @@ class MCPPerformanceBenchmark:
 
     def __init__(self):
         self.optimizer = get_performance_optimizer()
-        self._prompt_service = None  # Lazy loaded to avoid circular imports
+        self._mcp_server = None  # Lazy loaded to avoid circular imports
         self.analytics_service = get_analytics_interface()
 
     @property
-    def prompt_service(self):
-        """Lazy load PromptImprovementService to avoid circular imports."""
-        if self._prompt_service is None:
-            from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-            self._prompt_service = PromptImprovementService()
-        return self._prompt_service
+    def mcp_server(self):
+        """Lazy load APESMCPServer to avoid circular imports."""
+        if self._mcp_server is None:
+            from prompt_improver.mcp_server.server import APESMCPServer
+            self._mcp_server = APESMCPServer()
+        return self._mcp_server
 
         # Test data for benchmarking
         self.test_prompts = [
@@ -114,13 +116,13 @@ class MCPPerformanceBenchmark:
             prompt = self.test_prompts[len(self.optimizer._measurements.get("improve_prompt", [])) % len(self.test_prompts)]
             context = self.test_contexts[len(self.optimizer._measurements.get("improve_prompt", [])) % len(self.test_contexts)]
 
-            async with get_session() as db_session:
-                await self.prompt_service.improve_prompt(
-                    prompt=prompt,
-                    user_context=context,
-                    session_id=f"benchmark_{int(time.time())}",
-                    db_session=db_session
-                )
+            # Use APESMCPServer's improve_prompt implementation
+            await self.mcp_server._improve_prompt_impl(
+                prompt=prompt,
+                context=context,
+                session_id=f"benchmark_{int(time.time())}",
+                rate_limit_remaining=None
+            )
 
         return await self.optimizer.run_performance_benchmark(
             "improve_prompt",
@@ -133,9 +135,11 @@ class MCPPerformanceBenchmark:
         logger.info("Benchmarking database operations")
 
         async def database_operation():
+            get_session = _get_database_session()
             async with get_session() as db_session:
                 # Simulate typical database queries
-                result = await db_session.execute("SELECT 1")
+                from sqlalchemy import text
+                result = await db_session.execute(text("SELECT 1"))
                 await result.fetchone()
 
         return await self.optimizer.run_performance_benchmark(
@@ -149,6 +153,7 @@ class MCPPerformanceBenchmark:
         logger.info("Benchmarking analytics operations")
 
         async def analytics_operation():
+            get_session = _get_database_session()
             async with get_session() as db_session:
                 await self.analytics_service.get_rule_effectiveness(
                     days=7,
@@ -166,17 +171,18 @@ class MCPPerformanceBenchmark:
         """Benchmark session management operations."""
         logger.info("Benchmarking session operations")
 
-        from prompt_improver.utils.session_store import get_session_store
-
         async def session_operation():
-            store = get_session_store()
             session_id = f"benchmark_{int(time.time() * 1000)}"
 
-            # Create, update, and retrieve session
-            await store.create_session(session_id, {"test": "data"})
-            await store.get_session(session_id)
-            await store.update_session(session_id, {"updated": True})
-            await store.delete_session(session_id)
+            # Use APESMCPServer's session store through services
+            session_store = self.mcp_server.services.session_store
+            
+            # Create, update, and retrieve session using proper SessionStore API
+            await session_store.set(session_id, {"test": "data"})
+            await session_store.get(session_id)
+            await session_store.set(session_id, {"test": "data", "updated": True})  # Update by setting new data
+            await session_store.touch(session_id)  # Touch to extend TTL
+            await session_store.delete(session_id)
 
         return await self.optimizer.run_performance_benchmark(
             "session_management",

@@ -1025,16 +1025,20 @@ async def call_tool(name: str, arguments: dict):
 2. **Install dependencies:**
    ```bash
    pip install asyncpg sqlalchemy pydantic
-   npm install -g @modelcontextprotocol/server-postgres@latest
+   # APES unified MCP server - no external installation required
    ```
 
-3. **Configure MCP server:**
+3. **Configure APES MCP server:**
    ```json
    {
      "mcpServers": {
-       "postgres": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production"]
+       "apes-mcp": {
+         "command": "python",
+         "args": ["-m", "prompt_improver.mcp_server.server"],
+         "cwd": "/path/to/prompt-improver",
+         "env": {
+           "PYTHONPATH": "/path/to/prompt-improver/src"
+         }
        }
      }
    }

@@ -1,4 +1,0 @@
-# file: /Users/lukemckenzie/prompt-improver/src/prompt_improver/database/models.py
-# hypothesis_version: 6.135.26
-
-[0.05, 100, '1.0.0', 'active', 'applied_rules', 'created_at', 'gin', 'improvement_score', 'improvement_sessions', 'pending', 'prompt_type', 'rule_metadata', 'rule_performance', 'running', 'user_rating']

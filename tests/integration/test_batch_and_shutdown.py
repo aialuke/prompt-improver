@@ -144,7 +144,7 @@ class TestBatchProcessing:
         assert "background_manager" in components
         assert "session_store" in components
         assert "batch_processor" in components
-        assert "health_service" in components
+        assert "health_monitor" in components
 
         # Use real components for operations
         session_store = components["session_store"]

@@ -76,7 +76,7 @@ class TestStartupOrchestration:
             assert "background_manager" in result["components"]
             assert "session_store" in result["components"]
             assert "batch_processor" in result["components"]
-            assert "health_service" in result["components"]
+            assert "health_monitor" in result["components"]
 
             # Verify component references are available
             assert "component_refs" in result
@@ -112,7 +112,7 @@ class TestStartupOrchestration:
             assert "background_manager" in components
             assert "session_store" in components
             assert "batch_processor" in components
-            assert "health_service" in components
+            assert "health_monitor" in components
 
             # Verify startup is complete
             assert is_startup_complete()
@@ -165,12 +165,12 @@ class TestStartupOrchestration:
         result = await init_startup_tasks()
         assert result["status"] == "success"
 
-        # Verify health service is available
-        health_service = result["component_refs"]["health_service"]
-        assert health_service is not None
+        # Verify health monitor is available
+        health_monitor = result["component_refs"]["health_monitor"]
+        assert health_monitor is not None
 
         # Run a health check
-        health_result = await health_service.run_health_check()
+        health_result = await health_monitor.run_health_check()
         assert health_result.overall_status.value in ["healthy", "warning", "failed"]
 
         # Clean up

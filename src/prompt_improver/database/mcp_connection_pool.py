@@ -50,8 +50,8 @@ class MCPConnectionPool:
         # Build MCP server database URL with limited permissions user
         self.database_url = (
             f"postgresql+psycopg://mcp_server_user:{self.mcp_user_password}@"
-            f"{self.config.postgres_host}:{self.config.postgres_port}/"
-            f"{self.config.postgres_database}"
+            f"{self.config.host}:{self.config.port}/"
+            f"{self.config.database}"
         )
         
         # Create optimized async engine for MCP workload

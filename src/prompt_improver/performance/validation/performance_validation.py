@@ -110,14 +110,19 @@ class PerformanceValidator:
             start_time = time.perf_counter()
 
             try:
-                # Import here to avoid circular imports
-                from prompt_improver.mcp_server.mcp_server import improve_prompt
+                # Import APESMCPServer for modern class-based pattern
+                from ...mcp_server.server import APESMCPServer
+                
+                # Initialize server instance for testing
+                if not hasattr(self, '_mcp_server'):
+                    self._mcp_server = APESMCPServer()
 
                 test_prompt = f"Test prompt {i}: Write a Python function to calculate fibonacci numbers"
-                result = await improve_prompt(
+                result = await self._mcp_server._improve_prompt_impl(
                     prompt=test_prompt,
                     context={"domain": "programming", "test_run": True},
-                    session_id=f"validation_test_{i}"
+                    session_id=f"validation_test_{i}",
+                    rate_limit_remaining=None
                 )
 
                 response_time = (time.perf_counter() - start_time) * 1000
@@ -232,13 +237,17 @@ class PerformanceValidator:
 
             try:
                 # Simulate complete workflow: prompt improvement + analytics + storage
-                from prompt_improver.mcp_server.mcp_server import improve_prompt
+                # Use APESMCPServer for modern class-based pattern
+                if not hasattr(self, '_mcp_server'):
+                    from ...mcp_server.server import APESMCPServer
+                    self._mcp_server = APESMCPServer()
 
                 test_prompt = f"End-to-end test {i}: Create a REST API for user management"
-                result = await improve_prompt(
+                result = await self._mcp_server._improve_prompt_impl(
                     prompt=test_prompt,
                     context={"domain": "web_development", "framework": "fastapi"},
-                    session_id=f"e2e_test_{i}"
+                    session_id=f"e2e_test_{i}",
+                    rate_limit_remaining=None
                 )
 
                 # Validate complete response
@@ -270,12 +279,17 @@ class PerformanceValidator:
             start_time = time.perf_counter()
 
             try:
-                from prompt_improver.mcp_server.mcp_server import improve_prompt
+                # Use APESMCPServer for modern class-based pattern
+                from ...mcp_server.server import APESMCPServer
+                
+                # Create server instance for this concurrent operation
+                mcp_server = APESMCPServer()
 
-                result = await improve_prompt(
+                result = await mcp_server._improve_prompt_impl(
                     prompt=f"Concurrent test {operation_id}: Implement a binary search algorithm",
                     context={"domain": "algorithms", "concurrent_test": True},
-                    session_id=f"concurrent_test_{operation_id}"
+                    session_id=f"concurrent_test_{operation_id}",
+                    rate_limit_remaining=None
                 )
 
                 response_time = (time.perf_counter() - start_time) * 1000

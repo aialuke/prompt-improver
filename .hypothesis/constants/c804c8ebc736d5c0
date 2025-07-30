@@ -1,4 +1,0 @@
-# file: /Users/lukemckenzie/prompt-improver/src/prompt_improver/rule_engine/rules/clarity.py
-# hypothesis_version: 6.135.26
-
-[0.6, 0.8, 1.0, 'ClarityRule', 'Core', 'analyze', 'better', 'confidence', 'description', 'enhanced_prompt', 'error', 'fallback_clarity', 'good', 'improved_prompt', 'it', 'message', 'name', 'nice', 'relevant information', 'something', 'source', 'specific item', 'stuff', 'summarize', 'that', 'the specific element', 'the specific item', 'they', 'thing', 'this', 'total_words', 'transformations', 'type', 'vague_word_ratio', 'vague_words']

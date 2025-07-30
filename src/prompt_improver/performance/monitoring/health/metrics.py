@@ -18,15 +18,10 @@ class _Timer:
         self.duration = self.end - self.start
         return False  # Don't suppress exceptions
 
-try:
-    from prometheus_client import Counter, Gauge, Histogram, Summary
+# REMOVED prometheus_client for OpenTelemetry consolidation
+PROMETHEUS_AVAILABLE = False
 
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    # Graceful degradation when prometheus_client is not available
-    PROMETHEUS_AVAILABLE = False
-
-    class MockMetric:
+class MockMetric:
         """Mock metric class for when Prometheus is not available"""
 
         def __init__(self, *args, **kwargs):
@@ -47,7 +42,7 @@ except ImportError:
         def time(self):
             return _Timer()
 
-    Counter = Gauge = Histogram = Summary = MockMetric
+Counter = Gauge = Histogram = Summary = MockMetric
 
 # Health check metrics with graceful duplicate handling
 def _create_metric_safe(metric_class, *args, **kwargs):

@@ -23,9 +23,17 @@ try:
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
-    trace = baggage = otel_context = Context = None
-    TraceContextTextMapPropagator = W3CBaggagePropagator = CompositePropagator = None
-    attach = detach = get_current = None
+    # Create stub types for when OpenTelemetry is not available
+    trace = None  # type: ignore
+    baggage = None  # type: ignore
+    otel_context = None  # type: ignore
+    Context = None  # type: ignore
+    TraceContextTextMapPropagator = None  # type: ignore
+    W3CBaggagePropagator = None  # type: ignore
+    CompositePropagator = None  # type: ignore
+    attach = None  # type: ignore
+    detach = None  # type: ignore
+    get_current = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +42,7 @@ T = TypeVar("T")
 # Global composite propagator for context injection/extraction
 _propagator = None
 
-if OTEL_AVAILABLE:
+if OTEL_AVAILABLE and CompositePropagator and TraceContextTextMapPropagator and W3CBaggagePropagator:
     _propagator = CompositePropagator([
         TraceContextTextMapPropagator(),
         W3CBaggagePropagator()
@@ -117,7 +125,7 @@ def get_correlation_id() -> str:
     
     if not correlation_id:
         # Try to extract from current trace
-        if OTEL_AVAILABLE:
+        if OTEL_AVAILABLE and trace:
             current_span = trace.get_current_span()
             if current_span and current_span.is_recording():
                 span_context = current_span.get_span_context()
@@ -166,19 +174,19 @@ def propagate_context(func: Callable[..., T]) -> Callable[..., T]:
     async def async_wrapper(*args, **kwargs) -> T:
         # Capture current context
         current_context = _correlation_context.copy()
-        otel_ctx = get_current() if OTEL_AVAILABLE else None
+        otel_ctx = get_current() if OTEL_AVAILABLE and get_current else None
         
         # Create task with context
         if asyncio.iscoroutinefunction(func):
             async def context_aware_coro():
                 # Restore context in new task
-                nonlocal _correlation_context
+                global _correlation_context
                 old_context = _correlation_context
                 _correlation_context = current_context
                 
                 # Attach OpenTelemetry context if available
                 token = None
-                if OTEL_AVAILABLE and otel_ctx:
+                if OTEL_AVAILABLE and otel_ctx and attach:
                     token = attach(otel_ctx)
                 
                 try:
@@ -186,7 +194,7 @@ def propagate_context(func: Callable[..., T]) -> Callable[..., T]:
                 finally:
                     # Restore previous context
                     _correlation_context = old_context
-                    if token:
+                    if token and detach:
                         detach(token)
             
             return await context_aware_coro()
@@ -220,7 +228,7 @@ def inject_context(carrier: Dict[str, str]) -> None:
     
     return carrier
 
-def extract_context(carrier: Dict[str, str]) -> Optional[Context]:
+def extract_context(carrier: Dict[str, str]) -> Optional[Any]:
     """Extract trace and correlation context from a carrier."""
     if not carrier:
         return None
@@ -252,6 +260,7 @@ def context_scope(
     **extra_context
 ):
     """Context manager for scoped context variables."""
+    global _correlation_context
     # Save current context
     old_context = _correlation_context.copy()
     
@@ -274,7 +283,6 @@ def context_scope(
         
     finally:
         # Restore previous context
-        global _correlation_context
         _correlation_context = old_context
 
 def with_context(
@@ -319,10 +327,10 @@ def with_context(
 def create_child_context(
     operation_name: str,
     **context_updates
-) -> Context:
+) -> Any:
     """Create a child context for spawned operations."""
     # Get current OpenTelemetry context
-    parent_ctx = get_current() if OTEL_AVAILABLE else None
+    parent_ctx = get_current() if OTEL_AVAILABLE and get_current else None
     
     # Create new correlation context
     child_correlation = _correlation_context.copy()
@@ -344,19 +352,18 @@ async def run_with_context(
     token = None
     old_correlation = None
     
-    if OTEL_AVAILABLE and context:
+    if OTEL_AVAILABLE and context and attach:
         token = attach(context)
     
     if correlation_context:
         old_correlation = _correlation_context
-        global _correlation_context
         _correlation_context = correlation_context
     
     try:
         return await coro
     finally:
         # Restore context
-        if token:
+        if token and detach:
             detach(token)
         if old_correlation:
             _correlation_context = old_correlation
@@ -374,7 +381,7 @@ def trace_context_middleware():
         # Run request with extracted context
         with context_scope(request_id=request_id):
             token = None
-            if OTEL_AVAILABLE and extracted_context:
+            if OTEL_AVAILABLE and extracted_context and attach:
                 token = attach(extracted_context)
             
             try:
@@ -386,7 +393,7 @@ def trace_context_middleware():
                 
                 return response
             finally:
-                if token:
+                if token and detach:
                     detach(token)
     
     return middleware
@@ -398,7 +405,7 @@ def get_current_context_info() -> Dict[str, Any]:
         "otel_available": OTEL_AVAILABLE
     }
     
-    if OTEL_AVAILABLE:
+    if OTEL_AVAILABLE and trace:
         current_span = trace.get_current_span()
         if current_span and current_span.is_recording():
             span_context = current_span.get_span_context()

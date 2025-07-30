@@ -24,8 +24,7 @@ import uuid
 import numpy as np
 from pydantic import BaseModel, Field as PydanticField
 
-# Monitoring integrations
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest
+# REMOVED prometheus_client for OpenTelemetry consolidation
 from prompt_improver.performance.monitoring.health.enhanced_base import EnhancedHealthMonitor
 from prompt_improver.performance.monitoring.health.service import HealthService
 from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor

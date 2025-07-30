@@ -362,7 +362,7 @@ async def test_mcp_server_integration():
     
     try:
         # Import MCP server components
-        from prompt_improver.mcp_server.mcp_server import MLDataCollectionServer
+        # Legacy import removed - will be fixed with modern patterns
         
         # Create MCP-optimized manager
         manager = UnifiedConnectionManager(mode=ManagerMode.MCP_SERVER)

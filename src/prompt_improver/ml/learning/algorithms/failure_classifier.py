@@ -10,7 +10,21 @@ import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
+
+# Import OTelAlert for type checking only
+if TYPE_CHECKING:
+    from src.prompt_improver.monitoring.opentelemetry.ml_framework import OTelAlert
+else:
+    OTelAlert = Any
+
+# Check if OTel framework is available at runtime
+try:
+    from src.prompt_improver.monitoring.opentelemetry.ml_framework import OTelAlert as _OTelAlert
+    OTEL_AVAILABLE = True
+except ImportError:
+    OTEL_AVAILABLE = False
+    _OTelAlert = None
 
 import numpy as np
 
@@ -27,21 +41,8 @@ except ImportError:
         "Anomaly detection libraries not available. Install with: pip install scikit-learn"
     )
 
-try:
-    import prometheus_client
-    from prometheus_client import (
-        Counter as PromCounter,
-        Gauge,
-        Histogram,
-        start_http_server,
-    )
-
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
-    warnings.warn(
-        "Prometheus client not available. Install with: pip install prometheus-client"
-    )
+# REMOVED prometheus_client for OpenTelemetry consolidation
+PROMETHEUS_AVAILABLE = False
 
 try:
     import art
@@ -75,19 +76,7 @@ class MLFailureMode:
     impact_areas: list[str] = field(default_factory=list)
 
 
-@dataclass
-class PrometheusAlert:
-    """Prometheus alert definition"""
-
-    alert_name: str
-    metric_name: str
-    threshold: float
-    comparison: str  # 'gt', 'lt', 'eq'
-    severity: str  # 'critical', 'warning', 'info'
-    description: str
-    duration: str = "5m"  # Alert firing duration
-    cooldown: str = "10m"  # Alert cooldown period
-    triggered_at: Any = None
+# PrometheusAlert removed - using OTelAlert from ML framework instead
 
 
 class FailureClassifier:
@@ -109,16 +98,16 @@ class FailureClassifier:
         self.ensemble_detectors = {}
         self.anomaly_detectors = {}
         
-        # Initialize Prometheus monitoring components
-        self.prometheus_metrics = {}
-        self.alert_definitions = []
-        self.active_alerts = []
-        self.alert_history = []
+        # Initialize OpenTelemetry monitoring components
+        self.prometheus_metrics: dict[str, Any] = {}  # Legacy name for compatibility
+        self.alert_definitions: list[OTelAlert] = []
+        self.active_alerts: list[OTelAlert] = []
+        self.alert_history: list[OTelAlert] = []
         
         # Initialize components
         self._initialize_robustness_components()
         if self.config.enable_prometheus_monitoring:
-            self._initialize_prometheus_monitoring()
+            self._initialize_otel_monitoring()
 
     def _initialize_ml_fmea_database(self) -> list:
         """Initialize ML FMEA failure modes database following Microsoft Learn guidelines"""
@@ -706,182 +695,124 @@ class FailureClassifier:
             self.logger.error(f"Failed to initialize robustness components: {e}")
             self.config.enable_robustness_validation = False
 
-    def _initialize_prometheus_monitoring(self) -> None:
-        """Initialize Phase 3 Prometheus monitoring components"""
+    def _initialize_otel_monitoring(self) -> None:
+        """Initialize OpenTelemetry monitoring components"""
         try:
-            if PROMETHEUS_AVAILABLE:
-                # Define Prometheus metrics
-                self.prometheus_metrics = {
-                    "failure_rate": Gauge(
-                        "ml_failure_rate", "Current ML system failure rate"
-                    ),
-                    "failure_count": PromCounter(
-                        "ml_failures_total",
-                        "Total number of ML failures",
-                        ["failure_type", "severity"],
-                    ),
-                    "response_time": Histogram(
-                        "ml_response_time_seconds",
-                        "ML system response time distribution",
-                    ),
-                    "anomaly_score": Gauge(
-                        "ml_anomaly_score", "Current anomaly detection score"
-                    ),
-                    "rpn_score": Gauge(
-                        "ml_risk_priority_number", "ML FMEA Risk Priority Number"
-                    ),
-                }
+            # Import OpenTelemetry metrics
+            from src.prompt_improver.monitoring.opentelemetry.metrics import (
+                get_ml_metrics, get_ml_alerting_metrics
+            )
 
-                # Start Prometheus HTTP server
-                try:
-                    start_http_server(self.config.prometheus_port)
-                    self.logger.info(
-                        f"Prometheus metrics server started on port {self.config.prometheus_port}"
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Could not start Prometheus server: {e}")
+            # Initialize OpenTelemetry ML metrics
+            self.otel_ml_metrics = get_ml_metrics()
+            self.otel_alerting_metrics = get_ml_alerting_metrics(self.config.alert_thresholds)
 
-                # Initialize alert definitions
-                self._initialize_alert_definitions()
+            # Store reference for backward compatibility
+            self.prometheus_metrics = {
+                "failure_rate": self.otel_ml_metrics,
+                "failure_count": self.otel_ml_metrics,
+                "response_time": self.otel_ml_metrics,
+                "anomaly_score": self.otel_ml_metrics,
+                "rpn_score": self.otel_ml_metrics,
+            }
 
-                self.logger.info("Prometheus monitoring initialized successfully")
-            else:
-                self.logger.warning("Prometheus client not available")
+            # Initialize alert definitions using OpenTelemetry
+            self._initialize_alert_definitions()
+
+            self.logger.info("OpenTelemetry monitoring initialized successfully")
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize Prometheus monitoring: {e}")
+            self.logger.error(f"Failed to initialize OpenTelemetry monitoring: {e}")
             self.config.enable_prometheus_monitoring = False
 
     def _initialize_alert_definitions(self) -> None:
-        """Initialize alert definitions for monitoring"""
-        alert_definitions = [
-            PrometheusAlert(
-                alert_name="HighFailureRate",
-                metric_name="ml_failure_rate",
-                threshold=self.config.alert_thresholds["failure_rate"],
-                comparison="gt",
-                severity="critical",
-                description="ML system failure rate exceeds threshold",
-            ),
-            PrometheusAlert(
-                alert_name="SlowResponseTime",
-                metric_name="ml_response_time_seconds",
-                threshold=self.config.alert_thresholds["response_time_ms"] / 1000.0,
-                comparison="gt",
-                severity="warning",
-                description="ML system response time exceeds threshold",
-            ),
-            PrometheusAlert(
-                alert_name="HighAnomalyScore",
-                metric_name="ml_anomaly_score",
-                threshold=self.config.alert_thresholds.get("anomaly_score", 0.8),
-                comparison="gt",
-                severity="warning",
-                description="Anomaly detection score is elevated",
-            ),
-        ]
+        """Initialize alert definitions for monitoring - now handled by OTel alerting system"""
+        # Alert definitions are now managed by MLAlertingMetrics in the OTel framework
+        # The alerting system automatically creates default alerts based on thresholds
+        self.logger.info("Alert definitions managed by OpenTelemetry alerting system")
 
-        # Store alert definitions for monitoring
-        self.alert_definitions = alert_definitions
-        self.logger.info(f"Initialized {len(alert_definitions)} alert definitions")
-
-    async def _update_prometheus_metrics(
+    async def _update_otel_metrics(
         self, failure_analysis: dict[str, Any]
     ) -> None:
-        """Update Prometheus metrics with analysis results"""
-        if not PROMETHEUS_AVAILABLE or not self.prometheus_metrics:
+        """Update OpenTelemetry metrics with analysis results"""
+        if not hasattr(self, 'otel_ml_metrics'):
             return
 
         try:
             metadata = failure_analysis.get("metadata", {})
-
-            # Update failure rate metric
-            failure_rate = metadata.get("failure_rate", 0.0)
-            self.prometheus_metrics["failure_rate"].set(failure_rate)
-
-            # Update failure count by type and severity
             summary = failure_analysis.get("summary", {})
+
+            # Extract metrics data
+            failure_rate = metadata.get("failure_rate", 0.0)
             severity = summary.get("severity", "unknown")
             total_failures = metadata.get("total_failures", 0)
 
-            self.prometheus_metrics["failure_count"].labels(
-                failure_type="general", severity=severity
-            ).inc(total_failures)
-
-            # Update anomaly score if available
+            # Extract anomaly score
+            anomaly_rate = None
             anomaly_detection = failure_analysis.get("anomaly_detection", {})
             if "anomaly_summary" in anomaly_detection:
                 anomaly_rate = anomaly_detection["anomaly_summary"].get(
                     "consensus_anomaly_rate", 0
-                )
-                self.prometheus_metrics["anomaly_score"].set(anomaly_rate / 100.0)
+                ) / 100.0
 
-            # Update RPN score if available
+            # Extract RPN score
+            rpn_score = None
             risk_assessment = failure_analysis.get("risk_assessment", {})
             if "overall_risk_score" in risk_assessment:
                 rpn_score = risk_assessment["overall_risk_score"]
-                self.prometheus_metrics["rpn_score"].set(rpn_score)
 
-            self.logger.debug("Prometheus metrics updated successfully")
+            # Extract response time
+            response_time = metadata.get("avg_response_time", 0.1)
+
+            # Update OpenTelemetry metrics using the enhanced record_failure_analysis method
+            self.otel_ml_metrics.record_failure_analysis(
+                failure_rate=failure_rate,
+                failure_type="classification",
+                severity=severity,
+                total_failures=total_failures,
+                anomaly_rate=anomaly_rate,
+                rpn_score=rpn_score,
+                response_time=response_time
+            )
+
+            self.logger.debug("OpenTelemetry metrics updated successfully")
 
         except Exception as e:
-            self.logger.error(f"Failed to update Prometheus metrics: {e}")
+            self.logger.error(f"Failed to update OpenTelemetry metrics: {e}")
 
     async def _check_and_trigger_alerts(
         self, failure_analysis: dict[str, Any]
     ) -> list[dict[str, Any]]:
-        """Check thresholds and trigger alerts if necessary"""
-        triggered_alerts = []
-        current_time = datetime.now()
-
-        if not hasattr(self, "alert_definitions"):
-            return triggered_alerts
+        """Check thresholds and trigger alerts using OpenTelemetry alerting"""
+        if not hasattr(self, 'otel_alerting_metrics'):
+            return []
 
         try:
-            metadata = failure_analysis.get("metadata", {})
+            # Use OpenTelemetry alerting system
+            triggered_alerts = self.otel_alerting_metrics.check_alerts(failure_analysis)
 
-            for alert_def in self.alert_definitions:
-                metric_value = self._extract_metric_value(
-                    failure_analysis, alert_def.metric_name
-                )
+            # Convert to legacy format for compatibility
+            legacy_alerts = []
+            for alert in triggered_alerts:
+                legacy_alert = {
+                    "alert_name": alert.alert_name,
+                    "metric_name": alert.metric_name,
+                    "current_value": self.otel_alerting_metrics._extract_metric_value(
+                        failure_analysis, alert.metric_name
+                    ),
+                    "threshold": alert.threshold,
+                    "severity": alert.severity,
+                    "description": alert.description,
+                    "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+                    "recommended_actions": self._get_alert_recommendations(alert.alert_name),
+                }
+                legacy_alerts.append(legacy_alert)
 
-                if metric_value is not None and self._check_threshold(
-                    metric_value, alert_def
-                ):
-                    # Check if alert is not in cooldown period
-                    if self._is_alert_ready_to_trigger(alert_def, current_time):
-                        # Trigger alert
-                        alert_def.triggered_at = current_time
-
-                        triggered_alert = {
-                            "alert_name": alert_def.alert_name,
-                            "metric_name": alert_def.metric_name,
-                            "current_value": metric_value,
-                            "threshold": alert_def.threshold,
-                            "severity": alert_def.severity,
-                            "description": alert_def.description,
-                            "triggered_at": current_time.isoformat(),
-                            "recommended_actions": self._get_alert_recommendations(
-                                alert_def.alert_name
-                            ),
-                        }
-
-                        triggered_alerts.append(triggered_alert)
-                        self.active_alerts.append(alert_def)
-                        self.alert_history.append(alert_def)
-
-                        self.logger.warning(
-                            f"Alert triggered: {alert_def.alert_name} - "
-                            f"{alert_def.metric_name}={metric_value} > {alert_def.threshold}"
-                        )
-
-            # Update active alerts (remove resolved ones)
-            self._update_active_alerts(failure_analysis, current_time)
+            return legacy_alerts
 
         except Exception as e:
-            self.logger.error(f"Alert checking failed: {e}")
-
-        return triggered_alerts
+            self.logger.error(f"Failed to check alerts: {e}")
+            return []
 
     def _extract_metric_value(
         self, failure_analysis: dict[str, Any], metric_name: str
@@ -907,7 +838,7 @@ class FailureClassifier:
 
         return None
 
-    def _check_threshold(self, value: float, alert_def: PrometheusAlert) -> bool:
+    def _check_threshold(self, value: float, alert_def: OTelAlert) -> bool:
         """Check if metric value exceeds alert threshold"""
         if alert_def.comparison == "gt":
             return value > alert_def.threshold
@@ -918,7 +849,7 @@ class FailureClassifier:
         return False
 
     def _is_alert_ready_to_trigger(
-        self, alert_def: PrometheusAlert, current_time: datetime
+        self, alert_def: OTelAlert, current_time: datetime
     ) -> bool:
         """Check if alert is not in cooldown period"""
         if alert_def.triggered_at is None:
@@ -957,21 +888,6 @@ class FailureClassifier:
     def _update_active_alerts(
         self, failure_analysis: dict[str, Any], current_time: datetime
     ) -> None:
-        """Update active alerts list, removing resolved alerts"""
-        resolved_alerts = []
-
-        for alert in self.active_alerts:
-            metric_value = self._extract_metric_value(
-                failure_analysis, alert.metric_name
-            )
-
-            # Check if alert condition is no longer met
-            if metric_value is not None and not self._check_threshold(
-                metric_value, alert
-            ):
-                resolved_alerts.append(alert)
-                self.logger.info(f"Alert resolved: {alert.alert_name}")
-
-        # Remove resolved alerts from active list
-        for alert in resolved_alerts:
-            self.active_alerts.remove(alert)
+        """Update active alerts - now handled by OpenTelemetry alerting system"""
+        # Alert management is now handled by MLAlertingMetrics
+        pass

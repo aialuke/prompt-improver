@@ -98,8 +98,15 @@ class EnvironmentConfig(BaseModel):
         """Check if running in development environment."""
         return self.environment == "development"
 
-class DatabaseConfig(BaseModel):
+class DatabaseConfig(BaseSettings):
     """PostgreSQL database configuration with connection pooling and JSONB optimization."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
     
     # Connection settings
     host: str = Field(
@@ -1201,35 +1208,8 @@ class AppConfig(BaseSettings):
     @property
     def database(self) -> DatabaseConfig:
         """Get database configuration as structured object."""
-        return DatabaseConfig(
-            host=self.db_host,
-            port=self.db_port,
-            database=self.db_database,
-            username=self.db_username,
-            password=self.db_password,
-            pool_min_size=self.db_pool_min_size,
-            pool_max_size=self.db_pool_max_size,
-            pool_timeout=self.db_pool_timeout,
-            pool_max_lifetime=self.db_pool_max_lifetime,
-            pool_max_idle=self.db_pool_max_idle,
-            statement_timeout=self.db_statement_timeout,
-            echo_sql=self.db_echo_sql,
-            target_query_time_ms=self.db_target_query_time_ms,
-            target_cache_hit_ratio=self.db_target_cache_hit_ratio,
-            # Pool optimizer settings
-            pool_target_utilization=self.db_pool_target_utilization,
-            pool_high_utilization_threshold=self.db_pool_high_utilization_threshold,
-            pool_low_utilization_threshold=self.db_pool_low_utilization_threshold,
-            pool_stress_threshold=self.db_pool_stress_threshold,
-            pool_underutilized_threshold=self.db_pool_underutilized_threshold,
-            pool_wait_threshold=self.db_pool_wait_threshold,
-            pool_increase_step=self.db_pool_increase_step,
-            pool_decrease_step=self.db_pool_decrease_step,
-            pool_scale_up_factor=self.db_pool_scale_up_factor,
-            pool_scale_down_factor=self.db_pool_scale_down_factor,
-            pool_registry_size=self.db_pool_registry_size,
-            pool_max_connection_age_hours=self.db_pool_max_connection_age_hours
-        )
+        # Return standalone DatabaseConfig that loads from environment directly
+        return DatabaseConfig()
     
     @property
     def redis(self) -> RedisConfig:

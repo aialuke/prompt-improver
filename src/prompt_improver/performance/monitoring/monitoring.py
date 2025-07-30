@@ -83,7 +83,7 @@ from sqlalchemy import text
 
 from ...database import get_sessionmanager
 from ...database.models import RulePerformance
-from ..analytics.analytics import AnalyticsService
+from ...core.services.analytics_factory import get_analytics_interface
 from ...utils.error_handlers import handle_database_errors
 
 class TraceLevel(Enum):
@@ -335,7 +335,7 @@ class EnhancedRealTimeMonitor:
     ):
         """Initialize enhanced real-time monitor."""
         self.console = console or Console()
-        self.analytics = AnalyticsService()
+        self.analytics = get_analytics_interface()
         self.alert_thresholds = AlertThreshold()
         self.service_name = service_name
         self.otlp_endpoint = otlp_endpoint
@@ -1482,7 +1482,7 @@ class HealthMonitor:
     """System health monitoring with automated diagnostics"""
 
     def __init__(self):
-        self.analytics = AnalyticsService()
+        self.analytics = get_analytics_interface()
 
     async def run_health_check(self) -> dict[str, Any]:
         """Comprehensive system health check"""
@@ -1573,13 +1573,17 @@ class HealthMonitor:
     async def _check_mcp_performance(self) -> dict[str, Any]:
         """Check MCP server performance"""
         try:
-            from ..mcp_server.mcp_server import improve_prompt
+            from ..mcp_server.server import APESMCPServer
 
+            # Initialize APESMCPServer instance
+            mcp_server = APESMCPServer()
+            
             start_time = time.time()
-            result = await improve_prompt(
+            result = await mcp_server._improve_prompt_impl(
                 prompt="Health check test prompt",
                 context={"domain": "health_check"},
                 session_id="health_check",
+                rate_limit_remaining=None
             )
             response_time = (time.time() - start_time) * 1000
 

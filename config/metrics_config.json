@@ -1,0 +1,208 @@
+{
+  "metrics": {
+    "enabled": true,
+    "endpoint": "/metrics",
+    "port": 8000,
+    "collection_interval": 15,
+    "retention_days": 30
+  },
+  "opentelemetry": {
+    "service_name": "apes-ml-pipeline",
+    "service_version": "1.0.0",
+    "environment": "production",
+    "otlp_endpoint": "http://localhost:4317",
+    "enable_console_exporter": true,
+    "enable_otlp_exporter": true,
+    "enable_prometheus_exporter": true,
+    "prometheus_port": 8001
+  },
+  "application_metrics": {
+    "http_requests": {
+      "name": "http_requests_total",
+      "description": "Total HTTP requests",
+      "type": "counter",
+      "labels": [
+        "method",
+        "endpoint",
+        "status"
+      ]
+    },
+    "http_request_duration": {
+      "name": "http_request_duration_seconds",
+      "description": "HTTP request duration in seconds",
+      "type": "histogram",
+      "labels": [
+        "method",
+        "endpoint"
+      ],
+      "buckets": [
+        0.1,
+        0.25,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        10.0
+      ]
+    },
+    "ml_model_predictions": {
+      "name": "ml_model_predictions_total",
+      "description": "Total ML model predictions",
+      "type": "counter",
+      "labels": [
+        "model_name",
+        "model_version"
+      ]
+    },
+    "ml_model_inference_duration": {
+      "name": "ml_model_inference_duration_seconds",
+      "description": "ML model inference duration in seconds",
+      "type": "histogram",
+      "labels": [
+        "model_name",
+        "model_version"
+      ],
+      "buckets": [
+        0.01,
+        0.1,
+        0.5,
+        1.0,
+        2.0,
+        5.0
+      ]
+    },
+    "ml_model_errors": {
+      "name": "ml_model_errors_total",
+      "description": "Total ML model errors",
+      "type": "counter",
+      "labels": [
+        "model_name",
+        "model_version",
+        "error_type"
+      ]
+    },
+    "database_connections": {
+      "name": "db_connections_active",
+      "description": "Active database connections",
+      "type": "gauge",
+      "labels": [
+        "database",
+        "pool"
+      ]
+    },
+    "database_query_duration": {
+      "name": "db_query_duration_seconds",
+      "description": "Database query duration in seconds",
+      "type": "histogram",
+      "labels": [
+        "operation",
+        "table"
+      ],
+      "buckets": [
+        0.001,
+        0.01,
+        0.1,
+        0.5,
+        1.0,
+        2.0
+      ]
+    },
+    "redis_operations": {
+      "name": "redis_operations_total",
+      "description": "Total Redis operations",
+      "type": "counter",
+      "labels": [
+        "operation",
+        "key_pattern"
+      ]
+    },
+    "batch_processing_queue_size": {
+      "name": "batch_processing_queue_size",
+      "description": "Current batch processing queue size",
+      "type": "gauge",
+      "labels": [
+        "queue_name"
+      ]
+    },
+    "batch_processing_duration": {
+      "name": "batch_processing_duration_seconds",
+      "description": "Batch processing duration in seconds",
+      "type": "histogram",
+      "labels": [
+        "batch_type"
+      ],
+      "buckets": [
+        1.0,
+        5.0,
+        10.0,
+        30.0,
+        60.0,
+        300.0
+      ]
+    },
+    "mcp_operations": {
+      "name": "mcp_operations_total",
+      "description": "Total MCP operations",
+      "type": "counter",
+      "labels": [
+        "operation",
+        "status"
+      ]
+    },
+    "cache_hits": {
+      "name": "cache_hits_total",
+      "description": "Total cache hits",
+      "type": "counter",
+      "labels": [
+        "cache_type",
+        "key_pattern"
+      ]
+    },
+    "cache_misses": {
+      "name": "cache_misses_total",
+      "description": "Total cache misses",
+      "type": "counter",
+      "labels": [
+        "cache_type",
+        "key_pattern"
+      ]
+    }
+  },
+  "health_checks": {
+    "database": {
+      "enabled": true,
+      "timeout": 5,
+      "critical": true
+    },
+    "redis": {
+      "enabled": true,
+      "timeout": 3,
+      "critical": true
+    },
+    "ml_models": {
+      "enabled": true,
+      "timeout": 10,
+      "critical": false
+    },
+    "external_services": {
+      "enabled": true,
+      "timeout": 5,
+      "critical": false
+    }
+  },
+  "sli_slo": {
+    "availability": {
+      "target": 99.9,
+      "measurement_window": "30d"
+    },
+    "latency": {
+      "target_p95": 2.0,
+      "target_p99": 5.0,
+      "measurement_window": "30d"
+    },
+    "error_rate": {
+      "target": 0.1,
+      "measurement_window": "30d"
+    }
+  }
+}

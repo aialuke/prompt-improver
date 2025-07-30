@@ -1,0 +1,72 @@
+# Grafana Dashboards Provisioning Configuration for APES Monitoring Stack
+# Optimized for LGTM stack with PostgreSQL JSONB integration
+# Version: 11.4.0 (2025)
+
+apiVersion: 1
+
+providers:
+  # APES Application Dashboards
+  - name: 'apes-application'
+    orgId: 1
+    folder: 'APES Application'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/application
+
+  # Infrastructure Monitoring Dashboards
+  - name: 'apes-infrastructure'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/infrastructure
+
+  # ML Monitoring Dashboards
+  - name: 'apes-ml-monitoring'
+    orgId: 1
+    folder: 'ML Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/ml
+
+  # LGTM Stack Monitoring Dashboards
+  - name: 'lgtm-stack'
+    orgId: 1
+    folder: 'LGTM Stack'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/lgtm
+
+  # PostgreSQL JSONB Monitoring Dashboards
+  - name: 'postgresql-jsonb'
+    orgId: 1
+    folder: 'PostgreSQL JSONB'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/postgresql
+
+  # CI/CD Pipeline Monitoring Dashboards
+  - name: 'cicd-monitoring'
+    orgId: 1
+    folder: 'CI/CD Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/cicd

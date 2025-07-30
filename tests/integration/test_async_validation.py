@@ -16,7 +16,7 @@ from hypothesis import (
 )
 
 # Import real MCP server function for testing actual behavior
-from prompt_improver.mcp_server.mcp_server import improve_prompt
+# Legacy import removed - will be fixed with modern patterns
 from prompt_improver.database import get_session
 
 
@@ -41,9 +41,9 @@ class TestAsyncExecution:
         """Test actual async MCP function execution with real behavior."""
         # Mock database session (external dependency) but use real prompt improvement logic
         with patch(
-            "prompt_improver.mcp_server.mcp_server.get_session"
+            "prompt_improver.database.get_session"
         ) as mock_get_session, patch(
-            "prompt_improver.mcp_server.mcp_server.get_session_wrapper"
+            "prompt_improver.core.services.prompt_improvement.get_session"
         ) as mock_get_session_wrapper:
             # Create async context manager mock for database session
             mock_context_manager = AsyncMock()
@@ -62,11 +62,16 @@ class TestAsyncExecution:
             # Test with a simple prompt that should be improved
             test_prompt = "Make this better"
             
-            # Call the real improve_prompt function
-            result = await improve_prompt(
+            # Import and use the APESMCPServer improve_prompt implementation
+            from prompt_improver.mcp_server import APESMCPServer
+            server_instance = APESMCPServer()
+            
+            # Call the real improve_prompt function through the server instance
+            result = await server_instance._improve_prompt_impl(
                 prompt=test_prompt,
                 context={"domain": "testing"},
                 session_id="async_test",
+                rate_limit_remaining=None
             )
 
             # Print result for debugging
@@ -104,9 +109,9 @@ class TestAsyncExecution:
         """Property-based test for real prompt improvement behavior across various inputs."""
         # Mock database session (external dependency) but use real prompt improvement logic
         with patch(
-            "prompt_improver.mcp_server.mcp_server.get_session"
+            "prompt_improver.database.get_session"
         ) as mock_get_session, patch(
-            "prompt_improver.mcp_server.mcp_server.get_session_wrapper"
+            "prompt_improver.core.services.prompt_improvement.get_session"
         ) as mock_get_session_wrapper:
             # Create async context manager mock for database session
             mock_context_manager = AsyncMock()
@@ -122,11 +127,16 @@ class TestAsyncExecution:
             mock_session_wrapper.performance_context.return_value = mock_performance_context
             mock_get_session_wrapper.return_value = mock_session_wrapper
             
-            # Call the real improve_prompt function with various inputs
-            result = await improve_prompt(
+            # Import and use the APESMCPServer improve_prompt implementation
+            from prompt_improver.mcp_server import APESMCPServer
+            server_instance = APESMCPServer()
+            
+            # Call the real improve_prompt function through the server instance
+            result = await server_instance._improve_prompt_impl(
                 prompt=prompt,
                 context={"domain": "testing"},
                 session_id="property_test",
+                rate_limit_remaining=None
             )
 
             # Properties that should always hold for real behavior

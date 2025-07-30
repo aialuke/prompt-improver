@@ -136,7 +136,6 @@ Platform-agnostic: Use universal tools (rg, find, grep) for all environments
 <research>
   <memory>search previous solutions first</memory>
   <context7>mandatory for external dependencies and best practices</context7>
-  <firecrawl>web research, documentation scraping, real-time information</firecrawl>
   <sequential>multi-step planning for complex tasks</sequential>
   <parallel>invoke all relevant tools simultaneously</parallel>
   <store>document decisions and patterns</store>

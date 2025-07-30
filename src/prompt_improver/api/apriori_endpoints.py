@@ -34,14 +34,14 @@ apriori_router = APIRouter(
 
 async def get_apriori_analyzer() -> AprioriAnalyzer:
     """Dependency to get AprioriAnalyzer instance with unified manager"""
-    # Use unified connection manager for sync operations
-    db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
+    # Use unified connection manager for ML training operations
+    db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
     return AprioriAnalyzer(db_manager=db_manager)
 
 async def get_pattern_discovery() -> AdvancedPatternDiscovery:
     """Dependency to get AdvancedPatternDiscovery instance with unified manager"""
-    # Use unified connection manager for sync operations
-    db_manager = get_unified_manager(ManagerMode.SYNC_HEAVY)
+    # Use unified connection manager for ML training operations
+    db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
     return AdvancedPatternDiscovery(db_manager=db_manager)
 
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)
@@ -81,7 +81,7 @@ async def run_apriori_analysis(
         apriori_analyzer.config = config
 
         # Run Apriori analysis
-        results = apriori_analyzer.analyze_patterns(
+        results = await apriori_analyzer.analyze_patterns(
             window_days=request.window_days, save_to_database=request.save_to_database
         )
 
@@ -215,7 +215,7 @@ async def get_association_rules(
         List of association rules with metrics and insights
     """
     try:
-        from sqlalchemy import and_, select
+        from sqlalchemy import and_, desc, select
 
         # Build query with filters
         query = select(AprioriAssociationRule)
@@ -231,7 +231,7 @@ async def get_association_rules(
             )  # type: ignore[arg-type]
 
         query = query.where(and_(*conditions))  # type: ignore[arg-type]
-        query = query.order_by(AprioriAssociationRule.rule_strength.desc())  # type: ignore[attr-defined]
+        query = query.order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
         query = query.limit(limit)
 
         result = await db_session.execute(query)
@@ -329,14 +329,14 @@ async def get_discovery_runs(
         List of discovery run metadata
     """
     try:
-        from sqlalchemy import select
+        from sqlalchemy import desc, select
 
         query = select(AprioriPatternDiscovery)
 
         if status_filter:
             query = query.where(AprioriPatternDiscovery.status == status_filter)  # type: ignore[arg-type]
 
-        query = query.order_by(AprioriPatternDiscovery.created_at.desc())  # type: ignore[attr-defined]
+        query = query.order_by(desc(AprioriPatternDiscovery.created_at))  # type: ignore[arg-type]
         query = query.limit(limit)
 
         result = await db_session.execute(query)
@@ -387,7 +387,7 @@ async def get_discovery_insights(
         Detailed insights and patterns from the discovery run
     """
     try:
-        from sqlalchemy import select
+        from sqlalchemy import desc, select
 
         # Get discovery run metadata
         query = select(AprioriPatternDiscovery).where(
@@ -408,8 +408,8 @@ async def get_discovery_insights(
             .where(
                 AprioriAssociationRule.discovery_run_id == discovery_run_id  # type: ignore[arg-type]
             )
-            .order_by(AprioriAssociationRule.rule_strength.desc())
-        )  # type: ignore[attr-defined]
+            .order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
+        )
 
         rules_result = await db_session.execute(rules_query)
         rules = rules_result.scalars().all()

@@ -11,52 +11,38 @@ from typing import Dict, Any
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
+# Import the modern MCP server
+from prompt_improver.mcp_server.server import APESMCPServer
+
 @pytest.mark.asyncio
-async def test_mcp_server_pydantic_models():
-    """Test that MCP server models work correctly"""
+async def test_mcp_server_structure():
+    """Test that MCP server has correct structure"""
     try:
-        from prompt_improver.mcp_server.mcp_server import (
-            PromptEnhancementRequest,
-            PromptStorageRequest
-        )
+        # Test MCP server instantiation and structure
+        server = APESMCPServer()
         
-        # Test PromptEnhancementRequest validation
-        request_data = {
-            "prompt": "Test prompt for enhancement",
-            "context": {"domain": "technical", "complexity": "medium"},
-            "session_id": "test-session-123"
-        }
+        # Test that server has required components
+        assert hasattr(server, 'mcp'), "Server should have FastMCP instance"
+        assert hasattr(server, 'services'), "Server should have services container"
+        assert hasattr(server, 'config'), "Server should have configuration"
         
-        request = PromptEnhancementRequest.model_validate(request_data)
-        assert request.prompt == "Test prompt for enhancement"
-        assert request.context["domain"] == "technical"
-        assert request.session_id == "test-session-123"
+        # Test services structure
+        services = server.services
+        assert hasattr(services, 'input_validator'), "Services should have input validator"
+        assert hasattr(services, 'output_validator'), "Services should have output validator"
+        assert hasattr(services, 'session_store'), "Services should have session store"
+        assert hasattr(services, 'prompt_service'), "Services should have prompt service"
         
-        # Test serialization
-        serialized = request.model_dump()
-        assert "prompt" in serialized
-        assert "context" in serialized
-        assert "session_id" in serialized
+        # Test configuration
+        config = server.config
+        assert hasattr(config, 'mcp_batch_size'), "Config should have MCP batch size"
+        assert hasattr(config, 'mcp_session_maxsize'), "Config should have session maxsize"
         
-        # Test PromptStorageRequest validation
-        storage_data = {
-            "original": "Original prompt",
-            "enhanced": "Enhanced prompt with improvements",
-            "metrics": {"improvement_score": 0.85, "quality_score": 0.9},
-            "session_id": "test-session-456"
-        }
-        
-        storage_request = PromptStorageRequest.model_validate(storage_data)
-        assert storage_request.original == "Original prompt"
-        assert storage_request.enhanced == "Enhanced prompt with improvements"
-        assert storage_request.metrics["improvement_score"] == 0.85
-        assert storage_request.session_id == "test-session-456"
-        
-        print("✓ MCP server Pydantic models validation passed")
+        print("✓ MCP server structure validation passed")
         return True
         
     except Exception as e:
-        print(f"✗ MCP server models validation failed: {e}")
+        print(f"✗ MCP server structure validation failed: {e}")
         return False
 
 
@@ -304,7 +290,7 @@ async def test_comprehensive_field_validation():
 async def run_all_validation_tests():
     """Run all validation tests and return results"""
     tests = [
-        test_mcp_server_pydantic_models,
+        test_mcp_server_structure,
         test_database_models_creation,
         test_api_request_response_models,
         test_ml_generation_models,

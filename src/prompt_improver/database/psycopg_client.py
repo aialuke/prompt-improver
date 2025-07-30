@@ -22,7 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
-from .config import DatabaseConfig
+from prompt_improver.core.config import DatabaseConfig
 from .error_handling import (
     DatabaseErrorClassifier,
     ErrorCategory,
@@ -107,10 +107,7 @@ class TypeSafePsycopgClient:
         app_name = f"prompt-improver-{hostname}-{pid}"
 
         # Build connection string with 2025 optimizations (psycopg3 format)
-        self.conninfo = (
-            f"postgresql://{self.config.postgres_username}:{self.config.postgres_password}@"
-            f"{self.config.postgres_host}:{self.config.postgres_port}/{self.config.postgres_database}"
-        )
+        self.conninfo = self.config.database_url
 
         # 2025 Enhancement: Advanced connection kwargs (psycopg3 compatible)
         connection_kwargs = {
@@ -125,7 +122,7 @@ class TypeSafePsycopgClient:
         }
 
         # 2025 Enhancement: SSL and security settings
-        if self.config.postgres_host != "localhost":
+        if self.config.host != "localhost":
             connection_kwargs["sslmode"] = "require"
             connection_kwargs["sslcert"] = os.getenv("POSTGRES_SSL_CERT")
             connection_kwargs["sslkey"] = os.getenv("POSTGRES_SSL_KEY")
@@ -1634,7 +1631,7 @@ class TypeSafePsycopgClient:
             },
             "security_features": {
                 "sql_injection_protection": "PARAMETERIZED_QUERIES",
-                "connection_security": "SSL_ENABLED" if self.config.postgres_host != "localhost" else "LOCAL_CONNECTION",
+                "connection_security": "SSL_ENABLED" if self.config.host != "localhost" else "LOCAL_CONNECTION",
                 "timeout_protection": True
             },
             "recommendations": [

@@ -1,4 +1,0 @@
-# file: /Users/lukemckenzie/prompt-improver/src/prompt_improver/rule_engine/rules/specificity.py
-# hypothesis_version: 6.135.26
-
-[0.1, 0.3, 0.5, 0.6, 0.8, 0.9, 1.0, 'Core', 'SpecificityRule', 'additions', 'confidence', 'constraint', 'description', 'enhanced_prompt', 'error', 'example', 'fallback_specificity', 'for instance', 'has_constraints', 'has_examples', 'has_indicators', 'how', 'improved_prompt', 'is_short', 'message', 'metadata', 'must', 'name', 'requirement', 'should', 'source', 'specificity_score', 'such as', 'transformations', 'type', 'what kind', 'when', 'where', 'which', 'why', 'word_count']

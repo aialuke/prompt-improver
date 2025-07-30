@@ -67,8 +67,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
-        # Install additional dev tools
-        pip install prometheus-client>=0.19.0
+        # Install OpenTelemetry dependencies for monitoring
+        pip install opentelemetry-api>=1.36.0 opentelemetry-sdk>=1.36.0
+        pip install opentelemetry-exporter-otlp>=1.36.0 opentelemetry-exporter-prometheus>=0.57b0
         # Install pytest-xdist for parallel testing
         pip install pytest-xdist
 
@@ -151,29 +152,46 @@ jobs:
         name: codecov-umbrella
         fail_ci_if_error: false
 
-    - name: Export Prometheus metrics for ruff errors
+    - name: Export JSONB-compatible metrics for ruff errors
       run: |
         python -c "
-        from prometheus_client import CollectorRegistry, Gauge, write_to_textfile
         import os
+        import json
+        from datetime import datetime
 
-        registry = CollectorRegistry()
-        ruff_error_gauge = Gauge('ruff_errors_total', 'Total number of ruff linting errors', registry=registry)
-        ruff_error_gauge.set(int(os.environ.get('RUFF_ERROR_COUNT', '0')))
+        # Create JSONB-compatible metrics export for PostgreSQL storage
+        ruff_error_count = int(os.environ.get('RUFF_ERROR_COUNT', '0'))
 
-        write_to_textfile('ruff_metrics.prom', registry)
-        print(f'Ruff errors: {os.environ.get(\"RUFF_ERROR_COUNT\", \"0\")}')
+        metrics_data = {
+            'timestamp': datetime.now().isoformat(),
+            'service_name': 'apes-ci-pipeline',
+            'metrics': {
+                'ruff_errors_total': {
+                    'value': ruff_error_count,
+                    'type': 'gauge',
+                    'description': 'Total number of ruff linting errors',
+                    'labels': {'pipeline': 'ci', 'tool': 'ruff'}
+                }
+            }
+        }
+
+        # Export as JSONB-compatible JSON for PostgreSQL storage
+        with open('ruff_metrics.json', 'w') as f:
+            json.dump(metrics_data, f, indent=2, ensure_ascii=False)
+
+        print(f'Ruff errors: {ruff_error_count}')
+        print(f'JSONB-compatible metrics exported to ruff_metrics.json')
         "
 
     - name: Upload ruff metrics artifact
       uses: actions/upload-artifact@v3
       with:
         name: ruff-metrics-${{ matrix.python-version }}
-        path: ruff_metrics.prom
+        path: ruff_metrics.json
         retention-days: 30
 
   ml-drift-monitoring:
-    name: ML Drift Monitoring
+    name: ML Drift Monitoring (JSONB-Compatible)
     runs-on: ubuntu-latest
     needs: code-quality
     if: github.event_name == 'schedule' || github.event_name == 'push'
@@ -190,7 +208,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install evidently>=0.4.0 pandas numpy
+        pip install pandas numpy scipy scikit-learn
+        pip install opentelemetry-api>=1.36.0 opentelemetry-sdk>=1.36.0
 
     - name: Create sample data directories
       run: |
@@ -233,50 +252,90 @@ jobs:
         print('Created current dataset')
         "
 
-    - name: Run ML drift monitoring
+    - name: Run ML drift monitoring (JSONB-Compatible)
       run: |
         python -c "
         import pandas as pd
-        from evidently.report import Report
-        from evidently.metric_preset import DataDriftPreset, DataQualityPreset
+        import numpy as np
         import json
+        from datetime import datetime
+        from scipy import stats
 
         # Load datasets
         ref_data = pd.read_csv('data/ref.csv')
         current_data = pd.read_csv('data/new.csv')
 
-        # Create drift report
-        report = Report(metrics=[
-            DataDriftPreset(),
-            DataQualityPreset()
-        ])
+        # Custom drift detection using statistical tests
+        def detect_drift(ref_series, current_series, threshold=0.05):
+            '''Detect drift using Kolmogorov-Smirnov test'''
+            try:
+                statistic, p_value = stats.ks_2samp(ref_series, current_series)
+                return p_value < threshold, p_value, statistic
+            except Exception:
+                return False, 1.0, 0.0
 
-        report.run(reference_data=ref_data, current_data=current_data)
+        # Analyze each feature for drift
+        drift_results = {}
+        overall_drift = False
 
-        # Save report
-        report.save_json('data/drift_report.json')
+        for column in ref_data.columns:
+            if column in current_data.columns:
+                drift_detected, p_value, statistic = detect_drift(
+                    ref_data[column].dropna(),
+                    current_data[column].dropna()
+                )
+                drift_results[column] = {
+                    'drift_detected': drift_detected,
+                    'p_value': float(p_value),
+                    'ks_statistic': float(statistic),
+                    'mean_shift': float(current_data[column].mean() - ref_data[column].mean()),
+                    'std_shift': float(current_data[column].std() - ref_data[column].std())
+                }
+                if drift_detected:
+                    overall_drift = True
 
-        # Extract key metrics for CI
-        report_data = report.as_dict()
-        drift_detected = any(
-            metric.get('result', {}).get('drift_detected', False)
-            for metric in report_data.get('metrics', [])
-            if 'result' in metric and 'drift_detected' in metric.get('result', {})
-        )
-
-        with open('data/drift_summary.json', 'w') as f:
-            json.dump({
-                'drift_detected': drift_detected,
-                'timestamp': pd.Timestamp.now().isoformat(),
+        # Create JSONB-compatible drift report for PostgreSQL storage
+        otel_drift_report = {
+            'timestamp': datetime.now().isoformat(),
+            'service_name': 'apes-ml-drift-monitor',
+            'metrics': {
+                'ml_drift_detected': {
+                    'value': 1 if overall_drift else 0,
+                    'type': 'gauge',
+                    'description': 'Whether ML drift was detected',
+                    'labels': {'monitor_type': 'statistical', 'method': 'kolmogorov_smirnov'}
+                },
+                'ml_drift_features_affected': {
+                    'value': sum(1 for r in drift_results.values() if r['drift_detected']),
+                    'type': 'gauge',
+                    'description': 'Number of features with detected drift',
+                    'labels': {'threshold': '0.05'}
+                }
+            },
+            'feature_analysis': drift_results,
+            'summary': {
+                'drift_detected': overall_drift,
                 'reference_size': len(ref_data),
-                'current_size': len(current_data)
-            }, f, indent=2)
+                'current_size': len(current_data),
+                'features_analyzed': len(drift_results),
+                'features_with_drift': sum(1 for r in drift_results.values() if r['drift_detected'])
+            }
+        }
 
-        print(f'Drift monitoring completed. Drift detected: {drift_detected}')
+        # Save JSONB-compatible report for PostgreSQL storage
+        with open('data/drift_report.json', 'w') as f:
+            json.dump(otel_drift_report, f, indent=2, ensure_ascii=False)
+
+        # Save JSONB-compatible summary for CI and PostgreSQL storage
+        with open('data/drift_summary.json', 'w') as f:
+            json.dump(otel_drift_report['summary'], f, indent=2, ensure_ascii=False)
+
+        print(f'JSONB-compatible drift monitoring completed. Drift detected: {overall_drift}')
+        print(f'Features with drift: {otel_drift_report[\"summary\"][\"features_with_drift\"]}/{len(drift_results)}')
 
         # Fail CI if significant drift detected
-        if drift_detected:
-            print('::warning::ML drift detected in production data')
+        if overall_drift:
+            print('::warning::ML drift detected using statistical analysis')
             exit(1)
         "
 
@@ -560,49 +619,63 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Prometheus client
-      run: pip install prometheus-client>=0.19.0
+    - name: Install JSONB-compatible dependencies
+      run: |
+        pip install opentelemetry-api>=1.36.0 opentelemetry-sdk>=1.36.0
+        pip install opentelemetry-exporter-otlp>=1.36.0
 
     - name: Download artifacts
       uses: actions/download-artifact@v3
       with:
         path: artifacts/
 
-    - name: Generate Prometheus metrics and alerts
+    - name: Generate JSONB-compatible metrics and alerts
       run: |
         python -c "
-        from prometheus_client import CollectorRegistry, Gauge, Counter, Histogram, write_to_textfile
         import json
         import glob
         import os
+        from datetime import datetime
 
-        registry = CollectorRegistry()
-
-        # Ruff error metrics with threshold alerting
-        ruff_errors = Gauge('ci_ruff_errors_total', 'Total ruff linting errors from CI', ['python_version'], registry=registry)
-        ruff_threshold_exceeded = Gauge('ci_ruff_threshold_exceeded', 'Whether ruff error count exceeds threshold (0)', registry=registry)
+        # Initialize JSONB-compatible metrics collection for PostgreSQL storage
+        otel_metrics = {
+            'timestamp': datetime.now().isoformat(),
+            'service_name': 'apes-ci-dashboard',
+            'metrics': {},
+            'alerts': []
+        }
 
         # Process ruff metrics from artifacts
         total_errors = 0
-        for metrics_file in glob.glob('artifacts/ruff-metrics-*/ruff_metrics.prom'):
+        ruff_metrics_by_version = {}
+
+        for metrics_file in glob.glob('artifacts/ruff-metrics-*/ruff_metrics.json'):
             python_version = metrics_file.split('/')[-2].replace('ruff-metrics-', '')
             try:
                 with open(metrics_file, 'r') as f:
-                    content = f.read()
-                    if 'ruff_errors_total' in content:
-                        error_count = float(content.split('ruff_errors_total')[-1].strip())
-                        ruff_errors.labels(python_version=python_version).set(error_count)
-                        total_errors += error_count
-                        print(f'Ruff errors for Python {python_version}: {error_count}')
+                    metrics_data = json.load(f)
+                    error_count = metrics_data['metrics']['ruff_errors_total']['value']
+                    ruff_metrics_by_version[python_version] = error_count
+                    total_errors += error_count
+                    print(f'Ruff errors for Python {python_version}: {error_count}')
             except Exception as e:
                 print(f'Failed to process {metrics_file}: {e}')
 
-        # Set threshold alert (threshold = 0)
-        threshold_exceeded = 1 if total_errors > 0 else 0
-        ruff_threshold_exceeded.set(threshold_exceeded)
+        # Add ruff metrics to OpenTelemetry export
+        otel_metrics['metrics']['ci_ruff_errors_total'] = {
+            'value': total_errors,
+            'type': 'gauge',
+            'description': 'Total ruff linting errors from CI',
+            'labels': {'aggregated': 'true'},
+            'by_version': ruff_metrics_by_version
+        }
 
-        # ML drift monitoring metrics
-        ml_drift_detected = Gauge('ci_ml_drift_detected', 'Whether ML drift was detected (1=yes, 0=no)', registry=registry)
+        otel_metrics['metrics']['ci_ruff_threshold_exceeded'] = {
+            'value': 1 if total_errors > 0 else 0,
+            'type': 'gauge',
+            'description': 'Whether ruff error count exceeds threshold (0)',
+            'labels': {'threshold': '0'}
+        }
 
         # Process ML drift results
         try:
@@ -610,72 +683,108 @@ jobs:
             if drift_files:
                 with open(drift_files[0], 'r') as f:
                     drift_data = json.load(f)
-                    drift_detected = 1 if drift_data.get('drift_detected', False) else 0
-                    ml_drift_detected.set(drift_detected)
-                    print(f'ML drift detected: {bool(drift_detected)}')
+                    drift_detected = drift_data.get('drift_detected', False)
+
+                    otel_metrics['metrics']['ci_ml_drift_detected'] = {
+                        'value': 1 if drift_detected else 0,
+                        'type': 'gauge',
+                        'description': 'Whether ML drift was detected (1=yes, 0=no)',
+                        'labels': {'method': 'statistical_analysis'}
+                    }
+
+                    otel_metrics['metrics']['ci_ml_drift_features_affected'] = {
+                        'value': drift_data.get('features_with_drift', 0),
+                        'type': 'gauge',
+                        'description': 'Number of features with detected drift',
+                        'labels': {'total_features': str(drift_data.get('features_analyzed', 0))}
+                    }
+
+                    print(f'ML drift detected: {drift_detected}')
             else:
-                ml_drift_detected.set(0)
+                otel_metrics['metrics']['ci_ml_drift_detected'] = {
+                    'value': 0,
+                    'type': 'gauge',
+                    'description': 'Whether ML drift was detected (1=yes, 0=no)',
+                    'labels': {'status': 'no_data'}
+                }
                 print('No ML drift data found')
         except Exception as e:
             print(f'Failed to process ML drift data: {e}')
-            ml_drift_detected.set(0)
+            otel_metrics['metrics']['ci_ml_drift_detected'] = {
+                'value': 0,
+                'type': 'gauge',
+                'description': 'Whether ML drift was detected (1=yes, 0=no)',
+                'labels': {'status': 'error'}
+            }
 
-        # CI pipeline metrics
-        ci_duration = Gauge('ci_pipeline_duration_seconds', 'Total CI pipeline duration', registry=registry)
-        ci_success = Gauge('ci_pipeline_success', 'Whether CI pipeline succeeded (1=success, 0=failure)', registry=registry)
-
-        # Estimate pipeline duration (simplified)
+        # Add CI pipeline metrics
         import time
-        ci_duration.set(time.time() % 3600)  # Placeholder duration
-
-        # Determine CI success based on job results
+        pipeline_duration = time.time() % 3600  # Simplified duration estimate
         ci_success_value = 1 if total_errors == 0 else 0
-        ci_success.set(ci_success_value)
 
-        # Write all metrics to file
-        write_to_textfile('ci_dashboard_metrics.prom', registry)
+        otel_metrics['metrics']['ci_pipeline_duration_seconds'] = {
+            'value': pipeline_duration,
+            'type': 'gauge',
+            'description': 'Total CI pipeline duration',
+            'labels': {'pipeline_id': os.environ.get('GITHUB_RUN_ID', 'unknown')}
+        }
 
-        # Generate alerting rules file
-        alerting_rules = '''
-        groups:
-        - name: ci_quality_alerts
-          rules:
-          - alert: RuffErrorsThresholdExceeded
-            expr: ci_ruff_threshold_exceeded > 0
-            for: 0m
-            labels:
-              severity: critical
-              component: code_quality
-            annotations:
-              summary: \"Ruff linting errors detected in CI\"
-              description: \"CI pipeline detected {{ \$value }} ruff linting errors, exceeding threshold of 0\"
+        otel_metrics['metrics']['ci_pipeline_success'] = {
+            'value': ci_success_value,
+            'type': 'gauge',
+            'description': 'Whether CI pipeline succeeded (1=success, 0=failure)',
+            'labels': {'branch': os.environ.get('GITHUB_REF_NAME', 'unknown')}
+        }
 
-          - alert: MLDriftDetected
-            expr: ci_ml_drift_detected > 0
-            for: 0m
-            labels:
-              severity: warning
-              component: ml_monitoring
-            annotations:
-              summary: \"ML model drift detected\"
-              description: \"Evidently detected drift in ML model performance metrics\"
+        # Write JSONB-compatible metrics to file for PostgreSQL storage
+        with open('ci_dashboard_metrics.json', 'w') as f:
+            json.dump(otel_metrics, f, indent=2, ensure_ascii=False)
 
-          - alert: CIPipelineFailure
-            expr: ci_pipeline_success < 1
-            for: 0m
-            labels:
-              severity: critical
-              component: ci_pipeline
-            annotations:
-              summary: \"CI pipeline failed\"
-              description: \"CI pipeline failed due to code quality or test failures\"
-        '''
+        # Generate JSONB-compatible alerting rules for PostgreSQL storage
+        alerting_config = {
+            'alert_rules': [
+                {
+                    'name': 'RuffErrorsThresholdExceeded',
+                    'condition': 'ci_ruff_threshold_exceeded > 0',
+                    'severity': 'critical',
+                    'component': 'code_quality',
+                    'description': 'Ruff linting errors detected in CI',
+                    'threshold': 0,
+                    'metric': 'ci_ruff_errors_total'
+                },
+                {
+                    'name': 'MLDriftDetected',
+                    'condition': 'ci_ml_drift_detected > 0',
+                    'severity': 'warning',
+                    'component': 'ml_monitoring',
+                    'description': 'ML model drift detected using statistical analysis',
+                    'threshold': 0,
+                    'metric': 'ci_ml_drift_detected'
+                },
+                {
+                    'name': 'CIPipelineFailure',
+                    'condition': 'ci_pipeline_success < 1',
+                    'severity': 'critical',
+                    'component': 'ci_pipeline',
+                    'description': 'CI pipeline failed due to code quality or test failures',
+                    'threshold': 1,
+                    'metric': 'ci_pipeline_success'
+                }
+            ],
+            'notification_config': {
+                'enabled': True,
+                'channels': ['github_actions'],
+                'escalation_policy': 'immediate'
+            }
+        }
 
-        with open('ci_alerting_rules.yml', 'w') as f:
-            f.write(alerting_rules)
+        with open('ci_alerting_rules.json', 'w') as f:
+            json.dump(alerting_config, f, indent=2, ensure_ascii=False)
 
-        print('Dashboard metrics and alerting rules generated')
-        print(f'Total ruff errors: {total_errors} (threshold exceeded: {bool(threshold_exceeded)})')
+        print('JSONB-compatible dashboard metrics and alerting rules generated')
+        print(f'Total ruff errors: {total_errors} (threshold exceeded: {total_errors > 0})')
+        print(f'JSONB metrics exported to: ci_dashboard_metrics.json')
+        print(f'JSONB alert rules exported to: ci_alerting_rules.json')
         "
 
     - name: Upload dashboard artifacts
@@ -683,8 +792,8 @@ jobs:
       with:
         name: dashboard-metrics
         path: |
-          ci_dashboard_metrics.prom
-          ci_alerting_rules.yml
+          ci_dashboard_metrics.json
+          ci_alerting_rules.json
         retention-days: 30
 
     - name: Alert on threshold breach
@@ -708,12 +817,12 @@ jobs:
         echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
         echo "| Code Quality | ${{ needs.code-quality.result == 'success' && '✅ PASS' || '❌ FAIL' }} | Ruff check, format, pytest |" >> $GITHUB_STEP_SUMMARY
-        echo "| ML Drift Monitoring | ${{ needs.ml-drift-monitoring.result == 'success' && '✅ PASS' || '❌ FAIL' }} | Evidently drift detection |" >> $GITHUB_STEP_SUMMARY
+        echo "| ML Drift Monitoring | ${{ needs.ml-drift-monitoring.result == 'success' && '✅ PASS' || '❌ FAIL' }} | JSONB-compatible statistical drift detection |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Contract Tests | ${{ needs.mcp-contract-tests.result == 'success' && '✅ PASS' || '⚠️ SKIP' }} | Protocol compliance |" >> $GITHUB_STEP_SUMMARY
-        echo "| Dashboard Alerts | ${{ needs.dashboard-alerts.result == 'success' && '✅ PASS' || '❌ FAIL' }} | Prometheus metrics |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dashboard Alerts | ${{ needs.dashboard-alerts.result == 'success' && '✅ PASS' || '❌ FAIL' }} | JSONB-compatible metrics |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📊 Key Metrics" >> $GITHUB_STEP_SUMMARY
         echo "- **Ruff Error Threshold**: 0 (Zero tolerance policy)" >> $GITHUB_STEP_SUMMARY
         echo "- **Test Coverage**: Tracked with branch coverage" >> $GITHUB_STEP_SUMMARY
-        echo "- **ML Drift**: Daily monitoring with Evidently" >> $GITHUB_STEP_SUMMARY
+        echo "- **ML Drift**: Daily monitoring with JSONB-compatible statistical analysis" >> $GITHUB_STEP_SUMMARY
         echo "- **MCP Protocol**: Contract compliance validation" >> $GITHUB_STEP_SUMMARY

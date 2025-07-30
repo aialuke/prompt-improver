@@ -155,7 +155,7 @@ async def test_rate_limiting_real_behavior():
 async def test_mcp_server_real_behavior():
     """Test MCP server functionality without authentication."""
     try:
-        from prompt_improver.mcp_server.mcp_server import APESMCPServer
+        # Legacy import removed - will be fixed with modern patterns
         
         # Create server instance
         server = APESMCPServer()

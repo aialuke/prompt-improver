@@ -21,7 +21,19 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typer.testing import CliRunner
 from testcontainers.redis import RedisContainer
+from testcontainers.postgres import PostgresContainer
 import coredis
+import psycopg
+
+# OpenTelemetry imports for real behavior testing
+from opentelemetry import trace, metrics
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import Resource
 
 from prompt_improver.database.models import (
     ABExperiment,
@@ -525,6 +537,200 @@ async def redis_client(redis_container):
     
     # Cleanup connection
     client.connection_pool.disconnect()
+
+
+# ===============================
+# OPENTELEMETRY REAL BEHAVIOR TESTING INFRASTRUCTURE
+# ===============================
+
+@pytest.fixture(scope="session")
+def otel_test_setup():
+    """
+    Session-scoped OpenTelemetry setup for real behavior testing.
+
+    Configures OpenTelemetry with real exporters and collectors for
+    integration testing following 2025 best practices.
+    """
+    # Create resource for test environment
+    resource = Resource.create({
+        "service.name": "apes-test",
+        "service.version": "test",
+        "deployment.environment": "test",
+        "test.session": "real-behavior"
+    })
+
+    # Setup tracing with real exporter
+    tracer_provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(tracer_provider)
+
+    # Setup metrics with real exporter
+    metric_reader = PeriodicExportingMetricReader(
+        exporter=OTLPMetricExporter(
+            endpoint="http://localhost:4317",
+            insecure=True
+        ),
+        export_interval_millis=1000
+    )
+    meter_provider = MeterProvider(
+        resource=resource,
+        metric_readers=[metric_reader]
+    )
+    metrics.set_meter_provider(meter_provider)
+
+    yield {
+        "tracer_provider": tracer_provider,
+        "meter_provider": meter_provider,
+        "tracer": trace.get_tracer("apes-test"),
+        "meter": metrics.get_meter("apes-test")
+    }
+
+    # Cleanup
+    tracer_provider.shutdown()
+    meter_provider.shutdown()
+
+
+@pytest.fixture(scope="function")
+async def otel_metrics_collector(otel_test_setup):
+    """
+    Function-scoped OpenTelemetry metrics collector for real behavior testing.
+
+    Provides real metric collection and validation capabilities for testing
+    the migrated ML components with actual OpenTelemetry infrastructure.
+    """
+    meter = otel_test_setup["meter"]
+
+    # Create real metrics for testing
+    ml_processing_counter = meter.create_counter(
+        name="ml_processing_total",
+        description="Total ML processing operations",
+        unit="1"
+    )
+
+    ml_processing_histogram = meter.create_histogram(
+        name="ml_processing_duration",
+        description="ML processing duration",
+        unit="ms"
+    )
+
+    failure_analysis_counter = meter.create_counter(
+        name="failure_analysis_total",
+        description="Total failure analysis operations",
+        unit="1"
+    )
+
+    failure_classification_counter = meter.create_counter(
+        name="failure_classification_total",
+        description="Total failure classification operations",
+        unit="1"
+    )
+
+    yield {
+        "meter": meter,
+        "ml_processing_counter": ml_processing_counter,
+        "ml_processing_histogram": ml_processing_histogram,
+        "failure_analysis_counter": failure_analysis_counter,
+        "failure_classification_counter": failure_classification_counter
+    }
+
+
+@pytest.fixture(scope="function")
+async def real_ml_database(test_db_session):
+    """
+    Function-scoped real database fixture for ML component testing.
+
+    Creates ML-specific tables and provides real database interactions
+    for testing failure_analyzer.py and failure_classifier.py components.
+    """
+    # Create ML-specific tables for real behavior testing
+    await test_db_session.execute("""
+        CREATE TABLE IF NOT EXISTS ml_metrics (
+            id SERIAL PRIMARY KEY,
+            metric_name VARCHAR(255) NOT NULL,
+            metric_value FLOAT NOT NULL,
+            labels JSONB,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            component VARCHAR(100) NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ml_metrics_name
+        ON ml_metrics(metric_name);
+
+        CREATE INDEX IF NOT EXISTS idx_ml_metrics_component
+        ON ml_metrics(component);
+    """)
+
+    await test_db_session.execute("""
+        CREATE TABLE IF NOT EXISTS failure_analysis (
+            id SERIAL PRIMARY KEY,
+            analysis_id UUID NOT NULL,
+            failure_type VARCHAR(100) NOT NULL,
+            confidence_score FLOAT NOT NULL,
+            analysis_data JSONB NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_failure_analysis_type
+        ON failure_analysis(failure_type);
+    """)
+
+    await test_db_session.commit()
+
+    yield test_db_session
+
+    # Cleanup ML tables
+    await test_db_session.execute("DROP TABLE IF EXISTS ml_metrics CASCADE;")
+    await test_db_session.execute("DROP TABLE IF EXISTS failure_analysis CASCADE;")
+    await test_db_session.commit()
+
+
+@pytest.fixture(scope="function")
+async def real_behavior_environment(otel_metrics_collector, real_ml_database, redis_client):
+    """
+    Comprehensive real behavior testing environment.
+
+    Combines OpenTelemetry metrics, real PostgreSQL database, and Redis
+    for complete integration testing of migrated ML components following
+    2025 best practices.
+    """
+    environment = {
+        "otel_metrics": otel_metrics_collector,
+        "database": real_ml_database,
+        "redis": redis_client,
+        "tracer": trace.get_tracer("apes-test"),
+        "meter": otel_metrics_collector["meter"]
+    }
+
+    # Ensure clean state
+    await redis_client.flushdb()
+    await real_ml_database.execute("TRUNCATE TABLE ml_metrics, failure_analysis RESTART IDENTITY CASCADE;")
+    await real_ml_database.commit()
+
+    yield environment
+
+    # Final cleanup
+    await redis_client.flushdb()
+    await real_ml_database.execute("TRUNCATE TABLE ml_metrics, failure_analysis RESTART IDENTITY CASCADE;")
+    await real_ml_database.commit()
+
+
+# Skip markers for real behavior testing
+requires_otel = pytest.mark.skipif(
+    not all([
+        trace, metrics, TracerProvider, MeterProvider
+    ]),
+    reason="OpenTelemetry not properly configured"
+)
+
+requires_real_db = pytest.mark.skipif(
+    os.getenv("SKIP_REAL_DB_TESTS", "false").lower() == "true",
+    reason="Real database tests disabled"
+)
+
+requires_testcontainers = pytest.mark.skipif(
+    os.getenv("SKIP_TESTCONTAINER_TESTS", "false").lower() == "true",
+    reason="Testcontainer tests disabled"
+)
+
 
 # Temporary File Infrastructure
 @pytest.fixture(scope="function")

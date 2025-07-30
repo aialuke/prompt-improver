@@ -619,14 +619,18 @@ class APESInitializer:
 
         # Test MCP server performance (if available)
         try:
-            # Import and test MCP tools
-            from ..mcp_server.mcp_server import improve_prompt
+            # Import and test APESMCPServer
+            from ..mcp_server.server import APESMCPServer
 
+            # Initialize APESMCPServer instance
+            mcp_server = APESMCPServer()
+            
             start_time = asyncio.get_event_loop().time()
-            result = await improve_prompt(
+            result = await mcp_server._improve_prompt_impl(
                 prompt="Test prompt for performance validation",
                 context={"domain": "testing"},
                 session_id="health_check",
+                rate_limit_remaining=None
             )
             end_time = asyncio.get_event_loop().time()
 

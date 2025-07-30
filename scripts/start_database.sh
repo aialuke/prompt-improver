@@ -169,8 +169,13 @@ show_connection_info() {
     echo "Connection String:"
     echo "postgresql://$DB_USER:${POSTGRES_PASSWORD:-apes_secure_password_2024}@localhost:5432/$DB_NAME"
     echo ""
-    echo "For MCP Server configuration:"
-    echo '  "args": ["npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://apes_user:'${POSTGRES_PASSWORD:-apes_secure_password_2024}'@localhost:5432/apes_production"]'
+    echo "For APES MCP Server configuration:"
+    echo '  "apes-mcp": {'
+    echo '    "command": "python",'
+    echo '    "args": ["-m", "prompt_improver.mcp_server.server"],'
+    echo '    "cwd": "/path/to/prompt-improver",'
+    echo '    "env": {"PYTHONPATH": "/path/to/prompt-improver/src"}'
+    echo '  }'
     echo ""
 }
 

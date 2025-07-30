@@ -70,7 +70,7 @@ DATABASE_URL = "postgresql+psycopg://apes_user:apes_secure_password_2024@localho
       "command": "npx",
       "args": [
         "-y", 
-        "@modelcontextprotocol/server-postgres",
+        # Use APES unified MCP server instead
         "postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
       ]
     }
@@ -175,12 +175,25 @@ await db.execute(
 
 ## Next Steps
 
-1. **Install MCP PostgreSQL Server:**
-   ```bash
-   npm install -g @modelcontextprotocol/server-postgres
-   ```
+1. **Use APES Unified MCP Server:**
+   The APES project includes a built-in MCP server with database integration.
+   No external installation required.
 
-2. **Add to your MCP configuration** (in Claude Desktop or your application)
+2. **Add to your Claude CLI configuration:**
+   ```json
+   {
+     "mcpServers": {
+       "apes-mcp": {
+         "command": "python",
+         "args": ["-m", "prompt_improver.mcp_server.server"],
+         "cwd": "/path/to/prompt-improver",
+         "env": {
+           "PYTHONPATH": "/path/to/prompt-improver/src"
+         }
+       }
+     }
+   }
+   ```
 
 3. **Update your Python code** to use the database connection
 

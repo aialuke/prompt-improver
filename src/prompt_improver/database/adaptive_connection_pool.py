@@ -113,8 +113,7 @@ class AdaptiveConnectionPool:
     
     def _build_connection_string(self) -> str:
         """Build PostgreSQL connection string."""
-        return (f"postgresql://{self.config.postgres_username}:{self.config.postgres_password}"
-                f"@{self.config.postgres_host}:{self.config.postgres_port}/{self.config.postgres_database}")
+        return self.config.database_url
     
     async def initialize(self) -> None:
         """Initialize the connection pool."""

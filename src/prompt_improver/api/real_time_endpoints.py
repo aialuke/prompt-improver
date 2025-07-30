@@ -2,9 +2,10 @@
 Provides WebSocket and REST endpoints for live experiment monitoring
 """
 
+import json
 import logging
 from datetime import datetime, UTC
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List
 
 from fastapi import (
     APIRouter,
@@ -19,17 +20,216 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 # Make Redis import optional with proper error handling
+redis_available = True
 try:
     import coredis
-
-    REDIS_AVAILABLE = True
 except ImportError:
-    REDIS_AVAILABLE = False
+    redis_available = False
     coredis = None
 
-from ..database import get_session
+from ..database import get_session, get_async_session_factory
 from ..database.models import ABExperiment
+from ..database.analytics_query_interface import AnalyticsQueryInterface
 from ..utils.websocket_manager import connection_manager, setup_redis_connection
+
+# Import real-time analytics service with graceful fallback
+analytics_available = True
+try:
+    from ..performance.analytics.real_time_analytics import get_real_time_analytics_service
+except ImportError:
+    analytics_available = False
+
+    # Create a functional analytics service using existing APES infrastructure
+    async def get_real_time_analytics_service(db_session: AsyncSession) -> Any:
+        """Functional analytics service using AnalyticsQueryInterface and ABExperiment model"""
+
+        class FunctionalAnalyticsService:
+            """Real analytics service implementation using existing APES database infrastructure"""
+
+            def __init__(self, db_session: AsyncSession):
+                self.db_session = db_session
+                self.analytics = AnalyticsQueryInterface(db_session)
+                self.logger = logging.getLogger(__name__)
+
+            async def get_real_time_metrics(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+                """Get real-time metrics for an experiment using database queries"""
+                try:
+                    # Query the ABExperiment table for the specific experiment
+                    # Convert experiment_id to int if needed (ABExperiment.id is typically int)
+                    try:
+                        exp_id = int(experiment_id)
+                    except ValueError:
+                        # If experiment_id is not numeric, try string comparison
+                        query = select(ABExperiment).where(ABExperiment.experiment_name == experiment_id)
+                    else:
+                        query = select(ABExperiment).where(ABExperiment.id == exp_id)
+                    result = await self.db_session.execute(query)
+                    experiment = result.scalar_one_or_none()
+
+                    if not experiment:
+                        self.logger.warning(f"Experiment {experiment_id} not found")
+                        return None
+
+                    # Calculate metrics based on experiment data
+                    current_time = datetime.now(UTC)
+                    duration_hours = 0.0
+                    if experiment.started_at:
+                        duration_hours = (current_time - experiment.started_at).total_seconds() / 3600
+
+                    # Build real metrics from experiment data
+                    metrics = {
+                        "experiment_id": experiment_id,
+                        "experiment_name": experiment.experiment_name,
+                        "status": experiment.status,
+                        "current_sample_size": experiment.current_sample_size,
+                        "target_sample_size": experiment.sample_size_per_group * 2 if experiment.sample_size_per_group else 0,
+                        "completion_percentage": self._calculate_completion_percentage(experiment),
+                        "duration_hours": duration_hours,
+                        "target_metric": experiment.target_metric,
+                        "significance_threshold": experiment.significance_threshold,
+                        "results": experiment.results or {},
+                        "metadata": experiment.experiment_metadata or {},
+                        "last_updated": current_time.isoformat()
+                    }
+
+                    # Add statistical analysis if results are available
+                    if experiment.results:
+                        metrics.update(self._extract_statistical_metrics(experiment.results))
+
+                    return metrics
+
+                except Exception as e:
+                    self.logger.error(f"Error getting real-time metrics for experiment {experiment_id}: {e}")
+                    return None
+
+            async def start_experiment_monitoring(self, experiment_id: str, update_interval: int) -> bool:
+                """Start monitoring for an experiment by updating its configuration"""
+                try:
+                    # Convert experiment_id to appropriate type
+                    try:
+                        exp_id = int(experiment_id)
+                        query = select(ABExperiment).where(ABExperiment.id == exp_id)
+                    except ValueError:
+                        query = select(ABExperiment).where(ABExperiment.experiment_name == experiment_id)
+
+                    result = await self.db_session.execute(query)
+                    experiment = result.scalar_one_or_none()
+
+                    if not experiment:
+                        self.logger.warning(f"Cannot start monitoring: experiment {experiment_id} not found")
+                        return False
+
+                    # Update experiment metadata to include monitoring configuration
+                    metadata = experiment.experiment_metadata or {}
+                    metadata.update({
+                        "monitoring_enabled": True,
+                        "update_interval_seconds": update_interval,
+                        "monitoring_started_at": datetime.now(UTC).isoformat(),
+                        "last_monitoring_update": datetime.now(UTC).isoformat()
+                    })
+
+                    # Update the experiment in the database
+                    experiment.experiment_metadata = metadata
+                    await self.db_session.commit()
+
+                    self.logger.info(f"Started monitoring for experiment {experiment_id} with {update_interval}s interval")
+                    return True
+
+                except Exception as e:
+                    self.logger.error(f"Error starting monitoring for experiment {experiment_id}: {e}")
+                    await self.db_session.rollback()
+                    return False
+
+            async def stop_experiment_monitoring(self, experiment_id: str) -> bool:
+                """Stop monitoring for an experiment by updating its configuration"""
+                try:
+                    # Convert experiment_id to appropriate type
+                    try:
+                        exp_id = int(experiment_id)
+                        query = select(ABExperiment).where(ABExperiment.id == exp_id)
+                    except ValueError:
+                        query = select(ABExperiment).where(ABExperiment.experiment_name == experiment_id)
+
+                    result = await self.db_session.execute(query)
+                    experiment = result.scalar_one_or_none()
+
+                    if not experiment:
+                        self.logger.warning(f"Cannot stop monitoring: experiment {experiment_id} not found")
+                        return False
+
+                    # Update experiment metadata to disable monitoring
+                    metadata = experiment.experiment_metadata or {}
+                    metadata.update({
+                        "monitoring_enabled": False,
+                        "monitoring_stopped_at": datetime.now(UTC).isoformat(),
+                        "last_monitoring_update": datetime.now(UTC).isoformat()
+                    })
+
+                    # Update the experiment in the database
+                    experiment.experiment_metadata = metadata
+                    await self.db_session.commit()
+
+                    self.logger.info(f"Stopped monitoring for experiment {experiment_id}")
+                    return True
+
+                except Exception as e:
+                    self.logger.error(f"Error stopping monitoring for experiment {experiment_id}: {e}")
+                    await self.db_session.rollback()
+                    return False
+
+            async def get_active_experiments(self) -> List[str]:
+                """Get list of active experiment IDs from the database"""
+                try:
+                    # Query for experiments with active statuses (using simple status check)
+                    query = select(ABExperiment).where(ABExperiment.status == "running")
+                    result = await self.db_session.execute(query)
+                    experiments = result.scalars().all()
+
+                    # Return list of experiment IDs (convert to string for consistency)
+                    active_experiment_ids = [str(exp.id) for exp in experiments]
+
+                    self.logger.info(f"Found {len(active_experiment_ids)} active experiments")
+                    return active_experiment_ids
+
+                except Exception as e:
+                    self.logger.error(f"Error getting active experiments: {e}")
+                    return []
+
+            def _calculate_completion_percentage(self, experiment: ABExperiment) -> float:
+                """Calculate completion percentage based on sample sizes"""
+                if not experiment.sample_size_per_group:
+                    return 0.0
+
+                target_total = experiment.sample_size_per_group * 2  # Control + treatment
+                current_total = experiment.current_sample_size
+
+                if target_total <= 0:
+                    return 0.0
+
+                percentage = min((current_total / target_total) * 100, 100.0)
+                return round(percentage, 2)
+
+            def _extract_statistical_metrics(self, results: Dict[str, Any]) -> Dict[str, Any]:
+                """Extract statistical metrics from experiment results"""
+                statistical_metrics = {}
+
+                # Extract common statistical fields if they exist
+                if "p_value" in results:
+                    statistical_metrics["p_value"] = results["p_value"]
+                if "effect_size" in results:
+                    statistical_metrics["effect_size"] = results["effect_size"]
+                if "confidence_interval" in results:
+                    statistical_metrics["confidence_interval"] = results["confidence_interval"]
+                if "statistical_significance" in results:
+                    statistical_metrics["statistical_significance"] = results["statistical_significance"]
+                if "control_mean" in results:
+                    statistical_metrics["control_mean"] = results["control_mean"]
+                if "treatment_mean" in results:
+                    statistical_metrics["treatment_mean"] = results["treatment_mean"]
+
+                return statistical_metrics
+
+        return FunctionalAnalyticsService(db_session)
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +271,6 @@ async def websocket_experiment_endpoint(
 
                 # Parse and handle client messages
                 try:
-                    import json
-
                     message = json.loads(data)
                     await handle_websocket_message(websocket, experiment_id, message)
                 except json.JSONDecodeError:
@@ -110,9 +308,12 @@ async def handle_websocket_message(
         elif message_type == "request_metrics":
             # Send current metrics using proper async session pattern
             async_session_factory = get_async_session_factory()
-            async with async_session_factory() as db_session:
-                analytics_service = await get_real_time_analytics_service(db_session)
-                metrics = await analytics_service.get_real_time_metrics(experiment_id)
+            if async_session_factory is not None:
+                async with async_session_factory() as db_session:
+                    analytics_service = await get_real_time_analytics_service(db_session)
+                    metrics = await analytics_service.get_real_time_metrics(experiment_id)
+            else:
+                metrics = None
 
             if metrics:
                 await connection_manager.send_to_connection(
@@ -308,7 +509,7 @@ async def get_active_monitoring(db_session: AsyncSession = Depends(get_session))
         active_experiments = await analytics_service.get_active_experiments()
 
         # Get connection counts
-        connection_info = []
+        connection_info: List[Dict[str, Any]] = []
         for experiment_id in active_experiments:
             connection_count = connection_manager.get_connection_count(experiment_id)
             connection_info.append({
@@ -355,7 +556,7 @@ async def get_dashboard_config(
             )
 
         # Build dashboard configuration
-        config = {
+        config: Dict[str, Any] = {
             "experiment_id": experiment_id,
             "experiment_name": experiment.experiment_name,
             "status": experiment.status,
@@ -409,13 +610,13 @@ async def health_check() -> JSONResponse:
 
         # Check Redis connection if available
         redis_status = "not_configured"
-        if REDIS_AVAILABLE and connection_manager.redis_client:
+        if redis_available and connection_manager.redis_client:
             try:
                 await connection_manager.redis_client.ping()
                 redis_status = "connected"
             except Exception:
                 redis_status = "disconnected"
-        elif not REDIS_AVAILABLE:
+        elif not redis_available:
             redis_status = "not_installed"
 
         return JSONResponse({
@@ -427,7 +628,7 @@ async def health_check() -> JSONResponse:
                     "active_experiments": len(active_experiments),
                     "total_connections": total_connections,
                 },
-                "redis": {"status": redis_status, "available": REDIS_AVAILABLE},
+                "redis": {"status": redis_status, "available": redis_available},
             },
         })
 
@@ -456,15 +657,15 @@ async def get_orchestrator_status() -> JSONResponse:
         orchestrator = MLPipelineOrchestrator(config)
 
         # Get status information
-        status_data = {
+        status_data: Dict[str, Any] = {
             "state": orchestrator.state.value,
-            "initialized": orchestrator._is_initialized,
+            "initialized": getattr(orchestrator, '_is_initialized', False),
             "active_workflows": len(orchestrator.active_workflows),
             "timestamp": datetime.now().isoformat()
         }
 
         # If initialized, get component information
-        if orchestrator._is_initialized:
+        if getattr(orchestrator, '_is_initialized', False):
             components = orchestrator.get_loaded_components()
             status_data.update({
                 "loaded_components": len(components),
@@ -509,11 +710,11 @@ async def get_orchestrator_components() -> JSONResponse:
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
 
-        if not orchestrator._is_initialized:
+        if not getattr(orchestrator, '_is_initialized', False):
             await orchestrator.initialize()
 
         components = orchestrator.get_loaded_components()
-        component_details = []
+        component_details: List[Dict[str, Any]] = []
 
         for component_name in components:
             methods = orchestrator.get_component_methods(component_name)
@@ -559,7 +760,7 @@ async def get_orchestrator_history(
         config = OrchestratorConfig()
         orchestrator = MLPipelineOrchestrator(config)
 
-        if not orchestrator._is_initialized:
+        if not getattr(orchestrator, '_is_initialized', False):
             return JSONResponse(content={
                 "success": False,
                 "error": "Orchestrator not initialized",
@@ -601,7 +802,7 @@ async def get_orchestrator_history(
 async def setup_real_time_system(redis_url: str = "redis://localhost:6379"):
     """Setup real-time system with Redis connection"""
     try:
-        if REDIS_AVAILABLE:
+        if redis_available:
             await setup_redis_connection(redis_url)
             logger.info("Real-time system setup completed with Redis")
         else:

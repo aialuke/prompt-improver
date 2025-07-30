@@ -3,19 +3,17 @@
 APES Application Metrics Setup Script
 Configures application-specific metrics collection for the monitoring stack.
 
-This script sets up Prometheus metrics endpoints in the APES application
+This script sets up OpenTelemetry metrics endpoints in the APES application
 to provide comprehensive observability for ML pipeline operations.
 
-Created: 2025-07-25
+UPDATED: 2025-07-30 - Migrated from Prometheus to OpenTelemetry
 SRE Application Instrumentation
 """
 
-import os
 import sys
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 # Add the src directory to the Python path
 SCRIPT_DIR = Path(__file__).parent
@@ -51,12 +49,15 @@ class MetricsSetup:
                 "collection_interval": 15,
                 "retention_days": 30
             },
-            "prometheus": {
-                "multiproc_dir": self._get_prometheus_multiproc_dir(),
-                "registry_type": "CollectorRegistry",
-                "enable_gc_metrics": True,
-                "enable_platform_collector": True,
-                "enable_process_collector": True
+            "opentelemetry": {
+                "service_name": "apes-ml-pipeline",
+                "service_version": "1.0.0",
+                "environment": "production",
+                "otlp_endpoint": "http://localhost:4317",
+                "enable_console_exporter": True,
+                "enable_otlp_exporter": True,
+                "enable_prometheus_exporter": True,
+                "prometheus_port": 8001
             },
             "application_metrics": {
                 "http_requests": {
@@ -204,7 +205,7 @@ class MetricsSetup:
         logger.info("Creating metrics middleware...")
         
         middleware_code = '''"""
-Prometheus metrics middleware for APES application.
+OpenTelemetry metrics middleware for APES application.
 Provides comprehensive observability for HTTP requests, ML operations, and system resources.
 """
 
@@ -212,117 +213,61 @@ import time
 from typing import Callable, Optional
 from fastapi import Request, Response
 from fastapi.middleware.base import BaseHTTPMiddleware
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest
 import logging
+
+# Import OpenTelemetry metrics
+from src.prompt_improver.monitoring.opentelemetry.metrics import (
+    get_http_metrics, get_database_metrics, get_ml_metrics, get_business_metrics
+)
 
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics
-HTTP_REQUESTS = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status']
-)
-
-HTTP_REQUEST_DURATION = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request duration in seconds',
-    ['method', 'endpoint'],
-    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-)
-
-ML_MODEL_PREDICTIONS = Counter(
-    'ml_model_predictions_total',
-    'Total ML model predictions',
-    ['model_name', 'model_version']
-)
-
-ML_MODEL_INFERENCE_DURATION = Histogram(
-    'ml_model_inference_duration_seconds',
-    'ML model inference duration in seconds',
-    ['model_name', 'model_version'],
-    buckets=[0.01, 0.1, 0.5, 1.0, 2.0, 5.0]
-)
-
-ML_MODEL_ERRORS = Counter(
-    'ml_model_errors_total',
-    'Total ML model errors',
-    ['model_name', 'model_version', 'error_type']
-)
-
-DATABASE_CONNECTIONS = Gauge(
-    'db_connections_active',
-    'Active database connections',
-    ['database', 'pool']
-)
-
-DATABASE_QUERY_DURATION = Histogram(
-    'db_query_duration_seconds',
-    'Database query duration in seconds',
-    ['operation', 'table'],
-    buckets=[0.001, 0.01, 0.1, 0.5, 1.0, 2.0]
-)
-
-REDIS_OPERATIONS = Counter(
-    'redis_operations_total',
-    'Total Redis operations',
-    ['operation', 'key_pattern']
-)
-
-BATCH_PROCESSING_QUEUE_SIZE = Gauge(
-    'batch_processing_queue_size',
-    'Current batch processing queue size',
-    ['queue_name']
-)
-
-CACHE_HITS = Counter(
-    'cache_hits_total',
-    'Total cache hits',
-    ['cache_type', 'key_pattern']
-)
-
-CACHE_MISSES = Counter(
-    'cache_misses_total',
-    'Total cache misses',
-    ['cache_type', 'key_pattern']
-)
-
-MCP_OPERATIONS = Counter(
-    'mcp_operations_total',
-    'Total MCP operations',
-    ['operation', 'status']
-)
+# Global OpenTelemetry metrics instances
+http_metrics = get_http_metrics()
+database_metrics = get_database_metrics()
+ml_metrics = get_ml_metrics()
+business_metrics = get_business_metrics()
 
 
-class PrometheusMiddleware(BaseHTTPMiddleware):
-    """Middleware to collect Prometheus metrics for HTTP requests."""
-    
+class OpenTelemetryMiddleware(BaseHTTPMiddleware):
+    """Middleware to collect OpenTelemetry metrics for HTTP requests."""
+
     def __init__(self, app, metrics_enabled: bool = True):
         super().__init__(app)
         self.metrics_enabled = metrics_enabled
-        
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if not self.metrics_enabled:
             return await call_next(request)
-            
+
         # Skip metrics collection for the metrics endpoint itself
         if request.url.path == "/metrics":
             return await call_next(request)
-            
+
         start_time = time.time()
-        
+
         try:
             response = await call_next(request)
-            
-            # Record metrics
-            duration = time.time() - start_time
+
+            # Record metrics using OpenTelemetry
+            duration_ms = (time.time() - start_time) * 1000
             method = request.method
             endpoint = self._normalize_endpoint(request.url.path)
-            status = str(response.status_code)
-            
-            HTTP_REQUESTS.labels(method=method, endpoint=endpoint, status=status).inc()
-            HTTP_REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
-            
+            status_code = response.status_code
+
+            # Calculate request/response sizes if available
+            request_size = int(request.headers.get("content-length", 0))
+            response_size = len(response.body) if hasattr(response, 'body') else None
+
+            http_metrics.record_request(
+                method=method,
+                endpoint=endpoint,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                request_size=request_size if request_size > 0 else None,
+                response_size=response_size
+            )
+
             return response
             
         except Exception as e:
@@ -356,55 +301,97 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
 
 def record_ml_prediction(model_name: str, model_version: str, duration: float):
-    """Record ML model prediction metrics."""
-    ML_MODEL_PREDICTIONS.labels(model_name=model_name, model_version=model_version).inc()
-    ML_MODEL_INFERENCE_DURATION.labels(model_name=model_name, model_version=model_version).observe(duration)
+    """Record ML model prediction metrics using OpenTelemetry."""
+    duration_ms = duration * 1000  # Convert to milliseconds
+    ml_metrics.record_inference(
+        model_name=model_name,
+        model_version=model_version,
+        duration_ms=duration_ms,
+        success=True
+    )
 
 
 def record_ml_error(model_name: str, model_version: str, error_type: str):
-    """Record ML model error metrics."""
-    ML_MODEL_ERRORS.labels(model_name=model_name, model_version=model_version, error_type=error_type).inc()
+    """Record ML model error metrics using OpenTelemetry."""
+    ml_metrics.record_inference(
+        model_name=model_name,
+        model_version=model_version,
+        duration_ms=0,  # Error case, no duration
+        success=False
+    )
 
 
 def record_database_connection(database: str, pool: str, count: int):
-    """Record database connection metrics."""
-    DATABASE_CONNECTIONS.labels(database=database, pool=pool).set(count)
+    """Record database connection metrics using OpenTelemetry."""
+    database_metrics.set_connection_metrics(
+        active_connections=count,
+        pool_size=count + 5,  # Estimate pool size
+        pool_name=pool
+    )
 
 
 def record_database_query(operation: str, table: str, duration: float):
-    """Record database query metrics."""
-    DATABASE_QUERY_DURATION.labels(operation=operation, table=table).observe(duration)
+    """Record database query metrics using OpenTelemetry."""
+    duration_ms = duration * 1000  # Convert to milliseconds
+    database_metrics.record_query(
+        operation=operation,
+        table=table,
+        duration_ms=duration_ms,
+        success=True
+    )
 
 
 def record_redis_operation(operation: str, key_pattern: str):
-    """Record Redis operation metrics."""
-    REDIS_OPERATIONS.labels(operation=operation, key_pattern=key_pattern).inc()
+    """Record Redis operation metrics using OpenTelemetry."""
+    # Use business metrics for Redis operations
+    business_metrics.record_feature_flag_evaluation(
+        flag_name=f"redis_{operation}",
+        enabled=True
+    )
 
 
 def record_batch_queue_size(queue_name: str, size: int):
-    """Record batch processing queue size."""
-    BATCH_PROCESSING_QUEUE_SIZE.labels(queue_name=queue_name).set(size)
+    """Record batch processing queue size using OpenTelemetry."""
+    # Use business metrics for queue size tracking
+    business_metrics.update_active_sessions(
+        change=size,
+        session_type=f"batch_queue_{queue_name}"
+    )
 
 
 def record_cache_hit(cache_type: str, key_pattern: str):
-    """Record cache hit metrics."""
-    CACHE_HITS.labels(cache_type=cache_type, key_pattern=key_pattern).inc()
+    """Record cache hit metrics using OpenTelemetry."""
+    # Use business metrics for cache operations
+    business_metrics.record_feature_flag_evaluation(
+        flag_name=f"cache_hit_{cache_type}",
+        enabled=True
+    )
 
 
 def record_cache_miss(cache_type: str, key_pattern: str):
-    """Record cache miss metrics."""
-    CACHE_MISSES.labels(cache_type=cache_type, key_pattern=key_pattern).inc()
+    """Record cache miss metrics using OpenTelemetry."""
+    # Use business metrics for cache operations
+    business_metrics.record_feature_flag_evaluation(
+        flag_name=f"cache_miss_{cache_type}",
+        enabled=False
+    )
 
 
 def record_mcp_operation(operation: str, status: str):
-    """Record MCP operation metrics."""
-    MCP_OPERATIONS.labels(operation=operation, status=status).inc()
+    """Record MCP operation metrics using OpenTelemetry."""
+    # Use business metrics for MCP operations
+    business_metrics.record_feature_flag_evaluation(
+        flag_name=f"mcp_{operation}",
+        enabled=(status == "success")
+    )
 
 
 def get_metrics() -> str:
-    """Get Prometheus metrics in text format."""
+    """Get OpenTelemetry metrics in Prometheus format."""
     try:
-        return generate_latest()
+        # OpenTelemetry metrics are exported via OTLP/Prometheus exporters
+        # This function is kept for compatibility but metrics are now exported automatically
+        return "# OpenTelemetry metrics are exported via configured exporters\\n"
     except Exception as e:
         logger.error(f"Error generating metrics: {e}")
         return ""
@@ -693,12 +680,12 @@ APES Monitoring Package
 Provides comprehensive observability for the APES ML Pipeline Orchestrator.
 """
 
-from .metrics_middleware import PrometheusMiddleware, get_metrics
+from .metrics_middleware import OpenTelemetryMiddleware, get_metrics
 from .health_check import router as health_router
 
 __all__ = [
-    "PrometheusMiddleware",
-    "get_metrics",  
+    "OpenTelemetryMiddleware",
+    "get_metrics",
     "health_router"
 ]
 '''
@@ -719,14 +706,14 @@ Shows how to integrate metrics collection into the application.
 """
 
 from fastapi import FastAPI
-from prometheus_client import start_http_server, generate_latest
-from prompt_improver.monitoring import PrometheusMiddleware, health_router, get_metrics
+# REMOVED prometheus_client for OpenTelemetry consolidation
+from prompt_improver.monitoring import OpenTelemetryMiddleware, health_router, get_metrics
 
 # Example 1: Basic FastAPI integration
 app = FastAPI(title="APES ML Pipeline Orchestrator")
 
 # Add metrics middleware
-app.add_middleware(PrometheusMiddleware, metrics_enabled=True)
+app.add_middleware(OpenTelemetryMiddleware, metrics_enabled=True)
 
 # Add health check endpoints
 app.include_router(health_router, prefix="/api/v1")
@@ -835,22 +822,32 @@ def start_metrics_server(port: int = 8001):
     print(f"Metrics server started on port {port}")
     print(f"Metrics available at http://localhost:{port}/metrics")
 
-# Example 5: Custom metric collectors
-from prometheus_client import Gauge, Counter
+# Example 5: Custom metric collectors using OpenTelemetry
+from src.prompt_improver.monitoring.opentelemetry.metrics import get_business_metrics
 
-# Custom business metrics
-ACTIVE_USERS = Gauge('apes_active_users', 'Number of active users')
-PROMPT_IMPROVEMENTS = Counter('apes_prompt_improvements_total', 'Total prompt improvements', ['improvement_type'])
+# Get OpenTelemetry business metrics instance
+business_metrics = get_business_metrics()
 
 def update_business_metrics():
-    """Update custom business metrics."""
+    """Update custom business metrics using OpenTelemetry."""
     # Your business logic here
     active_users = get_active_user_count()
-    ACTIVE_USERS.set(active_users)
-    
+
+    # Record business metrics using OpenTelemetry
+    business_metrics.record_user_activity(
+        user_id=f"user_{active_users}",
+        activity_type="active_session"
+    )
+
     # Record specific improvement types
-    PROMPT_IMPROVEMENTS.labels(improvement_type='clarity').inc()
-    PROMPT_IMPROVEMENTS.labels(improvement_type='specificity').inc()
+    business_metrics.record_feature_flag_evaluation(
+        flag_name="prompt_improvement_clarity",
+        enabled=True
+    )
+    business_metrics.record_feature_flag_evaluation(
+        flag_name="prompt_improvement_specificity",
+        enabled=True
+    )
 
 if __name__ == "__main__":
     # Example usage
@@ -873,7 +870,14 @@ if __name__ == "__main__":
         logger.info("Updating requirements for monitoring...")
         
         monitoring_deps = [
-            "prometheus_client>=0.19.0",
+            "opentelemetry-api>=1.36.0",
+            "opentelemetry-sdk>=1.36.0",
+            "opentelemetry-exporter-otlp>=1.36.0",
+            "opentelemetry-exporter-prometheus>=0.57b0",
+            "opentelemetry-instrumentation-fastapi>=0.57b0",
+            "opentelemetry-instrumentation-asyncpg>=0.57b0",
+            "opentelemetry-instrumentation-httpx>=0.57b0",
+            "opentelemetry-instrumentation-requests>=0.57b0",
             "psutil>=5.9.0",  # For system metrics
         ]
         
@@ -912,22 +916,25 @@ if __name__ == "__main__":
             self.create_usage_examples()
             self.update_requirements()
             
-            logger.info("✅ APES application metrics setup completed successfully!")
-            
+            logger.info("✅ APES application OpenTelemetry metrics setup completed successfully!")
+
             print("\n" + "="*60)
-            print("APES Application Metrics Setup Complete")
+            print("APES Application OpenTelemetry Metrics Setup Complete")
             print("="*60)
             print("\nNext Steps:")
-            print("1. Install monitoring dependencies:")
+            print("1. Install OpenTelemetry dependencies:")
             print("   pip install -r requirements.txt")
-            print("\n2. Integrate metrics into your FastAPI application:")
+            print("\n2. Initialize OpenTelemetry in your application:")
+            print("   from prompt_improver.monitoring.opentelemetry import init_telemetry")
+            print("   init_telemetry(service_name='apes-ml-pipeline')")
+            print("\n3. Integrate metrics into your FastAPI application:")
             print("   See examples/monitoring_integration.py")
-            print("\n3. Add health check endpoints to your router")
-            print("\n4. Configure Prometheus to scrape your application:")
-            print("   - Endpoint: http://your-app:8000/metrics")
+            print("\n4. Add health check endpoints to your router")
+            print("\n5. Configure OpenTelemetry exporters:")
+            print("   - OTLP: http://localhost:4317")
+            print("   - Prometheus: http://localhost:8001/metrics")
             print("   - Health: http://your-app:8000/api/v1/health")
-            print("\n5. Start the monitoring stack:")
-            print("   cd monitoring && ./start-monitoring.sh")
+            print("\n6. Start the monitoring stack with OpenTelemetry support")
             
         except Exception as e:
             logger.error(f"❌ Setup failed: {e}")

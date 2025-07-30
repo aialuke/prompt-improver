@@ -35,6 +35,7 @@ async def init_startup_tasks(
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
     batch_config: BatchProcessorConfig | None = None,
+    session_store: SessionStore | None = None,
 ) -> dict[str, any]:
     """Initialize and start all core system components.
 
@@ -49,6 +50,7 @@ async def init_startup_tasks(
         session_ttl: Session time-to-live in seconds
         cleanup_interval: Session cleanup interval in seconds
         batch_config: Optional batch processor configuration (BatchProcessorConfig)
+        session_store: Optional pre-configured SessionStore instance (if None, creates new one)
 
     Returns:
         Dictionary with startup status and component references
@@ -87,14 +89,22 @@ async def init_startup_tasks(
         # Step 2: Initialize SessionStore with cleanup
         logger.info("💾 Initializing SessionStore with automatic cleanup...")
         try:
-            session_store = SessionStore(
-                maxsize=1000, ttl=session_ttl, cleanup_interval=cleanup_interval
-            )
-            await session_store.start_cleanup_task()
+            if session_store is None:
+                # Create new session store with provided configuration
+                session_store = SessionStore(
+                    maxsize=1000, ttl=session_ttl, cleanup_interval=cleanup_interval
+                )
+                await session_store.start_cleanup_task()
+                logger.info(
+                    f"✅ SessionStore created and started (TTL: {session_ttl}s, cleanup: {cleanup_interval}s)"
+                )
+            else:
+                # Use injected session store (already configured and potentially started)
+                logger.info(
+                    f"✅ SessionStore injected from external source (pre-configured)"
+                )
+            
             components["session_store"] = session_store
-            logger.info(
-                f"✅ SessionStore started (TTL: {session_ttl}s, cleanup: {cleanup_interval}s)"
-            )
         except Exception as e:
             startup_errors.append(f"SessionStore failed: {e}")
             logger.error(f"❌ SessionStore startup failed: {e}")
@@ -165,7 +175,7 @@ async def init_startup_tasks(
         # Step 6: Verify all components are healthy
         logger.info("🔍 Running initial health check...")
         try:
-            health_result = await health_service.run_health_check(parallel=True)
+            health_result = await health_monitor.run_health_check(parallel=True)
             if health_result.overall_status.value in ["healthy", "warning"]:
                 logger.info(
                     f"✅ Initial health check passed ({health_result.overall_status.value})"
@@ -192,7 +202,7 @@ async def init_startup_tasks(
                 "background_manager": type(components["background_manager"]).__name__,
                 "session_store": type(components["session_store"]).__name__,
                 "batch_processor": type(components["batch_processor"]).__name__,
-                "health_service": type(components["health_service"]).__name__,
+                "health_monitor": type(components["health_monitor"]).__name__,
             },
             "component_refs": components,
             "active_tasks": len(_startup_tasks),
@@ -213,7 +223,7 @@ async def init_startup_tasks(
             "errors": startup_errors + [str(e)],
         }
 
-async def health_monitor_coroutine(health_service) -> None:
+async def health_monitor_coroutine(health_monitor) -> None:
     """Continuous health monitoring coroutine.
 
     Monitors system health and logs warnings for degraded components.
@@ -228,7 +238,7 @@ async def health_monitor_coroutine(health_service) -> None:
             if _shutdown_event.is_set():
                 break
 
-            health_result = await health_service.run_health_check(parallel=True)
+            health_result = await health_monitor.run_health_check(parallel=True)
 
             # Log health status
             if health_result.overall_status.value == "healthy":
@@ -267,11 +277,17 @@ async def cleanup_partial_startup(components: dict) -> None:
     """
     logger.info("🧹 Cleaning up partially initialized components...")
 
-    # Stop session store cleanup if initialized
+    # Stop session store cleanup if initialized and we created it
     if "session_store" in components:
         try:
-            await components["session_store"].stop_cleanup_task()
-            logger.debug("✅ SessionStore cleanup stopped")
+            # Only stop cleanup if this was a locally created session store
+            # External session stores (like from APESMCPServer) manage their own lifecycle
+            session_store_instance = components["session_store"]
+            if hasattr(session_store_instance, '_cleanup_task') and session_store_instance._cleanup_task:
+                await session_store_instance.stop_cleanup_task()
+                logger.debug("✅ SessionStore cleanup stopped")
+            else:
+                logger.debug("✅ SessionStore cleanup managed externally")
         except Exception as e:
             logger.error(f"❌ Error stopping SessionStore: {e}")
 
@@ -376,6 +392,7 @@ async def startup_context(
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
     batch_config: BatchProcessorConfig | None = None,
+    session_store: SessionStore | None = None,
 ):
     """Async context manager for APES startup/shutdown lifecycle.
 
@@ -390,6 +407,7 @@ async def startup_context(
         session_ttl=session_ttl,
         cleanup_interval=cleanup_interval,
         batch_config=batch_config,
+        session_store=session_store,
     )
 
     if startup_result["status"] != "success":
@@ -471,12 +489,9 @@ class StartupOrchestrator:
         self._is_running = True
 
         try:
-            # Use existing init_startup_tasks function
+            # Use existing init_startup_tasks function with session_store injection
             components = await init_startup_tasks(
-                batch_processor=batch_processor,
-                health_service=health_service,
-                session_store=session_store,
-                startup_delay=startup_delay
+                session_store=session_store
             )
 
             self._initialized_components = components

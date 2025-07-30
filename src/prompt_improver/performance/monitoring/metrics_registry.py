@@ -12,12 +12,8 @@ import logging
 from threading import Lock
 from typing import Any
 
-# Prometheus availability detection
-try:
-    import prometheus_client
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
+# REMOVED prometheus_client for OpenTelemetry consolidation
+PROMETHEUS_AVAILABLE = False
 
 # Import real metrics implementation
 from .real_metrics import get_real_metrics_registry

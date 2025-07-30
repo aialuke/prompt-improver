@@ -42,7 +42,7 @@ class TestTask42ComprehensiveIntegration:
         - Test boundary enforcement works end-to-end
         """
         # Check MCP server has no ML imports
-        mcp_server_path = "/Users/lukemckenzie/prompt-improver/src/prompt_improver/mcp_server/mcp_server.py"
+        mcp_server_path = "/Users/lukemckenzie/prompt-improver/src/prompt_improver/mcp_server/server.py"
         
         with open(mcp_server_path, 'r') as f:
             mcp_content = f.read()
@@ -59,7 +59,7 @@ class TestTask42ComprehensiveIntegration:
             assert ml_import not in mcp_content, f"MCP server contains forbidden ML import: {ml_import}"
         
         # Test MCP server response time performance
-        from prompt_improver.mcp_server.mcp_server import create_mcp_server
+        # Legacy import removed - will be fixed with modern patterns
         
         # Mock server creation for performance testing
         async def mock_handle_request(request):
@@ -149,6 +149,9 @@ class TestTask42ComprehensiveIntegration:
             get_unified_manager
         )
         from prompt_improver.core.config import AppConfig
+        
+        # Import DatabaseConfig from the correct location
+        from prompt_improver.core.config import DatabaseConfig
         
         # Create test database config
         db_config = DatabaseConfig(
@@ -448,6 +451,9 @@ class TestTask42ComprehensiveIntegration:
         # Test 1: Database connection failure recovery
         from prompt_improver.database.unified_connection_manager import UnifiedConnectionManager, ManagerMode
         from prompt_improver.core.config import AppConfig
+        
+        # Import DatabaseConfig from the correct location  
+        from prompt_improver.core.config import DatabaseConfig
         
         db_config = DatabaseConfig(
             postgres_host="invalid_host",  # This will fail

@@ -84,6 +84,20 @@ from .context import (
     trace_context_middleware,
 )
 
+# ML Framework imports
+try:
+    from .ml_framework import (
+        MLMetricsCollector, MLAlertingSystem, OTelHTTPServer, OTelAlert,
+        get_ml_metrics, get_ml_alerting_metrics, start_ml_http_server
+    )
+    from .ml_utils import (
+        MLMonitoringMixin, ml_monitor, create_ml_monitoring_context,
+        MLPerformanceTracker, monitor_failure_analysis, monitor_classification
+    )
+    ML_FRAMEWORK_AVAILABLE = True
+except ImportError:
+    ML_FRAMEWORK_AVAILABLE = False
+
 __all__ = [
     # Core setup
     "init_telemetry",
@@ -134,3 +148,24 @@ __all__ = [
     "with_context",
     "trace_context_middleware",
 ]
+
+# Add ML framework exports if available
+if ML_FRAMEWORK_AVAILABLE:
+    __all__.extend([
+        # ML Framework Core
+        "MLMetricsCollector",
+        "MLAlertingSystem",
+        "OTelHTTPServer",
+        "OTelAlert",
+        "get_ml_metrics",
+        "get_ml_alerting_metrics",
+        "start_ml_http_server",
+
+        # ML Utilities
+        "MLMonitoringMixin",
+        "ml_monitor",
+        "create_ml_monitoring_context",
+        "MLPerformanceTracker",
+        "monitor_failure_analysis",
+        "monitor_classification",
+    ])

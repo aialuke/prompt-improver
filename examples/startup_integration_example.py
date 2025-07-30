@@ -106,7 +106,7 @@ class APESApplication:
         # Example: Access components initialized by startup
         session_store = self.components["session_store"]
         batch_processor = self.components["batch_processor"]
-        health_service = self.components["health_service"]
+        health_monitor = self.components["health_monitor"]
 
         # Simulate application work
         counter = 0
@@ -131,7 +131,7 @@ class APESApplication:
 
                 # Periodic health check reporting
                 if counter % 10 == 0:
-                    health_result = await health_service.run_health_check()
+                    health_result = await health_monitor.run_health_check()
                     logger.info(
                         f"🏥 Health status: {health_result.overall_status.value}"
                     )

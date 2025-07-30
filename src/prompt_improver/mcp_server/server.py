@@ -21,6 +21,8 @@ from prompt_improver.core.config import get_config
 # ML training components removed per architectural separation requirements
 # MCP server is strictly read-only for rule application only
 from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+# Import batch processor for health monitoring (ADR-005 compliant - read-only access)
+from prompt_improver.ml.optimization.batch.unified_batch_processor import UnifiedBatchProcessor
 # Startup benchmark functionality now part of unified loop manager
 from prompt_improver.utils.unified_loop_manager import get_unified_loop_manager
 from prompt_improver.core.config import AppConfig
@@ -32,7 +34,8 @@ from prompt_improver.performance.monitoring.performance_monitor import (
     get_performance_monitor,
 )
 from prompt_improver.utils.multi_level_cache import get_cache
-from prompt_improver.core.config import AppConfig  # Redis functionality start_cache_subscriber
+# Note: Cache subscriber functionality not implemented in current architecture
+from prompt_improver.core.config import AppConfig
 
 # Import MCP security components
 # Security components for input validation and rate limiting
@@ -219,6 +222,47 @@ class APESMCPServer:
             """Get current performance status and optimization metrics."""
             return await self._get_performance_status_impl()
 
+        @self.mcp.tool()
+        async def get_training_queue_size() -> dict[str, Any]:
+            """Get current training queue size and processing metrics from batch processor."""
+            return await self._get_training_queue_size_impl()
+
+        @self.mcp.tool()
+        @require_rate_limiting(include_ip=True)
+        async def store_prompt(
+            original_prompt: str = Field(..., description="The original prompt text"),
+            enhanced_prompt: str = Field(..., description="The enhanced prompt text"),
+            applied_rules: list[dict[str, Any]] = Field(..., description="List of applied rules with metadata"),
+            response_time_ms: int = Field(..., description="Response time in milliseconds"),
+            session_id: str | None = Field(default=None, description="Optional session ID (mapped to anonymized_user_hash)"),
+            agent_type: str = Field(default="external-agent", description="Agent type identifier"),
+            rate_limit_remaining: int | None = None,  # Added by rate limit middleware
+        ) -> dict[str, Any]:
+            """Store prompt improvement session data for feedback collection."""
+            return await self._store_prompt_impl(
+                original_prompt, enhanced_prompt, applied_rules, response_time_ms, session_id, agent_type, rate_limit_remaining
+            )
+
+        @self.mcp.tool()
+        async def query_database(
+            query: str = Field(..., description="Read-only SQL query to execute on rule tables"),
+            parameters: dict[str, Any] | None = Field(default=None, description="Query parameters for safe parameterized execution"),
+        ) -> dict[str, Any]:
+            """Execute read-only SQL queries on rule tables (rule_metadata, rule_performance, rule_combinations)."""
+            return await self._query_database_impl(query, parameters)
+
+        @self.mcp.tool()
+        async def list_tables() -> dict[str, Any]:
+            """List all accessible rule tables available for querying."""
+            return await self._list_tables_impl()
+
+        @self.mcp.tool()
+        async def describe_table(
+            table_name: str = Field(..., description="Name of the rule table to describe schema for"),
+        ) -> dict[str, Any]:
+            """Get schema information for rule application tables."""
+            return await self._describe_table_impl(table_name)
+
     def _setup_resources(self):
         """Setup all MCP resources as class methods."""
 
@@ -265,12 +309,9 @@ class APESMCPServer:
             # Initialize event loop optimization
             await self._initialize_event_loop_optimization()
 
-            # Start cache subscriber for pattern.invalidate events
-            try:
-                await start_cache_subscriber()
-                logger.info("Cache subscriber started for pattern.invalidate events")
-            except Exception as e:
-                logger.warning(f"Cache subscriber initialization failed: {e}")
+            # Cache subscriber functionality not implemented in current architecture
+            # This would handle pattern.invalidate events for cache management
+            logger.info("Cache subscriber functionality is not implemented in current architecture")
 
             # Additional startup tasks can be added here
             logger.info("APES MCP Server initialized successfully")
@@ -341,8 +382,9 @@ class APESMCPServer:
             # Setup uvloop if available
             get_unified_loop_manager().setup_uvloop()
 
-            # Run startup benchmark
-            benchmark_result = await unified_manager.benchmark_unified_performance()
+            # Run startup benchmark using the unified loop manager
+            loop_manager = get_unified_loop_manager()
+            benchmark_result = await loop_manager.benchmark_unified_performance()
             logger.info(f"Event loop optimization initialized - Benchmark: {benchmark_result}")
 
         except Exception as e:
@@ -399,10 +441,10 @@ class APESMCPServer:
         ) as perf_metrics:
             try:
                 # Get unified loop manager for session tracking
-                unified_manager = get_unified_loop_manager()
+                loop_manager = get_unified_loop_manager()
 
                 # Use session context for performance tracking
-                async with unified_manager.session_context(session_id or "default"):
+                async with loop_manager.session_context(session_id or "default"):
                     # Get database session with performance measurement
                     async with self.services.performance_optimizer.measure_operation("db_get_session"):
                         # Create structured prompt for secure processing
@@ -563,7 +605,8 @@ class APESMCPServer:
         """Implementation of benchmark_event_loop tool."""
         try:
             # Use the existing event loop benchmark functionality
-            benchmark_result = await unified_manager.benchmark_unified_performance()
+            loop_manager = get_unified_loop_manager()
+            benchmark_result = await loop_manager.benchmark_unified_performance()
 
             return {
                 "operation_type": operation_type,
@@ -649,6 +692,572 @@ class APESMCPServer:
         except Exception as e:
             logger.error(f"Failed to get performance status: {e}")
             return {"error": str(e), "timestamp": time.time()}
+
+    async def _get_training_queue_size_impl(self) -> dict[str, Any]:
+        """Implementation of get_training_queue_size tool."""
+        try:
+            # Create UnifiedBatchProcessor instance for health monitoring
+            # This follows ADR-005 architectural separation - read-only monitoring only
+            processor = UnifiedBatchProcessor()
+            
+            # Get current metrics summary from batch processor
+            metrics_summary = processor.get_metrics_summary()
+            
+            # Extract queue-related information
+            if metrics_summary.get("status") == "no_data":
+                # No processing history available
+                queue_info = {
+                    "queue_size": 0,
+                    "status": "idle",
+                    "processing_rate": 0.0,
+                    "active_batches": 0,
+                    "pending_items": 0,
+                    "total_processed": 0,
+                    "success_rate": 1.0,
+                    "avg_processing_time_ms": 0.0,
+                    "strategy_usage": {},
+                    "message": "No processing activity detected"
+                }
+            else:
+                # Extract metrics from recent processing activity
+                recent_summary = metrics_summary.get("recent_summary", {})
+                strategy_usage = metrics_summary.get("strategy_usage", {})
+                
+                # Calculate derived queue metrics
+                items_processed = recent_summary.get("items_processed", 0)
+                items_failed = recent_summary.get("items_failed", 0)
+                total_items = items_processed + items_failed
+                success_rate = recent_summary.get("success_rate", 1.0)
+                
+                queue_info = {
+                    "queue_size": total_items,  # Items in recent processing batches
+                    "status": "active" if items_processed > 0 else "idle",
+                    "processing_rate": recent_summary.get("avg_throughput_items_per_sec", 0.0),
+                    "active_batches": recent_summary.get("batches", 0),
+                    "pending_items": items_failed,  # Failed items could be considered pending retry
+                    "total_processed": items_processed,
+                    "success_rate": success_rate,
+                    "avg_processing_time_ms": recent_summary.get("avg_processing_time_ms", 0.0),
+                    "strategy_usage": strategy_usage,
+                    "total_batches_processed": metrics_summary.get("total_batches_processed", 0)
+                }
+            
+            # Add processor configuration info
+            config_info = metrics_summary.get("current_config", {})
+            queue_info.update({
+                "processor_config": {
+                    "strategy": config_info.get("strategy", "auto"),
+                    "max_concurrent_tasks": config_info.get("max_concurrent_tasks", 10),
+                    "task_timeout_seconds": config_info.get("task_timeout_seconds", 300.0),
+                    "enable_optimization": config_info.get("enable_optimization", True)
+                },
+                "health_status": "healthy" if queue_info["success_rate"] > 0.8 else "degraded",
+                "timestamp": time.time()
+            })
+            
+            logger.info(f"Training queue size retrieved: {queue_info['queue_size']} items, "
+                       f"status: {queue_info['status']}, rate: {queue_info['processing_rate']:.2f} items/sec")
+            
+            return queue_info
+            
+        except Exception as e:
+            logger.error(f"Failed to get training queue size: {e}")
+            return {
+                "queue_size": 0,
+                "status": "error",
+                "processing_rate": 0.0,
+                "error": str(e),
+                "timestamp": time.time(),
+                "health_status": "unhealthy"
+            }
+
+    async def _store_prompt_impl(
+        self,
+        original_prompt: str,
+        enhanced_prompt: str,
+        applied_rules: list[dict[str, Any]],
+        response_time_ms: int,
+        session_id: str | None,
+        agent_type: str,
+        rate_limit_remaining: int | None,
+    ) -> dict[str, Any]:
+        """Implementation of store_prompt tool for feedback collection."""
+        start_time = time.time()
+        
+        try:
+            # Security validation for inputs
+            validation_result = self.services.input_validator.validate_prompt(original_prompt)
+            if validation_result.is_blocked:
+                logger.warning(f"Blocked malicious original prompt - Threat: {validation_result.threat_type}")
+                return {
+                    "success": False,
+                    "error": "Input validation failed for original prompt",
+                    "threat_type": validation_result.threat_type.value if validation_result.threat_type else None,
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            validation_result_enhanced = self.services.input_validator.validate_prompt(enhanced_prompt)
+            if validation_result_enhanced.is_blocked:
+                logger.warning(f"Blocked malicious enhanced prompt - Threat: {validation_result_enhanced.threat_type}")
+                return {
+                    "success": False,
+                    "error": "Input validation failed for enhanced prompt",
+                    "threat_type": validation_result_enhanced.threat_type.value if validation_result_enhanced.threat_type else None,
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Validate inputs according to database schema constraints
+            if not original_prompt.strip():
+                return {
+                    "success": False,
+                    "error": "Original prompt cannot be empty",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            if not enhanced_prompt.strip():
+                return {
+                    "success": False,
+                    "error": "Enhanced prompt cannot be empty",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            if response_time_ms <= 0:
+                return {
+                    "success": False,
+                    "error": "Response time must be positive",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            if response_time_ms >= 30000:  # 30 seconds max per schema constraint
+                return {
+                    "success": False,
+                    "error": "Response time exceeds maximum allowed (30 seconds)",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Validate agent_type against schema constraint
+            valid_agent_types = ['claude-code', 'augment-code', 'external-agent']
+            if agent_type not in valid_agent_types:
+                logger.warning(f"Invalid agent_type '{agent_type}', using 'external-agent'")
+                agent_type = 'external-agent'
+
+            # Validate JSONB payload size to prevent memory exhaustion (security improvement)
+            import json
+            applied_rules_json = json.dumps(applied_rules) if applied_rules else '[]'
+            if len(applied_rules_json) > 100000:  # 100KB limit
+                return {
+                    "success": False,
+                    "error": "Applied rules payload too large (max 100KB allowed)",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Validate prompt lengths to prevent excessive database storage
+            if len(original_prompt) > 50000:  # 50KB limit per prompt
+                return {
+                    "success": False,
+                    "error": "Original prompt too large (max 50KB allowed)",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            if len(enhanced_prompt) > 50000:  # 50KB limit per prompt
+                return {
+                    "success": False,
+                    "error": "Enhanced prompt too large (max 50KB allowed)",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Get database connection using unified manager
+            connection_manager = get_unified_manager(ManagerMode.MCP_SERVER)
+            
+            async with connection_manager.get_async_session() as session:
+                # Import text function for SQL query
+                from sqlalchemy import text
+                
+                # Prepare the query following existing patterns
+                query = text("""
+                    INSERT INTO prompt_improvement_sessions (
+                        original_prompt, enhanced_prompt, applied_rules,
+                        response_time_ms, agent_type, session_timestamp,
+                        anonymized_user_hash, created_at
+                    ) VALUES (
+                        :original_prompt, :enhanced_prompt, :applied_rules,
+                        :response_time_ms, :agent_type, :session_timestamp,
+                        :anonymized_user_hash, :created_at
+                    ) RETURNING id
+                """)
+
+                # Prepare parameters
+                current_timestamp = time.time()
+                session_timestamp = current_timestamp
+                
+                # Use session_id as anonymized_user_hash if provided
+                anonymized_user_hash = session_id if session_id else f"anonymous_{int(current_timestamp)}"
+
+                # applied_rules_json already calculated above for size validation
+
+                result = await session.execute(query, {
+                    "original_prompt": original_prompt.strip(),
+                    "enhanced_prompt": enhanced_prompt.strip(),
+                    "applied_rules": applied_rules_json,
+                    "response_time_ms": response_time_ms,
+                    "agent_type": agent_type,
+                    "session_timestamp": session_timestamp,
+                    "anonymized_user_hash": anonymized_user_hash,
+                    "created_at": current_timestamp
+                })
+
+                await session.commit()
+                row = result.first()
+                record_id = row[0] if row else None
+
+                processing_time = (time.time() - start_time) * 1000
+
+                # Log successful storage
+                logger.info(f"Successfully stored prompt improvement session - "
+                           f"ID: {record_id}, Agent: {agent_type}, "
+                           f"Response time: {response_time_ms}ms, "
+                           f"Storage time: {processing_time:.2f}ms")
+
+                return {
+                    "success": True,
+                    "record_id": record_id,
+                    "message": "Prompt improvement session stored successfully",
+                    "processing_time_ms": processing_time,
+                    "agent_type": agent_type,
+                    "session_id": session_id,
+                    "anonymized_user_hash": anonymized_user_hash,
+                    "applied_rules_count": len(applied_rules) if applied_rules else 0,
+                    "rate_limit_remaining": rate_limit_remaining,
+                    "timestamp": time.time()
+                }
+
+        except Exception as e:
+            error_time = (time.time() - start_time) * 1000
+            logger.error(f"Failed to store prompt improvement session: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time_ms": error_time,
+                "timestamp": time.time()
+            }
+
+    async def _query_database_impl(self, query: str, parameters: dict[str, Any] | None) -> dict[str, Any]:
+        """Implementation of query_database tool with read-only access and SQL injection protection."""
+        start_time = time.time()
+        
+        try:
+            # Validate read-only access per ADR-005
+            if not self._is_read_only_query(query):
+                return {
+                    "success": False,
+                    "error": "Only read-only queries are permitted. SELECT statements only.",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Validate table access - only rule tables allowed
+            if not self._validates_table_access(query):
+                return {
+                    "success": False,
+                    "error": "Access restricted to rule tables only: rule_metadata, rule_performance, rule_combinations",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Get database connection using unified manager
+            connection_manager = get_unified_manager(ManagerMode.MCP_SERVER)
+            
+            async with connection_manager.get_async_session() as session:
+                # Import text function for SQL query (prevents SQL injection)
+                from sqlalchemy import text
+                
+                # Execute parameterized query for security
+                sql_query = text(query)
+                result = await session.execute(sql_query, parameters or {})
+                
+                # Convert results to list of dictionaries
+                rows = []
+                if result.returns_rows:
+                    column_names = list(result.keys())
+                    for row in result.fetchall():
+                        rows.append(dict(zip(column_names, row)))
+
+                processing_time = (time.time() - start_time) * 1000
+
+                # Log successful query execution
+                logger.info(f"Successfully executed database query - "
+                           f"Rows returned: {len(rows)}, "
+                           f"Processing time: {processing_time:.2f}ms")
+
+                return {
+                    "success": True,
+                    "rows": rows,
+                    "row_count": len(rows),
+                    "columns": column_names if result.returns_rows else [],
+                    "processing_time_ms": processing_time,
+                    "query_type": "SELECT",
+                    "timestamp": time.time()
+                }
+
+        except Exception as e:
+            error_time = (time.time() - start_time) * 1000
+            logger.error(f"Failed to execute database query: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time_ms": error_time,
+                "timestamp": time.time()
+            }
+
+    async def _list_tables_impl(self) -> dict[str, Any]:
+        """Implementation of list_tables tool showing accessible rule tables."""
+        start_time = time.time()
+        
+        try:
+            # Get database connection using unified manager
+            connection_manager = get_unified_manager(ManagerMode.MCP_SERVER)
+            
+            async with connection_manager.get_async_session() as session:
+                from sqlalchemy import text
+                
+                # Query to get table information for rule tables only
+                query = text("""
+                    SELECT table_name, 
+                           table_type,
+                           table_comment
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                      AND table_name IN ('rule_metadata', 'rule_performance', 'rule_combinations')
+                    ORDER BY table_name
+                """)
+                
+                result = await session.execute(query)
+                tables = []
+                
+                for row in result.fetchall():
+                    table_info = {
+                        "table_name": row[0],
+                        "table_type": row[1],
+                        "description": row[2] or f"Rule application table: {row[0]}",
+                        "access_level": "read_only"
+                    }
+                    tables.append(table_info)
+
+                processing_time = (time.time() - start_time) * 1000
+
+                logger.info(f"Successfully listed {len(tables)} accessible rule tables - "
+                           f"Processing time: {processing_time:.2f}ms")
+
+                return {
+                    "success": True,
+                    "tables": tables,
+                    "table_count": len(tables),
+                    "accessible_tables": ["rule_metadata", "rule_performance", "rule_combinations"],
+                    "access_level": "read_only_per_adr005",
+                    "processing_time_ms": processing_time,
+                    "timestamp": time.time()
+                }
+
+        except Exception as e:
+            error_time = (time.time() - start_time) * 1000
+            logger.error(f"Failed to list tables: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time_ms": error_time,
+                "timestamp": time.time()
+            }
+
+    async def _describe_table_impl(self, table_name: str) -> dict[str, Any]:
+        """Implementation of describe_table tool for rule application tables."""
+        start_time = time.time()
+        
+        try:
+            # Validate table access - only rule tables allowed
+            allowed_tables = ["rule_metadata", "rule_performance", "rule_combinations"]
+            if table_name not in allowed_tables:
+                return {
+                    "success": False,
+                    "error": f"Access denied. Only rule tables are accessible: {', '.join(allowed_tables)}",
+                    "processing_time_ms": (time.time() - start_time) * 1000,
+                    "timestamp": time.time()
+                }
+
+            # Get database connection using unified manager
+            connection_manager = get_unified_manager(ManagerMode.MCP_SERVER)
+            
+            async with connection_manager.get_async_session() as session:
+                from sqlalchemy import text
+                
+                # Query to get column information for the specified table
+                query = text("""
+                    SELECT column_name,
+                           data_type,
+                           is_nullable,
+                           column_default,
+                           character_maximum_length,
+                           numeric_precision,
+                           numeric_scale,
+                           column_comment
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public' 
+                      AND table_name = :table_name
+                    ORDER BY ordinal_position
+                """)
+                
+                result = await session.execute(query, {"table_name": table_name})
+                columns = []
+                
+                for row in result.fetchall():
+                    column_info = {
+                        "column_name": row[0],
+                        "data_type": row[1],
+                        "nullable": row[2] == "YES",
+                        "default_value": row[3],
+                        "max_length": row[4],
+                        "precision": row[5],
+                        "scale": row[6],
+                        "description": row[7] or f"Column in {table_name} table"
+                    }
+                    columns.append(column_info)
+
+                # Get table constraints (indexes, foreign keys, etc.)
+                constraints_query = text("""
+                    SELECT constraint_name, constraint_type 
+                    FROM information_schema.table_constraints 
+                    WHERE table_schema = 'public' 
+                      AND table_name = :table_name
+                """)
+                
+                constraints_result = await session.execute(constraints_query, {"table_name": table_name})
+                constraints = []
+                
+                for row in constraints_result.fetchall():
+                    constraints.append({
+                        "constraint_name": row[0],
+                        "constraint_type": row[1]
+                    })
+
+                processing_time = (time.time() - start_time) * 1000
+
+                logger.info(f"Successfully described table '{table_name}' - "
+                           f"Columns: {len(columns)}, Constraints: {len(constraints)}, "
+                           f"Processing time: {processing_time:.2f}ms")
+
+                return {
+                    "success": True,
+                    "table_name": table_name,
+                    "columns": columns,
+                    "column_count": len(columns),
+                    "constraints": constraints,
+                    "constraint_count": len(constraints),
+                    "access_level": "read_only",
+                    "table_purpose": self._get_table_purpose(table_name),
+                    "processing_time_ms": processing_time,
+                    "timestamp": time.time()
+                }
+
+        except Exception as e:
+            error_time = (time.time() - start_time) * 1000
+            logger.error(f"Failed to describe table '{table_name}': {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "table_name": table_name,
+                "processing_time_ms": error_time,
+                "timestamp": time.time()
+            }
+
+    def _is_read_only_query(self, query: str) -> bool:
+        """Validate that query is read-only (SELECT statements only) per ADR-005."""
+        # Remove leading/trailing whitespace and convert to uppercase
+        query_upper = query.strip().upper()
+        
+        # Check if query starts with SELECT (allowing for CTEs with WITH)
+        if query_upper.startswith("SELECT"):
+            return True
+        elif query_upper.startswith("WITH") and "SELECT" in query_upper:
+            return True
+        
+        # Explicitly deny write operations
+        write_operations = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE", "REPLACE"]
+        for operation in write_operations:
+            if query_upper.startswith(operation):
+                return False
+                
+        return False  # Conservative approach - deny if uncertain
+
+    def _validates_table_access(self, query: str) -> bool:
+        """Validate that query only accesses allowed rule tables per ADR-005."""
+        import re
+        
+        # Allowed tables for rule application workflows
+        allowed_tables = {"rule_metadata", "rule_performance", "rule_combinations"}
+        
+        # Extract table names from query using regex
+        # This is a simple implementation - could be enhanced with a proper SQL parser
+        query_lower = query.lower()
+        
+        # Find FROM and JOIN clauses (including CTEs)
+        table_pattern = r'\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)'
+        matches = re.findall(table_pattern, query_lower)
+        
+        # Filter out CTE aliases and only check actual table names
+        actual_tables = []
+        for table in matches:
+            if table in allowed_tables:
+                actual_tables.append(table)
+        
+        # If we found actual allowed tables via regex, validate them
+        if actual_tables:
+            # All found tables must be in allowed list (already filtered above)
+            # Check if any forbidden tables are also present
+            for table in matches:
+                if table not in allowed_tables and table not in ["cte", "subq", "t1", "t2", "alias"]:  # Common aliases
+                    return False
+            return True
+                
+        # If no tables found via regex, check if any allowed table names appear in the query
+        # This handles CTEs and complex queries
+        has_allowed_table = False
+        for table in allowed_tables:
+            if table in query_lower:
+                has_allowed_table = True
+                break
+        
+        if not has_allowed_table:
+            return False  # No allowed tables found
+        
+        # Additional check: ensure no forbidden tables are mentioned anywhere in the query
+        forbidden_patterns = [
+            "users", "user_data", "system_config", "passwords", "credentials",
+            "sessions", "tokens", "keys", "secrets", "logs", "audit",
+            "feedback_collection", "training_prompts"  # Other tables from schema
+        ]
+        
+        for forbidden in forbidden_patterns:
+            if forbidden in query_lower:
+                return False
+            
+        return True
+
+    def _get_table_purpose(self, table_name: str) -> str:
+        """Get descriptive purpose for rule application tables."""
+        purposes = {
+            "rule_metadata": "Stores rule definitions, categories, parameters, and configuration for prompt improvement rules",
+            "rule_performance": "Tracks rule effectiveness metrics, execution times, and performance data for ML optimization",
+            "rule_combinations": "Records combinations of rules, their combined effectiveness, and usage statistics"
+        }
+        return purposes.get(table_name, f"Rule application table: {table_name}")
 
     # Resource Implementation Methods
     # ===============================

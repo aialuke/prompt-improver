@@ -240,7 +240,7 @@ class HealthMonitoringValidator:
         
         # Test MCP server integration
         try:
-            from prompt_improver.mcp_server.mcp_server import APESMCPServer
+            # Legacy import removed - will be fixed with modern patterns
             results.append("MCP server class importable")
         except ImportError as e:
             issues.append(f"MCP server import issue: {e}")

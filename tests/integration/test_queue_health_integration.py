@@ -17,6 +17,7 @@ from prompt_improver.performance.monitoring.health.background_manager import (
     get_background_task_manager,
 )
 from prompt_improver.performance.monitoring.health.checkers import QueueHealthChecker
+from prompt_improver.mcp_server.server import APESMCPServer
 
 
 class TestQueueHealthIntegration:
@@ -213,8 +214,6 @@ class TestQueueHealthIntegration:
     @pytest.mark.asyncio
     async def test_queue_health_mcp_endpoint_integration(self, real_batch_processor, real_task_manager, monkeypatch):
         """Test integration with MCP server health endpoint using real components."""
-        from prompt_improver.mcp_server.mcp_server import health_queue
-        
         # Setup real health service
         monkeypatch.setattr(
             "prompt_improver.performance.monitoring.health.checkers.get_background_task_manager",
@@ -225,8 +224,12 @@ class TestQueueHealthIntegration:
         health_service = get_health_service()
         queue_checker = QueueHealthChecker(batch_processor=real_batch_processor)
         
-        # Call the real MCP endpoint
-        response = await health_queue()
+        # Create and initialize MCP server
+        server = APESMCPServer()
+        await server.initialize()
+        
+        # Call the real MCP endpoint using proper server method
+        response = await server._health_queue_impl()
 
         # Verify response structure with real data
         assert response["status"] in ["healthy", "warning", "failed"]

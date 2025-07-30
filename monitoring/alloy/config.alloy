@@ -1,0 +1,279 @@
+// Grafana Alloy Configuration for APES Monitoring Stack
+// Optimized for JSONB-compatible telemetry collection and PostgreSQL integration
+// Version: 1.4.2 (2025)
+
+// ===================================
+// Logging Configuration
+// ===================================
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// ===================================
+// OpenTelemetry Receivers
+// ===================================
+
+// OTLP receiver for traces, metrics, and logs
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// ===================================
+// OpenTelemetry Processors
+// ===================================
+
+// Batch processor for performance optimization
+otelcol.processor.batch "default" {
+  timeout = "1s"
+  send_batch_size = 1024
+
+  output {
+    metrics = [otelcol.processor.resource.default.input]
+    logs    = [otelcol.processor.resource.default.input]
+    traces  = [otelcol.processor.resource.default.input]
+  }
+}
+
+// Resource processor to add service information
+otelcol.processor.resource "default" {
+  attributes {
+    action = "insert"
+    key    = "service.instance.id"
+    value  = env("HOSTNAME")
+  }
+
+  attributes {
+    action = "insert"
+    key    = "deployment.environment"
+    value  = "apes-local"
+  }
+
+  output {
+    metrics = [otelcol.processor.attributes.default.input]
+    logs    = [otelcol.processor.attributes.default.input]
+    // traces removed - no Tempo in simplified stack
+  }
+}
+
+// Attributes processor for JSONB compatibility
+otelcol.processor.attributes "default" {
+  action {
+    key    = "jsonb.compatible"
+    value  = "true"
+    action = "insert"
+  }
+
+  action {
+    key    = "apes.monitoring.version"
+    value  = "2025.1"
+    action = "insert"
+  }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.default.input, otelcol.exporter.otlphttp.postgres.input]
+    logs    = [otelcol.exporter.loki.default.input, otelcol.exporter.otlphttp.postgres.input]
+    // traces removed - no Tempo in simplified stack
+  }
+}
+
+// ===================================
+// OpenTelemetry Exporters
+// ===================================
+
+// Prometheus exporter for Mimir
+otelcol.exporter.prometheus "default" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+  add_metric_suffixes = false
+  include_scope_info = true
+  include_target_info = true
+}
+
+// Tempo exporter removed - simplified stack without distributed tracing
+
+// Loki exporter for logs
+otelcol.exporter.loki "default" {
+  endpoint = "http://loki:3100/loki/api/v1/push"
+  
+  default_labels = {
+    service_name = "apes-monitoring"
+    environment  = "local"
+  }
+}
+
+// OTLP HTTP exporter for PostgreSQL JSONB storage
+otelcol.exporter.otlphttp "postgres" {
+  endpoint = "http://alloy:8080/v1/traces"
+  headers = {
+    "Content-Type" = "application/json"
+    "X-JSONB-Compatible" = "true"
+  }
+  compression = "gzip"
+}
+
+// ===================================
+// Prometheus Configuration
+// ===================================
+
+// Remote write to Mimir
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+    
+    queue_config {
+      capacity = 10000
+      max_shards = 200
+      min_shards = 1
+      max_samples_per_send = 2000
+      batch_send_deadline = "5s"
+      min_backoff = "30ms"
+      max_backoff = "100ms"
+    }
+  }
+}
+
+// Scrape Alloy's own metrics
+prometheus.scrape "alloy" {
+  targets = [{"__address__" = "localhost:12347"}]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+  scrape_interval = "15s"
+  metrics_path = "/metrics"
+}
+
+// Scrape PostgreSQL metrics
+prometheus.scrape "postgres" {
+  targets = [{"__address__" = "postgres:5432"}]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+  scrape_interval = "30s"
+  metrics_path = "/metrics"
+}
+
+// Scrape LGM stack metrics (simplified - no Tempo)
+prometheus.scrape "lgm_stack" {
+  targets = [
+    {"__address__" = "grafana:3000", "service" = "grafana"},
+    {"__address__" = "loki:3100", "service" = "loki"},
+    {"__address__" = "mimir:9009", "service" = "mimir"},
+  ]
+  forward_to = [prometheus.remote_write.mimir.receiver]
+  scrape_interval = "15s"
+  metrics_path = "/metrics"
+}
+
+// ===================================
+// Log Collection
+// ===================================
+
+// Collect Docker container logs
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.write.default.receiver]
+  
+  labels = {
+    job = "docker-containers"
+    environment = "apes-local"
+  }
+}
+
+// Docker service discovery
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=prompt-improver"]
+  }
+}
+
+// Loki write component
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+    
+    external_labels = {
+      cluster = "apes-local"
+      environment = "development"
+    }
+  }
+}
+
+// ===================================
+// Health Monitoring
+// ===================================
+
+// HTTP component for health checks
+http "health_check" {
+  listen_addr = "0.0.0.0:8080"
+  
+  route {
+    path_prefix = "/health"
+    handler = "health"
+  }
+  
+  route {
+    path_prefix = "/v1/traces"
+    handler = "jsonb_traces"
+  }
+  
+  route {
+    path_prefix = "/v1/metrics"
+    handler = "jsonb_metrics"
+  }
+  
+  route {
+    path_prefix = "/v1/logs"
+    handler = "jsonb_logs"
+  }
+}
+
+// ===================================
+// Custom Components for JSONB Integration
+// ===================================
+
+// Custom component for PostgreSQL JSONB export
+declare "postgres_jsonb_exporter" {
+  argument "endpoint" {
+    comment = "PostgreSQL connection endpoint"
+  }
+  
+  argument "database" {
+    comment = "Database name"
+  }
+  
+  argument "table" {
+    comment = "Table name for JSONB storage"
+  }
+  
+  // Export telemetry data in JSONB format
+  export "receiver" {
+    value = otelcol.receiver.otlp.postgres_export.receiver
+  }
+}
+
+// ===================================
+// Alerting Rules
+// ===================================
+
+// Define alerting rules for critical metrics
+prometheus.rule "apes_alerts" {
+  rule_files = ["/etc/alloy/rules/*.yml"]
+}
+
+// ===================================
+// Tracing Configuration
+// ===================================
+
+// Tracing disabled - simplified stack without Tempo

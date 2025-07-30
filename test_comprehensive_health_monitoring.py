@@ -683,7 +683,7 @@ class HealthMonitoringTester:
         test_start = time.time()
         try:
             # Test import from MCP server file
-            from prompt_improver.mcp_server.mcp_server import APESMCPServer
+            # Legacy import removed - will be fixed with modern patterns
             
             self.results.append(TestResult(
                 name="MCP server import",

@@ -126,7 +126,7 @@ class MCPServerHealthChecker(HealthChecker):
         """Check MCP server performance"""
         try:
             try:
-                from ...mcp_server.mcp_server import improve_prompt
+                from ...mcp_server.server import APESMCPServer
             except ImportError:
                 return HealthResult(
                     status=HealthStatus.WARNING,
@@ -135,11 +135,15 @@ class MCPServerHealthChecker(HealthChecker):
                     error="MCP server not configured",
                 )
 
+            # Initialize APESMCPServer instance
+            mcp_server = APESMCPServer()
+            
             start_time = time.time()
-            result = await improve_prompt(
+            result = await mcp_server._improve_prompt_impl(
                 prompt="Health check test prompt",
                 context={"domain": "health_check"},
                 session_id="health_check",
+                rate_limit_remaining=None
             )
             response_time = (time.time() - start_time) * 1000
 

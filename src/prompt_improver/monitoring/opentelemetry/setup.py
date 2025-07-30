@@ -39,13 +39,62 @@ try:
         PeriodicExportingMetricReader,
         ConsoleMetricExporter
     )
-    from opentelemetry.semantic_conventions.resource import ResourceAttributes
+    # Try different import paths for ResourceAttributes
+    ResourceAttributes = None
+    try:
+        from opentelemetry.semconv.resource import ResourceAttributes
+    except ImportError:
+        try:
+            from opentelemetry.semantic_conventions.resource import ResourceAttributes  # type: ignore
+        except ImportError:
+            # Create fallback constants for ResourceAttributes
+            class _ResourceAttributesFallback:
+                DEPLOYMENT_ENVIRONMENT = "deployment.environment"
+                SERVICE_NAMESPACE = "service.namespace"
+                SERVICE_INSTANCE_ID = "service.instance.id"
+            ResourceAttributes = _ResourceAttributesFallback()
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
-    trace = metrics = None
+    # Create stub types for when OpenTelemetry is not available
+    trace = None  # type: ignore
+    metrics = None  # type: ignore
+    ResourceAttributes = None  # type: ignore
+
+
 
 logger = logging.getLogger(__name__)
+
+# Create fallback classes for when OpenTelemetry is not available
+class _NoOpSpan:
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
+    def set_attribute(self, *args, **kwargs):
+        pass
+    def set_status(self, *args, **kwargs):
+        pass
+
+class _NoOpInstrument:
+    def add(self, *args, **kwargs):
+        pass
+    def record(self, *args, **kwargs):
+        pass
+
+class _NoOpTracer:
+    def start_span(self, *args, **kwargs):
+        return _NoOpSpan()
+    def start_as_current_span(self, *args, **kwargs):
+        return _NoOpSpan()
+
+class _NoOpMeter:
+    def create_counter(self, *args, **kwargs):
+        return _NoOpInstrument()
+    def create_histogram(self, *args, **kwargs):
+        return _NoOpInstrument()
+    def create_gauge(self, *args, **kwargs):
+        return _NoOpInstrument()
 
 class ExporterType(Enum):
     """Supported exporter types."""
@@ -107,16 +156,25 @@ class TelemetryConfig:
     
     @classmethod
     def from_environment(cls) -> "TelemetryConfig":
-        """Create configuration from environment variables."""
+        """Create configuration from environment variables with LGTM stack defaults."""
+        # LGTM stack integration headers
+        default_headers = {
+            "X-JSONB-Compatible": "true",
+            "X-APES-Service": "prompt-improver",
+            "X-LGTM-Integration": "enabled"
+        }
+
         return cls(
-            service_name=os.getenv("OTEL_SERVICE_NAME", "prompt-improver"),
+            service_name=os.getenv("OTEL_SERVICE_NAME", "apes-prompt-improver"),
             service_version=os.getenv("OTEL_SERVICE_VERSION", "1.0.0"),
-            environment=os.getenv("OTEL_ENVIRONMENT", "production"),
-            
+            environment=os.getenv("OTEL_ENVIRONMENT", "development"),
+
+            # LGTM stack endpoints (Tempo/Alloy)
             otlp_endpoint_grpc=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
             otlp_endpoint_http=os.getenv("OTEL_EXPORTER_OTLP_HTTP_ENDPOINT", "http://localhost:4318"),
             otlp_insecure=os.getenv("OTEL_EXPORTER_OTLP_INSECURE", "true").lower() == "true",
-            
+            otlp_headers=default_headers,
+
             trace_exporter=ExporterType(os.getenv("OTEL_TRACE_EXPORTER", "otlp_grpc")),
             metric_exporter=ExporterType(os.getenv("OTEL_METRIC_EXPORTER", "otlp_grpc")),
             
@@ -169,11 +227,23 @@ class TelemetryManager:
         attributes = {
             SERVICE_NAME: self.config.service_name,
             SERVICE_VERSION: self.config.service_version,
-            ResourceAttributes.DEPLOYMENT_ENVIRONMENT: self.config.environment,
-            ResourceAttributes.SERVICE_NAMESPACE: "prompt-improver",
-            ResourceAttributes.SERVICE_INSTANCE_ID: os.getenv("HOSTNAME", "unknown"),
             **self.config.resource_attributes
         }
+
+        # Add ResourceAttributes if available
+        if ResourceAttributes:
+            attributes.update({
+                ResourceAttributes.DEPLOYMENT_ENVIRONMENT: self.config.environment,
+                ResourceAttributes.SERVICE_NAMESPACE: "prompt-improver",
+                ResourceAttributes.SERVICE_INSTANCE_ID: os.getenv("HOSTNAME", "unknown"),
+            })
+        else:
+            # Fallback to string keys
+            attributes.update({
+                "deployment.environment": self.config.environment,
+                "service.namespace": "prompt-improver",
+                "service.instance.id": os.getenv("HOSTNAME", "unknown"),
+            })
         
         self._resource = Resource.create(attributes)
         return self._resource
@@ -199,7 +269,8 @@ class TelemetryManager:
             )
             self._tracer_provider.add_span_processor(processor)
         
-        trace.set_tracer_provider(self._tracer_provider)
+        if OTEL_AVAILABLE and trace:
+            trace.set_tracer_provider(self._tracer_provider)
     
     def _setup_metrics(self) -> None:
         """Configure metrics collection and export."""
@@ -219,28 +290,34 @@ class TelemetryManager:
             metric_readers=readers
         )
         
-        metrics.set_meter_provider(self._meter_provider)
+        if OTEL_AVAILABLE and metrics:
+            metrics.set_meter_provider(self._meter_provider)
     
-    def _create_sampler(self) -> sampling.Sampler:
+    def _create_sampler(self):
         """Create appropriate sampler based on configuration."""
+        if not OTEL_AVAILABLE:
+            return None
+
         strategy = self.config.sampling_strategy
-        
+
         if strategy == SamplingStrategy.ALWAYS_ON:
-            return sampling.AlwaysOnSampler()
+            return sampling.ALWAYS_ON
         elif strategy == SamplingStrategy.ALWAYS_OFF:
-            return sampling.AlwaysOffSampler()
+            return sampling.ALWAYS_OFF
         elif strategy == SamplingStrategy.PROBABILISTIC:
-            return sampling.TraceIdRatioBasedSampler(self.config.sampling_rate)
+            return sampling.TraceIdRatioBased(self.config.sampling_rate)
         elif strategy == SamplingStrategy.RATE_LIMITING:
-            return sampling.RateLimitingSampler(self.config.rate_limit_per_second)
+            # Rate limiting sampler doesn't exist in newer versions, use probabilistic
+            logger.warning("Rate limiting sampler not available, using probabilistic")
+            return sampling.TraceIdRatioBased(self.config.sampling_rate)
         elif strategy == SamplingStrategy.PARENT_BASED:
             return sampling.ParentBased(
-                root=sampling.TraceIdRatioBasedSampler(self.config.sampling_rate)
+                root=sampling.TraceIdRatioBased(self.config.sampling_rate)
             )
         else:
             logger.warning(f"Unknown sampling strategy: {strategy}, using parent-based")
             return sampling.ParentBased(
-                root=sampling.TraceIdRatioBasedSampler(self.config.sampling_rate)
+                root=sampling.TraceIdRatioBased(self.config.sampling_rate)
             )
     
     def _create_trace_exporter(self):
@@ -283,17 +360,21 @@ class TelemetryManager:
         else:
             raise ValueError(f"Unsupported metric exporter: {exporter_type}")
     
-    def get_tracer(self, name: str, version: Optional[str] = None) -> trace.Tracer:
+    def get_tracer(self, name: str, version: Optional[str] = None):
         """Get a tracer instance."""
         if not OTEL_AVAILABLE or not self._initialized:
-            return trace.NoOpTracer()
-        return trace.get_tracer(name, version)
+            return _NoOpTracer()
+        if trace:
+            return trace.get_tracer(name, version)
+        return _NoOpTracer()
     
-    def get_meter(self, name: str, version: Optional[str] = None) -> metrics.Meter:
+    def get_meter(self, name: str, version: Optional[str] = None):
         """Get a meter instance."""
         if not OTEL_AVAILABLE or not self._initialized:
-            return metrics.NoOpMeter()
-        return metrics.get_meter(name, version)
+            return _NoOpMeter()
+        if metrics:
+            return metrics.get_meter(name, version or "1.0.0")
+        return _NoOpMeter()
     
     def shutdown(self, timeout_millis: int = 30000) -> None:
         """Gracefully shutdown telemetry providers."""
@@ -349,17 +430,17 @@ def init_telemetry(
     
     return _telemetry_manager
 
-def get_tracer(name: str, version: Optional[str] = None) -> trace.Tracer:
+def get_tracer(name: str, version: Optional[str] = None):
     """Get a tracer instance from the global telemetry manager."""
     if _telemetry_manager:
         return _telemetry_manager.get_tracer(name, version)
-    return trace.NoOpTracer() if OTEL_AVAILABLE else None
+    return _NoOpTracer() if not OTEL_AVAILABLE else None
 
-def get_meter(name: str, version: Optional[str] = None) -> metrics.Meter:
+def get_meter(name: str, version: Optional[str] = None):
     """Get a meter instance from the global telemetry manager."""
     if _telemetry_manager:
         return _telemetry_manager.get_meter(name, version)
-    return metrics.NoOpMeter() if OTEL_AVAILABLE else None
+    return _NoOpMeter() if not OTEL_AVAILABLE else None
 
 def shutdown_telemetry(timeout_millis: int = 30000) -> None:
     """Shutdown global telemetry."""

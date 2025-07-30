@@ -761,7 +761,7 @@ class TestShutdownSequenceIntegration:
         components = startup_result["component_refs"]
         session_store = components["session_store"]
         batch_processor = components["batch_processor"]
-        health_service = components["health_service"]
+        health_monitor = components["health_monitor"]
         
         # Simulate realistic application usage
         # 1. Create user sessions
@@ -791,7 +791,7 @@ class TestShutdownSequenceIntegration:
             batch_jobs.append(job)
         
         # 3. Check system health
-        health_result = await health_service.run_health_check()
+        health_result = await health_monitor.run_health_check()
         # Real behavior: health check may fail due to database/redis issues
         print(f"Real behavior: health status is {health_result.overall_status.value}")
         assert health_result.overall_status.value in ["healthy", "warning", "failed"]

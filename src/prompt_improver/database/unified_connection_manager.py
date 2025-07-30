@@ -251,12 +251,12 @@ class UnifiedConnectionManager:
         """Setup both sync and async database connections"""
         # Build database URLs
         base_url = (
-            f"postgresql://{self.db_config.postgres_username}:{self.db_config.postgres_password}@"
-            f"{self.db_config.postgres_host}:{self.db_config.postgres_port}/"
-            f"{self.db_config.postgres_database}"
+            f"postgresql://{self.db_config.username}:{self.db_config.password}@"
+            f"{self.db_config.host}:{self.db_config.port}/"
+            f"{self.db_config.database}"
         )
-        sync_url = f"postgresql+psycopg://{self.db_config.postgres_username}:{self.db_config.postgres_password}@{self.db_config.postgres_host}:{self.db_config.postgres_port}/{self.db_config.postgres_database}"
-        async_url = f"postgresql+psycopg://{self.db_config.postgres_username}:{self.db_config.postgres_password}@{self.db_config.postgres_host}:{self.db_config.postgres_port}/{self.db_config.postgres_database}"
+        sync_url = f"postgresql+psycopg://{self.db_config.username}:{self.db_config.password}@{self.db_config.host}:{self.db_config.port}/{self.db_config.database}"
+        async_url = f"postgresql+psycopg://{self.db_config.username}:{self.db_config.password}@{self.db_config.host}:{self.db_config.port}/{self.db_config.database}"
         
         # Create async engine with proper pool configuration
         poolclass = None  # Use default async pool for async engines
@@ -305,7 +305,7 @@ class UnifiedConnectionManager:
             
         try:
             # Setup PostgreSQL HA pools
-            primary_dsn = f"postgresql://{self.db_config.postgres_username}:{self.db_config.postgres_password}@{self.db_config.postgres_host}:{self.db_config.postgres_port}/{self.db_config.postgres_database}"
+            primary_dsn = f"postgresql://{self.db_config.username}:{self.db_config.password}@{self.db_config.host}:{self.db_config.port}/{self.db_config.database}"
             
             primary_pool = AsyncConnectionPool(
                 conninfo=primary_dsn,
@@ -322,7 +322,7 @@ class UnifiedConnectionManager:
             # Add replica pools if configured
             replica_hosts = self._get_replica_hosts()
             for i, (host, port) in enumerate(replica_hosts):
-                replica_dsn = f"postgresql://{self.db_config.postgres_username}:{self.db_config.postgres_password}@{host}:{port}/{self.db_config.postgres_database}"
+                replica_dsn = f"postgresql://{self.db_config.username}:{self.db_config.password}@{host}:{port}/{self.db_config.database}"
                 replica_pool = AsyncConnectionPool(
                     conninfo=replica_dsn,
                     min_size=1,

@@ -18,7 +18,7 @@ Comprehensive tests for Redis cache implementation following 2025 best practices
 Tests cover:
 - Basic cache operations (get, set, invalidate)
 - Compression and decompression
-- Prometheus metrics collection
+- OpenTelemetry metrics collection
 - Singleflight pattern behavior
 - Error handling and edge cases
 - Performance characteristics
@@ -29,10 +29,12 @@ import json
 import pytest
 import pytest_asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
-from prometheus_client import REGISTRY
 import fakeredis
 import coredis
 import lz4.frame
+
+# OpenTelemetry imports for real behavior testing
+from opentelemetry import trace, metrics
 
 from prompt_improver.utils.redis_cache import (
     RedisCache,
@@ -41,10 +43,6 @@ from prompt_improver.utils.redis_cache import (
     invalidate,
     with_singleflight,
     _execute_and_cache,
-    CACHE_HITS,
-    CACHE_MISSES,
-    CACHE_LATENCY,
-    CACHE_ERRORS,
 )
 
 

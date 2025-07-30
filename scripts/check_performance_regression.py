@@ -44,7 +44,7 @@ class PerformanceRegessionChecker:
         # Test 1: Import performance
         start_time = time.time()
         try:
-            from prompt_improver.mcp_server import mcp_server
+            from prompt_improver.mcp_server.server import APESMCPServer
 
             metrics["import_time"] = time.time() - start_time
         except (ImportError, AttributeError, OSError):
@@ -54,10 +54,11 @@ class PerformanceRegessionChecker:
         start_time = time.time()
         try:
             # Simulate server initialization (don't actually start)
-            # This would measure initialization time
-            time.sleep(0.01)  # Simulate initialization work
+            # Create APESMCPServer instance to test initialization overhead
+            _ = APESMCPServer()
+            # Don't call run() or initialize() - just test class instantiation
             metrics["startup_time"] = time.time() - start_time
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, ImportError):
             metrics["startup_time"] = float("inf")
 
         # Test 3: Database connection simulation

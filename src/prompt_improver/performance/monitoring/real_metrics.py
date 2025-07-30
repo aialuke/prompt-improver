@@ -251,13 +251,8 @@ class RealMetricsRegistry:
                 return self._metrics[name]
             
             if self._prometheus_available:
-                try:
-                    from prometheus_client import Counter
-                    metric = Counter(name, description, labels or [], registry=registry)
-                    self._metrics[name] = metric
-                    return metric
-                except Exception as e:
-                    self.logger.warning(f"Failed to create Prometheus counter {name}: {e}")
+                # REMOVED prometheus_client for OpenTelemetry consolidation
+                self.logger.warning(f"Prometheus client removed for OpenTelemetry consolidation: {name}")
             
             # Fallback to in-memory counter
             metric = InMemoryCounter(name, description, labels)
