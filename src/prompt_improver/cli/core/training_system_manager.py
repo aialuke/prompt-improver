@@ -16,6 +16,8 @@ from sqlalchemy import text
 from rich.console import Console
 
 from ...database import get_sessionmanager
+# Signal handling integration - avoiding circular import
+from .signal_handler import SignalOperation
 from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from ...ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
@@ -37,6 +39,11 @@ class TrainingSystemManager:
         self.console = console or Console()
         self.logger = logging.getLogger("apes.training_system")
 
+        # Signal handling integration - lazy import to avoid circular dependency
+        self.signal_handler = None
+        self.background_manager = None
+        self._shutdown_priority = 5  # High priority for training system
+        
         # Training-specific state (no MCP state)
         self._training_status = "stopped"
         self._training_session_id: Optional[str] = None
@@ -52,6 +59,299 @@ class TrainingSystemManager:
         # Training system data directory (separate from MCP)
         self.training_data_dir = Path.home() / ".local" / "share" / "apes" / "training"
         self.training_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize signal handling integration (lazy)
+        self._init_signal_handlers()
+
+    def _init_signal_handlers(self):
+        """Initialize signal handler with lazy import to avoid circular dependency."""
+        try:
+            # Lazy import to avoid circular dependency
+            from ...performance.monitoring.health.background_manager import get_background_task_manager
+            from .signal_handler import AsyncSignalHandler
+            from rich.console import Console
+            
+            # Initialize signal handler if not already done
+            if self.signal_handler is None:
+                self.signal_handler = AsyncSignalHandler(console=Console())
+                
+                # Setup signal handlers with asyncio loop if available
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    self.signal_handler.setup_signal_handlers(loop)
+                except RuntimeError:
+                    # No running loop - will be set up when loop starts
+                    pass
+            
+            # Initialize background manager
+            if self.background_manager is None:
+                self.background_manager = get_background_task_manager()
+            
+            # Register handlers
+            self._register_signal_handlers()
+            
+        except ImportError as e:
+            self.logger.warning(f"Signal handling integration not available: {e}")
+            # Continue without signal handling
+            
+    def _register_signal_handlers(self):
+        """Register TrainingSystemManager-specific signal handlers."""
+        if self.signal_handler is None:
+            self.logger.warning("Signal handler not initialized, skipping signal registration")
+            return
+            
+        import signal
+        
+        # Shutdown coordination with high priority
+        self.signal_handler.register_shutdown_handler(
+            "TrainingSystemManager_shutdown", 
+            self.graceful_shutdown_handler
+        )
+        
+        # Emergency checkpoint creation (SIGUSR1)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.CHECKPOINT,
+            self.create_training_emergency_checkpoint
+        )
+        
+        # Status reporting (SIGUSR2)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.STATUS_REPORT,
+            self.generate_training_status_report
+        )
+        
+        # Signal chaining for coordinated shutdown preparation
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGTERM,
+            self.prepare_training_shutdown,
+            priority=self._shutdown_priority
+        )
+        
+        # SIGINT coordination for graceful training interruption
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGINT,
+            self.prepare_training_interruption,
+            priority=self._shutdown_priority
+        )
+        
+        self.logger.info("TrainingSystemManager signal handlers registered")
+
+    async def graceful_shutdown_handler(self, shutdown_context):
+        """Handle graceful shutdown with training progress preservation."""
+        self.logger.info("TrainingSystemManager graceful shutdown initiated")
+        
+        try:
+            # Stop training system with progress preservation
+            success = await self.stop_training_system(graceful=True)
+            
+            # Additional training-specific cleanup
+            await self._emergency_training_cleanup()
+            
+            return {
+                "status": "success" if success else "partial", 
+                "component": "TrainingSystemManager",
+                "training_stopped": success,
+                "progress_preserved": self._training_session_id is not None
+            }
+        except Exception as e:
+            self.logger.error(f"TrainingSystemManager shutdown error: {e}")
+            return {
+                "status": "error",
+                "component": "TrainingSystemManager", 
+                "error": str(e)
+            }
+
+    async def create_training_emergency_checkpoint(self, signal_context):
+        """Create emergency training checkpoint on SIGUSR1 signal."""
+        self.logger.info("Creating emergency training checkpoint")
+        
+        try:
+            if not self._training_session_id:
+                return {
+                    "status": "no_active_session",
+                    "message": "No active training session for checkpoint"
+                }
+            
+            # Save current training progress immediately
+            await self._save_training_progress()
+            
+            # Get current performance metrics
+            performance_metrics = await self._get_current_performance_metrics()
+            
+            # Create checkpoint via progress preservation
+            from .progress_preservation import ProgressPreservationManager
+            progress_manager = ProgressPreservationManager()
+            checkpoint_id = await progress_manager.create_checkpoint(self._training_session_id)
+            
+            return {
+                "status": "checkpoint_created",
+                "checkpoint_id": checkpoint_id,
+                "session_id": self._training_session_id,
+                "performance_metrics": performance_metrics,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Emergency checkpoint creation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    async def generate_training_status_report(self, signal_context):
+        """Generate comprehensive training status report on SIGUSR2 signal."""
+        self.logger.info("Generating training status report")
+        
+        try:
+            # Get comprehensive system status
+            system_status = await self.get_system_status()
+            
+            # Get training-specific metrics
+            training_metrics = await self._get_detailed_training_metrics()
+            
+            return {
+                "status": "report_generated",
+                "system_status": system_status,
+                "training_metrics": training_metrics,
+                "resource_usage": await self._get_resource_usage(),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Status report generation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    def prepare_training_shutdown(self, signum, signal_name):
+        """Prepare training system for coordinated shutdown."""
+        self.logger.info(f"Preparing training system for shutdown ({signal_name})")
+        
+        try:
+            # Set training status to indicate shutdown preparation
+            if self._training_status == "running":
+                self._training_status = "shutting_down"
+            
+            # If training is active, prepare for progress preservation
+            preparation_status = {
+                "prepared": True,
+                "component": "TrainingSystemManager",
+                "training_status": self._training_status,
+                "active_session": self._training_session_id is not None,
+                "orchestrator_active": self._orchestrator is not None
+            }
+            
+            return preparation_status
+        except Exception as e:
+            self.logger.error(f"Training shutdown preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "TrainingSystemManager",
+                "error": str(e)
+            }
+
+    def prepare_training_interruption(self, signum, signal_name):
+        """Prepare training system for user interruption (Ctrl+C)."""
+        self.logger.info(f"Preparing training system for interruption ({signal_name})")
+        
+        try:
+            # For user interruption, prioritize progress preservation
+            preparation_status = {
+                "prepared": True,
+                "component": "TrainingSystemManager",
+                "interruption_type": "user_requested",
+                "progress_preservation_ready": True,
+                "active_session": self._training_session_id,
+                "can_resume": True
+            }
+            
+            return preparation_status
+        except Exception as e:
+            self.logger.error(f"Training interruption preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "TrainingSystemManager",
+                "error": str(e)
+            }
+
+    async def _emergency_training_cleanup(self):
+        """Emergency cleanup for training resources during shutdown."""
+        try:
+            # Force close any hanging ML operations
+            if self._orchestrator:
+                try:
+                    await self._orchestrator.shutdown()
+                except Exception as e:
+                    self.logger.warning(f"Orchestrator emergency shutdown failed: {e}")
+            
+            # Emergency save of any remaining training data
+            if self._training_session_id:
+                try:
+                    await self._save_training_progress()
+                except Exception as e:
+                    self.logger.warning(f"Emergency progress save failed: {e}")
+            
+            # Release any background tasks
+            try:
+                await self.background_manager.stop(timeout=5.0)
+            except Exception as e:
+                self.logger.warning(f"Background task cleanup failed: {e}")
+                
+            self.logger.info("Emergency training cleanup completed")
+        except Exception as e:
+            self.logger.error(f"Emergency cleanup failed: {e}")
+
+    async def _get_current_performance_metrics(self) -> Dict[str, Any]:
+        """Get current training performance metrics for checkpoints."""
+        try:
+            if not self._orchestrator:
+                return {"error": "No orchestrator available"}
+            
+            # Get orchestrator health and metrics
+            health = await self._orchestrator.health_check()
+            
+            return {
+                "orchestrator_health": health,
+                "training_status": self._training_status,
+                "session_id": self._training_session_id,
+                "resource_usage": await self._get_resource_usage()
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _get_detailed_training_metrics(self) -> Dict[str, Any]:
+        """Get detailed training metrics for status reports."""
+        try:
+            metrics = {
+                "training_status": self._training_status,
+                "session_id": self._training_session_id,
+                "startup_time": self._startup_time,
+                "resource_usage": await self._get_resource_usage()
+            }
+            
+            # Add orchestrator metrics if available
+            if self._orchestrator:
+                try:
+                    health = await self._orchestrator.health_check()
+                    metrics["orchestrator_health"] = health
+                    
+                    # Get workflow information
+                    workflows = await self._orchestrator.list_workflows()
+                    metrics["active_workflows"] = len(workflows)
+                except Exception as e:
+                    metrics["orchestrator_error"] = str(e)
+            
+            # Add analytics metrics if available
+            if self._analytics:
+                try:
+                    performance = await self._analytics.get_recent_performance_summary()
+                    metrics["performance_summary"] = performance
+                except Exception as e:
+                    metrics["analytics_error"] = str(e)
+            
+            return metrics
+        except Exception as e:
+            return {"error": str(e)}
 
     async def start_training_system(self) -> Dict[str, Any]:
         """

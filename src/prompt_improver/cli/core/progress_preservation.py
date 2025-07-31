@@ -19,6 +19,8 @@ from ...database.models import (
     RuleMetadata, DiscoveredPattern
 )
 from sqlalchemy import select, text
+# Signal handling integration - avoiding circular import
+from .signal_handler import SignalOperation
 
 @dataclass
 class ProgressSnapshot:
@@ -62,9 +64,294 @@ class ProgressPreservationManager:
         self.backup_dir = backup_dir or Path("./training_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
+        # Signal handling integration - lazy import to avoid circular dependency
+        self.signal_handler = None
+        self.background_manager = None
+        self._shutdown_priority = 6  # Medium priority for progress preservation
+        
         # Progress tracking
         self.active_sessions: Dict[str, ProgressSnapshot] = {}
         self.checkpoint_interval = 5  # Save checkpoint every 5 iterations
+        
+        # Initialize signal handling integration (lazy)
+        self._init_signal_handlers()
+
+    def _init_signal_handlers(self):
+        """Initialize signal handler with lazy import to avoid circular dependency."""
+        try:
+            # Lazy import to avoid circular dependency
+            from ...performance.monitoring.health.background_manager import get_background_task_manager
+            from .signal_handler import AsyncSignalHandler
+            from rich.console import Console
+            
+            # Initialize signal handler if not already done
+            if self.signal_handler is None:
+                self.signal_handler = AsyncSignalHandler(console=Console())
+                
+                # Setup signal handlers with asyncio loop if available
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    self.signal_handler.setup_signal_handlers(loop)
+                except RuntimeError:
+                    # No running loop - will be set up when loop starts
+                    pass
+            
+            # Initialize background manager
+            if self.background_manager is None:
+                self.background_manager = get_background_task_manager()
+            
+            # Register handlers
+            self._register_signal_handlers()
+            
+        except ImportError as e:
+            self.logger.warning(f"Signal handling integration not available: {e}")
+            # Continue without signal handling
+    
+    def _register_signal_handlers(self):
+        """Register ProgressPreservationManager-specific signal handlers."""
+        if self.signal_handler is None:
+            self.logger.warning("Signal handler not initialized, skipping signal registration")
+            return
+            
+        import signal
+        
+        # Shutdown coordination for progress preservation
+        self.signal_handler.register_shutdown_handler(
+            "ProgressPreservationManager_shutdown", 
+            self.graceful_progress_shutdown
+        )
+        
+        # Emergency progress save (SIGUSR1) - PRIMARY FEATURE
+        self.signal_handler.register_operation_handler(
+            SignalOperation.CHECKPOINT,
+            self.emergency_progress_save
+        )
+        
+        # Progress status reporting (SIGUSR2)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.STATUS_REPORT,
+            self.generate_progress_status_report
+        )
+        
+        # Signal chaining for coordinated progress preservation
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGTERM,
+            self.prepare_progress_preservation,
+            priority=self._shutdown_priority
+        )
+        
+        # SIGINT coordination for progress saving on interruption
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGINT,
+            self.prepare_progress_interruption,
+            priority=self._shutdown_priority
+        )
+        
+        self.logger.info("ProgressPreservationManager signal handlers registered")
+
+    async def graceful_progress_shutdown(self, shutdown_context):
+        """Handle graceful shutdown with comprehensive progress preservation."""
+        self.logger.info("ProgressPreservationManager graceful shutdown initiated")
+        
+        try:
+            # Save all active session progress
+            save_results = {}
+            
+            for session_id, snapshot in self.active_sessions.items():
+                try:
+                    # Save current progress
+                    success = await self.save_training_progress(
+                        session_id=session_id,
+                        iteration=snapshot.iteration,
+                        performance_metrics=snapshot.performance_metrics,
+                        rule_optimizations=snapshot.rule_optimizations,
+                        workflow_state=snapshot.workflow_state,
+                        synthetic_data_generated=snapshot.synthetic_data_generated,
+                        model_checkpoints=snapshot.model_checkpoints,
+                        improvement_score=snapshot.improvement_score
+                    )
+                    
+                    # Export session results
+                    export_path = await self.export_session_results(
+                        session_id=session_id,
+                        export_format="json",
+                        include_iterations=True
+                    )
+                    
+                    save_results[session_id] = {
+                        "progress_saved": success,
+                        "export_path": export_path
+                    }
+                except Exception as e:
+                    save_results[session_id] = {
+                        "progress_saved": False,
+                        "error": str(e)
+                    }
+            
+            # Cleanup old backups
+            cleaned_files = await self.cleanup_old_backups(days_to_keep=30)
+            
+            return {
+                "status": "success",
+                "component": "ProgressPreservationManager",
+                "active_sessions_saved": len(save_results),
+                "save_results": save_results,
+                "cleaned_backup_files": cleaned_files
+            }
+        except Exception as e:
+            self.logger.error(f"ProgressPreservationManager shutdown error: {e}")
+            return {
+                "status": "error",
+                "component": "ProgressPreservationManager",
+                "error": str(e)
+            }
+
+    async def emergency_progress_save(self, signal_context):
+        """Perform emergency progress save for all active sessions on SIGUSR1 signal."""
+        self.logger.info("Emergency progress save triggered by SIGUSR1")
+        
+        try:
+            if not self.active_sessions:
+                return {
+                    "status": "no_active_sessions",
+                    "message": "No active training sessions for emergency save"
+                }
+            
+            emergency_saves = {}
+            
+            for session_id, snapshot in self.active_sessions.items():
+                try:
+                    # Create emergency checkpoint
+                    checkpoint_id = await self.create_checkpoint(session_id)
+                    
+                    # Save current progress with emergency flag
+                    snapshot.workflow_state["emergency_save"] = True
+                    snapshot.workflow_state["emergency_timestamp"] = datetime.now(timezone.utc).isoformat()
+                    
+                    success = await self.save_training_progress(
+                        session_id=session_id,
+                        iteration=snapshot.iteration,
+                        performance_metrics=snapshot.performance_metrics,
+                        rule_optimizations=snapshot.rule_optimizations,
+                        workflow_state=snapshot.workflow_state,
+                        synthetic_data_generated=snapshot.synthetic_data_generated,
+                        model_checkpoints=snapshot.model_checkpoints,
+                        improvement_score=snapshot.improvement_score
+                    )
+                    
+                    emergency_saves[session_id] = {
+                        "status": "saved",
+                        "checkpoint_id": checkpoint_id,
+                        "progress_saved": success
+                    }
+                except Exception as e:
+                    emergency_saves[session_id] = {
+                        "status": "error",
+                        "error": str(e)
+                    }
+            
+            return {
+                "status": "emergency_saves_completed",
+                "active_sessions": len(self.active_sessions),
+                "emergency_saves": emergency_saves,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Emergency progress save failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    async def generate_progress_status_report(self, signal_context):
+        """Generate comprehensive progress status report on SIGUSR2 signal."""
+        self.logger.info("Generating progress status report")
+        
+        try:
+            # Collect progress information for all active sessions
+            session_reports = {}
+            
+            for session_id, snapshot in self.active_sessions.items():
+                session_reports[session_id] = {
+                    "iteration": snapshot.iteration,
+                    "improvement_score": snapshot.improvement_score,
+                    "timestamp": snapshot.timestamp.isoformat(),
+                    "synthetic_data_generated": snapshot.synthetic_data_generated,
+                    "model_checkpoints": len(snapshot.model_checkpoints),
+                    "performance_metrics": snapshot.performance_metrics,
+                    "workflow_state": snapshot.workflow_state
+                }
+            
+            # Get backup directory stats
+            backup_stats = {
+                "backup_directory": str(self.backup_dir),
+                "total_backup_files": len(list(self.backup_dir.glob("*.json"))),
+                "directory_size_mb": sum(f.stat().st_size for f in self.backup_dir.glob("*")) / (1024 * 1024)
+            }
+            
+            return {
+                "status": "report_generated",
+                "active_sessions": len(self.active_sessions),
+                "session_reports": session_reports,
+                "backup_stats": backup_stats,
+                "checkpoint_interval": self.checkpoint_interval,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Progress status report generation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    def prepare_progress_preservation(self, signum, signal_name):
+        """Prepare progress preservation for coordinated shutdown."""
+        self.logger.info(f"Preparing progress preservation ({signal_name})")
+        
+        try:
+            # Prepare for coordinated progress preservation
+            preparation_status = {
+                "prepared": True,
+                "component": "ProgressPreservationManager",
+                "active_sessions": len(self.active_sessions),
+                "backup_directory": str(self.backup_dir),
+                "backup_directory_exists": self.backup_dir.exists(),
+                "ready_for_emergency_save": True
+            }
+            
+            return preparation_status
+        except Exception as e:
+            self.logger.error(f"Progress preservation preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "ProgressPreservationManager",
+                "error": str(e)
+            }
+
+    def prepare_progress_interruption(self, signum, signal_name):
+        """Prepare progress preservation for user interruption (Ctrl+C)."""
+        self.logger.info(f"Preparing progress interruption handling ({signal_name})")
+        
+        try:
+            # For user interruption, prioritize immediate progress save
+            interruption_preparation = {
+                "prepared": True,
+                "component": "ProgressPreservationManager",
+                "interruption_type": "user_requested",
+                "active_sessions": list(self.active_sessions.keys()),
+                "immediate_save_ready": True,
+                "export_on_interrupt": True
+            }
+            
+            return interruption_preparation
+        except Exception as e:
+            self.logger.error(f"Progress interruption preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "ProgressPreservationManager",
+                "error": str(e)
+            }
 
     async def save_training_progress(
         self,

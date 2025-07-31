@@ -19,6 +19,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Signal handling integration - avoiding circular import
+from .signal_handler import SignalOperation
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,6 +140,11 @@ class UnifiedProcessManager:
         """
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         
+        # Signal handling integration - lazy import to avoid circular dependency
+        self.signal_handler = None
+        self.background_manager = None
+        self._shutdown_priority = 8  # Lower priority for process management cleanup
+        
         # PID Management component (from PIDManager)
         self.pid_dir = pid_dir or Path("/tmp/prompt_improver_pids")
         self.pid_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
@@ -164,6 +172,9 @@ class UnifiedProcessManager:
         # Initialize directory security
         self._secure_directories()
         
+        # Initialize signal handling integration (lazy)
+        self._init_signal_handlers()
+        
         logger.info("UnifiedProcessManager initialized")
 
     def _secure_directories(self):
@@ -180,6 +191,253 @@ class UnifiedProcessManager:
                 self.logger.debug(f"Secured directory: {directory}")
             except Exception as e:
                 self.logger.warning(f"Failed to secure directory {directory}: {e}")
+
+    def _init_signal_handlers(self):
+        """Initialize signal handler with lazy import to avoid circular dependency."""
+        try:
+            # Lazy import to avoid circular dependency
+            from ...performance.monitoring.health.background_manager import get_background_task_manager
+            from .signal_handler import AsyncSignalHandler
+            from rich.console import Console
+            
+            # Initialize signal handler if not already done
+            if self.signal_handler is None:
+                self.signal_handler = AsyncSignalHandler(console=Console())
+                
+                # Setup signal handlers with asyncio loop if available
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    self.signal_handler.setup_signal_handlers(loop)
+                except RuntimeError:
+                    # No running loop - will be set up when loop starts
+                    pass
+            
+            # Initialize background manager
+            if self.background_manager is None:
+                self.background_manager = get_background_task_manager()
+            
+            # Register handlers
+            self._register_signal_handlers()
+            
+        except ImportError as e:
+            self.logger.warning(f"Signal handling integration not available: {e}")
+            # Continue without signal handling
+    
+    def _register_signal_handlers(self):
+        """Register UnifiedProcessManager-specific signal handlers."""
+        if self.signal_handler is None:
+            self.logger.warning("Signal handler not initialized, skipping signal registration")
+            return
+            
+        import signal
+        
+        # Shutdown coordination for process and crash management
+        self.signal_handler.register_shutdown_handler(
+            "UnifiedProcessManager_shutdown", 
+            self.graceful_process_shutdown
+        )
+        
+        # Emergency crash detection and recovery (SIGUSR1)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.CHECKPOINT,
+            self.perform_emergency_crash_detection
+        )
+        
+        # Process status reporting (SIGUSR2)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.STATUS_REPORT,
+            self.generate_process_status_report
+        )
+        
+        # Signal chaining for coordinated process cleanup
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGTERM,
+            self.prepare_process_cleanup,
+            priority=self._shutdown_priority
+        )
+        
+        # SIGINT coordination for graceful process management
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGINT,
+            self.prepare_process_interruption,
+            priority=self._shutdown_priority
+        )
+        
+        self.logger.info("UnifiedProcessManager signal handlers registered")
+
+    async def create_process_checkpoint(self, signal_context):
+        """Alias for perform_emergency_crash_detection to match naming convention."""
+        return await self.perform_emergency_crash_detection(signal_context)
+
+    async def graceful_process_shutdown(self, shutdown_context):
+        """Handle graceful shutdown with comprehensive process and crash cleanup."""
+        self.logger.info("UnifiedProcessManager graceful shutdown initiated")
+        
+        try:
+            # Perform comprehensive system check and recovery
+            check_result = await self.full_system_check_and_recovery()
+            
+            # Clean up all PID files
+            cleaned_pids = await self.cleanup_stale_pids()
+            
+            # Final process cleanup
+            active_sessions = await self.list_active_sessions()
+            cleanup_results = []
+            
+            for session in active_sessions:
+                try:
+                    success, message = await self.remove_pid_file(session.session_id)
+                    cleanup_results.append({
+                        "session_id": session.session_id,
+                        "success": success,
+                        "message": message
+                    })
+                except Exception as e:
+                    cleanup_results.append({
+                        "session_id": session.session_id,
+                        "success": False,
+                        "error": str(e)
+                    })
+            
+            return {
+                "status": "success",
+                "component": "UnifiedProcessManager",
+                "system_check": check_result,
+                "cleaned_stale_pids": len(cleaned_pids),
+                "active_sessions_cleaned": len(cleanup_results),
+                "cleanup_results": cleanup_results
+            }
+        except Exception as e:
+            self.logger.error(f"UnifiedProcessManager shutdown error: {e}")
+            return {
+                "status": "error",
+                "component": "UnifiedProcessManager",
+                "error": str(e)
+            }
+
+    async def perform_emergency_crash_detection(self, signal_context):
+        """Perform emergency crash detection and recovery on SIGUSR1 signal."""
+        self.logger.info("Performing emergency crash detection and recovery")
+        
+        try:
+            # Detect system crashes
+            detected_crashes = await self.detect_system_crashes()
+            
+            # Perform recovery for detected crashes
+            recovery_results = []
+            for crash in detected_crashes:
+                recovery_result = await self.recover_from_crash(crash.crash_id)
+                recovery_results.append(recovery_result)
+            
+            # Clean up stale PIDs during emergency operation
+            cleaned_pids = await self.cleanup_stale_pids()
+            
+            return {
+                "status": "emergency_operation_completed",
+                "detected_crashes": len(detected_crashes),
+                "recovery_results": len(recovery_results),
+                "successful_recoveries": len([r for r in recovery_results if r.recovery_status == "success"]),
+                "cleaned_stale_pids": len(cleaned_pids),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Emergency crash detection failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    async def generate_process_status_report(self, signal_context):
+        """Generate comprehensive process status report on SIGUSR2 signal."""
+        self.logger.info("Generating process status report")
+        
+        try:
+            # Get system status
+            system_status = await self.get_system_status()
+            
+            # Get active sessions
+            active_sessions = await self.list_active_sessions()
+            
+            # Get crash history
+            crash_summary = {
+                "detected_crashes": len(self.detected_crashes),
+                "recovery_history": len(self.recovery_history),
+                "successful_recoveries": len([r for r in self.recovery_history if r.recovery_status == "success"])
+            }
+            
+            return {
+                "status": "report_generated",
+                "system_status": system_status,
+                "active_sessions": len(active_sessions),
+                "session_details": [
+                    {
+                        "session_id": session.session_id,
+                        "pid": session.pid,
+                        "state": session.state.value,
+                        "started_at": session.started_at.isoformat(),
+                        "cpu_percent": session.cpu_percent,
+                        "memory_mb": session.memory_mb
+                    }
+                    for session in active_sessions
+                ],
+                "crash_summary": crash_summary,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Process status report generation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    def prepare_process_cleanup(self, signum, signal_name):
+        """Prepare process management for coordinated cleanup."""
+        self.logger.info(f"Preparing process cleanup ({signal_name})")
+        
+        try:
+            # Prepare for coordinated process cleanup
+            preparation_status = {
+                "prepared": True,
+                "component": "UnifiedProcessManager",
+                "active_sessions": len(self.active_sessions),
+                "pid_files": len(self.pid_files),
+                "detected_crashes": len(self.detected_crashes),
+                "cleanup_locks_ready": True
+            }
+            
+            return preparation_status
+        except Exception as e:
+            self.logger.error(f"Process cleanup preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "UnifiedProcessManager",
+                "error": str(e)
+            }
+
+    def prepare_process_interruption(self, signum, signal_name):
+        """Prepare process management for user interruption (Ctrl+C)."""
+        self.logger.info(f"Preparing process interruption handling ({signal_name})")
+        
+        try:
+            # For user interruption, prepare for graceful process handling
+            interruption_preparation = {
+                "prepared": True,
+                "component": "UnifiedProcessManager",
+                "interruption_type": "user_requested",
+                "active_sessions": list(self.active_sessions.keys()),
+                "stale_pid_cleanup_ready": True,
+                "crash_recovery_ready": True
+            }
+            
+            return interruption_preparation
+        except Exception as e:
+            self.logger.error(f"Process interruption preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "UnifiedProcessManager",
+                "error": str(e)
+            }
 
     # ============================================================================
     # PID Management Interface (from PIDManager)

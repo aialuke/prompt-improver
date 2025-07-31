@@ -13,6 +13,8 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 
 from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+# Signal handling integration - avoiding circular import
+from .signal_handler import SignalOperation
 
 class CLIOrchestrator:
     """
@@ -28,8 +30,270 @@ class CLIOrchestrator:
         self.console = console or Console()
         self.logger = logging.getLogger("apes.cli_orchestrator")
 
+        # Signal handling integration - lazy import to avoid circular dependency
+        self.signal_handler = None
+        self.background_manager = None
+        self._shutdown_priority = 3  # Medium-high priority for orchestrator
+        
         self._orchestrator: Optional[MLPipelineOrchestrator] = None
         self._active_workflows: Dict[str, Dict[str, Any]] = {}
+        
+        # Initialize signal handling integration (lazy)
+        self._init_signal_handlers()
+
+    def _init_signal_handlers(self):
+        """Initialize signal handler with lazy import to avoid circular dependency."""
+        try:
+            # Lazy import to avoid circular dependency
+            from ...performance.monitoring.health.background_manager import get_background_task_manager
+            from .signal_handler import AsyncSignalHandler
+            from rich.console import Console
+            
+            # Initialize signal handler if not already done
+            if self.signal_handler is None:
+                self.signal_handler = AsyncSignalHandler(console=Console())
+                
+                # Setup signal handlers with asyncio loop if available
+                try:
+                    import asyncio
+                    loop = asyncio.get_running_loop()
+                    self.signal_handler.setup_signal_handlers(loop)
+                except RuntimeError:
+                    # No running loop - will be set up when loop starts
+                    pass
+            
+            # Initialize background manager
+            if self.background_manager is None:
+                self.background_manager = get_background_task_manager()
+            
+            # Register handlers
+            self._register_signal_handlers()
+            
+        except ImportError as e:
+            self.logger.warning(f"Signal handling integration not available: {e}")
+            # Continue without signal handling
+    
+    def _register_signal_handlers(self):
+        """Register CLIOrchestrator-specific signal handlers."""
+        if self.signal_handler is None:
+            self.logger.warning("Signal handler not initialized, skipping signal registration")
+            return
+            
+        import signal
+        
+        # Shutdown coordination for workflow management
+        self.signal_handler.register_shutdown_handler(
+            "CLIOrchestrator_shutdown", 
+            self.graceful_workflow_shutdown
+        )
+        
+        # Emergency workflow checkpoint (SIGUSR1)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.CHECKPOINT,
+            self.create_workflow_checkpoint
+        )
+        
+        # Workflow status reporting (SIGUSR2)
+        self.signal_handler.register_operation_handler(
+            SignalOperation.STATUS_REPORT,
+            self.generate_workflow_status_report
+        )
+        
+        # Signal chaining for coordinated workflow shutdown
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGTERM,
+            self.prepare_workflow_shutdown,
+            priority=self._shutdown_priority
+        )
+        
+        # SIGINT coordination for graceful workflow interruption
+        self.signal_handler.add_signal_chain_handler(
+            signal.SIGINT,
+            self.prepare_workflow_interruption,
+            priority=self._shutdown_priority
+        )
+        
+        self.logger.info("CLIOrchestrator signal handlers registered")
+
+    async def graceful_workflow_shutdown(self, shutdown_context):
+        """Handle graceful shutdown of all active workflows."""
+        self.logger.info("CLIOrchestrator graceful shutdown initiated")
+        
+        try:
+            # Stop all active workflows gracefully
+            shutdown_result = await self.stop_all_workflows(graceful=True)
+            
+            # Stop the orchestrator if it exists
+            if self._orchestrator:
+                await self._orchestrator.shutdown()
+            
+            return {
+                "status": "success" if shutdown_result.get("status") == "success" else "partial",
+                "component": "CLIOrchestrator",
+                "stopped_workflows": shutdown_result.get("stopped_workflows", []),
+                "failed_workflows": shutdown_result.get("failed_workflows", []),
+                "total_workflows": shutdown_result.get("total_workflows", 0)
+            }
+        except Exception as e:
+            self.logger.error(f"CLIOrchestrator shutdown error: {e}")  
+            return {
+                "status": "error",
+                "component": "CLIOrchestrator",
+                "error": str(e)
+            }
+
+    async def create_workflow_checkpoint(self, signal_context):
+        """Create checkpoint for all active workflows on SIGUSR1 signal."""
+        self.logger.info("Creating workflow checkpoints")
+        
+        try:
+            if not self._active_workflows:
+                return {
+                    "status": "no_active_workflows",
+                    "message": "No active workflows for checkpoint creation"
+                }
+            
+            checkpoint_results = {}
+            
+            for workflow_id, workflow_info in self._active_workflows.items():
+                try:
+                    # Get workflow status from orchestrator
+                    if self._orchestrator:
+                        status = await self._orchestrator.get_workflow_status(workflow_id)
+                        
+                        # Create checkpoint data
+                        checkpoint_data = {
+                            "workflow_id": workflow_id,
+                            "session_id": workflow_info.get("session_id"),
+                            "status": status.state.value if hasattr(status.state, 'value') else str(status.state),
+                            "iterations": workflow_info.get("iterations", 0),
+                            "last_improvement": workflow_info.get("last_improvement"),
+                            "checkpoint_time": datetime.now(timezone.utc).isoformat()
+                        }
+                        
+                        checkpoint_results[workflow_id] = {
+                            "status": "checkpoint_created",
+                            "data": checkpoint_data
+                        }
+                except Exception as e:
+                    checkpoint_results[workflow_id] = {
+                        "status": "error",
+                        "error": str(e)
+                    }
+            
+            return {
+                "status": "checkpoints_created",
+                "checkpoints": checkpoint_results,
+                "total_workflows": len(self._active_workflows),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Workflow checkpoint creation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    async def generate_workflow_status_report(self, signal_context):
+        """Generate comprehensive workflow status report on SIGUSR2 signal."""
+        self.logger.info("Generating workflow status report")
+        
+        try:
+            workflow_statuses = {}
+            
+            for workflow_id, workflow_info in self._active_workflows.items():
+                try:
+                    if self._orchestrator:
+                        status = await self._orchestrator.get_workflow_status(workflow_id)
+                        workflow_statuses[workflow_id] = {
+                            "session_id": workflow_info.get("session_id"),
+                            "status": status.state.value if hasattr(status.state, 'value') else str(status.state),
+                            "started_at": workflow_info.get("started_at", {}).get("isoformat", "unknown"),
+                            "iterations": workflow_info.get("iterations", 0),
+                            "last_improvement": workflow_info.get("last_improvement"),
+                            "config": workflow_info.get("config", {})
+                        }
+                except Exception as e:
+                    workflow_statuses[workflow_id] = {
+                        "status": "error",
+                        "error": str(e)
+                    }
+            
+            # Get orchestrator health if available
+            orchestrator_health = {}
+            if self._orchestrator:
+                try:
+                    orchestrator_health = await self._orchestrator.health_check()
+                except Exception as e:
+                    orchestrator_health = {"error": str(e)}
+            
+            return {
+                "status": "report_generated",
+                "active_workflows": len(self._active_workflows),
+                "workflow_statuses": workflow_statuses,
+                "orchestrator_health": orchestrator_health,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Workflow status report generation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+    def prepare_workflow_shutdown(self, signum, signal_name):
+        """Prepare workflows for coordinated shutdown."""
+        self.logger.info(f"Preparing workflows for shutdown ({signal_name})")
+        
+        try:
+            # Mark workflows for shutdown preparation
+            workflow_preparation = {}
+            
+            for workflow_id, workflow_info in self._active_workflows.items():
+                workflow_preparation[workflow_id] = {
+                    "session_id": workflow_info.get("session_id"),
+                    "prepared_for_shutdown": True,
+                    "iterations_completed": workflow_info.get("iterations", 0)
+                }
+            
+            return {
+                "prepared": True,
+                "component": "CLIOrchestrator",
+                "active_workflows": len(self._active_workflows),
+                "workflow_preparations": workflow_preparation,
+                "orchestrator_available": self._orchestrator is not None
+            }
+        except Exception as e:
+            self.logger.error(f"Workflow shutdown preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "CLIOrchestrator",
+                "error": str(e)
+            }
+
+    def prepare_workflow_interruption(self, signum, signal_name):
+        """Prepare workflows for user interruption (Ctrl+C)."""
+        self.logger.info(f"Preparing workflows for interruption ({signal_name})")
+        
+        try:
+            # For user interruption, prepare for graceful workflow stopping
+            interruption_preparation = {
+                "prepared": True,
+                "component": "CLIOrchestrator", 
+                "interruption_type": "user_requested",
+                "active_workflows": list(self._active_workflows.keys()),
+                "graceful_stop_available": True,
+                "progress_preservation_ready": True
+            }
+            
+            return interruption_preparation
+        except Exception as e:
+            self.logger.error(f"Workflow interruption preparation failed: {e}")
+            return {
+                "prepared": False,
+                "component": "CLIOrchestrator",
+                "error": str(e)
+            }
 
     async def start_continuous_training(
         self,
