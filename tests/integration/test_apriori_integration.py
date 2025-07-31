@@ -9,15 +9,12 @@ Tests the complete integration of Apriori association rule mining with:
 - Pattern discovery workflow
 """
 
-import asyncio
-import json
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-from prompt_improver.database.connection import DatabaseManager
+from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.database.models import (
     AprioriAssociationRule,
     AprioriPatternDiscovery,
@@ -25,11 +22,11 @@ from prompt_improver.database.models import (
     RulePerformance,
     UserFeedback,
 )
-from prompt_improver.services.advanced_pattern_discovery import (
+from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
 )
-from prompt_improver.services.apriori_analyzer import AprioriAnalyzer, AprioriConfig
-from prompt_improver.services.ml_integration import MLModelService
+from prompt_improver.ml.learning.patterns.apriori_analyzer import AprioriAnalyzer, AprioriConfig
+from prompt_improver.ml.core.ml_integration import MLModelService
 
 
 @pytest.fixture
@@ -45,7 +42,7 @@ async def sample_data(db_session: AsyncSession):
             quality_score=0.8 + (i % 3) * 0.1,
             improvement_score=0.7 + (i % 4) * 0.1,
             confidence_level=0.8,
-            created_at=datetime.utcnow() - timedelta(days=i % 30),
+            created_at=datetime.now(timezone.utc) - timedelta(days=i % 30),
         )
         for i in range(20)
     ]
@@ -63,13 +60,13 @@ async def sample_data(db_session: AsyncSession):
 
         for rule_name in rules_to_apply:
             performance = RulePerformance(
-                session_id=session.session_id,
                 rule_id=rule_name,
+                rule_name=rule_name,
                 improvement_score=0.6
                 + (hash(f"{session.session_id}_{rule_name}") % 100) / 250,
-                execution_time_ms=50.0 + (i % 20) * 5,
+                execution_time_ms=int(50.0 + (i % 20) * 5),
                 confidence_level=0.7 + (i % 3) * 0.1,
-                parameters_used={"threshold": 0.5 + (i % 3) * 0.1},
+                rule_parameters={"threshold": 0.5 + (i % 3) * 0.1},
             )
             performances.append(performance)
             db_session.add(performance)
@@ -103,9 +100,7 @@ class TestAprioriAnalyzer:
     @pytest.mark.asyncio
     async def test_apriori_analyzer_initialization(self):
         """Test AprioriAnalyzer can be initialized with proper configuration"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         config = AprioriConfig(
             min_support=0.1, min_confidence=0.6, min_lift=1.0, max_itemset_length=5
         )
@@ -116,11 +111,9 @@ class TestAprioriAnalyzer:
         assert analyzer.db_manager is not None
 
     @pytest.mark.asyncio
-    async def test_transaction_extraction(self, db_session: AsyncSession, sample_data):
+    async def test_transaction_extraction(self):
         """Test extraction of transactions from database"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)
 
         # Mock the get_connection method for testing
@@ -132,9 +125,7 @@ class TestAprioriAnalyzer:
     @pytest.mark.asyncio
     async def test_prompt_characteristics_extraction(self):
         """Test extraction of prompt characteristics for itemset analysis"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)
 
         # Test various prompt types
@@ -166,9 +157,7 @@ class TestAprioriAnalyzer:
     @pytest.mark.asyncio
     async def test_frequent_itemset_mining(self):
         """Test frequent itemset mining with synthetic transaction data"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)
 
         # Create synthetic transactions that should produce clear patterns
@@ -183,7 +172,7 @@ class TestAprioriAnalyzer:
             ["rule_ClarityRule", "rule_SpecificityRule", "quality_high"],
         ]
 
-        frequent_itemsets = analyzer.mine_frequent_itemsets(
+        frequent_itemsets = await analyzer.mine_frequent_itemsets(
             transactions, min_support=0.3
         )
 
@@ -200,9 +189,7 @@ class TestAprioriAnalyzer:
         """Test generation of association rules from frequent itemsets"""
         import pandas as pd
 
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)
 
         # Create mock frequent itemsets
@@ -239,21 +226,21 @@ class TestMLIntegration:
     """Test ML pipeline integration with Apriori"""
 
     @pytest.mark.asyncio
-    async def test_ml_service_with_apriori(self, db_session: AsyncSession, sample_data):
+    async def test_ml_service_with_apriori(self):
         """Test MLModelService with Apriori integration"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         ml_service = MLModelService(db_manager=db_manager)
 
-        # Test comprehensive pattern discovery
-        results = await ml_service.discover_patterns(
-            db_session=db_session,
-            min_effectiveness=0.5,
-            min_support=3,
-            use_advanced_discovery=True,
-            include_apriori=True,
-        )
+        # Create a database session for the test
+        async with db_manager.get_async_session() as db_session:
+            # Test comprehensive pattern discovery
+            results = await ml_service.discover_patterns(
+                db_session=db_session,
+                min_effectiveness=0.5,
+                min_support=3,
+                use_advanced_discovery=True,
+                include_apriori=True,
+            )
 
         assert "status" in results
         assert "discovery_metadata" in results
@@ -276,19 +263,19 @@ class TestMLIntegration:
             assert apriori_results["discovery_type"] == "apriori_association_rules"
 
     @pytest.mark.asyncio
-    async def test_contextualized_patterns(self, db_session: AsyncSession, sample_data):
+    async def test_contextualized_patterns(self):
         """Test contextualized pattern analysis"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         ml_service = MLModelService(db_manager=db_manager)
 
         # Test with sample context items
         context_items = ["rule_ClarityRule", "domain_technical", "quality_high"]
 
-        results = await ml_service.get_contextualized_patterns(
-            context_items=context_items, db_session=db_session, min_confidence=0.5
-        )
+        # Create a database session for the test
+        async with db_manager.get_async_session() as db_session:
+            results = await ml_service.get_contextualized_patterns(
+                context_items=context_items, db_session=db_session, min_confidence=0.5
+            )
 
         assert "context_items" in results
         assert results["context_items"] == context_items
@@ -333,6 +320,7 @@ class TestDatabaseIntegration:
         assert retrieved_rule.confidence == 0.85
         assert retrieved_rule.lift == 2.1
         assert retrieved_rule.pattern_category == "rule_performance"
+        assert retrieved_rule.business_insight is not None
         assert "clarity rule" in retrieved_rule.business_insight.lower()
 
     @pytest.mark.asyncio
@@ -377,6 +365,7 @@ class TestDatabaseIntegration:
         assert retrieved_run.status == "completed"
         assert retrieved_run.transaction_count == 100
         assert retrieved_run.execution_time_seconds == 12.5
+        assert retrieved_run.top_patterns_summary is not None
         assert len(retrieved_run.top_patterns_summary) == 2
 
 
@@ -386,22 +375,16 @@ class TestAdvancedPatternDiscovery:
     @pytest.mark.asyncio
     async def test_advanced_pattern_discovery_initialization(self):
         """Test AdvancedPatternDiscovery can be initialized with database manager"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         discovery_service = AdvancedPatternDiscovery(db_manager=db_manager)
 
         assert discovery_service.apriori_analyzer is not None
         assert discovery_service.db_manager is not None
 
     @pytest.mark.asyncio
-    async def test_comprehensive_pattern_discovery(
-        self, db_session: AsyncSession, sample_data
-    ):
+    async def test_comprehensive_pattern_discovery(self, db_session: AsyncSession):
         """Test comprehensive pattern discovery including Apriori"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         discovery_service = AdvancedPatternDiscovery(db_manager=db_manager)
 
         results = await discovery_service.discover_advanced_patterns(
@@ -427,16 +410,11 @@ class TestEndToEndWorkflow:
     """Test complete end-to-end Apriori workflow"""
 
     @pytest.mark.asyncio
-    async def test_complete_apriori_workflow(
-        self, db_session: AsyncSession, sample_data
-    ):
+    async def test_complete_apriori_workflow(self, db_session: AsyncSession):
         """Test complete workflow from data extraction to rule storage"""
 
         # Step 1: Initialize services
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
-        analyzer = AprioriAnalyzer(db_manager=db_manager)
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         ml_service = MLModelService(db_manager=db_manager)
 
         # Step 2: Run comprehensive pattern discovery
@@ -475,22 +453,20 @@ class TestEndToEndWorkflow:
         assert contextual_results["context_items"] == context_items
 
     @pytest.mark.asyncio
-    async def test_performance_benchmarks(self, db_session: AsyncSession, sample_data):
+    async def test_performance_benchmarks(self):
         """Test performance benchmarks for Apriori implementation"""
-        db_manager = DatabaseManager(
-            "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-        )
+        db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)
 
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         # Run analysis with timing
-        results = analyzer.analyze_patterns(
+        results = await analyzer.analyze_patterns(
             window_days=30,
             save_to_database=False,  # Skip DB saving for pure performance test
         )
 
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         execution_time = (end_time - start_time).total_seconds()
 
         # Performance assertions
@@ -514,7 +490,7 @@ async def test_error_handling_and_edge_cases():
     # Test with no database manager
     try:
         analyzer = AprioriAnalyzer(db_manager=None)
-        assert analyzer.apriori_analyzer is None
+        assert analyzer.db_manager is None
     except Exception:
         pass  # Expected to fail gracefully
 
@@ -526,9 +502,7 @@ async def test_error_handling_and_edge_cases():
     )
 
     # Should handle invalid configuration gracefully
-    db_manager = DatabaseManager(
-        "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_test"
-    )
+    db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
     analyzer = AprioriAnalyzer(db_manager=db_manager, config=config)
     assert analyzer.config is not None
 

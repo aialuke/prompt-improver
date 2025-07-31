@@ -281,7 +281,7 @@ class DIContainer:
             if self._metrics_registry:
                 self._metrics_registry.increment_counter(
                     "di_container_resolution_errors",
-                    {"service": interface.__name__, "container": self.name}
+                    {"service": interface.__name__, "container": self.name, "error": type(e).__name__}
                 )
             raise
 
@@ -533,16 +533,21 @@ class DIContainer:
 
         self.logger.debug(f"Registered resource: {interface.__name__}")
 
-    def register_metrics_collector_factory(self, collector_type: str = "prometheus") -> None:
+    def register_metrics_collector_factory(self, collector_type: str = "opentelemetry") -> None:
         """Register factory for metrics collectors optimized for ML workloads.
 
         Args:
-            collector_type: Type of metrics collector (prometheus, opentelemetry, etc.)
+            collector_type: Type of metrics collector (opentelemetry, prometheus, etc.)
         """
         def create_metrics_collector() -> MetricsRegistryProtocol:
-            if collector_type == "prometheus":
-                from ...performance.monitoring.metrics_registry import MetricsRegistry
-                return MetricsRegistry()
+            if collector_type == "opentelemetry":
+                # Use modern OpenTelemetry-based unified metrics adapter
+                from ...core.metrics.unified_metrics_adapter import UnifiedMetricsAdapter
+                return UnifiedMetricsAdapter()
+            elif collector_type == "prometheus":
+                # Legacy fallback - use adapter to bridge the interface
+                from ...core.metrics.unified_metrics_adapter import UnifiedMetricsAdapter
+                return UnifiedMetricsAdapter(backend="prometheus")
             else:
                 raise ValueError(f"Unsupported metrics collector type: {collector_type}")
 
@@ -581,14 +586,14 @@ class DIContainer:
             # Factory will be implemented based on model_type
             # This is a placeholder for the pattern
             if model_type == "sklearn":
-                from ...ml.lifecycle.model_registry import ModelRegistry
-                return ModelRegistry()
+                from ...ml.lifecycle.model_registry import EnhancedModelRegistry
+                return EnhancedModelRegistry()
             else:
                 raise ValueError(f"Unsupported ML model type: {model_type}")
 
-        from ...ml.lifecycle.model_registry import ModelRegistry
+        from ...ml.lifecycle.model_registry import EnhancedModelRegistry
         self.register_factory(
-            ModelRegistry,
+            EnhancedModelRegistry,
             create_ml_model,
             ServiceLifetime.SINGLETON,
             tags={"ml", "model"},

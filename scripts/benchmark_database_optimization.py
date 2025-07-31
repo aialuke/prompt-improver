@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 import json
 
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from prompt_improver.database.connection_pool_optimizer import ConnectionPoolOptimizer
+from prompt_improver.database.unified_connection_manager import get_connection_pool_optimizer
 from prompt_improver.database.query_optimizer import OptimizedQueryExecutor, get_query_executor
 from prompt_improver.database.psycopg_client import get_psycopg_client
 from prompt_improver.database.connection import get_session_context
@@ -113,7 +113,7 @@ class DatabaseOptimizationBenchmark:
         cache_layer = DatabaseCacheLayer(cache_policy)
         
         # Enable pool optimization
-        pool_optimizer = ConnectionPoolOptimizer()
+        pool_optimizer = get_connection_pool_optimizer()
         await pool_optimizer.implement_connection_multiplexing()
         
         # Enable query optimization

@@ -244,7 +244,11 @@ class IntelligentCache:
             return
             
         if self.redis_client is None and self._redis_initialization_task is None:
-            self._redis_initialization_task = asyncio.create_task(self._initialize_redis())
+            # Use EnhancedBackgroundTaskManager for proper task management
+            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+            task_manager = get_background_task_manager()
+            task_id = await task_manager.submit_task("redis_initialization", self._initialize_redis())
+            self._redis_initialization_task = asyncio.create_task(self._initialize_redis())  # Keep original for compatibility
             await self._redis_initialization_task
 
     async def get(self, key: str) -> Optional[Any]:
@@ -361,262 +365,6 @@ class IntelligentCache:
         total = self.cache_stats["hits"] + self.cache_stats["misses"]
         return self.cache_stats["hits"] / total if total > 0 else 0.0
 
-class ConnectionPoolManager:
-    """Modern connection pool manager with health monitoring and optimization.
-
-    2025 Best Practice: Uses async context manager for proper lifecycle management
-    and avoids creating tasks in __init__ to prevent event loop issues.
-
-    features:
-    - Multi-pool support (HTTP, Database, Redis)
-    - Health monitoring with background tasks
-    - OpenTelemetry observability
-    - Orchestrator interface compatibility
-    - Graceful shutdown and cleanup
-    """
-
-    def __init__(self, config: Optional[AsyncOperationConfig] = None):
-        
-        self._http_session: Optional[aiohttp.ClientSession] = None
-        self._database_pools: Dict[str, Any] = {}
-        self._redis_pools: Dict[str, Any] = {}
-        self._pool_health: Dict[str, bool] = {}
-        self._pool_metrics: Dict[str, Dict[str, Any]] = defaultdict(dict)
-        self._health_monitoring_task: Optional[asyncio.Task] = None
-        self._is_started = False
-
-    async def __aenter__(self):
-        """Async context manager entry - 2025 best practice for resource management"""
-        await self.start()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit - ensures proper cleanup"""
-        await self.close()
-
-    async def start(self):
-        """Start the connection pool manager and health monitoring"""
-        with tracer.start_as_current_span("connection_pool_start") as span:
-            if self._is_started:
-                span.set_attribute("already_started", True)
-                return
-
-            self._is_started = True
-            # Start health monitoring only when explicitly started
-            # Give a small delay to allow the event loop to process other tasks
-            self._health_monitoring_task = asyncio.create_task(self._health_monitoring_loop())
-            # Allow the task to start but don't wait for it
-            await asyncio.sleep(0.001)  # Yield control to allow task to start
-            span.set_attribute("started_successfully", True)
-            logger.info("Enhanced connection pool manager started")
-
-    async def close(self):
-        """Close all connections and stop health monitoring"""
-        if not self._is_started:
-            return
-
-        # Stop health monitoring first
-        self._is_started = False  # Signal the loop to stop
-
-        if self._health_monitoring_task and not self._health_monitoring_task.done():
-            self._health_monitoring_task.cancel()
-            try:
-                await self._health_monitoring_task
-            except asyncio.CancelledError:
-                logger.debug("Health monitoring task cancelled successfully")
-            except Exception as e:
-                logger.warning(f"Error cancelling health monitoring task: {e}")
-            finally:
-                self._health_monitoring_task = None
-
-        # Close HTTP session
-        if self._http_session and not self._http_session.closed:
-            await self._http_session.close()
-
-        # Close database pools
-        for pool in self._database_pools.values():
-            if hasattr(pool, 'close'):
-                await pool.close()
-
-        # Close Redis pools
-        for pool in self._redis_pools.values():
-            if hasattr(pool, 'close'):
-                await pool.close()
-
-        logger.info("Connection pool manager closed")
-
-    async def _health_monitoring_loop(self):
-        """Health monitoring loop for connection pools - 2025 best practice"""
-        logger.info("Health monitoring loop started")
-
-        try:
-            while self._is_started:
-                try:
-                    # Monitor HTTP session health
-                    if self._http_session and not self._http_session.closed:
-                        self._pool_health['http'] = True
-                        # Get connection count safely
-                        conn_count = 0
-                        if hasattr(self._http_session.connector, '_conns'):
-                            conn_count = len(self._http_session.connector._conns)
-
-                        self._pool_metrics['http'] = {
-                            'active_connections': conn_count,
-                            'session_closed': self._http_session.closed,
-                            'last_check': datetime.now(UTC).isoformat()
-                        }
-                    else:
-                        # Mark as unhealthy if no session or session is closed
-                        self._pool_health['http'] = False
-                        self._pool_metrics['http'] = {
-                            'active_connections': 0,
-                            'session_closed': True,
-                            'last_check': datetime.now(UTC).isoformat()
-                        }
-
-                    # Monitor database pools
-                    for name, pool in self._database_pools.items():
-                        try:
-                            # Basic health check - attempt to get pool info
-                            if hasattr(pool, 'get_size'):
-                                pool_size = pool.get_size()
-                                self._pool_health[f'db_{name}'] = True
-                                self._pool_metrics[f'db_{name}'] = {
-                                    'pool_size': pool_size,
-                                    'last_check': datetime.now(UTC).isoformat()
-                                }
-                        except Exception as e:
-                            self._pool_health[f'db_{name}'] = False
-                            logger.warning(f"Database pool {name} health check failed: {e}")
-
-                    # Monitor Redis pools
-                    for name, pool in self._redis_pools.items():
-                        try:
-                            # Basic Redis health check
-                            if hasattr(pool, 'ping'):
-                                await pool.ping()
-                                self._pool_health[f'redis_{name}'] = True
-                                self._pool_metrics[f'redis_{name}'] = {
-                                    'status': 'healthy',
-                                    'last_check': datetime.now(UTC).isoformat()
-                                }
-                        except Exception as e:
-                            self._pool_health[f'redis_{name}'] = False
-                            logger.warning(f"Redis pool {name} health check failed: {e}")
-
-                    # Wait before next health check (shorter interval for testing)
-                    await asyncio.sleep(10)  # Check every 10 seconds
-
-                except asyncio.CancelledError:
-                    logger.info("Health monitoring loop cancelled")
-                    break
-                except Exception as e:
-                    logger.error(f"Health monitoring error: {e}")
-                    await asyncio.sleep(5)  # Wait before retrying
-
-        except asyncio.CancelledError:
-            logger.info("Health monitoring loop cancelled")
-        except Exception as e:
-            logger.error(f"Health monitoring loop error: {e}")
-        finally:
-            logger.info("Health monitoring loop ended")
-
-    async def get_http_session(self) -> aiohttp.ClientSession:
-        """Get optimized HTTP session with enhanced connection pooling"""
-        with tracer.start_as_current_span("connection_pool_get_http_session") as span:
-            if self._http_session is None or self._http_session.closed:
-                span.set_attribute("session_created", True)
-                # Enhanced connector settings for 2025
-                # Create SSL context for better certificate handling
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False  # For testing environments
-                ssl_context.verify_mode = ssl.CERT_NONE  # For testing environments
-
-                connector = aiohttp.TCPConnector(
-                    limit=100,  # Total connection pool size
-                    limit_per_host=20,  # Connections per host
-                    ttl_dns_cache=300,  # DNS cache ttl
-                    use_dns_cache=True,
-                    keepalive_timeout=30,
-                    enable_cleanup_closed=True,
-                    ssl=ssl_context  # Add SSL context for certificate handling
-                )
-
-                # Optimized timeout settings
-                timeout = aiohttp.ClientTimeout(
-                    total=30,  # Total timeout
-                    connect=10,  # Connection timeout
-                    sock_read=10  # Socket read timeout
-                )
-
-                self._http_session = aiohttp.ClientSession(
-                    connector=connector,
-                    timeout=timeout,
-                    headers={
-                        'User-Agent': 'APES-MCP-Server/2.0',
-                        'Accept-Encoding': 'gzip, deflate, br'
-                    }
-                )
-            else:
-                span.set_attribute("session_created", False)
-                span.set_attribute("session_reused", True)
-
-            return self._http_session
-
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Orchestrator-compatible interface for ML pipeline integration.
-
-        Args:
-            config: Configuration from orchestrator
-
-        Returns:
-            Standardized orchestrator response with pool health and metrics
-        """
-        with tracer.start_as_current_span("connection_pool_orchestrated", attributes={
-            "config_keys": list(config.keys())
-        }):
-            try:
-                operation_type = config.get("operation", "health_check")
-
-                if operation_type == "health_check":
-                    health_status = {
-                        pool_name: health for pool_name, health in self._pool_health.items()
-                    }
-
-                    pool_metrics = {
-                        "http_session_active": self._http_session is not None and not self._http_session.closed,
-                        "database_pools": len(self._database_pools),
-                        "redis_pools": len(self._redis_pools),
-                        "health_status": health_status
-                    }
-
-                elif operation_type == "get_metrics":
-                    pool_metrics = dict(self._pool_metrics)
-
-                else:
-                    raise ValueError(f"Unsupported operation type: {operation_type}")
-
-                return {
-                    "orchestrator_compatible": True,
-                    "component_result": pool_metrics,
-                    "metadata": {
-                        "component_type": "ConnectionPoolManager",
-                        "operation_type": operation_type,
-                        "pools_managed": len(self._database_pools) + len(self._redis_pools) + (1 if self._http_session else 0)
-                    }
-                }
-
-            except Exception as e:
-                return {
-                    "orchestrator_compatible": True,
-                    "component_result": None,
-                    "error": str(e),
-                    "metadata": {
-                        "component_type": "ConnectionPoolManager",
-                        "error_occurred": True
-                    }
-                }
-
 class AsyncBatchProcessor:
     """Batches async operations for improved throughput."""
 
@@ -639,7 +387,10 @@ class AsyncBatchProcessor:
 
             # Trigger batch processing if we hit the batch size
             if len(self._pending_operations) >= self.config.batch_size:
-                asyncio.create_task(self._process_batch())
+                # Use EnhancedBackgroundTaskManager for proper task management
+                from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+                task_manager = get_background_task_manager()
+                await task_manager.submit_task("batch_processing", self._process_batch())
 
             return await future
 
@@ -671,10 +422,15 @@ class AsyncBatchProcessor:
                         future.set_exception(e)
 
             # Execute all operations in the batch
-            tasks = [
-                asyncio.create_task(process_operation(op, args, kwargs, future))
-                for op, args, kwargs, future in batch
-            ]
+            # Use EnhancedBackgroundTaskManager for proper task management
+            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+            task_manager = get_background_task_manager()
+            
+            tasks = []
+            for i, (op, args, kwargs, future) in enumerate(batch):
+                task_id = await task_manager.submit_task(f"batch_op_{i}", process_operation(op, args, kwargs, future))
+                # Also create the task for immediate execution (hybrid approach)
+                tasks.append(asyncio.create_task(process_operation(op, args, kwargs, future)))
 
             await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -696,10 +452,15 @@ class AsyncTaskScheduler:
             return
 
         self._running = True
-        self._workers = [
-            asyncio.create_task(self._worker(f"worker-{i}"))
-            for i in range(self._worker_count)
-        ]
+        # Use EnhancedBackgroundTaskManager for proper worker management
+        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+        task_manager = get_background_task_manager()
+        
+        self._workers = []
+        for i in range(self._worker_count):
+            task_id = await task_manager.submit_task(f"scheduler_worker_{i}", self._worker(f"worker-{i}"))
+            # Also create the task for immediate execution (hybrid approach)
+            self._workers.append(asyncio.create_task(self._worker(f"worker-{i}")))
 
         logger.info(f"Started {self._worker_count} async task workers")
 
@@ -764,8 +525,9 @@ class AsyncOptimizer:
 
     def __init__(self, config: Optional[AsyncOperationConfig] = None):
         self.config = config or AsyncOperationConfig()
-        # Use modern ConnectionPoolManager with 2025 best practices
-        self.connection_manager = ConnectionPoolManager(self.config)
+        # Use UnifiedConnectionManager with 2025 best practices
+        from ...database.unified_connection_manager import get_unified_manager, ManagerMode
+        self.connection_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         self.batch_processor = AsyncBatchProcessor(self.config)
         self.task_scheduler = AsyncTaskScheduler()
         self._optimization_enabled = True
@@ -773,14 +535,14 @@ class AsyncOptimizer:
     async def initialize(self):
         """Initialize the async optimizer."""
         await self.task_scheduler.start()
-        # Start connection pool manager with health monitoring
-        await self.connection_manager.start()
-        logger.info("Async optimizer initialized with modern connection pooling")
+        # Initialize unified connection manager with health monitoring
+        await self.connection_manager.initialize()
+        logger.info("Async optimizer initialized with unified connection pooling")
 
     async def shutdown(self):
         """Shutdown the async optimizer."""
         await self.task_scheduler.stop()
-        # Use modern connection manager's close method
+        # Use unified connection manager's close method
         await self.connection_manager.close()
         logger.info("Async optimizer shutdown complete")
 
@@ -853,10 +615,15 @@ class AsyncOptimizer:
             async with semaphore:
                 return await operation(*args, **kwargs)
 
-        tasks = [
-            asyncio.create_task(execute_with_semaphore(op, args, kwargs))
-            for op, args, kwargs in operations
-        ]
+        # Use EnhancedBackgroundTaskManager for proper task management
+        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+        task_manager = get_background_task_manager()
+        
+        tasks = []
+        for i, (op, args, kwargs) in enumerate(operations):
+            task_id = await task_manager.submit_task(f"concurrent_op_{i}", execute_with_semaphore(op, args, kwargs))
+            # Also create the task for immediate execution (hybrid approach)
+            tasks.append(asyncio.create_task(execute_with_semaphore(op, args, kwargs)))
 
         return await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -914,5 +681,5 @@ async def shutdown_async_optimizer():
         await _global_optimizer.shutdown()
         _global_optimizer = None
 
-# Note: ConnectionPoolManager is the modern 2025-compliant implementation
-# features: Health monitoring, multi-pool support, orchestrator interface, observability
+# Note: Uses UnifiedConnectionManager for consolidated database operations
+# All connection pooling, health monitoring, and optimization features are now unified

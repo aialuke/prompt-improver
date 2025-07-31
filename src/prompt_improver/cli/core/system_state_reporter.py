@@ -4,7 +4,7 @@ Provides comprehensive system state reporting with component status, data metric
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -22,7 +22,7 @@ class SystemStateReporter:
     - Export capabilities for system state
     """
     
-    def __init__(self, console: Console = None):
+    def __init__(self, console: Optional[Console] = None):
         self.console = console or Console()
     
     def generate_comprehensive_report(self, initialization_results: Dict[str, Any]) -> None:
@@ -210,7 +210,29 @@ class SystemStateReporter:
             f"{overall_quality:.3f}",
             "[green]✅[/green]" if overall_quality > 0.7 else "[yellow]⚠️[/yellow]" if overall_quality > 0.5 else "[red]❌[/red]"
         )
-        
+
+        # Minimum requirements status
+        requirements_details = requirements.get("details", {})
+        requirements_status = requirements.get("status", "unknown")
+
+        data_table.add_row(
+            "Training Data Requirement",
+            "≥100 prompts",
+            "[green]✅[/green]" if requirements_details.get("training_data_count", False) else "[red]❌[/red]"
+        )
+
+        data_table.add_row(
+            "Synthetic Data Available",
+            "Required",
+            "[green]✅[/green]" if requirements_details.get("synthetic_data_available", False) else "[red]❌[/red]"
+        )
+
+        data_table.add_row(
+            "Overall Requirements",
+            requirements_status.replace("_", " ").title(),
+            "[green]✅[/green]" if requirements_status == "met" else "[red]❌[/red]"
+        )
+
         self.console.print(data_table)
     
     def _display_initialization_details(self, results: Dict[str, Any]) -> None:
@@ -282,7 +304,7 @@ class SystemStateReporter:
             )
             self.console.print(panel)
     
-    def export_state_report(self, results: Dict[str, Any], filepath: str = None) -> str:
+    def export_state_report(self, results: Dict[str, Any], filepath: Optional[str] = None) -> str:
         """
         Export system state report to file.
         

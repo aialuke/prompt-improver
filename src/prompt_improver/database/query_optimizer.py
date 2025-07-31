@@ -15,7 +15,8 @@ from datetime import datetime, timedelta, UTC
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.database.psycopg_client import get_psycopg_client
+# psycopg_client removed in Phase 1 - using unified_connection_manager instead
+from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
 from ..performance.optimization.performance_optimizer import measure_database_operation
 from prompt_improver.core.config import AppConfig  # Redis functionality RedisCache
 

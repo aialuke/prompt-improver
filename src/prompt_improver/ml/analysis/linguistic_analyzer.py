@@ -405,7 +405,14 @@ class LinguisticAnalyzer:
         Returns:
             LinguisticFeatures object containing all analysis results
         """
-        return asyncio.run(self.analyze_async(text))
+        # Use proven signal_handler pattern for async standardization
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context - use run_coroutine_threadsafe for proper async handling
+            return asyncio.run_coroutine_threadsafe(self.analyze_async(text), loop).result()
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run
+            return asyncio.run(self.analyze_async(text))
 
     async def _analyze_entities(self, text: str) -> dict[str, Any]:
         """Analyze named entities and technical terms."""

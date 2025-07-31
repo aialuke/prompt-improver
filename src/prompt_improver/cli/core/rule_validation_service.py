@@ -8,11 +8,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from sqlalchemy import select, func
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_sessionmanager
-from ...database.models import RuleMetadata, RulePerformance
+from ...database.models import RuleMetadata
 
 class RuleValidationService:
     """
@@ -85,7 +85,7 @@ class RuleValidationService:
         
         try:
             session_manager = get_sessionmanager()
-            async with session_manager.session() as db_session:
+            async with session_manager.get_async_session() as db_session:
                 
                 # Phase 1: Basic rule existence validation
                 rule_existence = await self._validate_rule_existence(db_session)
@@ -135,16 +135,15 @@ class RuleValidationService:
         """Validate that expected seeded rules exist in the database."""
         
         # Get all rules from database
-        result = await db_session.execute(
-            select(RuleMetadata.rule_id, RuleMetadata.rule_name, RuleMetadata.enabled, 
-                   RuleMetadata.priority, RuleMetadata.rule_category)
-        )
-        db_rules = {row[0]: {
-            "rule_name": row[1],
-            "enabled": row[2], 
-            "priority": row[3],
-            "category": row[4]
-        } for row in result.fetchall()}
+        result = await db_session.execute(select(RuleMetadata))
+        db_rules = {}
+        for rule in result.scalars().all():
+            db_rules[rule.rule_id] = {
+                "rule_name": rule.rule_name,
+                "enabled": rule.enabled,
+                "priority": rule.priority,
+                "category": rule.category
+            }
         
         # Validate each expected rule
         rule_validation = {}
@@ -188,14 +187,15 @@ class RuleValidationService:
         rule_metadata = {}
         
         # Get detailed metadata for all rules
-        result = await db_session.execute(
-            select(RuleMetadata.rule_id, RuleMetadata.default_parameters, 
-                   RuleMetadata.parameter_constraints, RuleMetadata.rule_version,
-                   RuleMetadata.created_at, RuleMetadata.updated_at)
-        )
-        
-        for row in result.fetchall():
-            rule_id, default_params, constraints, version, created_at, updated_at = row
+        result = await db_session.execute(select(RuleMetadata))
+
+        for rule in result.scalars().all():
+            rule_id = rule.rule_id
+            default_params = rule.default_parameters
+            constraints = rule.parameter_constraints
+            version = rule.rule_version
+            created_at = rule.created_at
+            updated_at = rule.updated_at
             
             rule_issues = []
             
@@ -253,12 +253,12 @@ class RuleValidationService:
         
         parameter_validation = {}
         
-        result = await db_session.execute(
-            select(RuleMetadata.rule_id, RuleMetadata.default_parameters, RuleMetadata.parameter_constraints)
-        )
-        
-        for row in result.fetchall():
-            rule_id, default_params, constraints = row
+        result = await db_session.execute(select(RuleMetadata))
+
+        for rule in result.scalars().all():
+            rule_id = rule.rule_id
+            default_params = rule.default_parameters
+            constraints = rule.parameter_constraints
             
             validation_result = {
                 "status": "valid",
@@ -337,15 +337,18 @@ class RuleValidationService:
         }
         
         try:
-            # Get performance statistics per rule
+            # Get performance statistics per rule using raw SQL
             result = await db_session.execute(
-                select(
-                    RulePerformance.rule_id,
-                    func.count(RulePerformance.id).label('record_count'),
-                    func.avg(RulePerformance.improvement_score).label('avg_improvement'),
-                    func.max(RulePerformance.improvement_score).label('max_improvement'),
-                    func.min(RulePerformance.improvement_score).label('min_improvement')
-                ).group_by(RulePerformance.rule_id)
+                text("""
+                    SELECT
+                        rule_id,
+                        COUNT(*) as record_count,
+                        AVG(improvement_score) as avg_improvement,
+                        MAX(improvement_score) as max_improvement,
+                        MIN(improvement_score) as min_improvement
+                    FROM rule_performance
+                    GROUP BY rule_id
+                """)
             )
             
             total_records = 0

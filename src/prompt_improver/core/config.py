@@ -300,14 +300,14 @@ class DatabaseConfig(BaseSettings):
     @property
     def database_url(self) -> str:
         """Generate async PostgreSQL connection URL with JSONB optimization."""
-        base_url = f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        base_url = f"postgresql+asyncpg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
         # Add JSONB optimizations for 2025 best practices
         return f"{base_url}?options=-c%20default_text_search_config=pg_catalog.english"
     
     @property
     def database_url_sync(self) -> str:
         """Generate sync PostgreSQL connection URL with JSONB optimization."""
-        base_url = f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        base_url = f"postgresql+asyncpg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
         # Add JSONB optimizations for 2025 best practices
         return f"{base_url}?options=-c%20default_text_search_config=pg_catalog.english"
 
@@ -1714,24 +1714,7 @@ class LegacyRedisConfig(BaseModel):
 # Database Configuration Extensions
 # =============================================================================
 
-# Additional database configuration methods for compatibility
-def extend_database_config():
-    """Extend DatabaseConfig with additional methods for compatibility."""
-    
-    def psycopg_connection_string(self) -> str:
-        """Generate psycopg3 connection string for direct psycopg.connect() usage."""
-        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
-    
-    def database_url_sync(self) -> str:
-        """Generate synchronous PostgreSQL connection URL for migrations."""
-        return self.database_url
-    
-    # Add methods to DatabaseConfig class
-    DatabaseConfig.psycopg_connection_string = property(psycopg_connection_string)
-    DatabaseConfig.database_url_sync = property(database_url_sync)
-
-# Apply extensions
-extend_database_config()
+# Legacy compatibility code removed - using unified asyncpg architecture
 
 # Example usage and testing
 if __name__ == "__main__":

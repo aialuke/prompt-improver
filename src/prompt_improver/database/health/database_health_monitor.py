@@ -19,8 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from ..psycopg_client import TypeSafePsycopgClient, get_psycopg_client
-from ..connection import get_session_context
+from ..unified_connection_manager import get_unified_manager, ManagerMode
 from .connection_pool_monitor import ConnectionPoolMonitor
 from .query_performance_analyzer import QueryPerformanceAnalyzer
 from .index_health_assessor import IndexHealthAssessor
@@ -72,7 +71,7 @@ class DatabaseHealthMonitor:
     and performance statistics to provide deep insights into database health.
     """
     
-    def __init__(self, client: Optional[TypeSafePsycopgClient] = None):
+    def __init__(self, client: Optional[Any] = None):
         self.client = client
         self.pool_monitor = ConnectionPoolMonitor(client)
         self.query_analyzer = QueryPerformanceAnalyzer(client)
@@ -92,10 +91,10 @@ class DatabaseHealthMonitor:
         self._metrics_history: List[DatabaseHealthMetrics] = []
         self._max_history_size = 1000
     
-    async def get_client(self) -> TypeSafePsycopgClient:
+    async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return await get_psycopg_client()
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
     
     async def collect_comprehensive_metrics(self) -> DatabaseHealthMetrics:

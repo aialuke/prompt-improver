@@ -17,8 +17,7 @@ from .progress_preservation import ProgressPreservationManager
 from .training_system_manager import TrainingSystemManager
 from ...database import get_session_context
 from ...database.models import TrainingSession
-from sqlalchemy import select, update, and_, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, update, text
 
 class SessionState(Enum):
     """Enumeration of training session states for resume detection."""
@@ -97,21 +96,17 @@ class SessionResumeManager:
             try:
                 # Get all sessions from database
                 async with get_session_context() as db_session:
-                    result = await db_session.execute(
-                        select(TrainingSession)
-                        .options(selectinload(TrainingSession.iterations))
-                        .where(
-                            or_(
-                                TrainingSession.status == "running",
-                                TrainingSession.status == "interrupted",
-                                and_(
-                                    TrainingSession.status == "running",
-                                    TrainingSession.last_activity_at < datetime.now(timezone.utc) - timedelta(minutes=30)
-                                )
-                            )
-                        )
-                    )
-                    sessions = result.scalars().all()
+                    # Use simple query and filter in Python for better compatibility
+                    result = await db_session.execute(select(TrainingSession))
+                    all_sessions = result.scalars().all()
+
+                    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=30)
+                    sessions = []
+
+                    for session in all_sessions:
+                        if (session.status in ["running", "interrupted"] or
+                            (session.status == "running" and session.last_activity_at < cutoff_time)):
+                            sessions.append(session)
 
                 interrupted_sessions = []
 
@@ -244,12 +239,18 @@ class SessionResumeManager:
 
     def _determine_recovery_strategy(self, session: TrainingSession, state: SessionState, integrity: float) -> str:
         """Determine the best recovery strategy for the session."""
+        # Use session information to determine strategy
+        session_age = datetime.now(timezone.utc) - session.started_at
+
         if state == SessionState.UNRECOVERABLE or integrity < 0.3:
             return "none"
         elif state == SessionState.CORRUPTED or integrity < 0.6:
             return "partial_recovery"
         elif state in [SessionState.INTERRUPTED, SessionState.RECOVERABLE]:
-            if integrity > 0.8:
+            # Consider session age for recovery strategy
+            if session_age.total_seconds() > 86400:  # 24 hours
+                return "partial_recovery"  # Old sessions should use partial recovery
+            elif integrity > 0.8:
                 return "full_resume"
             else:
                 return "checkpoint_resume"
@@ -264,8 +265,6 @@ class SessionResumeManager:
         time_since_activity: timedelta
     ) -> float:
         """Calculate confidence score for successful recovery."""
-        base_confidence = 0.5
-
         # State-based confidence
         state_confidence = {
             SessionState.RECOVERABLE: 0.9,
@@ -365,13 +364,19 @@ class SessionResumeManager:
             self.logger.info(f"Reconstructing workflow state for session: {session_id}")
 
             async with get_session_context() as db_session:
-                # Get session with iterations
+                # Get session and load iterations separately
                 result = await db_session.execute(
-                    select(TrainingSession)
-                    .options(selectinload(TrainingSession.iterations))
-                    .where(TrainingSession.session_id == session_id)
+                    select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
                 session = result.scalar_one_or_none()
+
+                # Load iterations separately if session exists
+                if session:
+                    from ...database.models import TrainingIteration
+                    iterations_result = await db_session.execute(
+                        select(TrainingIteration).where(text(f"session_id = '{session_id}'"))
+                    )
+                    session.iterations = list(iterations_result.scalars().all())
 
                 if not session:
                     self.logger.error(f"Session not found: {session_id}")
@@ -391,24 +396,30 @@ class SessionResumeManager:
                     # Analyze completed iterations to determine workflow progress
                     latest_iteration = max(session.iterations, key=lambda x: x.iteration)
 
-                    if latest_iteration.data_export_completed:
+                    # Infer workflow progress from available data in TrainingIteration
+                    # Check if data export was completed (synthetic_data_generated > 0)
+                    if latest_iteration.synthetic_data_generated > 0:
                         completed_steps.append("data_export")
                         current_step = "pattern_discovery"
-                        pending_steps.remove("data_export")
+                        if "data_export" in pending_steps:
+                            pending_steps.remove("data_export")
 
-                    if latest_iteration.pattern_discovery_completed:
+                    # Check if pattern discovery was completed (discovered_patterns has data)
+                    if latest_iteration.discovered_patterns:
                         completed_steps.append("pattern_discovery")
                         current_step = "rule_optimization"
                         if "pattern_discovery" in pending_steps:
                             pending_steps.remove("pattern_discovery")
 
-                    if latest_iteration.rule_optimization_completed:
+                    # Check if rule optimization was completed (rule_optimizations has data)
+                    if latest_iteration.rule_optimizations:
                         completed_steps.append("rule_optimization")
                         current_step = "validation"
                         if "rule_optimization" in pending_steps:
                             pending_steps.remove("rule_optimization")
 
-                    if latest_iteration.validation_completed:
+                    # Check if validation was completed (completed_at is set)
+                    if latest_iteration.completed_at:
                         completed_steps.append("validation")
                         current_step = "completed"
                         if "validation" in pending_steps:
@@ -570,7 +581,7 @@ class SessionResumeManager:
             # Check database consistency
             async with get_session_context() as db_session:
                 result = await db_session.execute(
-                    select(TrainingSession).where(TrainingSession.session_id == session_id)
+                    select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
                 session = result.scalar_one_or_none()
 
@@ -623,7 +634,7 @@ class SessionResumeManager:
             async with get_session_context() as db_session:
                 await db_session.execute(
                     update(TrainingSession)
-                    .where(TrainingSession.session_id == session_id)
+                    .where(text(f"session_id = '{session_id}'"))
                     .values(
                         status="running",
                         last_activity_at=datetime.now(timezone.utc),

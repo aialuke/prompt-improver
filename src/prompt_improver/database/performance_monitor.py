@@ -6,8 +6,10 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, UTC
 from typing import Any
+from sqlalchemy import text
 
-from .psycopg_client import TypeSafePsycopgClient, get_psycopg_client
+# psycopg_client removed in Phase 1 - using unified_connection_manager instead
+from .unified_connection_manager import get_unified_manager, ManagerMode
 
 @dataclass
 class QueryPerformanceMetric:
@@ -48,12 +50,18 @@ class DatabasePerformanceMonitor:
     - Event-driven monitoring with orchestrator integration
     """
 
-    def __init__(self, client: TypeSafePsycopgClient | None = None, event_bus=None):
+    def __init__(self, client=None, event_bus=None):
         self.client = client
         self.event_bus = event_bus
         self._monitoring = False
         self._snapshots: list[DatabasePerformanceSnapshot] = []
         self._last_alert_times = {}  # Track last alert times to prevent spam
+
+    async def get_client(self):
+        """Get database client"""
+        if self.client is None:
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
+        return self.client
 
     async def get_client(self) -> TypeSafePsycopgClient:
         """Get database client"""
@@ -63,7 +71,7 @@ class DatabasePerformanceMonitor:
 
     async def get_cache_hit_ratio(self) -> float:
         """Get current cache hit ratio from pg_stat_database"""
-        client = await self.get_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
 
         query = """
         SELECT
@@ -75,8 +83,10 @@ class DatabasePerformanceMonitor:
         WHERE datname = current_database()
         """
 
-        result = await client.fetch_raw(query)
-        return float(result[0]["cache_hit_ratio"]) if result else 0.0
+        async with manager.get_session() as session:
+            result = await session.execute(text(query))
+            row = await result.fetchone()
+            return float(row[0]) if row else 0.0
 
     async def get_index_hit_ratio(self) -> float:
         """Get index hit ratio for table access patterns"""

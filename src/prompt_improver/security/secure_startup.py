@@ -88,7 +88,7 @@ def get_secure_database_url() -> str:
     port = os.getenv("POSTGRES_PORT")
     database = os.getenv("POSTGRES_DATABASE")
 
-    return f"postgresql+psycopg://{username}:{password}@{host}:{port}/{database}"
+    return f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database}"
 
 def setup_secure_logging() -> None:
     """Configure logging to prevent credential leakage."""
@@ -102,7 +102,7 @@ def setup_secure_logging() -> None:
             (r'POSTGRES_PASSWORD["\s]*[:=]["\s]*([^"\s]+)', r'POSTGRES_PASSWORD=***REDACTED***'),
             # Database URL patterns
             (r'postgresql://([^:]+):([^@]+)@', r'postgresql://\1:***REDACTED***@'),
-            (r'postgresql\+psycopg://([^:]+):([^@]+)@', r'postgresql+psycopg://\1:***REDACTED***@'),
+            (r'postgresql\+asyncpg://([^:]+):([^@]+)@', r'postgresql+asyncpg://\1:***REDACTED***@'),
             # Authentication tokens
             (r'Bearer\s+([A-Za-z0-9\-._~+/]+)', r'Bearer ***REDACTED***'),
             # API keys

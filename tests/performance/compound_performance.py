@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from prompt_improver.database import get_session_context
 from prompt_improver.database.psycopg_client import PostgresAsyncClient
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from prompt_improver.database.connection_pool_optimizer import ConnectionPoolOptimizer
+from prompt_improver.database.unified_connection_manager import get_connection_pool_optimizer
 from prompt_improver.database.query_optimizer import get_query_executor
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
@@ -277,7 +277,7 @@ class TestCompoundPerformance:
     @pytest.fixture
     async def connection_optimizer(self):
         """Connection pool optimizer."""
-        optimizer = ConnectionPoolOptimizer()
+        optimizer = get_connection_pool_optimizer()
         yield optimizer
         if optimizer._monitoring:
             optimizer.stop_monitoring()
@@ -303,7 +303,7 @@ class TestCompoundPerformance:
         compound_metrics: CompoundPerformanceMetrics,
         db_client: PostgresAsyncClient,
         cache_layer: DatabaseCacheLayer,
-        connection_optimizer: ConnectionPoolOptimizer
+        connection_optimizer
     ):
         """
         Test 1: Database Compound Performance

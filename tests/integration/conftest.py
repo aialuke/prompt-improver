@@ -18,7 +18,7 @@ from typing import AsyncGenerator
 
 import pytest_asyncio
 from prompt_improver.database import get_session, _get_global_sessionmanager
-from prompt_improver.database.config import get_database_config
+from prompt_improver.core.config import get_config
 
 
 # Configure pytest-asyncio

@@ -15,9 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-import psycopg
-import psycopg_pool
-from testcontainers.postgres import PostgresContainer
+import asyncpg  # type: ignore[import-untyped]
+from testcontainers.postgres import PostgresContainer  # type: ignore[import-not-found]
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.metrics import MeterProvider
@@ -28,7 +27,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from prompt_improver.ml.learning.algorithms.analysis_orchestrator import AnalysisOrchestrator
 from prompt_improver.ml.learning.algorithms.failure_classifier import FailureClassifier
-from prompt_improver.ml.learning.algorithms.failure_analyzer import FailureConfig
 
 
 class MinimalFailureConfig:
@@ -97,7 +95,7 @@ class OTelMigrationValidator:
         self.use_testcontainer = use_testcontainer
         self.db_url: Optional[str] = None
         self.postgres_container: Optional[PostgresContainer] = None
-        self.connection_pool: Optional[psycopg_pool.AsyncConnectionPool] = None
+        self.connection_pool: Optional[asyncpg.Pool] = None
         self.validation_results: Dict[str, Any] = {}
         self.tracer: Optional[trace.Tracer] = None
         self.meter: Optional[metrics.Meter] = None
@@ -153,15 +151,15 @@ class OTelMigrationValidator:
                 # Wait for container to be ready
                 await self._wait_for_postgres()
 
-                # Get connection URL and convert to psycopg format
+                # Get connection URL and convert to asyncpg format
                 sqlalchemy_url = self.postgres_container.get_connection_url()
-                # Convert from postgresql+psycopg2://user:pass@host:port/db to psycopg format
+                # Convert TestContainer URL to standard PostgreSQL format for asyncpg
                 self.db_url = sqlalchemy_url.replace("postgresql+psycopg2://", "postgresql://")
                 print(f"✅ PostgreSQL testcontainer ready: {self.db_url}")
 
                 # Create connection pool
-                self.connection_pool = psycopg_pool.AsyncConnectionPool(
-                    conninfo=self.db_url,
+                self.connection_pool = await asyncpg.create_pool(
+                    dsn=self.db_url,
                     min_size=2,
                     max_size=10
                 )
@@ -174,8 +172,8 @@ class OTelMigrationValidator:
                 if not self.db_url:
                     self.db_url = "postgresql://localhost:5432/apes_test"
 
-                self.connection_pool = psycopg_pool.AsyncConnectionPool(
-                    conninfo=self.db_url,
+                self.connection_pool = await asyncpg.create_pool(
+                    dsn=self.db_url,
                     min_size=2,
                     max_size=10
                 )
@@ -193,8 +191,11 @@ class OTelMigrationValidator:
                 if self.postgres_container:
                     sqlalchemy_url = self.postgres_container.get_connection_url()
                     conn_url = sqlalchemy_url.replace("postgresql+psycopg2://", "postgresql://")
-                    async with await psycopg.AsyncConnection.connect(conn_url) as conn:
+                    conn = await asyncpg.connect(conn_url)
+                    try:
                         await conn.execute("SELECT 1")
+                    finally:
+                        await conn.close()
                         return
             except Exception:
                 if attempt == max_retries - 1:
@@ -206,7 +207,7 @@ class OTelMigrationValidator:
         if not self.connection_pool:
             return
 
-        async with self.connection_pool.connection() as conn:
+        async with self.connection_pool.acquire() as conn:
             # Create tables for ML monitoring
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS ml_metrics (
@@ -258,14 +259,17 @@ class OTelMigrationValidator:
 
             if self.connection_pool:
                 # Use connection pool if available
-                async with self.connection_pool.connection() as conn:
+                async with self.connection_pool.acquire() as conn:
                     await conn.execute("SELECT 1")
                     return True
             else:
                 # Direct connection
-                async with await psycopg.AsyncConnection.connect(self.db_url) as conn:
+                conn = await asyncpg.connect(self.db_url)
+                try:
                     await conn.execute("SELECT 1")
                     return True
+                finally:
+                    await conn.close()
         except Exception as e:
             print(f"❌ Database connection failed: {e}")
             return False
@@ -413,17 +417,16 @@ class OTelMigrationValidator:
             return
 
         try:
-            async with self.connection_pool.connection() as conn:
-                # Use psycopg3's Json adapter for JSONB columns (2025 best practice)
-                from psycopg.types.json import Json
+            async with self.connection_pool.acquire() as conn:
+                # Use asyncpg's JSON handling for JSONB columns (2025 best practice)
+                import json
                 await conn.execute(
                     """
                     INSERT INTO ml_metrics (metric_name, metric_value, labels, component)
-                    VALUES (%s, %s, %s, %s)
+                    VALUES ($1, $2, $3, $4)
                     """,
-                    (f"{component}_validation", value, Json({"test": True, "validation_run": True}), component)
+                    f"{component}_validation", value, json.dumps({"test": True, "validation_run": True}), component
                 )
-                await conn.commit()
         except Exception as e:
             print(f"⚠️  Failed to store test metrics: {e}")
 
@@ -435,23 +438,22 @@ class OTelMigrationValidator:
             return
 
         try:
-            async with self.connection_pool.connection() as conn:
+            async with self.connection_pool.acquire() as conn:
                 # Store analysis result
-                # Use psycopg3's Json adapter for JSONB columns (2025 best practice)
-                from psycopg.types.json import Json
+                # Use asyncpg's JSON handling for JSONB columns (2025 best practice)
+                import json
                 await conn.execute(
                     """
                     INSERT INTO failure_analysis (analysis_id, failure_type, confidence_score, analysis_data)
-                    VALUES (gen_random_uuid(), %s, %s, %s)
+                    VALUES (gen_random_uuid(), $1, $2, $3)
                     """,
-                    ("workflow_validation", 0.95, Json({
+                    "workflow_validation", 0.95, json.dumps({
                         "analysis_result": analysis_result,
                         "fmea_result": fmea_result,
                         "anomaly_result": anomaly_result,
                         "validation_timestamp": datetime.now(timezone.utc).isoformat()
-                    }))
+                    })
                 )
-                await conn.commit()
                 print("✅ Workflow results stored in database")
         except Exception as e:
             print(f"⚠️  Failed to store workflow results: {e}")

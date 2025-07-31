@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_session
+from ..database import get_unified_manager_async_modern, UnifiedConnectionManager
 from ..database.analytics_query_interface import (
     AnalyticsQueryInterface,
     TimeGranularity,
@@ -126,9 +126,9 @@ class SessionComparisonResponse(BaseModel):
 
 # Dependency injection
 
-async def get_analytics_interface(db_session: AsyncSession = Depends(get_session)) -> AnalyticsQueryInterface:
-    """Get analytics query interface"""
-    return AnalyticsQueryInterface(db_session)
+async def get_analytics_interface(db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)) -> AnalyticsQueryInterface:
+    """Get analytics query interface with unified connection manager"""
+    return AnalyticsQueryInterface(db_manager)
 
 async def get_ml_analysis_interface() -> MLAnalysisInterface:
     """Get ML analysis interface via dependency injection"""
@@ -439,7 +439,7 @@ async def websocket_dashboard_endpoint(
 
     Streams live analytics data to connected clients.
     """
-    await connection_manager.connect(websocket, "dashboard", user_id)
+    await connection_manager.connect_to_group(websocket, "analytics_dashboard", user_id)
 
     try:
         # Send initial dashboard data
@@ -598,7 +598,8 @@ async def broadcast_dashboard_updates():
         # For now, we'll skip the actual analytics call
         dashboard_data = {"status": "placeholder", "message": "Background update not implemented"}
 
-        await connection_manager.broadcast_to_all(
+        await connection_manager.broadcast_to_group(
+            "analytics_dashboard",
             {
                 "type": "dashboard_update",
                 "data": dashboard_data,
@@ -612,9 +613,10 @@ async def broadcast_dashboard_updates():
 async def broadcast_session_update(session_id: str, update_data: Dict[str, Any]):
     """Broadcast session update to all connected clients monitoring this session"""
     try:
-        # Note: ConnectionManager doesn't have broadcast_to_group method
-        # For now, we'll use broadcast_to_all as a placeholder
-        await connection_manager.broadcast_to_all(
+        # Use targeted group broadcasting for session-specific updates
+        session_group_id = f"session_{session_id}"
+        await connection_manager.broadcast_to_group(
+            session_group_id,
             {
                 "type": "session_update",
                 "session_id": session_id,

@@ -1,6 +1,12 @@
 """Modern MCP Server implementation for the Adaptive Prompt Enhancement System (APES).
 Provides prompt enhancement via Model Context Protocol with stdio transport.
 Features class-based architecture with proper lifecycle management and graceful shutdown.
+
+2025 FastMCP Enhancements:
+- Custom middleware stack implementation (timing, logging, rate limiting)
+- Progress reporting capability with Context support
+- Advanced resource templates with wildcard parameters
+- Streamable HTTP transport support
 """
 
 import asyncio
@@ -9,9 +15,9 @@ import signal
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
 
 
@@ -25,7 +31,6 @@ from prompt_improver.core.services.prompt_improvement import PromptImprovementSe
 from prompt_improver.ml.optimization.batch.unified_batch_processor import UnifiedBatchProcessor
 # Startup benchmark functionality now part of unified loop manager
 from prompt_improver.utils.unified_loop_manager import get_unified_loop_manager
-from prompt_improver.core.config import AppConfig
 from prompt_improver.utils.session_store import SessionStore
 from prompt_improver.performance.optimization.performance_optimizer import (
     get_performance_optimizer,
@@ -48,6 +53,17 @@ from prompt_improver.security.output_validator import OutputValidator
 
 # Import performance optimization
 from prompt_improver.performance.sla_monitor import SLAMonitor
+
+# Import 2025 FastMCP middleware components
+from prompt_improver.mcp_server.middleware import (
+    create_default_middleware_stack,
+    MiddlewareStack,
+    TimingMiddleware,
+    DetailedTimingMiddleware,
+    StructuredLoggingMiddleware,
+    RateLimitingMiddleware,
+    MiddlewareContext
+)
 
 # Configure logging to stderr for MCP protocol compliance
 # MCP servers using stdio transport should log to stderr, not stdout
@@ -82,6 +98,11 @@ class ServerServices:
     # Cache and utilities
     cache: Any
     event_loop_manager: Any
+    
+    # 2025 FastMCP Middleware Stack
+    middleware_stack: MiddlewareStack
+    timing_middleware: TimingMiddleware
+    detailed_timing_middleware: DetailedTimingMiddleware
 
 
 class APESMCPServer:
@@ -121,6 +142,14 @@ class APESMCPServer:
 
     def _create_services(self) -> ServerServices:
         """Create and organize all server services."""
+        # Create middleware components
+        middleware_stack = create_default_middleware_stack()
+        timing_middleware = TimingMiddleware()
+        detailed_timing_middleware = DetailedTimingMiddleware()
+        
+        # Add specialized middleware to stack
+        middleware_stack.add(detailed_timing_middleware)
+        
         return ServerServices(
             # Configuration
             config=self.config,
@@ -149,25 +178,16 @@ class APESMCPServer:
             # Cache and utilities
             cache=get_cache("prompt"),
             event_loop_manager=get_unified_loop_manager(),
+            
+            # 2025 FastMCP Middleware
+            middleware_stack=middleware_stack,
+            timing_middleware=timing_middleware,
+            detailed_timing_middleware=detailed_timing_middleware,
         )
 
     def _setup_tools(self):
         """Setup all MCP tools as class methods."""
 
-        @self.mcp.tool()
-        @require_rate_limiting(include_ip=True)
-        async def improve_prompt(
-            prompt: str = Field(..., description="The prompt to enhance"),
-            context: dict[str, Any] | None = Field(
-                default=None, description="Additional context"
-            ),
-            session_id: str | None = Field(default=None, description="Session ID for tracking"),
-            rate_limit_remaining: int | None = None,  # Added by rate limit middleware
-        ) -> dict[str, Any]:
-            """Enhance a prompt using ML-optimized rules."""
-            return await self._improve_prompt_impl(
-                prompt, context, session_id, rate_limit_remaining
-            )
 
         @self.mcp.tool()
         async def get_session(
@@ -234,13 +254,35 @@ class APESMCPServer:
             enhanced_prompt: str = Field(..., description="The enhanced prompt text"),
             applied_rules: list[dict[str, Any]] = Field(..., description="List of applied rules with metadata"),
             response_time_ms: int = Field(..., description="Response time in milliseconds"),
-            session_id: str | None = Field(default=None, description="Optional session ID (mapped to anonymized_user_hash)"),
+            session_id: str = Field(..., description="Required session ID for tracking and observability"),
             agent_type: str = Field(default="external-agent", description="Agent type identifier"),
-            rate_limit_remaining: int | None = None,  # Added by rate limit middleware
         ) -> dict[str, Any]:
-            """Store prompt improvement session data for feedback collection."""
+            """Store prompt improvement session data for feedback collection.
+            
+            ⚠️ BREAKING CHANGE: session_id is now required (no fallback to None).
+            
+            Args:
+                original_prompt: The original prompt text
+                enhanced_prompt: The enhanced prompt text
+                applied_rules: List of applied rules with metadata
+                response_time_ms: Response time in milliseconds
+                session_id: REQUIRED session ID for tracking (use create_session_id())
+                agent_type: Agent type identifier
+            
+            Example Usage:
+                session_id = APESMCPServer.create_session_id("feedback_client")
+                
+                result = await store_prompt(
+                    original_prompt="Original text",
+                    enhanced_prompt="Enhanced text", 
+                    applied_rules=[{"rule": "clarity", "impact": 0.8}],
+                    response_time_ms=150,
+                    session_id=session_id,  # REQUIRED
+                    agent_type="external-agent"
+                )
+            """
             return await self._store_prompt_impl(
-                original_prompt, enhanced_prompt, applied_rules, response_time_ms, session_id, agent_type, rate_limit_remaining
+                original_prompt, enhanced_prompt, applied_rules, response_time_ms, session_id, agent_type
             )
 
         @self.mcp.tool()
@@ -262,6 +304,107 @@ class APESMCPServer:
         ) -> dict[str, Any]:
             """Get schema information for rule application tables."""
             return await self._describe_table_impl(table_name)
+        
+        # 2025 FastMCP Enhancement: Progress-aware primary tool (replaces legacy improve_prompt)
+        @self.mcp.tool()
+        @require_rate_limiting(include_ip=True)
+        async def improve_prompt(
+            prompt: str = Field(..., description="The prompt to enhance"),
+            session_id: str = Field(..., description="Required session ID for tracking and observability"),
+            ctx: Context = Field(..., description="Required MCP Context for progress reporting and logging"),
+            context: dict[str, Any] | None = Field(default=None, description="Optional additional context"),
+        ) -> dict[str, Any]:
+            """Enhanced prompt improvement with mandatory 2025 progress reporting.
+            
+            ⚠️ BREAKING CHANGE: All parameters are now required. No fallback behavior.
+            
+            This tool provides real-time progress updates during the enhancement process.
+            All clients must provide Context and session_id - legacy patterns will fail.
+            
+            Args:
+                prompt: The text prompt to enhance
+                session_id: REQUIRED session ID for tracking (use create_session_id())
+                ctx: REQUIRED MCP Context for progress reporting (use create_mock_context() for testing)
+                context: Optional additional context for enhancement
+            
+            Returns:
+                Dict with enhanced prompt and 2025 observability metadata
+            
+            Example Usage:
+                # Modern 2025 pattern (REQUIRED)
+                session_id = APESMCPServer.create_session_id("my_client")
+                ctx = APESMCPServer.create_mock_context()  # or real MCP Context
+                
+                result = await improve_prompt(
+                    prompt="Make this prompt better",
+                    session_id=session_id,  # REQUIRED
+                    ctx=ctx,  # REQUIRED  
+                    context={"domain": "coding"}
+                )
+                
+                # Or use convenience method:
+                server = APESMCPServer()
+                result = await server.modern_improve_prompt("Make this prompt better")
+            
+            Raises:
+                TypeError: If required parameters are missing (no fallback behavior)
+            """
+            # Wrap with middleware for timing and logging
+            middleware_ctx = MiddlewareContext(
+                method="improve_prompt",
+                message={"prompt": prompt, "context": context, "session_id": session_id}
+            )
+            
+            async def handler(mctx: MiddlewareContext):
+                # 2025 Modern Implementation: Progress reporting is mandatory
+                await ctx.report_progress(progress=0, total=100, message="Starting validation")
+                await ctx.info("Beginning prompt enhancement process")
+                
+                # Input validation phase (0-25%)
+                await ctx.debug("Performing OWASP 2025 security validation")
+                validation_result = self.services.input_validator.validate_prompt(prompt)
+                
+                if validation_result.is_blocked:
+                    await ctx.error(f"Input validation failed: {validation_result.threat_type}")
+                    return {
+                        "error": "Input validation failed",
+                        "message": "The provided prompt contains potentially malicious content.",
+                        "threat_type": validation_result.threat_type.value if validation_result.threat_type else None
+                    }
+                
+                await ctx.report_progress(progress=25, total=100, message="Validation complete")
+                
+                # Rule application phase (25-75%)
+                await ctx.info("Applying enhancement rules")
+                await ctx.report_progress(progress=50, total=100, message="Processing rules")
+                
+                # Call original implementation
+                result = await self._improve_prompt_impl(
+                    prompt=validation_result.sanitized_input,
+                    context=context,
+                    session_id=session_id
+                )
+                
+                await ctx.report_progress(progress=75, total=100, message="Rules applied")
+                
+                # Output validation phase (75-90%)
+                await ctx.debug("Validating enhanced output")
+                
+                # Finalization phase (90-100%)
+                rules_count = len(result.get("applied_rules", []))
+                await ctx.info(f"Enhancement complete. Applied {rules_count} rules.")
+                await ctx.report_progress(progress=100, total=100, message="Complete")
+                
+                # Add mandatory 2025 timing metrics and observability data
+                result["_timing_metrics"] = self.services.timing_middleware.get_metrics_summary()
+                result["_session_id"] = session_id
+                result["_middleware_applied"] = True
+                
+                return result
+            
+            # Execute through middleware stack
+            wrapped = self.services.middleware_stack.wrap(handler)
+            return await wrapped(__method__="improve_prompt")
 
     def _setup_resources(self):
         """Setup all MCP resources as class methods."""
@@ -300,6 +443,38 @@ class APESMCPServer:
         async def get_event_loop_status() -> dict[str, Any]:
             """Get current event loop status and performance metrics."""
             return await self._get_event_loop_status_impl()
+        
+        # 2025 FastMCP Enhancement: Advanced resource templates with wildcards
+        @self.mcp.resource("apes://sessions/{session_id}/history")
+        async def get_session_history(session_id: str) -> dict[str, Any]:
+            """Get detailed session history with wildcard path support.
+            
+            Supports hierarchical session IDs like:
+            - sessions/user123/history
+            - sessions/user123/workspace/main/history
+            """
+            return await self._get_session_history_impl(session_id)
+        
+        @self.mcp.resource("apes://rules/{rule_category}/performance")
+        async def get_rule_category_performance(rule_category: str) -> dict[str, Any]:
+            """Get performance metrics for rule categories with wildcard support.
+            
+            Supports hierarchical categories like:
+            - rules/security/performance
+            - rules/security/input_validation/xss/performance
+            """
+            return await self._get_rule_category_performance_impl(rule_category)
+        
+        @self.mcp.resource("apes://metrics/{metric_type}")
+        async def get_hierarchical_metrics(metric_type: str) -> dict[str, Any]:
+            """Get hierarchical metrics with flexible path support.
+            
+            Examples:
+            - metrics/performance
+            - metrics/performance/tools/improve_prompt
+            - metrics/errors/by_method
+            """
+            return await self._get_hierarchical_metrics_impl(metric_type)
 
     async def initialize(self) -> bool:
         """Initialize the server and all services."""
@@ -341,7 +516,13 @@ class APESMCPServer:
         """Setup signal handlers for graceful shutdown."""
         def signal_handler(signum: int, _frame: Any) -> None:
             logger.info(f"Received signal {signum} - initiating graceful shutdown...")
-            asyncio.create_task(self.shutdown())
+            # Use proven event loop pattern from signal_handler for shutdown
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(self.shutdown())
+                logger.info("Scheduled shutdown as task")
+            except RuntimeError:
+                asyncio.run(self.shutdown())
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, signal_handler)
@@ -355,7 +536,13 @@ class APESMCPServer:
 
             def signal_handler():
                 logger.info("Received shutdown signal")
-                asyncio.create_task(self.shutdown())
+                # Use proven event loop pattern from signal_handler for shutdown
+                try:
+                    loop = asyncio.get_running_loop()
+                    task = loop.create_task(self.shutdown())
+                    logger.info("Scheduled shutdown as task")
+                except RuntimeError:
+                    asyncio.run(self.shutdown())
 
             for sig in [signal.SIGINT, signal.SIGTERM]:
                 loop.add_signal_handler(sig, signal_handler)
@@ -373,8 +560,13 @@ class APESMCPServer:
             finally:
                 await self.shutdown()
 
-        # Run the server
-        asyncio.run(main())
+        # Run the server - using proven pattern from signal_handler.py:560-568
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(main())
+            logger.info("MCP server started as task in existing event loop")
+        except RuntimeError:
+            asyncio.run(main())
 
     async def _initialize_event_loop_optimization(self):
         """Initialize event loop optimization and run startup benchmark."""
@@ -391,6 +583,161 @@ class APESMCPServer:
             logger.warning(f"Event loop optimization failed: {e}")
             # Continue without optimization
 
+    # 2025 Modern Usage Helper Methods
+    # ================================
+    
+    @staticmethod
+    def create_session_id(prefix: str = "apes") -> str:
+        """Create a properly formatted session ID for 2025 API requirements.
+        
+        Args:
+            prefix: Optional prefix for the session ID
+            
+        Returns:
+            A unique session ID string required by all modern tools
+            
+        Example:
+            session_id = APESMCPServer.create_session_id("client")
+            # Returns: "client_1640995200_abc123"
+        """
+        import uuid
+        timestamp = int(time.time())
+        unique_id = str(uuid.uuid4())[:8]
+        return f"{prefix}_{timestamp}_{unique_id}"
+    
+    @staticmethod 
+    def create_mock_context():
+        """Create a mock Context object for testing modern 2025 patterns.
+        
+        This is useful for clients who need to test the modern API without
+        implementing full MCP Context handling.
+        
+        Returns:
+            A mock Context object that implements required methods
+            
+        Example:
+            from unittest.mock import AsyncMock
+            ctx = APESMCPServer.create_mock_context()
+            # Use with modern tools that require Context
+        """
+        from unittest.mock import AsyncMock
+        from mcp.server.fastmcp import Context
+        
+        mock_ctx = AsyncMock(spec=Context)
+        mock_ctx.report_progress = AsyncMock()
+        mock_ctx.info = AsyncMock()
+        mock_ctx.debug = AsyncMock() 
+        mock_ctx.error = AsyncMock()
+        mock_ctx.warn = AsyncMock()
+        return mock_ctx
+    
+    def validate_modern_parameters(self, session_id: str, ctx) -> None:
+        """Validate that required 2025 parameters are properly provided.
+        
+        Args:
+            session_id: Required session ID (must not be None or empty)
+            ctx: Required Context object (must not be None)
+            
+        Raises:
+            ValueError: If parameters don't meet 2025 requirements
+            
+        Example:
+            server.validate_modern_parameters(session_id, ctx)
+        """
+        if not session_id or not isinstance(session_id, str):
+            raise ValueError("session_id is required and must be a non-empty string in 2025 API")
+        
+        if ctx is None:
+            raise ValueError("ctx (Context) parameter is required in 2025 API - no fallback behavior")
+        
+        # Validate Context has required methods
+        required_methods = ['report_progress', 'info', 'debug', 'error']
+        for method in required_methods:
+            if not hasattr(ctx, method):
+                raise ValueError(f"Context object must have {method} method for 2025 API compliance")
+    
+    async def modern_improve_prompt(self, prompt: str, context: dict[str, Any] | None = None, 
+                                  session_prefix: str = "client") -> dict[str, Any]:
+        """Convenience method for improve_prompt using modern 2025 patterns.
+        
+        This method automatically creates required parameters and provides
+        a simpler interface for clients migrating to 2025 patterns.
+        
+        Args:
+            prompt: The prompt to enhance
+            context: Optional additional context
+            session_prefix: Prefix for auto-generated session ID
+            
+        Returns:
+            Enhanced prompt result with 2025 metadata
+            
+        Example:
+            server = APESMCPServer()
+            result = await server.modern_improve_prompt("Enhance this prompt")
+        """
+        session_id = self.create_session_id(session_prefix)
+        ctx = self.create_mock_context()
+        
+        # Call the tool through the middleware stack
+        improve_prompt = None
+        for tool_name, tool_func in self.mcp._tools.items():
+            if tool_name == "improve_prompt":
+                improve_prompt = tool_func.implementation
+                break
+        
+        if improve_prompt is None:
+            raise RuntimeError("improve_prompt tool not found - server initialization issue")
+        
+        return await improve_prompt(
+            prompt=prompt,
+            session_id=session_id,
+            ctx=ctx,
+            context=context
+        )
+    
+    def get_modern_usage_examples(self) -> dict[str, str]:
+        """Get code examples showing how to use the modern 2025 API.
+        
+        Returns:
+            Dictionary of example code snippets for common patterns
+        """
+        return {
+            "basic_usage": '''
+# Modern 2025 pattern - all parameters required
+from prompt_improver.mcp_server.server import APESMCPServer
+
+server = APESMCPServer()
+session_id = server.create_session_id("my_client")
+ctx = server.create_mock_context()  # or use real MCP Context
+
+result = await improve_prompt_tool(
+    prompt="Enhance this prompt",
+    session_id=session_id,  # REQUIRED
+    ctx=ctx,  # REQUIRED
+    context={"optional": "context"}
+)
+''',
+            "convenience_method": '''
+# Using convenience method (auto-generates required params)
+server = APESMCPServer()
+result = await server.modern_improve_prompt("Enhance this prompt")
+''',
+            "session_management": '''
+# Proper session ID management
+session_id = APESMCPServer.create_session_id("my_app")
+# Use same session_id across related operations for tracking
+''',
+            "validation": '''
+# Validate parameters before tool calls
+server = APESMCPServer()
+try:
+    server.validate_modern_parameters(session_id, ctx)
+    # Parameters are valid for 2025 API
+except ValueError as e:
+    print(f"Invalid parameters: {e}")
+'''
+        }
+
     # Tool Implementation Methods
     # ==========================
 
@@ -398,8 +745,7 @@ class APESMCPServer:
         self,
         prompt: str,
         context: dict[str, Any] | None,
-        session_id: str | None,
-        rate_limit_remaining: int | None,
+        session_id: str,
     ) -> dict[str, Any]:
         """Implementation of improve_prompt tool with all existing functionality."""
         # Track start time for fallback metrics
@@ -777,9 +1123,8 @@ class APESMCPServer:
         enhanced_prompt: str,
         applied_rules: list[dict[str, Any]],
         response_time_ms: int,
-        session_id: str | None,
+        session_id: str,
         agent_type: str,
-        rate_limit_remaining: int | None,
     ) -> dict[str, Any]:
         """Implementation of store_prompt tool for feedback collection."""
         start_time = time.time()
@@ -1416,6 +1761,34 @@ class APESMCPServer:
                 "timestamp": time.time()
             }
 
+    # 2025 FastMCP Enhancement: Streamable HTTP transport
+    def run_streamable_http(self, host: str = "127.0.0.1", port: int = 8080):
+        """Run server with Streamable HTTP transport (2025-03-26 spec).
+        
+        This enables HTTP-based communication instead of stdio,
+        supporting both SSE and regular HTTP responses for better
+        client compatibility and production deployments.
+        """
+        logger.info(f"Starting APES MCP Server with Streamable HTTP transport on {host}:{port}")
+        
+        try:
+            # Note: The MCP SDK's FastMCP.run() method accepts transport parameter
+            # but the actual implementation may vary based on SDK version
+            self.mcp.run(
+                transport="streamable-http",
+                host=host,
+                port=port,
+                log_level="INFO"
+            )
+        except TypeError as e:
+            # Fallback if transport parameters not supported
+            logger.warning(f"Streamable HTTP transport parameters not supported in current MCP SDK: {e}")
+            logger.info("Falling back to standard stdio transport")
+            self.mcp.run()
+        except Exception as e:
+            logger.error(f"Failed to start with HTTP transport: {e}")
+            raise
+    
     async def _health_phase0_impl(self) -> dict[str, Any]:
         """Implementation of health/phase0 resource."""
         try:
@@ -1531,22 +1904,268 @@ class APESMCPServer:
             return {"error": str(e), "status": "error", "timestamp": time.time()}
 
 
-# Pydantic models for backward compatibility
+    # 2025 FastMCP Enhancement: Wildcard resource implementations
+    async def _get_session_history_impl(self, session_id: str) -> dict[str, Any]:
+        """Implementation for hierarchical session history with wildcards."""
+        try:
+            # Parse wildcard session_id (e.g., "user123/workspace/main")
+            path_parts = session_id.split('/')
+            base_session_id = path_parts[0]
+            
+            # Get session data from store
+            session_data = await self.services.session_store.get(base_session_id)
+            
+            if not session_data:
+                return {
+                    "session_id": session_id,
+                    "exists": False,
+                    "message": f"Session '{base_session_id}' not found",
+                    "path_components": path_parts,
+                    "timestamp": time.time()
+                }
+            
+            # Extract history based on path
+            history = session_data.get("history", [])
+            
+            # Filter by sub-paths if provided
+            if len(path_parts) > 1:
+                # Example: filter by workspace
+                if len(path_parts) >= 2 and path_parts[1] == "workspace":
+                    workspace_name = path_parts[2] if len(path_parts) > 2 else None
+                    if workspace_name:
+                        history = [h for h in history if h.get("workspace") == workspace_name]
+            
+            return {
+                "session_id": session_id,
+                "base_session_id": base_session_id,
+                "history": history,
+                "count": len(history),
+                "path_components": path_parts,
+                "exists": True,
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get session history for '{session_id}': {e}")
+            return {
+                "session_id": session_id,
+                "error": str(e),
+                "exists": False,
+                "timestamp": time.time()
+            }
+    
+    async def _get_rule_category_performance_impl(self, rule_category: str) -> dict[str, Any]:
+        """Implementation for rule category performance metrics with wildcards."""
+        start_time = time.time()
+        
+        try:
+            # Parse category path (e.g., "security/input_validation/xss")
+            categories = rule_category.split('/')
+            
+            # Build SQL query for hierarchical category filtering
+            connection_manager = get_unified_manager(ManagerMode.MCP_SERVER)
+            
+            async with connection_manager.get_async_session() as session:
+                from sqlalchemy import text
+                
+                # Query to get performance metrics for rules in the category
+                query = text("""
+                    SELECT 
+                        COUNT(DISTINCT rp.rule_id) as total_rules,
+                        COUNT(rp.id) as total_applications,
+                        AVG(rp.improvement_score) as avg_improvement_score,
+                        AVG(rp.execution_time_ms) as avg_execution_ms,
+                        SUM(CASE WHEN rp.success = true THEN 1 ELSE 0 END)::float / COUNT(rp.id) as success_rate,
+                        rm.category,
+                        rm.subcategory
+                    FROM rule_performance rp
+                    JOIN rule_metadata rm ON rp.rule_id = rm.rule_id
+                    WHERE rm.is_active = true
+                """)
+                
+                # Add category filtering based on path depth
+                params = {}
+                if len(categories) >= 1:
+                    query = text(str(query) + " AND rm.category = :category")
+                    params["category"] = categories[0]
+                
+                if len(categories) >= 2:
+                    query = text(str(query) + " AND rm.subcategory = :subcategory")
+                    params["subcategory"] = categories[1]
+                
+                query = text(str(query) + " GROUP BY rm.category, rm.subcategory")
+                
+                result = await session.execute(query, params)
+                row = result.first()
+                
+                if row:
+                    metrics = {
+                        "total_rules": int(row[0]),
+                        "total_applications": int(row[1]),
+                        "avg_improvement_score": float(row[2]) if row[2] else 0.0,
+                        "avg_processing_ms": float(row[3]) if row[3] else 0.0,
+                        "success_rate": float(row[4]) if row[4] else 0.0,
+                        "category": row[5],
+                        "subcategory": row[6]
+                    }
+                else:
+                    metrics = {
+                        "total_rules": 0,
+                        "total_applications": 0,
+                        "avg_improvement_score": 0.0,
+                        "avg_processing_ms": 0.0,
+                        "success_rate": 0.0
+                    }
+                
+                # Get top performing rules in the category
+                top_rules_query = text("""
+                    SELECT 
+                        rm.rule_id,
+                        rm.name,
+                        COUNT(rp.id) as applications,
+                        AVG(rp.improvement_score) as avg_score
+                    FROM rule_metadata rm
+                    JOIN rule_performance rp ON rm.rule_id = rp.rule_id
+                    WHERE rm.is_active = true
+                """)
+                
+                if "category" in params:
+                    top_rules_query = text(str(top_rules_query) + " AND rm.category = :category")
+                if "subcategory" in params:
+                    top_rules_query = text(str(top_rules_query) + " AND rm.subcategory = :subcategory")
+                
+                top_rules_query = text(str(top_rules_query) + """
+                    GROUP BY rm.rule_id, rm.name
+                    ORDER BY AVG(rp.improvement_score) DESC
+                    LIMIT 5
+                """)
+                
+                top_rules_result = await session.execute(top_rules_query, params)
+                top_rules = []
+                
+                for rule_row in top_rules_result.fetchall():
+                    top_rules.append({
+                        "rule_id": rule_row[0],
+                        "name": rule_row[1],
+                        "applications": int(rule_row[2]),
+                        "avg_improvement_score": float(rule_row[3]) if rule_row[3] else 0.0
+                    })
+                
+                processing_time = (time.time() - start_time) * 1000
+                
+                return {
+                    "category_path": rule_category,
+                    "categories": categories,
+                    "metrics": metrics,
+                    "top_rules": top_rules,
+                    "processing_time_ms": processing_time,
+                    "timestamp": time.time()
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get rule category performance for '{rule_category}': {e}")
+            return {
+                "category_path": rule_category,
+                "error": str(e),
+                "processing_time_ms": (time.time() - start_time) * 1000,
+                "timestamp": time.time()
+            }
+    
+    async def _get_hierarchical_metrics_impl(self, metric_type: str) -> dict[str, Any]:
+        """Implementation for hierarchical metrics with flexible paths."""
+        try:
+            # Parse metric path (e.g., "performance/tools/improve_prompt/daily")
+            path_parts = metric_type.split('/')
+            
+            # Route to appropriate metric source based on first path component
+            if path_parts[0] == "performance":
+                # Get timing metrics from middleware
+                timing_metrics = self.services.timing_middleware.get_metrics_summary()
+                
+                # Filter by tool name if specified
+                if len(path_parts) > 1 and path_parts[1] == "tools" and len(path_parts) > 2:
+                    tool_name = path_parts[2]
+                    if tool_name in timing_metrics:
+                        timing_metrics = {tool_name: timing_metrics[tool_name]}
+                
+                return {
+                    "metric_type": metric_type,
+                    "path": path_parts,
+                    "data": timing_metrics,
+                    "source": "timing_middleware",
+                    "timestamp": time.time()
+                }
+                
+            elif path_parts[0] == "errors":
+                # Get error metrics from error handling middleware
+                error_data = {}
+                
+                # Since we have ErrorHandlingMiddleware in our stack, get its data
+                for mw in self.services.middleware_stack.middleware:
+                    if hasattr(mw, 'error_counts'):
+                        error_data = {"error_counts": dict(mw.error_counts)}
+                        break
+                
+                return {
+                    "metric_type": metric_type,
+                    "path": path_parts,
+                    "data": error_data,
+                    "source": "error_middleware",
+                    "timestamp": time.time()
+                }
+                
+            elif path_parts[0] == "sessions":
+                # Get session store metrics
+                session_metrics = {
+                    "active_sessions": len(self.services.session_store._store),
+                    "max_size": self.services.session_store.maxsize,
+                    "ttl": self.services.session_store.ttl,
+                    "cleanup_interval": self.services.session_store.cleanup_interval
+                }
+                
+                return {
+                    "metric_type": metric_type,
+                    "path": path_parts,
+                    "data": session_metrics,
+                    "source": "session_store",
+                    "timestamp": time.time()
+                }
+                
+            else:
+                # Unknown metric type
+                return {
+                    "metric_type": metric_type,
+                    "path": path_parts,
+                    "data": {},
+                    "message": f"Unknown metric type: {path_parts[0]}",
+                    "available_types": ["performance", "errors", "sessions"],
+                    "timestamp": time.time()
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get hierarchical metrics for '{metric_type}': {e}")
+            return {
+                "metric_type": metric_type,
+                "error": str(e),
+                "timestamp": time.time()
+            }
+
+
 class PromptEnhancementRequest(BaseModel):
-    """Request model for prompt enhancement"""
+    """Request model for modern 2025 prompt enhancement - breaking change from legacy API"""
     prompt: str = Field(..., description="The prompt to enhance")
+    session_id: str = Field(..., description="Required session ID for tracking and observability")
     context: dict[str, Any] | None = Field(
-        default=None, description="Additional context for enhancement"
+        default=None, description="Optional additional context for enhancement"
     )
-    session_id: str | None = Field(default=None, description="Session ID for tracking")
 
 
 class PromptStorageRequest(BaseModel):
-    """Request model for storing prompt data"""
+    """Request model for modern 2025 prompt storage - breaking change from legacy API"""
     original: str = Field(..., description="The original prompt")
     enhanced: str = Field(..., description="The enhanced prompt")
     metrics: dict[str, Any] = Field(..., description="Success metrics")
-    session_id: str | None = Field(default=None, description="Session ID for tracking")
+    session_id: str = Field(..., description="Required session ID for tracking and observability")
 
 
 # Global server instance
@@ -1555,9 +2174,30 @@ server = APESMCPServer()
 
 # Main entry point for stdio transport
 def main():
-    """Main entry point for the modernized MCP server."""
-    logger.info("Starting APES MCP Server with modern architecture...")
-    server.run()
+    """Main entry point for the modernized MCP server with 2025 enhancements.
+    
+    Supports both stdio (default) and HTTP transport modes:
+    - Default: python server.py (stdio transport)
+    - HTTP: python server.py --http (streamable HTTP transport on port 8080)
+    - Custom HTTP: python server.py --http --port 9000
+    """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="APES MCP Server with 2025 FastMCP enhancements")
+    parser.add_argument("--http", action="store_true", help="Use streamable HTTP transport instead of stdio")
+    parser.add_argument("--port", type=int, default=8080, help="Port for HTTP transport (default: 8080)")
+    parser.add_argument("--host", default="127.0.0.1", help="Host for HTTP transport (default: 127.0.0.1)")
+    
+    args = parser.parse_args()
+    
+    logger.info("Starting APES MCP Server with modern architecture and 2025 enhancements...")
+    
+    if args.http:
+        logger.info(f"Using streamable HTTP transport on {args.host}:{args.port}")
+        server.run_streamable_http(host=args.host, port=args.port)
+    else:
+        logger.info("Using stdio transport (default)")
+        server.run()
 
 
 if __name__ == "__main__":

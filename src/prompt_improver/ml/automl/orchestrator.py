@@ -373,17 +373,13 @@ class AutoMLOrchestrator:
             import asyncio
 
             try:
-                # Check if we're already in an async context
+                # Use proven signal_handler pattern for async standardization
                 try:
                     loop = asyncio.get_running_loop()
-                    # If we have a running loop, we need to run in executor
-                    # to avoid "cannot be called from a running event loop" error
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(asyncio.run, async_objective_impl(trial))
-                        return future.result()
+                    # We're in an async context - use run_coroutine_threadsafe for proper async handling
+                    return asyncio.run_coroutine_threadsafe(async_objective_impl(trial), loop).result()
                 except RuntimeError:
-                    # No running event loop, safe to use asyncio.run()
+                    # No running event loop, safe to use asyncio.run
                     return asyncio.run(async_objective_impl(trial))
             except Exception as e:
                 logger.error(f"Objective function wrapper failed: {e}")

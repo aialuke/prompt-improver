@@ -18,6 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
+# Enhanced background task management integration
+from ...performance.monitoring.health.background_manager import (
+    EnhancedBackgroundTaskManager,
+    TaskPriority,
+    get_background_task_manager
+)
+
 from ...database.models import ABExperiment, RulePerformance
 from ...core.services.analytics_factory import get_analytics_router
 from .advanced_statistical_validator import (
@@ -192,6 +199,7 @@ class ExperimentOrchestrator:
         pattern_analyzer: PatternSignificanceAnalyzer | None = None,
         causal_analyzer: CausalInferenceAnalyzer | None = None,
         real_time_service: Any | None = None,
+        task_manager: EnhancedBackgroundTaskManager | None = None,
     ):
         """Initialize experiment orchestrator
 
@@ -201,6 +209,7 @@ class ExperimentOrchestrator:
             pattern_analyzer: Pattern significance analyzer
             causal_analyzer: Causal inference analyzer
             real_time_service: Real-time analytics service (deprecated - use analytics_router instead)
+            task_manager: Enhanced background task manager for centralized task management
         """
         self.db_session = db_session
 
@@ -212,14 +221,25 @@ class ExperimentOrchestrator:
         self.causal_analyzer = causal_analyzer or CausalInferenceAnalyzer()
         self.real_time_service = real_time_service
 
+        # Enhanced background task management integration
+        self.task_manager = task_manager or get_background_task_manager()
+        
         # Active experiments tracking
         self.active_experiments: dict[str, ExperimentConfiguration] = {}
-        self.experiment_tasks: dict[str, asyncio.Task] = {}
+        self.experiment_tasks: dict[str, str] = {}  # Track task IDs instead of asyncio tasks
 
         # Bayesian analysis capabilities
         self.bayesian_analyzer = None
         self.bayesian_config = None
         self.bayesian_monitoring_enabled = False
+        
+        # Task monitoring and lifecycle management
+        self.task_monitoring_enabled = True
+        self.experiment_task_timeout = 24 * 3600  # 24 hours default timeout
+        
+        logger.info(
+            f"Experiment Orchestrator initialized with task manager: {type(self.task_manager).__name__}"
+        )
 
     async def setup_experiment(self, config: ExperimentConfiguration) -> dict[str, Any]:
         """Set up and validate a new experiment
@@ -259,11 +279,20 @@ class ExperimentOrchestrator:
             # Store in active experiments
             self.active_experiments[config.experiment_id] = config
 
-            # Start experiment monitoring task
-            monitoring_task = asyncio.create_task(
-                self._monitor_experiment(config.experiment_id)
+            # Start experiment monitoring task using managed background tasks
+            monitoring_task_id = f"experiment_monitor_{config.experiment_id}_{int(datetime.now().timestamp())}"
+            task_id = await self.task_manager.submit_enhanced_task(
+                task_id=monitoring_task_id,
+                coroutine=self._monitor_experiment(config.experiment_id),
+                priority=TaskPriority.NORMAL,
+                timeout=config.max_duration_days * 24 * 3600,  # Experiment duration in seconds
+                tags={
+                    "type": "experiment_monitoring",
+                    "experiment_id": config.experiment_id,
+                    "experiment_name": config.experiment_name
+                }
             )
-            self.experiment_tasks[config.experiment_id] = monitoring_task
+            self.experiment_tasks[config.experiment_id] = task_id
 
             logger.info(f"Experiment setup completed: {config.experiment_id}")
 
@@ -447,9 +476,10 @@ class ExperimentOrchestrator:
             if self.real_time_service:
                 await self.real_time_service.stop_experiment_monitoring(experiment_id)
 
-            # Cancel monitoring task
+            # Cancel monitoring task using managed task system
             if experiment_id in self.experiment_tasks:
-                self.experiment_tasks[experiment_id].cancel()
+                task_id = self.experiment_tasks[experiment_id]
+                await self.task_manager.cancel_task(task_id)
                 del self.experiment_tasks[experiment_id]
 
             # Remove from active experiments
@@ -498,6 +528,12 @@ class ExperimentOrchestrator:
             # Get current data summary
             experiment_data = await self._collect_experiment_data(experiment_id, config)
 
+            # Get enhanced task status if available
+            task_status = None
+            if experiment_id in self.experiment_tasks:
+                task_id = self.experiment_tasks[experiment_id]
+                task_status = self.task_manager.get_enhanced_task_status(task_id)
+
             return {
                 "experiment_id": experiment_id,
                 "status": "active",
@@ -517,6 +553,12 @@ class ExperimentOrchestrator:
                 "estimated_completion_date": self._estimate_completion_date(
                     config, experiment_data
                 ),
+                "task_management": {
+                    "task_manager_integration": True,
+                    "monitoring_task_status": task_status["status"] if task_status else "unknown",
+                    "task_execution_time": task_status.get("metrics", {}).get("total_duration", 0) if task_status else 0,
+                    "task_retry_count": task_status.get("retry_count", 0) if task_status else 0
+                },
             }
 
         except Exception as e:
@@ -528,15 +570,13 @@ class ExperimentOrchestrator:
         try:
             logger.info("Cleaning up experiment orchestrator")
 
-            # Cancel all monitoring tasks
-            for task in self.experiment_tasks.values():
-                task.cancel()
-
-            # Wait for tasks to complete
-            if self.experiment_tasks:
-                await asyncio.gather(
-                    *self.experiment_tasks.values(), return_exceptions=True
-                )
+            # Cancel all monitoring tasks using managed task system
+            cleanup_tasks = []
+            for experiment_id, task_id in list(self.experiment_tasks.items()):
+                cleanup_tasks.append(self.task_manager.cancel_task(task_id))
+            
+            if cleanup_tasks:
+                await asyncio.gather(*cleanup_tasks, return_exceptions=True)
 
             # Stop real-time services
             if self.real_time_service:
@@ -705,9 +745,9 @@ class ExperimentOrchestrator:
         return experiment
 
     async def _monitor_experiment(self, experiment_id: str):
-        """Background task to monitor experiment progress"""
+        """Background task to monitor experiment progress via managed task system"""
         try:
-            logger.info(f"Starting experiment monitoring: {experiment_id}")
+            logger.info(f"Starting managed experiment monitoring: {experiment_id}")
 
             while experiment_id in self.active_experiments:
                 try:
@@ -729,14 +769,14 @@ class ExperimentOrchestrator:
                     await asyncio.sleep(300)  # Check every 5 minutes
 
                 except asyncio.CancelledError:
-                    logger.info(f"Monitoring cancelled for {experiment_id}")
+                    logger.info(f"Managed monitoring cancelled for {experiment_id}")
                     break
                 except Exception as e:
-                    logger.error(f"Error in experiment monitoring {experiment_id}: {e}")
+                    logger.error(f"Error in managed experiment monitoring {experiment_id}: {e}")
                     await asyncio.sleep(300)  # Continue monitoring despite errors
 
         except Exception as e:
-            logger.error(f"Fatal error in experiment monitoring {experiment_id}: {e}")
+            logger.error(f"Fatal error in managed experiment monitoring {experiment_id}: {e}")
 
     async def _check_stopping_criteria(
         self, experiment_id: str, config: ExperimentConfiguration
@@ -1511,6 +1551,67 @@ class ExperimentOrchestrator:
             logger.warning(f"Error estimating completion date: {e}")
             return "Unknown"
 
+    async def get_orchestrator_status(self) -> dict[str, Any]:
+        """Get comprehensive orchestrator status with task management information."""
+        try:
+            # Get task manager statistics
+            task_stats = self.task_manager.get_statistics() if self.task_manager else {}
+            
+            # Get detailed task information for all experiment monitoring tasks
+            experiment_task_details = []
+            for experiment_id, task_id in self.experiment_tasks.items():
+                task_status = self.task_manager.get_enhanced_task_status(task_id)
+                if task_status:
+                    experiment_task_details.append({
+                        "experiment_id": experiment_id,
+                        "task_id": task_id,
+                        "status": task_status["status"],
+                        "execution_time": task_status.get("metrics", {}).get("total_duration", 0),
+                        "retry_count": task_status.get("retry_count", 0),
+                        "created_at": task_status.get("created_at"),
+                        "started_at": task_status.get("started_at")
+                    })
+            
+            return {
+                "orchestrator_status": {
+                    "active_experiments": len(self.active_experiments),
+                    "monitoring_tasks": len(self.experiment_tasks),
+                    "task_manager_integration": True,
+                    "bayesian_analysis_enabled": self.bayesian_monitoring_enabled,
+                    "task_monitoring_enabled": self.task_monitoring_enabled
+                },
+                "experiment_details": [
+                    {
+                        "experiment_id": exp_id,
+                        "experiment_name": config.experiment_name,
+                        "experiment_type": config.experiment_type.value,
+                        "arms": len(config.arms),
+                        "max_duration_days": config.max_duration_days
+                    }
+                    for exp_id, config in self.active_experiments.items()
+                ],
+                "task_management": {
+                    "task_manager_type": type(self.task_manager).__name__,
+                    "task_manager_stats": task_stats,
+                    "experiment_tasks": experiment_task_details,
+                    "total_tasks_managed": task_stats.get("total_submitted", 0),
+                    "currently_running_tasks": task_stats.get("currently_running", 0)
+                },
+                "performance_metrics": {
+                    "task_success_rate": task_stats.get("total_completed", 0) / max(1, task_stats.get("total_submitted", 0)),
+                    "task_failure_rate": task_stats.get("total_failed", 0) / max(1, task_stats.get("total_submitted", 0)),
+                    "task_retry_rate": task_stats.get("total_retries", 0) / max(1, task_stats.get("total_submitted", 0))
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting orchestrator status: {e}")
+            return {
+                "orchestrator_status": {"error": str(e)},
+                "active_experiments": len(self.active_experiments),
+                "monitoring_tasks": len(self.experiment_tasks)
+            }
+
     async def enable_bayesian_analysis(self, config: BayesianExperimentConfig = None) -> bool:
         """Enable Bayesian analysis capabilities for experiments.
 
@@ -1768,6 +1869,7 @@ async def quick_experiment_setup(
     control_rules: dict[str, Any],
     treatment_rules: dict[str, Any],
     db_session: AsyncSession,
+    task_manager: EnhancedBackgroundTaskManager | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Quick experiment setup for immediate use"""
@@ -1796,8 +1898,11 @@ async def quick_experiment_setup(
             **kwargs,
         )
 
-        # Set up experiment
-        orchestrator = ExperimentOrchestrator(db_session)
+        # Set up experiment with task manager integration
+        orchestrator = ExperimentOrchestrator(
+            db_session=db_session,
+            task_manager=task_manager
+        )
         result = await orchestrator.setup_experiment(config)
 
         return result

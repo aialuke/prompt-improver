@@ -16,14 +16,15 @@ source /workspace/.venv/bin/activate
 echo "Upgrading pip and core tools..."
 pip install --upgrade pip setuptools wheel pip-tools
 
-# Install dependencies
-echo "Installing project dependencies..."
-if [ -f "/workspace/requirements.txt" ]; then
-    pip install -r /workspace/requirements.txt
-fi
-
-if [ -f "/workspace/requirements-dev.txt" ]; then
-    pip install -r /workspace/requirements-dev.txt
+# Install dependencies from pyproject.toml
+echo "Installing project dependencies from pyproject.toml..."
+if [ -f "/workspace/pyproject.toml" ]; then
+    # Install uv for faster dependency management
+    pip install uv
+    # Install project with all optional dependencies
+    uv pip install -e "/workspace[dev,test,docs,security]"
+else
+    echo "Warning: pyproject.toml not found, skipping dependency installation"
 fi
 
 # Install pre-commit hooks

@@ -133,11 +133,16 @@ main() {
         print_success "Disk space available: ${FREE_DISK_GB}GB"
     fi
     
-    # Install/update dependencies
-    print_status "Installing/updating test dependencies..."
-    if [[ -f "$PROJECT_ROOT/requirements-test-real.txt" ]]; then
-        pip install -q -r "$PROJECT_ROOT/requirements-test-real.txt"
-        print_success "Test dependencies installed"
+    # Install/update dependencies from pyproject.toml
+    print_status "Installing/updating test dependencies from pyproject.toml..."
+    if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+        # Install uv if not available
+        if ! command -v uv &> /dev/null; then
+            pip install -q uv
+        fi
+        # Install project with test dependencies
+        uv pip install -q -e "$PROJECT_ROOT[test]"
+        print_success "Test dependencies installed from pyproject.toml"
     else
         pip install -q pytest numpy pandas scikit-learn scipy psutil
         print_success "Basic dependencies installed"

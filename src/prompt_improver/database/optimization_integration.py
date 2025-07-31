@@ -119,9 +119,9 @@ class DatabaseOptimizationIntegration:
     
     async def _warm_cache(self):
         """Warm cache with frequently used queries"""
-        from .psycopg_client import get_psycopg_client
+        from .unified_connection_manager import get_unified_manager, ManagerMode
         
-        client = await get_psycopg_client()
+        client = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         # Common queries to warm up
         warm_queries = [

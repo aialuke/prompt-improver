@@ -35,6 +35,7 @@ class EventType(Enum):
     
     # Training events
     TRAINING_STARTED = "training.started"
+    TRAINING_PROGRESS = "training.progress"
     TRAINING_EPOCH_COMPLETED = "training.epoch_completed"
     TRAINING_COMPLETED = "training.completed"
     TRAINING_FAILED = "training.failed"

@@ -45,17 +45,19 @@ async def test_core_phase0_components():
     
     try:
         os.environ["MCP_POSTGRES_PASSWORD"] = "test_mcp_password"
-        os.environ["MCP_DB_POOL_SIZE"] = "5"
-        os.environ["MCP_DB_MAX_OVERFLOW"] = "2"
+        # Use unified database pool configuration for tests
+        os.environ["DB_POOL_MIN_SIZE"] = "2"
+        os.environ["DB_POOL_MAX_SIZE"] = "8"
+        os.environ["DB_POOL_TIMEOUT"] = "5"
         os.environ["MCP_REQUEST_TIMEOUT_MS"] = "200"
         
-        from prompt_improver.database.mcp_connection_pool import MCPConnectionPool
+        from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode, get_mcp_connection_pool
         
         # Test configuration without actually connecting
-        pool = MCPConnectionPool(mcp_user_password="test_password")
-        print(f"  ✅ MCP Pool Configuration - Pool size: {pool.pool_size}")
-        print(f"  ✅ MCP Pool Configuration - Max overflow: {pool.max_overflow}")
-        print(f"  ✅ MCP Pool Configuration - Timeout: {pool.timeout_ms}ms")
+        pool = get_mcp_connection_pool()
+        print(f"  ✅ MCP Pool Configuration - Pool size: {pool.pool_config.pg_pool_size}")
+        print(f"  ✅ MCP Pool Configuration - Max overflow: {pool.pool_config.pg_max_overflow}")
+        print(f"  ✅ MCP Pool Configuration - Timeout: {pool.pool_config.pg_timeout}ms")
         print(f"  ✅ MCP Pool Configuration - Database URL: mcp_server_user@localhost:5432")
         
         await pool.close()  # Clean up

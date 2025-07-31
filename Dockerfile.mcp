@@ -14,10 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements and install dependencies
-COPY requirements.txt pyproject.toml ./
+# Copy pyproject.toml and install dependencies
+COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir uv && \
+    uv pip install --system .
 
 # Copy source code and install the package
 COPY src/ src/
@@ -52,12 +53,16 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
 
-# Phase 0 MCP Server Configuration
+# Phase 0 MCP Server Configuration (using environment variables)
 ENV MCP_LOG_LEVEL=INFO
 ENV FASTMCP_LOG_LEVEL=INFO
 ENV MCP_FEEDBACK_ENABLED=true
-ENV MCP_DB_POOL_SIZE=20
-ENV MCP_DB_MAX_OVERFLOW=10
+# Database pool settings - use unified configuration from host environment
+ENV DB_POOL_MIN_SIZE=${DB_POOL_MIN_SIZE:-4}
+ENV DB_POOL_MAX_SIZE=${DB_POOL_MAX_SIZE:-16}
+ENV DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-10}
+ENV REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-20}
+# MCP-specific settings
 ENV MCP_REQUEST_TIMEOUT_MS=200
 ENV MCP_CACHE_TTL_SECONDS=7200
 ENV MCP_PERFORMANCE_MONITORING_ENABLED=true
@@ -67,7 +72,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD python -c "\
 import asyncio, sys; \
 sys.path.insert(0, '/app/src'); \
-from prompt_improver.database.mcp_connection_pool import get_mcp_connection_pool; \
+from prompt_improver.database.unified_connection_manager import get_mcp_connection_pool; \
 async def check(): \
     try: \
         pool = get_mcp_connection_pool(); \

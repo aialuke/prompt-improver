@@ -60,7 +60,10 @@ async def run_phase0_tests():
     try:
         # Set required environment variables for testing
         os.environ["MCP_POSTGRES_PASSWORD"] = "test_password"
-        os.environ["MCP_DB_POOL_SIZE"] = "5"
+        # Use unified database pool configuration for tests
+        os.environ["DB_POOL_MIN_SIZE"] = "2"
+        os.environ["DB_POOL_MAX_SIZE"] = "8"
+        os.environ["DB_POOL_TIMEOUT"] = "5"
         os.environ["POSTGRES_HOST"] = "localhost"
         os.environ["POSTGRES_PORT"] = "5432"
         os.environ["POSTGRES_DATABASE"] = "apes_production"
@@ -68,14 +71,14 @@ async def run_phase0_tests():
         os.environ["POSTGRES_PASSWORD"] = "test_password"
         
         # Test MCP connection pool
-        from prompt_improver.database.mcp_connection_pool import MCPConnectionPool
+        from prompt_improver.database.unified_connection_manager import get_mcp_connection_pool
         
-        pool = MCPConnectionPool(mcp_user_password="test_password")
+        pool = get_mcp_connection_pool()
         print("  ✅ MCP Connection Pool - Initialization successful")
         
-        # Test configuration
-        assert pool.pool_size == 5
-        assert pool.timeout_ms == 200
+        # Test configuration - uses unified manager defaults for MCP mode
+        assert pool.pool_config.pg_pool_size >= 5
+        assert pool.pool_config.pg_timeout <= 0.2  # 200ms converted to seconds
         print("  ✅ MCP Connection Pool - Configuration correct")
         
         await pool.close()

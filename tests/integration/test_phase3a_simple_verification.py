@@ -94,7 +94,7 @@ async def test_enhanced_async_optimizer():
         )
 
         # Import ConnectionPoolManager (modern implementation)
-        from prompt_improver.performance.optimization.async_optimizer import ConnectionPoolManager
+        from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
 
         start_time = time.time()
 

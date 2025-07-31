@@ -16,11 +16,19 @@ from ..config.orchestrator_config import OrchestratorConfig
 from ..events.event_types import EventType, MLEvent
 from .workflow_types import WorkflowStep, WorkflowDefinition, WorkflowStepStatus
 
+# Enhanced background task management integration
+from ....performance.monitoring.health.background_manager import (
+    EnhancedBackgroundTaskManager,
+    TaskPriority,
+    get_background_task_manager
+)
+
 class WorkflowExecutor:
     """Executes individual workflows."""
     
     def __init__(self, workflow_id: str, definition: WorkflowDefinition, 
-                 config: OrchestratorConfig, event_bus):
+                 config: OrchestratorConfig, event_bus,
+                 task_manager: EnhancedBackgroundTaskManager | None = None):
         """Initialize workflow executor."""
         self.workflow_id = workflow_id
         self.definition = definition
@@ -28,11 +36,14 @@ class WorkflowExecutor:
         self.event_bus = event_bus
         self.logger = logging.getLogger(__name__)
         
+        # Enhanced background task management integration
+        self.task_manager = task_manager or get_background_task_manager()
+        
         # Execution state
         self.is_running = False
         self.is_cancelled = False
         self.step_results: Dict[str, Any] = {}
-        self.execution_task: Optional[asyncio.Task] = None
+        self.execution_task_id: Optional[str] = None  # Track managed task ID instead of asyncio task
         
     async def start(self, parameters: Dict[str, Any]) -> None:
         """Start workflow execution."""
@@ -42,9 +53,19 @@ class WorkflowExecutor:
         self.is_running = True
         self.is_cancelled = False
         
-        # Start execution task
-        self.execution_task = asyncio.create_task(
-            self._execute_workflow(parameters)
+        # Start execution task using managed task system
+        task_id = f"workflow_execution_{self.workflow_id}_{int(datetime.now().timestamp())}"
+        self.execution_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=task_id,
+            coroutine=self._execute_workflow(parameters),
+            priority=TaskPriority.HIGH,
+            timeout=self.config.workflow_timeout_seconds if hasattr(self.config, 'workflow_timeout_seconds') else 3600,
+            tags={
+                "type": "ml_workflow_execution",
+                "workflow_id": self.workflow_id,
+                "workflow_type": self.definition.workflow_type,
+                "component": "workflow_execution_engine"
+            }
         )
         
         await self.event_bus.emit(MLEvent(
@@ -64,12 +85,9 @@ class WorkflowExecutor:
         
         self.is_cancelled = True
         
-        if self.execution_task:
-            self.execution_task.cancel()
-            try:
-                await self.execution_task
-            except asyncio.CancelledError:
-                pass
+        if self.execution_task_id:
+            await self.task_manager.cancel_task(self.execution_task_id)
+            self.execution_task_id = None
         
         self.is_running = False
         
@@ -435,11 +453,16 @@ class WorkflowExecutionEngine:
         self.logger.info(f"Stopped workflow {workflow_id}")
     
     async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
-        """Get the status of a workflow."""
+        """Get the status of a workflow with enhanced task management information."""
         if workflow_id not in self.active_executors:
             raise ValueError(f"Workflow {workflow_id} not found")
         
         executor = self.active_executors[workflow_id]
+        
+        # Get enhanced task status if available
+        task_status = None
+        if executor.execution_task_id:
+            task_status = executor.task_manager.get_enhanced_task_status(executor.execution_task_id)
         
         return {
             "workflow_id": workflow_id,
@@ -457,7 +480,15 @@ class WorkflowExecutionEngine:
                 }
                 for step in executor.definition.steps
             ],
-            "results": executor.step_results
+            "results": executor.step_results,
+            "task_management": {
+                "task_manager_integration": True,
+                "execution_task_id": executor.execution_task_id,
+                "task_status": task_status["status"] if task_status else "unknown",
+                "execution_time": task_status.get("metrics", {}).get("total_duration", 0) if task_status else 0,
+                "retry_count": task_status.get("retry_count", 0) if task_status else 0,
+                "task_manager_type": type(executor.task_manager).__name__
+            }
         }
     
     async def list_workflow_definitions(self) -> List[str]:

@@ -7,13 +7,15 @@ import asyncio
 import json
 import os
 import pytest
+import pytest_asyncio
 import time
 from typing import Any, Dict
 
-# Import the components we're testing
-from prompt_improver.database.mcp_connection_pool import (
-    MCPConnectionPool, 
-    get_mcp_connection_pool
+# Import the components we're testing - using UnifiedConnectionManager
+from prompt_improver.database.unified_connection_manager import (
+    UnifiedConnectionManager,
+    get_unified_manager,
+    ManagerMode
 )
 # Import modern MCP server class
 from prompt_improver.mcp_server.server import APESMCPServer
@@ -25,13 +27,15 @@ TEST_MCP_PASSWORD = "test_mcp_password_for_integration"
 class TestPhase0MCPIntegration:
     """Integration tests for Phase 0 MCP server components."""
     
-    @pytest.fixture(scope="class")
+    @pytest_asyncio.fixture(scope="class")
     async def mcp_pool(self):
         """Create MCP connection pool for testing."""
-        # Set test environment variables
+        # Set test environment variables using unified configuration
         os.environ["MCP_POSTGRES_PASSWORD"] = TEST_MCP_PASSWORD
-        os.environ["MCP_DB_POOL_SIZE"] = "5"  # Smaller for tests
-        os.environ["MCP_DB_MAX_OVERFLOW"] = "2"
+        # Use unified database pool configuration for tests
+        os.environ["DB_POOL_MIN_SIZE"] = "2"
+        os.environ["DB_POOL_MAX_SIZE"] = "8"  # Smaller pool for tests
+        os.environ["DB_POOL_TIMEOUT"] = "5"   # Faster timeout for tests
         
         pool = MCPConnectionPool(mcp_user_password=TEST_MCP_PASSWORD)
         yield pool
@@ -40,15 +44,17 @@ class TestPhase0MCPIntegration:
     @pytest.fixture(scope="class")
     def mcp_server(self):
         """Get the MCP server instance for testing."""
-        return mcp
+        return APESMCPServer()
     
+    @pytest.mark.asyncio
     async def test_mcp_connection_pool_initialization(self, mcp_pool):
-        """Test MCP connection pool initializes correctly."""
-        assert mcp_pool.pool_size == 5
-        assert mcp_pool.max_overflow == 2
+        """Test MCP connection pool initializes correctly with unified configuration."""
+        # Pool should use unified configuration: max_size=8 for tests
+        assert mcp_pool.pool_size == 8
         assert mcp_pool.timeout_ms == 200
-        assert mcp_pool.database_url.startswith("postgresql+psycopg://mcp_server_user:")
+        assert mcp_pool.database_url.startswith("postgresql+asyncpg://mcp_server_user:")
     
+    @pytest.mark.asyncio
     async def test_mcp_connection_pool_health_check(self, mcp_pool):
         """Test MCP connection pool health check functionality."""
         health_result = await mcp_pool.health_check()
@@ -65,6 +71,7 @@ class TestPhase0MCPIntegration:
             assert health_result["database_user"] == "mcp_server_user"
             assert health_result["permissions"] == "read_rules_write_feedback"
     
+    @pytest.mark.asyncio
     async def test_mcp_connection_pool_permissions(self, mcp_pool):
         """Test MCP user database permissions are correctly configured."""
         permissions_result = await mcp_pool.test_permissions()
@@ -88,34 +95,41 @@ class TestPhase0MCPIntegration:
             # Overall security compliance
             assert permissions_result.get("security_compliant", False)
     
+    @pytest.mark.asyncio
     async def test_mcp_session_management(self, mcp_pool):
         """Test MCP session creation and management."""
+        from sqlalchemy import text
         try:
             async with mcp_pool.get_session() as session:
                 # Test basic query execution
-                result = await session.execute("SELECT 1 as test_value")
+                result = await session.execute(text("SELECT 1 as test_value"))
                 row = result.fetchone()
                 assert row[0] == 1
                 
             # Test read-only session
             async with mcp_pool.get_read_session() as read_session:
                 # Should be able to run read queries
-                result = await read_session.execute("SELECT 1 as read_test")
+                result = await read_session.execute(text("SELECT 1 as read_test"))
                 row = result.fetchone()
                 assert row[0] == 1
                 
             # Test feedback session
             async with mcp_pool.get_feedback_session() as feedback_session:
                 # Should be able to run write queries to feedback tables
-                result = await feedback_session.execute("SELECT 1 as feedback_test")
+                result = await feedback_session.execute(text("SELECT 1 as feedback_test"))
                 row = result.fetchone()
                 assert row[0] == 1
                 
         except Exception as e:
             # For integration tests, DB might not be available
             # But we can still validate the session structure
+            print(f"ERROR in session management test: {e}")
+            print(f"Exception type: {type(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             pytest.skip(f"Database not available for integration test: {e}")
     
+    @pytest.mark.asyncio
     async def test_mcp_pool_monitoring(self, mcp_pool):
         """Test MCP connection pool monitoring capabilities."""
         pool_status = await mcp_pool.get_pool_status()
@@ -150,7 +164,11 @@ class TestPhase0MCPIntegration:
             "delete_session",
             "benchmark_event_loop",
             "run_performance_benchmark",
-            "get_performance_status"
+            "get_performance_status",
+            "get_training_queue_size",  # Read-only monitoring
+            "query_database",  # Read-only database queries
+            "list_tables",  # Read-only table listing
+            "describe_table"  # Read-only schema info
         }
         
         # Tools that should NOT be present (removed in Phase 0)
@@ -162,20 +180,29 @@ class TestPhase0MCPIntegration:
             "invoke_ml_component"
         }
         
-        # Note: FastMCP doesn't provide easy access to registered tools
-        # This is a structural test to ensure the methods exist
-        for tool_name in expected_tools:
-            # Check if the tool function exists in the APESMCPServer
-            server_instance = APESMCPServer()
-            # Tools are registered as methods on the MCP instance, not module functions
-            assert hasattr(server_instance.mcp, 'tools') or tool_name in ['improve_prompt', 'get_session', 'set_session', 'touch_session', 'delete_session', 'benchmark_event_loop', 'run_performance_benchmark', 'get_performance_status'], f"Tool {tool_name} not found in APESMCPServer"
+        # FastMCP stores tools in mcp._tools
+        # The tools are registered during __init__, so they should be available
         
-        # Check that forbidden tools are not accessible
-        for forbidden_tool in forbidden_tools:
-            server_instance = APESMCPServer()
-            # Forbidden tools should not be registered in the modern server
-            # This is structural validation that the tools don't exist
-            assert forbidden_tool not in ['improve_prompt', 'get_session', 'set_session', 'touch_session', 'delete_session', 'benchmark_event_loop', 'run_performance_benchmark', 'get_performance_status'], f"Forbidden tool {forbidden_tool} still present"
+        # Get actual registered tools
+        registered_tools = set()
+        if hasattr(server_instance.mcp, '_tools'):
+            registered_tools = set(server_instance.mcp._tools.keys())
+        
+        # If no tools found, it means they weren't registered yet
+        # This is a structural test to verify the expected tools would be registered
+        if not registered_tools:
+            # Check that the tool methods exist on the server
+            for tool_name in expected_tools:
+                impl_method = f"_{tool_name}_impl"
+                assert hasattr(server_instance, impl_method), f"Implementation method {impl_method} not found on APESMCPServer"
+        else:
+            # Check expected tools are present
+            for tool_name in expected_tools:
+                assert tool_name in registered_tools, f"Expected tool {tool_name} not found. Available tools: {registered_tools}"
+            
+            # Check forbidden tools are not present
+            for forbidden_tool in forbidden_tools:
+                assert forbidden_tool not in registered_tools, f"Forbidden tool {forbidden_tool} still present"
     
     def test_mcp_server_resource_inventory(self, mcp_server):
         """Test that MCP server has the correct Phase 0 resources."""
@@ -206,6 +233,7 @@ class TestPhase0MCPIntegration:
             # This is structural validation that the resources exist
             assert func_name in ['health_live', 'health_ready', 'health_phase0'], f"Health function {func_name} not found in APESMCPServer"
     
+    @pytest.mark.asyncio
     async def test_phase0_exit_criteria_validation(self, mcp_pool):
         """Test all Phase 0 exit criteria are met."""
         exit_criteria = {
@@ -227,8 +255,9 @@ class TestPhase0MCPIntegration:
         # Test 2: Environment variables
         required_env_vars = [
             "MCP_POSTGRES_PASSWORD",
-            "MCP_DB_POOL_SIZE",
-            "MCP_DB_MAX_OVERFLOW"
+            "DB_POOL_MAX_SIZE",
+            "DB_POOL_MIN_SIZE",
+            "DB_POOL_TIMEOUT"
         ]
         
         env_vars_loaded = all(os.getenv(var) is not None for var in required_env_vars)
@@ -263,6 +292,7 @@ class TestPhase0MCPIntegration:
         structural_met = all(exit_criteria[criterion] for criterion in structural_criteria)
         assert structural_met, "Basic structural Phase 0 criteria not met"
     
+    @pytest.mark.asyncio
     async def test_performance_requirements(self, mcp_pool):
         """Test Phase 0 performance requirements."""
         # Test connection pool response time
@@ -298,10 +328,10 @@ class TestPhase0MCPIntegration:
             # Check environment variables
             env_vars = server_config.get("env", {})
             required_env_vars = [
-                "MCP_POSTGRES_PASSWORD",
-                "MCP_JWT_SECRET_KEY", 
-                "MCP_DB_POOL_SIZE",
+                "POSTGRES_PASSWORD",  # Changed from MCP_POSTGRES_PASSWORD
+                "DB_POOL_MAX_SIZE",
                 "MCP_REQUEST_TIMEOUT_MS"
+                # JWT_SECRET_KEY not required for Phase 0 read-only MCP server
             ]
             
             for var in required_env_vars:
@@ -315,8 +345,8 @@ class TestPhase0MCPIntegration:
             
             mcp_vars = [
                 "MCP_POSTGRES_PASSWORD",
-                "MCP_JWT_SECRET_KEY",
-                "MCP_DB_POOL_SIZE", 
+                # JWT removed from system - no JWT_SECRET_KEY needed
+                "DB_POOL_MAX_SIZE", 
                 "MCP_REQUEST_TIMEOUT_MS",
                 "MCP_FEEDBACK_ENABLED"
             ]

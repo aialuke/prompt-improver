@@ -30,11 +30,10 @@ from typing import Any, Dict, List, Optional, Set
 # - Focus on real behavior validation rather than implementation details
 
 import pytest
-import psycopg
-from psycopg.rows import dict_row
+import asyncpg
 
 from prompt_improver.core.config import AppConfig
-from prompt_improver.database.psycopg_client import TypeSafePsycopgClient
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 
 class Permission(Enum):

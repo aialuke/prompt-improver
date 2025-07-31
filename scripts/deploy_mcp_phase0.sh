@@ -146,7 +146,7 @@ echo "To test the MCP server manually:"
 echo "  1. Connect to MCP server: docker-compose -f $COMPOSE_FILE exec mcp-server bash"
 echo "  2. Test stdio transport: echo '{\"jsonrpc\":\"2.0\",\"method\":\"ping\"}' | python -m prompt_improver.mcp_server.mcp_server"
 echo "  3. View logs: docker-compose -f $COMPOSE_FILE logs mcp-server"
-echo "  4. Monitor health: docker-compose -f $COMPOSE_FILE exec mcp-server python -c \"import asyncio; from src.prompt_improver.database.mcp_connection_pool import get_mcp_connection_pool; print(asyncio.run(get_mcp_connection_pool().health_check()))\""
+echo "  4. Monitor health: docker-compose -f $COMPOSE_FILE exec mcp-server python -c \"import asyncio; from src.prompt_improver.database.unified_connection_manager import get_mcp_connection_pool; print(asyncio.run(get_mcp_connection_pool().health_check()))\""
 
 # Instructions for cleanup
 echo -e "\n${BLUE}8. Cleanup Instructions${NC}"

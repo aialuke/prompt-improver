@@ -2,6 +2,8 @@
 
 This guide walks you through setting up PostgreSQL with Docker for the Adaptive Prompt Enhancement System (APES).
 
+**For architectural strategies and integration approaches, see [PostgreSetup.md](PostgreSetup.md)**
+
 ## Quick Start
 
 1. **Start the database:**
@@ -59,7 +61,7 @@ Convenient commands for database management:
 
 **For your Python code:**
 ```python
-DATABASE_URL = "postgresql+psycopg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
+DATABASE_URL = "postgresql+asyncpg://apes_user:apes_secure_password_2024@localhost:5432/apes_production"
 ```
 
 **For MCP Server configuration:**
@@ -200,6 +202,11 @@ await db.execute(
 4. **Start storing rule performance data** as rules are applied
 
 5. **Implement the ML feedback loop** using the stored data
+
+6. **Choose your integration strategy** - See [PostgreSetup.md](PostgreSetup.md) for architectural approaches:
+   - MCP Server Only (external tools)
+   - Direct Integration (high performance)
+   - Hybrid Approach (recommended)
 
 ## Environment Variables
 

@@ -27,10 +27,75 @@ import re
 
 import coredis
 
-# Import the Redis client from existing cache utilities
-from ..core.config import AppConfig  # Redis config via AppConfig redis_client, CACHE_ERRORS
+# Import configuration for Redis connection
+from ..core.config import get_config
+
+# Import metrics registry for error tracking
+from ..performance.monitoring.metrics_registry import get_metrics_registry
 
 logger = logging.getLogger(__name__)
+
+# Initialize metrics for cache error tracking
+_metrics_registry = get_metrics_registry()
+CACHE_ERRORS = _metrics_registry.get_or_create_counter(
+    'cache_errors_total',
+    'Total cache operation errors',
+    ['operation', 'error_type']
+)
+
+# Global Redis client instance
+_redis_client: Optional[coredis.Redis] = None
+
+async def get_redis_client() -> Optional[coredis.Redis]:
+    """Get or create global Redis client."""
+    global _redis_client
+    if _redis_client is None:
+        try:
+            config = get_config()
+            redis_url = config.get_redis_url()
+            _redis_client = coredis.Redis.from_url(redis_url, decode_responses=True)
+            await _redis_client.ping()
+        except Exception as e:
+            logger.warning(f"Failed to initialize Redis client: {e}")
+            return None
+    return _redis_client
+
+# For backward compatibility
+redis_client = None  # Will be set by get_redis_client()
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Safely convert Redis response to int."""
+    try:
+        return int(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Safely convert Redis response to float."""
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
+
+def _safe_str(value: Any, default: str = "") -> str:
+    """Safely convert Redis response to string."""
+    try:
+        return str(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
+
+def _safe_bool(value: Any, default: bool = False) -> bool:
+    """Safely convert Redis response to boolean."""
+    try:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes', 'on')
+        return default
+    except (ValueError, TypeError):
+        return default
 
 class RedisHealthStatus(Enum):
     """Redis health status levels."""
@@ -363,7 +428,7 @@ class KeyspaceMetrics:
     def is_healthy(self) -> bool:
         """Check if keyspace metrics indicate healthy state."""
         # Check for extremely large keys (>100MB)
-        for key_name, size in self.large_keys:
+        for _, size in self.large_keys:
             if size > 100 * 1024 * 1024:  # 100MB
                 return False
         
@@ -375,7 +440,7 @@ class KeyspaceMetrics:
             return RedisHealthStatus.CRITICAL
         
         # Warning if large keys exist (>10MB)
-        for key_name, size in self.large_keys:
+        for _, size in self.large_keys:
             if size > 10 * 1024 * 1024:  # 10MB
                 return RedisHealthStatus.WARNING
                 
@@ -476,11 +541,12 @@ class RedisHealthMonitor:
     def __init__(self, client: Optional[coredis.Redis] = None):
         """
         Initialize Redis health monitor.
-        
+
         Args:
             client: Optional Redis client. Uses global client if not provided.
         """
-        self.client = client or redis_client
+        self.client = client
+        self._client_initialized = False
         self.last_check_time: Optional[datetime] = None
         self.check_count = 0
         
@@ -497,6 +563,13 @@ class RedisHealthMonitor:
         self.max_large_keys_to_track = 50
         self.slowlog_entries_to_analyze = 100
         self.keyspace_sample_size = 1000
+
+    async def _ensure_client(self) -> bool:
+        """Ensure Redis client is available."""
+        if self.client is None and not self._client_initialized:
+            self.client = await get_redis_client()
+            self._client_initialized = True
+        return self.client is not None
         
     async def collect_all_metrics(self) -> Dict[str, Any]:
         """
@@ -508,6 +581,16 @@ class RedisHealthMonitor:
         start_time = time.time()
         
         try:
+            # Ensure Redis client is available
+            if not await self._ensure_client():
+                return {
+                    "status": RedisHealthStatus.FAILED.value,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "error": "Redis client not available",
+                    "check_duration_ms": round((time.time() - start_time) * 1000, 2),
+                    "check_count": self.check_count
+                }
+
             # Test basic connectivity first
             await self._test_connectivity()
             
@@ -560,6 +643,8 @@ class RedisHealthMonitor:
     
     async def _test_connectivity(self):
         """Test basic Redis connectivity."""
+        if not self.client:
+            raise Exception("Redis client not available")
         start_time = time.time()
         await self.client.ping()
         latency_ms = (time.time() - start_time) * 1000
@@ -568,20 +653,22 @@ class RedisHealthMonitor:
     async def _collect_memory_metrics(self):
         """Collect Redis memory usage metrics."""
         try:
-            info = await self.client.info(section="memory")
-            
-            self.memory_metrics.used_memory = info.get("used_memory", 0)
-            self.memory_metrics.used_memory_human = info.get("used_memory_human", "0B")
-            self.memory_metrics.used_memory_rss = info.get("used_memory_rss", 0)
-            self.memory_metrics.used_memory_peak = info.get("used_memory_peak", 0)
-            self.memory_metrics.used_memory_peak_human = info.get("used_memory_peak_human", "0B")
-            self.memory_metrics.mem_fragmentation_ratio = float(info.get("mem_fragmentation_ratio", 1.0))
-            self.memory_metrics.used_memory_overhead = info.get("used_memory_overhead", 0)
-            self.memory_metrics.used_memory_dataset = info.get("used_memory_dataset", 0)
-            self.memory_metrics.total_system_memory = info.get("total_system_memory", 0)
-            self.memory_metrics.maxmemory = info.get("maxmemory", 0)
-            self.memory_metrics.maxmemory_human = info.get("maxmemory_human", "0B")
-            self.memory_metrics.maxmemory_policy = info.get("maxmemory_policy", "noeviction")
+            if not self.client:
+                return
+            info = await self.client.info()
+
+            self.memory_metrics.used_memory = _safe_int(info.get("used_memory", 0))
+            self.memory_metrics.used_memory_human = _safe_str(info.get("used_memory_human", "0B"))
+            self.memory_metrics.used_memory_rss = _safe_int(info.get("used_memory_rss", 0))
+            self.memory_metrics.used_memory_peak = _safe_int(info.get("used_memory_peak", 0))
+            self.memory_metrics.used_memory_peak_human = _safe_str(info.get("used_memory_peak_human", "0B"))
+            self.memory_metrics.mem_fragmentation_ratio = _safe_float(info.get("mem_fragmentation_ratio", 1.0))
+            self.memory_metrics.used_memory_overhead = _safe_int(info.get("used_memory_overhead", 0))
+            self.memory_metrics.used_memory_dataset = _safe_int(info.get("used_memory_dataset", 0))
+            self.memory_metrics.total_system_memory = _safe_int(info.get("total_system_memory", 0))
+            self.memory_metrics.maxmemory = _safe_int(info.get("maxmemory", 0))
+            self.memory_metrics.maxmemory_human = _safe_str(info.get("maxmemory_human", "0B"))
+            self.memory_metrics.maxmemory_policy = _safe_str(info.get("maxmemory_policy", "noeviction"))
             
             # Calculate derived metrics
             if self.memory_metrics.maxmemory > 0:
@@ -600,16 +687,18 @@ class RedisHealthMonitor:
     async def _collect_performance_metrics(self):
         """Collect Redis performance metrics."""
         try:
+            if not self.client:
+                return
             info = await self.client.info()
-            
-            self.performance_metrics.instantaneous_ops_per_sec = info.get("instantaneous_ops_per_sec", 0)
-            self.performance_metrics.total_commands_processed = info.get("total_commands_processed", 0)
-            self.performance_metrics.keyspace_hits = info.get("keyspace_hits", 0)
-            self.performance_metrics.keyspace_misses = info.get("keyspace_misses", 0)
-            self.performance_metrics.expired_keys = info.get("expired_keys", 0)
-            self.performance_metrics.evicted_keys = info.get("evicted_keys", 0)
-            self.performance_metrics.rejected_connections = info.get("rejected_connections", 0)
-            self.performance_metrics.total_connections_received = info.get("total_connections_received", 0)
+
+            self.performance_metrics.instantaneous_ops_per_sec = _safe_int(info.get("instantaneous_ops_per_sec", 0))
+            self.performance_metrics.total_commands_processed = _safe_int(info.get("total_commands_processed", 0))
+            self.performance_metrics.keyspace_hits = _safe_int(info.get("keyspace_hits", 0))
+            self.performance_metrics.keyspace_misses = _safe_int(info.get("keyspace_misses", 0))
+            self.performance_metrics.expired_keys = _safe_int(info.get("expired_keys", 0))
+            self.performance_metrics.evicted_keys = _safe_int(info.get("evicted_keys", 0))
+            self.performance_metrics.rejected_connections = _safe_int(info.get("rejected_connections", 0))
+            self.performance_metrics.total_connections_received = _safe_int(info.get("total_connections_received", 0))
             
             # Calculate hit rate
             self.performance_metrics.calculate_hit_rate()
@@ -631,31 +720,33 @@ class RedisHealthMonitor:
     async def _collect_persistence_metrics(self):
         """Collect Redis persistence metrics."""
         try:
-            info = await self.client.info(section="persistence")
+            if not self.client:
+                return
+            info = await self.client.info()
             
             # RDB metrics
-            self.persistence_metrics.rdb_changes_since_last_save = info.get("rdb_changes_since_last_save", 0)
-            self.persistence_metrics.rdb_bgsave_in_progress = bool(info.get("rdb_bgsave_in_progress", 0))
-            self.persistence_metrics.rdb_last_save_time = info.get("rdb_last_save_time", 0)
-            self.persistence_metrics.rdb_last_bgsave_status = info.get("rdb_last_bgsave_status", "ok")
-            self.persistence_metrics.rdb_last_bgsave_time_sec = info.get("rdb_last_bgsave_time_sec", 0)
-            self.persistence_metrics.rdb_current_bgsave_time_sec = info.get("rdb_current_bgsave_time_sec", 0)
-            
+            self.persistence_metrics.rdb_changes_since_last_save = _safe_int(info.get("rdb_changes_since_last_save", 0))
+            self.persistence_metrics.rdb_bgsave_in_progress = _safe_bool(info.get("rdb_bgsave_in_progress", 0))
+            self.persistence_metrics.rdb_last_save_time = _safe_int(info.get("rdb_last_save_time", 0))
+            self.persistence_metrics.rdb_last_bgsave_status = _safe_str(info.get("rdb_last_bgsave_status", "ok"))
+            self.persistence_metrics.rdb_last_bgsave_time_sec = _safe_int(info.get("rdb_last_bgsave_time_sec", 0))
+            self.persistence_metrics.rdb_current_bgsave_time_sec = _safe_int(info.get("rdb_current_bgsave_time_sec", 0))
+
             # AOF metrics
-            self.persistence_metrics.aof_enabled = bool(info.get("aof_enabled", 0))
+            self.persistence_metrics.aof_enabled = _safe_bool(info.get("aof_enabled", 0))
             if self.persistence_metrics.aof_enabled:
-                self.persistence_metrics.aof_rewrite_in_progress = bool(info.get("aof_rewrite_in_progress", 0))
-                self.persistence_metrics.aof_rewrite_scheduled = bool(info.get("aof_rewrite_scheduled", 0))
-                self.persistence_metrics.aof_last_rewrite_time_sec = info.get("aof_last_rewrite_time_sec", 0)
-                self.persistence_metrics.aof_current_rewrite_time_sec = info.get("aof_current_rewrite_time_sec", 0)
-                self.persistence_metrics.aof_last_bgrewrite_status = info.get("aof_last_bgrewrite_status", "ok")
-                self.persistence_metrics.aof_current_size = info.get("aof_current_size", 0)
-                self.persistence_metrics.aof_base_size = info.get("aof_base_size", 0)
-                self.persistence_metrics.aof_pending_rewrite = bool(info.get("aof_pending_rewrite", 0))
-                self.persistence_metrics.aof_buffer_length = info.get("aof_buffer_length", 0)
-                self.persistence_metrics.aof_rewrite_buffer_length = info.get("aof_rewrite_buffer_length", 0)
-                self.persistence_metrics.aof_pending_bio_fsync = info.get("aof_pending_bio_fsync", 0)
-                self.persistence_metrics.aof_delayed_fsync = info.get("aof_delayed_fsync", 0)
+                self.persistence_metrics.aof_rewrite_in_progress = _safe_bool(info.get("aof_rewrite_in_progress", 0))
+                self.persistence_metrics.aof_rewrite_scheduled = _safe_bool(info.get("aof_rewrite_scheduled", 0))
+                self.persistence_metrics.aof_last_rewrite_time_sec = _safe_int(info.get("aof_last_rewrite_time_sec", 0))
+                self.persistence_metrics.aof_current_rewrite_time_sec = _safe_int(info.get("aof_current_rewrite_time_sec", 0))
+                self.persistence_metrics.aof_last_bgrewrite_status = _safe_str(info.get("aof_last_bgrewrite_status", "ok"))
+                self.persistence_metrics.aof_current_size = _safe_int(info.get("aof_current_size", 0))
+                self.persistence_metrics.aof_base_size = _safe_int(info.get("aof_base_size", 0))
+                self.persistence_metrics.aof_pending_rewrite = _safe_bool(info.get("aof_pending_rewrite", 0))
+                self.persistence_metrics.aof_buffer_length = _safe_int(info.get("aof_buffer_length", 0))
+                self.persistence_metrics.aof_rewrite_buffer_length = _safe_int(info.get("aof_rewrite_buffer_length", 0))
+                self.persistence_metrics.aof_pending_bio_fsync = _safe_int(info.get("aof_pending_bio_fsync", 0))
+                self.persistence_metrics.aof_delayed_fsync = _safe_int(info.get("aof_delayed_fsync", 0))
             
         except Exception as e:
             logger.error(f"Failed to collect persistence metrics: {e}")
@@ -663,38 +754,40 @@ class RedisHealthMonitor:
     async def _collect_replication_metrics(self):
         """Collect Redis replication metrics."""
         try:
-            info = await self.client.info(section="replication")
+            if not self.client:
+                return
+            info = await self.client.info()
             
             # Role detection
-            role = info.get("role", "master")
+            role = _safe_str(info.get("role", "master"))
             if role == "master":
                 self.replication_metrics.role = RedisRole.MASTER
             elif role in ["slave", "replica"]:
                 self.replication_metrics.role = RedisRole.SLAVE
             else:
                 self.replication_metrics.role = RedisRole.STANDALONE
-            
+
             # Common metrics
-            self.replication_metrics.connected_slaves = info.get("connected_slaves", 0)
-            self.replication_metrics.master_replid = info.get("master_replid", "")
-            self.replication_metrics.master_replid2 = info.get("master_replid2", "")
-            self.replication_metrics.master_repl_offset = info.get("master_repl_offset", 0)
-            self.replication_metrics.second_repl_offset = info.get("second_repl_offset", -1)
-            self.replication_metrics.repl_backlog_active = bool(info.get("repl_backlog_active", 0))
-            self.replication_metrics.repl_backlog_size = info.get("repl_backlog_size", 0)
-            self.replication_metrics.repl_backlog_first_byte_offset = info.get("repl_backlog_first_byte_offset", 0)
-            self.replication_metrics.repl_backlog_histlen = info.get("repl_backlog_histlen", 0)
+            self.replication_metrics.connected_slaves = _safe_int(info.get("connected_slaves", 0))
+            self.replication_metrics.master_replid = _safe_str(info.get("master_replid", ""))
+            self.replication_metrics.master_replid2 = _safe_str(info.get("master_replid2", ""))
+            self.replication_metrics.master_repl_offset = _safe_int(info.get("master_repl_offset", 0))
+            self.replication_metrics.second_repl_offset = _safe_int(info.get("second_repl_offset", -1))
+            self.replication_metrics.repl_backlog_active = _safe_bool(info.get("repl_backlog_active", 0))
+            self.replication_metrics.repl_backlog_size = _safe_int(info.get("repl_backlog_size", 0))
+            self.replication_metrics.repl_backlog_first_byte_offset = _safe_int(info.get("repl_backlog_first_byte_offset", 0))
+            self.replication_metrics.repl_backlog_histlen = _safe_int(info.get("repl_backlog_histlen", 0))
             
             # Slave-specific metrics
             if self.replication_metrics.role == RedisRole.SLAVE:
-                self.replication_metrics.master_host = info.get("master_host", "")
-                self.replication_metrics.master_port = info.get("master_port", 0)
-                self.replication_metrics.master_link_status = info.get("master_link_status", "up")
-                self.replication_metrics.master_last_io_seconds_ago = info.get("master_last_io_seconds_ago", 0)
-                self.replication_metrics.master_sync_in_progress = bool(info.get("master_sync_in_progress", 0))
-                self.replication_metrics.slave_repl_offset = info.get("slave_repl_offset", 0)
-                self.replication_metrics.slave_priority = info.get("slave_priority", 100)
-                self.replication_metrics.slave_read_only = bool(info.get("slave_read_only", 1))
+                self.replication_metrics.master_host = _safe_str(info.get("master_host", ""))
+                self.replication_metrics.master_port = _safe_int(info.get("master_port", 0))
+                self.replication_metrics.master_link_status = _safe_str(info.get("master_link_status", "up"))
+                self.replication_metrics.master_last_io_seconds_ago = _safe_int(info.get("master_last_io_seconds_ago", 0))
+                self.replication_metrics.master_sync_in_progress = _safe_bool(info.get("master_sync_in_progress", 0))
+                self.replication_metrics.slave_repl_offset = _safe_int(info.get("slave_repl_offset", 0))
+                self.replication_metrics.slave_priority = _safe_int(info.get("slave_priority", 100))
+                self.replication_metrics.slave_read_only = _safe_bool(info.get("slave_read_only", 1))
                 
                 # Calculate replication lag
                 self.replication_metrics.calculate_replication_lag()
@@ -705,13 +798,14 @@ class RedisHealthMonitor:
                 for i in range(self.replication_metrics.connected_slaves):
                     slave_key = f"slave{i}"
                     if slave_key in info:
-                        slave_data = info[slave_key]
+                        slave_data = _safe_str(info[slave_key])
                         # Parse slave info string: "ip=127.0.0.1,port=6380,state=online,offset=123,lag=0"
                         slave_dict = {}
-                        for item in slave_data.split(','):
-                            if '=' in item:
-                                key, value = item.split('=', 1)
-                                slave_dict[key] = value
+                        if slave_data:
+                            for item in slave_data.split(','):
+                                if '=' in item:
+                                    key, value = item.split('=', 1)
+                                    slave_dict[key] = value
                         slave_info.append(slave_dict)
                 self.replication_metrics.slave_info = slave_info
             
@@ -721,25 +815,26 @@ class RedisHealthMonitor:
     async def _collect_connection_metrics(self):
         """Collect Redis connection metrics."""
         try:
-            info = await self.client.info(section="clients")
+            if not self.client:
+                return
+            info = await self.client.info()
+
+            self.connection_metrics.connected_clients = _safe_int(info.get("connected_clients", 0))
+            self.connection_metrics.client_recent_max_input_buffer = _safe_int(info.get("client_recent_max_input_buffer", 0))
+            self.connection_metrics.client_recent_max_output_buffer = _safe_int(info.get("client_recent_max_output_buffer", 0))
+            self.connection_metrics.blocked_clients = _safe_int(info.get("blocked_clients", 0))
+            self.connection_metrics.tracking_clients = _safe_int(info.get("tracking_clients", 0))
+            self.connection_metrics.clients_in_timeout_table = _safe_int(info.get("clients_in_timeout_table", 0))
             
-            self.connection_metrics.connected_clients = info.get("connected_clients", 0)
-            self.connection_metrics.client_recent_max_input_buffer = info.get("client_recent_max_input_buffer", 0)
-            self.connection_metrics.client_recent_max_output_buffer = info.get("client_recent_max_output_buffer", 0)
-            self.connection_metrics.blocked_clients = info.get("blocked_clients", 0)
-            self.connection_metrics.tracking_clients = info.get("tracking_clients", 0)
-            self.connection_metrics.clients_in_timeout_table = info.get("clients_in_timeout_table", 0)
-            
-            # Stats section
-            stats_info = await self.client.info(section="stats")
-            self.connection_metrics.total_connections_received = stats_info.get("total_connections_received", 0)
-            self.connection_metrics.rejected_connections = stats_info.get("rejected_connections", 0)
-            
+            # Stats from same info call (no separate section needed)
+            self.connection_metrics.total_connections_received = _safe_int(info.get("total_connections_received", 0))
+            self.connection_metrics.rejected_connections = _safe_int(info.get("rejected_connections", 0))
+
             # Config for maxclients
             try:
-                config = await self.client.config_get("maxclients")
+                config = await self.client.config_get(["maxclients"])
                 if config and "maxclients" in config:
-                    self.connection_metrics.maxclients = int(config["maxclients"])
+                    self.connection_metrics.maxclients = _safe_int(config["maxclients"])
             except:
                 # Default maxclients if config get fails
                 self.connection_metrics.maxclients = 10000
@@ -753,27 +848,34 @@ class RedisHealthMonitor:
     async def _collect_keyspace_metrics(self):
         """Collect Redis keyspace analytics."""
         try:
-            info = await self.client.info(section="keyspace")
+            if not self.client:
+                return
+            info = await self.client.info()
             
             # Parse keyspace info
             self.keyspace_metrics.databases.clear()
             for key, value in info.items():
-                if key.startswith("db"):
-                    db_id = int(key[2:])  # Extract number from "db0", "db1", etc.
-                    
-                    # Parse db info: "keys=123,expires=45,avg_ttl=67890"
-                    db_info = KeyspaceInfo(db_id=db_id)
-                    for item in value.split(','):
-                        if '=' in item:
-                            metric_key, metric_value = item.split('=', 1)
-                            if metric_key == "keys":
-                                db_info.keys = int(metric_value)
-                            elif metric_key == "expires":
-                                db_info.expires = int(metric_value)
-                            elif metric_key == "avg_ttl":
-                                db_info.avg_ttl = float(metric_value)
-                    
-                    self.keyspace_metrics.databases[db_id] = db_info
+                if isinstance(key, str) and key.startswith("db"):
+                    try:
+                        db_id = int(key[2:])  # Extract number from "db0", "db1", etc.
+
+                        # Parse db info: "keys=123,expires=45,avg_ttl=67890"
+                        db_info = KeyspaceInfo(db_id=db_id)
+                        value_str = _safe_str(value)
+                        if value_str:
+                            for item in value_str.split(','):
+                                if '=' in item:
+                                    metric_key, metric_value = item.split('=', 1)
+                                    if metric_key == "keys":
+                                        db_info.keys = _safe_int(metric_value)
+                                    elif metric_key == "expires":
+                                        db_info.expires = _safe_int(metric_value)
+                                    elif metric_key == "avg_ttl":
+                                        db_info.avg_ttl = _safe_float(metric_value)
+
+                        self.keyspace_metrics.databases[db_id] = db_info
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid database entries
             
             # Calculate totals
             self.keyspace_metrics.calculate_totals()
@@ -787,22 +889,28 @@ class RedisHealthMonitor:
     async def _analyze_key_patterns(self):
         """Analyze key patterns and memory usage."""
         try:
+            if not self.client:
+                return
+
             # Reset collections
             self.keyspace_metrics.sample_key_memory.clear()
             self.keyspace_metrics.large_keys.clear()
             self.keyspace_metrics.key_distribution.clear()
-            
+
+            # Temporary collection for memory samples (pattern -> list of memory values)
+            temp_memory_samples: Dict[str, List[float]] = {}
+
             # Sample keys from each database
-            for db_id in self.keyspace_metrics.databases.keys():
+            for _ in self.keyspace_metrics.databases.keys():
                 # Use SCAN to sample keys
                 cursor = 0
                 sampled_keys = 0
                 key_patterns = {}
-                
+
                 while cursor != 0 or sampled_keys == 0:
                     if sampled_keys >= self.keyspace_sample_size:
                         break
-                    
+
                     # Scan with limited count to avoid blocking
                     cursor, keys = await self.client.scan(cursor, count=100)
                     
@@ -821,9 +929,9 @@ class RedisHealthMonitor:
                                 key_patterns[pattern] = key_patterns.get(pattern, 0) + 1
                                 
                                 # Track memory usage by pattern
-                                if pattern not in self.keyspace_metrics.sample_key_memory:
-                                    self.keyspace_metrics.sample_key_memory[pattern] = []
-                                self.keyspace_metrics.sample_key_memory[pattern].append(memory_usage)
+                                if pattern not in temp_memory_samples:
+                                    temp_memory_samples[pattern] = []
+                                temp_memory_samples[pattern].append(memory_usage)
                                 
                                 # Track large keys
                                 if memory_usage > 1024 * 1024:  # >1MB
@@ -847,7 +955,7 @@ class RedisHealthMonitor:
             self.keyspace_metrics.large_keys = self.keyspace_metrics.large_keys[:self.max_large_keys_to_track]
             
             # Average memory usage by pattern
-            for pattern, memory_list in self.keyspace_metrics.sample_key_memory.items():
+            for pattern, memory_list in temp_memory_samples.items():
                 self.keyspace_metrics.sample_key_memory[pattern] = statistics.mean(memory_list)
                 
         except Exception as e:
@@ -855,9 +963,11 @@ class RedisHealthMonitor:
     
     def _extract_key_pattern(self, key: Union[str, bytes]) -> str:
         """Extract pattern from Redis key."""
-        if isinstance(key, bytes):
-            key = key.decode('utf-8', errors='ignore')
-        
+        # Convert to string safely
+        key_str = _safe_str(key)
+        if not key_str:
+            return "unknown"
+
         # Common patterns to identify
         patterns = [
             (r'^session:\w+$', 'session:*'),
@@ -868,29 +978,32 @@ class RedisHealthMonitor:
             (r'^\w+:\d+$', 'prefix:id'),
             (r'^\w+:\w+:\w+$', 'prefix:key:value'),
         ]
-        
+
         for pattern_regex, pattern_name in patterns:
-            if re.match(pattern_regex, key):
+            if re.match(pattern_regex, key_str):
                 return pattern_name
-        
+
         # Default pattern based on prefix
-        if ':' in key:
-            return key.split(':', 1)[0] + ':*'
+        if ':' in key_str:
+            return key_str.split(':', 1)[0] + ':*'
         else:
             return "simple_key"
     
     async def _collect_slowlog_metrics(self):
         """Collect and analyze Redis slow log."""
         try:
+            if not self.client:
+                return
+
             # Get slow log entries
             slowlog_entries = await self.client.slowlog_get(self.slowlog_entries_to_analyze)
-            
+
             # Get slow log configuration
             slowlog_len = await self.client.slowlog_len()
-            
+
             try:
-                config = await self.client.config_get("slowlog-max-len")
-                slowlog_max_len = int(config.get("slowlog-max-len", 128)) if config else 128
+                config = await self.client.config_get(["slowlog-max-len"])
+                slowlog_max_len = _safe_int(config.get("slowlog-max-len", 128)) if config else 128
             except:
                 slowlog_max_len = 128
             
@@ -898,12 +1011,12 @@ class RedisHealthMonitor:
             self.slowlog_metrics.entries.clear()
             for entry in slowlog_entries:
                 slow_entry = SlowLogEntry(
-                    id=entry[0],
-                    timestamp=entry[1],
-                    duration_microseconds=entry[2],
-                    command=entry[3] if len(entry) > 3 else [],
-                    client_ip=entry[4] if len(entry) > 4 else "",
-                    client_name=entry[5] if len(entry) > 5 else ""
+                    id=_safe_int(entry[0]),
+                    timestamp=_safe_int(entry[1]),
+                    duration_microseconds=_safe_int(entry[2]),
+                    command=[_safe_str(cmd) for cmd in entry[3]] if len(entry) > 3 and entry[3] else [],
+                    client_ip=_safe_str(entry[4]) if len(entry) > 4 else "",
+                    client_name=_safe_str(entry[5]) if len(entry) > 5 else ""
                 )
                 self.slowlog_metrics.entries.append(slow_entry)
             
@@ -1211,20 +1324,34 @@ async def get_redis_health_summary() -> Dict[str, Any]:
     monitor = RedisHealthMonitor()
     
     try:
+        # Ensure client is available
+        if not await monitor._ensure_client():
+            return {
+                "status": "failed",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error": "Redis client not available",
+                "ping_ms": None,
+                "memory_mb": None,
+                "hit_rate": None
+            }
+
+        # Type assertion for client availability
+        assert monitor.client is not None, "Client should be available after _ensure_client"
+
         # Quick connectivity test
         start_time = time.time()
         await monitor.client.ping()
         ping_time_ms = (time.time() - start_time) * 1000
-        
+
         # Get basic info
         info = await monitor.client.info()
-        
+
         # Calculate basic metrics
-        memory_usage_mb = info.get("used_memory", 0) / 1024 / 1024
+        memory_usage_mb = _safe_int(info.get("used_memory", 0)) / 1024 / 1024
         hit_rate = 0.0
-        total_ops = info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0)
+        total_ops = _safe_int(info.get("keyspace_hits", 0)) + _safe_int(info.get("keyspace_misses", 0))
         if total_ops > 0:
-            hit_rate = (info.get("keyspace_hits", 0) / total_ops) * 100.0
+            hit_rate = (_safe_int(info.get("keyspace_hits", 0)) / total_ops) * 100.0
         
         # Determine health status
         status = "healthy"
@@ -1238,18 +1365,18 @@ async def get_redis_health_summary() -> Dict[str, Any]:
             status = "warning" 
             issues.append(f"Low hit rate: {hit_rate:.1f}%")
         
-        fragmentation_ratio = float(info.get("mem_fragmentation_ratio", 1.0))
+        fragmentation_ratio = _safe_float(info.get("mem_fragmentation_ratio", 1.0))
         if fragmentation_ratio > 2.0:
             status = "warning"
             issues.append(f"High fragmentation: {fragmentation_ratio:.2f}")
-        
+
         return {
             "healthy": status == "healthy",
             "status": status,
             "response_time_ms": round(ping_time_ms, 2),
             "memory_usage_mb": round(memory_usage_mb, 2),
             "hit_rate_percentage": round(hit_rate, 2),
-            "connected_clients": info.get("connected_clients", 0),
+            "connected_clients": _safe_int(info.get("connected_clients", 0)),
             "total_commands": info.get("total_commands_processed", 0),
             "fragmentation_ratio": round(fragmentation_ratio, 2),
             "issues": issues,

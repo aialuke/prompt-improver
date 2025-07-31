@@ -12,7 +12,7 @@ import time
 import threading
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional, Set, TypeVar, Coroutine
+from typing import Any, Dict, Optional, Set, TypeVar, Coroutine, cast
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class UnifiedLoopManager:
     and provides production-ready async infrastructure.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize unified loop manager with performance optimization and session tracking."""
         # Global event loop state
         self._uvloop_available = False
@@ -65,7 +65,7 @@ class UnifiedLoopManager:
         
         # Session management state
         self._sessions: Dict[str, SessionMetrics] = {}
-        self._session_active_tasks: Dict[str, Set[asyncio.Task]] = {}
+        self._session_active_tasks: Dict[str, Set[asyncio.Task[Any]]] = {}
         self._default_timeout = 30.0
         
         logger.info("UnifiedLoopManager initialized")
@@ -143,16 +143,16 @@ class UnifiedLoopManager:
             try:
                 import uvloop
 
-                loop = uvloop.new_event_loop()
+                uvloop_instance = uvloop.new_event_loop()
                 logger.debug("Created new uvloop event loop")
-                return loop
+                return cast(asyncio.AbstractEventLoop, uvloop_instance)
             except Exception as e:
                 logger.warning(f"Failed to create uvloop, falling back to asyncio: {e}")
 
         # Fallback to standard asyncio
-        loop = asyncio.new_event_loop()
+        asyncio_loop = asyncio.new_event_loop()
         logger.debug("Created new asyncio event loop")
-        return loop
+        return asyncio_loop
 
     def get_loop_info(self) -> Dict[str, Any]:
         """Get information about the current event loop.
@@ -243,7 +243,7 @@ class UnifiedLoopManager:
             Dictionary with throughput statistics
         """
 
-        async def dummy_task():
+        async def dummy_task() -> bool:
             """Dummy task for benchmarking."""
             await asyncio.sleep(0.001)  # Small delay
             return True

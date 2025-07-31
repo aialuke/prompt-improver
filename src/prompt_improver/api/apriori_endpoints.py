@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_session, get_unified_manager, ManagerMode
+from ..database import get_unified_manager_ml_training, get_unified_manager, ManagerMode, UnifiedConnectionManager
 from ..database.models import (
     AprioriAnalysisRequest,
     AprioriAnalysisResponse,
@@ -47,7 +47,7 @@ async def get_pattern_discovery() -> AdvancedPatternDiscovery:
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)
 async def run_apriori_analysis(
     request: AprioriAnalysisRequest,
-    db_session: AsyncSession = Depends(get_session),
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training),
     apriori_analyzer: AprioriAnalyzer = Depends(get_apriori_analyzer),
 ) -> AprioriAnalysisResponse:
     """Run Apriori association rule mining analysis.
@@ -59,7 +59,7 @@ async def run_apriori_analysis(
     Args:
         request: Configuration parameters for Apriori analysis
         apriori_analyzer: AprioriAnalyzer service instance
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         AprioriAnalysisResponse with discovered patterns and insights
@@ -67,40 +67,41 @@ async def run_apriori_analysis(
     Raises:
         HTTPException: If analysis fails or insufficient data
     """
-    try:
-        logger.info(f"Starting Apriori analysis with config: {request.model_dump()}")
+    async with db_manager.get_async_session() as session:
+        try:
+            logger.info(f"Starting Apriori analysis with config: {request.model_dump()}")
 
-        # Update analyzer configuration
-        config = AprioriConfig(
-            min_support=request.min_support,
-            min_confidence=request.min_confidence,
-            min_lift=request.min_lift,
-            max_itemset_length=request.max_itemset_length,
-            verbose=True,
-        )
-        apriori_analyzer.config = config
+            # Update analyzer configuration
+            config = AprioriConfig(
+                min_support=request.min_support,
+                min_confidence=request.min_confidence,
+                min_lift=request.min_lift,
+                max_itemset_length=request.max_itemset_length,
+                verbose=True,
+            )
+            apriori_analyzer.config = config
 
-        # Run Apriori analysis
-        results = await apriori_analyzer.analyze_patterns(
-            window_days=request.window_days, save_to_database=request.save_to_database
-        )
-
-        if "error" in results:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Apriori analysis failed: {results['error']}",
+            # Run Apriori analysis
+            results = await apriori_analyzer.analyze_patterns(
+                window_days=request.window_days, save_to_database=request.save_to_database
             )
 
-        # Generate discovery run ID for tracking
-        discovery_run_id = str(uuid.uuid4())
+            if "error" in results:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Apriori analysis failed: {results['error']}",
+                )
 
-        # Store analysis metadata in database if requested
-        if request.save_to_database:
-            await _store_apriori_analysis_metadata(
-                db_session, discovery_run_id, request, results
-            )
+            # Generate discovery run ID for tracking
+            discovery_run_id = str(uuid.uuid4())
 
-        return AprioriAnalysisResponse(
+            # Store analysis metadata in database if requested
+            if request.save_to_database:
+                await _store_apriori_analysis_metadata(
+                    session, discovery_run_id, request, results
+                )
+
+            return AprioriAnalysisResponse(
             discovery_run_id=discovery_run_id,
             transaction_count=results.get("transaction_count", 0),
             frequent_itemsets_count=results.get("frequent_itemsets_count", 0),
@@ -111,23 +112,23 @@ async def run_apriori_analysis(
             pattern_insights=results.get("pattern_insights", {}),
             config=results.get("config", {}),
             status="success",
-            timestamp=results.get("timestamp", datetime.now().isoformat()),
-        )
+                timestamp=results.get("timestamp", datetime.now().isoformat()),
+            )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Apriori analysis failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal error during Apriori analysis: {e!s}",
-        )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Apriori analysis failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Internal error during Apriori analysis: {e!s}",
+            )
 
 @apriori_router.post("/discover-patterns", response_model=PatternDiscoveryResponse)
 async def comprehensive_pattern_discovery(
     request: PatternDiscoveryRequest,
     ml_service: Annotated[MLModelService, Depends(get_ml_service)],
-    db_session: AsyncSession = Depends(get_session),
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training),
 ) -> PatternDiscoveryResponse:
     """Run comprehensive pattern discovery combining traditional ML with Apriori analysis.
 
@@ -141,7 +142,7 @@ async def comprehensive_pattern_discovery(
     Args:
         request: Configuration for pattern discovery
         ml_service: ML service instance
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         PatternDiscoveryResponse with comprehensive pattern analysis
@@ -149,31 +150,32 @@ async def comprehensive_pattern_discovery(
     Raises:
         HTTPException: If pattern discovery fails
     """
-    try:
-        logger.info(f"Starting comprehensive pattern discovery: {request.model_dump()}")
+    async with db_manager.get_async_session() as session:
+        try:
+            logger.info(f"Starting comprehensive pattern discovery: {request.model_dump()}")
 
-        # Run enhanced pattern discovery
-        results = await ml_service.discover_patterns(
-            db_session=db_session,
-            min_effectiveness=request.min_effectiveness,
-            min_support=request.min_support,
-            use_advanced_discovery=request.use_advanced_discovery,
-            include_apriori=request.include_apriori,
-        )
-
-        if results.get("status") == "error":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Pattern discovery failed: {results.get('error')}",
+            # Run enhanced pattern discovery
+            results = await ml_service.discover_patterns(
+                db_session=session,
+                min_effectiveness=request.min_effectiveness,
+                min_support=request.min_support,
+                use_advanced_discovery=request.use_advanced_discovery,
+                include_apriori=request.include_apriori,
             )
 
-        # Generate discovery run ID
-        discovery_run_id = str(uuid.uuid4())
+            if results.get("status") == "error":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Pattern discovery failed: {results.get('error')}",
+                )
 
-        # Store comprehensive results in database
-        await _store_pattern_discovery_results(db_session, discovery_run_id, results)
+            # Generate discovery run ID
+            discovery_run_id = str(uuid.uuid4())
 
-        return PatternDiscoveryResponse(
+            # Store comprehensive results in database
+            await _store_pattern_discovery_results(session, discovery_run_id, results)
+
+            return PatternDiscoveryResponse(
             status=results.get("status", "success"),
             discovery_run_id=discovery_run_id,
             traditional_patterns=results.get("traditional_patterns"),
@@ -182,21 +184,21 @@ async def comprehensive_pattern_discovery(
             cross_validation=results.get("cross_validation"),
             unified_recommendations=results.get("unified_recommendations", []),
             business_insights=results.get("business_insights", {}),
-            discovery_metadata=results.get("discovery_metadata", {}),
-        )
+                discovery_metadata=results.get("discovery_metadata", {}),
+            )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Comprehensive pattern discovery failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal error during pattern discovery: {e!s}",
-        )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Comprehensive pattern discovery failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Internal error during pattern discovery: {e!s}",
+            )
 
 @apriori_router.get("/rules", response_model=list[dict[str, Any]])
 async def get_association_rules(
-    db_session: AsyncSession = Depends(get_session),
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training),
     min_confidence: float = 0.6,
     min_lift: float = 1.0,
     pattern_category: str | None = None,
@@ -209,37 +211,38 @@ async def get_association_rules(
         min_lift: Minimum lift threshold
         pattern_category: Filter by pattern category
         limit: Maximum number of rules to return
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         List of association rules with metrics and insights
     """
-    try:
-        from sqlalchemy import and_, desc, select
+    async with db_manager.get_async_session() as session:
+        try:
+            from sqlalchemy import and_, desc, select
 
-        # Build query with filters
-        query = select(AprioriAssociationRule)
+            # Build query with filters
+            query = select(AprioriAssociationRule)
 
-        conditions = [
-            AprioriAssociationRule.confidence >= min_confidence,
-            AprioriAssociationRule.lift >= min_lift,
-        ]
+            conditions = [
+                AprioriAssociationRule.confidence >= min_confidence,
+                AprioriAssociationRule.lift >= min_lift,
+            ]
 
-        if pattern_category:
-            conditions.append(
-                AprioriAssociationRule.pattern_category == pattern_category
-            )  # type: ignore[arg-type]
+            if pattern_category:
+                conditions.append(
+                    AprioriAssociationRule.pattern_category == pattern_category
+                )  # type: ignore[arg-type]
 
-        query = query.where(and_(*conditions))  # type: ignore[arg-type]
-        query = query.order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
-        query = query.limit(limit)
+            query = query.where(and_(*conditions))  # type: ignore[arg-type]
+            query = query.order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
+            query = query.limit(limit)
 
-        result = await db_session.execute(query)
-        rules = result.scalars().all()
+            result = await session.execute(query)
+            rules = result.scalars().all()
 
-        # Convert to response format
-        rule_list = []
-        for rule in rules:
+            # Convert to response format
+            rule_list = []
+            for rule in rules:
             rule_dict = {
                 "id": rule.id,
                 "antecedents": rule.antecedents,
@@ -270,7 +273,7 @@ async def get_association_rules(
 async def get_contextualized_patterns(
     context_items: list[str],
     ml_service: Annotated[MLModelService, Depends(get_ml_service)],
-    db_session: AsyncSession = Depends(get_session),
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training),
     min_confidence: float = 0.6,
 ) -> dict[str, Any]:
     """Get patterns relevant to a specific context using Apriori and ML analysis.
@@ -282,20 +285,21 @@ async def get_contextualized_patterns(
         context_items: Items representing current context (rules, characteristics)
         min_confidence: Minimum confidence for returned patterns
         ml_service: ML service instance
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         Dictionary with contextualized patterns and recommendations
     """
-    try:
-        logger.info(f"Getting contextualized patterns for: {context_items}")
+    async with db_manager.get_async_session() as session:
+        try:
+            logger.info(f"Getting contextualized patterns for: {context_items}")
 
-        # Get contextualized patterns using ML service
-        results = await ml_service.get_contextualized_patterns(
-            context_items=context_items,
-            db_session=db_session,
-            min_confidence=min_confidence,
-        )
+            # Get contextualized patterns using ML service
+            results = await ml_service.get_contextualized_patterns(
+                context_items=context_items,
+                db_session=session,
+                min_confidence=min_confidence,
+            )
 
         if "error" in results:
             raise HTTPException(
@@ -316,30 +320,31 @@ async def get_contextualized_patterns(
 
 @apriori_router.get("/discovery-runs", response_model=list[dict[str, Any]])
 async def get_discovery_runs(
-    db_session: AsyncSession = Depends(get_session), limit: int = 20, status_filter: str | None = None
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training), limit: int = 20, status_filter: str | None = None
 ) -> list[dict[str, Any]]:
     """Retrieve historical pattern discovery runs.
 
     Args:
         limit: Maximum number of runs to return
         status_filter: Filter by run status (running, completed, failed)
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         List of discovery run metadata
     """
-    try:
-        from sqlalchemy import desc, select
+    async with db_manager.get_async_session() as session:
+        try:
+            from sqlalchemy import desc, select
 
-        query = select(AprioriPatternDiscovery)
+            query = select(AprioriPatternDiscovery)
 
-        if status_filter:
-            query = query.where(AprioriPatternDiscovery.status == status_filter)  # type: ignore[arg-type]
+            if status_filter:
+                query = query.where(AprioriPatternDiscovery.status == status_filter)  # type: ignore[arg-type]
 
-        query = query.order_by(desc(AprioriPatternDiscovery.created_at))  # type: ignore[arg-type]
-        query = query.limit(limit)
+            query = query.order_by(desc(AprioriPatternDiscovery.created_at))  # type: ignore[arg-type]
+            query = query.limit(limit)
 
-        result = await db_session.execute(query)
+            result = await session.execute(query)
         runs = result.scalars().all()
 
         run_list = []
@@ -375,43 +380,44 @@ async def get_discovery_runs(
 
 @apriori_router.get("/insights/{discovery_run_id}")
 async def get_discovery_insights(
-    discovery_run_id: str, db_session: AsyncSession = Depends(get_session)
+    discovery_run_id: str, db_manager: UnifiedConnectionManager = Depends(get_unified_manager_ml_training)
 ) -> dict[str, Any]:
     """Get detailed insights for a specific discovery run.
 
     Args:
         discovery_run_id: ID of the discovery run
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         Detailed insights and patterns from the discovery run
     """
-    try:
-        from sqlalchemy import desc, select
+    async with db_manager.get_async_session() as session:
+        try:
+            from sqlalchemy import desc, select
 
-        # Get discovery run metadata
-        query = select(AprioriPatternDiscovery).where(
-            AprioriPatternDiscovery.discovery_run_id == discovery_run_id  # type: ignore[arg-type]
-        )
-        result = await db_session.execute(query)
-        discovery_run = result.scalar_one_or_none()
+            # Get discovery run metadata
+            query = select(AprioriPatternDiscovery).where(
+                AprioriPatternDiscovery.discovery_run_id == discovery_run_id  # type: ignore[arg-type]
+            )
+            result = await session.execute(query)
+            discovery_run = result.scalar_one_or_none()
 
-        if not discovery_run:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Discovery run {discovery_run_id} not found",
+            if not discovery_run:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Discovery run {discovery_run_id} not found",
+                )
+
+            # Get associated rules
+            rules_query = (
+                select(AprioriAssociationRule)
+                .where(
+                    AprioriAssociationRule.discovery_run_id == discovery_run_id  # type: ignore[arg-type]
+                )
+                .order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
             )
 
-        # Get associated rules
-        rules_query = (
-            select(AprioriAssociationRule)
-            .where(
-                AprioriAssociationRule.discovery_run_id == discovery_run_id  # type: ignore[arg-type]
-            )
-            .order_by(desc(AprioriAssociationRule.rule_strength))  # type: ignore[arg-type]
-        )
-
-        rules_result = await db_session.execute(rules_query)
+            rules_result = await session.execute(rules_query)
         rules = rules_result.scalars().all()
 
         # Compile insights
@@ -464,7 +470,7 @@ async def get_discovery_insights(
 # Helper functions for database operations
 
 async def _store_apriori_analysis_metadata(
-    db_session: AsyncSession,
+    session: AsyncSession,
     discovery_run_id: str,
     request: AprioriAnalysisRequest,
     results: dict[str, Any],
@@ -486,17 +492,17 @@ async def _store_apriori_analysis_metadata(
             status="completed",
         )
 
-        db_session.add(discovery_record)
-        await db_session.commit()
+        session.add(discovery_record)
+        await session.commit()
 
         logger.info(f"Stored Apriori analysis metadata for run {discovery_run_id}")
 
     except Exception as e:
         logger.error(f"Error storing Apriori analysis metadata: {e}")
-        await db_session.rollback()
+        await session.rollback()
 
 async def _store_pattern_discovery_results(
-    db_session: AsyncSession, discovery_run_id: str, results: dict[str, Any]
+    session: AsyncSession, discovery_run_id: str, results: dict[str, Any]
 ) -> None:
     """Store comprehensive pattern discovery results"""
     try:
@@ -533,11 +539,11 @@ async def _store_pattern_discovery_results(
             algorithms_count=metadata.get("algorithms_count", 1),
         )
 
-        db_session.add(results_record)
-        await db_session.commit()
+        session.add(results_record)
+        await session.commit()
 
         logger.info(f"Stored pattern discovery results for run {discovery_run_id}")
 
     except Exception as e:
         logger.error(f"Error storing pattern discovery results: {e}")
-        await db_session.rollback()
+        await session.rollback()

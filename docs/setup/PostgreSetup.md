@@ -1,9 +1,11 @@
-# PostgreSQL Integration Plan for APES
-## Adaptive Prompt Enhancement System Database Strategy
+# PostgreSQL Integration Strategy for APES
+## Adaptive Prompt Enhancement System Database Architecture
 
 ### Executive Summary
 
-This document outlines the complete PostgreSQL integration strategy for the APES project, providing three implementation approaches with detailed analysis, code examples, and step-by-step implementation guidance.
+This document outlines the complete PostgreSQL integration strategy for the APES project, providing three implementation approaches with detailed analysis and architectural guidance. 
+
+**For quick setup instructions, see [README_POSTGRES_SETUP.md](README_POSTGRES_SETUP.md)**
 
 ## Current APES Architecture Analysis
 
@@ -1017,34 +1019,16 @@ async def call_tool(name: str, arguments: dict):
 
 ## Getting Started
 
-1. **Start the database:**
-   ```bash
-   ./scripts/start_database.sh start
-   ```
+## Implementation Steps
 
-2. **Install dependencies:**
-   ```bash
-   pip install asyncpg sqlalchemy pydantic
-   # APES unified MCP server - no external installation required
-   ```
+1. **Complete setup following [README_POSTGRES_SETUP.md](README_POSTGRES_SETUP.md)**
 
-3. **Configure APES MCP server:**
-   ```json
-   {
-     "mcpServers": {
-       "apes-mcp": {
-         "command": "python",
-         "args": ["-m", "prompt_improver.mcp_server.server"],
-         "cwd": "/path/to/prompt-improver",
-         "env": {
-           "PYTHONPATH": "/path/to/prompt-improver/src"
-         }
-       }
-     }
-   }
-   ```
+2. **Choose your implementation approach** from the options analyzed above:
+   - **Option A:** MCP Server Only (external tools, simple configurations)
+   - **Option B:** Direct Integration (high-performance internal operations) 
+   - **Option C:** Hybrid Approach (recommended - combines both)
 
-4. **Choose your implementation approach** and follow the specific code examples above.
+3. **Follow the specific code examples** provided in each approach section above.
 
 ## Recommendation: Hybrid Approach
 

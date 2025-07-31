@@ -16,7 +16,7 @@ try:
     from opentelemetry import trace
     from opentelemetry.trace import SpanKind, Status, StatusCode
     from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
-    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.instrumentation.redis import RedisInstrumentor
@@ -58,7 +58,7 @@ class InstrumentationManager:
         
         try:
             # Instrument HTTP clients
-            HTTPXClientInstrumentor().instrument()
+            AioHttpClientInstrumentor().instrument()
             RequestsInstrumentor().instrument()
             
             # FastAPI will be instrumented when the app is created
@@ -106,7 +106,7 @@ class InstrumentationManager:
             return
         
         try:
-            HTTPXClientInstrumentor().uninstrument()
+            AioHttpClientInstrumentor().uninstrument()
             RequestsInstrumentor().uninstrument()
             AsyncPGInstrumentor().uninstrument()
             RedisInstrumentor().uninstrument()

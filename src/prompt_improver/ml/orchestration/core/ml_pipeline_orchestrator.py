@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from .workflow_execution_engine import WorkflowExecutionEngine
 from .resource_manager import ResourceManager
 from .component_registry import ComponentRegistry
-from ..events.event_bus import EventBus
+from ..events.adaptive_event_bus import AdaptiveEventBus as EventBus
 from ..events.event_types import EventType, MLEvent
 from ..config.orchestrator_config import OrchestratorConfig
 from ..integration.direct_component_loader import DirectComponentLoader

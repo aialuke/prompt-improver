@@ -49,6 +49,13 @@ from prompt_improver.database.optimization_integration import DatabaseOptimizati
 from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
+# Enhanced background task management integration
+from prompt_improver.performance.monitoring.health.background_manager import (
+    EnhancedBackgroundTaskManager,
+    TaskPriority,
+    get_background_task_manager
+)
+
 logger = logging.getLogger(__name__)
 
 class PlatformStatus(Enum):
@@ -166,13 +173,15 @@ class MLPlatformIntegration:
     def __init__(self,
                  storage_path: Path = Path("./ml_platform"),
                  enable_distributed: bool = True,
-                 enable_monitoring: bool = True):
+                 enable_monitoring: bool = True,
+                 task_manager: EnhancedBackgroundTaskManager | None = None):
         """Initialize ML Platform Integration.
         
         Args:
             storage_path: Path for platform storage
             enable_distributed: Enable distributed computing
             enable_monitoring: Enable comprehensive monitoring
+            task_manager: Enhanced background task manager for centralized task management
         """
         self.storage_path = storage_path
         self.storage_path.mkdir(parents=True, exist_ok=True)
@@ -189,6 +198,9 @@ class MLPlatformIntegration:
         self.database_manager: Optional[DatabaseOptimizationManager] = None
         self.performance_monitor: Optional[PerformanceMonitor] = None
         
+        # Enhanced background task management integration
+        self.task_manager = task_manager or get_background_task_manager()
+        
         # Platform State
         self.platform_status = PlatformStatus.INITIALIZING
         self.start_time = time.time()
@@ -203,8 +215,8 @@ class MLPlatformIntegration:
         self.enable_distributed = enable_distributed
         self.enable_monitoring = enable_monitoring
         
-        # Background tasks
-        self._background_tasks: List[asyncio.Task] = []
+        # Background task tracking (now managed via EnhancedBackgroundTaskManager)
+        self._background_task_ids: List[str] = []
         self._is_running = False
         
         logger.info("ML Platform Integration initialized")
@@ -342,30 +354,66 @@ class MLPlatformIntegration:
         logger.info("✅ Cross-component integrations configured")
     
     async def _start_background_tasks(self):
-        """Start background monitoring and optimization tasks."""
+        """Start background monitoring and optimization tasks using managed task system."""
         
         # Metrics collection
-        self._background_tasks.append(
-            asyncio.create_task(self._metrics_collector())
+        metrics_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"ml_platform_metrics_{int(time.time())}",
+            coroutine=self._metrics_collector(),
+            priority=TaskPriority.NORMAL,
+            timeout=24 * 3600,  # 24 hours
+            tags={
+                "type": "ml_platform_metrics",
+                "component": "ml_platform_integration",
+                "function": "metrics_collection"
+            }
         )
+        self._background_task_ids.append(metrics_task_id)
         
         # Performance optimization
-        self._background_tasks.append(
-            asyncio.create_task(self._performance_optimizer())
+        performance_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"ml_platform_performance_{int(time.time())}",
+            coroutine=self._performance_optimizer(),
+            priority=TaskPriority.HIGH,
+            timeout=24 * 3600,  # 24 hours
+            tags={
+                "type": "ml_platform_performance",
+                "component": "ml_platform_integration",
+                "function": "performance_optimization"
+            }
         )
+        self._background_task_ids.append(performance_task_id)
         
         # Health monitoring
-        self._background_tasks.append(
-            asyncio.create_task(self._health_monitor())
+        health_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"ml_platform_health_{int(time.time())}",
+            coroutine=self._health_monitor(),
+            priority=TaskPriority.HIGH,
+            timeout=24 * 3600,  # 24 hours
+            tags={
+                "type": "ml_platform_health",
+                "component": "ml_platform_integration",
+                "function": "health_monitoring"
+            }
         )
+        self._background_task_ids.append(health_task_id)
         
         # Workflow cleanup
-        self._background_tasks.append(
-            asyncio.create_task(self._workflow_cleanup())
+        cleanup_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"ml_platform_cleanup_{int(time.time())}",
+            coroutine=self._workflow_cleanup(),
+            priority=TaskPriority.LOW,
+            timeout=24 * 3600,  # 24 hours
+            tags={
+                "type": "ml_platform_cleanup",
+                "component": "ml_platform_integration",
+                "function": "workflow_cleanup"
+            }
         )
+        self._background_task_ids.append(cleanup_task_id)
         
         self._is_running = True
-        logger.info("✅ Background monitoring and optimization tasks started")
+        logger.info("✅ Background monitoring and optimization tasks started via managed task system")
     
     async def execute_workflow(self, request: WorkflowRequest) -> str:
         """Execute ML platform workflow with integrated optimizations.
@@ -729,19 +777,19 @@ class MLPlatformIntegration:
         return len(health_checks) > 0 and (sum(health_checks) / len(health_checks)) >= 0.75
     
     async def shutdown_platform(self):
-        """Gracefully shutdown the ML platform."""
+        """Gracefully shutdown the ML platform using managed task system."""
         
         logger.info("🛑 Shutting down ML Platform...")
         
         self._is_running = False
         
-        # Cancel background tasks
-        for task in self._background_tasks:
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        # Cancel managed background tasks
+        cancel_tasks = []
+        for task_id in self._background_task_ids:
+            cancel_tasks.append(self.task_manager.cancel_task(task_id))
+        
+        if cancel_tasks:
+            await asyncio.gather(*cancel_tasks, return_exceptions=True)
         
         # Shutdown components
         if self.experiment_orchestrator:
@@ -758,7 +806,8 @@ class MLPlatformIntegration:
 async def create_ml_platform(
     storage_path: Path = Path("./ml_platform"),
     enable_distributed: bool = True,
-    enable_monitoring: bool = True
+    enable_monitoring: bool = True,
+    task_manager: EnhancedBackgroundTaskManager | None = None
 ) -> MLPlatformIntegration:
     """Create and initialize ML Platform with Phase 1 integrations.
     
@@ -766,6 +815,7 @@ async def create_ml_platform(
         storage_path: Platform storage path
         enable_distributed: Enable distributed computing
         enable_monitoring: Enable monitoring
+        task_manager: Enhanced background task manager for centralized task management
         
     Returns:
         Initialized ML Platform Integration
@@ -774,7 +824,8 @@ async def create_ml_platform(
     platform = MLPlatformIntegration(
         storage_path=storage_path,
         enable_distributed=enable_distributed,
-        enable_monitoring=enable_monitoring
+        enable_monitoring=enable_monitoring,
+        task_manager=task_manager
     )
     
     success = await platform.initialize_platform()

@@ -577,9 +577,9 @@ class TypeSafePsycopgClientConnector(ComponentConnector):
     async def _initialize_component(self) -> None:
         """Initialize TypeSafePsycopgClient component."""
         try:
-            from prompt_improver.database.psycopg_client import get_psycopg_client
-            # Get the global client instance
-            self.component = await get_psycopg_client()
+            from prompt_improver.database import get_unified_manager, ManagerMode
+            # Get the unified manager instance
+            self.component = get_unified_manager(ManagerMode.ASYNC_MODERN)
             self.logger.info("TypeSafePsycopgClient connector initialized")
 
             # Emit initialization event

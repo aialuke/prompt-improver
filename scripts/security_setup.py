@@ -67,11 +67,11 @@ POSTGRES_USERNAME=apes_user
 POSTGRES_PASSWORD={secure_password}
 
 # Database URL (alternative to individual settings)
-DATABASE_URL=postgresql+psycopg://apes_user:{secure_password}@localhost:5432/apes_production
+DATABASE_URL=postgresql+asyncpg://apes_user:{secure_password}@localhost:5432/apes_production
 
 # Test Database
 TEST_DB_NAME=apes_test
-TEST_DATABASE_URL=postgresql+psycopg://apes_user:{secure_password}@localhost:5432/apes_test
+TEST_DATABASE_URL=postgresql+asyncpg://apes_user:{secure_password}@localhost:5432/apes_test
 
 # ===================================
 # MCP Configuration (Secure)
@@ -79,7 +79,7 @@ TEST_DATABASE_URL=postgresql+psycopg://apes_user:{secure_password}@localhost:543
 
 # MCP Postgres Server Configuration
 MCP_POSTGRES_ENABLED=true
-MCP_POSTGRES_CONNECTION_STRING=postgresql+psycopg://apes_user:{secure_password}@localhost:5432/apes_production
+MCP_POSTGRES_CONNECTION_STRING=postgresql+asyncpg://apes_user:{secure_password}@localhost:5432/apes_production
 
 # ===================================
 # Development Settings

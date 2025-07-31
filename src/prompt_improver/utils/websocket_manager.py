@@ -22,12 +22,19 @@ class ConnectionManager:
     def __init__(self, redis_client: coredis.Redis | None = None):
         # Active WebSocket connections by experiment_id
         self.experiment_connections: dict[str, set[WebSocket]] = defaultdict(set)
+        # General group connections (dashboard, session-specific, etc.)
+        self.group_connections: dict[str, set[WebSocket]] = defaultdict(set)
         # Connection metadata (user info, connection time, etc.)
         self.connection_metadata: dict[WebSocket, dict[str, Any]] = {}
         # Redis client for pub/sub messaging
         self.redis_client = redis_client
         # Background tasks
         self._background_tasks: set[asyncio.Task] = set()
+        
+        # Connection management and rate limiting
+        self.MAX_CONNECTIONS_PER_GROUP = 1000
+        self.MAX_MESSAGES_PER_SECOND = 100
+        self._message_counters: dict[str, list[float]] = defaultdict(list)
 
     async def connect(
         self, websocket: WebSocket, experiment_id: str, user_id: str | None = None
@@ -46,6 +53,7 @@ class ConnectionManager:
             "user_id": user_id,
             "connected_at": aware_utc_now(),
             "connection_id": str(uuid4()),
+            "connection_type": "experiment"
         }
 
         logger.info(
@@ -67,25 +75,74 @@ class ConnectionManager:
         if self.redis_client:
             await self._ensure_redis_subscription(experiment_id)
 
+    async def connect_to_group(
+        self, websocket: WebSocket, group_id: str, user_id: str | None = None
+    ):
+        """Connect WebSocket to a specific group (dashboard, session, etc.)"""
+        await websocket.accept()
+        
+        # Enforce connection limits
+        if not await self._enforce_connection_limits(group_id):
+            await websocket.close(code=1008, reason="Connection limit exceeded")
+            return
+        
+        # Add to group connections
+        self.group_connections[group_id].add(websocket)
+        
+        # Store connection metadata
+        self.connection_metadata[websocket] = {
+            "group_id": group_id,
+            "user_id": user_id,
+            "connected_at": aware_utc_now(),
+            "connection_id": str(uuid4()),
+            "connection_type": "group"
+        }
+        
+        logger.info(f"WebSocket connected to group {group_id}, user {user_id}")
+        
+        # Send initial connection confirmation
+        await self._send_to_websocket(
+            websocket,
+            {
+                "type": "connection_established",
+                "group_id": group_id,
+                "timestamp": aware_utc_now().isoformat(),
+                "connection_id": self.connection_metadata[websocket]["connection_id"],
+            },
+        )
+
     async def disconnect(self, websocket: WebSocket):
         """Remove WebSocket connection and clean up"""
         if websocket in self.connection_metadata:
             metadata = self.connection_metadata[websocket]
-            experiment_id = metadata["experiment_id"]
+            connection_type = metadata.get("connection_type", "experiment")
 
-            # Remove from experiment connections
-            if experiment_id in self.experiment_connections:
-                self.experiment_connections[experiment_id].discard(websocket)
+            if connection_type == "group":
+                # Handle group connection disconnect
+                group_id = metadata["group_id"]
+                if group_id in self.group_connections:
+                    self.group_connections[group_id].discard(websocket)
+                    
+                    # Clean up empty groups
+                    if not self.group_connections[group_id]:
+                        del self.group_connections[group_id]
+                        
+                logger.info(f"WebSocket disconnected from group {group_id}")
+            else:
+                # Handle experiment connection disconnect
+                experiment_id = metadata["experiment_id"]
+                if experiment_id in self.experiment_connections:
+                    self.experiment_connections[experiment_id].discard(websocket)
 
-                # Clean up empty experiment groups
-                if not self.experiment_connections[experiment_id]:
-                    del self.experiment_connections[experiment_id]
-                    # Could also unsubscribe from Redis here if no connections remain
+                    # Clean up empty experiment groups
+                    if not self.experiment_connections[experiment_id]:
+                        del self.experiment_connections[experiment_id]
+                        # Could also unsubscribe from Redis here if no connections remain
+                        
+                logger.info(f"WebSocket disconnected for experiment {experiment_id}")
 
             # Remove metadata
             del self.connection_metadata[websocket]
-
-            logger.info(f"WebSocket disconnected for experiment {experiment_id}")
 
     async def broadcast_to_experiment(
         self, experiment_id: str, message: dict[str, Any]
@@ -112,10 +169,45 @@ class ConnectionManager:
         for websocket in disconnected_connections:
             await self.disconnect(websocket)
 
+    async def broadcast_to_group(self, group_id: str, message: dict[str, Any]):
+        """Broadcast message to specific WebSocket group - PERFORMANCE OPTIMIZED"""
+        if group_id not in self.group_connections:
+            return
+            
+        # Rate limiting check
+        if not await self._check_rate_limit(group_id):
+            logger.warning(f"Rate limit exceeded for group {group_id}")
+            return
+
+        # Add timestamp to message
+        message["timestamp"] = aware_utc_now().isoformat()
+
+        # Send to all connections in this group
+        disconnected_connections = []
+        for websocket in self.group_connections[group_id]:
+            try:
+                await self._send_to_websocket(websocket, message)
+            except WebSocketDisconnect:
+                disconnected_connections.append(websocket)
+            except Exception as e:
+                logger.error(f"Error sending message to WebSocket in group {group_id}: {e}")
+                disconnected_connections.append(websocket)
+
+        # Clean up disconnected connections
+        for websocket in disconnected_connections:
+            await self.disconnect(websocket)
+            
+        logger.debug(f"Broadcast to group {group_id}: {len(self.group_connections[group_id])} connections")
+
     async def broadcast_to_all(self, message: dict[str, Any]):
-        """Broadcast message to all active WebSocket connections"""
+        """Broadcast message to all active WebSocket connections (INEFFICIENT - use targeted broadcasting instead)"""
+        # Broadcast to all experiment connections
         for experiment_id in list(self.experiment_connections.keys()):
             await self.broadcast_to_experiment(experiment_id, message)
+        
+        # Broadcast to all group connections
+        for group_id in list(self.group_connections.keys()):
+            await self.broadcast_to_group(group_id, message)
 
     async def send_to_connection(self, websocket: WebSocket, message: dict[str, Any]):
         """Send message to specific WebSocket connection"""
@@ -134,6 +226,33 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Failed to send WebSocket message: {e}")
             raise
+
+    async def _enforce_connection_limits(self, group_id: str) -> bool:
+        """Enforce connection limits per group"""
+        current_count = len(self.group_connections.get(group_id, set()))
+        if current_count >= self.MAX_CONNECTIONS_PER_GROUP:
+            logger.warning(f"Connection limit exceeded for group {group_id}: {current_count}/{self.MAX_CONNECTIONS_PER_GROUP}")
+            return False
+        return True
+
+    async def _check_rate_limit(self, group_id: str) -> bool:
+        """Check rate limiting for message broadcasting"""
+        import time
+        current_time = time.time()
+        
+        # Clean old entries (older than 1 second)
+        self._message_counters[group_id] = [
+            timestamp for timestamp in self._message_counters[group_id] 
+            if current_time - timestamp < 1.0
+        ]
+        
+        # Check if we're under the rate limit
+        if len(self._message_counters[group_id]) >= self.MAX_MESSAGES_PER_SECOND:
+            return False
+            
+        # Add current timestamp
+        self._message_counters[group_id].append(current_time)
+        return True
 
     async def _ensure_redis_subscription(self, experiment_id: str):
         """Ensure Redis subscription exists for experiment updates"""
@@ -188,17 +307,39 @@ class ConnectionManager:
                 f"Redis subscription error for experiment {experiment_id}: {e}"
             )
 
-    def get_connection_count(self, experiment_id: str = None) -> int:
-        """Get number of active connections for experiment or total"""
+    def get_connection_count(self, experiment_id: str = None, group_id: str = None) -> int:
+        """Get number of active connections for experiment, group, or total"""
         if experiment_id:
             return len(self.experiment_connections.get(experiment_id, set()))
-        return sum(
-            len(connections) for connections in self.experiment_connections.values()
-        )
+        elif group_id:
+            return len(self.group_connections.get(group_id, set()))
+        else:
+            # Total connections (experiments + groups)
+            experiment_total = sum(len(connections) for connections in self.experiment_connections.values())
+            group_total = sum(len(connections) for connections in self.group_connections.values())
+            return experiment_total + group_total
 
     def get_active_experiments(self) -> list[str]:
         """Get list of experiment IDs with active connections"""
         return list(self.experiment_connections.keys())
+        
+    def get_active_groups(self) -> list[str]:
+        """Get list of group IDs with active connections"""
+        return list(self.group_connections.keys())
+        
+    def get_connection_stats(self) -> dict[str, Any]:
+        """Get comprehensive connection statistics"""
+        return {
+            "total_connections": self.get_connection_count(),
+            "experiment_connections": sum(len(conns) for conns in self.experiment_connections.values()),
+            "group_connections": sum(len(conns) for conns in self.group_connections.values()),
+            "active_experiments": len(self.experiment_connections),
+            "active_groups": len(self.group_connections),
+            "experiment_details": {exp_id: len(conns) for exp_id, conns in self.experiment_connections.items()},
+            "group_details": {group_id: len(conns) for group_id, conns in self.group_connections.items()},
+            "max_connections_per_group": self.MAX_CONNECTIONS_PER_GROUP,
+            "max_messages_per_second": self.MAX_MESSAGES_PER_SECOND
+        }
 
     async def cleanup(self):
         """Clean up all connections and background tasks"""
@@ -212,18 +353,30 @@ class ConnectionManager:
             await asyncio.gather(*self._background_tasks, return_exceptions=True)
 
         # Close all WebSocket connections
+        # Close experiment connections
         for experiment_connections in self.experiment_connections.values():
             for websocket in list(experiment_connections):
                 try:
                     await websocket.close()
                 except (ConnectionError, Exception) as e:
-                    logger.warning(f"Failed to close websocket connection: {e}")
+                    logger.warning(f"Failed to close experiment websocket connection: {e}")
+                    pass
+        
+        # Close group connections
+        for group_connections in self.group_connections.values():
+            for websocket in list(group_connections):
+                try:
+                    await websocket.close()
+                except (ConnectionError, Exception) as e:
+                    logger.warning(f"Failed to close group websocket connection: {e}")
                     pass
 
         # Clear all data structures
         self.experiment_connections.clear()
+        self.group_connections.clear()
         self.connection_metadata.clear()
         self._background_tasks.clear()
+        self._message_counters.clear()
 
 # Global connection manager instance
 connection_manager = ConnectionManager()

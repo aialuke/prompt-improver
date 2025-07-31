@@ -23,8 +23,8 @@ from src.prompt_improver.metrics.api_metrics import (
 
 # Try to import database components
 try:
-    from src.prompt_improver.database.connection_manager import get_connection_manager
-    import psycopg
+    from src.prompt_improver.database import get_unified_manager, ManagerMode
+    import asyncpg
     POSTGRES_AVAILABLE = True
 except ImportError:
     POSTGRES_AVAILABLE = False

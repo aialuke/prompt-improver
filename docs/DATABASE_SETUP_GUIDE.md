@@ -180,8 +180,8 @@ _This guide was simplified after removing Homebrew PostgreSQL conflicts during t
 
 ### Database URL Formats
 
-**Async (psycopg3)**: `postgresql+psycopg://user:pass@host:port/db`
-**Sync (psycopg3)**: `postgresql://user:pass@host:port/db`
+**Async (asyncpg)**: `postgresql+asyncpg://user:pass@host:port/db`
+**Sync (asyncpg)**: `postgresql://user:pass@host:port/db`
 
 ### Environment Variables
 
@@ -194,9 +194,9 @@ All database configuration should use the following pattern:
 
 ### TestContainers
 
-TestContainers URLs are automatically converted from psycopg2 to psycopg3 format:
+TestContainers URLs are automatically converted from psycopg2 to asyncpg format:
 ```python
-db_url = postgres.get_connection_url().replace("postgresql+psycopg2://", "postgresql+psycopg://")
+db_url = postgres.get_connection_url().replace("postgresql+psycopg2://", "postgresql+asyncpg://")
 ```
 
 ### SQLite Migration Notes
@@ -204,7 +204,7 @@ db_url = postgres.get_connection_url().replace("postgresql+psycopg2://", "postgr
 The project has been fully migrated from SQLite to PostgreSQL:
 - **aiosqlite dependency removed**: No SQLite-related dependencies remain
 - **Package metadata cleaned**: All stale references removed
-- **Environment standardized**: All configurations use psycopg3 format
+- **Environment standardized**: All configurations use asyncpg format
 - **Validation scripts added**: Monitoring prevents unwanted dependencies
 
 ### Dependency Monitoring

@@ -64,10 +64,13 @@ else
     fi
 fi
 
-# Install or update dependencies
-print_status "Installing real-behavior testing dependencies..."
-pip install -r requirements-test-real.txt
-print_success "Dependencies installed"
+# Install or update dependencies from pyproject.toml
+print_status "Installing real-behavior testing dependencies from pyproject.toml..."
+if ! command -v uv &> /dev/null; then
+    pip install uv
+fi
+uv pip install -e ".[test]"
+print_success "Dependencies installed from pyproject.toml"
 
 # Set environment variables for testing
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"

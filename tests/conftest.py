@@ -23,7 +23,7 @@ from typer.testing import CliRunner
 from testcontainers.redis import RedisContainer
 from testcontainers.postgres import PostgresContainer
 import coredis
-import psycopg
+import asyncpg
 
 # OpenTelemetry imports for real behavior testing
 from opentelemetry import trace, metrics
@@ -212,7 +212,7 @@ async def test_db_engine():
     if not db_cleaned:
         pytest.skip("Could not clean up test database")
 
-    test_db_url = f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/{test_db_name}"
+    test_db_url = f"postgresql+asyncpg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:{config.postgres_port}/{test_db_name}"
 
     engine = await create_test_engine_with_retry(
         test_db_url,

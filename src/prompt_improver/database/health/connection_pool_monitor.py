@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from ..psycopg_client import TypeSafePsycopgClient, get_psycopg_client
-from ..connection import get_session_context
+# psycopg_client removed in Phase 1 - using unified_connection_manager instead
+from ..unified_connection_manager import get_unified_manager, ManagerMode
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class ConnectionPoolMonitor:
     and pg_stat_activity for detailed connection analysis.
     """
     
-    def __init__(self, client: Optional[TypeSafePsycopgClient] = None):
+    def __init__(self, client: Optional[Any] = None):
         self.client = client
         
         # Configuration thresholds
@@ -102,10 +102,10 @@ class ConnectionPoolMonitor:
         self.utilization_warning_threshold = 80.0    # 80%
         self.utilization_critical_threshold = 95.0   # 95%
     
-    async def get_client(self) -> TypeSafePsycopgClient:
+    async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return await get_psycopg_client()
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
     
     async def collect_connection_pool_metrics(self) -> Dict[str, Any]:

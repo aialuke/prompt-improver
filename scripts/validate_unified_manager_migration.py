@@ -94,7 +94,7 @@ def test_database_manager_sync_pattern():
         
         # Create database URL (using test database if available)
         db_config = DatabaseConfig()
-        database_url = f"postgresql+psycopg://{db_config.postgres_username}:{db_config.postgres_password}@{db_config.postgres_host}:{db_config.postgres_port}/{db_config.postgres_database}"
+        database_url = f"postgresql+asyncpg://{db_config.postgres_username}:{db_config.postgres_password}@{db_config.postgres_host}:{db_config.postgres_port}/{db_config.postgres_database}"
         
         # Test DatabaseManager instantiation pattern (used in AprioriAnalyzer)
         db_manager = DatabaseManager(database_url, echo=False)

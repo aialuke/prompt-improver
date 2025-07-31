@@ -52,8 +52,8 @@ class CLIOrchestrator:
             # Get orchestrator instance
             orchestrator = await self._get_orchestrator()
 
-            # Create continuous training workflow
-            workflow_def = await self._create_continuous_training_workflow(config)
+            # Create continuous training workflow (workflow definition not used directly)
+            await self._create_continuous_training_workflow(config)
 
             # Start workflow execution
             workflow_id = await orchestrator.start_workflow(
@@ -130,9 +130,9 @@ class CLIOrchestrator:
             consecutive_poor_iterations = 0  # Track consecutive poor performance
             max_poor_iterations = 5         # Stop after 5 consecutive poor iterations
 
-            # Performance trend analysis
+            # Performance trend analysis (variables for future use)
             trend_window = 10               # Number of iterations for trend analysis
-            early_stop_patience = 15       # Early stopping patience (iterations)
+            _ = 15                          # Early stopping patience (iterations) - not used yet
 
             with Progress(
                 SpinnerColumn(),
@@ -163,7 +163,7 @@ class CLIOrchestrator:
                         if hasattr(status, 'state'):
                             workflow_state = status.state.value if hasattr(status.state, 'value') else str(status.state)
                         else:
-                            workflow_state = status.get("status", "unknown")
+                            workflow_state = "unknown"
 
                         if workflow_state in ["completed", "failed", "cancelled", "error"]:
                             progress.update(monitor_task, description=f"Training {workflow_state}")
@@ -475,17 +475,20 @@ class CLIOrchestrator:
             while time.time() - start_time < timeout:
                 status = await orchestrator.get_workflow_status(workflow_id)
 
-                if status["status"] in ["completed", "failed", "cancelled"]:
-                    # Get final results
-                    result = await orchestrator.get_workflow_result(workflow_id)
+                # Convert WorkflowInstance state to string for comparison
+                status_str = status.state.value if hasattr(status.state, 'value') else str(status.state)
+
+                if status_str in ["completed", "failed", "cancelled"]:
+                    # Get final results (using metadata as result since get_workflow_result doesn't exist)
+                    result = status.metadata or {}
 
                     # Update workflow tracking
                     if workflow_id in self._active_workflows:
-                        self._active_workflows[workflow_id]["status"] = status["status"]
+                        self._active_workflows[workflow_id]["status"] = status_str
                         self._active_workflows[workflow_id]["completed_at"] = datetime.now(timezone.utc)
 
                     return {
-                        "status": status["status"],
+                        "status": status_str,
                         "result": result,
                         "duration": time.time() - start_time,
                         "iterations": self._active_workflows.get(workflow_id, {}).get("iterations", 0)
@@ -548,9 +551,12 @@ class CLIOrchestrator:
                     # Calculate progress information
                     elapsed_time = time.time() - start_time
                     remaining_time = timeout - elapsed_time
+                    # Convert WorkflowInstance state to string
+                    status_str = status.state.value if hasattr(status.state, 'value') else str(status.state)
+
                     progress_info = {
                         "workflow_id": workflow_id,
-                        "status": status.get("status", "unknown"),
+                        "status": status_str,
                         "elapsed_seconds": elapsed_time,
                         "remaining_seconds": remaining_time,
                         "progress_percentage": min(100, (elapsed_time / timeout) * 100)
@@ -563,7 +569,7 @@ class CLIOrchestrator:
                         except Exception as e:
                             self.logger.warning(f"Progress callback error: {e}")
 
-                    current_status = status.get("status", "unknown")
+                    current_status = status.state.value if hasattr(status.state, 'value') else str(status.state)
 
                     # Log status changes with enhanced information
                     if current_status != last_status:
@@ -581,12 +587,8 @@ class CLIOrchestrator:
                         duration = time.time() - start_time
                         self.logger.info(f"Workflow {workflow_id} completed successfully in {duration:.2f}s")
 
-                        # Get final results
-                        try:
-                            result = await orchestrator.get_workflow_result(workflow_id)
-                        except Exception as e:
-                            self.logger.warning(f"Could not get workflow result: {e}")
-                            result = {}
+                        # Get final results (use metadata since get_workflow_result doesn't exist)
+                        result = status.metadata or {}
 
                         return {
                             "status": "completed",
@@ -600,7 +602,7 @@ class CLIOrchestrator:
                     # Check if workflow failed
                     elif current_status == "failed":
                         duration = time.time() - start_time
-                        error_msg = status.get('error', 'Unknown error')
+                        error_msg = status.error_message or 'Unknown error'
 
                         self.logger.error(f"Workflow {workflow_id} failed after {duration:.2f}s: {error_msg}")
 
@@ -681,7 +683,7 @@ class CLIOrchestrator:
     async def stop_all_workflows(
         self,
         graceful: bool = True,
-        timeout: int = 30
+        _timeout: int = 30  # Parameter kept for interface compatibility
     ) -> Dict[str, Any]:
         """
         Stop all active workflows.
@@ -703,7 +705,8 @@ class CLIOrchestrator:
 
             for workflow_id in list(self._active_workflows.keys()):
                 try:
-                    success = await orchestrator.cancel_workflow(workflow_id, graceful=graceful)
+                    await orchestrator.stop_workflow(workflow_id)
+                    success = True
 
                     if success:
                         stopped_workflows.append(workflow_id)
@@ -735,16 +738,27 @@ class CLIOrchestrator:
             orchestrator = await self._get_orchestrator()
             status = await orchestrator.get_workflow_status(workflow_id)
 
-            # Enhance with local tracking info
+            # Convert WorkflowInstance to dictionary and enhance with local tracking info
+            status_dict = {
+                "workflow_id": status.workflow_id,
+                "workflow_type": status.workflow_type,
+                "status": status.state.value if hasattr(status.state, 'value') else str(status.state),
+                "created_at": status.created_at.isoformat() if status.created_at else None,
+                "started_at": status.started_at.isoformat() if status.started_at else None,
+                "completed_at": status.completed_at.isoformat() if status.completed_at else None,
+                "error_message": status.error_message,
+                "metadata": status.metadata or {}
+            }
+
             if workflow_id in self._active_workflows:
                 local_info = self._active_workflows[workflow_id]
-                status.update({
+                status_dict.update({
                     "session_id": local_info["session_id"],
                     "iterations": local_info["iterations"],
                     "last_improvement": local_info["last_improvement"]
                 })
 
-            return status
+            return status_dict
 
         except Exception as e:
             self.logger.error(f"Error getting workflow status: {e}")
@@ -757,9 +771,9 @@ class CLIOrchestrator:
 
             config = OrchestratorConfig(
                 max_concurrent_workflows=3,
-                default_timeout=1800,
-                enable_monitoring=True,
-                enable_caching=True
+                training_timeout=1800,
+                debug_mode=False,
+                verbose_logging=False
             )
 
             self._orchestrator = MLPipelineOrchestrator(config)
@@ -769,7 +783,7 @@ class CLIOrchestrator:
 
     async def _create_continuous_training_workflow(self, config: Dict[str, Any]):
         """Create continuous training workflow definition."""
-        from ...ml.orchestration.config.workflow_definition import WorkflowDefinition, WorkflowStep
+        from ...ml.orchestration.core.workflow_types import WorkflowDefinition, WorkflowStep
 
         # Create 7-step continuous training workflow
         return WorkflowDefinition(
@@ -894,7 +908,7 @@ class CLIOrchestrator:
     async def stop_training_gracefully(
         self,
         session_id: str,
-        timeout: int = 30,
+        _timeout: int = 30,  # Parameter kept for interface compatibility
         save_progress: bool = True
     ) -> Dict[str, Any]:
         """
@@ -937,20 +951,23 @@ class CLIOrchestrator:
                     # Get current workflow status before stopping
                     status = await orchestrator.get_workflow_status(workflow_id)
 
-                    if save_progress and status.get("status") == "running":
+                    # Check if workflow is running
+                    status_str = status.state.value if hasattr(status.state, 'value') else str(status.state)
+
+                    if save_progress and status_str == "running":
                         # Save current progress
                         progress_data = {
                             "workflow_id": workflow_id,
                             "session_id": session_id,
                             "stopped_at": datetime.now(timezone.utc).isoformat(),
-                            "iterations_completed": status.get("iterations_completed", 0),
-                            "current_performance": status.get("current_performance"),
-                            "last_checkpoint": status.get("last_checkpoint")
+                            "iterations_completed": 0,  # Default since not available in WorkflowInstance
+                            "current_performance": None,  # Default since not available in WorkflowInstance
+                            "last_checkpoint": None  # Default since not available in WorkflowInstance
                         }
                         saved_data[workflow_id] = progress_data
 
-                    # Stop workflow gracefully
-                    await orchestrator.stop_workflow(workflow_id, graceful=True, timeout=timeout)
+                    # Stop workflow
+                    await orchestrator.stop_workflow(workflow_id)
                     stopped_workflows.append(workflow_id)
 
                     # Remove from active workflows
@@ -1013,7 +1030,7 @@ class CLIOrchestrator:
 
             for workflow_id in session_workflows:
                 try:
-                    await orchestrator.stop_workflow(workflow_id, graceful=False, timeout=5)
+                    await orchestrator.stop_workflow(workflow_id)
                     stopped_workflows.append(workflow_id)
 
                     # Remove from active workflows

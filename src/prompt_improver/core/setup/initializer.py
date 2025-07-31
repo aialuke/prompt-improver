@@ -302,7 +302,7 @@ class APESInitializer:
         # Database configuration
         db_config = {
             "database": {
-                "url": "${DATABASE_URL:-postgresql+psycopg://localhost:5432/apes_db}",
+                "url": "${DATABASE_URL:-postgresql+asyncpg://localhost:5432/apes_db}",
                 "pool_size": 10,
                 "max_overflow": 20,
                 "pool_timeout": 30,

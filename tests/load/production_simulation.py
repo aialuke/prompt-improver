@@ -32,7 +32,7 @@ import aiofiles
 
 # Core system imports
 from prompt_improver.database import get_session_context
-from prompt_improver.database.psycopg_client import TypeSafePsycopgClient
+from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )
@@ -489,7 +489,7 @@ class TestProductionSimulation:
         self,
         simulation_metrics: ProductionSimulationMetrics,
         ml_orchestrator: MLPipelineOrchestrator,
-        db_client: TypeSafePsycopgClient,
+        db_client: Any,
         cache_layer: DatabaseCacheLayer
     ):
         """

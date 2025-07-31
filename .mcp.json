@@ -1,14 +1,16 @@
 {
   "mcpServers": {
-    "apes-rule-application": {
+    "_apes-rule-application": {
       "command": "python",
-      "args": ["-m", "prompt_improver.mcp_server.mcp_server"],
+      "args": ["-m", "prompt_improver.mcp_server.server"],
+      "cwd": "/Users/lukemckenzie/prompt-improver",
       "env": {
+        "PYTHONPATH": "/Users/lukemckenzie/prompt-improver/src",
         "POSTGRES_HOST": "localhost",
         "POSTGRES_PORT": "5432",
         "POSTGRES_DATABASE": "apes_production",
         "POSTGRES_USERNAME": "mcp_server_user",
-        "POSTGRES_PASSWORD": "${MCP_POSTGRES_PASSWORD}",
+        "POSTGRES_PASSWORD": "${MCP_POSTGRES_PASSWORD:-SecureMcpUserPassword2025!}",
         "MCP_RATE_LIMIT_REDIS_URL": "redis://localhost:6379/2",
         "MCP_CACHE_REDIS_URL": "redis://localhost:6379/3",
         "MCP_LOG_LEVEL": "INFO",
@@ -17,10 +19,34 @@
         "MCP_MAX_PROMPT_LENGTH": "10240",
         "MCP_REQUEST_TIMEOUT_MS": "200",
         "MCP_CACHE_TTL_SECONDS": "7200",
-        "MCP_DB_POOL_SIZE": "20",
-        "MCP_DB_MAX_OVERFLOW": "10",
+        "DB_POOL_MIN_SIZE": "${DB_POOL_MIN_SIZE:-4}",
+        "DB_POOL_MAX_SIZE": "${DB_POOL_MAX_SIZE:-16}",
+        "DB_POOL_TIMEOUT": "${DB_POOL_TIMEOUT:-10}",
         "FASTMCP_LOG_LEVEL": "INFO",
         "FASTMCP_MASK_ERROR_DETAILS": "true"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/lukemckenzie/Desktop",
+        "/Users/lukemckenzie/prompt-improver"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "hyperbrowser": {
+      "command": "npx",
+      "args": ["-y", "hyperbrowser-mcp"],
+      "env": {
+        "HYPERBROWSER_API_KEY": "hb_f87ada9b0d3612054e7e791bfc7e"
       }
     }
   }

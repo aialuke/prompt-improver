@@ -7,11 +7,10 @@ integrated with the unified retry manager.
 
 import asyncio
 import logging
-from datetime import timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
-from psycopg import errors as psycopg_errors
+import asyncpg
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -19,7 +18,6 @@ from prompt_improver.utils.datetime_utils import aware_utc_now
 from ..performance.monitoring.metrics_registry import (
     get_metrics_registry,
     StandardMetrics,
-    PROMETHEUS_AVAILABLE
 )
 
 logger = logging.getLogger(__name__)
@@ -47,35 +45,34 @@ class ErrorSeverity(Enum):
 class DatabaseErrorClassifier:
     """Classifies database errors for appropriate handling."""
 
-    # Error classification mappings
+    # Error classification mappings for asyncpg
     ERROR_MAPPINGS = {
         # Connection errors
-        psycopg_errors.OperationalError: (ErrorCategory.connection, ErrorSeverity.high),
-        psycopg_errors.InterfaceError: (ErrorCategory.connection, ErrorSeverity.high),
+        asyncpg.ConnectionDoesNotExistError: (ErrorCategory.connection, ErrorSeverity.high),
+        asyncpg.ConnectionFailureError: (ErrorCategory.connection, ErrorSeverity.high),
+        asyncpg.InterfaceError: (ErrorCategory.connection, ErrorSeverity.high),
 
         # Timeout errors
-        psycopg_errors.QueryCanceled: (ErrorCategory.timeout, ErrorSeverity.medium),
+        asyncio.CancelledError: (ErrorCategory.timeout, ErrorSeverity.medium),
 
-        # Transient errors
-        psycopg_errors.DeadlockDetected: (ErrorCategory.transient, ErrorSeverity.medium),
-        psycopg_errors.SerializationFailure: (ErrorCategory.transient, ErrorSeverity.medium),
+        # Transient errors - asyncpg uses PostgresError with specific codes
+        asyncpg.PostgresError: (ErrorCategory.transient, ErrorSeverity.medium),
 
         # Constraint violations
-        psycopg_errors.IntegrityError: (ErrorCategory.constraint, ErrorSeverity.low),
-        psycopg_errors.UniqueViolation: (ErrorCategory.constraint, ErrorSeverity.low),
-        psycopg_errors.ForeignKeyViolation: (ErrorCategory.constraint, ErrorSeverity.low),
+        asyncpg.IntegrityConstraintViolationError: (ErrorCategory.constraint, ErrorSeverity.low),
+        asyncpg.UniqueViolationError: (ErrorCategory.constraint, ErrorSeverity.low),
+        asyncpg.ForeignKeyViolationError: (ErrorCategory.constraint, ErrorSeverity.low),
 
         # Syntax errors
-        psycopg_errors.SyntaxError: (ErrorCategory.syntax, ErrorSeverity.high),
-        psycopg_errors.UndefinedTable: (ErrorCategory.syntax, ErrorSeverity.high),
-        psycopg_errors.UndefinedColumn: (ErrorCategory.syntax, ErrorSeverity.high),
+        asyncpg.SyntaxOrAccessError: (ErrorCategory.syntax, ErrorSeverity.high),
+        asyncpg.UndefinedTableError: (ErrorCategory.syntax, ErrorSeverity.high),
+        asyncpg.UndefinedColumnError: (ErrorCategory.syntax, ErrorSeverity.high),
 
         # Permission errors
-        psycopg_errors.InsufficientPrivilege: (ErrorCategory.permission, ErrorSeverity.high),
+        asyncpg.InsufficientPrivilegeError: (ErrorCategory.permission, ErrorSeverity.high),
 
-        # Resource errors
-        psycopg_errors.DiskFull: (ErrorCategory.resource, ErrorSeverity.critical),
-        psycopg_errors.OutOfMemory: (ErrorCategory.resource, ErrorSeverity.critical),
+        # Resource errors - asyncpg uses generic PostgresError for these
+        asyncpg.PostgresError: (ErrorCategory.resource, ErrorSeverity.critical),
     }
 
     @classmethod
@@ -200,12 +197,12 @@ def create_database_error_classifier():
         # Map database categories to retry error types
         category_mapping = {
             ErrorCategory.connection: RetryableErrorType.NETWORK,
-            ErrorCategory.timeout: RetryableErrorType.timeout,
-            ErrorCategory.transient: RetryableErrorType.transient,
+            ErrorCategory.timeout: RetryableErrorType.TIMEOUT,
+            ErrorCategory.transient: RetryableErrorType.TRANSIENT,
             ErrorCategory.resource: RetryableErrorType.RESOURCE_EXHAUSTION,
         }
 
-        return category_mapping.get(category, RetryableErrorType.transient)
+        return category_mapping.get(category, RetryableErrorType.TRANSIENT)
 
     return classify_for_retry
 
@@ -236,7 +233,7 @@ def get_default_database_retry_config():
     )
 
 # Convenience function for database operations with retry
-async def execute_with_database_retry(operation, operation_name: str, **kwargs):
+async def execute_with_database_retry(operation, operation_name: str):
     """Execute database operation with unified retry logic."""
     from ..core.retry_manager import get_retry_manager
 

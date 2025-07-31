@@ -17,8 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from ..psycopg_client import TypeSafePsycopgClient, get_psycopg_client
-from ..connection import get_session_context
+from ..unified_connection_manager import get_unified_manager, ManagerMode
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +82,7 @@ class IndexHealthAssessor:
     Assess PostgreSQL index health using system catalogs and statistics
     """
     
-    def __init__(self, client: Optional[TypeSafePsycopgClient] = None):
+    def __init__(self, client: Optional[Any] = None):
         self.client = client
         
         # Health thresholds
@@ -97,10 +96,10 @@ class IndexHealthAssessor:
         self._cache_timestamp = None
         self._cache_duration_seconds = 300  # 5 minutes
     
-    async def get_client(self) -> TypeSafePsycopgClient:
+    async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return await get_psycopg_client()
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
     
     async def assess_index_health(self) -> IndexHealthReport:

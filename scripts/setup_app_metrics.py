@@ -876,7 +876,7 @@ if __name__ == "__main__":
             "opentelemetry-exporter-prometheus>=0.57b0",
             "opentelemetry-instrumentation-fastapi>=0.57b0",
             "opentelemetry-instrumentation-asyncpg>=0.57b0",
-            "opentelemetry-instrumentation-httpx>=0.57b0",
+            "opentelemetry-instrumentation-aiohttp-client>=0.57b0",
             "opentelemetry-instrumentation-requests>=0.57b0",
             "psutil>=5.9.0",  # For system metrics
         ]

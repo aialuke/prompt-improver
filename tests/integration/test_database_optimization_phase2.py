@@ -12,9 +12,9 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from prompt_improver.database.connection_pool_optimizer import ConnectionPoolOptimizer
+from prompt_improver.database.unified_connection_manager import get_connection_pool_optimizer
 from prompt_improver.database.query_optimizer import OptimizedQueryExecutor, get_query_executor
-from prompt_improver.database.psycopg_client import get_psycopg_client
+from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.database.models import Rule, Session, PromptImprovement
 from prompt_improver.database.connection import get_session_context
 
@@ -38,7 +38,7 @@ class TestDatabaseOptimizationPhase2:
     @pytest.fixture
     async def pool_optimizer(self):
         """Create connection pool optimizer"""
-        optimizer = ConnectionPoolOptimizer()
+        optimizer = get_connection_pool_optimizer()
         yield optimizer
         if optimizer._monitoring:
             optimizer.stop_monitoring()
@@ -60,7 +60,7 @@ class TestDatabaseOptimizationPhase2:
     @pytest.mark.asyncio
     async def test_query_result_caching(self, cache_layer):
         """Test query result caching reduces database load"""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         # Define test query
         query = "SELECT id, name, description FROM rules WHERE active = true LIMIT 10"
@@ -101,7 +101,7 @@ class TestDatabaseOptimizationPhase2:
     @pytest.mark.asyncio
     async def test_cache_with_different_parameters(self, cache_layer):
         """Test cache correctly handles different query parameters"""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         query = "SELECT * FROM sessions WHERE user_id = %(user_id)s LIMIT 5"
         
@@ -129,7 +129,7 @@ class TestDatabaseOptimizationPhase2:
     @pytest.mark.asyncio
     async def test_cache_invalidation(self, cache_layer):
         """Test cache invalidation when data changes"""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         query = "SELECT COUNT(*) as count FROM rules WHERE active = true"
         
@@ -196,7 +196,7 @@ class TestDatabaseOptimizationPhase2:
         
         # Simulate concurrent database operations
         async def simulate_db_operation(operation_id: int):
-            client = await get_psycopg_client()
+            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
             async with client.connection() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute("SELECT pg_sleep(0.01)")  # 10ms operation
@@ -306,7 +306,7 @@ class TestDatabaseOptimizationPhase2:
     @pytest.mark.asyncio
     async def test_cache_performance_under_load(self, cache_layer):
         """Test cache performance under concurrent load"""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         # Test query that returns consistent results
         query = "SELECT id, name FROM rules WHERE active = true ORDER BY id LIMIT 5"
@@ -368,7 +368,7 @@ class TestDatabaseOptimizationPhase2:
         # Switch to smart strategy
         cache_layer.policy.strategy = CacheStrategy.SMART
         
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         async def execute_query(q, p):
             # Simulate varying query costs

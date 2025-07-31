@@ -7,7 +7,9 @@ import json
 import subprocess
 import sys
 import time
+import pytest
 
+@pytest.mark.asyncio
 async def test_mcp_server():
     """Test the MCP server startup and basic functionality"""
     # Start the MCP server

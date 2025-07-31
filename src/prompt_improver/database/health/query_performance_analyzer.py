@@ -14,12 +14,13 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy import text
 
-from ..psycopg_client import TypeSafePsycopgClient, get_psycopg_client
-from ..connection import get_session_context
+# psycopg_client removed in Phase 1 - using unified_connection_manager instead
+from ..unified_connection_manager import get_unified_manager, ManagerMode
+from .. import get_session_context
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class QueryPerformanceAnalyzer:
     Analyze query performance using pg_stat_statements and execution plans
     """
     
-    def __init__(self, client: Optional[TypeSafePsycopgClient] = None):
+    def __init__(self, client: Optional[Any] = None):
         self.client = client
         
         # Performance thresholds
@@ -102,10 +103,10 @@ class QueryPerformanceAnalyzer:
         self._query_patterns = {}
         self._analysis_cache = {}
     
-    async def get_client(self) -> TypeSafePsycopgClient:
+    async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return await get_psycopg_client()
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
     
     async def analyze_query_performance(self) -> Dict[str, Any]:
@@ -130,11 +131,12 @@ class QueryPerformanceAnalyzer:
                     return_exceptions=True
                 )
                 
-                slow_queries = results[0] if not isinstance(results[0], Exception) else []
-                frequent_queries = results[1] if not isinstance(results[1], Exception) else []
-                io_intensive = results[2] if not isinstance(results[2], Exception) else []
-                cache_analysis = results[3] if not isinstance(results[3], Exception) else {}
-                current_activity = results[4] if not isinstance(results[4], Exception) else []
+                # Type-safe exception handling for asyncio.gather results
+                slow_queries = cast(List[Dict[str, Any]], results[0] if not isinstance(results[0], Exception) else [])
+                frequent_queries = cast(List[Dict[str, Any]], results[1] if not isinstance(results[1], Exception) else [])
+                io_intensive = cast(List[Dict[str, Any]], results[2] if not isinstance(results[2], Exception) else [])
+                cache_analysis = cast(Dict[str, Any], results[3] if not isinstance(results[3], Exception) else {})
+                current_activity = cast(List[Dict[str, Any]], results[4] if not isinstance(results[4], Exception) else [])
                 
             else:
                 # Fallback analysis without pg_stat_statements
@@ -403,14 +405,23 @@ class QueryPerformanceAnalyzer:
             
             result = await session.execute(cache_query)
             row = result.fetchone()
-            
-            cache_stats = {
-                "total_blocks_hit": int(row[0]) if row[0] else 0,
-                "total_blocks_read": int(row[1]) if row[1] else 0,
-                "total_blocks_accessed": int(row[2]) if row[2] else 0,
-                "overall_hit_ratio_percent": float(row[3]) if row[3] else 100.0,
-                "total_queries_analyzed": int(row[4]) if row[4] else 0
-            }
+
+            if row:
+                cache_stats = {
+                    "total_blocks_hit": int(row[0]) if row[0] else 0,
+                    "total_blocks_read": int(row[1]) if row[1] else 0,
+                    "total_blocks_accessed": int(row[2]) if row[2] else 0,
+                    "overall_hit_ratio_percent": float(row[3]) if row[3] else 100.0,
+                    "total_queries_analyzed": int(row[4]) if row[4] else 0
+                }
+            else:
+                cache_stats = {
+                    "total_blocks_hit": 0,
+                    "total_blocks_read": 0,
+                    "total_blocks_accessed": 0,
+                    "overall_hit_ratio_percent": 100.0,
+                    "total_queries_analyzed": 0
+                }
             
             # Queries with poor cache performance
             poor_cache_query = text("""
@@ -511,7 +522,7 @@ class QueryPerformanceAnalyzer:
             
             return current_queries
     
-    async def _get_query_execution_plan(self, query_text: str, analyze: bool = False) -> Dict[str, Any]:
+    async def _get_query_execution_plan(self, query_text: str) -> Dict[str, Any]:
         """
         Get execution plan for a query
         """

@@ -25,6 +25,13 @@ import statistics
 from .event_types import EventType, MLEvent
 from ..config.orchestrator_config import OrchestratorConfig
 
+# Enhanced background task management integration
+from ....performance.monitoring.health.background_manager import (
+    EnhancedBackgroundTaskManager,
+    TaskPriority,
+    get_background_task_manager
+)
+
 
 class EventBusState(Enum):
     """Event bus operational states."""
@@ -74,7 +81,8 @@ class AdaptiveEventBus:
     and worker auto-scaling based on real-time performance metrics.
     """
     
-    def __init__(self, config: OrchestratorConfig):
+    def __init__(self, config: OrchestratorConfig,
+                 task_manager: EnhancedBackgroundTaskManager | None = None):
         """Initialize adaptive event bus."""
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -84,11 +92,14 @@ class AdaptiveEventBus:
         self.max_queue_size = 50000  # Significantly increased from 1000
         self.current_queue_size = config.event_bus_buffer_size
         
-        # Worker management
+        # Enhanced background task management integration
+        self.task_manager = task_manager or get_background_task_manager()
+        
+        # Worker management (now managed via EnhancedBackgroundTaskManager)
         self.min_workers = 2
         self.max_workers = 20  # Increased from implicit 1
         self.current_workers = 2
-        self.worker_tasks: List[asyncio.Task] = []
+        self.worker_task_ids: List[str] = []  # Track managed task IDs instead of asyncio tasks
         
         # Event processing
         self.event_queue: asyncio.Queue = asyncio.Queue(maxsize=self.current_queue_size)
@@ -135,10 +146,21 @@ class AdaptiveEventBus:
         # Start initial workers
         await self._scale_workers(self.current_workers)
         
-        # Start monitoring task
-        self._monitoring_task = asyncio.create_task(self._performance_monitor())
+        # Start monitoring task using managed task system
+        monitoring_task_id = f"event_bus_monitor_{int(time.time())}"
+        self._monitoring_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=monitoring_task_id,
+            coroutine=self._performance_monitor(),
+            priority=TaskPriority.HIGH,
+            timeout=24 * 3600,  # 24 hours
+            tags={
+                "type": "event_bus_monitoring",
+                "component": "adaptive_event_bus",
+                "function": "performance_monitor"
+            }
+        )
         
-        self.logger.info(f"Adaptive event bus started with {len(self.worker_tasks)} workers")
+        self.logger.info(f"Adaptive event bus started with {len(self.worker_task_ids)} managed workers")
     
     async def stop(self) -> None:
         """Stop the adaptive event bus gracefully."""
@@ -150,20 +172,21 @@ class AdaptiveEventBus:
         self.is_running = False
         self.shutdown_event.set()
         
-        # Cancel monitoring
-        if hasattr(self, '_monitoring_task'):
-            self._monitoring_task.cancel()
+        # Cancel monitoring using managed task system
+        if hasattr(self, '_monitoring_task_id'):
+            await self.task_manager.cancel_task(self._monitoring_task_id)
         
-        # Cancel all workers
-        for task in self.worker_tasks:
-            task.cancel()
+        # Cancel all managed workers
+        cancel_tasks = []
+        for task_id in self.worker_task_ids:
+            cancel_tasks.append(self.task_manager.cancel_task(task_id))
         
-        # Wait for workers to finish
-        if self.worker_tasks:
-            await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+        # Wait for all cancellations to complete
+        if cancel_tasks:
+            await asyncio.gather(*cancel_tasks, return_exceptions=True)
         
-        self.worker_tasks.clear()
-        self.logger.info("Adaptive event bus stopped")
+        self.worker_task_ids.clear()
+        self.logger.info("Adaptive event bus stopped with managed task cleanup")
     
     def subscribe(self, 
                   event_type: EventType, 
@@ -386,22 +409,35 @@ class AdaptiveEventBus:
         current_count = len(self.worker_tasks)
         
         if target_count > current_count:
-            # Scale up
+            # Scale up using managed tasks
             for i in range(current_count, target_count):
-                task = asyncio.create_task(self._worker_loop(i))
-                self.worker_tasks.append(task)
-            self.logger.info(f"Scaled up workers: {current_count} → {target_count}")
+                worker_task_id = await self.task_manager.submit_enhanced_task(
+                    task_id=f"event_bus_worker_{i}_{int(time.time())}",
+                    coroutine=self._worker_loop(i),
+                    priority=TaskPriority.HIGH,
+                    timeout=24 * 3600,  # 24 hours
+                    tags={
+                        "type": "event_bus_worker",
+                        "component": "adaptive_event_bus",
+                        "worker_id": str(i)
+                    }
+                )
+                self.worker_task_ids.append(worker_task_id)
+            self.logger.info(f"Scaled up managed workers: {current_count} → {target_count}")
             
         elif target_count < current_count:
-            # Scale down
-            tasks_to_cancel = self.worker_tasks[target_count:]
-            self.worker_tasks = self.worker_tasks[:target_count]
+            # Scale down using managed task cancellation
+            task_ids_to_cancel = self.worker_task_ids[target_count:]
+            self.worker_task_ids = self.worker_task_ids[:target_count]
             
-            for task in tasks_to_cancel:
-                task.cancel()
+            cancel_tasks = []
+            for task_id in task_ids_to_cancel:
+                cancel_tasks.append(self.task_manager.cancel_task(task_id))
             
-            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
-            self.logger.info(f"Scaled down workers: {current_count} → {target_count}")
+            if cancel_tasks:
+                await asyncio.gather(*cancel_tasks, return_exceptions=True)
+            
+            self.logger.info(f"Scaled down managed workers: {current_count} → {target_count}")
         
         self.current_workers = target_count
         self.metrics.worker_count = target_count
@@ -555,4 +591,55 @@ class AdaptiveEventBus:
             'subscription_count': sum(len(subs) for subs in self.subscriptions.values()),
             'last_scale_event': self.metrics.last_scale_event.isoformat() if self.metrics.last_scale_event else None,
             'performance_window': list(self.performance_window)
+        }
+    
+    # Interface compatibility methods for Basic EventBus replacement
+    
+    async def initialize(self) -> None:
+        """Initialize the event bus (alias for start() for compatibility)."""
+        await self.start()
+    
+    async def shutdown(self) -> None:
+        """Shutdown the event bus (alias for stop() for compatibility)."""
+        await self.stop()
+    
+    def get_event_history(self, event_type: Optional[EventType] = None, limit: int = 100) -> List[MLEvent]:
+        """
+        Get recent event history for compatibility with Basic EventBus.
+        
+        Args:
+            event_type: Filter by event type (optional)
+            limit: Maximum number of events to return
+            
+        Returns:
+            List of recent events (empty list as this implementation doesn't store history)
+        """
+        # AdaptiveEventBus focuses on performance over history tracking
+        # Return empty list for compatibility, but log that history is not available
+        self.logger.debug("Event history not available in AdaptiveEventBus - optimized for performance")
+        return []
+    
+    def get_subscription_count(self, event_type: Optional[EventType] = None) -> int:
+        """
+        Get number of active subscriptions.
+        
+        Args:
+            event_type: Count for specific event type (optional)
+            
+        Returns:
+            Number of subscriptions
+        """
+        if event_type:
+            return len(self.subscriptions.get(event_type, []))
+        
+        return sum(len(subs) for subs in self.subscriptions.values())
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get event bus statistics for compatibility with Basic EventBus."""
+        return {
+            "total_events": self.metrics.events_processed,
+            "failed_events": self.metrics.events_failed,
+            "active_handlers": self.get_subscription_count(),
+            "queue_size": self.metrics.queue_size,
+            "is_running": self.is_running
         }

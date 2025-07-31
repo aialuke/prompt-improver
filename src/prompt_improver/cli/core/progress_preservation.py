@@ -18,8 +18,7 @@ from ...database.models import (
     TrainingSession, TrainingIteration, RulePerformance,
     RuleMetadata, DiscoveredPattern
 )
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, text
 
 @dataclass
 class ProgressSnapshot:
@@ -130,7 +129,7 @@ class ProgressPreservationManager:
             async with get_session_context() as db_session:
                 # Get training session
                 session_query = select(TrainingSession).where(
-                    TrainingSession.session_id == snapshot.session_id
+                    text(f"session_id = '{snapshot.session_id}'")
                 )
                 session_result = await db_session.execute(session_query)
                 training_session = session_result.scalar_one_or_none()
@@ -192,25 +191,26 @@ class ProgressPreservationManager:
         try:
             async with get_session_context() as db_session:
                 for rule_id, optimization_data in rule_optimizations.items():
-                    # Save to rule_performance table
-                    performance_record = RulePerformance(
-                        rule_id=rule_id,
-                        rule_name=optimization_data.get("rule_name", rule_id),
-                        prompt_id=session_id,  # Use session_id as prompt_id for training sessions
-                        prompt_type="training_session",
-                        improvement_score=optimization_data.get("improvement_score", 0.0),
-                        confidence_level=optimization_data.get("confidence_level", 0.0),
-                        execution_time_ms=optimization_data.get("execution_time_ms", 0),
-                        rule_parameters=optimization_data.get("optimized_parameters", {}),
-                        before_metrics=optimization_data.get("before_metrics", {}),
-                        after_metrics=optimization_data.get("after_metrics", {})
-                    )
+                    # Save to rule_performance table (id is auto-increment)
+                    performance_data = {
+                        "rule_id": rule_id,
+                        "rule_name": optimization_data.get("rule_name", rule_id),
+                        "prompt_id": session_id,  # Use session_id as prompt_id for training sessions
+                        "prompt_type": "training_session",
+                        "improvement_score": optimization_data.get("improvement_score", 0.0),
+                        "confidence_level": optimization_data.get("confidence_level", 0.0),
+                        "execution_time_ms": optimization_data.get("execution_time_ms", 0),
+                        "rule_parameters": optimization_data.get("optimized_parameters", {}),
+                        "before_metrics": optimization_data.get("before_metrics", {}),
+                        "after_metrics": optimization_data.get("after_metrics", {})
+                    }
+                    performance_record = RulePerformance(**performance_data)
                     db_session.add(performance_record)
 
                     # Update rule_metadata with optimized parameters if they improved performance
                     if optimization_data.get("improvement_score", 0) > 0.1:  # 10% improvement threshold
                         rule_query = select(RuleMetadata).where(
-                            RuleMetadata.rule_id == rule_id
+                            text(f"rule_id = '{rule_id}'")
                         )
                         rule_result = await db_session.execute(rule_query)
                         rule_metadata = rule_result.scalar_one_or_none()
@@ -248,15 +248,16 @@ class ProgressPreservationManager:
         try:
             async with get_session_context() as db_session:
                 for pattern_name, pattern_data in discovered_patterns.items():
-                    # Create discovered pattern record
-                    pattern_record = DiscoveredPattern(
-                        pattern_id=f"{session_id}_{pattern_name}_{int(datetime.now(timezone.utc).timestamp())}",
-                        avg_effectiveness=pattern_data.get("effectiveness_score", 0.0),
-                        parameters=pattern_data.get("parameters", {}),
-                        support_count=pattern_data.get("support_count", 1),
-                        pattern_type="ml_training",
-                        discovery_run_id=session_id
-                    )
+                    # Create discovered pattern record (id is auto-increment)
+                    pattern_data_dict = {
+                        "pattern_id": f"{session_id}_{pattern_name}_{int(datetime.now(timezone.utc).timestamp())}",
+                        "avg_effectiveness": pattern_data.get("effectiveness_score", 0.0),
+                        "parameters": pattern_data.get("parameters", {}),
+                        "support_count": pattern_data.get("support_count", 1),
+                        "pattern_type": "ml_training",
+                        "discovery_run_id": session_id
+                    }
+                    pattern_record = DiscoveredPattern(**pattern_data_dict)
                     db_session.add(pattern_record)
 
                 await db_session.commit()
@@ -306,7 +307,7 @@ class ProgressPreservationManager:
             async with get_session_context() as db_session:
                 # Get complete session data
                 session_result = await db_session.execute(
-                    select(TrainingSession).where(TrainingSession.session_id == session_id)
+                    select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
                 session = session_result.scalar_one_or_none()
 
@@ -378,8 +379,8 @@ class ProgressPreservationManager:
                 # Get latest iteration for the session
                 latest_iteration = await db_session.execute(
                     select(TrainingIteration)
-                    .where(TrainingIteration.session_id == session_id)
-                    .order_by(TrainingIteration.iteration.desc())
+                    .where(text(f"session_id = '{session_id}'"))
+                    .order_by(text("iteration DESC"))
                     .limit(1)
                 )
 
@@ -666,10 +667,18 @@ class ProgressPreservationManager:
             async with get_session_context() as db_session:
                 # Get complete session data
                 session_result = await db_session.execute(
-                    select(TrainingSession)
-                    .options(selectinload(TrainingSession.training_iterations))
-                    .where(TrainingSession.session_id == session_id)
+                    select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
+                session = session_result.scalar_one_or_none()
+
+                # Load iterations separately if needed
+                if session and include_iterations:
+                    iterations_result = await db_session.execute(
+                        select(TrainingIteration)
+                        .where(text(f"session_id = '{session_id}'"))
+                        .order_by(text("iteration ASC"))
+                    )
+                    session.iterations = list(iterations_result.scalars().all())
                 session = session_result.scalar_one_or_none()
 
                 if not session:
@@ -712,15 +721,15 @@ class ProgressPreservationManager:
                 "status": session.status,
                 "started_at": session.started_at.isoformat(),
                 "completed_at": session.completed_at.isoformat() if session.completed_at else None,
-                "total_iterations": session.total_iterations,
+                "max_iterations": session.max_iterations,
+                "current_iteration": session.current_iteration,
                 "best_performance": session.best_performance,
-                "performance_history": session.performance_history,
-                "stopped_reason": session.stopped_reason
+                "performance_history": session.performance_history
             }
         }
 
-        if include_iterations and session.training_iterations:
-            export_data["iterations"] = [
+        if include_iterations and session.iterations:
+            export_data["iterations"] = [  # type: ignore
                 {
                     "iteration": iter_data.iteration,
                     "workflow_id": iter_data.workflow_id,
@@ -731,7 +740,7 @@ class ProgressPreservationManager:
                     "improvement_score": iter_data.improvement_score,
                     "created_at": iter_data.created_at.isoformat()
                 }
-                for iter_data in sorted(session.training_iterations, key=lambda x: x.iteration)
+                for iter_data in sorted(session.iterations, key=lambda x: x.iteration)
             ]
 
         # Save export file
@@ -754,7 +763,7 @@ class ProgressPreservationManager:
         export_file = self.backup_dir / f"{session.session_id}_export_{timestamp}.csv"
 
         with open(export_file, 'w', newline='') as csvfile:
-            if include_iterations and session.training_iterations:
+            if include_iterations and session.iterations:
                 # Export iteration details
                 fieldnames = [
                     'session_id', 'iteration', 'workflow_id', 'improvement_score',
@@ -762,15 +771,15 @@ class ProgressPreservationManager:
                 ]
 
                 # Add performance metrics columns
-                if session.training_iterations:
-                    sample_metrics = session.training_iterations[0].performance_metrics or {}
+                if session.iterations:
+                    sample_metrics = session.iterations[0].performance_metrics or {}
                     for metric_name in sample_metrics.keys():
                         fieldnames.append(f'metric_{metric_name}')
 
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
 
-                for iter_data in sorted(session.training_iterations, key=lambda x: x.iteration):
+                for iter_data in sorted(session.iterations, key=lambda x: x.iteration):
                     row = {
                         'session_id': session.session_id,
                         'iteration': iter_data.iteration,
@@ -805,8 +814,7 @@ class ProgressPreservationManager:
                     'status': session.status,
                     'started_at': session.started_at.isoformat(),
                     'completed_at': session.completed_at.isoformat() if session.completed_at else None,
-                    'total_iterations': session.total_iterations,
-                    'stopped_reason': session.stopped_reason
+                    'current_iteration': session.current_iteration
                 })
 
         self.logger.info(f"Session exported to CSV: {export_file}")

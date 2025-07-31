@@ -11,14 +11,13 @@ import json
 import logging
 import os
 import psutil
-import signal
+import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
-import tempfile
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +220,7 @@ class UnifiedProcessManager:
                     "pid": pid,
                     "session_id": session_id,
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                    "command": " ".join(os.sys.argv) if hasattr(os, 'sys') else "unknown",
+                    "command": " ".join(sys.argv),
                     "process_info": process_info or {}
                 }
                 
@@ -417,7 +416,9 @@ class UnifiedProcessManager:
                         success, message = await self.remove_pid_file(session_id)
                         if success:
                             cleaned_sessions.append(session_id)
-                            self.logger.info(f"Cleaned stale PID: {session_id} - {reason}")
+                            self.logger.info(f"Cleaned stale PID: {session_id} - {reason} ({message})")
+                        else:
+                            self.logger.warning(f"Failed to clean stale PID {session_id}: {message}")
                             
                 return cleaned_sessions
                 
@@ -600,9 +601,10 @@ class UnifiedProcessManager:
                             success, message = await self.remove_pid_file(session_id)
                             if success:
                                 recovered_sessions.append(session_id)
-                                recovery_actions.append(f"Cleaned PID file for {session_id}")
+                                recovery_actions.append(f"Cleaned PID file for {session_id}: {message}")
                             else:
                                 failed_sessions.append(session_id)
+                                recovery_actions.append(f"Failed to clean PID file for {session_id}: {message}")
                         except Exception as e:
                             failed_sessions.append(session_id)
                             self.logger.error(f"Failed to recover session {session_id}: {e}")

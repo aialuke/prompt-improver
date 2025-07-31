@@ -27,7 +27,7 @@ except ImportError:
     redis_available = False
     coredis = None
 
-from ..database import get_session, get_async_session_factory
+from ..database import get_unified_manager_async_modern, UnifiedConnectionManager
 from ..database.models import ABExperiment
 from ..database.analytics_query_interface import AnalyticsQueryInterface
 from ..utils.websocket_manager import connection_manager, setup_redis_connection
@@ -306,13 +306,14 @@ async def handle_websocket_message(
             )
 
         elif message_type == "request_metrics":
-            # Send current metrics using proper async session pattern
-            async_session_factory = get_async_session_factory()
-            if async_session_factory is not None:
-                async with async_session_factory() as db_session:
-                    analytics_service = await get_real_time_analytics_service(db_session)
+            # Send current metrics using UnifiedConnectionManager
+            db_manager = get_unified_manager_async_modern()
+            try:
+                async with db_manager.get_async_session() as session:
+                    analytics_service = await get_real_time_analytics_service(session)
                     metrics = await analytics_service.get_real_time_metrics(experiment_id)
-            else:
+            except Exception as e:
+                logger.error(f"Error getting metrics in WebSocket: {e}")
                 metrics = None
 
             if metrics:
@@ -356,20 +357,21 @@ async def handle_websocket_message(
 
 @real_time_router.get("/experiments/{experiment_id}/metrics")
 async def get_experiment_metrics(
-    experiment_id: str, db_session: AsyncSession = Depends(get_session)
+    experiment_id: str, db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)
 ) -> JSONResponse:
     """Get current real-time metrics for an experiment
 
     Args:
         experiment_id: UUID of experiment
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         JSON response with current metrics
     """
-    try:
-        analytics_service = await get_real_time_analytics_service(db_session)
-        metrics = await analytics_service.get_real_time_metrics(experiment_id)
+    async with db_manager.get_async_session() as session:
+        try:
+            analytics_service = await get_real_time_analytics_service(session)
+            metrics = await analytics_service.get_real_time_metrics(experiment_id)
 
         if metrics:
             return JSONResponse({
@@ -427,23 +429,24 @@ async def get_experiment_metrics(
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/start")
 async def start_monitoring(
-    experiment_id: str, db_session: AsyncSession = Depends(get_session), update_interval: int = 30
+    experiment_id: str, db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern), update_interval: int = 30
 ) -> JSONResponse:
     """Start real-time monitoring for an experiment
 
     Args:
         experiment_id: UUID of experiment
         update_interval: Update interval in seconds (default: 30)
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         JSON response confirming monitoring started
     """
-    try:
-        analytics_service = await get_real_time_analytics_service(db_session)
-        success = await analytics_service.start_experiment_monitoring(
-            experiment_id, update_interval
-        )
+    async with db_manager.get_async_session() as session:
+        try:
+            analytics_service = await get_real_time_analytics_service(session)
+            success = await analytics_service.start_experiment_monitoring(
+                experiment_id, update_interval
+            )
 
         if success:
             return JSONResponse({
@@ -467,19 +470,20 @@ async def start_monitoring(
         )
 
 @real_time_router.post("/experiments/{experiment_id}/monitoring/stop")
-async def stop_monitoring(experiment_id: str, db_session: AsyncSession = Depends(get_session)) -> JSONResponse:
+async def stop_monitoring(experiment_id: str, db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)) -> JSONResponse:
     """Stop real-time monitoring for an experiment
 
     Args:
         experiment_id: UUID of experiment
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         JSON response confirming monitoring stopped
     """
-    try:
-        analytics_service = await get_real_time_analytics_service(db_session)
-        success = await analytics_service.stop_experiment_monitoring(experiment_id)
+    async with db_manager.get_async_session() as session:
+        try:
+            analytics_service = await get_real_time_analytics_service(session)
+            success = await analytics_service.stop_experiment_monitoring(experiment_id)
 
         return JSONResponse({
             "status": "success" if success else "warning",
@@ -495,18 +499,19 @@ async def stop_monitoring(experiment_id: str, db_session: AsyncSession = Depends
         )
 
 @real_time_router.get("/monitoring/active")
-async def get_active_monitoring(db_session: AsyncSession = Depends(get_session)) -> JSONResponse:
+async def get_active_monitoring(db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)) -> JSONResponse:
     """Get list of experiments currently being monitored
 
     Args:
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         JSON response with list of active experiments
     """
-    try:
-        analytics_service = await get_real_time_analytics_service(db_session)
-        active_experiments = await analytics_service.get_active_experiments()
+    async with db_manager.get_async_session() as session:
+        try:
+            analytics_service = await get_real_time_analytics_service(session)
+            active_experiments = await analytics_service.get_active_experiments()
 
         # Get connection counts
         connection_info: List[Dict[str, Any]] = []
@@ -533,21 +538,22 @@ async def get_active_monitoring(db_session: AsyncSession = Depends(get_session))
 
 @real_time_router.get("/dashboard/config/{experiment_id}")
 async def get_dashboard_config(
-    experiment_id: str, db_session: AsyncSession = Depends(get_session)
+    experiment_id: str, db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)
 ) -> JSONResponse:
     """Get dashboard configuration for an experiment
 
     Args:
         experiment_id: UUID of experiment
-        db_session: Database session
+        db_manager: Database manager
 
     Returns:
         JSON response with dashboard configuration
     """
-    try:
-        # Get experiment details for dashboard configuration
-        stmt = select(ABExperiment).where(ABExperiment.experiment_id == experiment_id)
-        result = await db_session.execute(stmt)
+    async with db_manager.get_async_session() as session:
+        try:
+            # Get experiment details for dashboard configuration
+            stmt = select(ABExperiment).where(ABExperiment.experiment_id == experiment_id)
+            result = await session.execute(stmt)
         experiment = result.scalar_one_or_none()
 
         if not experiment:

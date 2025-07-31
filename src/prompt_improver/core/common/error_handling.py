@@ -161,7 +161,7 @@ def safe_operation(
 ) -> tuple[Any, bool, Optional[str]]:
     """
     Execute an operation safely with consistent error handling.
-    
+
     Args:
         operation: Function to execute
         operation_name: Name of operation for logging
@@ -170,7 +170,7 @@ def safe_operation(
         fallback_value: Value to return on failure
         log_errors: Whether to log errors
         reraise: Whether to reraise exceptions
-        
+
     Returns:
         Tuple of (result, success, error_message)
     """
@@ -178,15 +178,24 @@ def safe_operation(
         result = operation()
         return result, True, None
     except Exception as e:
-        error_msg = f"{operation_name} failed in {component_name}: {e}"
-        
+        error_msg = f"{operation_name} failed in {component_name} [{category.value}]: {e}"
+
         if log_errors:
-            logger.error(error_msg)
-            logger.debug(f"Stack trace for {operation_name}:", exc_info=True)
-        
+            # Include error category in logging for better classification
+            logger.error(
+                error_msg,
+                extra={
+                    "error_category": category.value,
+                    "component": component_name,
+                    "operation": operation_name,
+                    "exception_type": type(e).__name__
+                }
+            )
+            logger.debug(f"Stack trace for {operation_name} [{category.value}]:", exc_info=True)
+
         if reraise:
             raise
-        
+
         return fallback_value, False, error_msg
 
 def with_retry(
@@ -199,7 +208,7 @@ def with_retry(
 ) -> Any:
     """
     Execute operation with retry logic and consistent error handling.
-    
+
     Args:
         operation: Function to execute
         max_retries: Maximum number of retries
@@ -207,18 +216,23 @@ def with_retry(
         backoff_factor: Factor to multiply delay by each retry
         operation_name: Name of operation for logging
         component_name: Name of component for logging
-        
+
     Returns:
         Result of successful operation
-        
+
     Raises:
         Exception: Last exception if all retries fail
+        ValueError: If max_retries is negative
     """
     import time
-    
+
+    # Validate parameters
+    if max_retries < 0:
+        raise ValueError(f"max_retries must be non-negative, got {max_retries}")
+
     last_exception = None
     current_delay = delay
-    
+
     for attempt in range(max_retries + 1):
         try:
             result = operation()
@@ -227,7 +241,7 @@ def with_retry(
             return result
         except Exception as e:
             last_exception = e
-            
+
             if attempt < max_retries:
                 logger.warning(
                     f"{operation_name} failed in {component_name} "
@@ -240,7 +254,11 @@ def with_retry(
                     f"{operation_name} failed in {component_name} "
                     f"after {max_retries} retries: {e}"
                 )
-    
+
+    # This should never happen due to parameter validation, but handle it defensively
+    if last_exception is None:
+        raise RuntimeError(f"Operation {operation_name} failed with no exception recorded")
+
     raise last_exception
 
 class ErrorHandler:

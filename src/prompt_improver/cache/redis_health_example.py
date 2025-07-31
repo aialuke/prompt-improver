@@ -34,9 +34,14 @@ async def demonstrate_comprehensive_monitoring():
     print("\n" + "=" * 60)
     print("COMPREHENSIVE REDIS HEALTH MONITORING")
     print("=" * 60)
-    
+
     monitor = RedisHealthMonitor()
-    
+
+    # Ensure Redis client is available
+    if not await monitor._ensure_client():
+        print("❌ Redis client not available - skipping comprehensive monitoring")
+        return
+
     # Collect all metrics
     print("\n2. Comprehensive Health Check:")
     print("-" * 35)
@@ -110,7 +115,10 @@ async def demonstrate_specific_metrics():
     # Performance analysis
     print("\n4. Performance Analysis:")
     print("-" * 25)
-    
+
+    # Ensure client is available for performance testing
+    assert monitor.client is not None, "Redis client should be available"
+
     # Generate some test operations for latency tracking
     test_key = "health_monitor_test"
     for i in range(10):
@@ -119,8 +127,8 @@ async def demonstrate_specific_metrics():
         await monitor.client.get(test_key)
         latency_ms = (time.time() - start) * 1000
         monitor.performance_metrics.add_latency_sample(latency_ms)
-    
-    await monitor.client.delete([test_key])  # Cleanup
+
+    await monitor.client.expire(test_key, 1)  # Cleanup
     
     await monitor._collect_performance_metrics()
     perf_data = monitor._performance_metrics_to_dict()
@@ -142,13 +150,21 @@ async def demonstrate_keyspace_analysis():
     print("\n" + "=" * 60)
     print("KEYSPACE ANALYSIS")
     print("=" * 60)
-    
+
     monitor = RedisHealthMonitor()
-    
+
+    # Ensure Redis client is available
+    if not await monitor._ensure_client():
+        print("❌ Redis client not available - skipping keyspace analysis")
+        return
+
+    # Type assertion for client availability
+    assert monitor.client is not None, "Redis client should be available"
+
     # Create some test data for analysis
     print("\n5. Creating Test Data for Analysis:")
     print("-" * 40)
-    
+
     test_keys = [
         ("user:123:profile", "User profile data" * 100),
         ("session:abc123", "Session data" * 50),
@@ -157,7 +173,7 @@ async def demonstrate_keyspace_analysis():
         ("lock:resource_123", "Lock data"),
         ("analytics:2024:01:15", "Analytics data" * 75),
     ]
-    
+
     # Set test keys with expiration
     for key, value in test_keys:
         await monitor.client.set(key, value, ex=300)  # 5 minute expiration
@@ -190,22 +206,31 @@ async def demonstrate_keyspace_analysis():
         for key_info in keyspace_data['large_keys'][:3]:
             print(f"  {key_info.get('key', 'N/A')}: {key_info.get('size_mb', 0):.2f}MB")
     
-    # Cleanup test keys
+    # Cleanup test keys (set short expiration)
     test_key_names = [key for key, _ in test_keys]
-    await monitor.client.delete(test_key_names)
-    print(f"\n✓ Cleaned up {len(test_key_names)} test keys")
+    for key in test_key_names:
+        await monitor.client.expire(key, 1)  # Expire in 1 second
+    print(f"\n✓ Set expiration for {len(test_key_names)} test keys")
 
 async def demonstrate_slowlog_analysis():
     """Demonstrate slow log analysis."""
     print("\n" + "=" * 60)
-    print("SLOW LOG ANALYSIS")  
+    print("SLOW LOG ANALYSIS")
     print("=" * 60)
-    
+
     monitor = RedisHealthMonitor()
-    
+
+    # Ensure Redis client is available
+    if not await monitor._ensure_client():
+        print("❌ Redis client not available - skipping slowlog analysis")
+        return
+
+    # Type assertion for client availability
+    assert monitor.client is not None, "Redis client should be available"
+
     print("\n6. Slow Log Analysis:")
     print("-" * 25)
-    
+
     # Generate some intentionally slow operations for demonstration
     # (In production, you'd analyze actual slow operations)
     large_data = "x" * 10000  # 10KB of data
@@ -235,8 +260,9 @@ async def demonstrate_slowlog_analysis():
         for entry in slowlog_data['recent_entries'][:2]:
             print(f"    {entry.get('command', 'N/A')} - {entry.get('duration_ms', 0):.2f}ms")
     
-    # Cleanup
-    await monitor.client.delete([f"slow_test_{i}" for i in range(3)])
+    # Cleanup (set short expiration)
+    for i in range(3):
+        await monitor.client.expire(f"slow_test_{i}", 1)
 
 async def demonstrate_replication_monitoring():
     """Demonstrate replication monitoring (if applicable)."""

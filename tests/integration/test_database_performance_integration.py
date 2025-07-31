@@ -11,7 +11,7 @@ Following 2025 best practices:
 
 import asyncio
 import pytest
-import psycopg
+import asyncpg
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
@@ -31,7 +31,7 @@ class TestDatabasePerformanceIntegration:
     async def db_connection(self):
         """Create direct database connection for real behavior testing."""
         conn_string = 'postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production'
-        conn = await psycopg.AsyncConnection.connect(conn_string)
+        conn = await asyncpg.connect(conn_string)
         yield conn
         await conn.close()
 

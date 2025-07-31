@@ -47,7 +47,7 @@ def extract_database_urls(file_path: Path) -> Dict[str, str]:
             r'DB_URL\s*[=:]\s*["\']?([^"\';\s]+)["\']?',
             r'postgresql://[^"\';\s]+',
             r'postgresql\+psycopg2://[^"\';\s]+',
-            r'postgresql\+psycopg://[^"\';\s]+',
+            r'postgresql\+asyncpg://[^"\';\s]+',
         ]
         
         for pattern in patterns:
@@ -66,17 +66,17 @@ def validate_url_format(url: str) -> Dict[str, bool]:
     """Validate database URL format."""
     validation = {
         "is_postgresql": False,
-        "uses_psycopg3": False,
+        "uses_asyncpg": False,
         "no_psycopg2": False,
         "no_sqlite": False,
     }
-    
+
     validation["is_postgresql"] = url.startswith("postgresql://") or url.startswith("postgresql+")
-    # Both postgresql:// (sync) and postgresql+psycopg:// (async) are valid psycopg3 formats
-    validation["uses_psycopg3"] = (url.startswith("postgresql://") or "postgresql+psycopg://" in url) and "psycopg2" not in url
+    # Both postgresql:// (sync) and postgresql+asyncpg:// (async) are valid asyncpg formats
+    validation["uses_asyncpg"] = (url.startswith("postgresql://") or "postgresql+asyncpg://" in url) and "psycopg2" not in url
     validation["no_psycopg2"] = "psycopg2" not in url
     validation["no_sqlite"] = "sqlite" not in url.lower()
-    
+
     return validation
 
 
@@ -127,13 +127,13 @@ def main():
     if validation_passed:
         print("✅ All database URLs are properly configured!")
         print("   - Using PostgreSQL")
-        print("   - Using psycopg3 format (postgresql:// or postgresql+psycopg://)")
+        print("   - Using asyncpg format (postgresql:// or postgresql+asyncpg://)")
         print("   - No SQLite references")
         print("   - No psycopg2 references")
     else:
         print("❌ Environment configuration validation failed!")
-        print("   Please update database URLs to use psycopg3 format")
-        print("   Valid formats: postgresql:// (sync) or postgresql+psycopg:// (async)")
+        print("   Please update database URLs to use asyncpg format")
+        print("   Valid formats: postgresql:// (sync) or postgresql+asyncpg:// (async)")
     
     return validation_passed
 

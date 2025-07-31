@@ -6,7 +6,7 @@ Implements emergency operations triggered by signals: checkpoint creation, statu
 import json
 import logging
 import os
-import psutil
+import psutil  # type: ignore
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -19,10 +19,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .signal_handler import SignalContext
 
-def _get_signal_context():
-    """Lazy import of SignalContext to avoid circular imports."""
-    from .signal_handler import SignalContext
-    return SignalContext
+
 from .progress_preservation import ProgressPreservationManager
 from ...database import get_session_context
 from ...database.models import TrainingSession
@@ -95,7 +92,16 @@ class EmergencyOperationsManager:
 
             # Save to database if possible
             try:
-                await self.progress_manager.create_checkpoint(checkpoint_id, checkpoint_data)
+                # Get session_id from context parameters
+                session_id = context.parameters.get("session_id") if context.parameters else None
+
+                if session_id:
+                    # create_checkpoint only takes session_id parameter
+                    db_checkpoint_id = await self.progress_manager.create_checkpoint(session_id)
+                    if db_checkpoint_id:
+                        checkpoint_data["database_checkpoint_id"] = db_checkpoint_id
+                else:
+                    self.logger.warning("No session_id found in context for database checkpoint")
             except Exception as e:
                 self.logger.warning(f"Failed to save checkpoint to database: {e}")
 
@@ -271,9 +277,9 @@ class EmergencyOperationsManager:
         try:
             async with get_session_context() as db_session:
                 # Get active training sessions
-                from sqlalchemy import select
+                from sqlalchemy import select, text
                 result = await db_session.execute(
-                    select(TrainingSession).where(TrainingSession.status == "running")
+                    select(TrainingSession).where(text("status = 'running'"))
                 )
                 active_sessions = result.scalars().all()
 
@@ -282,7 +288,8 @@ class EmergencyOperationsManager:
                     sessions_data.append({
                         "session_id": session.session_id,
                         "started_at": session.started_at.isoformat() if session.started_at else None,
-                        "total_iterations": session.total_iterations,
+                        "max_iterations": session.max_iterations,  # Use max_iterations instead of total_iterations
+                        "current_iteration": session.current_iteration,
                         "status": session.status
                     })
 

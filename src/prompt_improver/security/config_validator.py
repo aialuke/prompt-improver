@@ -162,7 +162,7 @@ POSTGRES_USERNAME=apes_user
 POSTGRES_PASSWORD={secure_password}
 
 # Alternative: Use full DATABASE_URL (without embedded credentials in code)
-# DATABASE_URL=postgresql+psycopg://apes_user:{secure_password}@localhost:5432/apes_production
+# DATABASE_URL=postgresql+asyncpg://apes_user:{secure_password}@localhost:5432/apes_production
 
 # Development Mode
 DEVELOPMENT_MODE=true

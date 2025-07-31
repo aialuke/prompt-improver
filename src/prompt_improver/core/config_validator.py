@@ -201,28 +201,30 @@ class ConfigurationValidator:
     async def _validate_database_connectivity(self) -> ValidationResult:
         """Test database connectivity with configuration values."""
         try:
-            import psycopg
-            
+            import asyncpg
+
             # Test basic connectivity
-            conn_string = self.db_config.psycopg_connection_string
+            conn_string = self.db_config.database_url
             timeout = 5  # seconds
             
-            async with psycopg.AsyncConnection.connect(
-                conn_string, 
-                connect_timeout=timeout
-            ) as conn:
+            # Convert asyncpg URL format for connection
+            if "postgresql+asyncpg://" in conn_string:
+                conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+
+            conn = await asyncpg.connect(conn_string, timeout=timeout)
+            try:
                 # Test basic query
-                async with conn.cursor() as cur:
-                    await cur.execute("SELECT 1")
-                    result = await cur.fetchone()
-                    
-                    if result and result[0] == 1:
-                        return ValidationResult(
-                            component="database_connectivity",
-                            is_valid=True,
-                            message="Database connectivity test passed",
-                            details={"response_time_ms": timeout * 1000}
-                        )
+                result = await conn.fetchval("SELECT 1")
+
+                if result == 1:
+                    return ValidationResult(
+                        component="database_connectivity",
+                        is_valid=True,
+                        message="Database connectivity test passed",
+                        details={"response_time_ms": timeout * 1000}
+                    )
+            finally:
+                await conn.close()
             
             return ValidationResult(
                 component="database_connectivity",

@@ -238,6 +238,8 @@ class EmergencySaveManager:
         async with self.validation_lock:
             validation_results = {
                 "validation_time": datetime.now(timezone.utc).isoformat(),
+                "save_id": context.save_id,
+                "trigger_type": context.trigger_type,
                 "components_validated": [],
                 "validation_errors": [],
                 "integrity_checks": {}
@@ -319,7 +321,8 @@ class EmergencySaveManager:
                         "status": session.status,
                         "started_at": session.started_at.isoformat() if session.started_at else None,
                         "completed_at": session.completed_at.isoformat() if session.completed_at else None,
-                        "total_iterations": session.total_iterations,
+                        "max_iterations": session.max_iterations,
+                        "current_iteration": session.current_iteration,
                         "continuous_mode": session.continuous_mode,
                         "improvement_threshold": session.improvement_threshold
                     }
@@ -346,7 +349,7 @@ class EmergencySaveManager:
     async def _gather_system_state(self) -> Dict[str, Any]:
         """Gather system state for emergency save."""
         try:
-            import psutil
+            import psutil  # type: ignore
             return {
                 "pid": os.getpid(),
                 "memory_mb": psutil.Process().memory_info().rss / 1024 / 1024,
@@ -369,6 +372,7 @@ class EmergencySaveManager:
             snapshots = []
             for session_id, snapshot in self.progress_manager.active_sessions.items():
                 snapshot_dict = asdict(snapshot)
+                snapshot_dict["session_id"] = session_id  # Ensure session_id is included
                 snapshots.append(snapshot_dict)
             
             return {
@@ -391,5 +395,18 @@ class EmergencySaveManager:
 
     async def _validate_database_state(self, data: Dict[str, Any], results: Dict[str, Any]) -> None:
         """Validate database state data."""
-        # Placeholder for database state validation
-        pass
+        # Basic validation of database state structure
+        if "sessions" not in data:
+            results["validation_errors"].append("Database state missing 'sessions' key")
+            return
+
+        if not isinstance(data["sessions"], list):
+            results["validation_errors"].append("Database state 'sessions' is not a list")
+            return
+
+        # Validate each session has required fields
+        required_fields = ["session_id", "status"]
+        for i, session in enumerate(data["sessions"]):
+            for field in required_fields:
+                if field not in session:
+                    results["validation_errors"].append(f"Session {i} missing required field '{field}'")

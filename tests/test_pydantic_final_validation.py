@@ -242,7 +242,7 @@ def test_configuration_models():
     assert db_config.postgres_host == "localhost"  # default value
     assert db_config.pool_size == 5  # default value 
     assert db_config.echo_sql is False  # default value
-    assert db_config.database_url.startswith("postgresql+psycopg://")
+    assert db_config.database_url.startswith("postgresql+asyncpg://")
     
     # Test that we can access the generated URL
     url = db_config.database_url

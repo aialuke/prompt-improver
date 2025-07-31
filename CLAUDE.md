@@ -59,7 +59,7 @@ Required workflow:
 
 Format: [Finding]: [Evidence] ([Scope]) 📍 Source: file:line
 
-Parallel execution: Invoke all relevant tools simultaneously rather than sequentially for maximum efficiency.
+**Parallel execution**: Always invoke relevant tools simultaneously for maximum efficiency.
 </analysis>
 ```
 
@@ -79,9 +79,9 @@ Apply core principles:
 
 <search_protocol>
 MANDATORY 4-step search before creating new code:
-1. Direct name search: rg "exact_function_name|exact_component_name" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
-2. Pattern/keyword search: rg "validate.*email|email.*validation" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
-3. Import/export search: rg "import.*{similar}|export.*{similar}" --type-add 'web:*.{ts,tsx,js,jsx}' -t web
+1. Direct name search: rg "exact_function_name|exact_class_name" --type py
+2. Pattern/keyword search: rg "validate.*email|email.*validation" --type py  
+3. Import search: rg "from.*import.*{similar}|import.*{similar}" --type py
 4. If unclear: Use comprehensive search tools for complete analysis
 </search_protocol>
 
@@ -104,24 +104,13 @@ REFACTOR FIRST when:
 
 <deletion_verification>
 For DELETING code - verify zero usage:
-- rg "ExactItemName" . --type ts --type tsx --type js --type jsx -n
-- rg "import.*ExactItemName|export.*ExactItemName" . -n
-- rg "<ExactItemName|ExactItemName>" . --type tsx --type jsx -n
-- rg ": ExactItemName|extends ExactItemName" . -n
+- rg "ExactItemName" . --type py -n
+- rg "from.*import.*ExactItemName|import.*ExactItemName" . --type py -n
+- rg "class.*ExactItemName|def.*ExactItemName" . --type py -n
+- rg ": ExactItemName|ExactItemName\(" . --type py -n
 Decision: Zero usage = safe removal
 </deletion_verification>
 
-<error_hierarchy>
-When fixing build/type errors, prioritize:
-1. Security & Safety - Never compromise
-2. Code Correctness - Proper structure and logic
-3. Type Safety - Maintain proper TypeScript typing
-4. Code Quality - Readable, maintainable code
-5. Test Passing - Only after above are satisfied
-
-❌ Never use quick fixes: Remove imports, add @ts-ignore, use any type, delete code
-✅ Always use proper fixes: Import types correctly, fix type mismatches, maintain explicit typing
-</error_hierarchy>
 
 Platform-agnostic: Use universal tools (rg, find, grep) for all environments
 </verification>
@@ -132,15 +121,15 @@ Platform-agnostic: Use universal tools (rg, find, grep) for all environments
 ### Rule 3: MCP RESEARCH WORKFLOW
 *Streamlined MCP Implementation Tools with Web Research*
 
-```xml
+```
 <research>
-  <memory>search previous solutions first</memory>
-  <context7>mandatory for external dependencies and best practices</context7>
-  <sequential>multi-step planning for complex tasks</sequential>
-  <parallel>invoke all relevant tools simultaneously</parallel>
-  <store>document decisions and patterns</store>
-  <thinking>use thinking blocks for complex reasoning</thinking>
-  <fallback>manual analysis when MCP unavailable</fallback>
+- Search previous solutions first via memory tools
+- Use Context7 for external dependencies and best practices  
+- Apply multi-step planning for complex tasks
+- Invoke all relevant tools simultaneously (parallel execution)
+- Document decisions and patterns for future reference
+- Use thinking blocks for complex reasoning
+- Fall back to manual analysis when MCP unavailable
 </research>
 ```
 
@@ -178,25 +167,29 @@ Always validate claims with concrete evidence before marking complete.
 
 ---
 
-#### **RULE 5: ERROR CORRECTION**
+#### **RULE 5: ERROR HANDLING & CORRECTION**
 ```
 <error_handling>
-When errors occur:
+Error Priority Hierarchy:
+1. Security & Safety - Never compromise
+2. Code Correctness - Proper structure and logic  
+3. Type Safety - Maintain proper type hints and validation
+4. Code Quality - Readable, maintainable code
+5. Test Passing - Only after above are satisfied
 
-<immediate>
+Immediate Response:
 - Investigate root cause before applying fixes
 - Document: error type, location, specific cause
 - Avoid quick fixes that mask underlying issues
-</immediate>
 
-<correction>
+Correction Process:
 - Re-examine with different methodology
 - Update documentation and related claims
 - Verify fix doesn't introduce new issues
 - Test edge cases and error scenarios
-</correction>
 
-Error hierarchy: Security → Correctness → Type Safety → Code Quality → Test Passing
+❌ Never use quick fixes: Remove imports, add # type: ignore, use Any type, delete code
+✅ Always use proper fixes: Import types correctly, fix type mismatches, maintain explicit typing
 </error_handling>
 ```
 
@@ -206,9 +199,10 @@ Error hierarchy: Security → Correctness → Type Safety → Code Quality → T
 ```
 <improvement>
 Modernization patterns:
-- JavaScript: var→const/let, .then()→async/await
-- Python: %formatting→f-strings, os.path→pathlib
-- TypeScript: any→specific types, manual loops→built-in methods
+- Python: %formatting→f-strings, os.path→pathlib, dict.keys()→dict iteration
+- Type hints: Any→specific types, missing annotations→explicit typing
+- Async: callback patterns→async/await, threading→asyncio where appropriate
+- Data structures: manual loops→comprehensions/built-in methods
 
 Process:
 1. Research latest practices via Context7
@@ -233,29 +227,91 @@ When rules conflict, follow this order:
 5. **MCP Research** (informed decisions)
 6. **Continuous Improvement** (optimize over time)
 
-### **PARALLEL EXECUTION INSTRUCTION**
+---
 
-**Critical for Claude-4 Sonnet optimization:**
-```
-For maximum efficiency, whenever you perform multiple operations, invoke all relevant tools simultaneously rather than sequentially. This applies to:
-- Reading multiple files
-- Running multiple searches
-- Gathering different types of evidence
-- Performing independent validations
+### **AGENT DELEGATION**
 
-Default to parallel execution unless output of one tool is required for input of another.
-```
+**Delegate to specialized agents using the Task tool for domain expertise:**
+
+- **code-reviewer**: Use PROACTIVELY for code review, refactoring, technical debt analysis, quality assessment
+- **system-reliability-engineer**: Use PROACTIVELY for monitoring, health checks, incident response, observability setup
+- **database-specialist**: Use PROACTIVELY for query optimization, schema design, migrations, connection pooling
+- **security-architect**: Use PROACTIVELY for authentication, authorization, vulnerability assessment, security reviews
+- **ml-orchestrator**: Use PROACTIVELY for ML training issues, pipeline design, feature engineering, model optimization
+- **performance-engineer**: Use PROACTIVELY for slow performance, profiling, load testing, bottleneck analysis
+- **infrastructure-specialist**: Use PROACTIVELY for testcontainers, CI/CD, development environments, testing infrastructure
+
+**Delegation triggers:** review, optimize, secure, monitor, test, deploy, analyze, refactor, troubleshoot
+
+---
+
+### **PARALLEL PROCESSING**
+
+**Maximize efficiency through concurrent execution:**
+
+#### **Parallel Tool Calls**
+- **Use when**: Multiple independent operations needed simultaneously
+- **Pattern**: Invoke Read, Grep, Glob, Bash tools together in single response
+- **Benefit**: 3-10x faster than sequential execution
+- **Example**: `Read file1.py + Grep "pattern" + Bash "test command"` simultaneously
+
+#### **Task Tool Parallelism** 
+- **Use when**: Multiple complex tasks can run independently
+- **Limit**: Up to 10 concurrent tasks automatically managed
+- **Pattern**: Let Claude Code decide parallelism level for optimal performance
+- **Benefit**: Concurrent agent execution and analysis
+
+#### **Information Gathering**
+- **Always parallel**: File reads, searches, validations, evidence collection
+- **Pattern**: Batch all independent tool calls in single message
+- **Rule**: Default to parallel unless one tool output feeds another
+
+#### **Parallel Triggers**
+**Use parallel execution for**: analyze + verify + search, read + grep + validate, test + profile + measure, scan + check + assess
+
+**Avoid parallel for**: sequential dependencies, file writes, destructive operations
+
+---
 
 ### **EXTENDED THINKING MODE**
 
-**For complex multi-step tasks:**
-```
-Use <thinking> tags for complex reasoning, planning, and analysis:
-- After tool use for reflection
-- Before making decisions
-- When breaking down complex problems
-- For step-by-step reasoning
+**Use thinking blocks for complex reasoning and reflection:**
 
-This enables more deliberate and structured problem-solving.
-```
+#### **When to Think**
+- **After tool results**: Reflect on quality and determine optimal next steps
+- **Before complex decisions**: Multi-step reasoning and planning
+- **During problem decomposition**: Breaking down complex tasks
+- **For iterative improvement**: Analyzing and refining approaches
+
+#### **Think Tool Pattern**
+- **Mid-response analysis**: Structured reasoning during complex task execution
+- **Use for**: Tool output analysis, policy compliance, sequential high-stakes decisions
+- **Benefit**: 54% performance improvement in complex domains
+- **Pattern**: Pause → Analyze → Decide → Continue
+
+#### **Thinking Triggers**
+**Use extended thinking for**: analyze, plan, evaluate, reason, decompose, optimize, strategize, debug
+
+---
+
+### **CONTEXT MANAGEMENT**
+
+**Optimize context usage and agent coordination:**
+
+#### **Subagent Context Preservation**
+- **Use subagents** to verify details and investigate complex problems
+- **Benefit**: Preserves main context availability during deep investigations
+- **Pattern**: Delegate specialized analysis to maintain primary workflow
+
+#### **Iterative Development**
+- **Explore → Plan → Code → Commit** workflow for complex features
+- **Test-driven development**: Write tests first, then implement
+- **Visual iteration**: Use screenshots for UI/UX feedback loops
+- **Rule**: "Claude's outputs improve significantly with iteration"
+
+#### **Tool Cleanup**
+- **Always clean up**: Temporary files, scripts, helper files at task completion
+- **Pattern**: Create → Use → Clean up in single workflow
+- **Benefit**: Prevents context pollution and maintains clean workspace
+
 ---

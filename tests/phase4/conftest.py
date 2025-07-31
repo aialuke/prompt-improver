@@ -51,7 +51,7 @@ def database_url(postgres_container):
     database = postgres_container.dbname
 
     # Create async URL for SQLAlchemy 2.0 with psycopg3 driver (2025 best practice)
-    async_url = f"postgresql+psycopg://{username}:{password}@{host}:{port}/{database}"
+    async_url = f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database}"
     return async_url
 
 

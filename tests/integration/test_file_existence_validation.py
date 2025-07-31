@@ -95,7 +95,7 @@ def test_file_existence():
         "DatabasePerformanceMonitor": "src/prompt_improver/database/performance_monitor.py",
         "DatabaseConnectionOptimizer": "src/prompt_improver/database/query_optimizer.py",
         "PreparedStatementCache": "src/prompt_improver/database/query_optimizer.py",
-        "TypeSafePsycopgClient": "src/prompt_improver/database/psycopg_client.py",
+        # "TypeSafePsycopgClient": Removed - migrated to UnifiedConnectionManager
         "RetryManager": "src/prompt_improver/database/error_handling.py",
         "ABTestingWidget": "src/prompt_improver/tui/widgets/ab_testing.py",
         "ServiceControlWidget": "src/prompt_improver/tui/widgets/service_control.py",

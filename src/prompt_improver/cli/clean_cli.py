@@ -39,7 +39,7 @@ def setup_signal_handlers():
     - SIGTERM for system shutdown
     - Graceful workflow termination with progress preservation
     """
-    def signal_handler(signum, frame):
+    def signal_handler(signum, _frame):
         global shutdown_requested
         signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
         console.print(f"\n⚠️  Received {signal_name} - Initiating graceful shutdown...", style="yellow")
@@ -67,7 +67,7 @@ async def graceful_shutdown():
             # Stop training gracefully with progress preservation
             result = await cli_orchestrator.stop_training_gracefully(
                 session_id=current_training_session,
-                timeout=30,
+                _timeout=30,
                 save_progress=True
             )
 
@@ -494,7 +494,7 @@ def stop(
                     # Graceful shutdown with progress saving
                     result = await cli_orchestrator.stop_training_gracefully(
                         session_id=session.session_id,
-                        timeout=timeout,
+                        _timeout=timeout,
                         save_progress=save_progress
                     )
 

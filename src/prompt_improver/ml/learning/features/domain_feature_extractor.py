@@ -272,27 +272,13 @@ class DomainFeatureExtractor:
         Returns:
             List of 15 normalized domain features
         """
-        # Check if we're already in an async context
+        # Use proven signal_handler pattern for async standardization
         try:
             loop = asyncio.get_running_loop()
-            # If we're in an async context, we need to run in a thread pool
-            import concurrent.futures
-            
-            # Create a new event loop in a separate thread
-            def run_in_thread():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(self.extract_features_async(text, context))
-                finally:
-                    new_loop.close()
-            
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_thread)
-                return future.result(timeout=self.config.timeout_seconds + 5)
-                
+            # We're in an async context - use run_coroutine_threadsafe for proper async handling
+            return asyncio.run_coroutine_threadsafe(self.extract_features_async(text, context), loop).result()
         except RuntimeError:
-            # No event loop running, we can create one
+            # No running loop, safe to use asyncio.run
             return asyncio.run(self.extract_features_async(text, context))
     
     async def extract_features_async(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[float]:

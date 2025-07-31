@@ -81,17 +81,29 @@ def main():
     used_imports = find_all_imports(root_dir)
     used_normalized = {normalize_package_name(imp) for imp in used_imports}
     
-    # Parse requirements files
-    requirements_files = [
-        root_dir / 'requirements.lock',
-        root_dir / 'requirements-dev.txt',
-        root_dir / 'requirements-test-real.txt'
-    ]
-    
+    # Parse pyproject.toml dependencies
+    import tomllib
+
+    pyproject_file = root_dir / 'pyproject.toml'
     all_packages = set()
-    for req_file in requirements_files:
-        packages = parse_requirements(req_file)
-        all_packages.update(packages)
+
+    if pyproject_file.exists():
+        with open(pyproject_file, 'rb') as f:
+            pyproject_data = tomllib.load(f)
+
+        # Extract main dependencies
+        dependencies = pyproject_data.get('project', {}).get('dependencies', [])
+        for dep in dependencies:
+            # Extract package name (before >=, ==, etc.)
+            pkg_name = dep.split('>=')[0].split('==')[0].split('<=')[0].split('~=')[0].split('[')[0]
+            all_packages.add(pkg_name.strip('"').strip("'"))
+
+        # Extract optional dependencies
+        optional_deps = pyproject_data.get('project', {}).get('optional-dependencies', {})
+        for group_deps in optional_deps.values():
+            for dep in group_deps:
+                pkg_name = dep.split('>=')[0].split('==')[0].split('<=')[0].split('~=')[0].split('[')[0]
+                all_packages.add(pkg_name.strip('"').strip("'"))
     
     # Known unused packages (confirmed by analysis)
     known_unused = {

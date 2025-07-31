@@ -35,10 +35,19 @@ def get_logger(name: Optional[str] = None, level: Optional[str] = None) -> loggi
         # Get caller's module name automatically
         frame = inspect.currentframe()
         try:
-            caller_frame = frame.f_back
-            name = caller_frame.f_globals.get('__name__', 'unknown')
+            # Handle cases where frame inspection might not be available
+            if frame is not None:
+                caller_frame = frame.f_back
+                if caller_frame is not None:
+                    name = caller_frame.f_globals.get('__name__', 'unknown')
+                else:
+                    name = 'unknown'
+            else:
+                name = 'unknown'
         finally:
-            del frame
+            # Safely delete frame reference to prevent memory leaks
+            if frame is not None:
+                del frame
     
     logger = logging.getLogger(name)
     

@@ -1,0 +1,151 @@
+# Unified Configuration Schema for Prompt Improver Infrastructure
+# This schema eliminates configuration drift across all environments
+# Generated: 2025-07-31 - Infrastructure Specialist
+
+# =============================================================================
+# STANDARDIZED ENVIRONMENT VARIABLE NAMES
+# =============================================================================
+
+# Database Pool Configuration (Standard naming)
+database_pool:
+  naming_convention: "DB_POOL_*"  # Standard across all environments
+  deprecated_names: ["MCP_DB_POOL_*"]  # Phase out MCP-specific names
+  
+  # Environment-specific pool sizing  
+  production:
+    min_size: 8    # DB_POOL_MIN_SIZE
+    max_size: 32   # DB_POOL_MAX_SIZE  
+    timeout: 10    # DB_POOL_TIMEOUT
+    max_lifetime: 1800  # DB_POOL_MAX_LIFETIME
+    max_idle: 300  # DB_POOL_MAX_IDLE
+    
+  development:
+    min_size: 4    # DB_POOL_MIN_SIZE
+    max_size: 16   # DB_POOL_MAX_SIZE
+    timeout: 10    # DB_POOL_TIMEOUT  
+    max_lifetime: 1800
+    max_idle: 300
+    
+  test:
+    min_size: 2    # DB_POOL_MIN_SIZE
+    max_size: 8    # DB_POOL_MAX_SIZE
+    timeout: 5     # DB_POOL_TIMEOUT (faster for tests)
+    max_lifetime: 1800
+    max_idle: 300
+
+# Redis Connection Configuration (Standard naming)
+redis_connections:
+  naming_convention: "REDIS_*"  # Standard across all environments
+  
+  production:
+    max_connections: 50  # REDIS_MAX_CONNECTIONS
+    timeout: 5          # REDIS_TIMEOUT
+    
+  development:
+    max_connections: 20  # REDIS_MAX_CONNECTIONS  
+    timeout: 5          # REDIS_TIMEOUT
+    
+  test:
+    max_connections: 10  # REDIS_MAX_CONNECTIONS
+    timeout: 3          # REDIS_TIMEOUT
+
+# MCP Server Configuration (Uses standard pool settings)
+mcp_server:
+  database_pool: "inherit from environment DB_POOL_* settings"
+  request_timeout_ms: 200  # MCP_REQUEST_TIMEOUT_MS
+  cache_ttl_seconds: 7200  # MCP_CACHE_TTL_SECONDS
+  
+  # Redis database separation (for rate limiting/cache isolation)
+  redis_rate_limit_db: 2   # MCP_RATE_LIMIT_REDIS_URL redis://host:port/2
+  redis_cache_db: 3        # MCP_CACHE_REDIS_URL redis://host:port/3
+
+# =============================================================================
+# MIGRATION MAPPING
+# =============================================================================
+
+# Variables to be REMOVED (deprecated)
+deprecated_variables:
+  - MCP_DB_POOL_SIZE        # Replace with DB_POOL_MIN_SIZE/DB_POOL_MAX_SIZE
+  - MCP_DB_MAX_OVERFLOW     # Replace with DB_POOL_MAX_SIZE calculation
+
+# Variables to be UNIFIED (consistent naming)
+variable_mappings:
+  # Database pool settings
+  "MCP_DB_POOL_SIZE": "DB_POOL_MAX_SIZE"
+  "MCP_DB_MAX_OVERFLOW": "calculated from DB_POOL_MAX_SIZE - DB_POOL_MIN_SIZE"
+  
+  # Keep MCP-specific settings (these are MCP domain-specific)
+  "MCP_REQUEST_TIMEOUT_MS": "MCP_REQUEST_TIMEOUT_MS"  # Keep as-is
+  "MCP_CACHE_TTL_SECONDS": "MCP_CACHE_TTL_SECONDS"   # Keep as-is
+  "MCP_LOG_LEVEL": "MCP_LOG_LEVEL"                   # Keep as-is
+
+# =============================================================================
+# ENVIRONMENT-SPECIFIC CONFIGURATIONS  
+# =============================================================================
+
+environments:
+  production:
+    file: ".env.production"
+    database_pool_strategy: "high_availability"
+    redis_pool_strategy: "high_throughput"
+    
+  development:
+    file: ".env.example"  
+    database_pool_strategy: "balanced"
+    redis_pool_strategy: "balanced"
+    
+  test:
+    file: ".env.test"
+    database_pool_strategy: "fast_startup"
+    redis_pool_strategy: "minimal_resources"
+
+# =============================================================================
+# DOCKER CONFIGURATION STANDARDIZATION
+# =============================================================================
+
+docker_env_vars:
+  # Remove hardcoded values, use environment variable passthrough
+  hardcoded_removal:
+    - "ENV MCP_DB_POOL_SIZE=20"      # Remove hardcoded value
+    - "ENV MCP_DB_MAX_OVERFLOW=10"   # Remove hardcoded value
+    
+  # Replace with environment variable references
+  environment_passthrough:
+    - "ENV DB_POOL_MIN_SIZE=${DB_POOL_MIN_SIZE:-4}"
+    - "ENV DB_POOL_MAX_SIZE=${DB_POOL_MAX_SIZE:-16}"
+    - "ENV DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-10}"
+    - "ENV REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-20}"
+
+# =============================================================================
+# VALIDATION REQUIREMENTS
+# =============================================================================
+
+validation_checks:
+  - name: "no_hardcoded_values"
+    description: "Ensure no hardcoded pool sizes in Docker files"
+    files: ["Dockerfile.mcp", "docker-compose.yml"]
+    
+  - name: "consistent_naming"
+    description: "All pool settings use DB_POOL_* convention"
+    files: [".env.example", ".env.test", ".mcp.json"]
+    
+  - name: "environment_parity"
+    description: "All environments have complete configuration"
+    check: "production, development, test configs are complete"
+    
+  - name: "test_configuration"
+    description: "Test files use standard environment variables"
+    files: ["scripts/test_phase0_core.py", "tests/integration/test_phase0_mcp_integration.py"]
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+
+implementation_steps:
+  1: "Update .mcp.json to use standard DB_POOL_* variables"
+  2: "Update .env.example with consistent naming"
+  3: "Update .env.test with environment-appropriate values"  
+  4: "Remove hardcoded values from Dockerfile.mcp"
+  5: "Update test files to use standard variables"
+  6: "Validate configuration consistency"
+  7: "Update documentation references"

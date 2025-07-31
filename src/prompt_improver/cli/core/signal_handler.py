@@ -7,7 +7,7 @@ import asyncio
 import signal
 import logging
 import sys
-from typing import Dict, Any, Optional, Callable, Set
+from typing import Dict, Any, Optional, Callable, Set, List, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from enum import Enum
@@ -46,7 +46,8 @@ class ShutdownContext:
     timeout: int = 30
     save_progress: bool = True
     force_after_timeout: bool = True
-    started_at: datetime = None
+    started_at: Optional[datetime] = None
+    parameters: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.started_at is None:
@@ -59,7 +60,7 @@ class SignalContext:
     signal_name: str
     signal_number: int
     triggered_at: datetime
-    parameters: Dict[str, Any] = None
+    parameters: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.parameters is None:
@@ -110,7 +111,7 @@ class AsyncSignalHandler:
         self.original_handlers: Dict[int, Any] = {}
 
         # Signal chaining support
-        self.signal_chain: Dict[int, List[Callable]] = {}
+        self.signal_chain: Dict[int, List[Tuple[int, Callable]]] = {}
         self.chain_enabled = True
 
         # Emergency operations manager (lazy initialization)
@@ -225,7 +226,7 @@ class AsyncSignalHandler:
         shutdown_signals = {signal.SIGINT, signal.SIGTERM}
         received_shutdown_signals = self.signals_received.intersection(shutdown_signals)
 
-        if len(received_shutdown_signals) > 1:
+        if len(received_shutdown_signals) > 1 and self.first_signal_time is not None:
             time_since_first = (current_time - self.first_signal_time).total_seconds()
             if time_since_first < 5:  # Multiple signals within 5 seconds = force shutdown
                 self.console.print(
@@ -291,8 +292,9 @@ class AsyncSignalHandler:
                 # Schedule async operation
                 if self.loop and self.loop.is_running():
                     # Use call_soon_threadsafe to ensure proper scheduling
+                    loop = self.loop  # Capture loop reference for lambda
                     self.loop.call_soon_threadsafe(
-                        lambda: self.loop.create_task(self._execute_operation_handler(operation, signal_context))
+                        lambda: loop.create_task(self._execute_operation_handler(operation, signal_context))
                     )
                 else:
                     # Fallback to sync execution for testing or when loop not available
@@ -305,11 +307,11 @@ class AsyncSignalHandler:
             self.logger.warning(f"No handler registered for {operation.value} operation")
             self.console.print(f"⚠️  No handler registered for {operation.value}", style="yellow")
 
-    def _sync_signal_handler(self, signum: int, frame) -> None:
+    def _sync_signal_handler(self, signum: int, _frame) -> None:
         """Synchronous signal handler for Windows compatibility."""
         signal_names = {
-            signal.SIGINT: "SIGINT",
-            signal.SIGTERM: "SIGTERM"
+            signal.SIGINT.value: "SIGINT",
+            signal.SIGTERM.value: "SIGTERM"
         }
         signal_name = signal_names.get(signum, f"SIG{signum}")
 
@@ -368,7 +370,7 @@ class AsyncSignalHandler:
 
         # Insert handler based on priority
         inserted = False
-        for i, (existing_priority, existing_handler) in enumerate(self.signal_chain[signum]):
+        for i, (existing_priority, _existing_handler) in enumerate(self.signal_chain[signum]):
             if priority < existing_priority:
                 self.signal_chain[signum].insert(i, (priority, handler))
                 inserted = True
@@ -393,7 +395,7 @@ class AsyncSignalHandler:
         if signum not in self.signal_chain:
             return False
 
-        for i, (priority, existing_handler) in enumerate(self.signal_chain[signum]):
+        for i, (_priority, existing_handler) in enumerate(self.signal_chain[signum]):
             if existing_handler == handler:
                 self.signal_chain[signum].pop(i)
                 self.logger.debug(f"Removed signal chain handler for signal {signum}")
@@ -490,7 +492,7 @@ class AsyncSignalHandler:
         except Exception as e:
             self.logger.error(f"Failed to register emergency handlers: {e}")
 
-    async def _default_checkpoint_handler(self, context) -> Dict[str, Any]:
+    async def _default_checkpoint_handler(self, _context) -> Dict[str, Any]:
         """Default checkpoint handler when emergency operations not available."""
         self.logger.info("Creating basic checkpoint (emergency operations not loaded)")
         return {
@@ -499,7 +501,7 @@ class AsyncSignalHandler:
             "message": "Basic checkpoint created without emergency operations"
         }
 
-    async def _default_status_handler(self, context) -> Dict[str, Any]:
+    async def _default_status_handler(self, _context) -> Dict[str, Any]:
         """Default status handler when emergency operations not available."""
         self.logger.info("Generating basic status report")
         return {
@@ -508,7 +510,7 @@ class AsyncSignalHandler:
             "message": "Basic status report (emergency operations not loaded)"
         }
 
-    async def _default_config_reload_handler(self, context) -> Dict[str, Any]:
+    async def _default_config_reload_handler(self, _context) -> Dict[str, Any]:
         """Default config reload handler when emergency operations not available."""
         self.logger.info("Basic configuration reload")
         return {
@@ -558,7 +560,7 @@ class AsyncSignalHandler:
             try:
                 loop = asyncio.get_running_loop()
                 # We're in a running loop, create a task
-                task = loop.create_task(handler(context))
+                _task = loop.create_task(handler(context))
                 # Don't wait for it, just schedule it
                 self.logger.info(f"Scheduled {operation.value} operation as task")
             except RuntimeError:
@@ -674,12 +676,12 @@ class AsyncSignalHandler:
                 # Signal might not be available
                 pass
 
-    async def wait_for_shutdown(self) -> ShutdownContext:
+    async def wait_for_shutdown(self) -> Optional[ShutdownContext]:
         """
         Wait for shutdown signal and return shutdown context.
 
         Returns:
-            ShutdownContext with shutdown details
+            ShutdownContext with shutdown details, or None if not available
         """
         await self.shutdown_event.wait()
         return self.shutdown_context
@@ -728,11 +730,11 @@ class AsyncSignalHandler:
 
             return {
                 "status": "success",
-                "reason": self.shutdown_context.reason.value,
+                "reason": self.shutdown_context.reason.value if self.shutdown_context else "unknown",
                 "duration_seconds": shutdown_duration,
                 "shutdown_results": shutdown_results,
                 "cleanup_results": cleanup_results,
-                "progress_saved": self.shutdown_context.save_progress
+                "progress_saved": self.shutdown_context.save_progress if self.shutdown_context else False
             }
 
         except asyncio.TimeoutError:
@@ -743,7 +745,7 @@ class AsyncSignalHandler:
             self.logger.error(f"Error during graceful shutdown: {e}")
             self.console.print(f"❌ Shutdown error: {e}", style="red")
 
-            if self.shutdown_context.force_after_timeout:
+            if self.shutdown_context and self.shutdown_context.force_after_timeout:
                 return await self._execute_force_shutdown()
             else:
                 return {
@@ -757,7 +759,7 @@ class AsyncSignalHandler:
     async def _execute_shutdown_handlers(self) -> Dict[str, Any]:
         """Execute all registered shutdown handlers with timeout."""
         results = {}
-        timeout = self.shutdown_context.timeout
+        timeout = self.shutdown_context.timeout if self.shutdown_context else 30
 
         self.console.print(f"   Executing {len(self.shutdown_handlers)} shutdown handlers...", style="dim")
 
