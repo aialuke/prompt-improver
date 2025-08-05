@@ -1,0 +1,180 @@
+{
+  "commands": {
+    "search": {
+      "description": "Semantic code search with Voyage AI embeddings",
+      "script": "python voyage-search/src/search_integration.py",
+      "examples": [
+        {
+          "description": "Search for quicksort implementation",
+          "command": "search 'quicksort algorithm implementation'"
+        },
+        {
+          "description": "Search with analysis for Claude Code",
+          "command": "search 'database connection management' --analysis explain --format-claude"
+        },
+        {
+          "description": "Optimize search with specific parameters",
+          "command": "search 'error handling patterns' --analysis optimize --max-results 5 --min-similarity 0.2"
+        }
+      ],
+      "parameters": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "Search query for semantic code search"
+        },
+        "--analysis": {
+          "type": "choice",
+          "choices": [
+            "explain",
+            "optimize",
+            "review",
+            "refactor"
+          ],
+          "description": "Analysis type for Claude Code integration"
+        },
+        "--max-results": {
+          "type": "integer",
+          "default": 3,
+          "description": "Maximum number of results to return"
+        },
+        "--min-similarity": {
+          "type": "float",
+          "default": 0.2,
+          "description": "Minimum similarity threshold (0.0-1.0) - ADJUSTED: Default 0.2 based on observed ranges"
+        },
+        "--method": {
+          "type": "choice",
+          "choices": [
+            "semantic",
+            "lexical",
+            "hybrid"
+          ],
+          "default": "hybrid",
+          "description": "Search method to use"
+        },
+        "--format-claude": {
+          "type": "flag",
+          "description": "Format output for Claude Code CLI analysis"
+        },
+        "--export": {
+          "type": "string",
+          "description": "Export results to JSON file"
+        }
+      }
+    },
+    "search-explain": {
+      "description": "Search code and generate explanation for Claude Code",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --analysis explain --format-claude",
+      "examples": [
+        {
+          "description": "Explain quicksort implementation",
+          "command": "search-explain 'quicksort algorithm'"
+        },
+        {
+          "description": "Explain database models",
+          "command": "search-explain 'database models and schemas'"
+        }
+      ]
+    },
+    "search-optimize": {
+      "description": "Search code and generate optimization suggestions",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --analysis optimize --format-claude",
+      "examples": [
+        {
+          "description": "Optimize database queries",
+          "command": "search-optimize 'database query performance'"
+        },
+        {
+          "description": "Optimize ML training code",
+          "command": "search-optimize 'machine learning training loop'"
+        }
+      ]
+    },
+    "search-review": {
+      "description": "Search code and generate code review",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --analysis review --format-claude",
+      "examples": [
+        {
+          "description": "Review error handling",
+          "command": "search-review 'error handling and exceptions'"
+        },
+        {
+          "description": "Review security patterns",
+          "command": "search-review 'authentication and authorization'"
+        }
+      ]
+    },
+    "search-refactor": {
+      "description": "Search code and suggest refactoring improvements",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --analysis refactor --format-claude",
+      "examples": [
+        {
+          "description": "Refactor configuration management",
+          "command": "search-refactor 'configuration and settings management'"
+        },
+        {
+          "description": "Refactor async patterns",
+          "command": "search-refactor 'asynchronous processing patterns'"
+        }
+      ]
+    },
+    "search-similar": {
+      "description": "Find similar code patterns with moderate similarity threshold",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --min-similarity 0.15 --max-results 10 --format-claude",
+      "examples": [
+        {
+          "description": "Find all similar patterns",
+          "command": "search-similar 'class initialization patterns'"
+        }
+      ]
+    },
+    "search-exact": {
+      "description": "Find exact or highly similar code matches",
+      "script": "python voyage-search/src/search_integration.py",
+      "template": "{query} --min-similarity 0.7 --method semantic --format-claude",
+      "examples": [
+        {
+          "description": "Find exact implementation",
+          "command": "search-exact 'specific function implementation'"
+        }
+      ]
+    }
+  },
+  "aliases": {
+    "find": "search",
+    "explain": "search-explain",
+    "optimize": "search-optimize",
+    "review": "search-review",
+    "refactor": "search-refactor"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Enhanced semantic code search with Voyage AI embeddings for Claude Code CLI",
+    "features": [
+      "Contextualized embeddings with voyage-context-3",
+      "Binary rescoring for performance",
+      "Voyage AI reranking with rerank-2.5-lite",
+      "Hybrid search (semantic + lexical)",
+      "Claude Code CLI integration",
+      "Multiple analysis types",
+      "JSON export capabilities"
+    ],
+    "requirements": {
+      "python": ">=3.8",
+      "environment_variables": [
+        "VOYAGE_API_KEY"
+      ],
+      "dependencies": [
+        "voyageai",
+        "rank_bm25",
+        "sentence_transformers"
+      ]
+    }
+  }
+}

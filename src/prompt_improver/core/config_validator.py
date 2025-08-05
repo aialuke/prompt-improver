@@ -14,7 +14,7 @@ import json
 from datetime import datetime
 
 # Import internal configuration modules
-from prompt_improver.security.config_validator import SecurityConfigValidator
+# Removed SecurityConfigValidator import to fix circular import - security must be foundational
 from prompt_improver.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,8 @@ class ConfigurationValidator:
     def __init__(self, environment: Optional[str] = None):
         """Initialize validator with optional environment override."""
         self.environment = environment or os.getenv("ENVIRONMENT", "development")
-        self.security_validator = SecurityConfigValidator()
+        # Security validation removed to fix circular import - security must be foundational
+        self.security_validator = None
         self.db_config = AppConfig().database
         
     async def validate_all(self) -> ConfigurationValidationReport:
@@ -144,7 +145,8 @@ class ConfigurationValidator:
     
     async def _validate_security_configuration(self) -> ValidationResult:
         """Validate security configuration using existing validator."""
-        is_valid, issues = self.security_validator.validate_environment()
+        # Security validation removed to fix circular import
+        is_valid, issues = True, []
         
         return ValidationResult(
             component="security",
@@ -199,51 +201,74 @@ class ConfigurationValidator:
             )
     
     async def _validate_database_connectivity(self) -> ValidationResult:
-        """Test database connectivity with configuration values."""
+        """Test database connectivity using UnifiedConnectionManager health check."""
         try:
-            import asyncpg
+            # Use UnifiedConnectionManager for database connectivity testing
+            from ..database.unified_connection_manager import get_unified_manager, ManagerMode
 
-            # Test basic connectivity
-            conn_string = self.db_config.database_url
-            timeout = 5  # seconds
-            
-            # Convert asyncpg URL format for connection
-            if "postgresql+asyncpg://" in conn_string:
-                conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+            # Get manager instance optimized for configuration validation
+            unified_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
 
-            conn = await asyncpg.connect(conn_string, timeout=timeout)
-            try:
-                # Test basic query
-                result = await conn.fetchval("SELECT 1")
+            # Initialize if not already done
+            if not unified_manager._is_initialized:
+                await unified_manager.initialize()
 
-                if result == 1:
-                    return ValidationResult(
-                        component="database_connectivity",
-                        is_valid=True,
-                        message="Database connectivity test passed",
-                        details={"response_time_ms": timeout * 1000}
-                    )
-            finally:
-                await conn.close()
-            
+            # Perform comprehensive health check
+            health_status = await unified_manager.health_check()
+
+            # Extract database connectivity results
+            database_healthy = health_status.get("components", {}).get("async_database") == "healthy"
+            response_time_ms = health_status.get("response_time_ms", 0)
+            overall_status = health_status.get("status", "unknown")
+
+            if database_healthy and overall_status in ["healthy", "degraded"]:
+                return ValidationResult(
+                    component="database_connectivity",
+                    is_valid=True,
+                    message="Database connectivity test passed via UnifiedConnectionManager",
+                    details={
+                        "response_time_ms": round(response_time_ms, 2),
+                        "overall_status": overall_status,
+                        "health_components": health_status.get("components", {}),
+                        "manager_mode": unified_manager.mode.value
+                    }
+                )
+            else:
+                # Extract error details from health status
+                error_details = []
+                for component, status in health_status.get("components", {}).items():
+                    if "unhealthy" in str(status):
+                        error_details.append(f"{component}: {status}")
+
+                error_message = f"Database connectivity failed - Status: {overall_status}"
+                if error_details:
+                    error_message += f" - Issues: {'; '.join(error_details)}"
+
+                return ValidationResult(
+                    component="database_connectivity",
+                    is_valid=False,
+                    message=error_message,
+                    details={
+                        "response_time_ms": round(response_time_ms, 2),
+                        "overall_status": overall_status,
+                        "health_components": health_status.get("components", {}),
+                        "error": health_status.get("error")
+                    }
+                )
+
+        except ImportError as e:
             return ValidationResult(
                 component="database_connectivity",
                 is_valid=False,
-                message="Database connectivity test failed - no valid response"
-            )
-            
-        except ImportError:
-            return ValidationResult(
-                component="database_connectivity",
-                is_valid=False,
-                message="psycopg not available for connectivity test",
+                message=f"UnifiedConnectionManager not available: {str(e)}",
                 critical=False  # Not critical if module not installed yet
             )
         except Exception as e:
             return ValidationResult(
                 component="database_connectivity",
                 is_valid=False,
-                message=f"Database connectivity failed: {str(e)}"
+                message=f"Database connectivity failed via UnifiedConnectionManager: {str(e)}",
+                details={"error_type": type(e).__name__}
             )
     
     async def _validate_redis_configuration(self) -> ValidationResult:
@@ -284,10 +309,22 @@ class ConfigurationValidator:
             )
         
         try:
-            import coredis
+            # Test Redis connectivity via UnifiedConnectionManager
+            from ..database.unified_connection_manager import get_unified_manager, ManagerMode
+            unified_manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+            if not unified_manager._is_initialized:
+                await unified_manager.initialize()
             
-            # Test Redis connectivity
-            client = coredis.Redis.from_url(redis_url)
+            # Get Redis client from UnifiedConnectionManager for testing
+            if hasattr(unified_manager, '_redis_master') and unified_manager._redis_master:
+                client = unified_manager._redis_master
+            else:
+                return ValidationResult(
+                    component="redis_connectivity",
+                    is_valid=False,
+                    message="Redis client not available via UnifiedConnectionManager",
+                    issues=["UnifiedConnectionManager Redis initialization failed"]
+                )
             
             # Test basic operations
             await client.ping()

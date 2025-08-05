@@ -14,12 +14,12 @@ from sqlalchemy import Column, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
-# Import centralized registry first to patch SQLModel
-from prompt_improver.database.registry import get_registry_manager
+# Import centralized registry lazily to avoid import-time blocking
+# from prompt_improver.database.registry import get_registry_manager
 from prompt_improver.utils.datetime_utils import naive_utc_now
 
-# Ensure we're using the centralized registry
-_registry_manager = get_registry_manager()
+# Ensure we're using the centralized registry (lazy-loaded when needed)
+# _registry_manager = get_registry_manager()  # Now lazy-loaded
 
 # Generation models will be added directly to this file
 

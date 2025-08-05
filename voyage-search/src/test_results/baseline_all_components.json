@@ -1,0 +1,49 @@
+{
+  "config": {
+    "enable_semantic": true,
+    "enable_lexical": true,
+    "enable_binary_rescoring": true,
+    "enable_cross_encoder": true,
+    "enable_local_quantization": true,
+    "test_name": "baseline_all_components"
+  },
+  "total_queries": 3,
+  "total_time_ms": 1374.9120235443115,
+  "avg_time_per_query_ms": 458.3040078481038,
+  "total_api_calls": 7,
+  "total_false_positives": 4,
+  "avg_false_positives_per_query": 1.3333333333333333,
+  "query_results": [
+    {
+      "query": "sorting algorithm implementation",
+      "category": "algorithms",
+      "search_time_ms": 542.8769588470459,
+      "results_count": 5,
+      "false_positives": 2,
+      "avg_similarity": 0.38515625,
+      "top_similarity": 0.455078125,
+      "relevant_results": 3
+    },
+    {
+      "query": "binary search function",
+      "category": "algorithms",
+      "search_time_ms": 594.7680473327637,
+      "results_count": 2,
+      "false_positives": 2,
+      "avg_similarity": 0.3193359375,
+      "top_similarity": 0.34765625,
+      "relevant_results": 0
+    },
+    {
+      "query": "linked list implementation",
+      "category": "data_structures",
+      "search_time_ms": 237.26701736450195,
+      "results_count": 0,
+      "false_positives": 0,
+      "avg_similarity": 0.0,
+      "top_similarity": 0.0,
+      "relevant_results": 0
+    }
+  ],
+  "timestamp": 1754062620.918446
+}

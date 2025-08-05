@@ -7,6 +7,9 @@ import os
 import signal
 import sys
 from pathlib import Path
+from prompt_improver.performance.monitoring.health.background_manager import (
+    get_background_task_manager, TaskPriority
+)
 
 # Optional psutil import
 try:
@@ -47,7 +50,7 @@ except ImportError:
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from rich.console import Console
 
@@ -83,6 +86,9 @@ class APESServiceManager:
         self.event_bus = event_bus
         self._is_initialized = False
         self._service_status = "stopped"
+        
+        # Enhanced task management
+        self._health_monitoring_task_id: Optional[str] = None
 
         # Setup logging
         self.setup_logging()
@@ -333,8 +339,18 @@ class APESServiceManager:
         """Initialize performance monitoring"""
         self.logger.info("Performance monitoring initialized")
 
-        # Create monitoring task
-        asyncio.create_task(self.monitor_service_health_background())
+        # Create monitoring task using enhanced task management
+        task_manager = get_background_task_manager()
+        task_id = await task_manager.submit_enhanced_task(
+            task_id=f"service_health_monitoring_{id(self)}",
+            coroutine=self.monitor_service_health_background,
+            priority=TaskPriority.HIGH,
+            tags={"service": "service_manager", "type": "health_monitoring", "component": "core"}
+        )
+        
+        # Store task ID for potential cleanup
+        self._health_monitoring_task_id = task_id
+        self.logger.info("Started service health monitoring with enhanced task management")
 
     async def verify_service_health(self) -> dict[str, Any]:
         """Verify service health and performance using unified health monitor"""

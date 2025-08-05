@@ -18,7 +18,8 @@ import aiofiles
 from ..monitoring.performance_benchmark import MCPPerformanceBenchmark
 from ..optimization.performance_optimizer import get_performance_optimizer
 from ..monitoring.performance_monitor import get_performance_monitor
-from ...utils.multi_level_cache import get_specialized_caches
+# Using UnifiedConnectionManager instead of standalone multi_level_cache
+from ...database.unified_connection_manager import get_unified_manager, ManagerMode
 from ..optimization.response_optimizer import get_response_optimizer
 
 logger = logging.getLogger(__name__)
@@ -189,8 +190,11 @@ class PerformanceValidator:
         response_times = []
         errors = 0
 
-        caches = get_specialized_caches()
-        test_cache = caches.get_cache_for_type("prompt")
+        # Use UnifiedConnectionManager for consolidated cache management
+        unified_cache = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+        if not unified_cache._is_initialized:
+            await unified_cache.initialize()
+        test_cache = unified_cache
 
         for i in range(sample_count):
             start_time = time.perf_counter()
@@ -432,7 +436,9 @@ class PerformanceValidator:
     def _get_optimization_summary(self) -> Dict[str, Any]:
         """Get summary of applied optimizations."""
         # Get stats from various optimization components
-        cache_stats = get_specialized_caches().get_all_stats()
+        # Get cache stats from UnifiedConnectionManager
+        unified_cache = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+        cache_stats = unified_cache.get_cache_stats()
         response_optimizer_stats = get_response_optimizer().get_optimization_stats()
 
         return {

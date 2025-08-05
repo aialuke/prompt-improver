@@ -520,74 +520,142 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.importlinter]
-# Import Linter configuration for architectural boundary enforcement
+# Import Linter configuration for architectural boundary enforcement (2025 best practices)
 root_packages = ["prompt_improver"]
+include_external_packages = true
 
+# Contract 1: Circular Import Detection (Primary Goal)
+[[tool.importlinter.contracts]]
+name = "Circular Import Prevention"
+type = "independence"
+modules = [
+    "prompt_improver.**"
+]
+unmatched_ignore_imports_alerting = "warn"
+
+# Contract 2: Clean Architecture Layers (Strict Layering)
 [[tool.importlinter.contracts]]
 name = "Clean Architecture Layers"
 type = "layers"
 layers = [
     "prompt_improver.core",
-    "prompt_improver.shared", 
+    "prompt_improver.shared",
     "prompt_improver.domain | prompt_improver.ml | prompt_improver.rule_engine",
     "prompt_improver.application",
     "prompt_improver.infrastructure | prompt_improver.database | prompt_improver.performance | prompt_improver.security",
     "prompt_improver.presentation | prompt_improver.api | prompt_improver.cli | prompt_improver.mcp_server"
 ]
+ignore_imports = [
+    # Allow core utilities to be imported from anywhere
+    "prompt_improver.** -> prompt_improver.core.**",
+    "prompt_improver.** -> prompt_improver.shared.**",
+    # Allow dependency injection patterns
+    "prompt_improver.** -> prompt_improver.core.di.**",
+    # Allow common types and protocols
+    "prompt_improver.** -> prompt_improver.core.types",
+    "prompt_improver.** -> prompt_improver.core.protocols.**"
+]
+unmatched_ignore_imports_alerting = "warn"
 
-[[tool.importlinter.contracts]]
-name = "Core Module Independence"
-type = "independence"
-modules = ["prompt_improver.core"]
-
+# Contract 3: Domain Layer Independence (Hexagonal Architecture)
 [[tool.importlinter.contracts]]
 name = "Domain Independence"
-type = "independence" 
+type = "independence"
 modules = [
     "prompt_improver.domain",
     "prompt_improver.ml",
     "prompt_improver.rule_engine"
 ]
+unmatched_ignore_imports_alerting = "warn"
 
-[[tool.importlinter.contracts]]
-name = "No Circular Dependencies"
-type = "forbidden"
-source_modules = ["prompt_improver"]
-forbidden_modules = ["prompt_improver"]
-ignore_imports = [
-    "prompt_improver -> prompt_improver.core",
-    "prompt_improver -> prompt_improver.shared"
-]
-
+# Contract 4: Infrastructure Boundaries (Dependency Inversion)
 [[tool.importlinter.contracts]]
 name = "Infrastructure Boundaries"
 type = "forbidden"
 source_modules = [
     "prompt_improver.domain",
     "prompt_improver.ml",
-    "prompt_improver.rule_engine"
+    "prompt_improver.rule_engine",
+    "prompt_improver.core"
 ]
 forbidden_modules = [
     "prompt_improver.database",
     "prompt_improver.api",
     "prompt_improver.cli",
     "prompt_improver.mcp_server",
-    "prompt_improver.performance.monitoring"
+    "prompt_improver.performance.monitoring",
+    "prompt_improver.infrastructure",
+    "prompt_improver.security",
+    "prompt_improver.cache",
+    "prompt_improver.utils",
+    "prompt_improver.tui"
 ]
+ignore_imports = [
+    # Allow protocols and interfaces
+    "prompt_improver.domain -> prompt_improver.core.protocols.**",
+    "prompt_improver.ml -> prompt_improver.core.protocols.**",
+    "prompt_improver.rule_engine -> prompt_improver.core.protocols.**",
+    # Allow shared types
+    "prompt_improver.** -> prompt_improver.shared.types.**",
+    "prompt_improver.** -> prompt_improver.shared.interfaces.**"
+]
+unmatched_ignore_imports_alerting = "warn"
 
+# Contract 5: Presentation Layer Isolation
 [[tool.importlinter.contracts]]
 name = "Presentation Layer Isolation"
 type = "forbidden"
 source_modules = [
     "prompt_improver.api",
-    "prompt_improver.cli", 
-    "prompt_improver.mcp_server"
+    "prompt_improver.cli",
+    "prompt_improver.mcp_server",
+    "prompt_improver.tui"
 ]
 forbidden_modules = [
-    "prompt_improver.database",
-    "prompt_improver.ml.lifecycle",
-    "prompt_improver.performance.monitoring.health"
+    # Presentation layers should not directly access each other
+    "prompt_improver.api",
+    "prompt_improver.cli",
+    "prompt_improver.mcp_server",
+    "prompt_improver.tui"
 ]
+allow_indirect_imports = false
+unmatched_ignore_imports_alerting = "warn"
+
+# Contract 6: External Dependencies Control
+[[tool.importlinter.contracts]]
+name = "External Dependencies Control"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.domain",
+    "prompt_improver.core"
+]
+forbidden_modules = [
+    # Prevent domain/core from depending on heavy external libraries
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy",
+    "asyncpg",
+    "redis",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "optuna",
+    "mlflow"
+]
+ignore_imports = [
+    # Allow typing imports
+    "prompt_improver.** -> typing",
+    "prompt_improver.** -> typing_extensions",
+    # Allow standard library
+    "prompt_improver.** -> datetime",
+    "prompt_improver.** -> uuid",
+    "prompt_improver.** -> enum",
+    "prompt_improver.** -> dataclasses",
+    "prompt_improver.** -> abc",
+    "prompt_improver.** -> pathlib",
+    "prompt_improver.** -> logging"
+]
+unmatched_ignore_imports_alerting = "warn"
 
 [dependency-groups]
 dev = [

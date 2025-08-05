@@ -446,7 +446,8 @@ if __name__ == "__main__":
     
     # Generate report
     report = logger.generate_report("config_logging_demo_report.json")
-    print(f"\\nGenerated report with {report['total_events']} events")
+    print(f"\
+Generated report with {report['total_events']} events")
     
     # Show error summary
     errors = logger.get_error_summary()

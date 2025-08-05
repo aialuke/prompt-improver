@@ -18,6 +18,10 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+import uuid
+
+# Enhanced background task management
+from ..monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 # Core components
 from .models import (
@@ -540,12 +544,16 @@ class track_production_operation:
             duration_ms = (time.time() - self.start_time) * 1000
             is_error = exc_type is not None
             
-            # Record asynchronously
-            asyncio.create_task(
-                record_production_request(
+            # Record asynchronously using EnhancedBackgroundTaskManager
+            task_manager = get_background_task_manager()
+            asyncio.create_task(task_manager.submit_enhanced_task(
+                task_id=f"baseline_production_record_{self.operation_name}_{str(uuid.uuid4())[:8]}",
+                coroutine=record_production_request(
                     self.operation_name, duration_ms, is_error, **self.metadata
-                )
-            )
+                ),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "performance", "type": "tracking", "component": "baseline", "operation": self.operation_name}
+            ))
 
 __all__ = [
     # Core models

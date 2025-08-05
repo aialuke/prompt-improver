@@ -59,15 +59,33 @@ test_connection() {
     # Test with Python
     if python -c "
 import asyncio
-import asyncpg
+import sys
+import os
+# Add src to path for UnifiedConnectionManager
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 async def test():
     try:
+        # Try UnifiedConnectionManager first
+        from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        health_info = await manager.get_health_info()
+        if health_info.get('status') == 'healthy':
+            print('✅ Database connection successful (UnifiedConnectionManager)')
+            return
+    except Exception:
+        pass
+    
+    # Fallback to direct connection for compatibility
+    try:
+        import asyncpg
         conn = await asyncpg.connect('postgresql://apes_user:apes_secure_password_2024@localhost:5432/apes_production')
         await conn.close()
-        print('✅ Database connection successful')
+        print('✅ Database connection successful (direct asyncpg fallback)')
     except Exception as e:
         print(f'❌ Database connection failed: {e}')
         exit(1)
+
 asyncio.run(test())
     " 2>/dev/null; then
         echo -e "${GREEN}✅ Database connection test passed${NC}"

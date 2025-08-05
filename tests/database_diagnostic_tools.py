@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 
 import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -154,7 +155,26 @@ class DatabaseDiagnostics:
         
         results = {}
         
-        # Test asyncpg connection
+        # Test UnifiedConnectionManager health check
+        try:
+            from prompt_improver.database.unified_connection_manager import (
+                get_unified_manager, ManagerMode
+            )
+            
+            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+            health_info = await manager.get_health_info()
+            
+            if health_info.get('status') == 'healthy':
+                results["unified_manager"] = {"success": True, "status": "✅ UNIFIED_MANAGER_HEALTHY"}
+                print("  UnifiedConnectionManager: ✅")
+            else:
+                results["unified_manager"] = {"success": False, "status": "⚠️ DEGRADED", "info": health_info}
+                print(f"  UnifiedConnectionManager: ⚠️ ({health_info.get('status', 'unknown')})")
+        except Exception as e:
+            results["unified_manager"] = {"success": False, "error": str(e), "status": "❌ FAILED"}
+            print(f"  UnifiedConnectionManager: ❌ ({e})")
+            
+        # Fallback test with direct asyncpg connection for compatibility
         try:
             conn = await asyncpg.connect(
                 host=self.config.postgres_host,
@@ -165,11 +185,11 @@ class DatabaseDiagnostics:
                 timeout=5.0
             )
             await conn.close()
-            results["asyncpg"] = {"success": True, "status": "✅ CONNECTED"}
-            print("  asyncpg connection: ✅")
+            results["asyncpg_fallback"] = {"success": True, "status": "✅ CONNECTED"}
+            print("  asyncpg fallback: ✅")
         except Exception as e:
-            results["asyncpg"] = {"success": False, "error": str(e), "status": "❌ FAILED"}
-            print(f"  asyncpg connection: ❌ ({e})")
+            results["asyncpg_fallback"] = {"success": False, "error": str(e), "status": "❌ FAILED"}
+            print(f"  asyncpg fallback: ❌ ({e})")
             
         # Test SQLAlchemy connection
         try:
@@ -350,7 +370,25 @@ class DatabaseDiagnostics:
         print("⚡ Checking performance metrics...")
         
         try:
-            # Test connection time
+            # Test UnifiedConnectionManager performance first
+            from prompt_improver.database.unified_connection_manager import (
+                get_unified_manager, ManagerMode
+            )
+            
+            start_time = asyncio.get_event_loop().time()
+            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+            async with manager.get_async_session() as session:
+                # Test query performance using unified manager
+                query_start = asyncio.get_event_loop().time()
+                await session.execute(text("SELECT 1"))
+                unified_query_time = (asyncio.get_event_loop().time() - query_start) * 1000
+                
+            unified_connection_time = (asyncio.get_event_loop().time() - start_time) * 1000
+            
+            print(f"  UnifiedConnectionManager connection: {unified_connection_time:.1f}ms")
+            print(f"  UnifiedConnectionManager query: {unified_query_time:.1f}ms")
+            
+            # Fallback performance test with direct asyncpg for comparison
             start_time = asyncio.get_event_loop().time()
             conn = await asyncpg.connect(
                 host=self.config.postgres_host,

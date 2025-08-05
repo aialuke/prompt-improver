@@ -20,6 +20,93 @@ from typing import Any, DefaultDict, Deque
 logger = logging.getLogger(__name__)
 
 
+class CounterAdapter:
+    """Adapter to provide Prometheus counter interface using OpenTelemetry."""
+    
+    def __init__(self, name: str, description: str, label_names: list[str] | None, adapter):
+        self.name = name
+        self.description = description
+        self.label_names = label_names or []
+        self.adapter = adapter
+        self._current_labels = {}
+    
+    def inc(self, amount: float = 1.0, **labels: str) -> None:
+        """Increment counter by amount."""
+        labels_dict = {**self._current_labels, **labels}
+        self.adapter.increment_counter(self.name, labels_dict)
+    
+    def labels(self, **labels: str):
+        """Return a labeled version of this counter."""
+        self._current_labels = labels
+        return self
+
+
+class GaugeAdapter:
+    """Adapter to provide Prometheus gauge interface using OpenTelemetry."""
+    
+    def __init__(self, name: str, description: str, label_names: list[str] | None, adapter):
+        self.name = name
+        self.description = description
+        self.label_names = label_names or []
+        self.adapter = adapter
+        self._current_labels = {}
+    
+    def set(self, value: float, **labels: str) -> None:
+        """Set gauge to value."""
+        labels_dict = {**self._current_labels, **labels}
+        self.adapter.set_gauge(self.name, value, labels_dict)
+    
+    def inc(self, amount: float = 1.0, **labels: str) -> None:
+        """Increment gauge by amount."""
+        # Note: OpenTelemetry doesn't have direct gauge increment, using set with cached value
+        labels_dict = {**self._current_labels, **labels}
+        current_value = getattr(self, f'_cached_value_{hash(frozenset(labels_dict.items()))}', 0.0)
+        new_value = current_value + amount
+        setattr(self, f'_cached_value_{hash(frozenset(labels_dict.items()))}', new_value)
+        self.adapter.set_gauge(self.name, new_value, labels_dict)
+    
+    def dec(self, amount: float = 1.0, **labels: str) -> None:
+        """Decrement gauge by amount."""
+        self.inc(-amount, **labels)
+    
+    def labels(self, **labels: str):
+        """Return a labeled version of this gauge."""
+        self._current_labels = labels
+        return self
+
+
+class HistogramAdapter:
+    """Adapter to provide Prometheus histogram interface using OpenTelemetry."""
+    
+    def __init__(self, name: str, description: str, label_names: list[str] | None, buckets: list[float] | None, adapter):
+        self.name = name
+        self.description = description
+        self.label_names = label_names or []
+        self.buckets = buckets
+        self.adapter = adapter
+        self._current_labels = {}
+    
+    def observe(self, value: float, **labels: str) -> None:
+        """Record an observation."""
+        labels_dict = {**self._current_labels, **labels}
+        self.adapter.record_histogram(self.name, value, labels_dict)
+    
+    def labels(self, **labels: str):
+        """Return a labeled version of this histogram."""
+        self._current_labels = labels
+        return self
+    
+    @contextmanager
+    def time(self, **labels: str):
+        """Context manager to time an operation."""
+        start_time = time.time()
+        try:
+            yield
+        finally:
+            duration = time.time() - start_time
+            self.observe(duration, **labels)
+
+
 @dataclass
 class MetricValue:
     """Represents a metric value with timestamp and labels."""
@@ -231,12 +318,9 @@ class RealMetricsRegistry:
             self.logger.info("Using in-memory metrics backend (real behavior)")
     
     def _check_prometheus_availability(self) -> bool:
-        """Check if Prometheus client is available."""
-        try:
-            import prometheus_client
-            return True
-        except ImportError:
-            return False
+        """Check if Prometheus client is available - DEPRECATED for OpenTelemetry consolidation."""
+        # Prometheus client eliminated for Week 7 OpenTelemetry consolidation
+        return False
     
     def get_or_create_counter(
         self,
@@ -251,8 +335,16 @@ class RealMetricsRegistry:
                 return self._metrics[name]
             
             if self._prometheus_available:
-                # REMOVED prometheus_client for OpenTelemetry consolidation
-                self.logger.warning(f"Prometheus client removed for OpenTelemetry consolidation: {name}")
+                # Use UnifiedMetricsAdapter for OpenTelemetry integration
+                try:
+                    from ...core.metrics.unified_metrics_adapter import get_unified_metrics_adapter
+                    adapter = get_unified_metrics_adapter()
+                    # Return adapter wrapper that provides counter interface
+                    metric = CounterAdapter(name, description, labels, adapter)
+                    self._metrics[name] = metric
+                    return metric
+                except Exception as e:
+                    self.logger.warning(f"Failed to create OpenTelemetry counter {name}: {e}")
             
             # Fallback to in-memory counter
             metric = InMemoryCounter(name, description, labels)
@@ -273,12 +365,14 @@ class RealMetricsRegistry:
             
             if self._prometheus_available:
                 try:
-                    from prometheus_client import Gauge
-                    metric = Gauge(name, description, labels or [], registry=registry)
+                    from ...core.metrics.unified_metrics_adapter import get_unified_metrics_adapter
+                    adapter = get_unified_metrics_adapter()
+                    # Return adapter wrapper that provides gauge interface
+                    metric = GaugeAdapter(name, description, labels, adapter)
                     self._metrics[name] = metric
                     return metric
                 except Exception as e:
-                    self.logger.warning(f"Failed to create Prometheus gauge {name}: {e}")
+                    self.logger.warning(f"Failed to create OpenTelemetry gauge {name}: {e}")
             
             # Fallback to in-memory gauge
             metric = InMemoryGauge(name, description, labels)
@@ -300,15 +394,14 @@ class RealMetricsRegistry:
             
             if self._prometheus_available:
                 try:
-                    from prometheus_client import Histogram
-                    kwargs = {}
-                    if buckets:
-                        kwargs['buckets'] = buckets
-                    metric = Histogram(name, description, labels or [], registry=registry, **kwargs)
+                    from ...core.metrics.unified_metrics_adapter import get_unified_metrics_adapter
+                    adapter = get_unified_metrics_adapter()
+                    # Return adapter wrapper that provides histogram interface
+                    metric = HistogramAdapter(name, description, labels, buckets, adapter)
                     self._metrics[name] = metric
                     return metric
                 except Exception as e:
-                    self.logger.warning(f"Failed to create Prometheus histogram {name}: {e}")
+                    self.logger.warning(f"Failed to create OpenTelemetry histogram {name}: {e}")
             
             # Fallback to in-memory histogram
             metric = InMemoryHistogram(name, description, labels, buckets)

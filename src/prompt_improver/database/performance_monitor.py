@@ -63,10 +63,10 @@ class DatabasePerformanceMonitor:
             return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
 
-    async def get_client(self) -> TypeSafePsycopgClient:
-        """Get database client"""
+    async def get_client(self):
+        """Get database client - using UnifiedConnectionManager"""
         if self.client is None:
-            return await get_psycopg_client()
+            return get_unified_manager(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def get_cache_hit_ratio(self) -> float:

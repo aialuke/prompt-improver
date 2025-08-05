@@ -10,10 +10,13 @@ import asyncio
 import logging
 import time
 import threading
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Set, TypeVar, Coroutine, cast
 from dataclasses import dataclass, field
+
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +253,29 @@ class UnifiedLoopManager:
 
         start_time = time.perf_counter()
 
-        # Create and execute tasks
-        tasks = [asyncio.create_task(dummy_task()) for _ in range(task_count)]
-        results = await asyncio.gather(*tasks)
+        # Create and execute tasks via EnhancedBackgroundTaskManager for batch operations
+        task_manager = get_background_task_manager()
+        
+        # Submit all tasks as a batch operation
+        task_coroutines = [dummy_task() for _ in range(task_count)]
+        batch_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"benchmark_batch_{str(uuid.uuid4())[:8]}",
+            coroutine=asyncio.gather(*task_coroutines),
+            priority=TaskPriority.LOW,
+            tags={
+                "service": "benchmarking", 
+                "type": "throughput_test", 
+                "component": "unified_loop_manager",
+                "task_count": str(task_count)
+            }
+        )
+        
+        # Wait for batch completion and get results
+        task_status = await task_manager.wait_for_completion(batch_task_id, timeout=30.0)
+        if task_status.status != "completed":
+            raise RuntimeError(f"Benchmark batch failed with status: {task_status.status}")
+        
+        results = task_status.result
 
         end_time = time.perf_counter()
         duration_ms = (end_time - start_time) * 1000

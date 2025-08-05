@@ -530,152 +530,8 @@ class PreparedStatementCacheConnector(ComponentConnector):
             "connector": "PreparedStatementCacheConnector"
         }
 
-class TypeSafePsycopgClientConnector(ComponentConnector):
-    """Connector for TypeSafePsycopgClient component."""
-
-    def __init__(self, event_bus=None):
-        metadata = ComponentMetadata(
-            name="type_safe_psycopg_client",
-            tier=ComponentTier.TIER_4_PERFORMANCE,
-            version="1.0.0",
-            capabilities=[
-                ComponentCapability(
-                    name="performance_metrics_analysis",
-                    description="Analyze database performance metrics",
-                    input_types=["metrics_config"],
-                    output_types=["performance_metrics", "recommendations"]
-                ),
-                ComponentCapability(
-                    name="connection_health_analysis",
-                    description="Analyze database connection health",
-                    input_types=["health_config"],
-                    output_types=["health_status", "pool_analysis"]
-                ),
-                ComponentCapability(
-                    name="query_pattern_analysis",
-                    description="Analyze query execution patterns",
-                    input_types=["query_config"],
-                    output_types=["query_analysis", "optimization_opportunities"]
-                ),
-                ComponentCapability(
-                    name="type_safety_validation",
-                    description="Validate type safety and security features",
-                    input_types=["validation_config"],
-                    output_types=["type_safety_report", "security_analysis"]
-                ),
-                ComponentCapability(
-                    name="comprehensive_database_analysis",
-                    description="Run comprehensive database analysis",
-                    input_types=["comprehensive_config"],
-                    output_types=["comprehensive_report", "executive_summary"]
-                )
-            ],
-            resource_requirements={"memory": "512MB", "cpu": "2 cores"}
-        )
-        super().__init__(metadata, event_bus)
-
-    async def _initialize_component(self) -> None:
-        """Initialize TypeSafePsycopgClient component."""
-        try:
-            from prompt_improver.database import get_unified_manager, ManagerMode
-            # Get the unified manager instance
-            self.component = get_unified_manager(ManagerMode.ASYNC_MODERN)
-            self.logger.info("TypeSafePsycopgClient connector initialized")
-
-            # Emit initialization event
-            if self.event_bus:
-                try:
-                    result = self.event_bus.emit("type_safe_psycopg_client_initialized", {
-                        "component_name": self.metadata.name,
-                        "status": "ready",
-                        "pool_config": {
-                            "min_size": self.component.config.pool_min_size,
-                            "max_size": self.component.config.pool_max_size
-                        }
-                    })
-                    if hasattr(result, '__await__'):
-                        await result
-                except Exception as e:
-                    # Don't fail initialization if event emission fails
-                    self.logger.debug(f"Failed to emit initialization event: {e}")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize TypeSafePsycopgClient: {e}")
-            raise
-
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute TypeSafePsycopgClient capability."""
-        if capability_name == "performance_metrics_analysis":
-            return await self._performance_metrics_analysis(parameters)
-        elif capability_name == "connection_health_analysis":
-            return await self._connection_health_analysis(parameters)
-        elif capability_name == "query_pattern_analysis":
-            return await self._query_pattern_analysis(parameters)
-        elif capability_name == "type_safety_validation":
-            return await self._type_safety_validation(parameters)
-        elif capability_name == "comprehensive_database_analysis":
-            return await self._comprehensive_database_analysis(parameters)
-        else:
-            raise ValueError(f"Unknown capability: {capability_name}")
-
-    async def _performance_metrics_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze database performance metrics."""
-        if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("TypeSafePsycopgClient component not initialized")
-
-        analysis_result = await self.component.run_orchestrated_analysis("performance_metrics", **parameters)
-        return {
-            "status": "success",
-            "analysis_result": analysis_result,
-            "connector": "TypeSafePsycopgClientConnector"
-        }
-
-    async def _connection_health_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze database connection health."""
-        if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("TypeSafePsycopgClient component not initialized")
-
-        analysis_result = await self.component.run_orchestrated_analysis("connection_health", **parameters)
-        return {
-            "status": "success",
-            "analysis_result": analysis_result,
-            "connector": "TypeSafePsycopgClientConnector"
-        }
-
-    async def _query_pattern_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze query execution patterns."""
-        if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("TypeSafePsycopgClient component not initialized")
-
-        analysis_result = await self.component.run_orchestrated_analysis("query_analysis", **parameters)
-        return {
-            "status": "success",
-            "analysis_result": analysis_result,
-            "connector": "TypeSafePsycopgClientConnector"
-        }
-
-    async def _type_safety_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate type safety features."""
-        if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("TypeSafePsycopgClient component not initialized")
-
-        analysis_result = await self.component.run_orchestrated_analysis("type_safety_validation", **parameters)
-        return {
-            "status": "success",
-            "analysis_result": analysis_result,
-            "connector": "TypeSafePsycopgClientConnector"
-        }
-
-    async def _comprehensive_database_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Run comprehensive database analysis."""
-        if not hasattr(self, 'component') or not self.component:
-            raise RuntimeError("TypeSafePsycopgClient component not initialized")
-
-        analysis_result = await self.component.run_orchestrated_analysis("comprehensive_analysis", **parameters)
-        return {
-            "status": "success",
-            "analysis_result": analysis_result,
-            "connector": "TypeSafePsycopgClientConnector"
-        }
+# TypeSafePsycopgClientConnector REMOVED - eliminated per DATABASE_CONSOLIDATION.md
+# Database operations now handled directly by UnifiedConnectionManager as single source of truth
 
 class RetryManagerConnector(ComponentConnector):
     """Connector for RetryManager component."""
@@ -900,7 +756,7 @@ class Tier4ConnectorFactory:
             "database_performance_monitor": DatabasePerformanceMonitorConnector,
             "database_connection_optimizer": DatabaseConnectionOptimizerConnector,
             "prepared_statement_cache": PreparedStatementCacheConnector,
-            "type_safe_psycopg_client": TypeSafePsycopgClientConnector,
+            # "type_safe_psycopg_client": REMOVED - eliminated per DATABASE_CONSOLIDATION.md
             "retry_manager": RetryManagerConnector,
         }
         

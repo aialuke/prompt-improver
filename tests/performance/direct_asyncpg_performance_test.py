@@ -17,6 +17,11 @@ from typing import Dict, List
 import numpy as np
 import asyncpg
 
+# Import the new test adapter for unified connection management
+from prompt_improver.database.test_adapter import (
+    DatabaseTestAdapter, TestConnectionConfig, benchmark_database_connection
+)
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -98,11 +103,10 @@ class DirectAsyncPGPerformanceTest:
             start_time = time.perf_counter()
             
             try:
-                conn = await asyncpg.connect(self.database_url)
-                try:
+                # Use test adapter for controlled benchmarking while supporting unified connections
+                # This maintains test isolation for accurate performance measurement
+                async with benchmark_database_connection() as conn:
                     result = await conn.fetchval(query)
-                finally:
-                    await conn.close()
                 
                 end_time = time.perf_counter()
                 execution_time_ms = (end_time - start_time) * 1000

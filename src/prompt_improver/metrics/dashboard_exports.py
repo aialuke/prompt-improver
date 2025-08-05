@@ -29,7 +29,6 @@ class ExportFormat(Enum):
     JSON = "json"
     CSV = "csv"
     PROMETHEUS = "prometheus"
-    GRAFANA = "grafana"
     TABLEAU = "tableau"
     EXCEL = "excel"
     PARQUET = "parquet"
@@ -953,8 +952,6 @@ class DashboardExporter:
             elif export_format == ExportFormat.PROMETHEUS:
                 return self._format_prometheus_export(dashboard_data)
 
-            elif export_format == ExportFormat.GRAFANA:
-                return self._format_grafana_export(dashboard_data)
 
             elif export_format == ExportFormat.TABLEAU:
                 return self._format_tableau_export(dashboard_data)
@@ -1030,46 +1027,6 @@ class DashboardExporter:
 
         return "\n".join(metrics)
 
-    def _format_grafana_export(self, dashboard_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format dashboard data for Grafana."""
-        panels = []
-
-        for i, (widget_id, widget_data) in enumerate(dashboard_data["widgets"].items()):
-            if "error" in widget_data.get("data", {}):
-                continue
-
-            panel = {
-                "id": i + 1,
-                "title": widget_data["title"],
-                "type": self._map_widget_type_to_grafana(widget_data["widget_type"]),
-                "gridPos": {
-                    "h": widget_data.get("position", {}).get("height", 4),
-                    "w": widget_data.get("position", {}).get("width", 6),
-                    "x": widget_data.get("position", {}).get("x", 0),
-                    "y": widget_data.get("position", {}).get("y", 0)
-                },
-                "targets": [{
-                    "expr": f"dashboard_{widget_id}",
-                    "refId": "A"
-                }]
-            }
-            panels.append(panel)
-
-        return {
-            "dashboard": {
-                "id": None,
-                "title": dashboard_data["title"],
-                "tags": [],
-                "style": "dark",
-                "timezone": "browser",
-                "panels": panels,
-                "time": {
-                    "from": dashboard_data["time_range"]["start"],
-                    "to": dashboard_data["time_range"]["end"]
-                },
-                "refresh": "30s"
-            }
-        }
 
     def _format_tableau_export(self, dashboard_data: Dict[str, Any]) -> Dict[str, Any]:
         """Format dashboard data for Tableau."""
@@ -1181,15 +1138,6 @@ class DashboardExporter:
             self.logger.error(f"Error creating Parquet export: {e}")
             raise
 
-    def _map_widget_type_to_grafana(self, widget_type: str) -> str:
-        """Map widget type to Grafana panel type."""
-        mapping = {
-            "chart": "graph",
-            "metric": "stat",
-            "table": "table",
-            "alert": "stat"
-        }
-        return mapping.get(widget_type, "graph")
 
     def _map_widget_type_to_tableau(self, widget_type: str) -> str:
         """Map widget type to Tableau visualization type."""

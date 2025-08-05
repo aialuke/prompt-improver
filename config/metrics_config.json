@@ -10,9 +10,9 @@
     "service_name": "apes-ml-pipeline",
     "service_version": "1.0.0",
     "environment": "production",
-    "otlp_endpoint": "http://localhost:4317",
+    "otlp_endpoint": null,
     "enable_console_exporter": true,
-    "enable_otlp_exporter": true,
+    "enable_otlp_exporter": false,
     "enable_prometheus_exporter": true,
     "prometheus_port": 8001
   },

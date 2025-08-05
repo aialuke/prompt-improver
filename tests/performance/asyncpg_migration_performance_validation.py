@@ -33,8 +33,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Import actual database components (no mocks)
 from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.database.health.index_health_assessor import IndexHealthAssessor
-from prompt_improver.database.health.query_performance_analyzer import QueryPerformanceAnalyzer
-from prompt_improver.database.health.database_health_monitor import DatabaseHealthMonitor
+# QueryPerformanceAnalyzer consolidated into DatabaseHealthMonitor
+from prompt_improver.database.health.database_health_monitor import DatabaseHealthMonitor, get_database_health_monitor
 from prompt_improver.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -359,7 +359,7 @@ class AsyncPGPerformanceValidator:
             health_performance["index_health_assessment_ms"] = 5000.0  # Penalty
 
         # Test Query Performance Analysis
-        query_analyzer = QueryPerformanceAnalyzer()
+        query_analyzer = get_database_health_monitor()
         start_time = time.perf_counter()
         try:
             await query_analyzer.analyze_query_performance()

@@ -10,6 +10,7 @@ import logging
 import time
 from typing import Dict, Any, Optional
 import inspect
+import uuid
 
 from .integration_middleware import (
     track_ml_operation,
@@ -21,6 +22,7 @@ from .integration_middleware import (
 from .ml_metrics import PromptCategory, ModelInferenceStage
 from .business_intelligence_metrics import FeatureCategory, CostType
 from .performance_metrics import DatabaseOperation, CacheType
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -289,16 +291,27 @@ class DatabaseInstrumentation:
                             end_time = time.time()
                             execution_time_ms = (end_time - start_time) * 1000
 
-                            # Run async tracking in background
-                            asyncio.create_task(db_metrics.track_query(
-                                query=str(query_or_sql)[:500],
-                                operation_type=operation_type,
-                                table_name=table_name,
-                                execution_time_ms=execution_time_ms,
-                                rows_affected=rows_affected,
-                                success=success,
-                                error_type=error_type
-                            ))
+                            # Run async tracking in background using EnhancedBackgroundTaskManager
+                            async def submit_db_tracking():
+                                task_manager = get_background_task_manager()
+                                await task_manager.submit_enhanced_task(
+                                    task_id=f"db_track_{operation_type.value}_{str(uuid.uuid4())[:8]}",
+                                    coroutine=db_metrics.track_query(
+                                        query=str(query_or_sql)[:500],
+                                        operation_type=operation_type,
+                                        table_name=table_name,
+                                        execution_time_ms=execution_time_ms,
+                                        rows_affected=rows_affected,
+                                        success=success,
+                                        error_type=error_type
+                                    ),
+                                    priority=TaskPriority.NORMAL,
+                                    tags={"service": "metrics", "type": "tracking", "component": "database", "table": table_name}
+                                )
+                            
+                            # Schedule via event loop without direct asyncio.create_task
+                            loop = asyncio.get_event_loop()
+                            loop.create_task(submit_db_tracking())
 
                         return result
 
@@ -384,15 +397,26 @@ class CacheInstrumentation:
                             end_time = time.time()
                             response_time_ms = (end_time - start_time) * 1000
 
-                            # Run async tracking in background
-                            asyncio.create_task(cache_metrics.track_cache_operation(
-                                cache_type=cache_type,
-                                operation=method_name,
-                                key=str(key),
-                                hit=hit,
-                                response_time_ms=response_time_ms,
-                                success=success
-                            ))
+                            # Run async tracking in background using EnhancedBackgroundTaskManager
+                            async def submit_cache_tracking():
+                                task_manager = get_background_task_manager()
+                                await task_manager.submit_enhanced_task(
+                                    task_id=f"cache_track_{method_name}_{str(uuid.uuid4())[:8]}",
+                                    coroutine=cache_metrics.track_cache_operation(
+                                        cache_type=cache_type,
+                                        operation=method_name,
+                                        key=str(key),
+                                        hit=hit,
+                                        response_time_ms=response_time_ms,
+                                        success=success
+                                    ),
+                                    priority=TaskPriority.NORMAL,
+                                    tags={"service": "metrics", "type": "tracking", "component": "cache", "operation": method_name}
+                                )
+                                
+                            # Schedule via event loop without direct asyncio.create_task
+                            loop = asyncio.get_event_loop()
+                            loop.create_task(submit_cache_tracking())
 
                         return result
 

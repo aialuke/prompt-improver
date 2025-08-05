@@ -536,27 +536,8 @@ class ComponentDefinitions:
                 "cache_hit_threshold": 0.8
             }
         },
-        "type_safe_psycopg_client": {
-            "description": "Type-safe PostgreSQL client with orchestrator integration",
-            "file_path": "database/psycopg_client.py",
-            "capabilities": [
-                "performance_metrics", "connection_health", "query_analysis",
-                "type_safety_validation", "comprehensive_analysis", "orchestrator_compatible",
-                "real_time_monitoring", "circuit_breaker_protection", "error_classification"
-            ],
-            "dependencies": ["database_config"],
-            "resource_requirements": {"memory": "512MB", "cpu": "2 cores"},
-            "local_config": {
-                "target_query_time_ms": 50,
-                "target_cache_hit_ratio": 0.9,
-                "pool_min_size": 2,
-                "pool_max_size": 20,
-                "enable_circuit_breaker": True,
-                "enable_error_metrics": True,
-                "statement_timeout": 30,
-                "connection_timeout": 10
-            }
-        }
+        # "type_safe_psycopg_client": REMOVED - eliminated per DATABASE_CONSOLIDATION.md
+        # Database operations now handled directly by UnifiedConnectionManager
     })
 
     # Tier 6: Security & Encryption Components (2 components)

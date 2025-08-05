@@ -38,6 +38,7 @@ from .automated_deployment_pipeline import DeploymentConfig, DeploymentStrategy
 from .model_serving_infrastructure import ServingConfig, ScalingStrategy
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -539,13 +540,26 @@ class PerformanceValidator:
                 experiment_config=exp_config
             )
             
-            task = asyncio.create_task(
-                self.test_platform.execute_workflow(workflow_request)
+            # Submit workflow execution task with HIGH priority for performance testing
+            task_manager = get_background_task_manager()
+            task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_perf_test_workflow_{i}_{str(uuid.uuid4())[:8]}",
+                coroutine=self.test_platform.execute_workflow(workflow_request),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "ml",
+                    "type": "performance_testing",
+                    "component": "workflow_execution",
+                    "experiment_config": exp_config.experiment_id,
+                    "module": "performance_validation"
+                }
             )
-            tasks.append(task)
+            tasks.append(task_id)
         
         # Wait for all experiments to complete
-        await asyncio.gather(*tasks)
+        task_manager = get_background_task_manager()
+        for task_id in tasks:
+            await task_manager.wait_for_completion(task_id)
     
     async def _benchmark_end_to_end_workflow(self, config: BenchmarkConfig):
         """Benchmark complete end-to-end workflow."""
@@ -558,13 +572,28 @@ class PerformanceValidator:
     async def _benchmark_resource_efficiency(self, config: BenchmarkConfig):
         """Benchmark resource utilization efficiency."""
         
-        # Execute resource-intensive operations
-        tasks = []
-        for _ in range(config.concurrent_operations):
-            task = asyncio.create_task(self._benchmark_deployment_speed(config))
-            tasks.append(task)
+        # Execute resource-intensive operations with distributed task management
+        task_ids = []
+        task_manager = get_background_task_manager()
         
-        await asyncio.gather(*tasks)
+        for i in range(config.concurrent_operations):
+            task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_resource_benchmark_{i}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._benchmark_deployment_speed(config),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "ml",
+                    "type": "performance_testing",
+                    "component": "resource_efficiency",
+                    "benchmark_id": config.benchmark_id,
+                    "module": "performance_validation"
+                }
+            )
+            task_ids.append(task_id)
+        
+        # Wait for all tasks to complete
+        for task_id in task_ids:
+            await task_manager.wait_for_completion(task_id)
     
     async def _benchmark_scalability(self, config: BenchmarkConfig):
         """Benchmark system scalability under load."""

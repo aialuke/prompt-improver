@@ -33,14 +33,10 @@ sys.path.insert(0, str(project_root / "src"))
 os.environ['PYTHONPATH'] = str(project_root / "src")
 
 # Performance monitoring imports
-try:
-    from prompt_improver.database.connection import get_session_context
-    from prompt_improver.utils.redis_cache import redis_client
-    from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor
-    DATABASE_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Database/Redis components not available: {e}")
-    DATABASE_AVAILABLE = False
+from prompt_improver.database.connection import get_session_context
+from prompt_improver.utils.redis_cache import get_redis_client
+from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor
+DATABASE_AVAILABLE = True
 
 # Suppress noisy logging for cleaner output
 logging.getLogger("asyncio").setLevel(logging.WARNING)
@@ -217,16 +213,15 @@ class PerformanceBenchmark:
     
     async def benchmark_redis(self) -> Optional[RedisMetrics]:
         """Benchmark Redis cache performance."""
-        if not DATABASE_AVAILABLE:
-            print("⚠️  Redis components not available, skipping Redis benchmark")
-            return None
-            
         print("📊 Benchmarking Redis performance...")
         
         try:
+            # Get Redis client
+            client = await get_redis_client()
+            
             # Ping test
             start_time = time.time()
-            await redis_client.ping()
+            await client.ping()
             ping_time = (time.time() - start_time) * 1000
             
             # Set operation
@@ -234,21 +229,21 @@ class PerformanceBenchmark:
             test_value = json.dumps({"test": "data", "timestamp": time.time()})
             
             start_time = time.time()
-            await redis_client.set(test_key, test_value, ex=60)
+            await client.setex(test_key, 60, test_value)
             set_time = (time.time() - start_time) * 1000
             
             # Get operation
             start_time = time.time()
-            result = await redis_client.get(test_key)
+            result = await client.get(test_key)
             get_time = (time.time() - start_time) * 1000
             
             # Delete operation
             start_time = time.time()
-            await redis_client.delete(test_key)
+            await client.delete(test_key)
             delete_time = (time.time() - start_time) * 1000
             
             # Get Redis info
-            info = await redis_client.info()
+            info = await client.info()
             
             return RedisMetrics(
                 ping_time_ms=round(ping_time, 2),
@@ -279,17 +274,19 @@ class PerformanceBenchmark:
         
         metrics = []
         
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-            for endpoint in endpoints:
-                try:
-                    # Capture metrics before request
-                    memory_before = self.process.memory_info().rss / (1024*1024)
-                    cpu_before = self.process.cpu_percent()
-                    
-                    start_time = time.time()
-                    async with session.get(f"{base_url}{endpoint}") as response:
-                        content = await response.read()
-                        response_time = (time.time() - start_time) * 1000
+        # Use unified HTTP client for health checks
+        from prompt_improver.monitoring.unified_http_client import make_health_check_request
+        
+        for endpoint in endpoints:
+            try:
+                # Capture metrics before request
+                memory_before = self.process.memory_info().rss / (1024*1024)
+                cpu_before = self.process.cpu_percent()
+                
+                start_time = time.time()
+                async with make_health_check_request(f"{base_url}{endpoint}") as response:
+                    content = await response.read()
+                    response_time = (time.time() - start_time) * 1000
                         
                         # Capture metrics after request
                         memory_after = self.process.memory_info().rss / (1024*1024)

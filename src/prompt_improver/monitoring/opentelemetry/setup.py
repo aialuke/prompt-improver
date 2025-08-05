@@ -175,8 +175,8 @@ class TelemetryConfig:
             otlp_insecure=os.getenv("OTEL_EXPORTER_OTLP_INSECURE", "true").lower() == "true",
             otlp_headers=default_headers,
 
-            trace_exporter=ExporterType(os.getenv("OTEL_TRACE_EXPORTER", "otlp_grpc")),
-            metric_exporter=ExporterType(os.getenv("OTEL_METRIC_EXPORTER", "otlp_grpc")),
+            trace_exporter=ExporterType(os.getenv("OTEL_TRACE_EXPORTER", "console")),
+            metric_exporter=ExporterType(os.getenv("OTEL_METRIC_EXPORTER", "console")),
             
             sampling_strategy=SamplingStrategy(os.getenv("OTEL_SAMPLING_STRATEGY", "parent_based")),
             sampling_rate=float(os.getenv("OTEL_SAMPLING_RATE", "0.1")),

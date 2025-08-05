@@ -9,6 +9,7 @@ import ssl
 import socket
 import time
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Set, Union
 from dataclasses import dataclass, field, asdict
@@ -18,6 +19,7 @@ from enum import Enum
 
 import aiohttp
 import dns.resolver
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 import dns.exception
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -277,14 +279,29 @@ class ExternalAPIHealthMonitor:
         """
         logger.info(f"Starting health checks for {len(self.endpoints)} external APIs")
         
-        # Create tasks for parallel execution
+        # Create tasks for parallel execution using background task manager
+        task_manager = get_background_task_manager()
         tasks = []
+        task_ids = []
+        
         for endpoint in self.endpoints:
-            task = asyncio.create_task(
-                self._check_single_endpoint(endpoint),
-                name=f"health_check_{endpoint.name}"
+            task_id = await task_manager.submit_enhanced_task(
+                task_id=f"api_health_check_{endpoint.name}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._check_single_endpoint(endpoint),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "monitoring",
+                    "type": "health_monitoring",
+                    "component": "external_api_health",
+                    "endpoint": endpoint.name,
+                    "operation": "endpoint_health_check"
+                }
             )
-            tasks.append(task)
+            task_ids.append(task_id)
+            # Get the actual task for gathering results
+            task_status = await task_manager.get_task_status(task_id)
+            if task_status and "task" in task_status:
+                tasks.append(task_status["task"])
         
         # Execute all checks in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)

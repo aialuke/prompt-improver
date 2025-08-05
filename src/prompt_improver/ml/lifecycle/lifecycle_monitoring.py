@@ -29,6 +29,7 @@ from prompt_improver.performance.monitoring.health.enhanced_base import Enhanced
 from prompt_improver.performance.monitoring.health.service import HealthService
 from prompt_improver.performance.monitoring.performance_monitor import PerformanceMonitor
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -244,8 +245,8 @@ class LifecycleMonitor:
         self.prometheus_registry = CollectorRegistry()
         self._setup_prometheus_metrics()
         
-        # Background tasks
-        self._background_tasks: List[asyncio.Task] = []
+        # Background task IDs for EnhancedBackgroundTaskManager
+        self._background_task_ids: List[str] = []
         self._is_running = False
         
         # Performance tracking
@@ -270,14 +271,76 @@ class LifecycleMonitor:
         # Load existing configuration
         await self._load_configuration()
         
-        # Start background monitoring tasks
-        self._background_tasks = [
-            asyncio.create_task(self._metrics_collector()),
-            asyncio.create_task(self._alert_evaluator()),
-            asyncio.create_task(self._sla_tracker()),
-            asyncio.create_task(self._data_retention_manager()),
-            asyncio.create_task(self._health_checker())
-        ]
+        # Start background monitoring tasks using EnhancedBackgroundTaskManager
+        task_manager = get_background_task_manager()
+        
+        # Start metrics collector with NORMAL priority for regular data collection
+        metrics_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_metrics_collector_{str(uuid.uuid4())[:8]}",
+            coroutine=self._metrics_collector(),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "metrics_collector",
+                "module": "lifecycle_monitoring"
+            }
+        )
+        
+        # Start alert evaluator with HIGH priority for real-time alerting
+        alert_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_alert_evaluator_{str(uuid.uuid4())[:8]}",
+            coroutine=self._alert_evaluator(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "alert_evaluator",
+                "module": "lifecycle_monitoring"
+            }
+        )
+        
+        # Start SLA tracker with HIGH priority for compliance monitoring
+        sla_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_sla_tracker_{str(uuid.uuid4())[:8]}",
+            coroutine=self._sla_tracker(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "sla_tracker",
+                "module": "lifecycle_monitoring"
+            }
+        )
+        
+        # Start data retention manager with LOW priority for cleanup operations
+        retention_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_data_retention_{str(uuid.uuid4())[:8]}",
+            coroutine=self._data_retention_manager(),
+            priority=TaskPriority.LOW,
+            tags={
+                "service": "ml",
+                "type": "maintenance",
+                "component": "data_retention",
+                "module": "lifecycle_monitoring"
+            }
+        )
+        
+        # Start health checker with HIGH priority for system health monitoring
+        health_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_health_checker_{str(uuid.uuid4())[:8]}",
+            coroutine=self._health_checker(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "health_checker",
+                "module": "lifecycle_monitoring"
+            }
+        )
+        
+        # Store task IDs for cleanup
+        self._background_task_ids = [metrics_task_id, alert_task_id, sla_task_id, retention_task_id, health_task_id]
         
         logger.info("✅ ML Lifecycle Monitoring started")
         
@@ -294,13 +357,11 @@ class LifecycleMonitor:
         
         self._is_running = False
         
-        # Cancel background tasks
-        for task in self._background_tasks:
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        # Cancel background tasks using task manager
+        task_manager = get_background_task_manager()
+        for task_id in self._background_task_ids:
+            await task_manager.cancel_task(task_id)
+        self._background_task_ids.clear()
         
         # Save configuration
         await self._save_configuration()

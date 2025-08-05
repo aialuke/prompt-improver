@@ -14,9 +14,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, DefaultDict, Deque, Protocol
+import uuid
 
 # Use consolidated common utilities
 from ..core.common import ConfigMixin, MetricsMixin, get_logger
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class EndpointCategory(Enum):
     """Categories of API endpoints."""
@@ -204,10 +206,11 @@ class APIMetricsCollector(MetricsMixin, ConfigMixin):
         # Initialize Prometheus metrics using MetricsMixin
         self._initialize_prometheus_metrics()
 
-        # Background processing
+        # Background processing using EnhancedBackgroundTaskManager
         self.is_running = False
-        self.aggregation_task: asyncio.Task[None] | None = None
-        self.session_cleanup_task: asyncio.Task[None] | None = None
+        self.aggregation_task_id: str | None = None
+        self.session_cleanup_task_id: str | None = None
+        self.task_manager = get_background_task_manager()
 
     def _initialize_prometheus_metrics(self) -> None:
         """Initialize real metrics for API operations."""
@@ -320,8 +323,22 @@ class APIMetricsCollector(MetricsMixin, ConfigMixin):
             return
 
         self.is_running = True
-        self.aggregation_task = asyncio.create_task(self._aggregation_loop())
-        self.session_cleanup_task = asyncio.create_task(self._session_cleanup_loop())
+        
+        # Start background tasks using EnhancedBackgroundTaskManager
+        self.aggregation_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"api_aggregation_{str(uuid.uuid4())[:8]}",
+            coroutine=self._aggregation_loop(),
+            priority=TaskPriority.NORMAL,
+            tags={"service": "metrics", "type": "aggregation", "component": "api_metrics"}
+        )
+        
+        self.session_cleanup_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"api_session_cleanup_{str(uuid.uuid4())[:8]}",
+            coroutine=self._session_cleanup_loop(),
+            priority=TaskPriority.LOW,
+            tags={"service": "metrics", "type": "cleanup", "component": "session_management"}
+        )
+        
         self.logger.info("Started API metrics collection")
 
     async def stop_collection(self) -> None:
@@ -330,13 +347,18 @@ class APIMetricsCollector(MetricsMixin, ConfigMixin):
             return
 
         self.is_running = False
-        for task in [self.aggregation_task, self.session_cleanup_task]:
-            if task:
-                task.cancel()
+        
+        # Cancel all submitted tasks using EnhancedBackgroundTaskManager
+        for task_id in [self.aggregation_task_id, self.session_cleanup_task_id]:
+            if task_id:
                 try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    await self.task_manager.cancel_task(task_id)
+                except Exception as e:
+                    self.logger.warning(f"Failed to cancel API metrics task {task_id}: {e}")
+
+        # Clear task IDs
+        self.aggregation_task_id = None
+        self.session_cleanup_task_id = None
 
         self.logger.info("Stopped API metrics collection")
 

@@ -459,7 +459,7 @@ class DatabaseConnectionOptimizer:
 
     async def optimize_connection_settings(self):
         """Apply optimal connection settings for performance with dynamic resource detection."""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
 
         # Get system resources for dynamic optimization
         system_resources = self._get_system_resources()
@@ -507,7 +507,7 @@ class DatabaseConnectionOptimizer:
 
     async def create_performance_indexes(self):
         """Create indexes for optimal query performance."""
-        client = await get_psycopg_client()
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
 
         # Performance-critical indexes
         index_queries = [

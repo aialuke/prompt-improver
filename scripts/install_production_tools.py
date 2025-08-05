@@ -224,9 +224,11 @@ class ProductionToolsInstaller:
         download_url = f"https://github.com/grafana/k6/releases/download/v{self.versions['k6']}/k6-v{self.versions['k6']}-{k6_system}-{k6_arch}.tar.gz"
         
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(download_url) as response:
-                    if response.status == 200:
+            # Use unified HTTP client for downloads
+            from prompt_improver.monitoring.unified_http_client import download_file
+            
+            async with download_file(download_url) as response:
+                if response.status == 200:
                         with tempfile.TemporaryDirectory() as temp_dir:
                             temp_path = Path(temp_dir)
                             archive_path = temp_path / "k6.tar.gz"

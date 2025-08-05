@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime, timezone
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from ..config.orchestrator_config import OrchestratorConfig
 from ..shared.component_types import ComponentTier, ComponentInfo, ComponentCapability
@@ -647,7 +649,20 @@ class ComponentRegistry:
             return
 
         self.is_monitoring = True
-        self.health_check_task = asyncio.create_task(self._health_monitoring_loop())
+        
+        # Start health monitoring with HIGH priority for component registry monitoring
+        task_manager = get_background_task_manager()
+        self.health_check_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_component_registry_health_{str(uuid.uuid4())[:8]}",
+            coroutine=self._health_monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "component_registry_health",
+                "module": "component_registry"
+            }
+        )
 
         self.logger.info("Started component health monitoring")
 

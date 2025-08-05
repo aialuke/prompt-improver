@@ -17,6 +17,9 @@ from sqlalchemy import text
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 from prompt_improver.database.utils import fetch_all_rows
+from prompt_improver.performance.monitoring.health.background_manager import (
+    get_background_task_manager, TaskPriority
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +75,15 @@ class MCPMLDataCollector:
     - Performance analytics or predictions
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession | None = None):
         """Initialize MCP ML data collector.
 
         Args:
-            db_session: Database session for data storage
+            db_session: Optional database session for data storage.
+                       If None, uses unified session factory from database package.
         """
         self.db_session = db_session
+        self._uses_unified_session = db_session is None
 
         # Data collection configuration
         self.batch_size = 100
@@ -94,8 +99,8 @@ class MCPMLDataCollector:
             "collection_latency_ms": 0.0
         }
 
-        # Background collection task
-        self._collection_task: Optional[asyncio.Task[None]] = None
+        # Background collection task (now managed centrally)
+        self._collection_task_id: Optional[str] = None
         self._running = False
 
     async def start_collection(self) -> None:
@@ -105,19 +110,28 @@ class MCPMLDataCollector:
             return
 
         self._running = True
-        self._collection_task = asyncio.create_task(self._collection_loop())
-        logger.info("Started MCP ML data collection")
+        
+        # Use enhanced background task manager for centralized task management
+        task_manager = get_background_task_manager()
+        task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_data_collection_{id(self)}",
+            coroutine=self._collection_loop,
+            priority=TaskPriority.HIGH,
+            tags={"service": "ml_data_collector", "type": "collection_loop", "component": "mcp_server"}
+        )
+        
+        # Store task ID for cleanup
+        self._collection_task_id = task_id
+        logger.info("Started MCP ML data collection with enhanced task management")
 
     async def stop_collection(self) -> None:
         """Stop background data collection."""
         self._running = False
 
-        if self._collection_task:
-            self._collection_task.cancel()
-            try:
-                await self._collection_task
-            except asyncio.CancelledError:
-                pass
+        if self._collection_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._collection_task_id)
+            self._collection_task_id = None
 
         logger.info("Stopped MCP ML data collection")
 
@@ -312,20 +326,38 @@ class MCPMLDataCollector:
             ) RETURNING id
         """)
 
-        result = await self.db_session.execute(query, {
-            "original_prompt": data.prompt_text,
-            "enhanced_prompt": data.enhanced_prompt,
-            "applied_rules": data.applied_rules,
-            "response_time_ms": int(data.response_time_ms),
-            "agent_type": data.user_agent,
-            "session_timestamp": data.timestamp,
-            "anonymized_user_hash": data.session_id,  # Use session_id as hash
-            "created_at": data.timestamp
-        })
-
-        await self.db_session.commit()
-        row = result.first()
-        return str(row[0]) if row else application_id
+        # Use unified session pattern when applicable
+        if self._uses_unified_session:
+            from prompt_improver.database import get_session_context
+            async with get_session_context() as session:
+                result = await session.execute(query, {
+                    "original_prompt": data.prompt_text,
+                    "enhanced_prompt": data.enhanced_prompt,
+                    "applied_rules": data.applied_rules,
+                    "response_time_ms": int(data.response_time_ms),
+                    "agent_type": data.user_agent,
+                    "session_timestamp": data.timestamp,
+                    "anonymized_user_hash": data.session_id,  # Use session_id as hash
+                    "created_at": data.timestamp
+                })
+                await session.commit()
+                row = result.first()
+                return str(row[0]) if row else application_id
+        else:
+            # Use provided session for backward compatibility
+            result = await self.db_session.execute(query, {
+                "original_prompt": data.prompt_text,
+                "enhanced_prompt": data.enhanced_prompt,
+                "applied_rules": data.applied_rules,
+                "response_time_ms": int(data.response_time_ms),
+                "agent_type": data.user_agent,
+                "session_timestamp": data.timestamp,
+                "anonymized_user_hash": data.session_id,  # Use session_id as hash
+                "created_at": data.timestamp
+            })
+            await self.db_session.commit()
+            row = result.first()
+            return str(row[0]) if row else application_id
 
     async def _store_user_feedback(self, data: UserFeedbackData) -> str:
         """Store user feedback data in database using existing schema."""
@@ -340,18 +372,34 @@ class MCPMLDataCollector:
             ) RETURNING id
         """)
 
-        result = await self.db_session.execute(query, {
-            "session_id": data.rule_application_id,
-            "user_rating": int(data.user_rating),
-            "feedback_text": data.feedback_text,
-            "improvement_areas": data.improvement_suggestions,
-            "applied_rules": [data.rule_application_id],  # Store as array
-            "created_at": data.timestamp
-        })
-
-        await self.db_session.commit()
-        row = result.first()
-        return str(row[0]) if row else data.feedback_id
+        # Use unified session pattern when applicable
+        if self._uses_unified_session:
+            from prompt_improver.database import get_session_context
+            async with get_session_context() as session:
+                result = await session.execute(query, {
+                    "session_id": data.rule_application_id,
+                    "user_rating": int(data.user_rating),
+                    "feedback_text": data.feedback_text,
+                    "improvement_areas": data.improvement_suggestions,
+                    "applied_rules": [data.rule_application_id],  # Store as array
+                    "created_at": data.timestamp
+                })
+                await session.commit()
+                row = result.first()
+                return str(row[0]) if row else data.feedback_id
+        else:
+            # Use provided session for backward compatibility
+            result = await self.db_session.execute(query, {
+                "session_id": data.rule_application_id,
+                "user_rating": int(data.user_rating),
+                "feedback_text": data.feedback_text,
+                "improvement_areas": data.improvement_suggestions,
+                "applied_rules": [data.rule_application_id],  # Store as array
+                "created_at": data.timestamp
+            })
+            await self.db_session.commit()
+            row = result.first()
+            return str(row[0]) if row else data.feedback_id
 
     async def _get_rule_applications(self, start_time: datetime) -> List[RuleApplicationData]:
         """Get rule applications from database using existing schema."""
@@ -364,7 +412,15 @@ class MCPMLDataCollector:
             ORDER BY created_at DESC
         """)
 
-        rows = await fetch_all_rows(self.db_session, query, {"start_time": start_time})
+        # Use unified session pattern when applicable
+        if self._uses_unified_session:
+            from prompt_improver.database import get_session_context
+            from prompt_improver.database.utils import fetch_all_rows
+            async with get_session_context() as session:
+                rows = await fetch_all_rows(session, query, {"start_time": start_time})
+        else:
+            # Use provided session for backward compatibility
+            rows = await fetch_all_rows(self.db_session, query, {"start_time": start_time})
 
         applications: List[RuleApplicationData] = []
         for row in rows:

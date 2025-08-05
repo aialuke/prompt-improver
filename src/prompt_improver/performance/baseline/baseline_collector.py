@@ -38,6 +38,9 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
+# Background task manager
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 from .models import (
     BaselineMetrics, MetricValue, MetricDefinition, MetricType,
     STANDARD_METRICS, get_metric_definition
@@ -93,7 +96,7 @@ class BaselineCollector:
         
         # State management
         self._running = False
-        self._collection_task: Optional[asyncio.Task] = None
+        self._collection_task_id: Optional[str] = None
         self._current_baseline: Optional[BaselineMetrics] = None
         self._last_collection_time = datetime.now(timezone.utc)
         
@@ -143,7 +146,19 @@ class BaselineCollector:
             return
         
         self._running = True
-        self._collection_task = asyncio.create_task(self._collection_loop())
+        # Start collection loop using background task manager
+        task_manager = get_background_task_manager()
+        self._collection_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"baseline_collection_{str(uuid.uuid4())[:8]}",
+            coroutine=self._collection_loop(),
+            priority=TaskPriority.LOW,
+            tags={
+                "service": "performance",
+                "type": "baseline",
+                "component": "collector",
+                "operation": "data_collection"
+            }
+        )
         logger.info(f"Started baseline collection (interval: {self.collection_interval}s)")
 
     async def stop_collection(self) -> None:
@@ -153,12 +168,10 @@ class BaselineCollector:
         
         self._running = False
         
-        if self._collection_task:
-            self._collection_task.cancel()
-            try:
-                await self._collection_task
-            except asyncio.CancelledError:
-                pass
+        if self._collection_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._collection_task_id)
+            self._collection_task_id = None
         
         # Save final baseline if available
         if self._current_baseline:
@@ -308,9 +321,18 @@ class BaselineCollector:
             return
         
         try:
-            # Basic Redis connection test
-            import coredis
-            redis_client = coredis.Redis(decode_responses=True)
+            # Use UnifiedConnectionManager for Redis baseline collection
+            from ...database.unified_connection_manager import get_unified_manager, ManagerMode
+            unified_manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+            if not unified_manager._is_initialized:
+                await unified_manager.initialize()
+            
+            # Get Redis client from UnifiedConnectionManager
+            if hasattr(unified_manager, '_redis_master') and unified_manager._redis_master:
+                redis_client = unified_manager._redis_master
+            else:
+                logger.warning("Redis client not available via UnifiedConnectionManager for baseline collection")
+                return
             
             # Ping time
             ping_start = time.time()

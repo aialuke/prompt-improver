@@ -262,11 +262,15 @@ def create_env_template():
     for migration in HIGH_CONFIDENCE_MIGRATIONS:
         env_vars.add(migration["env_var"])
     
-    template = "# Environment variables for migrated configuration\\n"
-    template += f"# Generated on: {datetime.now().isoformat()}\\n\\n"
+    template = "# Environment variables for migrated configuration\
+"
+    template += f"# Generated on: {datetime.now().isoformat()}\
+\
+"
     
     for env_var in sorted(env_vars):
-        template += f"{env_var}=CHANGE_ME\\n"
+        template += f"{env_var}=CHANGE_ME\
+"
     
     Path("migration_env_template.env").write_text(template)
     print("📄 Created migration_env_template.env")
@@ -312,7 +316,8 @@ def main():
     filtered_values = [hv for hv in report.hardcoded_values if hv.confidence >= args.min_confidence]
     
     # Print summary
-    print(f"\\n📊 Scan Results:")
+    print(f"\
+📊 Scan Results:")
     print(f"   Files scanned: {report.total_files_scanned}")
     print(f"   Total hardcoded values: {len(report.hardcoded_values)}")
     print(f"   High confidence (>= {args.min_confidence}): {len(filtered_values)}")
@@ -320,7 +325,8 @@ def main():
     
     # Show top findings
     if filtered_values:
-        print(f"\\n🔥 Top findings (confidence >= {args.min_confidence}):")
+        print(f"\
+🔥 Top findings (confidence >= {args.min_confidence}):")
         for i, hv in enumerate(sorted(filtered_values, key=lambda x: x.confidence, reverse=True)[:10]):
             print(f"   {i+1:2d}. {hv.file_path}:{hv.line_number}")
             print(f"       Value: {hv.value}")
@@ -339,7 +345,8 @@ def main():
     
     # Show suggested environment variables
     if report.suggested_env_vars:
-        print(f"\\n📋 Suggested environment variables:")
+        print(f"\
+📋 Suggested environment variables:")
         for env_var in sorted(report.suggested_env_vars):
             print(f"   {env_var}")
 

@@ -16,6 +16,12 @@ from collections import deque
 import logging
 import math
 
+# Unified Redis operations through UnifiedConnectionManager
+from ...database.unified_connection_manager import (
+    get_unified_manager, ManagerMode, create_security_context
+)
+
+# Legacy coredis imports for backward compatibility
 try:
     import coredis
     REDIS_AVAILABLE = True
@@ -79,34 +85,40 @@ class SLICalculator:
         self, 
         slo_target: SLOTarget,
         max_measurements: int = 10000,
-        redis_url: Optional[str] = None
+        redis_url: Optional[str] = None,
+        unified_manager = None
     ):
         self.slo_target = slo_target
         self.max_measurements = max_measurements
-        self.redis_url = redis_url
-        self._redis_client = None
+        self.redis_url = redis_url  # Kept for backward compatibility
+        self._redis_client = None  # Legacy field
+        
+        # Unified connection manager for Redis operations
+        self._unified_manager = unified_manager or get_unified_manager(ManagerMode.ASYNC_MODERN)
+        self._security_context = None
         
         # In-memory storage for measurements
         self._measurements = deque(maxlen=max_measurements)
         
-        # Cache for calculated results
+        # Cache for calculated results (now using UnifiedConnectionManager L1 cache)
         self._result_cache: Dict[str, Tuple[SLIResult, float]] = {}
         self._cache_ttl = 60  # Cache for 60 seconds
     
     async def get_redis_client(self) -> Optional[coredis.Redis]:
-        """Get Redis client for distributed storage"""
-        if not REDIS_AVAILABLE or not self.redis_url:
-            return None
-            
-        if self._redis_client is None:
-            try:
-                self._redis_client = coredis.Redis.from_url(self.redis_url, decode_responses=True)
-                await self._redis_client.ping()
-            except Exception as e:
-                logger.warning(f"Failed to connect to Redis: {e}")
-                return None
-        
-        return self._redis_client
+        """Legacy Redis client method - deprecated, uses UnifiedConnectionManager internally"""
+        # For backward compatibility, but internally uses UnifiedConnectionManager
+        logger.info("Using UnifiedConnectionManager for Redis operations instead of direct client")
+        return None  # Always return None to force usage of unified cache methods
+    
+    async def _ensure_security_context(self):
+        """Ensure security context exists for Redis operations"""
+        if self._security_context is None:
+            self._security_context = await create_security_context(
+                agent_id=f"slo_calculator_{self.slo_target.service_name}_{self.slo_target.name}",
+                tier="professional",
+                authenticated=True
+            )
+        return self._security_context
     
     def add_measurement(
         self, 
@@ -130,34 +142,55 @@ class SLICalculator:
         # Clear cache as new measurement invalidates results
         self._result_cache.clear()
         
-        # Store in Redis if available
-        asyncio.create_task(self._store_measurement_redis(measurement))
+        # Store in unified cache system (L1 + Redis L2)
+        from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+        import uuid
+        task_manager = get_background_task_manager()
+        await task_manager.submit_enhanced_task(
+            task_id=f"slo_unified_store_{self.slo_target.name}_{str(uuid.uuid4())[:8]}",
+            coroutine=self._store_measurement_unified(measurement),
+            priority=TaskPriority.NORMAL,
+            tags={"service": "slo", "type": "unified_cache_storage", "component": "slo_calculator", "slo_name": self.slo_target.name}
+        )
     
-    async def _store_measurement_redis(self, measurement: SLIMeasurement) -> None:
-        """Store measurement in Redis for distributed access"""
-        redis = await self.get_redis_client()
-        if not redis:
-            return
-            
+    async def _store_measurement_unified(self, measurement: SLIMeasurement) -> None:
+        """Store measurement in unified cache system for distributed access"""
         try:
-            key = f"sli:{self.slo_target.service_name}:{self.slo_target.name}"
+            # Initialize unified manager if needed
+            if not self._unified_manager._is_initialized:
+                await self._unified_manager.initialize()
+            
+            # Get security context
+            security_context = await self._ensure_security_context()
+            
+            key = f"sli:{self.slo_target.service_name}:{self.slo_target.name}:{measurement.timestamp}"
             data = {
                 "timestamp": measurement.timestamp,
                 "value": measurement.value,
                 "success": int(measurement.success),
-                "labels": str(measurement.labels),
-                "metadata": str(measurement.metadata)
+                "labels": measurement.labels,  # Keep as dict for better serialization
+                "metadata": measurement.metadata
             }
             
-            # Store as hash with timestamp as field
-            await redis.hset(key, str(measurement.timestamp), str(data))
-            
-            # Set expiration based on longest time window needed
+            # Calculate TTL based on longest time window needed
             max_window_seconds = max(window.seconds for window in SLOTimeWindow)
-            await redis.expire(key, max_window_seconds * 2)  # Keep extra for safety
+            ttl_seconds = max_window_seconds * 2  # Keep extra for safety
+            
+            # Store in unified cache (L1 + Redis L2)
+            success = await self._unified_manager.set_cached(
+                key=key,
+                value=data,
+                ttl_seconds=ttl_seconds,
+                security_context=security_context
+            )
+            
+            if success:
+                logger.debug(f"Stored SLI measurement for {self.slo_target.name} in unified cache")
+            else:
+                logger.warning(f"Failed to store SLI measurement for {self.slo_target.name} in unified cache")
             
         except Exception as e:
-            logger.warning(f"Failed to store measurement in Redis: {e}")
+            logger.warning(f"Failed to store measurement in unified cache: {e}")
     
     def calculate_sli(
         self, 
@@ -169,8 +202,26 @@ class SLICalculator:
         end_time = end_time or datetime.now(UTC)
         start_time = end_time - timedelta(seconds=time_window.seconds)
         
-        # Check cache first
-        cache_key = f"{time_window.value}:{end_time.timestamp():.0f}"
+        # Check unified cache first (L1 + Redis L2)
+        cache_key = f"sli_result:{self.slo_target.service_name}:{self.slo_target.name}:{time_window.value}:{end_time.timestamp():.0f}"
+        
+        try:
+            # Initialize unified manager if needed
+            if not self._unified_manager._is_initialized:
+                await self._unified_manager.initialize()
+            
+            # Try unified cache first
+            security_context = await self._ensure_security_context()
+            cached_result = await self._unified_manager.get_cached(cache_key, security_context)
+            
+            if cached_result is not None:
+                logger.debug(f"SLI result cache hit for {self.slo_target.name}")
+                # Reconstruct SLIResult from cached data
+                return SLIResult(**cached_result)
+        except Exception as e:
+            logger.warning(f"Failed to check unified cache for SLI result: {e}")
+        
+        # Fallback to in-memory cache
         if cache_key in self._result_cache:
             result, cache_time = self._result_cache[cache_key]
             if time.time() - cache_time < self._cache_ttl:
@@ -219,8 +270,42 @@ class SLICalculator:
                 std_deviation=statistics.stdev(values) if len(values) > 1 else 0.0
             )
         
-        # Cache result
+        # Cache result in both unified cache and local cache
         self._result_cache[cache_key] = (result, time.time())
+        
+        # Store in unified cache for distributed access
+        try:
+            security_context = await self._ensure_security_context()
+            result_data = {
+                "slo_target": {
+                    "name": self.slo_target.name,
+                    "service_name": self.slo_target.service_name,
+                    "slo_type": self.slo_target.slo_type.value,
+                    "target_value": self.slo_target.target_value,
+                    "unit": self.slo_target.unit
+                },
+                "time_window": time_window.value,
+                "current_value": result.current_value,
+                "target_value": result.target_value,
+                "compliance_ratio": result.compliance_ratio,
+                "measurement_count": result.measurement_count,
+                "window_start": result.window_start.isoformat(),
+                "window_end": result.window_end.isoformat(),
+                "min_value": result.min_value,
+                "max_value": result.max_value,
+                "median_value": result.median_value,
+                "std_deviation": result.std_deviation
+            }
+            
+            await self._unified_manager.set_cached(
+                key=cache_key,
+                value=result_data,
+                ttl_seconds=self._cache_ttl,
+                security_context=security_context
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to cache SLI result in unified cache: {e}")
         
         return result
     
@@ -316,7 +401,8 @@ class MultiWindowSLICalculator:
         slo_target: SLOTarget,
         windows: Optional[List[SLOTimeWindow]] = None,
         max_measurements: int = 50000,
-        redis_url: Optional[str] = None
+        redis_url: Optional[str] = None,
+        unified_manager = None
     ):
         self.slo_target = slo_target
         self.windows = windows or [
@@ -326,12 +412,16 @@ class MultiWindowSLICalculator:
             SLOTimeWindow.MONTH_1
         ]
         
-        # Create individual calculators for each window
+        # Get unified manager for Redis operations
+        self._unified_manager = unified_manager or get_unified_manager(ManagerMode.ASYNC_MODERN)
+        
+        # Create individual calculators for each window with unified manager
         self.calculators = {
             window: SLICalculator(
                 slo_target=slo_target,
                 max_measurements=max_measurements,
-                redis_url=redis_url
+                redis_url=redis_url,  # Legacy parameter
+                unified_manager=self._unified_manager  # Use shared unified manager
             )
             for window in self.windows
         }

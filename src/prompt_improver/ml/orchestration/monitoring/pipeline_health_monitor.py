@@ -10,6 +10,8 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from ..events.event_types import EventType, MLEvent
 from .component_health_monitor import ComponentHealthStatus, ComponentHealthMonitor
@@ -89,8 +91,19 @@ class PipelineHealthMonitor:
         self.logger.info("Starting pipeline health monitoring")
         self.is_monitoring = True
         
-        # Start monitoring task
-        self.monitor_task = asyncio.create_task(self._monitoring_loop())
+        # Start monitoring task with HIGH priority for real-time health monitoring
+        task_manager = get_background_task_manager()
+        self.monitor_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_pipeline_health_monitor_{str(uuid.uuid4())[:8]}",
+            coroutine=self._monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "pipeline_health_monitor",
+                "module": "pipeline_health_monitor"
+            }
+        )
         
         # Emit monitoring started event
         if self.event_bus:

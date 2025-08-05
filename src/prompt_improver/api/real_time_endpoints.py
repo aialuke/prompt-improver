@@ -240,7 +240,10 @@ real_time_router = APIRouter(
 
 @real_time_router.websocket("/live/{experiment_id}")
 async def websocket_experiment_endpoint(
-    websocket: WebSocket, experiment_id: str, user_id: str | None = None
+    websocket: WebSocket, 
+    experiment_id: str, 
+    user_id: str | None = None,
+    db_manager: UnifiedConnectionManager = Depends(get_unified_manager_async_modern)
 ):
     """WebSocket endpoint for real-time experiment monitoring
 
@@ -248,6 +251,7 @@ async def websocket_experiment_endpoint(
         websocket: WebSocket connection
         experiment_id: UUID of experiment to monitor
         user_id: Optional user ID for connection tracking
+        db_manager: Unified database connection manager
     """
     try:
         # Accept WebSocket connection
@@ -272,7 +276,7 @@ async def websocket_experiment_endpoint(
                 # Parse and handle client messages
                 try:
                     message = json.loads(data)
-                    await handle_websocket_message(websocket, experiment_id, message)
+                    await handle_websocket_message(websocket, experiment_id, message, db_manager)
                 except json.JSONDecodeError:
                     await connection_manager.send_to_connection(
                         websocket, {"type": "error", "message": "Invalid JSON format"}
@@ -293,7 +297,7 @@ async def websocket_experiment_endpoint(
         await connection_manager.disconnect(websocket)
 
 async def handle_websocket_message(
-    websocket: WebSocket, experiment_id: str, message: dict[str, Any]
+    websocket: WebSocket, experiment_id: str, message: dict[str, Any], db_manager: UnifiedConnectionManager
 ):
     """Handle incoming WebSocket messages from clients"""
     try:
@@ -306,8 +310,7 @@ async def handle_websocket_message(
             )
 
         elif message_type == "request_metrics":
-            # Send current metrics using UnifiedConnectionManager
-            db_manager = get_unified_manager_async_modern()
+            # Send current metrics using injected UnifiedConnectionManager
             try:
                 async with db_manager.get_async_session() as session:
                     analytics_service = await get_real_time_analytics_service(session)
@@ -368,53 +371,54 @@ async def get_experiment_metrics(
     Returns:
         JSON response with current metrics
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             analytics_service = await get_real_time_analytics_service(session)
             metrics = await analytics_service.get_real_time_metrics(experiment_id)
 
-        if metrics:
-            return JSONResponse({
-                "status": "success",
-                "experiment_id": experiment_id,
-                "metrics": {
-                    "experiment_id": metrics.experiment_id,
-                    "timestamp": metrics.timestamp.isoformat(),
-                    "sample_sizes": {
-                        "control": metrics.control_sample_size,
-                        "treatment": metrics.treatment_sample_size,
-                        "total": metrics.total_sample_size,
+            if metrics:
+                return JSONResponse({
+                    "status": "success",
+                    "experiment_id": experiment_id,
+                    "metrics": {
+                        "experiment_id": metrics.experiment_id,
+                        "timestamp": metrics.timestamp.isoformat(),
+                        "sample_sizes": {
+                            "control": metrics.control_sample_size,
+                            "treatment": metrics.treatment_sample_size,
+                            "total": metrics.total_sample_size,
+                        },
+                        "means": {
+                            "control": metrics.control_mean,
+                            "treatment": metrics.treatment_mean,
+                        },
+                        "statistical_analysis": {
+                            "effect_size": metrics.effect_size,
+                            "p_value": metrics.p_value,
+                            "confidence_interval": [
+                                metrics.confidence_interval_lower,
+                                metrics.confidence_interval_upper,
+                            ],
+                            "statistical_significance": metrics.statistical_significance,
+                            "statistical_power": metrics.statistical_power,
+                        },
+                        "progress": {
+                            "completion_percentage": metrics.completion_percentage,
+                            "estimated_days_remaining": metrics.estimated_days_remaining,
+                        },
+                        "quality": {
+                            "balance_ratio": metrics.balance_ratio,
+                            "data_quality_score": metrics.data_quality_score,
+                        },
+                        "early_stopping": {
+                            "recommendation": metrics.early_stopping_recommendation,
+                            "confidence": metrics.early_stopping_confidence,
+                        },
                     },
-                    "means": {
-                        "control": metrics.control_mean,
-                        "treatment": metrics.treatment_mean,
-                    },
-                    "statistical_analysis": {
-                        "effect_size": metrics.effect_size,
-                        "p_value": metrics.p_value,
-                        "confidence_interval": [
-                            metrics.confidence_interval_lower,
-                            metrics.confidence_interval_upper,
-                        ],
-                        "statistical_significance": metrics.statistical_significance,
-                        "statistical_power": metrics.statistical_power,
-                    },
-                    "progress": {
-                        "completion_percentage": metrics.completion_percentage,
-                        "estimated_days_remaining": metrics.estimated_days_remaining,
-                    },
-                    "quality": {
-                        "balance_ratio": metrics.balance_ratio,
-                        "data_quality_score": metrics.data_quality_score,
-                    },
-                    "early_stopping": {
-                        "recommendation": metrics.early_stopping_recommendation,
-                        "confidence": metrics.early_stopping_confidence,
-                    },
-                },
-            })
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+                })
+
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
             detail="Experiment not found or insufficient data",
         )
 
@@ -441,24 +445,25 @@ async def start_monitoring(
     Returns:
         JSON response confirming monitoring started
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             analytics_service = await get_real_time_analytics_service(session)
             success = await analytics_service.start_experiment_monitoring(
                 experiment_id, update_interval
             )
 
-        if success:
-            return JSONResponse({
-                "status": "success",
-                "message": f"Started monitoring for experiment {experiment_id}",
-                "experiment_id": experiment_id,
-                "update_interval": update_interval,
-            })
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to start monitoring (experiment may not exist or not be running)",
-        )
+            if success:
+                return JSONResponse({
+                    "status": "success",
+                    "message": f"Started monitoring for experiment {experiment_id}",
+                    "experiment_id": experiment_id,
+                    "update_interval": update_interval,
+                })
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to start monitoring (experiment may not exist or not be running)",
+            )
 
     except HTTPException:
         raise
@@ -480,16 +485,16 @@ async def stop_monitoring(experiment_id: str, db_manager: UnifiedConnectionManag
     Returns:
         JSON response confirming monitoring stopped
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             analytics_service = await get_real_time_analytics_service(session)
             success = await analytics_service.stop_experiment_monitoring(experiment_id)
 
-        return JSONResponse({
-            "status": "success" if success else "warning",
-            "message": f"Stopped monitoring for experiment {experiment_id}",
-            "experiment_id": experiment_id,
-        })
+            return JSONResponse({
+                "status": "success" if success else "warning",
+                "message": f"Stopped monitoring for experiment {experiment_id}",
+                "experiment_id": experiment_id,
+            })
 
     except Exception as e:
         logger.error(f"Error stopping monitoring: {e}")
@@ -508,26 +513,26 @@ async def get_active_monitoring(db_manager: UnifiedConnectionManager = Depends(g
     Returns:
         JSON response with list of active experiments
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             analytics_service = await get_real_time_analytics_service(session)
             active_experiments = await analytics_service.get_active_experiments()
 
-        # Get connection counts
-        connection_info: List[Dict[str, Any]] = []
-        for experiment_id in active_experiments:
-            connection_count = connection_manager.get_connection_count(experiment_id)
-            connection_info.append({
-                "experiment_id": experiment_id,
-                "active_connections": connection_count,
-            })
+            # Get connection counts
+            connection_info: List[Dict[str, Any]] = []
+            for experiment_id in active_experiments:
+                connection_count = connection_manager.get_connection_count(experiment_id)
+                connection_info.append({
+                    "experiment_id": experiment_id,
+                    "active_connections": connection_count,
+                })
 
-        return JSONResponse({
-            "status": "success",
-            "active_experiments": len(active_experiments),
-            "total_connections": connection_manager.get_connection_count(),
-            "experiments": connection_info,
-        })
+            return JSONResponse({
+                "status": "success",
+                "active_experiments": len(active_experiments),
+                "total_connections": connection_manager.get_connection_count(),
+                "experiments": connection_info,
+            })
 
     except Exception as e:
         logger.error(f"Error getting active monitoring: {e}")
@@ -549,53 +554,53 @@ async def get_dashboard_config(
     Returns:
         JSON response with dashboard configuration
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             # Get experiment details for dashboard configuration
             stmt = select(ABExperiment).where(ABExperiment.experiment_id == experiment_id)
             result = await session.execute(stmt)
-        experiment = result.scalar_one_or_none()
+            experiment = result.scalar_one_or_none()
 
-        if not experiment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
-            )
+            if not experiment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+                )
 
-        # Build dashboard configuration
-        config: Dict[str, Any] = {
-            "experiment_id": experiment_id,
-            "experiment_name": experiment.experiment_name,
-            "status": experiment.status,
-            "started_at": experiment.started_at.isoformat()
-            if experiment.started_at
-            else None,
-            "target_metric": experiment.target_metric,
-            "sample_size_per_group": experiment.sample_size_per_group,
-            "significance_level": 0.05,  # Default or from experiment config
-            "dashboard_settings": {
-                "auto_refresh": True,
-                "refresh_interval": 30,  # seconds
-                "show_alerts": True,
-                "show_early_stopping": True,
-                "chart_types": ["line", "bar", "confidence_interval"],
-                "metrics_to_display": [
-                    "sample_sizes",
-                    "conversion_rates",
-                    "effect_size",
-                    "p_value",
-                    "confidence_interval",
-                    "statistical_power",
-                ],
-            },
-            "websocket_url": f"/api/v1/experiments/real-time/live/{experiment_id}",
-            "api_endpoints": {
-                "metrics": f"/api/v1/experiments/real-time/experiments/{experiment_id}/metrics",
-                "start_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/start",
-                "stop_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/stop",
-            },
-        }
+            # Build dashboard configuration
+            config: Dict[str, Any] = {
+                "experiment_id": experiment_id,
+                "experiment_name": experiment.experiment_name,
+                "status": experiment.status,
+                "started_at": experiment.started_at.isoformat()
+                if experiment.started_at
+                else None,
+                "target_metric": experiment.target_metric,
+                "sample_size_per_group": experiment.sample_size_per_group,
+                "significance_level": 0.05,  # Default or from experiment config
+                "dashboard_settings": {
+                    "auto_refresh": True,
+                    "refresh_interval": 30,  # seconds
+                    "show_alerts": True,
+                    "show_early_stopping": True,
+                    "chart_types": ["line", "bar", "confidence_interval"],
+                    "metrics_to_display": [
+                        "sample_sizes",
+                        "conversion_rates",
+                        "effect_size",
+                        "p_value",
+                        "confidence_interval",
+                        "statistical_power",
+                    ],
+                },
+                "websocket_url": f"/api/v1/experiments/real-time/live/{experiment_id}",
+                "api_endpoints": {
+                    "metrics": f"/api/v1/experiments/real-time/experiments/{experiment_id}/metrics",
+                    "start_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/start",
+                    "stop_monitoring": f"/api/v1/experiments/real-time/experiments/{experiment_id}/monitoring/stop",
+                },
+            }
 
-        return JSONResponse({"status": "success", "config": config})
+            return JSONResponse({"status": "success", "config": config})
 
     except HTTPException:
         raise

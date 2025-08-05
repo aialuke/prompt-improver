@@ -7,13 +7,15 @@ to achieve 50% database load reduction.
 
 import asyncio
 import logging
+import uuid
 from typing import Dict, Any, Optional
 
 from .cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
-from .connection_pool_optimizer import get_connection_pool_optimizer
+from .unified_connection_manager import get_unified_manager, ManagerMode
 from .query_optimizer import get_query_executor
 from .performance_monitor import get_performance_monitor
 from ..ml.orchestration.events.event_bus import get_event_bus
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ class DatabaseOptimizationIntegration:
         self.performance_monitor = None
         self.event_bus = None
         self._initialized = False
-        self._monitoring_task = None
+        self._monitoring_task_id = None
     
     async def initialize(self, cache_policy: Optional[CachePolicy] = None):
         """Initialize all optimization components"""
@@ -56,8 +58,8 @@ class DatabaseOptimizationIntegration:
             )
         )
         
-        # Initialize connection pool optimizer
-        self.pool_optimizer = get_connection_pool_optimizer()
+        # Initialize connection pool optimizer - using UnifiedConnectionManager
+        self.pool_optimizer = get_unified_manager(ManagerMode.ASYNC_MODERN)
         
         # Initialize query executor (already has caching)
         self.query_executor = get_query_executor()
@@ -105,15 +107,26 @@ class DatabaseOptimizationIntegration:
         
         logger.info("Starting database optimization processes...")
         
-        # Implement connection multiplexing
-        multiplex_result = await self.pool_optimizer.implement_connection_multiplexing()
-        logger.info(f"Connection multiplexing: {multiplex_result}")
+        # Optimize connection pool (UnifiedConnectionManager handles multiplexing internally)
+        multiplex_result = await self.pool_optimizer.optimize_pool_size()
+        logger.info(f"Connection pool optimization: {multiplex_result}")
         
         # Warm cache with common queries
         await self._warm_cache()
         
-        # Start monitoring
-        self._monitoring_task = asyncio.create_task(self._continuous_monitoring())
+        # Start monitoring using background task manager
+        task_manager = get_background_task_manager()
+        self._monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"db_optimization_monitoring_{str(uuid.uuid4())[:8]}",
+            coroutine=self._continuous_monitoring(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "database",
+                "type": "optimization",
+                "component": "continuous_monitoring",
+                "operation": "performance_monitoring"
+            }
+        )
         
         logger.info("Database optimization started")
     
@@ -168,7 +181,7 @@ class DatabaseOptimizationIntegration:
         
         # Collect all metrics
         cache_stats = await self.cache_layer.get_cache_stats()
-        pool_stats = await self.pool_optimizer.get_optimization_summary()
+        pool_stats = await self.pool_optimizer.get_health_status()  # Use health status for pool metrics
         executor_stats = await self.query_executor.get_performance_summary()
         perf_summary = await self.performance_monitor.get_performance_summary(hours=1)
         
@@ -210,15 +223,14 @@ class DatabaseOptimizationIntegration:
     
     async def stop_optimization(self):
         """Stop optimization processes"""
-        if self._monitoring_task:
-            self._monitoring_task.cancel()
-            try:
-                await self._monitoring_task
-            except asyncio.CancelledError:
-                pass
+        if self._monitoring_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._monitoring_task_id)
+            self._monitoring_task_id = None
         
-        if self.pool_optimizer and self.pool_optimizer._monitoring:
-            self.pool_optimizer.stop_monitoring()
+        if self.pool_optimizer and hasattr(self.pool_optimizer, '_monitoring'):
+            # UnifiedConnectionManager handles monitoring internally
+            logger.info("Pool monitoring handled by UnifiedConnectionManager")
         
         if self.performance_monitor and self.performance_monitor._monitoring:
             self.performance_monitor.stop_monitoring()

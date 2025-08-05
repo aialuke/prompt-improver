@@ -15,12 +15,14 @@ from enum import Enum
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
+import uuid
 
 from .ml_metrics import get_ml_metrics_collector
 from .api_metrics import get_api_metrics_collector
 from .performance_metrics import get_performance_metrics_collector
 from .business_intelligence_metrics import get_bi_metrics_collector
 from ..performance.monitoring.metrics_registry import get_metrics_registry
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class AggregationWindow(Enum):
     """Time windows for aggregation."""
@@ -168,11 +170,12 @@ class RealTimeAggregationEngine:
         self.metrics_registry = get_metrics_registry()
         self._initialize_prometheus_metrics()
 
-        # Background tasks
+        # Background tasks using EnhancedBackgroundTaskManager
         self.is_running = False
-        self.processing_tasks: List[asyncio.Task[None]] = []
-        self.aggregation_tasks: List[asyncio.Task[None]] = []
+        self.processing_task_ids: List[str] = []
+        self.aggregation_task_ids: List[str] = []
         self.thread_pool = ThreadPoolExecutor(max_workers=self.config.get("thread_pool_size", 4))
+        self.task_manager = get_background_task_manager()
 
         # Initialize default alert rules
         self._initialize_default_alert_rules()
@@ -299,29 +302,54 @@ class RealTimeAggregationEngine:
         await self.performance_collector.start_collection()
         await self.bi_collector.start_collection()
 
-        # Start processing tasks
+        # Start processing tasks using EnhancedBackgroundTaskManager
         num_processors = self.config.get("num_processors", 2)
         for i in range(num_processors):
-            task = asyncio.create_task(self._process_metrics_loop(f"processor_{i}"))
-            self.processing_tasks.append(task)
+            task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"aggregation_processor_{i}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._process_metrics_loop(f"processor_{i}"),
+                priority=TaskPriority.HIGH,
+                tags={"service": "metrics", "type": "processing", "component": "aggregation_engine", "processor": str(i)}
+            )
+            self.processing_task_ids.append(task_id)
 
         # Start aggregation tasks for different windows
         for window in AggregationWindow:
-            task = asyncio.create_task(self._aggregation_loop(window))
-            self.aggregation_tasks.append(task)
+            task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"aggregation_{window.value}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._aggregation_loop(window),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "metrics", "type": "aggregation", "component": "window_processing", "window": window.value}
+            )
+            self.aggregation_task_ids.append(task_id)
 
         # Start correlation and alerting tasks
         if self.enable_correlations:
-            correlation_task = asyncio.create_task(self._correlation_loop())
-            self.processing_tasks.append(correlation_task)
+            correlation_task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"aggregation_correlation_{str(uuid.uuid4())[:8]}",
+                coroutine=self._correlation_loop(),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "metrics", "type": "analysis", "component": "correlation"}
+            )
+            self.processing_task_ids.append(correlation_task_id)
 
         if self.enable_alerting:
-            alerting_task = asyncio.create_task(self._alerting_loop())
-            self.processing_tasks.append(alerting_task)
+            alerting_task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"aggregation_alerting_{str(uuid.uuid4())[:8]}",
+                coroutine=self._alerting_loop(),
+                priority=TaskPriority.HIGH,
+                tags={"service": "metrics", "type": "alerting", "component": "alert_processing"}
+            )
+            self.processing_task_ids.append(alerting_task_id)
 
         # Start cleanup task
-        cleanup_task = asyncio.create_task(self._cleanup_loop())
-        self.processing_tasks.append(cleanup_task)
+        cleanup_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"aggregation_cleanup_{str(uuid.uuid4())[:8]}",
+            coroutine=self._cleanup_loop(),
+            priority=TaskPriority.LOW,
+            tags={"service": "metrics", "type": "maintenance", "component": "cleanup"}
+        )
+        self.processing_task_ids.append(cleanup_task_id)
 
         self.logger.info("Started real-time aggregation engine")
 
@@ -332,13 +360,17 @@ class RealTimeAggregationEngine:
 
         self.is_running = False
 
-        # Stop all tasks
-        all_tasks = self.processing_tasks + self.aggregation_tasks
-        for task in all_tasks:
-            task.cancel()
+        # Stop all tasks using EnhancedBackgroundTaskManager
+        all_task_ids = self.processing_task_ids + self.aggregation_task_ids
+        for task_id in all_task_ids:
+            try:
+                await self.task_manager.cancel_task(task_id)
+            except Exception as e:
+                self.logger.warning(f"Failed to cancel task {task_id}: {e}")
 
-        # Wait for tasks to complete
-        await asyncio.gather(*all_tasks, return_exceptions=True)
+        # Clear task ID lists
+        self.processing_task_ids.clear()
+        self.aggregation_task_ids.clear()
 
         # Stop metric collectors
         await self.ml_collector.stop_aggregation()

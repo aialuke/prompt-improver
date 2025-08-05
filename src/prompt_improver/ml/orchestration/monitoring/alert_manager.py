@@ -11,6 +11,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 import json
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from ..events.event_types import EventType, MLEvent
 
@@ -194,8 +196,19 @@ class AlertManager:
         self.logger.info("Starting alert monitoring")
         self.is_monitoring = True
         
-        # Start monitoring task
-        self.monitor_task = asyncio.create_task(self._monitoring_loop())
+        # Start monitoring task with HIGH priority for real-time alerting
+        task_manager = get_background_task_manager()
+        self.monitor_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_alert_monitor_{str(uuid.uuid4())[:8]}",
+            coroutine=self._monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "alert_monitor",
+                "module": "alert_manager"
+            }
+        )
         
         # Emit monitoring started event
         if self.event_bus:

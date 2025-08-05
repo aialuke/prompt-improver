@@ -12,6 +12,7 @@ Converts existing health checkers to the unified plugin system:
 
 import asyncio
 import logging
+import time
 from typing import Optional, Dict, Any
 
 from .unified_health_system import (
@@ -19,67 +20,161 @@ from .unified_health_system import (
     HealthCheckCategory,
     HealthCheckPluginConfig
 )
-from ....core.protocols.health_protocol import HealthCheckResult, HealthStatus
+# Removed circular import - will use lazy loading for health protocol types
 from .base import HealthResult, HealthStatus as BaseHealthStatus
 
-# Import existing health checkers
-from .checkers import (
-    DatabaseHealthChecker,
-    AnalyticsServiceHealthChecker, 
-    MLServiceHealthChecker,
-    RedisHealthChecker,
-    SystemResourcesHealthChecker,
-    QueueHealthChecker,
-    MCPServerHealthChecker
-)
-from .enhanced_checkers import (
-    EnhancedMLServiceHealthChecker,
-    EnhancedAnalyticsServiceHealthChecker
-)
-from .ml_specific_checkers import (
-    MLModelHealthChecker,
-    MLDataQualityChecker,
-    MLTrainingHealthChecker,
-    MLPerformanceHealthChecker
-)
-from .ml_orchestration_checkers import (
-    MLOrchestratorHealthChecker,
-    MLComponentRegistryHealthChecker,
-    MLResourceManagerHealthChecker,
-    MLWorkflowEngineHealthChecker,
-    MLEventBusHealthChecker
-)
+# Import existing health checkers - lazy-loaded to avoid import-time blocking
+# from .checkers import (...)  # Now lazy-loaded when needed
+# from .enhanced_checkers import (...)  # Now lazy-loaded when needed
+# from .ml_specific_checkers import (...)  # Now lazy-loaded when needed
+# from .ml_orchestration_checkers import (...)  # Now lazy-loaded when needed
 
-# Import database health monitors
-try:
-    from ...database.health.database_health_monitor import DatabaseHealthMonitor
-    from ...database.health.connection_pool_monitor import ConnectionPoolMonitor
-    from ...database.health.query_performance_analyzer import QueryPerformanceAnalyzer
-    from ...database.health.index_health_assessor import IndexHealthAssessor
-    from ...database.health.table_bloat_detector import TableBloatDetector
-    DATABASE_HEALTH_AVAILABLE = True
-except ImportError:
-    DATABASE_HEALTH_AVAILABLE = False
+# Import consolidated database health monitor - lazy-loaded to avoid import-time blocking
+# try:
+#     from ...database.health.database_health_monitor import DatabaseHealthMonitor, get_database_health_monitor
+#     DATABASE_HEALTH_AVAILABLE = True
+# except ImportError:
+#     DATABASE_HEALTH_AVAILABLE = False
 
-# Import Redis health monitor
-try:
-    from ...cache.redis_health import RedisHealthChecker as DetailedRedisHealthChecker
-    REDIS_HEALTH_AVAILABLE = True
-except ImportError:
-    REDIS_HEALTH_AVAILABLE = False
+# Import Redis health monitor - lazy-loaded to avoid import-time blocking
+# try:
+#     from ...cache.redis_health import RedisHealthChecker as DetailedRedisHealthChecker
+#     REDIS_HEALTH_AVAILABLE = True
+# except ImportError:
+#     REDIS_HEALTH_AVAILABLE = False
 
-# Import API health checkers
-try:
-    from ...api.health import HealthRouter
-    API_HEALTH_AVAILABLE = True
-except ImportError:
-    API_HEALTH_AVAILABLE = False
+# Import API health checkers - lazy-loaded to avoid import-time blocking
+# try:
+#     from ...api.health import HealthRouter
+#     API_HEALTH_AVAILABLE = True
+# except ImportError:
+#     API_HEALTH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
-def _convert_health_status(status: BaseHealthStatus) -> HealthStatus:
+# Lazy loading helper functions to avoid import-time blocking
+def _get_database_health_checker():
+    """Lazy import DatabaseHealthChecker"""
+    from .checkers import DatabaseHealthChecker
+    return DatabaseHealthChecker
+
+def _get_ml_service_health_checker():
+    """Lazy import MLServiceHealthChecker"""
+    from .checkers import MLServiceHealthChecker
+    return MLServiceHealthChecker
+
+def _get_analytics_service_health_checker():
+    """Lazy import AnalyticsServiceHealthChecker"""
+    from .checkers import AnalyticsServiceHealthChecker
+    return AnalyticsServiceHealthChecker
+
+def _get_redis_health_checker():
+    """Lazy import RedisHealthChecker"""
+    from .checkers import RedisHealthChecker
+    return RedisHealthChecker
+
+def _get_system_resources_health_checker():
+    """Lazy import SystemResourcesHealthChecker"""
+    from .checkers import SystemResourcesHealthChecker
+    return SystemResourcesHealthChecker
+
+def _get_queue_health_checker():
+    """Lazy import QueueHealthChecker"""
+    from .checkers import QueueHealthChecker
+    return QueueHealthChecker
+
+def _get_mcp_server_health_checker():
+    """Lazy import MCPServerHealthChecker"""
+    from .checkers import MCPServerHealthChecker
+    return MCPServerHealthChecker
+
+def _get_enhanced_ml_service_health_checker():
+    """Lazy import EnhancedMLServiceHealthChecker"""
+    from .enhanced_checkers import EnhancedMLServiceHealthChecker
+    return EnhancedMLServiceHealthChecker
+
+def _get_enhanced_analytics_service_health_checker():
+    """Lazy import EnhancedAnalyticsServiceHealthChecker"""
+    from .enhanced_checkers import EnhancedAnalyticsServiceHealthChecker
+    return EnhancedAnalyticsServiceHealthChecker
+
+def _get_ml_model_health_checker():
+    """Lazy import MLModelHealthChecker"""
+    from .ml_specific_checkers import MLModelHealthChecker
+    return MLModelHealthChecker
+
+def _get_ml_data_quality_checker():
+    """Lazy import MLDataQualityChecker"""
+    from .ml_specific_checkers import MLDataQualityChecker
+    return MLDataQualityChecker
+
+def _get_ml_training_health_checker():
+    """Lazy import MLTrainingHealthChecker"""
+    from .ml_specific_checkers import MLTrainingHealthChecker
+    return MLTrainingHealthChecker
+
+def _get_ml_performance_health_checker():
+    """Lazy import MLPerformanceHealthChecker"""
+    from .ml_specific_checkers import MLPerformanceHealthChecker
+    return MLPerformanceHealthChecker
+
+def _get_database_health_monitor():
+    """Lazy import DatabaseHealthMonitor"""
+    try:
+        from ...database.health.database_health_monitor import DatabaseHealthMonitor, get_database_health_monitor
+        return get_database_health_monitor()
+    except ImportError:
+        return None
+
+def _get_detailed_redis_health_checker():
+    """Lazy import detailed RedisHealthChecker"""
+    try:
+        from ...cache.redis_health import RedisHealthChecker as DetailedRedisHealthChecker
+        return DetailedRedisHealthChecker
+    except ImportError:
+        return None
+
+def _get_health_protocol_types():
+    """Lazy import health protocol types to avoid circular imports"""
+    from ....core.protocols.health_protocol import HealthMonitorProtocol, HealthCheckResult, HealthStatus
+    return HealthMonitorProtocol, HealthCheckResult, HealthStatus
+
+def _create_health_check_result(status, message, details=None, check_name="", duration_ms=0.0):
+    """Helper function to create HealthCheckResult with lazy loading"""
+    _, HealthCheckResult, _ = _get_health_protocol_types()
+    return _create_health_check_result(
+        status=status,
+        message=message,
+        details=details or {},
+        check_name=check_name,
+        duration_ms=duration_ms
+    )
+
+def _convert_health_result(health_result: HealthResult):
+    """Convert HealthResult to HealthCheckResult"""
+    _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+
+    # Convert base status to protocol status
+    status_mapping = {
+        BaseHealthStatus.HEALTHY: HealthStatus.HEALTHY,
+        BaseHealthStatus.WARNING: HealthStatus.DEGRADED,
+        BaseHealthStatus.FAILED: HealthStatus.UNHEALTHY
+    }
+
+    return _create_health_check_result(
+        status=status_mapping.get(health_result.status, HealthStatus.UNKNOWN),
+        message=health_result.message or "",
+        details=health_result.details or {},
+        check_name=health_result.component,
+        duration_ms=health_result.response_time_ms or 0.0
+    )
+
+
+def _convert_health_status(status: BaseHealthStatus):
     """Convert base health status to protocol health status"""
+    _, _, HealthStatus = _get_health_protocol_types()
+
     if status == BaseHealthStatus.HEALTHY:
         return HealthStatus.HEALTHY
     elif status == BaseHealthStatus.WARNING:
@@ -90,9 +185,11 @@ def _convert_health_status(status: BaseHealthStatus) -> HealthStatus:
         return HealthStatus.UNKNOWN
 
 
-def _convert_health_result(result: HealthResult) -> HealthCheckResult:
+def _convert_health_result(result: HealthResult):
     """Convert base health result to protocol health result"""
-    return HealthCheckResult(
+    _, HealthCheckResult, _ = _get_health_protocol_types()
+
+    return _create_health_check_result(
         status=_convert_health_status(result.status),
         message=result.message or "",
         details=result.details or {},
@@ -115,12 +212,12 @@ class MLServicePlugin(HealthCheckPlugin):
         )
         self.checker = MLServiceHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML service check failed: {str(e)}",
                 details={"error": str(e)},
@@ -139,12 +236,12 @@ class EnhancedMLServicePlugin(HealthCheckPlugin):
         )
         self.checker = EnhancedMLServiceHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Enhanced ML service check failed: {str(e)}",
                 details={"error": str(e)},
@@ -163,12 +260,12 @@ class MLModelPlugin(HealthCheckPlugin):
         )
         self.checker = MLModelHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML model check failed: {str(e)}",
                 details={"error": str(e)},
@@ -187,12 +284,12 @@ class MLDataQualityPlugin(HealthCheckPlugin):
         )
         self.checker = MLDataQualityChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML data quality check failed: {str(e)}",
                 details={"error": str(e)},
@@ -211,12 +308,12 @@ class MLTrainingPlugin(HealthCheckPlugin):
         )
         self.checker = MLTrainingHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML training check failed: {str(e)}",
                 details={"error": str(e)},
@@ -235,12 +332,12 @@ class MLPerformancePlugin(HealthCheckPlugin):
         )
         self.checker = MLPerformanceHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML performance check failed: {str(e)}",
                 details={"error": str(e)},
@@ -260,12 +357,12 @@ class MLOrchestratorPlugin(HealthCheckPlugin):
         )
         self.checker = MLOrchestratorHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML orchestrator check failed: {str(e)}",
                 details={"error": str(e)},
@@ -284,12 +381,12 @@ class MLComponentRegistryPlugin(HealthCheckPlugin):
         )
         self.checker = MLComponentRegistryHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML component registry check failed: {str(e)}",
                 details={"error": str(e)},
@@ -308,12 +405,12 @@ class MLResourceManagerPlugin(HealthCheckPlugin):
         )
         self.checker = MLResourceManagerHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML resource manager check failed: {str(e)}",
                 details={"error": str(e)},
@@ -332,12 +429,12 @@ class MLWorkflowEnginePlugin(HealthCheckPlugin):
         )
         self.checker = MLWorkflowEngineHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML workflow engine check failed: {str(e)}",
                 details={"error": str(e)},
@@ -356,12 +453,12 @@ class MLEventBusPlugin(HealthCheckPlugin):
         )
         self.checker = MLEventBusHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"ML event bus check failed: {str(e)}",
                 details={"error": str(e)},
@@ -371,31 +468,107 @@ class MLEventBusPlugin(HealthCheckPlugin):
 
 # Database Health Check Plugins
 class DatabasePlugin(HealthCheckPlugin):
-    """Basic database health check plugin"""
-    
+    """Enhanced comprehensive database health check plugin with <10ms performance target"""
+
     def __init__(self, config: Optional[HealthCheckPluginConfig] = None):
         super().__init__(
             name="database",
             category=HealthCheckCategory.DATABASE,
-            config=config or HealthCheckPluginConfig(critical=True, timeout_seconds=10.0)
+            config=config or HealthCheckPluginConfig(
+                critical=True,  # Database health is critical
+                timeout_seconds=8.0,  # Optimized for <10ms target
+                retry_count=2  # Allow retries for critical checks
+            )
         )
-        self.checker = DatabaseHealthChecker()
-        
-    async def execute_check(self) -> HealthCheckResult:
+        self._cached_monitor = None
+
+    def _get_monitor(self):
+        """Get database health monitor with lazy loading and caching"""
+        if self._cached_monitor is None:
+            try:
+                from ...database.health.database_health_monitor import get_database_health_monitor
+                self._cached_monitor = get_database_health_monitor()
+            except ImportError:
+                return None
+        return self._cached_monitor
+
+    async def execute_check(self):
         try:
-            result = await self.checker.check()
-            return _convert_health_result(result)
+            monitor = self._get_monitor()
+            if not monitor:
+                _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+                return _create_health_check_result(
+                    status=HealthStatus.UNKNOWN,
+                    message="Database health monitor not available",
+                    check_name=self.name
+                )
+
+            # Use the comprehensive health check from DatabaseHealthMonitor
+            start_time = time.time()
+            health_metrics = await monitor.get_comprehensive_health()
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Analyze comprehensive health metrics for overall status
+            connection_health = health_metrics.get('connection_health', {})
+            storage_health = health_metrics.get('storage_health', {})
+            cache_metrics = health_metrics.get('cache_metrics', {})
+
+            # Extract key health indicators
+            pool_utilization = connection_health.get('utilization_percent', 0)
+            cache_hit_ratio = cache_metrics.get('overall_cache_hit_ratio_percent', 100)
+            db_size_gb = storage_health.get('database_size_bytes', 0) / (1024**3)
+
+            # Determine overall health status
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            issues = []
+
+            if pool_utilization > 90:
+                issues.append(f"High pool utilization: {pool_utilization:.1f}%")
+            if cache_hit_ratio < 90:
+                issues.append(f"Low cache hit ratio: {cache_hit_ratio:.1f}%")
+            if db_size_gb > 50:  # Large database threshold
+                issues.append(f"Large database: {db_size_gb:.1f}GB")
+
+            if len(issues) > 2:
+                status = HealthStatus.UNHEALTHY
+                message = f"Database health critical: {', '.join(issues[:2])}"
+            elif len(issues) > 0:
+                status = HealthStatus.DEGRADED
+                message = f"Database health degraded: {', '.join(issues[:1])}"
+            else:
+                status = HealthStatus.HEALTHY
+                message = f"Database healthy: {pool_utilization:.1f}% pool, {cache_hit_ratio:.1f}% cache hit"
+
+            return _create_health_check_result(
+                status=status,
+                message=message,
+                details={
+                    "pool_utilization_percent": pool_utilization,
+                    "cache_hit_ratio_percent": cache_hit_ratio,
+                    "database_size_gb": round(db_size_gb, 2),
+                    "issues_detected": issues,
+                    "performance_ms": round(duration_ms, 2),
+                    "comprehensive_metrics": {
+                        "connection_health": connection_health.get('health_status', 'unknown'),
+                        "storage_health": storage_health.get('health_status', 'unknown'),
+                        "cache_efficiency": cache_metrics.get('cache_efficiency', 'unknown')
+                    }
+                },
+                check_name=self.name,
+                duration_ms=duration_ms
+            )
         except Exception as e:
-            return HealthCheckResult(
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
-                message=f"Database check failed: {str(e)}",
-                details={"error": str(e)},
+                message=f"Database health check failed: {str(e)}",
+                details={"error": str(e), "error_type": type(e).__name__},
                 check_name=self.name
             )
 
 
 class DatabaseConnectionPoolPlugin(HealthCheckPlugin):
-    """Database connection pool health check plugin"""
+    """Database connection pool health check plugin - integrated with UnifiedConnectionManager"""
     
     def __init__(self, config: Optional[HealthCheckPluginConfig] = None):
         super().__init__(
@@ -404,49 +577,83 @@ class DatabaseConnectionPoolPlugin(HealthCheckPlugin):
             config=config or HealthCheckPluginConfig(timeout_seconds=5.0)
         )
         
-    async def execute_check(self) -> HealthCheckResult:
-        if not DATABASE_HEALTH_AVAILABLE:
-            return HealthCheckResult(
-                status=HealthStatus.UNKNOWN,
-                message="Database health monitoring not available",
-                check_name=self.name
-            )
-        
+    async def execute_check(self):
         try:
-            monitor = ConnectionPoolMonitor()
-            metrics = await monitor.get_pool_metrics()
+            # Use UnifiedConnectionManager for consolidated pool health monitoring
+            from ....database.unified_connection_manager import get_unified_connection_manager
+            unified_manager = get_unified_connection_manager()
             
-            total_connections = metrics.get('total_connections', 0)
-            active_connections = metrics.get('active_connections', 0)
+            # Get comprehensive pool health status including ML telemetry metrics
+            pool_metrics = await unified_manager.get_ml_telemetry_metrics()
+            coordination_status = await unified_manager.coordinate_pools()
             
-            # Check for high connection usage
-            if total_connections > 0:
-                usage_ratio = active_connections / total_connections
-                if usage_ratio > 0.9:
-                    status = HealthStatus.UNHEALTHY
-                    message = f"High connection pool usage: {usage_ratio:.1%}"
-                elif usage_ratio > 0.75:
+            # Determine overall pool health
+            utilization = pool_metrics.get('pool_utilization', 0)
+            active_connections = pool_metrics.get('active_connections', 0)
+            pool_size = pool_metrics.get('pool_size', 0)
+            health_status = pool_metrics.get('health_status', 'unknown')
+            
+            # Check pool health thresholds
+            is_healthy = True
+            issues = []
+            
+            # High utilization check (>90%)
+            if utilization > 0.9:
+                is_healthy = False
+                issues.append(f"High pool utilization: {utilization:.1%}")
+            
+            # Pool exhaustion check
+            if pool_size > 0 and active_connections >= pool_size:
+                is_healthy = False
+                issues.append("Pool exhausted: all connections in use")
+            
+            # Overall health from UnifiedConnectionManager
+            if health_status != 'healthy':
+                is_healthy = False
+                issues.append(f"Pool health degraded: {health_status}")
+            
+            # Multi-pool coordination health
+            healthy_pools = coordination_status.get('healthy_pools', 0)
+            if healthy_pools == 0:
+                is_healthy = False
+                issues.append("No healthy pools available in coordination")
+            
+            metadata = {
+                "pool_utilization": utilization,
+                "active_connections": active_connections,
+                "available_connections": pool_metrics.get('available_connections', 0),
+                "pool_size": pool_size,
+                "avg_connection_time_ms": pool_metrics.get('avg_connection_time_ms', 0),
+                "avg_query_time_ms": pool_metrics.get('avg_query_time_ms', 0),
+                "coordination_status": coordination_status.get('status', 'unknown'),
+                "healthy_pools": healthy_pools,
+                "issues": issues
+            }
+            
+            # Determine final health status and message
+            if is_healthy:
+                if utilization > 0.75:
                     status = HealthStatus.DEGRADED
-                    message = f"Moderate connection pool usage: {usage_ratio:.1%}"
+                    message = f"Pool utilization high but stable: {utilization:.1%}"
                 else:
                     status = HealthStatus.HEALTHY
-                    message = f"Connection pool healthy: {usage_ratio:.1%} usage"
+                    message = f"Connection pool healthy: {utilization:.1%} utilization"
             else:
-                status = HealthStatus.HEALTHY
-                message = "No active connections"
+                status = HealthStatus.UNHEALTHY
+                message = f"Connection pool unhealthy: {', '.join(issues)}"
             
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=status,
                 message=message,
-                details=metrics,
+                details=metadata,
                 check_name=self.name
             )
             
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Connection pool check failed: {str(e)}",
-                details={"error": str(e)},
+                details={"error": str(e), "source": "UnifiedConnectionManager"},
                 check_name=self.name
             )
 
@@ -461,16 +668,17 @@ class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
             config=config or HealthCheckPluginConfig(timeout_seconds=10.0)
         )
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         if not DATABASE_HEALTH_AVAILABLE:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNKNOWN,
                 message="Database health monitoring not available",
                 check_name=self.name
             )
         
         try:
-            analyzer = QueryPerformanceAnalyzer()
+            from ...database.health.database_health_monitor import get_database_health_monitor
+            analyzer = get_database_health_monitor()
             metrics = await analyzer.analyze_query_performance()
             
             avg_query_time = metrics.get('average_query_time_ms', 0)
@@ -486,7 +694,7 @@ class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
                 status = HealthStatus.HEALTHY
                 message = f"Good query performance: {avg_query_time:.1f}ms avg"
             
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=status,
                 message=message,
                 details=metrics,
@@ -494,7 +702,7 @@ class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
             )
             
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Query performance check failed: {str(e)}",
                 details={"error": str(e)},
@@ -503,105 +711,202 @@ class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
 
 
 class DatabaseIndexHealthPlugin(HealthCheckPlugin):
-    """Database index health check plugin"""
-    
+    """Enhanced database index health check plugin with <10ms performance target"""
+
     def __init__(self, config: Optional[HealthCheckPluginConfig] = None):
         super().__init__(
             name="database_index_health",
             category=HealthCheckCategory.DATABASE,
-            config=config or HealthCheckPluginConfig(timeout_seconds=15.0)
-        )
-        
-    async def execute_check(self) -> HealthCheckResult:
-        if not DATABASE_HEALTH_AVAILABLE:
-            return HealthCheckResult(
-                status=HealthStatus.UNKNOWN,
-                message="Database health monitoring not available",
-                check_name=self.name
+            config=config or HealthCheckPluginConfig(
+                timeout_seconds=8.0,  # Optimized for <10ms target
+                critical=False,  # Index issues are important but not critical
+                retry_count=1
             )
-        
+        )
+        self._cached_monitor = None
+
+    def _get_monitor(self):
+        """Get database health monitor with lazy loading and caching"""
+        if self._cached_monitor is None:
+            try:
+                from ...database.health.database_health_monitor import get_database_health_monitor
+                self._cached_monitor = get_database_health_monitor()
+            except ImportError:
+                return None
+        return self._cached_monitor
+
+    async def execute_check(self):
         try:
-            assessor = IndexHealthAssessor()
-            assessment = await assessor.assess_index_health()
-            
-            unused_indexes = assessment.get('unused_indexes', [])
-            missing_indexes = assessment.get('missing_indexes', [])
-            
-            if len(unused_indexes) > 5 or len(missing_indexes) > 3:
+            monitor = self._get_monitor()
+            if not monitor:
+                _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+                return _create_health_check_result(
+                    status=HealthStatus.UNKNOWN,
+                    message="Database health monitor not available",
+                    check_name=self.name
+                )
+
+            # Use the consolidated index assessment from DatabaseHealthMonitor
+            start_time = time.time()
+            assessment_report = await monitor.index_assessor.assess_index_health()
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Analyze assessment report for health status
+            if hasattr(assessment_report, 'unused_indexes'):
+                # New IndexHealthReport format
+                unused_count = len(assessment_report.unused_indexes)
+                redundant_count = len(assessment_report.redundant_indexes)
+                bloated_count = len(assessment_report.bloated_indexes)
+                low_usage_count = len(assessment_report.low_usage_indexes)
+                missing_suggestions = len(assessment_report.missing_index_suggestions)
+                health_score = assessment_report.health_score
+                potential_savings_mb = assessment_report.potential_space_savings_bytes / (1024**2)
+            else:
+                # Legacy dict format
+                unused_count = len(assessment_report.get('unused_indexes', []))
+                redundant_count = len(assessment_report.get('redundant_indexes', []))
+                bloated_count = len(assessment_report.get('bloated_indexes', []))
+                low_usage_count = len(assessment_report.get('low_usage_indexes', []))
+                missing_suggestions = len(assessment_report.get('missing_index_suggestions', []))
+                health_score = assessment_report.get('health_score', 100)
+                potential_savings_mb = assessment_report.get('potential_space_savings_bytes', 0) / (1024**2)
+
+            # Determine health status with performance-optimized thresholds
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            total_issues = unused_count + redundant_count + bloated_count
+
+            if health_score < 60 or total_issues > 10 or potential_savings_mb > 500:
+                status = HealthStatus.UNHEALTHY
+                message = f"Critical index issues: {total_issues} problematic indexes, {potential_savings_mb:.1f}MB potential savings"
+            elif health_score < 80 or total_issues > 5 or missing_suggestions > 3:
                 status = HealthStatus.DEGRADED
-                message = f"Index issues: {len(unused_indexes)} unused, {len(missing_indexes)} missing"
-            elif len(unused_indexes) > 2 or len(missing_indexes) > 1:
-                status = HealthStatus.DEGRADED
-                message = f"Minor index issues: {len(unused_indexes)} unused, {len(missing_indexes)} missing"  
+                message = f"Index optimization needed: {total_issues} issues, {missing_suggestions} missing indexes"
             else:
                 status = HealthStatus.HEALTHY
-                message = "Index health good"
-            
-            return HealthCheckResult(
+                message = f"Index health good: score {health_score:.1f}, {total_issues} minor issues"
+
+            return _create_health_check_result(
                 status=status,
                 message=message,
-                details=assessment,
-                check_name=self.name
+                details={
+                    "health_score": health_score,
+                    "unused_indexes": unused_count,
+                    "redundant_indexes": redundant_count,
+                    "bloated_indexes": bloated_count,
+                    "low_usage_indexes": low_usage_count,
+                    "missing_suggestions": missing_suggestions,
+                    "potential_savings_mb": round(potential_savings_mb, 2),
+                    "total_issues": total_issues,
+                    "performance_ms": round(duration_ms, 2)
+                },
+                check_name=self.name,
+                duration_ms=duration_ms
             )
-            
         except Exception as e:
-            return HealthCheckResult(
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Index health check failed: {str(e)}",
-                details={"error": str(e)},
+                details={"error": str(e), "error_type": type(e).__name__},
                 check_name=self.name
             )
 
 
 class DatabaseBloatPlugin(HealthCheckPlugin):
-    """Database table bloat health check plugin"""
-    
+    """Enhanced database table bloat detection plugin with <10ms performance target"""
+
     def __init__(self, config: Optional[HealthCheckPluginConfig] = None):
         super().__init__(
             name="database_bloat",
             category=HealthCheckCategory.DATABASE,
-            config=config or HealthCheckPluginConfig(timeout_seconds=20.0)
-        )
-        
-    async def execute_check(self) -> HealthCheckResult:
-        if not DATABASE_HEALTH_AVAILABLE:
-            return HealthCheckResult(
-                status=HealthStatus.UNKNOWN,
-                message="Database health monitoring not available",
-                check_name=self.name
+            config=config or HealthCheckPluginConfig(
+                timeout_seconds=8.0,  # Optimized for <10ms target
+                critical=False,  # Bloat is important but not critical
+                retry_count=1
             )
-        
+        )
+        self._cached_monitor = None
+
+    def _get_monitor(self):
+        """Get database health monitor with lazy loading and caching"""
+        if self._cached_monitor is None:
+            try:
+                from ...database.health.database_health_monitor import get_database_health_monitor
+                self._cached_monitor = get_database_health_monitor()
+            except ImportError:
+                return None
+        return self._cached_monitor
+
+    async def execute_check(self):
         try:
-            detector = TableBloatDetector()
-            bloat_info = await detector.detect_table_bloat()
-            
-            high_bloat_tables = [
-                table for table, info in bloat_info.items()
-                if info.get('bloat_percentage', 0) > 25
-            ]
-            
-            if len(high_bloat_tables) > 3:
+            monitor = self._get_monitor()
+            if not monitor:
+                _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+                return _create_health_check_result(
+                    status=HealthStatus.UNKNOWN,
+                    message="Database health monitor not available",
+                    check_name=self.name
+                )
+
+            # Use the consolidated bloat detection from DatabaseHealthMonitor
+            start_time = time.time()
+            bloat_report = await monitor.bloat_detector.detect_table_bloat()
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Analyze bloat report for health status
+            high_bloat_tables = []
+            moderate_bloat_tables = []
+            total_bloat_bytes = 0
+
+            if hasattr(bloat_report, 'bloated_tables'):
+                # New BloatDetectionReport format
+                high_bloat_tables = [t.table_name for t in bloat_report.bloated_tables if t.bloat_ratio_percent > 30]
+                moderate_bloat_tables = [t.table_name for t in bloat_report.bloated_tables if 15 <= t.bloat_ratio_percent <= 30]
+                total_bloat_bytes = sum(t.bloat_bytes for t in bloat_report.bloated_tables)
+                total_tables = bloat_report.total_tables_analyzed
+            else:
+                # Legacy dict format
+                for table_name, info in bloat_report.items():
+                    bloat_pct = info.get('bloat_percentage', 0)
+                    if bloat_pct > 30:
+                        high_bloat_tables.append(table_name)
+                    elif bloat_pct >= 15:
+                        moderate_bloat_tables.append(table_name)
+                    total_bloat_bytes += info.get('bloat_bytes', 0)
+                total_tables = len(bloat_report)
+
+            # Determine health status with performance-optimized thresholds
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            if len(high_bloat_tables) > 5 or total_bloat_bytes > 1024**3:  # >1GB bloat
                 status = HealthStatus.UNHEALTHY
-                message = f"High table bloat: {len(high_bloat_tables)} tables need attention"
-            elif len(high_bloat_tables) > 1:
+                message = f"Critical table bloat: {len(high_bloat_tables)} tables with >30% bloat"
+            elif len(high_bloat_tables) > 2 or len(moderate_bloat_tables) > 5:
                 status = HealthStatus.DEGRADED
-                message = f"Some table bloat: {len(high_bloat_tables)} tables need attention"
+                message = f"Moderate table bloat: {len(high_bloat_tables)} high, {len(moderate_bloat_tables)} moderate"
             else:
                 status = HealthStatus.HEALTHY
-                message = "Table bloat within acceptable limits"
-            
-            return HealthCheckResult(
+                message = f"Table bloat acceptable: {total_tables} tables analyzed"
+
+            return _create_health_check_result(
                 status=status,
                 message=message,
-                details={"bloat_info": bloat_info, "high_bloat_tables": high_bloat_tables},
-                check_name=self.name
+                details={
+                    "high_bloat_tables": high_bloat_tables[:10],  # Limit for performance
+                    "moderate_bloat_tables": moderate_bloat_tables[:10],
+                    "total_tables_analyzed": total_tables,
+                    "total_bloat_bytes": total_bloat_bytes,
+                    "total_bloat_mb": round(total_bloat_bytes / (1024**2), 2),
+                    "performance_ms": round(duration_ms, 2)
+                },
+                check_name=self.name,
+                duration_ms=duration_ms
             )
-            
         except Exception as e:
-            return HealthCheckResult(
+            _, HealthCheckResult, HealthStatus = _get_health_protocol_types()
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
-                message=f"Bloat detection failed: {str(e)}",
-                details={"error": str(e)},
+                message=f"Database bloat check failed: {str(e)}",
+                details={"error": str(e), "error_type": type(e).__name__},
                 check_name=self.name
             )
 
@@ -618,12 +923,12 @@ class RedisPlugin(HealthCheckPlugin):
         )
         self.checker = RedisHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Redis check failed: {str(e)}",
                 details={"error": str(e)},
@@ -641,9 +946,9 @@ class RedisDetailedPlugin(HealthCheckPlugin):
             config=config or HealthCheckPluginConfig(timeout_seconds=10.0)
         )
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         if not REDIS_HEALTH_AVAILABLE:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNKNOWN,
                 message="Detailed Redis health monitoring not available",
                 check_name=self.name
@@ -662,7 +967,7 @@ class RedisDetailedPlugin(HealthCheckPlugin):
             else:
                 status = HealthStatus.UNHEALTHY
             
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=status,
                 message=health_report.get('summary', 'Redis health check completed'),
                 details=health_report,
@@ -670,7 +975,7 @@ class RedisDetailedPlugin(HealthCheckPlugin):
             )
             
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Detailed Redis check failed: {str(e)}",
                 details={"error": str(e)},
@@ -688,7 +993,7 @@ class RedisMemoryPlugin(HealthCheckPlugin):
             config=config or HealthCheckPluginConfig(timeout_seconds=5.0)
         )
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             # Simple Redis memory check using basic Redis connection
             from ...cache.redis_client import get_redis_client
@@ -714,7 +1019,7 @@ class RedisMemoryPlugin(HealthCheckPlugin):
                 status = HealthStatus.HEALTHY
                 message = f"Redis memory usage: {used_memory / 1024 / 1024:.1f}MB"
             
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=status,
                 message=message,
                 details={"used_memory": used_memory, "max_memory": max_memory},
@@ -722,7 +1027,7 @@ class RedisMemoryPlugin(HealthCheckPlugin):
             )
             
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Redis memory check failed: {str(e)}",
                 details={"error": str(e)},
@@ -742,12 +1047,12 @@ class AnalyticsServicePlugin(HealthCheckPlugin):
         )
         self.checker = AnalyticsServiceHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Analytics service check failed: {str(e)}",
                 details={"error": str(e)},
@@ -766,12 +1071,12 @@ class EnhancedAnalyticsServicePlugin(HealthCheckPlugin):
         )
         self.checker = EnhancedAnalyticsServiceHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Enhanced analytics service check failed: {str(e)}",
                 details={"error": str(e)},
@@ -790,12 +1095,12 @@ class MCPServerPlugin(HealthCheckPlugin):
         )
         self.checker = MCPServerHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"MCP server check failed: {str(e)}",
                 details={"error": str(e)},
@@ -815,12 +1120,12 @@ class SystemResourcesPlugin(HealthCheckPlugin):
         )
         self.checker = SystemResourcesHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"System resources check failed: {str(e)}",
                 details={"error": str(e)},
@@ -839,12 +1144,12 @@ class QueuePlugin(HealthCheckPlugin):
         )
         self.checker = QueueHealthChecker()
         
-    async def execute_check(self) -> HealthCheckResult:
+    async def execute_check(self):
         try:
             result = await self.checker.check()
             return _convert_health_result(result)
         except Exception as e:
-            return HealthCheckResult(
+            return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Queue service check failed: {str(e)}",
                 details={"error": str(e)},

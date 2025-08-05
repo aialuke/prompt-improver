@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Core system imports
 from prompt_improver.database import get_session_context
-from prompt_improver.database.psycopg_client import PostgresAsyncClient
+from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     StreamingBatchProcessor, StreamingBatchConfig, ChunkingStrategy
 )

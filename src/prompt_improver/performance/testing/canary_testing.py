@@ -20,6 +20,8 @@ from typing import Dict, List, Optional, Any, Callable
 from collections import defaultdict, deque
 import statistics
 
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 import yaml
 from rich.console import Console
 
@@ -588,15 +590,23 @@ class EnhancedCanaryTestingService:
             if self.enable_service_mesh:
                 await self._setup_service_mesh_traffic_split(deployment_name, initial_percentage)
 
-            # Start monitoring
-            monitoring_task = asyncio.create_task(
-                self._monitor_deployment(deployment_name),
-                name=f"monitor_{deployment_name}"
+            # Start monitoring via EnhancedBackgroundTaskManager
+            task_manager = get_background_task_manager()
+            monitoring_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"canary_monitor_{str(uuid.uuid4())[:8]}",
+                coroutine=self._monitor_deployment(deployment_name),
+                priority=TaskPriority.NORMAL,
+                tags={
+                    "service": "testing", 
+                    "type": "canary_monitoring", 
+                    "component": "canary_testing",
+                    "deployment_name": deployment_name
+                }
             )
 
             self.active_deployments[deployment_name] = {
                 "canary_group": canary_group,
-                "monitoring_task": monitoring_task,
+                "monitoring_task_id": monitoring_task_id,
                 "start_time": datetime.now(UTC),
                 "target_percentage": target_percentage,
                 "ramp_duration_minutes": ramp_duration_minutes

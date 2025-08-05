@@ -16,11 +16,13 @@ from datetime import datetime, timedelta, UTC
 from enum import Enum
 from dataclasses import dataclass
 import asyncio
+import uuid
 
 from pydantic import BaseModel
 from .logging_utils import LoggerMixin
 from .config_utils import ConfigMixin
 from .metrics_utils import MetricsMixin
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class ServiceState(str, Enum):
     """Common service state enumeration."""
@@ -304,7 +306,7 @@ class BaseMonitor(BaseService):
     def __init__(self, name: str, check_interval: float = 30.0, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
         self.check_interval = check_interval
-        self.monitoring_task: Optional[asyncio.Task[None]] = None
+        self.monitoring_task_id: Optional[str] = None
         self.health_checkers: Dict[str, BaseHealthChecker] = {}
         self.monitoring_enabled = True
     
@@ -329,8 +331,19 @@ class BaseMonitor(BaseService):
         self.start_time = datetime.now(UTC)
         self.monitoring_enabled = True
         
-        # Start monitoring task
-        self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+        # Start monitoring task using background task manager
+        task_manager = get_background_task_manager()
+        self.monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"monitor_{self.name}_{str(uuid.uuid4())[:8]}",
+            coroutine=self._monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "monitoring",
+                "type": "health_monitoring",
+                "component": self.name,
+                "operation": "continuous_monitoring"
+            }
+        )
         
         self.logger.info(f"Started monitor: {self.name}")
         return True
@@ -339,12 +352,10 @@ class BaseMonitor(BaseService):
         """Stop monitoring."""
         self.monitoring_enabled = False
         
-        if self.monitoring_task and not self.monitoring_task.done():
-            self.monitoring_task.cancel()
-            try:
-                await self.monitoring_task
-            except asyncio.CancelledError:
-                pass
+        if self.monitoring_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.monitoring_task_id)
+            self.monitoring_task_id = None
         
         self.state = ServiceState.STOPPED
         self.logger.info(f"Stopped monitor: {self.name}")
@@ -363,11 +374,24 @@ class BaseMonitor(BaseService):
             )
         
         # Check if monitoring task is running
-        if not self.monitoring_task or self.monitoring_task.done():
+        if not self.monitoring_task_id:
             return HealthCheckResult(
                 status=HealthStatus.UNHEALTHY,
                 message="Monitoring task is not running",
                 details={"task_running": False},
+                timestamp=datetime.now(UTC),
+                duration_ms=0,
+                critical=True
+            )
+        
+        # Check task status with background task manager
+        task_manager = get_background_task_manager()
+        task_status = await task_manager.get_task_status(self.monitoring_task_id)
+        if not task_status or task_status.get("status") not in ["running", "pending"]:
+            return HealthCheckResult(
+                status=HealthStatus.UNHEALTHY,
+                message="Monitoring task is not running",
+                details={"task_running": False, "task_status": task_status},
                 timestamp=datetime.now(UTC),
                 duration_ms=0,
                 critical=True

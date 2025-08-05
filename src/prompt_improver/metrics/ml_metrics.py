@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 import statistics
 from collections import defaultdict, deque
+import uuid
 
 # Lazy import to avoid circular dependency
 # from ..performance.monitoring.metrics_registry import get_metrics_registry
@@ -21,6 +22,7 @@ from .base_metrics_collector import (
     BaseMetricsCollector, MetricsConfig, PrometheusMetricsMixin,
     MetricsStorageMixin
 )
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class PromptCategory(Enum):
     """Categories for prompt improvements."""
@@ -140,6 +142,10 @@ class MLMetricsCollector(
             "feature_flags_tracked": 0,
             "pipeline_operations_tracked": 0,
         }
+        
+        # Background task management using EnhancedBackgroundTaskManager
+        self.aggregation_task_id: Optional[str] = None
+        self.task_manager = get_background_task_manager()
 
     def collect_metric(self, metric: Union[PromptImprovementMetric, ModelInferenceMetric,
                                          FeatureFlagMetric, MLPipelineMetric]) -> None:
@@ -234,7 +240,12 @@ class MLMetricsCollector(
             return
 
         self.is_running = True
-        self.aggregation_task = asyncio.create_task(self._aggregation_loop())
+        self.aggregation_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"ml_aggregation_{str(uuid.uuid4())[:8]}",
+            coroutine=self._aggregation_loop(),
+            priority=TaskPriority.HIGH,
+            tags={"service": "metrics", "type": "aggregation", "component": "ml_metrics"}
+        )
         self.logger.info("Started ML metrics aggregation")
 
     async def stop_aggregation(self) -> None:
@@ -243,12 +254,13 @@ class MLMetricsCollector(
             return
 
         self.is_running = False
-        if self.aggregation_task:
-            self.aggregation_task.cancel()
+        if self.aggregation_task_id:
             try:
-                await self.aggregation_task
-            except asyncio.CancelledError:
-                pass
+                await self.task_manager.cancel_task(self.aggregation_task_id)
+            except Exception as e:
+                self.logger.warning(f"Failed to cancel ML aggregation task {self.aggregation_task_id}: {e}")
+            
+            self.aggregation_task_id = None
 
         self.logger.info("Stopped ML metrics aggregation")
 

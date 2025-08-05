@@ -21,8 +21,15 @@ from .unified_connection_manager import (
     UnifiedConnectionManager,
 )
 
-# Global manager instance
-_global_manager = UnifiedConnectionManager(ManagerMode.ASYNC_MODERN)
+# Global manager instance (lazy-loaded to avoid import-time blocking)
+_global_manager = None
+
+def _get_global_manager():
+    """Get or create the global manager instance."""
+    global _global_manager
+    if _global_manager is None:
+        _global_manager = UnifiedConnectionManager(ManagerMode.ASYNC_MODERN)
+    return _global_manager
 
 # Note: DatabaseManager and DatabaseSessionManager aliases removed - use UnifiedConnectionManager directly
 
@@ -30,25 +37,32 @@ _global_manager = UnifiedConnectionManager(ManagerMode.ASYNC_MODERN)
 @contextlib.asynccontextmanager
 async def get_session():
     """Database session factory using unified manager"""
-    async with _global_manager.get_async_session() as session:
+    manager = _get_global_manager()
+    async with manager.get_async_session() as session:
         yield session
 
 @contextlib.asynccontextmanager
 async def get_session_context():
     """Database session context using unified manager"""
-    async with _global_manager.get_async_session() as session:
+    manager = _get_global_manager()
+    async with manager.get_async_session() as session:
         yield session
 
 def get_async_session_factory():
     """Get async session factory from unified manager"""
-    return _global_manager._async_session_factory
+    manager = _get_global_manager()
+    return manager._async_session_factory
 
 def _get_global_sessionmanager():
     """Get global session manager (unified manager)"""
-    return _global_manager
+    return _get_global_manager()
+
+def get_sessionmanager():
+    """Get the global session manager (UnifiedConnectionManager)"""
+    return _get_global_manager()
 
 # Type aliases for compatibility
-AsyncSessionFactory = type(get_async_session_factory())
+# AsyncSessionFactory = type(get_async_session_factory())  # Lazy-loaded, defined when needed
 
 # Protocol import - Unified manager is the SessionProvider
 SessionProvider = UnifiedConnectionManager

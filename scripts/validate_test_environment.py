@@ -120,30 +120,48 @@ def validate_optional_variables() -> None:
             print_status(f"{var} ({description})", "WARN", "Not set (using defaults)")
 
 async def test_database_connection() -> bool:
-    """Test database connection."""
+    """Test database connection using UnifiedConnectionManager."""
     try:
-        import asyncpg
+        # Use UnifiedConnectionManager for database connectivity testing
+        from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+
+        # Get manager instance optimized for environment validation
+        unified_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+
+        # Initialize if not already done
+        if not unified_manager._is_initialized:
+            await unified_manager.initialize()
+
+        # Perform comprehensive health check
+        health_status = await unified_manager.health_check()
+
+        # Extract database connectivity results
+        database_healthy = health_status.get("components", {}).get("async_database") == "healthy"
+        response_time_ms = health_status.get("response_time_ms", 0)
+        overall_status = health_status.get("status", "unknown")
+
+        if database_healthy and overall_status in ["healthy", "degraded"]:
+            print_status("Database connection", "PASS", f"Connected via UnifiedConnectionManager ({response_time_ms:.2f}ms)")
+            return True
+        else:
+            # Extract error details from health status
+            error_details = []
+            for component, status in health_status.get("components", {}).items():
+                if "unhealthy" in str(status):
+                    error_details.append(f"{component}: {status}")
+            
+            error_message = f"Database connectivity failed - Status: {overall_status}"
+            if error_details:
+                error_message += f" - Issues: {'; '.join(error_details)}"
+            
+            print_status("Database connection", "FAIL", error_message)
+            return False
         
-        conn = await asyncpg.connect(
-            host=os.getenv('POSTGRES_HOST', 'localhost'),
-            port=int(os.getenv('POSTGRES_PORT', 5432)),
-            database=os.getenv('POSTGRES_DATABASE', 'apes_production'),
-            user=os.getenv('POSTGRES_USERNAME', 'apes_user'),
-            password=os.getenv('POSTGRES_PASSWORD')
-        )
-        
-        # Test a simple query
-        result = await conn.fetchval('SELECT version()')
-        await conn.close()
-        
-        print_status("Database connection", "PASS", f"Connected to PostgreSQL")
-        return True
-        
-    except ImportError:
-        print_status("Database connection", "WARN", "asyncpg not installed - skipping test")
+    except ImportError as e:
+        print_status("Database connection", "WARN", f"UnifiedConnectionManager not available: {str(e)}")
         return True
     except Exception as e:
-        print_status("Database connection", "FAIL", str(e))
+        print_status("Database connection", "FAIL", f"Database connectivity failed via UnifiedConnectionManager: {str(e)}")
         return False
 
 def test_redis_connection() -> bool:

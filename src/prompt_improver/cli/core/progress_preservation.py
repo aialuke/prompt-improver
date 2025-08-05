@@ -64,12 +64,15 @@ class ProgressPreservationManager:
         self.backup_dir = backup_dir or Path("./training_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
+        # Unified session manager for consolidated session management
+        self._unified_session_manager = None
+
         # Signal handling integration - lazy import to avoid circular dependency
         self.signal_handler = None
         self.background_manager = None
         self._shutdown_priority = 6  # Medium priority for progress preservation
         
-        # Progress tracking
+        # Progress tracking (legacy compatibility)
         self.active_sessions: Dict[str, ProgressSnapshot] = {}
         self.checkpoint_interval = 5  # Save checkpoint every 5 iterations
         
@@ -353,6 +356,11 @@ class ProgressPreservationManager:
                 "error": str(e)
             }
 
+    async def _ensure_unified_session_manager(self):
+        """Ensure unified session manager is available."""
+        if self._unified_session_manager is None:
+            self._unified_session_manager = await get_unified_session_manager()
+
     async def save_training_progress(
         self,
         session_id: str,
@@ -365,7 +373,7 @@ class ProgressPreservationManager:
         improvement_score: float = 0.0
     ) -> bool:
         """
-        Save comprehensive training progress to database and backup files.
+        Save comprehensive training progress using unified session management.
 
         Args:
             session_id: Training session identifier
@@ -381,7 +389,7 @@ class ProgressPreservationManager:
             True if progress saved successfully
         """
         try:
-            # Create progress snapshot
+            # Create progress snapshot for legacy compatibility
             snapshot = ProgressSnapshot(
                 session_id=session_id,
                 iteration=iteration,
@@ -394,17 +402,28 @@ class ProgressPreservationManager:
                 improvement_score=improvement_score
             )
 
-            # Save to database
+            # Use unified session manager for primary storage
+            await self._ensure_unified_session_manager()
+            
+            # Update progress in unified session manager
+            unified_success = await self._unified_session_manager.update_training_progress(
+                session_id=session_id,
+                iteration=iteration,
+                performance_metrics=performance_metrics,
+                improvement_score=improvement_score
+            )
+
+            # Save to database (legacy path)
             await self._save_to_database(snapshot)
 
-            # Save to backup file
+            # Save to backup file (legacy path)
             await self._save_to_backup_file(snapshot)
 
-            # Update active sessions tracking
+            # Update active sessions tracking (legacy compatibility)
             self.active_sessions[session_id] = snapshot
 
-            self.logger.info(f"Progress saved for session {session_id}, iteration {iteration}")
-            return True
+            self.logger.info(f"Progress saved for session {session_id}, iteration {iteration} (unified: {unified_success})")
+            return unified_success and True
 
         except Exception as e:
             self.logger.error(f"Failed to save training progress: {e}")

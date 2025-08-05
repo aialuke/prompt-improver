@@ -597,7 +597,8 @@ if __name__ == "__main__":
         
         requirements_path = build_path / "requirements.txt"
         with open(requirements_path, "w") as f:
-            f.write("\\n".join(requirements))
+            f.write("\
+".join(requirements))
     
     async def _deploy_to_docker(self,
                                result: DeploymentResult,

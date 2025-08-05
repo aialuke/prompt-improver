@@ -94,7 +94,7 @@ class DirectComponentLoader:
                 "database_performance_monitor": "prompt_improver.database.performance_monitor",
                 "database_connection_optimizer": "prompt_improver.database.query_optimizer",
                 "prepared_statement_cache": "prompt_improver.database.query_optimizer",
-                "type_safe_psycopg_client": "prompt_improver.database.psycopg_client",
+                # "type_safe_psycopg_client": REMOVED - eliminated per DATABASE_CONSOLIDATION.md
                 "apes_service_manager": "prompt_improver.core.services.manager",
                 "unified_retry_manager": "prompt_improver.core.retry_manager",
                 "secure_key_manager": "prompt_improver.security.key_manager",
@@ -271,7 +271,7 @@ class DirectComponentLoader:
             "ml_resource_manager_health_checker": "MLResourceManagerHealthChecker",
             "redis_health_monitor": "RedisHealthMonitor",
             "prepared_statement_cache": "PreparedStatementCache",
-            "type_safe_psycopg_client": "TypeSafePsycopgClient",
+            # "type_safe_psycopg_client": REMOVED - eliminated per DATABASE_CONSOLIDATION.md
             "context_cache_manager": "ContextCacheManager",
             "apes_service_manager": "APESServiceManager",
             "unified_retry_manager": "RetryManager",

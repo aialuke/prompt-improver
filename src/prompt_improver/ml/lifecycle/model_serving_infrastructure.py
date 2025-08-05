@@ -23,7 +23,9 @@ import uuid
 import numpy as np
 import psutil
 from pydantic import BaseModel, Field as PydanticField
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, generate_latest
+from ...monitoring.opentelemetry.metrics import get_ml_metrics
+from ...core.metrics.unified_metrics_adapter import get_unified_metrics_adapter, get_metrics_streamer
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, ModelStatus
 from prompt_improver.utils.datetime_utils import aware_utc_now
@@ -275,9 +277,11 @@ class ModelServingInstance:
         self.cache: Dict[str, Any] = {}
         self.cache_timestamps: Dict[str, float] = {}
         
-        # Prometheus metrics
-        self.prometheus_registry = CollectorRegistry()
-        self._setup_prometheus_metrics()
+        # OpenTelemetry metrics integration - dual approach for comprehensive coverage
+        self.ml_metrics = get_ml_metrics()  # Direct ML-specific metrics
+        self.unified_adapter = get_unified_metrics_adapter()  # Unified adapter for compatibility
+        self.metrics_streamer = get_metrics_streamer()  # Real-time WebSocket streaming
+        self._setup_opentelemetry_metrics()
         
     async def initialize(self):
         """Initialize the serving instance."""
@@ -295,12 +299,33 @@ class ModelServingInstance:
             self.status = ServingStatus.HEALTHY
             self.metrics.model_load_time_ms = (time.time() - self.start_time) * 1000
             
-            # Start background tasks
-            asyncio.create_task(self._health_monitor())
-            asyncio.create_task(self._metrics_collector())
+            # Start background tasks using centralized task manager
+            task_manager = get_background_task_manager()
+            
+            # Submit health monitoring task with HIGH priority
+            await task_manager.submit_enhanced_task(
+                task_id=f"health_monitor_{self.instance_id}",
+                coroutine=self._health_monitor,
+                priority=TaskPriority.HIGH,
+                tags={"service": "ml_serving", "type": "health_monitor", "instance_id": self.instance_id}
+            )
+            
+            # Submit metrics collection task with NORMAL priority
+            await task_manager.submit_enhanced_task(
+                task_id=f"metrics_collector_{self.instance_id}",
+                coroutine=self._metrics_collector,
+                priority=TaskPriority.NORMAL,
+                tags={"service": "ml_serving", "type": "metrics_collector", "instance_id": self.instance_id}
+            )
             
             if self.config.enable_batching:
-                asyncio.create_task(self._batch_processor())
+                # Submit batch processing task with NORMAL priority
+                await task_manager.submit_enhanced_task(
+                    task_id=f"batch_processor_{self.instance_id}",
+                    coroutine=self._batch_processor,
+                    priority=TaskPriority.NORMAL,
+                    tags={"service": "ml_serving", "type": "batch_processor", "instance_id": self.instance_id}
+                )
             
             logger.info(f"Model serving instance {self.instance_id} initialized")
             
@@ -530,8 +555,8 @@ class ModelServingInstance:
                 self._last_rps_update = current_time
                 self._last_request_count = self.metrics.total_requests
                 
-                # Update Prometheus metrics
-                self._update_prometheus_metrics()
+                # Update OpenTelemetry metrics
+                await self._update_opentelemetry_metrics()
                 
                 await asyncio.sleep(10)  # Update every 10 seconds
                 
@@ -539,29 +564,92 @@ class ModelServingInstance:
                 logger.error(f"Metrics collector error: {e}")
                 await asyncio.sleep(30)
     
-    def _setup_prometheus_metrics(self):
-        """Setup Prometheus metrics."""
+    def _setup_opentelemetry_metrics(self):
+        """Setup OpenTelemetry metrics integration."""
+        # Initialize model information in unified adapter (replaces Prometheus model_info)
+        self.unified_adapter.set_model_info(
+            model_name=self.model_metadata.model_name,
+            model_version=str(self.model_metadata.version),
+            instance_id=self.instance_id,
+            status="initializing"
+        )
         
-        self.prometheus_metrics = {
-            "requests_total": Counter(
-                "model_requests_total",
-                "Total number of requests",
-                ["model_id", "instance_id", "status"],
-                registry=self.prometheus_registry
-            ),
-            "request_duration": Histogram(
-                "model_request_duration_seconds",
-                "Request duration",
-                ["model_id", "instance_id"],
-                registry=self.prometheus_registry
-            ),
-            "model_info": Gauge(
-                "model_info",
-                "Model information",
-                ["model_id", "model_name", "version", "instance_id"],
-                registry=self.prometheus_registry
+        logger.info(f"OpenTelemetry metrics configured for model serving instance {self.instance_id}")
+    
+    async def _update_opentelemetry_metrics(self):
+        """Update OpenTelemetry metrics with current serving statistics."""
+        try:
+            # Update model status in unified adapter
+            self.unified_adapter.set_model_info(
+                model_name=self.model_metadata.model_name,
+                model_version=str(self.model_metadata.version),
+                instance_id=self.instance_id,
+                status=self.status.value
             )
-        }
+            
+            # Record serving metrics via unified adapter (replaces Prometheus counters/histograms)
+            if self.metrics.total_requests > 0:
+                self.unified_adapter.record_ml_serving_metrics(
+                    model_name=self.model_metadata.model_name,
+                    instance_id=self.instance_id,
+                    request_count=1,  # Incremental update
+                    duration_ms=self.metrics.avg_latency_ms,
+                    error_count=1 if self.metrics.error_rate > 0 else 0
+                )
+            
+            # Record detailed ML metrics via direct MLMetrics integration
+            if self.metrics.total_requests > 0:
+                # Record inference duration and success rate
+                self.ml_metrics.record_inference(
+                    model_name=self.model_metadata.model_name,
+                    model_version=str(self.model_metadata.version),
+                    duration_ms=self.metrics.avg_latency_ms,
+                    success=(self.metrics.error_rate < 0.05)  # Consider success if error rate < 5%
+                )
+                
+                # Record failure analysis if there are errors
+                if self.metrics.error_rate > 0:
+                    self.ml_metrics.record_failure_analysis(
+                        failure_rate=self.metrics.error_rate,
+                        failure_type="model_serving",
+                        severity="warning" if self.metrics.error_rate < 0.1 else "critical",
+                        total_failures=int(self.metrics.failed_requests),
+                        response_time=self.metrics.avg_latency_ms / 1000.0,  # Convert to seconds
+                        rpn_score=self._calculate_rpn_score()
+                    )
+            
+            # Stream real-time metrics via WebSocket (Phase 2 integration)
+            try:
+                serving_metrics_data = {
+                    "instance_id": self.instance_id,
+                    "total_requests": self.metrics.total_requests,
+                    "error_rate": self.metrics.error_rate,
+                    "avg_latency_ms": self.metrics.avg_latency_ms,
+                    "rps": self.metrics.requests_per_second,
+                    "cpu_percent": self.metrics.cpu_utilization_percent,
+                    "memory_mb": self.metrics.memory_usage_mb,
+                    "status": self.status.value
+                }
+                
+                await self.metrics_streamer.stream_ml_serving_update(
+                    model_name=self.model_metadata.model_name,
+                    metrics_data=serving_metrics_data
+                )
+            except Exception as streaming_error:
+                # Non-critical error - don't break metrics collection
+                logger.debug(f"WebSocket streaming error (non-critical): {streaming_error}")
+                
+        except Exception as e:
+            logger.error(f"Failed to update OpenTelemetry metrics: {e}")
+    
+    def _calculate_rpn_score(self) -> float:
+        """Calculate Risk Priority Number for FMEA analysis."""
+        # Simple RPN calculation based on error rate, latency, and health
+        severity = min(10, max(1, int(self.metrics.error_rate * 100)))  # 1-10 scale
+        occurrence = min(10, max(1, int(self.metrics.avg_latency_ms / 20)))  # Based on latency
+        detection = 3 if self.status == ServingStatus.HEALTHY else 7  # Detection difficulty
+        
+        return float(severity * occurrence * detection)
     
     def get_metrics(self) -> Dict[str, Any]:
         """Get comprehensive metrics."""
@@ -643,9 +731,15 @@ class ProductionModelServer:
         self.serving_instances[model_id] = instances
         self.serving_configs[model_id] = serving_config
         
-        # Start auto-scaler if enabled
+        # Start auto-scaler if enabled using centralized task manager
         if self.enable_auto_scaling:
-            asyncio.create_task(self._auto_scaler(model_id))
+            task_manager = get_background_task_manager()
+            await task_manager.submit_enhanced_task(
+                task_id=f"auto_scaler_{model_id}",
+                coroutine=lambda: self._auto_scaler(model_id),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "ml_serving", "type": "auto_scaler", "model_id": model_id}
+            )
         
         logger.info(f"Deployed model {model_id} with {len(instances)} instances")
         return model_id

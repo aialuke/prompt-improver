@@ -15,51 +15,18 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from datetime import datetime, UTC
 
 import aiofiles
-from prometheus_client import Counter, Histogram, Gauge
 
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics for performance monitoring - using lazy initialization to avoid duplicates
-_metrics = {}
-
-def get_response_time_histogram():
-    """Get or create response time histogram"""
-    if 'response_time' not in _metrics:
-        _metrics['response_time'] = Histogram(
-            'mcp_response_time_seconds',
-            'Response time for MCP operations',
-            ['operation', 'status']
-        )
-    return _metrics['response_time']
-
-def get_response_time_violations():
-    """Get or create response time violations counter"""
-    if 'violations' not in _metrics:
-        _metrics['violations'] = Counter(
-            'mcp_response_time_violations_total',
-            'Number of responses exceeding 200ms target',
-            ['operation']
-        )
-    return _metrics['violations']
-
-def get_active_requests():
-    """Get or create active requests gauge"""
-    if 'active_requests' not in _metrics:
-        _metrics['active_requests'] = Gauge(
-            'mcp_active_requests',
-            'Number of currently active requests'
-        )
-    return _metrics['active_requests']
-
-def get_cache_performance():
-    """Get or create cache performance histogram"""
-    if 'cache_performance' not in _metrics:
-        _metrics['cache_performance'] = Histogram(
-            'mcp_cache_operation_seconds',
-            'Cache operation performance',
-            ['operation', 'hit_miss']
-        )
-    return _metrics['cache_performance']
+# OpenTelemetry metrics integration - consolidated monitoring system
+try:
+    from ...monitoring.opentelemetry.metrics import get_http_metrics
+    _http_metrics = get_http_metrics()
+    _metrics_available = True
+except ImportError:
+    _http_metrics = None
+    _metrics_available = False
+    logger.warning("OpenTelemetry metrics not available, using in-memory fallback")
 
 @dataclass
 class PerformanceMetrics:
@@ -78,17 +45,17 @@ class PerformanceMetrics:
         self.status = status
         self.metadata.update(metadata)
 
-        # Record Prometheus metrics
-        get_response_time_histogram().labels(
-            operation=self.operation_name,
-            status=self.status
-        ).observe(self.duration_ms / 1000)
+        # Record OpenTelemetry metrics
+        if _metrics_available and _http_metrics:
+            _http_metrics.record_request(
+                method="INTERNAL",
+                endpoint=self.operation_name,
+                status_code=200 if self.status == "success" else 500,
+                duration_ms=self.duration_ms
+            )
 
         # Check if we exceeded the 200ms target
         if self.duration_ms > 200:
-            get_response_time_violations().labels(
-                operation=self.operation_name
-            ).inc()
             logger.warning(
                 f"Response time target violation: {self.operation_name} "
                 f"took {self.duration_ms:.2f}ms (target: <200ms)"
@@ -151,7 +118,10 @@ class PerformanceOptimizer:
         Yields:
             PerformanceMetrics instance for the operation
         """
-        get_active_requests().inc()
+        # Track active requests via OpenTelemetry
+        if _metrics_available and _http_metrics:
+            # Active request tracking handled by OpenTelemetry instrumentation
+            pass
 
         metrics = PerformanceMetrics(
             operation_name=operation_name,
@@ -168,7 +138,8 @@ class PerformanceOptimizer:
             raise
 
         finally:
-            get_active_requests().dec()
+            # Active request decrement handled by OpenTelemetry instrumentation
+            pass
 
             # Store measurement for analysis
             if operation_name not in self._measurements:

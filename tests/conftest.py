@@ -35,12 +35,21 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 
+# Testcontainers imports for Phase 4 consolidation
+from testcontainers.postgres import PostgresContainer
+import subprocess
+import time
+from prompt_improver.database import get_session
+from prompt_improver.core.config import get_config
+
 from prompt_improver.database.models import (
     ABExperiment,
     ImprovementSession,
     RuleMetadata,
     RulePerformance,
     UserFeedback,
+    SQLModel,
+    RuleIntelligenceCache,
 )
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -235,10 +244,31 @@ async def test_db_engine():
         except Exception:
             pass
         
-        # Clean up the unique test database
+        # Clean up the unique test database using UnifiedConnectionManager when possible
         try:
-            import asyncpg
+            # Try UnifiedConnectionManager for verification first
+            from prompt_improver.database.unified_connection_manager import (
+                get_unified_manager, ManagerMode
+            )
+            from sqlalchemy import text
             
+            try:
+                manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+                async with manager.get_async_session() as session:
+                    # Verify database exists before attempting to drop
+                    result = await session.execute(
+                        text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                        {"db_name": test_db_name}
+                    )
+                    exists = result.scalar()
+                    if not exists:
+                        logger.info(f"Test database {test_db_name} does not exist, cleanup not needed")
+                        return
+            except Exception as e:
+                logger.debug(f"UnifiedConnectionManager verification failed, proceeding with direct cleanup: {e}")
+            
+            # Use direct connection for DDL operations (required for DROP DATABASE)
+            import asyncpg
             conn = await asyncpg.connect(
                 host=config.postgres_host,
                 port=config.postgres_port,
@@ -1477,3 +1507,314 @@ def async_test(f):
 def async_test_decorator():
     """Async test decorator utility."""
     return async_test
+
+
+# ===============================
+# PHASE 4 CONSOLIDATION: UNIFIED TEST INFRASTRUCTURE
+# ===============================
+
+# Testcontainer fixtures for real database testing (consolidated from phase4)
+@pytest.fixture(scope="session")
+def postgres_container():
+    """Start PostgreSQL container for testing session.
+    
+    Consolidated from phase4 conftest.py - provides testcontainer infrastructure
+    for tests requiring isolated database environments.
+    """
+    with PostgresContainer(
+        image="postgres:16-alpine",
+        username="test_user", 
+        password="test_password",
+        dbname="test_db",
+        port=5432
+    ) as postgres:
+        yield postgres
+
+
+@pytest.fixture(scope="session")
+def testcontainer_database_url(postgres_container):
+    """Get async database URL from testcontainer.
+    
+    Consolidated from phase4 conftest.py - provides isolated test database URL.
+    """
+    host = postgres_container.get_container_host_ip()
+    port = postgres_container.get_exposed_port(5432)
+    username = postgres_container.username
+    password = postgres_container.password
+    database = postgres_container.dbname
+    
+    async_url = f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database}"
+    return async_url
+
+
+@pytest_asyncio.fixture(scope="session") 
+async def testcontainer_engine(testcontainer_database_url):
+    """Create async SQLAlchemy engine for testcontainer testing.
+    
+    Consolidated from phase4 conftest.py - provides isolated test engine.
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    
+    engine = create_async_engine(
+        testcontainer_database_url,
+        echo=False,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
+    
+    # Create all tables
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    
+    yield engine
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def testcontainer_session_factory(testcontainer_engine):
+    """Create async session factory for testcontainer testing.
+    
+    Consolidated from phase4 conftest.py - provides isolated session factory.
+    """
+    return async_sessionmaker(
+        bind=testcontainer_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+        autocommit=False,
+    )
+
+
+@pytest_asyncio.fixture
+async def isolated_db_session(testcontainer_session_factory):
+    """Provide isolated database session for each test.
+    
+    Consolidated from phase4 conftest.py - provides perfect test isolation
+    through transaction rollback.
+    """
+    async with testcontainer_session_factory() as session:
+        transaction = await session.begin()
+        try:
+            yield session
+        finally:
+            await transaction.rollback()
+            await session.close()
+
+
+# Real database fixtures (consolidated from integration)
+@pytest.fixture(scope="session", autouse=True)
+def setup_real_database():
+    """Setup real database for integration testing.
+    
+    Consolidated from integration conftest.py - manages real database setup
+    for integration tests requiring production-like environment.
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--filter", "name=apes_postgres", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if "apes_postgres" not in result.stdout:
+            print("Starting real PostgreSQL database for integration tests...")
+            subprocess.run(
+                ["docker-compose", "up", "-d", "postgres"],
+                check=True,
+                timeout=60,
+                cwd="/Users/lukemckenzie/prompt-improver"
+            )
+            
+            # Wait for database readiness
+            print("Waiting for database to be ready...")
+            max_retries = 30
+            for i in range(max_retries):
+                try:
+                    result = subprocess.run([
+                        "docker", "exec", "apes_postgres", 
+                        "pg_isready", "-U", "apes_user", "-d", "apes_production"
+                    ], capture_output=True, timeout=5)
+                    
+                    if result.returncode == 0:
+                        print("Real database is ready!")
+                        break
+                except subprocess.TimeoutExpired:
+                    pass
+                    
+                if i == max_retries - 1:
+                    raise RuntimeError("Real database failed to start within timeout")
+                time.sleep(1)
+        else:
+            print("Real database already running - using for integration testing")
+            
+        yield
+    except Exception as e:
+        print(f"Real database setup failed: {e}")
+        yield
+
+
+@pytest.fixture
+async def real_database_session():
+    """Provide real database session for integration tests.
+    
+    Consolidated from integration conftest.py - provides production database
+    access for real behavior testing.
+    """
+    async with get_session() as session:
+        yield session
+
+
+@pytest.fixture
+async def performance_baseline():
+    """Establish performance baseline for tests.
+    
+    Consolidated from integration conftest.py - provides performance baselines
+    for regression testing.
+    """
+    from prompt_improver.database.performance_monitor import get_performance_monitor
+    
+    monitor = await get_performance_monitor()
+    baseline_snapshot = await monitor.take_performance_snapshot()
+    
+    return {
+        "baseline_cache_hit_ratio": baseline_snapshot.cache_hit_ratio,
+        "baseline_query_time_ms": baseline_snapshot.avg_query_time_ms,
+        "baseline_connections": baseline_snapshot.active_connections,
+        "baseline_timestamp": baseline_snapshot.timestamp
+    }
+
+
+# Sample data fixtures (consolidated from phase4)
+@pytest_asyncio.fixture
+async def sample_rule_intelligence_cache(isolated_db_session):
+    """Create sample rule intelligence cache data for testing.
+    
+    Consolidated from phase4 conftest.py - provides test data for rule intelligence.
+    """
+    cache_entry = RuleIntelligenceCache(
+        cache_key="test_cache_key_1",
+        rule_id="test_rule_1", 
+        rule_name="Test Rule 1",
+        prompt_characteristics_hash="hash_1",
+        effectiveness_score=0.8,
+        characteristic_match_score=0.75,
+        historical_performance_score=0.85,
+        ml_prediction_score=0.7,
+        recency_score=0.9,
+        total_score=0.8,
+        confidence_level=0.85,
+        sample_size=25,
+        pattern_insights={"key": "value"},
+        optimization_recommendations=["rec1", "rec2"],
+        performance_trend="improving"
+    )
+    
+    isolated_db_session.add(cache_entry)
+    await isolated_db_session.commit()
+    await isolated_db_session.refresh(cache_entry)
+    
+    return [cache_entry]
+
+
+# Performance testing configuration (consolidated from phase4)
+@pytest.fixture(scope="session")
+def performance_test_config():
+    """Configuration for performance testing following 2025 standards.
+    
+    Consolidated from phase4 conftest.py - provides performance test configuration.
+    """
+    return {
+        "max_response_time_ms": 200,  # <200ms SLA requirement
+        "batch_size_limits": {
+            "small": 50,
+            "medium": 100, 
+            "large": 500
+        },
+        "parallel_worker_limits": {
+            "min": 2,
+            "max": 8,
+            "default": 4
+        },
+        "confidence_thresholds": {
+            "minimum": 0.6,
+            "good": 0.8,
+            "excellent": 0.9
+        }
+    }
+
+
+# Event bus mock (consolidated from integration)
+@pytest.fixture
+def mock_event_bus():
+    """Provide event bus for testing event-driven behavior.
+    
+    Consolidated from integration conftest.py - provides minimal event bus
+    for event collection in tests.
+    """
+    class TestEventBus:
+        def __init__(self):
+            self.events = []
+            self.subscribers = {}
+        
+        async def emit(self, event):
+            self.events.append(event)
+            if event.event_type in self.subscribers:
+                for handler in self.subscribers[event.event_type]:
+                    await handler(event)
+        
+        def subscribe(self, event_type, handler):
+            if event_type not in self.subscribers:
+                self.subscribers[event_type] = []
+            self.subscribers[event_type].append(handler)
+        
+        async def start(self):
+            pass
+        
+        async def stop(self):
+            pass
+    
+    return TestEventBus()
+
+
+# Unified pytest markers configuration (consolidated from integration)
+def pytest_configure(config):
+    """Configure custom pytest markers for all test types."""
+    config.addinivalue_line("markers", "performance: mark test as performance test")
+    config.addinivalue_line("markers", "integration: mark test as integration test") 
+    config.addinivalue_line("markers", "real_database: mark test as requiring real database")
+    config.addinivalue_line("markers", "event_driven: mark test as testing event-driven behavior")
+    config.addinivalue_line("markers", "testcontainer: mark test as using testcontainer isolation")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection to add markers automatically for all test types."""
+    for item in items:
+        # Add integration marker to integration tests
+        if "integration" in str(item.fspath):
+            item.add_marker(pytest.mark.integration)
+        
+        # Add real_database marker to database tests
+        if "database" in str(item.fspath):
+            item.add_marker(pytest.mark.real_database)
+        
+        # Add performance marker to performance tests  
+        if "performance" in item.name.lower():
+            item.add_marker(pytest.mark.performance)
+        
+        # Add event_driven marker to event tests
+        if "event" in item.name.lower():
+            item.add_marker(pytest.mark.event_driven)
+            
+        # Add testcontainer marker to phase4 tests
+        if "phase4" in str(item.fspath):
+            item.add_marker(pytest.mark.testcontainer)
+
+
+# Unified async test timeout (consolidated from integration)
+@pytest.fixture(autouse=True)
+def async_test_timeout():
+    """Set reasonable timeout for async tests."""
+    return 30  # 30 seconds timeout for async tests

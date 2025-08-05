@@ -88,8 +88,14 @@ from ....core.protocols.retry_protocols import (
     RetryStrategy,
     RetryableErrorType
 )
-# Import modern retry manager
-from ....core.retry_manager import RetryManager, get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
+# Lazy import retry manager to avoid circular imports
+# from ....core.retry_manager import RetryManager, get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
+
+# Create fallback classes for type hints to avoid NameError
+class _RetryConfigFallback:
+    """Fallback RetryConfig for type hints when avoiding circular imports."""
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 @dataclass
 class TaskMetrics:
@@ -110,7 +116,7 @@ class EnhancedBackgroundTask:
     task_id: str
     coroutine: Callable
     priority: TaskPriority = TaskPriority.NORMAL
-    retry_config: RetryConfig = field(default_factory=RetryConfig)
+    retry_config: RetryConfigProtocol = field(default_factory=_RetryConfigFallback)
     circuit_breaker: Optional[CircuitBreaker] = None
     timeout: Optional[float] = None
     tags: Dict[str, str] = field(default_factory=dict)
@@ -135,34 +141,49 @@ class EnhancedBackgroundTask:
         """For priority queue ordering."""
         return self.priority.value < other.priority.value
 
-# Use centralized metrics registry
-from ..metrics_registry import get_metrics_registry, StandardMetrics
+# Use centralized metrics registry - lazy-loaded to avoid circular imports
+# from ..metrics_registry import get_metrics_registry, StandardMetrics
 
-metrics_registry = get_metrics_registry()
-TASK_COUNTER = metrics_registry.get_or_create_counter(
-    StandardMetrics.BACKGROUND_TASKS_TOTAL,
-    'Total background tasks',
-    ['status', 'priority']
-)
-TASK_DURATION = metrics_registry.get_or_create_histogram(
-    StandardMetrics.BACKGROUND_TASK_DURATION,
-    'Task execution duration',
-    ['task_type', 'priority']
-)
-ACTIVE_TASKS = metrics_registry.get_or_create_gauge(
-    StandardMetrics.BACKGROUND_TASKS_ACTIVE,
-    'Currently active tasks'
-)
-RETRY_COUNTER = metrics_registry.get_or_create_counter(
-    StandardMetrics.BACKGROUND_TASK_RETRIES_TOTAL,
-    'Task retry attempts',
-    ['task_type']
-)
-CIRCUIT_BREAKER_STATE = metrics_registry.get_or_create_gauge(
-    StandardMetrics.CIRCUIT_BREAKER_STATE,
-    'Circuit breaker state',
-    ['task_type']
-)
+def _get_metrics_registry():
+    """Lazy import metrics registry to avoid circular imports"""
+    from ..metrics_registry import get_metrics_registry, StandardMetrics
+    return get_metrics_registry(), StandardMetrics
+
+def _get_task_metrics():
+    """Get task metrics with lazy loading"""
+    metrics_registry, StandardMetrics = _get_metrics_registry()
+
+    task_counter = metrics_registry.get_or_create_counter(
+        StandardMetrics.BACKGROUND_TASKS_TOTAL,
+        'Total background tasks',
+        ['status', 'priority']
+    )
+    task_duration = metrics_registry.get_or_create_histogram(
+        StandardMetrics.BACKGROUND_TASK_DURATION,
+        'Task execution duration',
+        ['task_type', 'priority']
+    )
+    return task_counter, task_duration
+
+def _get_additional_metrics():
+    """Get additional metrics with lazy loading"""
+    metrics_registry, StandardMetrics = _get_metrics_registry()
+
+    active_tasks = metrics_registry.get_or_create_gauge(
+        StandardMetrics.BACKGROUND_TASKS_ACTIVE,
+        'Currently active tasks'
+    )
+    retry_counter = metrics_registry.get_or_create_counter(
+        StandardMetrics.BACKGROUND_TASK_RETRIES_TOTAL,
+        'Task retry attempts',
+        ['task_type']
+    )
+    circuit_breaker_state = metrics_registry.get_or_create_gauge(
+        StandardMetrics.CIRCUIT_BREAKER_STATE,
+        'Circuit breaker state',
+        ['task_type']
+    )
+    return active_tasks, retry_counter, circuit_breaker_state
 
 @dataclass
 class BackgroundTask:
@@ -217,6 +238,9 @@ class EnhancedBackgroundTaskManager:
         self._monitor_task: Optional[asyncio.Task] = None
         self._scheduler_task: Optional[asyncio.Task] = None
         self._retry_task: Optional[asyncio.Task] = None
+        
+        # Internal task tracking for operational consistency
+        self._internal_tasks: Dict[str, asyncio.Task] = {}
 
         # Statistics
         self.stats = {
@@ -231,12 +255,27 @@ class EnhancedBackgroundTaskManager:
         """Start the enhanced background task manager."""
         self.logger.info("Starting EnhancedBackgroundTaskManager")
 
-        # Start monitoring tasks
-        self._monitor_task = asyncio.create_task(self._monitor_tasks())
-        self._scheduler_task = asyncio.create_task(self._scheduler_loop())
-        self._retry_task = asyncio.create_task(self._retry_loop())
+        # Start monitoring tasks using internal task management for consistency
+        self._monitor_task = self._create_internal_task("monitor", self._monitor_tasks())
+        self._scheduler_task = self._create_internal_task("scheduler", self._scheduler_loop())
+        self._retry_task = self._create_internal_task("retry", self._retry_loop())
 
         self.logger.info("Enhanced background task manager started with priority scheduling and retry mechanisms")
+
+    def _create_internal_task(self, name: str, coro) -> asyncio.Task:
+        """Create and register an internal operational task.
+        
+        Args:
+            name: Unique name for the internal task
+            coro: Coroutine to execute
+            
+        Returns:
+            The created asyncio task
+        """
+        task = asyncio.create_task(coro)
+        self._internal_tasks[name] = task
+        self.logger.debug(f"Created internal task: {name}")
+        return task
 
     async def stop(self, timeout: float = 30.0) -> None:
         """Stop the background task manager gracefully.
@@ -268,7 +307,25 @@ class EnhancedBackgroundTaskManager:
             except TimeoutError:
                 self.logger.warning("Some tasks did not complete within timeout")
 
-        # Stop all monitoring tasks
+        # Stop all internal monitoring tasks
+        if self._internal_tasks:
+            self.logger.info(f"Cancelling {len(self._internal_tasks)} internal tasks")
+            for name, task in self._internal_tasks.items():
+                if not task.done():
+                    self.logger.debug(f"Cancelling internal task: {name}")
+                    task.cancel()
+            
+            # Wait for internal tasks to complete
+            internal_tasks = [task for task in self._internal_tasks.values() if not task.done()]
+            if internal_tasks:
+                try:
+                    await asyncio.gather(*internal_tasks, return_exceptions=True)
+                except Exception as e:
+                    self.logger.warning(f"Error stopping internal tasks: {e}")
+            
+            self._internal_tasks.clear()
+
+        # Legacy cleanup for backwards compatibility
         for task in [self._monitor_task, self._scheduler_task, self._retry_task]:
             if task and not task.done():
                 task.cancel()
@@ -284,7 +341,7 @@ class EnhancedBackgroundTaskManager:
         task_id: Optional[str] = None,
         coroutine: Callable = None,
         priority: TaskPriority = TaskPriority.NORMAL,
-        retry_config: Optional[RetryConfig] = None,
+        retry_config: Optional[RetryConfigProtocol] = None,
         timeout: Optional[float] = None,
         circuit_breaker_key: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
@@ -326,7 +383,7 @@ class EnhancedBackgroundTaskManager:
             task_id=task_id,
             coroutine=coroutine,
             priority=priority,
-            retry_config=retry_config or RetryConfig(),
+            retry_config=retry_config or _RetryConfigFallback(),
             circuit_breaker=circuit_breaker,
             timeout=timeout or self.default_timeout,
             tags=tags or {}
@@ -343,7 +400,8 @@ class EnhancedBackgroundTaskManager:
 
         # Update metrics
         if self.enable_metrics:
-            TASK_COUNTER.labels(status="submitted", priority=priority.name).inc()
+            task_counter, _ = _get_task_metrics()
+            task_counter.labels(status="submitted", priority=priority.name).inc()
 
         self.logger.info(f"Submitted enhanced task {task_id} with priority {priority.name}")
         return task_id
@@ -480,8 +538,9 @@ class EnhancedBackgroundTaskManager:
 
             # Update Prometheus metrics
             if self.enable_metrics:
-                TASK_COUNTER.labels(status="completed", priority=task.priority.name).inc()
-                TASK_DURATION.labels(
+                task_counter, task_duration = _get_task_metrics()
+                task_counter.labels(status="completed", priority=task.priority.name).inc()
+                task_duration.labels(
                     task_type=task.tags.get("type", "unknown"),
                     priority=task.priority.name
                 ).observe(duration)
@@ -537,7 +596,8 @@ class EnhancedBackgroundTaskManager:
 
         # Update Prometheus metrics
         if self.enable_metrics:
-            TASK_COUNTER.labels(status="failed", priority=task.priority.name).inc()
+            task_counter, _ = _get_task_metrics()
+            task_counter.labels(status="failed", priority=task.priority.name).inc()
 
         self.logger.error(f"Task {task.task_id} failed: {error_msg}")
 
@@ -547,6 +607,8 @@ class EnhancedBackgroundTaskManager:
         task.status = TaskStatus.RETRYING
 
         # Convert task retry config to unified retry config
+        # Lazy import for retry config
+        from ....core.retry_manager import RetryConfig
         unified_config = RetryConfig(
             max_attempts=getattr(task.retry_config, 'max_attempts', 3),
             strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
@@ -555,7 +617,8 @@ class EnhancedBackgroundTaskManager:
             jitter=getattr(task.retry_config, 'jitter', True)
         )
 
-        # Use unified retry manager to calculate delay
+        # Use unified retry manager to calculate delay (lazy import)
+        from ....core.retry_manager import get_retry_manager
         retry_manager = get_retry_manager()
         delay = retry_manager._calculate_delay(task.retry_count, unified_config)
 
@@ -848,7 +911,7 @@ class EnhancedBackgroundTaskManager:
                     task_id=task_config.get("task_id"),
                     coroutine=task_config.get("coroutine"),
                     priority=TaskPriority(task_config.get("priority", TaskPriority.NORMAL.value)),
-                    retry_config=RetryConfig(**task_config.get("retry_config", {})),
+                    retry_config=_RetryConfigFallback(**task_config.get("retry_config", {})),
                     timeout=task_config.get("timeout"),
                     circuit_breaker_key=task_config.get("circuit_breaker_key"),
                     tags=task_config.get("tags", {})

@@ -6,7 +6,13 @@ from typing import Any, Optional
 
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy import text
 from sqlmodel import SQLModel
+
+# Import UnifiedConnectionManager for health checks
+from prompt_improver.database.unified_connection_manager import (
+    get_unified_manager, ManagerMode
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +31,20 @@ async def wait_for_postgres_async(
     Best practice: Always verify database is ready before running tests.
     2025 enhancement: Use main database instead of 'postgres' for Docker compatibility.
     """
+    # Use UnifiedConnectionManager for health checks when possible
+    try:
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        health_info = await manager.get_health_info()
+        if health_info.get('status') == 'healthy':
+            logger.info(f"PostgreSQL ready via UnifiedConnectionManager (database: {database})")
+            return True
+    except Exception as e:
+        logger.debug(f"UnifiedConnectionManager health check failed, falling back to direct connection: {e}")
+    
+    # Fallback to direct connection for compatibility with test infrastructure
     for attempt in range(max_retries):
         try:
-            # Try to connect directly with asyncpg
+            # Try to connect directly with asyncpg for test infrastructure compatibility
             conn = await asyncpg.connect(
                 host=host,
                 port=port,
@@ -88,6 +105,24 @@ async def ensure_test_database_exists(
         # Connect to main database (apes_production in Docker setup)
         # instead of 'postgres' which doesn't exist in our Docker container
         admin_database = "apes_production"
+        # Try UnifiedConnectionManager for database existence check first
+        try:
+            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+            async with manager.get_async_session() as session:
+                # Check if test database exists using unified manager
+                result = await session.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                    {"db_name": test_db_name}
+                )
+                exists = result.scalar()
+                
+                if exists:
+                    logger.info(f"Test database {test_db_name} already exists (verified via UnifiedConnectionManager)")
+                    return
+        except Exception as e:
+            logger.debug(f"UnifiedConnectionManager database check failed, using direct connection: {e}")
+        
+        # Use direct connection for DDL operations (CREATE DATABASE requires special privileges)
         conn = await asyncpg.connect(
             host=host,
             port=port,
@@ -129,6 +164,22 @@ async def cleanup_test_database(
     try:
         # Connect to the main database (apes_production in Docker setup)
         admin_database = "apes_production"
+        # Try to verify database existence using UnifiedConnectionManager first
+        try:
+            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+            async with manager.get_async_session() as session:
+                result = await session.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                    {"db_name": test_db_name}
+                )
+                exists = result.scalar()
+                if not exists:
+                    logger.info(f"Test database {test_db_name} does not exist (verified via UnifiedConnectionManager)")
+                    return
+        except Exception as e:
+            logger.debug(f"UnifiedConnectionManager verification failed, proceeding with direct connection: {e}")
+        
+        # Use direct connection for DDL operations (DROP DATABASE requires special privileges)
         conn = await asyncpg.connect(
             host=host,
             port=port,

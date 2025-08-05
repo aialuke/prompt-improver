@@ -21,6 +21,9 @@ from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 
+# Enhanced background task management imports
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 class SystemOverviewWidget(Static):
     """
     Widget displaying system overview and health metrics with 2025 best practices.
@@ -57,7 +60,7 @@ class SystemOverviewWidget(Static):
         self.console = Console()
         self.logger = logging.getLogger(__name__)
         self.data_provider: Optional[Any] = None
-        self._update_task: Optional[asyncio.Task] = None
+        self._task_id: Optional[str] = None
         self._is_updating = False
         self._pending_content: Optional[Any] = None
 
@@ -239,19 +242,27 @@ class SystemOverviewWidget(Static):
         if interval:
             self.update_interval = interval
 
-        if self._update_task and not self._update_task.done():
+        if self._task_id:
             return  # Already running
 
-        self._update_task = asyncio.create_task(self._auto_refresh_loop())
+        # Use centralized background task manager for better resource efficiency
+        task_manager = get_background_task_manager()
+        widget_id = f"{self.__class__.__name__}_{id(self)}"
+        task_id = await task_manager.submit_enhanced_task(
+            task_id=f"tui_refresh_{widget_id}",
+            coroutine=self._auto_refresh_loop,
+            priority=TaskPriority.LOW,
+            tags={"service": "tui_widgets", "type": "auto_refresh", "widget": "system_overview"}
+        )
+        # Store task ID for cleanup
+        self._task_id = task_id
 
     async def stop_auto_refresh(self) -> None:
         """Stop auto-refresh gracefully."""
-        if self._update_task and not self._update_task.done():
-            self._update_task.cancel()
-            try:
-                await self._update_task
-            except asyncio.CancelledError:
-                pass
+        if self._task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._task_id)
+            self._task_id = None
 
     async def _auto_refresh_loop(self) -> None:
         """Auto-refresh loop with error handling and graceful shutdown."""

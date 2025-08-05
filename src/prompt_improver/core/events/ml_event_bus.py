@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Callable, Optional, Union
 from dataclasses import dataclass, field
 from collections import defaultdict
 import weakref
+from prompt_improver.performance.monitoring.health.background_manager import (
+    get_background_task_manager, TaskPriority
+)
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +220,7 @@ class MLEventBus:
         
         # Event processing
         self.event_queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue_size)
-        self.processing_task: Optional[asyncio.Task] = None
+        self.processing_task_id: Optional[str] = None  # Now stores task ID for enhanced management
         self.is_running = False
         
         # Subscriptions management
@@ -252,10 +255,18 @@ class MLEventBus:
         self.logger.info("Starting ML Event Bus")
         self.is_running = True
         
-        # Start background processing
-        self.processing_task = asyncio.create_task(self._process_events())
+        # Start background processing using enhanced task management
+        task_manager = get_background_task_manager()
+        task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_event_processing_{id(self)}",
+            coroutine=self._process_events,
+            priority=TaskPriority.HIGH,
+            tags={"service": "ml_event_bus", "type": "event_processing", "component": "core"}
+        )
         
-        self.logger.info("ML Event Bus started successfully")
+        # Store task ID for cleanup
+        self.processing_task_id = task_id
+        self.logger.info("ML Event Bus started successfully with enhanced task management")
     
     async def shutdown(self) -> None:
         """Shutdown the event bus gracefully."""
@@ -265,13 +276,11 @@ class MLEventBus:
         self.logger.info("Shutting down ML Event Bus")
         self.is_running = False
         
-        # Cancel processing task
-        if self.processing_task:
-            self.processing_task.cancel()
-            try:
-                await self.processing_task
-            except asyncio.CancelledError:
-                pass
+        # Cancel processing task using enhanced task manager
+        if self.processing_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.processing_task_id)
+            self.processing_task_id = None
         
         # Clear queues and subscriptions
         self._clear_resources()
@@ -430,32 +439,50 @@ class MLEventBus:
             return []
         
         try:
-            handler_tasks = []
+            task_manager = get_background_task_manager()
+            handler_task_ids = []
             
             for subscription in valid_subscribers:
                 if subscription.is_async:
-                    task = asyncio.create_task(
-                        asyncio.wait_for(
+                    # Submit async handler with timeout to enhanced task manager
+                    async def async_handler_wrapper():
+                        return await asyncio.wait_for(
                             subscription.handler(event),
                             timeout=self.event_handler_timeout
                         )
+                    
+                    task_id = await task_manager.submit_enhanced_task(
+                        task_id=f"event_handler_async_{subscription.subscription_id}_{int(asyncio.get_event_loop().time() * 1000)}",
+                        coroutine=async_handler_wrapper,
+                        priority=TaskPriority.NORMAL,
+                        tags={"service": "ml_event_bus", "type": "async_handler", "event_type": str(event.event_type)}
                     )
                 else:
-                    # Run sync handlers in thread pool
-                    task = asyncio.create_task(
-                        asyncio.get_event_loop().run_in_executor(
+                    # Submit sync handler in executor to enhanced task manager
+                    async def sync_handler_wrapper():
+                        return await asyncio.get_event_loop().run_in_executor(
                             None, subscription.handler, event
                         )
+                    
+                    task_id = await task_manager.submit_enhanced_task(
+                        task_id=f"event_handler_sync_{subscription.subscription_id}_{int(asyncio.get_event_loop().time() * 1000)}",
+                        coroutine=sync_handler_wrapper,
+                        priority=TaskPriority.NORMAL,
+                        tags={"service": "ml_event_bus", "type": "sync_handler", "event_type": str(event.event_type)}
                     )
                 
-                handler_tasks.append(task)
+                handler_task_ids.append(task_id)
             
-            # Wait for all handlers
-            if handler_tasks:
-                results = await asyncio.wait_for(
-                    asyncio.gather(*handler_tasks, return_exceptions=True),
-                    timeout=timeout
-                )
+            # Wait for all handlers using enhanced task manager
+            if handler_task_ids:
+                results = []
+                for task_id in handler_task_ids:
+                    try:
+                        result = await task_manager.wait_for_task(task_id, timeout=timeout)
+                        results.append(result)
+                    except Exception as e:
+                        results.append(e)
+                        self.logger.error(f"Handler task {task_id} failed: {e}")
             
         except asyncio.TimeoutError:
             self.logger.error(f"Timeout waiting for handlers of {event.event_type.value}")

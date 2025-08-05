@@ -28,6 +28,7 @@ import asyncio
 import logging
 import random
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar, Union
@@ -51,6 +52,9 @@ from ..performance.monitoring.metrics_registry import (
     StandardMetrics
 )
 
+# Lazy import background task manager to avoid circular imports
+# from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 # OpenTelemetry imports
 try:
     from opentelemetry import trace, metrics as otel_metrics
@@ -61,6 +65,36 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
+
+
+def _get_background_task_manager():
+    """Lazy import background task manager to avoid circular imports."""
+    try:
+        from ..performance.monitoring.health.background_manager import get_background_task_manager
+        return get_background_task_manager()
+    except ImportError as e:
+        logger.warning(f"Background task manager not available: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get background task manager: {e}")
+        return None
+
+
+def _get_task_priority():
+    """Lazy import TaskPriority to avoid circular imports."""
+    try:
+        from ..performance.monitoring.health.background_manager import TaskPriority
+        return TaskPriority
+    except ImportError:
+        # Fallback enum if background manager not available
+        from enum import Enum
+        class FallbackTaskPriority(Enum):
+            CRITICAL = 1
+            HIGH = 2
+            NORMAL = 3
+            LOW = 4
+            BACKGROUND = 5
+        return FallbackTaskPriority
 
 
 class CircuitBreakerState(Enum):
@@ -360,7 +394,20 @@ class CircuitBreaker:
 
     def reset(self) -> None:
         """Reset circuit breaker to closed state."""
-        asyncio.create_task(self._reset_async())
+        task_manager = _get_background_task_manager()
+        if task_manager:
+            TaskPriority = _get_task_priority()
+            asyncio.create_task(task_manager.submit_enhanced_task(
+                task_id=f"circuit_breaker_reset_{self.operation_name}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._reset_async(),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "retry_manager",
+                    "type": "circuit_breaker",
+                    "component": "reset",
+                    "operation": self.operation_name
+            }
+        ))
 
     async def _reset_async(self):
         """Async reset implementation."""

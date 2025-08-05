@@ -544,6 +544,15 @@ class SessionResumeManager:
                         "integrity_check": integrity_check
                     }
 
+                # Update session in unified manager
+                await self._ensure_unified_session_manager()
+                await self._unified_session_manager.update_training_progress(
+                    session_id=session_id,
+                    iteration=context.resume_from_iteration,
+                    performance_metrics={"recovery_confidence": context.recovery_confidence},
+                    improvement_score=0.0
+                )
+                
                 # Perform actual resume operation
                 resume_result = await self._perform_resume_operation(
                     session_id, context, workflow_state, training_manager

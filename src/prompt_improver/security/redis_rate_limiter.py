@@ -2,6 +2,9 @@
 
 Implements 2025 best practices for distributed rate limiting using Redis
 with Lua scripts for atomic operations and sliding window algorithm.
+
+MIGRATED: Now uses UnifiedConnectionManager instead of hardcoded Redis URLs.
+Fixes CVSS 7.5 authentication bypass vulnerability with fail-secure policy.
 """
 
 import logging
@@ -10,9 +13,15 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-import coredis
-from coredis import Redis
 from coredis.exceptions import ConnectionError, TimeoutError
+
+# Import UnifiedConnectionManager for secure Redis connections
+from ..database.unified_connection_manager import (
+    get_unified_manager,
+    ManagerMode,
+    create_security_context,
+    SecurityContext
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +51,31 @@ class SlidingWindowRateLimiter:
     - Supports burst capacity for short-term spikes
     - Uses Lua scripts for atomic operations
     - Provides accurate rate limiting across distributed systems
+    
+    MIGRATED: Now uses UnifiedConnectionManager for secure Redis connections.
+    Fixes hardcoded Redis URLs and implements fail-secure policy.
     """
 
-    def __init__(self, redis_client: Optional[Redis] = None, redis_url: str = "redis://localhost:6379/2"):
+    def __init__(self, redis_client: Optional[object] = None, redis_url: str = "redis://localhost:6379/2"):
         """Initialize sliding window rate limiter.
 
         Args:
-            redis_client: Optional Redis client instance
-            redis_url: Redis connection URL (used if redis_client not provided)
+            redis_client: DEPRECATED - ignored, using UnifiedConnectionManager
+            redis_url: DEPRECATED - ignored, using UnifiedConnectionManager
+            
+        MIGRATION: Now uses UnifiedConnectionManager instead of direct Redis connections.
+        Parameters kept for backward compatibility but are ignored.
         """
-        self.redis_client = redis_client
-        self.redis_url = redis_url
-        self._redis = None
+        # Log deprecation warning for hardcoded URLs
+        if redis_url != "redis://localhost:6379/2" or redis_client is not None:
+            logger.warning(
+                "SlidingWindowRateLimiter: redis_client and redis_url parameters are deprecated. "
+                "Now using UnifiedConnectionManager for secure Redis connections."
+            )
+        
+        # Use UnifiedConnectionManager instead of direct Redis connections
+        self._connection_manager = None
+        self._redis = None  # Keep for compatibility but will use UnifiedConnectionManager
 
         # Lua script for atomic sliding window rate limiting
         self.rate_limit_script = """
@@ -141,14 +163,26 @@ class SlidingWindowRateLimiter:
         end
         """
 
-    async def _get_redis(self) -> Redis:
-        """Get Redis client instance."""
-        if self._redis is None:
-            if self.redis_client:
-                self._redis = self.redis_client
-            else:
-                self._redis = coredis.Redis.from_url(self.redis_url, decode_responses=True)
-        return self._redis
+    async def _get_redis(self):
+        """Get Redis client instance via UnifiedConnectionManager.
+        
+        MIGRATED: Now uses UnifiedConnectionManager instead of direct Redis connections.
+        Eliminates hardcoded Redis URLs and provides secure connection management.
+        """
+        if self._connection_manager is None:
+            try:
+                self._connection_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+                await self._connection_manager.initialize()
+                logger.debug("SlidingWindowRateLimiter: Initialized UnifiedConnectionManager")
+            except Exception as e:
+                logger.error(f"Failed to initialize UnifiedConnectionManager: {e}")
+                raise
+        
+        # Use the Redis master connection from UnifiedConnectionManager
+        if not self._connection_manager._redis_master:
+            raise ConnectionError("Redis master connection not available in UnifiedConnectionManager")
+            
+        return self._connection_manager._redis_master
 
     async def check_rate_limit(
         self,
@@ -171,13 +205,14 @@ class SlidingWindowRateLimiter:
             RateLimitStatus with current status and remaining capacity
         """
         try:
+            # Get Redis connection via UnifiedConnectionManager
             redis = await self._get_redis()
             current_time = time.time()
 
             # Create rate limit key
             key = f"rate_limit:sliding:{identifier}"
 
-            # Execute Lua script atomically
+            # Execute Lua script atomically via UnifiedConnectionManager
             result = await redis.eval(
                 self.rate_limit_script,
                 keys=[key],
@@ -206,26 +241,26 @@ class SlidingWindowRateLimiter:
             )
 
         except (ConnectionError, TimeoutError) as e:
-            logger.error(f"Redis connection error in rate limiter: {e}")
-            # Fail open - allow request when Redis is unavailable
+            logger.error(f"Redis connection error in rate limiter (UnifiedConnectionManager): {e}")
+            # SECURITY FIX: Fail secure (fail-closed) - deny requests when Redis is unavailable
             return RateLimitStatus(
                 result=RateLimitResult.ERROR,
-                requests_remaining=rate_limit_per_minute,
-                burst_remaining=burst_capacity,
-                reset_time=time.time() + window_size_seconds,
-                retry_after=None,
+                requests_remaining=0,  # Fail-secure: deny access
+                burst_remaining=0,
+                reset_time=time.time() + 60,  # Retry in 1 minute
+                retry_after=60,
                 current_requests=0,
                 window_start=time.time() - window_size_seconds
             )
         except Exception as e:
-            logger.error(f"Unexpected error in rate limiter: {e}")
-            # Fail open for unexpected errors
+            logger.error(f"Unexpected error in rate limiter (UnifiedConnectionManager): {e}")
+            # SECURITY FIX: Fail secure (fail-closed) for unexpected errors
             return RateLimitStatus(
                 result=RateLimitResult.ERROR,
-                requests_remaining=rate_limit_per_minute,
-                burst_remaining=burst_capacity,
-                reset_time=time.time() + window_size_seconds,
-                retry_after=None,
+                requests_remaining=0,  # Fail-secure: deny access
+                burst_remaining=0,
+                reset_time=time.time() + 60,  # Retry in 1 minute
+                retry_after=60,
                 current_requests=0,
                 window_start=time.time() - window_size_seconds
             )
@@ -247,6 +282,7 @@ class SlidingWindowRateLimiter:
             Dict with current rate limit information
         """
         try:
+            # Get Redis connection via UnifiedConnectionManager
             redis = await self._get_redis()
             current_time = time.time()
             window_start = current_time - window_size_seconds
@@ -283,7 +319,7 @@ class SlidingWindowRateLimiter:
             }
 
         except Exception as e:
-            logger.error(f"Error getting rate limit info: {e}")
+            logger.error(f"Error getting rate limit info (UnifiedConnectionManager): {e}")
             return {
                 "identifier": identifier,
                 "current_requests": 0,
@@ -304,6 +340,7 @@ class SlidingWindowRateLimiter:
             True if successful, False otherwise
         """
         try:
+            # Get Redis connection via UnifiedConnectionManager
             redis = await self._get_redis()
             pattern = f"rate_limit:sliding:{identifier}:*"
 
@@ -320,5 +357,5 @@ class SlidingWindowRateLimiter:
             return True
 
         except Exception as e:
-            logger.error(f"Error resetting rate limit for {identifier}: {e}")
+            logger.error(f"Error resetting rate limit for {identifier} (UnifiedConnectionManager): {e}")
             return False

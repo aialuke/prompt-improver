@@ -13,6 +13,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 import json
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from ..events.event_types import EventType, MLEvent
 
@@ -104,12 +106,48 @@ class WorkflowMetricsCollector:
         self.logger.info("Starting workflow metrics collection")
         self.is_collecting = True
         
-        # Start collection tasks
-        self.collection_task = asyncio.create_task(self._collection_loop())
-        self.aggregation_task = asyncio.create_task(self._aggregation_loop())
+        # Start collection tasks using EnhancedBackgroundTaskManager
+        task_manager = get_background_task_manager()
         
+        # Collection task with NORMAL priority for metrics gathering
+        self.collection_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_metrics_collection_{str(uuid.uuid4())[:8]}",
+            coroutine=self._collection_loop(),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "metrics_collection",
+                "module": "workflow_metrics_collector"
+            }
+        )
+        
+        # Aggregation task with NORMAL priority for data processing
+        self.aggregation_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_metrics_aggregation_{str(uuid.uuid4())[:8]}",
+            coroutine=self._aggregation_loop(),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "metrics_aggregation",
+                "module": "workflow_metrics_collector"
+            }
+        )
+        
+        # Export task with LOW priority for external reporting
         if self.enable_external_export:
-            self.export_task = asyncio.create_task(self._export_loop())
+            self.export_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_metrics_export_{str(uuid.uuid4())[:8]}",
+                coroutine=self._export_loop(),
+                priority=TaskPriority.LOW,
+                tags={
+                    "service": "ml",
+                    "type": "monitoring",
+                    "component": "metrics_export",
+                    "module": "workflow_metrics_collector"
+                }
+            )
         
         # Emit collection started event
         if self.event_bus:
@@ -438,7 +476,6 @@ class WorkflowMetricsCollector:
             
             # Export to external systems (implement based on requirements)
             await self._export_to_prometheus(export_data)
-            await self._export_to_grafana(export_data)
             
             self.collection_stats["exports_completed"] += 1
             
@@ -466,14 +503,6 @@ class WorkflowMetricsCollector:
         except Exception as e:
             self.logger.error(f"Error exporting to Prometheus: {e}")
     
-    async def _export_to_grafana(self, export_data: Dict[str, Any]) -> None:
-        """Export metrics to Grafana/InfluxDB."""
-        try:
-            # This would implement actual Grafana/InfluxDB integration
-            # For now, just log the export
-            self.logger.debug(f"Grafana export: {len(export_data['aggregated_metrics'])} metrics")
-        except Exception as e:
-            self.logger.error(f"Error exporting to Grafana: {e}")
     
     async def _cleanup_old_metrics(self) -> None:
         """Clean up old raw metrics."""

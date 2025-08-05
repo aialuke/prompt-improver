@@ -25,6 +25,11 @@ from typing import (
     Callable, Awaitable, Union, Deque, DefaultDict, TYPE_CHECKING
 )
 
+# Enhanced background task management imports
+from ..performance.monitoring.health.background_manager import (
+    get_background_task_manager, TaskPriority
+)
+
 # Modern 2025 approach: TYPE_CHECKING for type hints, lazy imports for runtime
 if TYPE_CHECKING:
     from ..performance.monitoring.metrics_registry import MetricsRegistry
@@ -168,11 +173,25 @@ class BaseMetricsCollector(Generic[MetricData], ABC):
         self.collection_stats.is_running = True
         self._shutdown_event.clear()
 
-        # Start background tasks if enabled
+        # Start background tasks if enabled with centralized task management
         if self.config.enable_background_aggregation:
-            self._background_tasks["aggregation"] = asyncio.create_task(
-                self._aggregation_loop()
+            task_manager = get_background_task_manager()
+            collector_id = f"{self.__class__.__name__}_{id(self)}"
+            
+            # Submit aggregation task to centralized manager
+            await task_manager.submit_enhanced_task(
+                task_id=f"metrics_aggregation_{collector_id}",
+                coroutine=self._aggregation_loop,
+                priority=TaskPriority.NORMAL,
+                tags={
+                    "service": "metrics_collection",
+                    "type": "aggregation",
+                    "collector": self.__class__.__name__
+                }
             )
+            
+            # Track task in local registry for backwards compatibility
+            self._background_tasks["aggregation"] = f"metrics_aggregation_{collector_id}"
             self.collection_stats.background_tasks_active += 1
 
         self.logger.info(f"Started {self.__class__.__name__} collection")
@@ -185,17 +204,26 @@ class BaseMetricsCollector(Generic[MetricData], ABC):
         self.collection_stats.is_running = False
         self._shutdown_event.set()
 
-        # Cancel and cleanup background tasks
-        for task_name, task in self._background_tasks.items():
-            if task and not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+        # Cancel and cleanup background tasks via centralized manager
+        task_manager = get_background_task_manager()
+        for task_name, task_id in self._background_tasks.items():
+            if task_id and isinstance(task_id, str):
+                # Cancel task via centralized manager
+                await task_manager.cancel_task(task_id)
                 self.collection_stats.background_tasks_active = max(
                     0, self.collection_stats.background_tasks_active - 1
                 )
+            elif task_id and hasattr(task_id, 'cancel'):
+                # Handle legacy task objects (temporary during migration)
+                if not task_id.done():
+                    task_id.cancel()
+                    try:
+                        await task_id
+                    except asyncio.CancelledError:
+                        pass
+                    self.collection_stats.background_tasks_active = max(
+                        0, self.collection_stats.background_tasks_active - 1
+                    )
 
         self._background_tasks.clear()
         self.logger.info(f"Stopped {self.__class__.__name__} collection")

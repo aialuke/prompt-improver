@@ -312,7 +312,7 @@ class DatabaseConfig(BaseSettings):
         return f"{base_url}?options=-c%20default_text_search_config=pg_catalog.english"
 
 class RedisConfig(BaseModel):
-    """Redis configuration for caching and rate limiting."""
+    """Redis configuration for caching and rate limiting with enhanced security."""
     
     # Connection settings
     host: str = Field(
@@ -336,13 +336,45 @@ class RedisConfig(BaseModel):
     )
     password: Optional[str] = Field(
         default=None,
-        description="Redis password (optional)",
+        description="Redis password (required for production)",
         validation_alias="REDIS_PASSWORD"
     )
     username: Optional[str] = Field(
         default=None,
         description="Redis username (Redis 6.0+)",
         validation_alias="REDIS_USERNAME"
+    )
+    
+    # Security settings
+    require_auth: bool = Field(
+        default=True,
+        description="Require authentication for Redis connections",
+        validation_alias="REDIS_REQUIRE_AUTH"
+    )
+    use_ssl: bool = Field(
+        default=False,
+        description="Use SSL/TLS for Redis connections",
+        validation_alias="REDIS_USE_SSL"
+    )
+    ssl_cert_path: Optional[str] = Field(
+        default=None,
+        description="Path to SSL certificate file",
+        validation_alias="REDIS_SSL_CERT_PATH"
+    )
+    ssl_key_path: Optional[str] = Field(
+        default=None,
+        description="Path to SSL private key file",
+        validation_alias="REDIS_SSL_KEY_PATH"
+    )
+    ssl_ca_path: Optional[str] = Field(
+        default=None,
+        description="Path to SSL CA certificate file",
+        validation_alias="REDIS_SSL_CA_PATH"
+    )
+    ssl_verify_mode: str = Field(
+        default="required",
+        description="SSL certificate verification mode (none, optional, required)",
+        validation_alias="REDIS_SSL_VERIFY_MODE"
     )
     
     # Connection pool settings
@@ -406,16 +438,81 @@ class RedisConfig(BaseModel):
         validation_alias="REDIS_SENTINEL_SERVICE_NAME"
     )
     
+    @field_validator("password")
+    @classmethod
+    def validate_password_security(cls, v: Optional[str], info) -> Optional[str]:
+        """Validate password meets security requirements."""
+        if v and len(v) < 12:
+            logger.warning("Redis password should be at least 12 characters for security")
+        return v
+    
+    @field_validator("ssl_verify_mode")
+    @classmethod
+    def validate_ssl_verify_mode(cls, v: str) -> str:
+        """Validate SSL verification mode."""
+        valid_modes = {"none", "optional", "required"}
+        if v not in valid_modes:
+            raise ValueError(f"SSL verify mode must be one of: {valid_modes}")
+        return v
+    
+    @model_validator(mode='after')
+    def validate_security_configuration(self) -> 'RedisConfig':
+        """Validate security configuration consistency."""
+        
+        # Check authentication requirements
+        if self.require_auth and not self.password:
+            if self.host != "localhost":
+                raise ValueError("Redis password required when authentication is enabled for non-localhost connections")
+            else:
+                logger.warning("Redis authentication disabled for localhost - acceptable for development only")
+        
+        # Check SSL configuration
+        if self.use_ssl:
+            if self.ssl_verify_mode == "required" and not self.ssl_ca_path:
+                logger.warning("SSL verification set to 'required' but no CA certificate path provided")
+        
+        return self
+    
+    def validate_production_security(self) -> List[str]:
+        """Validate configuration meets production security requirements."""
+        issues = []
+        
+        # Authentication checks
+        if not self.password:
+            issues.append("Redis password not configured - required for production")
+        elif len(self.password) < 16:
+            issues.append("Redis password should be at least 16 characters for production")
+        
+        # SSL/TLS checks
+        if not self.use_ssl and self.host != "localhost":
+            issues.append("SSL/TLS not enabled for non-localhost Redis connection")
+        
+        # Host security checks
+        if self.host == "localhost" and not self.password:
+            issues.append("Localhost Redis without password - not suitable for production")
+        
+        return issues
+    
     @property
     def redis_url(self) -> str:
-        """Generate Redis connection URL."""
+        """Generate Redis connection URL with security considerations."""
+        # Use rediss:// scheme for SSL connections
+        scheme = "rediss" if self.use_ssl else "redis"
+        
         auth_part = ""
         if self.username and self.password:
             auth_part = f"{self.username}:{self.password}@"
         elif self.password:
             auth_part = f":{self.password}@"
         
-        return f"redis://{auth_part}{self.host}:{self.port}/{self.database}"
+        return f"{scheme}://{auth_part}{self.host}:{self.port}/{self.database}"
+    
+    @property
+    def secure_redis_url(self) -> str:
+        """Generate Redis connection URL with authentication masked for logging."""
+        scheme = "rediss" if self.use_ssl else "redis"
+        auth_part = "***:***@" if self.password else ""
+        return f"{scheme}://{auth_part}{self.host}:{self.port}/{self.database}"
 
 class MLConfig(BaseModel):
     """Machine Learning model and inference configuration."""
@@ -497,6 +594,8 @@ class MLConfig(BaseModel):
         validation_alias="ML_MODEL_WARMUP_ENABLED"
     )
 
+
+
 class APIConfig(BaseModel):
     """API server and HTTP configuration."""
     
@@ -565,7 +664,7 @@ class APIConfig(BaseModel):
         validation_alias="API_CORS_ENABLED"
     )
     cors_origins: List[str] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:8080"],
+        default_factory=lambda: ["http://localhost:8080"],
         description="Allowed CORS origins",
         validation_alias="API_CORS_ORIGINS"
     )
@@ -1014,6 +1113,12 @@ class AppConfig(BaseSettings):
     redis_database: int = Field(default=0, validation_alias="REDIS_DB", ge=0, le=15)
     redis_password: Optional[str] = Field(default=None, validation_alias="REDIS_PASSWORD")
     redis_username: Optional[str] = Field(default=None, validation_alias="REDIS_USERNAME")
+    redis_require_auth: bool = Field(default=True, validation_alias="REDIS_REQUIRE_AUTH")
+    redis_use_ssl: bool = Field(default=False, validation_alias="REDIS_USE_SSL")
+    redis_ssl_cert_path: Optional[str] = Field(default=None, validation_alias="REDIS_SSL_CERT_PATH")
+    redis_ssl_key_path: Optional[str] = Field(default=None, validation_alias="REDIS_SSL_KEY_PATH")
+    redis_ssl_ca_path: Optional[str] = Field(default=None, validation_alias="REDIS_SSL_CA_PATH")
+    redis_ssl_verify_mode: str = Field(default="required", validation_alias="REDIS_SSL_VERIFY_MODE")
     redis_max_connections: int = Field(default=20, validation_alias="REDIS_MAX_CONNECTIONS", ge=1, le=100)
     redis_connection_timeout: int = Field(default=5, validation_alias="REDIS_CONNECT_TIMEOUT", ge=1, le=30)
     redis_socket_timeout: int = Field(default=5, validation_alias="REDIS_SOCKET_TIMEOUT", ge=1, le=30)
@@ -1036,7 +1141,8 @@ class AppConfig(BaseSettings):
     ml_mlflow_experiment_name: str = Field(default="prompt-improvement", validation_alias="MLFLOW_EXPERIMENT_NAME")
     ml_model_serving_enabled: bool = Field(default=True, validation_alias="ML_MODEL_SERVING_ENABLED")
     ml_model_warmup_enabled: bool = Field(default=True, validation_alias="ML_MODEL_WARMUP_ENABLED")
-    
+
+
     # API Settings (flattened)
     api_host: str = Field(default="0.0.0.0", validation_alias="API_HOST")
     api_port: int = Field(default=8000, validation_alias="API_PORT", ge=1, le=65535)
@@ -1047,7 +1153,7 @@ class AppConfig(BaseSettings):
     api_rate_limit_requests_per_minute: int = Field(default=60, validation_alias="API_RATE_LIMIT_RPM", ge=1, le=10000)
     api_rate_limit_burst: int = Field(default=10, validation_alias="API_RATE_LIMIT_BURST", ge=1, le=100)
     api_cors_enabled: bool = Field(default=True, validation_alias="API_CORS_ENABLED")
-    api_cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:8080"], validation_alias="API_CORS_ORIGINS")
+    api_cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:8080"], validation_alias="API_CORS_ORIGINS")
     api_cors_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], validation_alias="API_CORS_METHODS")
     api_enable_https: bool = Field(default=False, validation_alias="API_ENABLE_HTTPS")
     api_ssl_cert_path: Optional[Path] = Field(default=None, validation_alias="API_SSL_CERT_PATH")
@@ -1220,6 +1326,12 @@ class AppConfig(BaseSettings):
             database=self.redis_database,
             password=self.redis_password,
             username=self.redis_username,
+            require_auth=self.redis_require_auth,
+            use_ssl=self.redis_use_ssl,
+            ssl_cert_path=self.redis_ssl_cert_path,
+            ssl_key_path=self.redis_ssl_key_path,
+            ssl_ca_path=self.redis_ssl_ca_path,
+            ssl_verify_mode=self.redis_ssl_verify_mode,
             max_connections=self.redis_max_connections,
             connection_timeout=self.redis_connection_timeout,
             socket_timeout=self.redis_socket_timeout,
@@ -1341,7 +1453,8 @@ class AppConfig(BaseSettings):
             log_dir=self.log_dir,
             secure_temp_permissions=self.secure_temp_permissions
         )
-    
+
+
     def get_database_url(self, async_driver: bool = True) -> str:
         """Get database connection URL."""
         return self.database.database_url if async_driver else self.database.database_url_sync

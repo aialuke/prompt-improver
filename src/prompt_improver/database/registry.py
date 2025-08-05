@@ -190,6 +190,8 @@ def get_registry_manager() -> RegistryManager:
     """
     global _registry_manager
     if _registry_manager is None:
+        # Apply SQLModel patch before creating registry manager
+        patch_sqlmodel_registry()
         _registry_manager = RegistryManager()
     return _registry_manager
 
@@ -231,11 +233,15 @@ def patch_sqlmodel_registry():
     This prevents SQLModel from creating its own registry and
     ensures all models use the same registry.
     """
-    # Replace SQLModel's registry with our centralized one
-    SQLModel.registry = PromptImproverBase.registry
-    SQLModel.metadata = PromptImproverBase.metadata
+    try:
+        # Replace SQLModel's registry with our centralized one
+        SQLModel.registry = PromptImproverBase.registry
+        SQLModel.metadata = PromptImproverBase.metadata
 
-    logger.info("SQLModel registry patched to use centralized registry")
+        logger.info("SQLModel registry patched to use centralized registry")
+    except Exception as e:
+        logger.warning(f"Failed to patch SQLModel registry: {e}")
+        # Continue without patching - not critical for basic functionality
 
-# Apply the patch at module import
-patch_sqlmodel_registry()
+# Apply the patch lazily to avoid import-time blocking
+# patch_sqlmodel_registry()  # Now called lazily when needed

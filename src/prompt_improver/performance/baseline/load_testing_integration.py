@@ -14,6 +14,9 @@ from typing import Any, Dict, List, Optional
 from enum import Enum
 import statistics
 
+# Enhanced background task management
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 # Load testing libraries
 try:
     LOCUST_AVAILABLE = True
@@ -71,9 +74,13 @@ class LoadTestingIntegration:
         
         logger.info(f"Starting load test {test_name} with baseline collection")
         
-        # Start baseline collection
-        collection_task = asyncio.create_task(
-            self._collect_baselines_during_test(test_id, config.duration_minutes)
+        # Start baseline collection using EnhancedBackgroundTaskManager
+        task_manager = get_background_task_manager()
+        collection_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"load_test_baseline_collection_{test_id[:8]}",
+            coroutine=self._collect_baselines_during_test(test_id, config.duration_minutes),
+            priority=TaskPriority.HIGH,
+            tags={"service": "performance", "type": "load_testing", "component": "baseline_collection", "test_name": test_name}
         )
         
         # Run load test based on pattern
@@ -87,7 +94,7 @@ class LoadTestingIntegration:
             load_results = await self._run_generic_load_test(config, target_endpoints)
         
         # Wait for baseline collection to complete
-        baseline_results = await collection_task
+        baseline_results = await task_manager.wait_for_task(collection_task_id)
         
         # Analyze results
         analysis = await self._analyze_load_test_results(

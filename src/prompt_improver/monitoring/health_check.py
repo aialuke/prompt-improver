@@ -81,15 +81,21 @@ class HealthChecker:
         start_time = time.time()
         
         try:
-            from prompt_improver.utils.redis_cache import get_cache
+            # Use UnifiedConnectionManager for health checking
+            from ..database.unified_connection_manager import get_unified_manager, ManagerMode, create_security_context
             
-            cache = await get_cache()
+            unified_manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+            if not unified_manager._is_initialized:
+                await unified_manager.initialize()
             
-            # Test Redis with a ping
+            # Create security context for health checks
+            security_context = await create_security_context(agent_id="health_check", tier="basic")
+            
+            # Test Redis with cache operations via UnifiedConnectionManager
             test_key = "health_check_test"
-            await cache.set(test_key, "test_value", expire=10)
-            value = await cache.get(test_key)
-            await cache.delete(test_key)
+            await unified_manager.set_cached(test_key, "test_value", ttl_seconds=10, security_context=security_context)
+            value = await unified_manager.get_cached(test_key, security_context)
+            await unified_manager.invalidate_cached([test_key], security_context)
             
             if value != "test_value":
                 raise Exception("Redis read/write test failed")

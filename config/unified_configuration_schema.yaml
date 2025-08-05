@@ -90,7 +90,7 @@ environments:
     redis_pool_strategy: "high_throughput"
     
   development:
-    file: ".env.example"  
+    file: ".env.template"
     database_pool_strategy: "balanced"
     redis_pool_strategy: "balanced"
     
@@ -127,7 +127,7 @@ validation_checks:
     
   - name: "consistent_naming"
     description: "All pool settings use DB_POOL_* convention"
-    files: [".env.example", ".env.test", ".mcp.json"]
+    files: [".env.template", ".env.test", ".mcp.json"]
     
   - name: "environment_parity"
     description: "All environments have complete configuration"
@@ -143,7 +143,7 @@ validation_checks:
 
 implementation_steps:
   1: "Update .mcp.json to use standard DB_POOL_* variables"
-  2: "Update .env.example with consistent naming"
+  2: "Update .env.template with consistent naming"
   3: "Update .env.test with environment-appropriate values"  
   4: "Remove hardcoded values from Dockerfile.mcp"
   5: "Update test files to use standard variables"

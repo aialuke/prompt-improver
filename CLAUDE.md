@@ -26,6 +26,7 @@ NON-NEGOTIABLE - Follow for EVERY user request:
    Always list which specific rules apply:
    - User preservation directives → "Applying: INSTRUCTION HIERARCHY PROTOCOL"
    - Creating/modifying code → "Applying: PRE-ACTION VERIFICATION + MINIMAL COMPLEXITY"
+   - Background services/async tasks → "Applying: UNIFIED ASYNC INFRASTRUCTURE PROTOCOL + PRE-ACTION VERIFICATION"
    - Code deletion → "Applying: CRITICAL VERIFICATION RULE"
    - Analysis requests → "Applying: SYSTEMATIC ANALYSIS PROTOCOL"
    - External libraries → "Applying: MCP RESEARCH WORKFLOW"
@@ -216,16 +217,99 @@ Focus on: Performance, maintainability, readability, current best practices
 
 ---
 
+#### **RULE 7: UNIFIED ASYNC INFRASTRUCTURE PROTOCOL**
+```
+<async_governance>
+MANDATORY enforcement of unified async infrastructure patterns per ADR-007:
+
+<adr_reference>
+ARCHITECTURAL AUTHORITY: @docs/architecture/ADR-007-unified-async-infrastructure.md
+STATUS: ACCEPTED - All async background services MUST comply
+</adr_reference>
+
+<background_service_detection>
+Before creating ANY async background operation, analyze context:
+
+DETECTION PATTERNS:
+- File paths: /services/, /monitoring/, /background/, /lifecycle/, /orchestration/, /metrics/, /performance/, /health/
+- Class patterns: *Manager, *Monitor, *Service, *Collector, *Worker, *Orchestrator, *Controller
+- Method patterns: _loop, _monitor, _background, _periodic, _continuous, _worker, _daemon, _service
+- Service patterns: while True loops, asyncio.sleep(), scheduled operations, service lifecycle methods
+
+CONTEXT ANALYSIS:
+- Persistent background operations → MANDATORY unified infrastructure
+- Service monitoring/health checks → MANDATORY unified infrastructure  
+- Data collection/aggregation → MANDATORY unified infrastructure
+- Periodic/scheduled tasks → MANDATORY unified infrastructure
+- Worker pools/processing queues → MANDATORY unified infrastructure
+</background_service_detection>
+
+<unified_infrastructure_mandate>
+REQUIRED IMPLEMENTATION - EnhancedBackgroundTaskManager:
+
+1. MANDATORY VERIFICATION:
+   - rg "get_background_task_manager|EnhancedBackgroundTaskManager" . --type py
+   - Confirm centralized task management is available and operational
+
+2. REQUIRED PATTERN:
+   ```python
+   from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+   
+   task_manager = get_background_task_manager()
+   await task_manager.submit_enhanced_task(
+       task_id=f"service_name_{unique_identifier}",
+       coroutine=background_function,
+       priority=TaskPriority.HIGH,  # CRITICAL, HIGH, NORMAL, LOW, BACKGROUND
+       tags={"service": "service_name", "type": "operation_type", "component": "component_name"}
+   )
+   ```
+
+3. PROHIBITED PATTERNS:
+   - Direct asyncio.create_task() for persistent background services
+   - Custom async task management systems
+   - Independent worker pools or schedulers
+   - Ad-hoc background service implementations
+</unified_infrastructure_mandate>
+
+<legitimate_exceptions>
+ALLOWED direct asyncio.create_task() usage:
+- Test files (/tests/* directories) - parallel test execution
+- Framework internals (EnhancedBackgroundTaskManager implementation)
+- Request/response processing (short-lived operations)
+- Coordinated parallel execution within functions (not persistent services)
+- Temporary operations with clear lifecycle boundaries
+</legitimate_exceptions>
+
+<enforcement_protocol>
+AUTOMATIC GOVERNANCE (enforced by pre-tool hooks):
+1. Code analysis for asyncio.create_task() patterns
+2. Context detection for background service indicators
+3. Validation against legitimate exception patterns
+4. Violation blocking with specific remediation guidance
+5. ADR-007 compliance verification
+
+VIOLATION RESPONSE:
+- IMMEDIATE BLOCKING of non-compliant code generation
+- SPECIFIC GUIDANCE with exact implementation requirements
+- ADR-007 REFERENCE for architectural authority
+- REMEDIATION STEPS with working code examples
+</enforcement_protocol>
+</async_governance>
+```
+
+---
+
 ### **RULE PRECEDENCE HIERARCHY**
 
 When rules conflict, follow this order:
 0. **Mandatory First Response Protocol** (governs all interactions)
 1. **Error Correction** (safety first)
 2. **Pre-Action Verification** (prevent issues)
-3. **Systematic Analysis** (gather evidence)
-4. **Implementation Validation** (ensure quality)
-5. **MCP Research** (informed decisions)
-6. **Continuous Improvement** (optimize over time)
+3. **Unified Async Infrastructure Protocol** (architectural consistency)
+4. **Systematic Analysis** (gather evidence)
+5. **Implementation Validation** (ensure quality)
+6. **MCP Research** (informed decisions)
+7. **Continuous Improvement** (optimize over time)
 
 ---
 

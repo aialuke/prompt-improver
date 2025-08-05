@@ -29,6 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.ml.types import features, labels, model_config, hyper_parameters
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -350,35 +352,80 @@ class EnhancedModelRegistry:
             metadata.version = version
             metadata.created_at = aware_utc_now()
         
-        # Parallel processing tasks for 40% speed improvement
-        tasks = []
+        # Parallel processing tasks for 40% speed improvement using EnhancedBackgroundTaskManager
+        task_ids = []
         
         if self.enable_parallel_processing:
-            # Task 1: Store model artifacts
-            tasks.append(asyncio.create_task(
-                self._store_model_artifacts_async(model, model_id, metadata)
-            ))
+            task_manager = get_background_task_manager()
             
-            # Task 2: Update lineage
+            # Task 1: Store model artifacts with HIGH priority for model storage
+            artifacts_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_store_artifacts_{model_id}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._store_model_artifacts_async(model, model_id, metadata),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "ml",
+                    "type": "storage",
+                    "component": "model_artifacts",
+                    "model_id": model_id,
+                    "module": "enhanced_model_registry"
+                }
+            )
+            task_ids.append(artifacts_task_id)
+            
+            # Task 2: Update lineage with NORMAL priority for metadata tracking
             if parent_model_id:
-                tasks.append(asyncio.create_task(
-                    self._update_lineage_async(model_id, parent_model_id, experiment_id)
-                ))
+                lineage_task_id = await task_manager.submit_enhanced_task(
+                    task_id=f"ml_update_lineage_{model_id}_{str(uuid.uuid4())[:8]}",
+                    coroutine=self._update_lineage_async(model_id, parent_model_id, experiment_id),
+                    priority=TaskPriority.NORMAL,
+                    tags={
+                        "service": "ml",
+                        "type": "metadata",
+                        "component": "model_lineage",
+                        "model_id": model_id,
+                        "parent_model_id": parent_model_id,
+                        "module": "enhanced_model_registry"
+                    }
+                )
+                task_ids.append(lineage_task_id)
             
-            # Task 3: Register with MLflow
+            # Task 3: Register with MLflow with HIGH priority for external integration
             if self.mlflow_tracking_uri:
-                tasks.append(asyncio.create_task(
-                    self._register_with_mlflow_async(model, model_name, metadata, experiment_id)
-                ))
+                mlflow_task_id = await task_manager.submit_enhanced_task(
+                    task_id=f"ml_mlflow_register_{model_id}_{str(uuid.uuid4())[:8]}",
+                    coroutine=self._register_with_mlflow_async(model, model_name, metadata, experiment_id),
+                    priority=TaskPriority.HIGH,
+                    tags={
+                        "service": "ml",
+                        "type": "integration",
+                        "component": "mlflow_registration",
+                        "model_id": model_id,
+                        "model_name": model_name,
+                        "module": "enhanced_model_registry"
+                    }
+                )
+                task_ids.append(mlflow_task_id)
             
-            # Task 4: Auto-validation
+            # Task 4: Auto-validation with NORMAL priority for quality checks
             if auto_validate:
-                tasks.append(asyncio.create_task(
-                    self._validate_model_async(model_id, model)
-                ))
+                validation_task_id = await task_manager.submit_enhanced_task(
+                    task_id=f"ml_validate_model_{model_id}_{str(uuid.uuid4())[:8]}",
+                    coroutine=self._validate_model_async(model_id, model),
+                    priority=TaskPriority.NORMAL,
+                    tags={
+                        "service": "ml",
+                        "type": "validation",
+                        "component": "model_validation",
+                        "model_id": model_id,
+                        "module": "enhanced_model_registry"
+                    }
+                )
+                task_ids.append(validation_task_id)
             
-            # Execute all tasks in parallel
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Wait for all tasks to complete
+            for task_id in task_ids:
+                await task_manager.wait_for_completion(task_id)
         else:
             # Sequential processing (fallback)
             await self._store_model_artifacts_async(model, model_id, metadata)

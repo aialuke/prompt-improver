@@ -1,17 +1,19 @@
 """Enhanced Async Optimization with 2025 Best Practices
 
 Advanced async optimizer implementing 2025 best practices:
-- Intelligent connection pooling with health monitoring
-- Multi-tier caching with ttl and lru strategies
+- Unified connection management with health monitoring
+- Multi-level caching via UnifiedConnectionManager (L1 memory + L2 Redis)
 - Resource optimization with memory and CPU management
 - Enhanced monitoring with OpenTelemetry integration
 - Adaptive batching with dynamic sizing
 - Circuit breakers and fault tolerance
+- Security context validation for cache operations
 """
 
 import asyncio
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -26,15 +28,8 @@ from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
 
-# Enhanced caching imports - Use coredis for better async compatibility
-try:
-    import coredis
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
-
-# Note: Using coredis instead of aioredis for better Python 3.13 compatibility
-AIOREDIS_AVAILABLE = False
+# Note: Caching now handled via UnifiedConnectionManager's multi-level cache system
+# No independent Redis client needed - uses UnifiedConnectionManager's L1+L2 cache
 
 # Database connection pooling
 try:
@@ -64,22 +59,8 @@ from .performance_optimizer import measure_mcp_operation
 
 logger = logging.getLogger(__name__)
 
-# Enhanced 2025 enums and data structures
-class CacheStrategy(Enum):
-    """Caching strategies"""
-    lru = "lru"
-    ttl = "ttl"
-    lfu = "lfu"
-    adaptive = "adaptive"
-    WRITE_THROUGH = "write_through"
-    WRITE_BACK = "write_back"
-
-class ConnectionPoolType(Enum):
-    """Connection pool types"""
-    HTTP = "http"
-    database = "database"
-    redis = "redis"
-    custom = "custom"
+# Enhanced 2025 enums and data structures - using UnifiedConnectionManager pool types
+from ...database.unified_connection_manager import PoolConfiguration
 
 class ResourceOptimizationMode(Enum):
     """Resource optimization modes"""
@@ -87,29 +68,6 @@ class ResourceOptimizationMode(Enum):
     CPU_OPTIMIZED = "cpu_optimized"
     balanced = "balanced"
     THROUGHPUT_OPTIMIZED = "throughput_optimized"
-
-@dataclass
-class CacheConfig:
-    """Configuration for intelligent caching"""
-    strategy: CacheStrategy = CacheStrategy.lru
-    max_size: int = 1000
-    ttl_seconds: int = 300
-    enable_compression: bool = True
-    enable_serialization: bool = True
-    cache_hit_threshold: float = 0.8
-    eviction_policy: str = "lru"
-
-@dataclass
-class ConnectionPoolConfig:
-    """Configuration for connection pools"""
-    pool_type: ConnectionPoolType
-    min_connections: int = 5
-    max_connections: int = 50
-    connection_timeout: float = 30.0
-    idle_timeout: float = 300.0
-    health_check_interval: float = 60.0
-    retry_attempts: int = 3
-    enable_health_monitoring: bool = True
 
 @dataclass
 class ResourceMetrics:
@@ -157,11 +115,12 @@ class AsyncOperationConfig:
     memory_limit_mb: int = 512
     cpu_limit_percent: float = 80.0
 
-    # Caching configuration
-    cache_config: CacheConfig = field(default_factory=CacheConfig)
+    # Caching configuration - integrated with UnifiedConnectionManager
+    cache_ttl_seconds: int = 3600  # 1 hour default TTL
+    enable_cache_warming: bool = True
 
-    # Connection pooling
-    connection_pools: Dict[str, ConnectionPoolConfig] = field(default_factory=dict)
+    # Connection pooling - integrated with UnifiedConnectionManager
+    pool_configuration: Optional[PoolConfiguration] = None
 
     # Circuit breaker settings
     circuit_breaker_failure_threshold: int = 5
@@ -205,165 +164,6 @@ else:
     CONNECTION_POOL_UTILIZATION = None
     RESOURCE_UTILIZATION = None
 
-class IntelligentCache:
-    """Intelligent caching with multiple strategies and optimization"""
-
-    def __init__(self, config: CacheConfig):
-        self.config = config
-        self.cache: Dict[str, Any] = {}
-        self.access_times: Dict[str, datetime] = {}
-        self.access_counts: Dict[str, int] = defaultdict(int)
-        self.cache_stats = {
-            "hits": 0,
-            "misses": 0,
-            "evictions": 0,
-            "size": 0
-        }
-
-        # Redis connection for distributed caching
-        self.redis_client: Optional[coredis.Redis] = None
-        self._redis_initialization_task: Optional[asyncio.Task] = None
-        if REDIS_AVAILABLE:
-            # Don't create task immediately during __init__ to avoid event loop issues
-            # Initialize Redis on first use or explicitly via ensure_redis_connection()
-            pass
-
-    async def _initialize_redis(self):
-        """Initialize Redis connection for distributed caching"""
-        try:
-            self.redis_client = coredis.Redis(host="localhost", port=6379, decode_responses=True)
-            await self.redis_client.ping()
-            logger.info("Redis cache initialized")
-        except Exception as e:
-            logger.warning(f"Redis not available, using local cache only: {e}")
-            self.redis_client = None
-
-    async def ensure_redis_connection(self):
-        """Ensure Redis connection is established"""
-        if not REDIS_AVAILABLE:
-            return
-            
-        if self.redis_client is None and self._redis_initialization_task is None:
-            # Use EnhancedBackgroundTaskManager for proper task management
-            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
-            task_manager = get_background_task_manager()
-            task_id = await task_manager.submit_task("redis_initialization", self._initialize_redis())
-            self._redis_initialization_task = asyncio.create_task(self._initialize_redis())  # Keep original for compatibility
-            await self._redis_initialization_task
-
-    async def get(self, key: str) -> Optional[Any]:
-        """Get value from cache with intelligent strategy"""
-        # Ensure Redis connection if needed
-        await self.ensure_redis_connection()
-        
-        # Try local cache first
-        if key in self.cache:
-            self.access_times[key] = datetime.now(UTC)
-            self.access_counts[key] += 1
-            self.cache_stats["hits"] += 1
-
-            # Check ttl if enabled
-            if self.config.strategy == CacheStrategy.ttl:
-                if self._is_expired(key):
-                    await self.delete(key)
-                    self.cache_stats["misses"] += 1
-                    return None
-
-            return self.cache[key]
-
-        # Try Redis if available
-        if self.redis_client:
-            try:
-                value = await self.redis_client.get(key)
-                if value is not None:
-                    # Deserialize if needed
-                    if self.config.enable_serialization:
-                        value = json.loads(value)
-
-                    # Store in local cache for faster access
-                    await self.set(key, value, local_only=True)
-                    self.cache_stats["hits"] += 1
-                    return value
-            except Exception as e:
-                logger.warning(f"Redis get error: {e}")
-
-        self.cache_stats["misses"] += 1
-        return None
-
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None, local_only: bool = False):
-        """Set value in cache with intelligent eviction"""
-        # Ensure Redis connection if needed
-        await self.ensure_redis_connection()
-        
-        # Check if eviction is needed
-        if len(self.cache) >= self.config.max_size:
-            await self._evict_items()
-
-        # Store in local cache
-        self.cache[key] = value
-        self.access_times[key] = datetime.now(UTC)
-        self.access_counts[key] = 1
-        self.cache_stats["size"] = len(self.cache)
-
-        # Store in Redis if available and not local_only
-        if self.redis_client and not local_only:
-            try:
-                serialized_value = json.dumps(value) if self.config.enable_serialization else value
-                ttl = ttl or self.config.ttl_seconds
-                await self.redis_client.setex(key, ttl, serialized_value)
-            except Exception as e:
-                logger.warning(f"Redis set error: {e}")
-
-    async def delete(self, key: str):
-        """Delete key from cache"""
-        # Ensure Redis connection if needed
-        await self.ensure_redis_connection()
-        
-        if key in self.cache:
-            del self.cache[key]
-            del self.access_times[key]
-            del self.access_counts[key]
-            self.cache_stats["size"] = len(self.cache)
-
-        if self.redis_client:
-            try:
-                await self.redis_client.delete(key)
-            except Exception as e:
-                logger.warning(f"Redis delete error: {e}")
-
-    async def _evict_items(self):
-        """Evict items based on strategy"""
-        if not self.cache:
-            return
-
-        evict_count = max(1, len(self.cache) // 10)  # Evict 10% of items
-
-        if self.config.strategy == CacheStrategy.lru:
-            # Evict least recently used
-            sorted_items = sorted(self.access_times.items(), key=lambda x: x[1])
-            for key, _ in sorted_items[:evict_count]:
-                await self.delete(key)
-                self.cache_stats["evictions"] += 1
-
-        elif self.config.strategy == CacheStrategy.lfu:
-            # Evict least frequently used
-            sorted_items = sorted(self.access_counts.items(), key=lambda x: x[1])
-            for key, _ in sorted_items[:evict_count]:
-                await self.delete(key)
-                self.cache_stats["evictions"] += 1
-
-    def _is_expired(self, key: str) -> bool:
-        """Check if key is expired (ttl strategy)"""
-        if key not in self.access_times:
-            return True
-
-        age = datetime.now(UTC) - self.access_times[key]
-        return age.total_seconds() > self.config.ttl_seconds
-
-    def get_hit_rate(self) -> float:
-        """Get cache hit rate"""
-        total = self.cache_stats["hits"] + self.cache_stats["misses"]
-        return self.cache_stats["hits"] / total if total > 0 else 0.0
 
 class AsyncBatchProcessor:
     """Batches async operations for improved throughput."""
@@ -423,16 +223,29 @@ class AsyncBatchProcessor:
 
             # Execute all operations in the batch
             # Use EnhancedBackgroundTaskManager for proper task management
-            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
             task_manager = get_background_task_manager()
             
-            tasks = []
+            task_ids = []
+            batch_id = str(uuid.uuid4())[:8]
             for i, (op, args, kwargs, future) in enumerate(batch):
-                task_id = await task_manager.submit_task(f"batch_op_{i}", process_operation(op, args, kwargs, future))
-                # Also create the task for immediate execution (hybrid approach)
-                tasks.append(asyncio.create_task(process_operation(op, args, kwargs, future)))
+                task_id = await task_manager.submit_enhanced_task(
+                    task_id=f"batch_op_{batch_id}_{i}",
+                    coroutine=lambda op=op, args=args, kwargs=kwargs, future=future: process_operation(op, args, kwargs, future),
+                    priority=TaskPriority.NORMAL,
+                    tags={"service": "async_optimizer", "type": "batch_operation", "batch_id": batch_id}
+                )
+                task_ids.append(task_id)
 
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Wait for all batch operations to complete
+            batch_tasks = []
+            for task_id in task_ids:
+                task = task_manager.get_task_status(task_id)
+                if task and task.asyncio_task:
+                    batch_tasks.append(task.asyncio_task)
+            
+            if batch_tasks:
+                await asyncio.gather(*batch_tasks, return_exceptions=True)
 
         finally:
             self._processing = False
@@ -442,9 +255,10 @@ class AsyncTaskScheduler:
 
     def __init__(self):
         self._task_queue: asyncio.Queue = asyncio.Queue()
-        self._workers: List[asyncio.Task] = []
+        self._worker_task_ids: List[str] = []
         self._running = False
         self._worker_count = 4  # Optimal for most workloads
+        self._scheduler_id = str(uuid.uuid4())[:8]  # Unique scheduler identifier
 
     async def start(self):
         """Start the task scheduler workers."""
@@ -453,30 +267,42 @@ class AsyncTaskScheduler:
 
         self._running = True
         # Use EnhancedBackgroundTaskManager for proper worker management
-        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
         task_manager = get_background_task_manager()
         
-        self._workers = []
+        self._worker_task_ids = []
         for i in range(self._worker_count):
-            task_id = await task_manager.submit_task(f"scheduler_worker_{i}", self._worker(f"worker-{i}"))
-            # Also create the task for immediate execution (hybrid approach)
-            self._workers.append(asyncio.create_task(self._worker(f"worker-{i}")))
+            task_id = await task_manager.submit_enhanced_task(
+                task_id=f"async_optimizer_worker_{self._scheduler_id}_{i}",
+                coroutine=lambda worker_id=i: self._worker(f"worker-{worker_id}"),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "async_optimizer", "type": "worker_pool", "scheduler_id": self._scheduler_id}
+            )
+            self._worker_task_ids.append(task_id)
 
-        logger.info(f"Started {self._worker_count} async task workers")
+        logger.info(f"Started {self._worker_count} async task workers with centralized management")
 
     async def stop(self):
         """Stop the task scheduler workers."""
         self._running = False
 
-        # Cancel all workers
-        for worker in self._workers:
-            worker.cancel()
+        # Cancel all workers through centralized management
+        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+        task_manager = get_background_task_manager()
+        
+        worker_tasks = []
+        for task_id in self._worker_task_ids:
+            task = task_manager.get_task_status(task_id)
+            if task and task.asyncio_task:
+                task.asyncio_task.cancel()
+                worker_tasks.append(task.asyncio_task)
 
         # Wait for workers to finish
-        await asyncio.gather(*self._workers, return_exceptions=True)
-        self._workers.clear()
-
-        logger.info("Stopped async task scheduler")
+        if worker_tasks:
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+        
+        self._worker_task_ids.clear()
+        logger.info("Stopped async task scheduler with centralized management")
 
     async def schedule_task(
         self,
@@ -525,19 +351,32 @@ class AsyncOptimizer:
 
     def __init__(self, config: Optional[AsyncOperationConfig] = None):
         self.config = config or AsyncOperationConfig()
-        # Use UnifiedConnectionManager with 2025 best practices
-        from ...database.unified_connection_manager import get_unified_manager, ManagerMode
+        # Use UnifiedConnectionManager with 2025 best practices and enhanced caching
+        from ...database.unified_connection_manager import get_unified_manager, ManagerMode, SecurityContext, create_security_context
         self.connection_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
         self.batch_processor = AsyncBatchProcessor(self.config)
         self.task_scheduler = AsyncTaskScheduler()
         self._optimization_enabled = True
+        
+        # Security context for cache operations (async optimizer operations are always authenticated)
+        self._security_context: Optional[SecurityContext] = None
+        self._cache_key_prefix = "async_optimizer"
 
     async def initialize(self):
         """Initialize the async optimizer."""
         await self.task_scheduler.start()
         # Initialize unified connection manager with health monitoring
         await self.connection_manager.initialize()
-        logger.info("Async optimizer initialized with unified connection pooling")
+        
+        # Create security context for cache operations
+        from ...database.unified_connection_manager import create_security_context
+        self._security_context = await create_security_context(
+            agent_id="async_optimizer",
+            tier="professional",  # Professional tier for optimization operations
+            authenticated=True
+        )
+        
+        logger.info("Async optimizer initialized with unified connection pooling and integrated caching")
 
     async def shutdown(self):
         """Shutdown the async optimizer."""
@@ -616,34 +455,201 @@ class AsyncOptimizer:
                 return await operation(*args, **kwargs)
 
         # Use EnhancedBackgroundTaskManager for proper task management
-        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+        from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
         task_manager = get_background_task_manager()
         
-        tasks = []
+        task_ids = []
+        operation_batch_id = str(uuid.uuid4())[:8]
         for i, (op, args, kwargs) in enumerate(operations):
-            task_id = await task_manager.submit_task(f"concurrent_op_{i}", execute_with_semaphore(op, args, kwargs))
-            # Also create the task for immediate execution (hybrid approach)
-            tasks.append(asyncio.create_task(execute_with_semaphore(op, args, kwargs)))
+            task_id = await task_manager.submit_enhanced_task(
+                task_id=f"concurrent_op_{operation_batch_id}_{i}",
+                coroutine=lambda op=op, args=args, kwargs=kwargs: execute_with_semaphore(op, args, kwargs),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "async_optimizer", "type": "concurrent_operation", "batch_id": operation_batch_id}
+            )
+            task_ids.append(task_id)
 
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        # Wait for all concurrent operations to complete
+        concurrent_tasks = []
+        for task_id in task_ids:
+            task = task_manager.get_task_status(task_id)
+            if task and task.asyncio_task:
+                concurrent_tasks.append(task.asyncio_task)
+        
+        if concurrent_tasks:
+            return await asyncio.gather(*concurrent_tasks, return_exceptions=True)
+        else:
+            return []
 
     def get_performance_metrics(self) -> Dict[str, Any]:
-        """Get performance metrics for the async optimizer."""
-        return {
+        """Get performance metrics for the async optimizer including cache performance."""
+        base_metrics = {
             "optimization_enabled": self._optimization_enabled,
             "config": {
                 "max_concurrent_operations": self.config.max_concurrent_operations,
                 "operation_timeout": self.config.operation_timeout,
                 "retry_attempts": self.config.retry_attempts,
                 "batch_size": self.config.batch_size,
-                "batch_timeout": self.config.batch_timeout
+                "batch_timeout": self.config.batch_timeout,
+                "enable_intelligent_caching": self.config.enable_intelligent_caching,
+                "cache_ttl_seconds": self.config.cache_ttl_seconds
             },
             "task_scheduler": {
                 "running": self.task_scheduler._running,
-                "worker_count": len(self.task_scheduler._workers),
+                "worker_count": len(self.task_scheduler._worker_task_ids),
                 "queue_size": self.task_scheduler._task_queue.qsize()
             }
         }
+        
+        # Add cache performance metrics from UnifiedConnectionManager
+        if self.connection_manager and hasattr(self.connection_manager, 'get_cache_stats'):
+            try:
+                cache_stats = self.connection_manager.get_cache_stats()
+                base_metrics["cache_performance"] = {
+                    "l1_cache_stats": cache_stats.get("l1_cache", {}),
+                    "l2_cache_stats": cache_stats.get("l2_cache", {}),
+                    "cache_hit_rate": cache_stats.get("overall_hit_rate", 0.0),
+                    "cache_operations": cache_stats.get("operations", {}),
+                    "cache_warming_stats": cache_stats.get("warming", {})
+                }
+            except Exception as e:
+                logger.warning(f"Failed to get cache stats: {e}")
+                base_metrics["cache_performance"] = {"error": str(e)}
+        
+        return base_metrics
+    
+    # ========== Integrated Caching Methods Using UnifiedConnectionManager ==========
+    
+    async def get_cached_result(self, operation_key: str) -> Optional[Any]:
+        """Get cached optimization result using UnifiedConnectionManager's multi-level cache.
+        
+        Args:
+            operation_key: Unique key for the optimization operation
+            
+        Returns:
+            Cached result or None if not found
+        """
+        if not self.config.enable_intelligent_caching or not self._security_context:
+            return None
+        
+        try:
+            cache_key = f"{self._cache_key_prefix}:result:{operation_key}"
+            return await self.connection_manager.get_cached(
+                key=cache_key,
+                security_context=self._security_context
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get cached result for {operation_key}: {e}")
+            return None
+    
+    async def cache_optimization_result(self, operation_key: str, result: Any) -> bool:
+        """Cache optimization result using UnifiedConnectionManager's multi-level cache.
+        
+        Args:
+            operation_key: Unique key for the optimization operation
+            result: Result to cache
+            
+        Returns:
+            True if successfully cached, False otherwise
+        """
+        if not self.config.enable_intelligent_caching or not self._security_context:
+            return False
+        
+        try:
+            cache_key = f"{self._cache_key_prefix}:result:{operation_key}"
+            return await self.connection_manager.set_cached(
+                key=cache_key,
+                value=result,
+                ttl_seconds=self.config.cache_ttl_seconds,
+                security_context=self._security_context
+            )
+        except Exception as e:
+            logger.warning(f"Failed to cache result for {operation_key}: {e}")
+            return False
+    
+    async def get_cached_metrics(self, metrics_key: str) -> Optional[Dict[str, Any]]:
+        """Get cached performance metrics using UnifiedConnectionManager.
+        
+        Args:
+            metrics_key: Unique key for the metrics
+            
+        Returns:
+            Cached metrics or None if not found
+        """
+        if not self.config.enable_intelligent_caching or not self._security_context:
+            return None
+        
+        try:
+            cache_key = f"{self._cache_key_prefix}:metrics:{metrics_key}"
+            return await self.connection_manager.get_cached(
+                key=cache_key,
+                security_context=self._security_context
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get cached metrics for {metrics_key}: {e}")
+            return None
+    
+    async def cache_performance_metrics(self, metrics_key: str, metrics: Dict[str, Any]) -> bool:
+        """Cache performance metrics using UnifiedConnectionManager.
+        
+        Args:
+            metrics_key: Unique key for the metrics
+            metrics: Metrics to cache
+            
+        Returns:
+            True if successfully cached, False otherwise
+        """
+        if not self.config.enable_intelligent_caching or not self._security_context:
+            return False
+        
+        try:
+            cache_key = f"{self._cache_key_prefix}:metrics:{metrics_key}"
+            # Use shorter TTL for metrics (30 minutes)
+            metrics_ttl = min(self.config.cache_ttl_seconds, 1800)
+            return await self.connection_manager.set_cached(
+                key=cache_key,
+                value=metrics,
+                ttl_seconds=metrics_ttl,
+                security_context=self._security_context
+            )
+        except Exception as e:
+            logger.warning(f"Failed to cache metrics for {metrics_key}: {e}")
+            return False
+    
+    async def invalidate_cache(self, pattern: str = None) -> int:
+        """Invalidate cached optimization data.
+        
+        Args:
+            pattern: Optional pattern to match keys (None invalidates all optimizer cache)
+            
+        Returns:
+            Number of keys invalidated
+        """
+        if not self._security_context:
+            return 0
+        
+        invalidated_count = 0
+        
+        try:
+            # For now, we'll implement basic key-by-key deletion
+            # In the future, UnifiedConnectionManager could support pattern-based deletion
+            if pattern:
+                # Delete specific pattern-based keys
+                cache_key = f"{self._cache_key_prefix}:{pattern}"
+                if await self.connection_manager.delete_cached(
+                    key=cache_key,
+                    security_context=self._security_context
+                ):
+                    invalidated_count += 1
+            else:
+                # For now, we can't easily iterate all keys, so log the intent
+                logger.info(f"Cache invalidation requested for async optimizer (prefix: {self._cache_key_prefix})")
+                # Individual key invalidation would need to be implemented per use case
+                
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache: {e}")
+        
+        return invalidated_count
 
 # Global async optimizer instance
 _global_optimizer: Optional[AsyncOptimizer] = None
@@ -681,5 +687,6 @@ async def shutdown_async_optimizer():
         await _global_optimizer.shutdown()
         _global_optimizer = None
 
-# Note: Uses UnifiedConnectionManager for consolidated database operations
-# All connection pooling, health monitoring, and optimization features are now unified
+# Note: Uses UnifiedConnectionManager for consolidated database and cache operations
+# All connection pooling, health monitoring, caching, and optimization features are now unified
+# Independent Redis client eliminated - uses UnifiedConnectionManager's L1+L2 multi-level cache

@@ -43,6 +43,7 @@ from prompt_improver.utils.redis_cache import (
     invalidate,
     with_singleflight,
     _execute_and_cache,
+    get_cache,
 )
 
 

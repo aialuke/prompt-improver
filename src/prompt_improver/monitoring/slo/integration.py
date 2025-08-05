@@ -26,6 +26,12 @@ except ImportError:
     metrics = MeterProvider = Meter = SDKMeterProvider = None
     MetricExporter = MetricReader = PrometheusMetricReader = None
 
+# Unified Redis operations through UnifiedConnectionManager
+from ...database.unified_connection_manager import (
+    get_unified_manager, ManagerMode, create_security_context
+)
+
+# Legacy coredis imports for backward compatibility
 try:
     import coredis
     REDIS_AVAILABLE = True
@@ -35,6 +41,7 @@ except ImportError:
 
 from .framework import SLODefinition, SLOTarget, SLOType
 from .monitor import SLOMonitor
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -705,11 +712,16 @@ class MetricsCollector:
     def __init__(
         self,
         redis_url: Optional[str] = None,
-        collection_interval: int = 30
+        collection_interval: int = 30,
+        unified_manager = None
     ):
-        self.redis_url = redis_url
+        self.redis_url = redis_url  # Kept for backward compatibility
         self.collection_interval = collection_interval
-        self._redis_client = None
+        self._redis_client = None  # Legacy field
+        
+        # Unified connection manager for Redis operations
+        self._unified_manager = unified_manager or get_unified_manager(ManagerMode.ASYNC_MODERN)
+        self._security_context = None
         
         # Data sources
         self.data_sources: List[Callable] = []
@@ -717,25 +729,26 @@ class MetricsCollector:
         
         # Collection state
         self.is_collecting = False
-        self.collection_task: Optional[asyncio.Task] = None
+        self.collection_task_id: Optional[str] = None
         
         # OpenTelemetry integration
         self.otel_integration: Optional[OpenTelemetryIntegration] = None
     
     async def get_redis_client(self) -> Optional[coredis.Redis]:
-        """Get Redis client for metrics storage"""
-        if not REDIS_AVAILABLE or not self.redis_url:
-            return None
-            
-        if self._redis_client is None:
-            try:
-                self._redis_client = coredis.Redis.from_url(self.redis_url, decode_responses=True)
-                await self._redis_client.ping()
-            except Exception as e:
-                logger.warning(f"Failed to connect to Redis: {e}")
-                return None
-        
-        return self._redis_client
+        """Legacy Redis client method - deprecated, uses UnifiedConnectionManager internally"""
+        # For backward compatibility, but internally uses UnifiedConnectionManager
+        logger.info("Using UnifiedConnectionManager for Redis operations instead of direct client")
+        return None  # Always return None to force usage of unified cache methods
+    
+    async def _ensure_security_context(self):
+        """Ensure security context exists for Redis operations"""
+        if self._security_context is None:
+            self._security_context = await create_security_context(
+                agent_id="slo_metrics_collector",
+                tier="professional",
+                authenticated=True
+            )
+        return self._security_context
     
     def set_opentelemetry_integration(self, integration: OpenTelemetryIntegration) -> None:
         """Set OpenTelemetry integration for metrics export"""
@@ -759,18 +772,25 @@ class MetricsCollector:
             return
         
         self.is_collecting = True
-        self.collection_task = asyncio.create_task(self._collection_loop())
+        task_manager = get_background_task_manager()
+        self.collection_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"metrics_collector_{id(self)}",
+            coroutine=self._collection_loop,
+            priority=TaskPriority.NORMAL,
+            tags={
+                "type": "slo_monitoring",
+                "component": "metrics_collector"
+            }
+        )
         logger.info("Started metrics collection")
     
     async def stop_collection(self) -> None:
         """Stop metrics collection"""
         self.is_collecting = False
-        if self.collection_task:
-            self.collection_task.cancel()
-            try:
-                await self.collection_task
-            except asyncio.CancelledError:
-                pass
+        if self.collection_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.collection_task_id)
+            self.collection_task_id = None
         logger.info("Stopped metrics collection")
     
     async def _collection_loop(self) -> None:
@@ -842,28 +862,32 @@ class MetricsCollector:
                             labels={"window": window.value}
                         )
                 
-                # Store in Redis
-                await self._store_metrics_redis(monitor_name, target_name, window_results)
+                # Store in unified cache system
+                await self._store_metrics_unified(monitor_name, target_name, window_results)
         
         except Exception as e:
             logger.error(f"Failed to collect SLO metrics for {monitor_name}: {e}")
     
-    async def _store_metrics_redis(
+    async def _store_metrics_unified(
         self,
         monitor_name: str,
         target_name: str,
         window_results: Dict[Any, Any]
     ) -> None:
-        """Store metrics in Redis for historical analysis"""
-        redis = await self.get_redis_client()
-        if not redis:
-            return
-        
+        """Store metrics in unified cache system for historical analysis"""
         try:
+            # Initialize unified manager if needed
+            if not self._unified_manager._is_initialized:
+                await self._unified_manager.initialize()
+            
+            # Get security context
+            security_context = await self._ensure_security_context()
+            
             timestamp = int(time.time())
             
             for window, result in window_results.items():
-                key = f"slo_metrics:{monitor_name}:{target_name}:{window.value}"
+                # Store individual metric entry
+                metric_key = f"slo_metrics:{monitor_name}:{target_name}:{window.value}:{timestamp}"
                 
                 data = {
                     "timestamp": timestamp,
@@ -871,20 +895,45 @@ class MetricsCollector:
                     "target_value": result.target_value,
                     "compliance_ratio": result.compliance_ratio,
                     "measurement_count": result.measurement_count,
-                    "is_compliant": result.is_compliant
+                    "is_compliant": result.is_compliant,
+                    "window": window.value,
+                    "monitor_name": monitor_name,
+                    "target_name": target_name
                 }
                 
-                # Store as sorted set for time-series data
-                await redis.zadd(key, {json.dumps(data): timestamp})
+                # Calculate TTL based on window size
+                ttl_seconds = window.seconds * 2  # Keep for 2x the window duration
                 
-                # Keep only last 1000 points
-                await redis.zremrangebyrank(key, 0, -1001)
+                # Store in unified cache (L1 + Redis L2)
+                success = await self._unified_manager.set_cached(
+                    key=metric_key,
+                    value=data,
+                    ttl_seconds=ttl_seconds,
+                    security_context=security_context
+                )
                 
-                # Set expiration
-                await redis.expire(key, window.seconds * 2)
+                if success:
+                    logger.debug(f"Stored SLO metrics for {monitor_name}:{target_name}:{window.value} in unified cache")
+                else:
+                    logger.warning(f"Failed to store SLO metrics for {monitor_name}:{target_name}:{window.value} in unified cache")
+                
+                # Also store a time-series index for efficient retrieval
+                index_key = f"slo_metrics_index:{monitor_name}:{target_name}:{window.value}"
+                index_data = {
+                    "latest_timestamp": timestamp,
+                    "latest_metric_key": metric_key,
+                    "window_seconds": window.seconds
+                }
+                
+                await self._unified_manager.set_cached(
+                    key=index_key,
+                    value=index_data,
+                    ttl_seconds=ttl_seconds,
+                    security_context=security_context
+                )
         
         except Exception as e:
-            logger.error(f"Failed to store metrics in Redis: {e}")
+            logger.error(f"Failed to store metrics in unified cache: {e}")
     
     def get_collection_status(self) -> Dict[str, Any]:
         """Get current collection status"""

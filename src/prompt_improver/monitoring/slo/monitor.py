@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import deque
 
+# Unified Redis operations through UnifiedConnectionManager
+from ...database.unified_connection_manager import (
+    get_unified_manager, ManagerMode, create_security_context
+)
+
+# Legacy coredis imports for backward compatibility
 try:
     import coredis
     REDIS_AVAILABLE = True
@@ -27,6 +33,7 @@ from .framework import (
 
 )
 from .calculator import MultiWindowSLICalculator, SLIResult
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 logger = logging.getLogger(__name__)
 
@@ -289,11 +296,16 @@ class ErrorBudgetMonitor:
     def __init__(
         self,
         slo_definition: SLODefinition,
-        redis_url: Optional[str] = None
+        redis_url: Optional[str] = None,
+        unified_manager = None
     ):
         self.slo_definition = slo_definition
-        self.redis_url = redis_url
-        self._redis_client = None
+        self.redis_url = redis_url  # Kept for backward compatibility
+        self._redis_client = None  # Legacy field
+        
+        # Unified connection manager for Redis operations
+        self._unified_manager = unified_manager or get_unified_manager(ManagerMode.ASYNC_MODERN)
+        self._security_context = None
 
         # Error budget tracking
         self.error_budgets: Dict[str, ErrorBudget] = {}
@@ -305,23 +317,24 @@ class ErrorBudgetMonitor:
 
         # Monitoring configuration
         self.check_interval_seconds = 60  # Check every minute
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.monitoring_task_id: Optional[str] = None
         self.is_monitoring = False
 
     async def get_redis_client(self) -> Optional[coredis.Redis]:
-        """Get Redis client for distributed storage"""
-        if not REDIS_AVAILABLE or not self.redis_url:
-            return None
-
-        if self._redis_client is None:
-            try:
-                self._redis_client = coredis.Redis.from_url(self.redis_url, decode_responses=True)
-                await self._redis_client.ping()
-            except Exception as e:
-                logger.warning(f"Failed to connect to Redis: {e}")
-                return None
-
-        return self._redis_client
+        """Legacy Redis client method - deprecated, uses UnifiedConnectionManager internally"""
+        # For backward compatibility, but internally uses UnifiedConnectionManager
+        logger.info("Using UnifiedConnectionManager for Redis operations instead of direct client")
+        return None  # Always return None to force usage of unified cache methods
+    
+    async def _ensure_security_context(self):
+        """Ensure security context exists for Redis operations"""
+        if self._security_context is None:
+            self._security_context = await create_security_context(
+                agent_id=f"slo_error_budget_monitor_{self.slo_definition.service_name}",
+                tier="professional",
+                authenticated=True
+            )
+        return self._security_context
 
     def register_policy_action(self, action_name: str, callback: Callable) -> None:
         """Register a policy action callback"""
@@ -353,8 +366,8 @@ class ErrorBudgetMonitor:
         # Calculate error budget
         budget.calculate_budget(total_requests, failed_requests)
 
-        # Store in Redis
-        await self._store_budget_redis(budget_key, budget)
+        # Store in unified cache system
+        await self._store_budget_unified(budget_key, budget)
 
         # Check for exhaustion and policy enforcement
         await self._check_budget_exhaustion(budget)
@@ -376,13 +389,16 @@ class ErrorBudgetMonitor:
 
         return budget
 
-    async def _store_budget_redis(self, budget_key: str, budget: ErrorBudget) -> None:
-        """Store error budget in Redis"""
-        redis = await self.get_redis_client()
-        if not redis:
-            return
-
+    async def _store_budget_unified(self, budget_key: str, budget: ErrorBudget) -> None:
+        """Store error budget in unified cache system"""
         try:
+            # Initialize unified manager if needed
+            if not self._unified_manager._is_initialized:
+                await self._unified_manager.initialize()
+            
+            # Get security context
+            security_context = await self._ensure_security_context()
+            
             key = f"error_budget:{self.slo_definition.service_name}:{budget_key}"
             data = {
                 "total_budget": budget.total_budget,
@@ -390,14 +406,30 @@ class ErrorBudgetMonitor:
                 "remaining_budget": budget.remaining_budget,
                 "budget_percentage": budget.budget_percentage,
                 "current_burn_rate": budget.current_burn_rate,
-                "last_updated": budget.last_updated.isoformat() if budget.last_updated else None
+                "last_updated": budget.last_updated.isoformat() if budget.last_updated else None,
+                "service_name": self.slo_definition.service_name,
+                "budget_key": budget_key,
+                "time_window_seconds": budget.time_window.seconds
             }
 
-            await redis.hset(key, mapping={k: str(v) for k, v in data.items()})
-            await redis.expire(key, budget.time_window.seconds * 2)
+            # Calculate TTL based on budget time window
+            ttl_seconds = budget.time_window.seconds * 2
+            
+            # Store in unified cache (L1 + Redis L2)
+            success = await self._unified_manager.set_cached(
+                key=key,
+                value=data,
+                ttl_seconds=ttl_seconds,
+                security_context=security_context
+            )
+            
+            if success:
+                logger.debug(f"Stored error budget for {self.slo_definition.service_name}:{budget_key} in unified cache")
+            else:
+                logger.warning(f"Failed to store error budget for {self.slo_definition.service_name}:{budget_key} in unified cache")
 
         except Exception as e:
-            logger.warning(f"Failed to store error budget in Redis: {e}")
+            logger.warning(f"Failed to store error budget in unified cache: {e}")
 
     async def _check_budget_exhaustion(self, budget: ErrorBudget) -> None:
         """Check for error budget exhaustion and enforce policies"""
@@ -492,18 +524,26 @@ class ErrorBudgetMonitor:
             return
 
         self.is_monitoring = True
-        self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+        task_manager = get_background_task_manager()
+        self.monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"error_budget_monitor_{self.slo_definition.service_name}_{id(self)}",
+            coroutine=self._monitoring_loop,
+            priority=TaskPriority.HIGH,
+            tags={
+                "type": "slo_monitoring",
+                "service": self.slo_definition.service_name,
+                "component": "error_budget"
+            }
+        )
         logger.info("Started error budget monitoring")
 
     async def stop_monitoring(self) -> None:
         """Stop error budget monitoring"""
         self.is_monitoring = False
-        if self.monitoring_task:
-            self.monitoring_task.cancel()
-            try:
-                await self.monitoring_task
-            except asyncio.CancelledError:
-                pass
+        if self.monitoring_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.monitoring_task_id)
+            self.monitoring_task_id = None
         logger.info("Stopped error budget monitoring")
 
     async def _monitoring_loop(self) -> None:
@@ -535,12 +575,16 @@ class SLOMonitor:
         self.redis_url = redis_url
         self.alert_callbacks = alert_callbacks or []
 
-        # Create calculators for each SLO target
+        # Get unified manager for Redis operations
+        self._unified_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        
+        # Create calculators for each SLO target with unified manager
         self.calculators: Dict[str, MultiWindowSLICalculator] = {}
         for target in slo_definition.targets:
             self.calculators[target.name] = MultiWindowSLICalculator(
                 slo_target=target,
-                redis_url=redis_url
+                redis_url=redis_url,  # Legacy parameter
+                unified_manager=self._unified_manager  # Use shared unified manager
             )
 
         # Create burn rate alerting for each target
@@ -548,15 +592,16 @@ class SLOMonitor:
         for target in slo_definition.targets:
             self.burn_rate_alerts[target.name] = BurnRateAlert(slo_target=target)
 
-        # Error budget monitoring
+        # Error budget monitoring with unified manager
         self.error_budget_monitor = ErrorBudgetMonitor(
             slo_definition=slo_definition,
-            redis_url=redis_url
+            redis_url=redis_url,  # Legacy parameter
+            unified_manager=self._unified_manager  # Use shared unified manager
         )
 
         # Monitoring state
         self.is_monitoring = False
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.monitoring_task_id: Optional[str] = None
         self.check_interval_seconds = 60
 
         # Alert aggregation
@@ -699,7 +744,17 @@ class SLOMonitor:
         await self.error_budget_monitor.start_monitoring()
 
         # Start main monitoring loop
-        self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+        task_manager = get_background_task_manager()
+        self.monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"slo_monitor_{self.slo_definition.service_name}_{id(self)}",
+            coroutine=self._monitoring_loop,
+            priority=TaskPriority.HIGH,
+            tags={
+                "type": "slo_monitoring",
+                "service": self.slo_definition.service_name,
+                "component": "slo_monitor"
+            }
+        )
 
         logger.info(f"Started SLO monitoring for {self.slo_definition.service_name}")
 
@@ -711,12 +766,10 @@ class SLOMonitor:
         await self.error_budget_monitor.stop_monitoring()
 
         # Stop main monitoring loop
-        if self.monitoring_task:
-            self.monitoring_task.cancel()
-            try:
-                await self.monitoring_task
-            except asyncio.CancelledError:
-                pass
+        if self.monitoring_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.monitoring_task_id)
+            self.monitoring_task_id = None
 
         logger.info(f"Stopped SLO monitoring for {self.slo_definition.service_name}")
 

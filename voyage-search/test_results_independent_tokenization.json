@@ -1,0 +1,104 @@
+{
+  "test_suite": "Independent Tokenization Optimization",
+  "timestamp": 1754066088.6474009,
+  "tests": [
+    {
+      "test_name": "BM25 Tokenization Optimization",
+      "passed": true,
+      "details": {
+        "manager_initialized": true,
+        "batch_tokenization_time_ms": 0.08225440979003906,
+        "tokenized_count": 3,
+        "sample_tokens": [
+          "calcul",
+          "similar",
+          "vector",
+          "use",
+          "cosin"
+        ],
+        "stemming_test": [
+          "run",
+          "runner",
+          "run"
+        ],
+        "stemming_working": true,
+        "performance_stats": {
+          "bm25_stats": {
+            "tokenization_count": 4,
+            "stemming_enabled": true,
+            "stopwords_count": 198,
+            "min_token_length": 2
+          },
+          "voyage_stats": {
+            "api_calls": 0,
+            "model": "voyage-context-3",
+            "batch_size": 100
+          },
+          "api_call_reduction": "BM25 tokenization uses zero API calls"
+        }
+      }
+    },
+    {
+      "test_name": "Voyage Semantic Tokenization",
+      "passed": true,
+      "details": {
+        "semantic_tokens": [
+          "semantic",
+          "search",
+          "with",
+          "contextualized",
+          "embeddings"
+        ],
+        "api_available": true,
+        "batch_semantic_count": 3,
+        "voyage_api_calls": 2
+      }
+    },
+    {
+      "test_name": "API Call Reduction",
+      "passed": true,
+      "details": {
+        "query_similarity_calculation_results": 1,
+        "query_tokenizer_optimization_results": 2,
+        "query_import_statements_results": 1,
+        "api_calls_made": 3,
+        "bm25_tokenizations_made": 3,
+        "api_calls_saved": 3,
+        "reduction_percentage": 50.0
+      }
+    },
+    {
+      "test_name": "Search Quality Maintenance",
+      "passed": true,
+      "details": {
+        "test_Function_name_matching": {
+          "query": "similarity calculation",
+          "found_expected": true,
+          "results_count": 1,
+          "quality_score": 1.0
+        },
+        "test_Class_name_matching": {
+          "query": "BM25 tokenizer",
+          "found_expected": true,
+          "results_count": 2,
+          "quality_score": 1.0
+        },
+        "test_Method_content_matching": {
+          "query": "stemming optimization",
+          "found_expected": true,
+          "results_count": 2,
+          "quality_score": 1.0
+        },
+        "overall_quality_score": 1.0,
+        "quality_threshold": 0.6
+      }
+    }
+  ],
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "overall_passed": true
+  }
+}

@@ -13,11 +13,13 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 import statistics
 from collections import defaultdict, deque
+import uuid
 
 from .base_metrics_collector import (
     BaseMetricsCollector, MetricsConfig, PrometheusMetricsMixin,
     MetricsStorageMixin
 )
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class StageStats(TypedDict):
     """Type definition for stage statistics."""
@@ -214,8 +216,9 @@ class PerformanceMetricsCollector(
             "cache_misses_detected": 0,
         }
 
-        # Additional background task for system monitoring
-        self.system_monitoring_task: Optional[asyncio.Task[None]] = None
+        # Additional background task for system monitoring using EnhancedBackgroundTaskManager
+        self.system_monitoring_task_id: Optional[str] = None
+        self.task_manager = get_background_task_manager()
 
     def collect_metric(self, metric: Union[RequestPipelineMetric, DatabasePerformanceMetric,
                                          CachePerformanceMetric, ExternalAPIMetric]) -> None:
@@ -362,20 +365,26 @@ class PerformanceMetricsCollector(
         # Call base class start_collection first
         await super().start_collection()
 
-        # Start performance-specific system monitoring task
-        if not self.system_monitoring_task or self.system_monitoring_task.done():
-            self.system_monitoring_task = asyncio.create_task(self._system_monitoring_loop())
+        # Start performance-specific system monitoring task using EnhancedBackgroundTaskManager
+        if not self.system_monitoring_task_id:
+            self.system_monitoring_task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"perf_system_monitoring_{str(uuid.uuid4())[:8]}",
+                coroutine=self._system_monitoring_loop(),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "metrics", "type": "monitoring", "component": "system_resources"}
+            )
             self.collection_stats.background_tasks_active += 1
 
     async def stop_collection(self) -> None:
         """Stop background metrics collection and processing."""
-        # Stop performance-specific tasks first
-        if self.system_monitoring_task and not self.system_monitoring_task.done():
-            self.system_monitoring_task.cancel()
+        # Stop performance-specific tasks first using EnhancedBackgroundTaskManager
+        if self.system_monitoring_task_id:
             try:
-                await self.system_monitoring_task
-            except asyncio.CancelledError:
-                pass
+                await self.task_manager.cancel_task(self.system_monitoring_task_id)
+            except Exception as e:
+                self.logger.warning(f"Failed to cancel system monitoring task {self.system_monitoring_task_id}: {e}")
+            
+            self.system_monitoring_task_id = None
             self.collection_stats.background_tasks_active = max(
                 0, self.collection_stats.background_tasks_active - 1
             )

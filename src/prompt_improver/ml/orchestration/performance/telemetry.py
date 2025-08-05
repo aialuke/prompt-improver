@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 import statistics
 import json
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 
 class PerformanceLevel(Enum):
@@ -137,9 +139,10 @@ class PerformanceTelemetrySystem:
         self.monitoring_task: Optional[asyncio.Task] = None
         self.collection_interval = 10  # seconds
         
-        # Component references
+        # Component references  
         self.event_bus = None
-        self.connection_pool = None
+        # CONSOLIDATION: Use UnifiedConnectionManager instead of independent pool registration
+        self._unified_manager = None
         
         self.logger.info("Performance telemetry system initialized")
     
@@ -195,10 +198,14 @@ class PerformanceTelemetrySystem:
         self.event_bus = event_bus
         self.logger.info("Event bus registered for telemetry")
     
-    def register_connection_pool(self, connection_pool) -> None:
-        """Register connection pool for monitoring."""
-        self.connection_pool = connection_pool
-        self.logger.info("Connection pool registered for telemetry")
+    def register_unified_manager(self, unified_manager) -> None:
+        """Register UnifiedConnectionManager for consolidated pool monitoring.
+        
+        This replaces independent connection pool registration with unified
+        pool monitoring, eliminating duplication across ML orchestration.
+        """
+        self._unified_manager = unified_manager
+        self.logger.info("UnifiedConnectionManager registered for consolidated telemetry")
     
     async def start_monitoring(self) -> None:
         """Start performance monitoring."""
@@ -207,7 +214,20 @@ class PerformanceTelemetrySystem:
         
         self.logger.info("Starting performance monitoring...")
         self.is_monitoring = True
-        self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+        
+        # Start monitoring using EnhancedBackgroundTaskManager with HIGH priority for real-time monitoring
+        task_manager = get_background_task_manager()
+        self.monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_telemetry_monitor_{str(uuid.uuid4())[:8]}",
+            coroutine=self._monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "performance_telemetry",
+                "module": "telemetry"
+            }
+        )
     
     async def stop_monitoring(self) -> None:
         """Stop performance monitoring."""
@@ -217,12 +237,9 @@ class PerformanceTelemetrySystem:
         self.logger.info("Stopping performance monitoring...")
         self.is_monitoring = False
         
-        if self.monitoring_task:
-            self.monitoring_task.cancel()
-            try:
-                await self.monitoring_task
-            except asyncio.CancelledError:
-                pass
+        if hasattr(self, 'monitoring_task_id') and self.monitoring_task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self.monitoring_task_id)
     
     async def _monitoring_loop(self) -> None:
         """Main monitoring loop."""
@@ -247,9 +264,9 @@ class PerformanceTelemetrySystem:
         if self.event_bus:
             await self._collect_event_bus_metrics(timestamp)
         
-        # Collect connection pool metrics
-        if self.connection_pool:
-            await self._collect_connection_pool_metrics(timestamp)
+        # Collect unified pool metrics (replaces independent pool monitoring)
+        if self._unified_manager:
+            await self._collect_unified_pool_metrics(timestamp)
         
         # Collect system metrics
         await self._collect_system_metrics(timestamp)
@@ -305,10 +322,15 @@ class PerformanceTelemetrySystem:
         except Exception as e:
             self.logger.error(f"Error collecting event bus metrics: {e}")
     
-    async def _collect_connection_pool_metrics(self, timestamp: datetime) -> None:
-        """Collect connection pool performance metrics."""
+    async def _collect_unified_pool_metrics(self, timestamp: datetime) -> None:
+        """Collect unified connection pool performance metrics.
+        
+        Uses UnifiedConnectionManager's consolidated pool monitoring,
+        eliminating the need for independent pool registration patterns.
+        """
         try:
-            pool_metrics = self.connection_pool.get_performance_metrics()
+            # Get ML telemetry-compatible metrics from UnifiedConnectionManager
+            pool_metrics = await self._unified_manager.get_ml_telemetry_metrics()
             
             # Connection utilization
             self._record_metric(
@@ -317,7 +339,7 @@ class PerformanceTelemetrySystem:
                 "ratio",
                 timestamp,
                 MetricType.UTILIZATION,
-                "connection_pool"
+                "unified_pool"
             )
             
             # Connection latency
@@ -327,7 +349,7 @@ class PerformanceTelemetrySystem:
                 "ms",
                 timestamp,
                 MetricType.LATENCY,
-                "connection_pool"
+                "unified_pool"
             )
             
             # Query latency
@@ -337,7 +359,7 @@ class PerformanceTelemetrySystem:
                 "ms",
                 timestamp,
                 MetricType.LATENCY,
-                "connection_pool"
+                "unified_pool"
             )
             
             # Connection pool size
@@ -347,11 +369,30 @@ class PerformanceTelemetrySystem:
                 "connections",
                 timestamp,
                 MetricType.CONNECTION_POOL,
-                "connection_pool"
+                "unified_pool"
+            )
+            
+            # Additional unified metrics available
+            self._record_metric(
+                "active_connections",
+                pool_metrics.get('active_connections', 0),
+                "connections",
+                timestamp,
+                MetricType.CONNECTION_POOL,
+                "unified_pool"
+            )
+            
+            self._record_metric(
+                "available_connections",
+                pool_metrics.get('available_connections', 0),
+                "connections",
+                timestamp,
+                MetricType.CONNECTION_POOL,
+                "unified_pool"
             )
             
         except Exception as e:
-            self.logger.error(f"Error collecting connection pool metrics: {e}")
+            self.logger.error(f"Error collecting unified pool metrics: {e}")
     
     async def _collect_system_metrics(self, timestamp: datetime) -> None:
         """Collect system-level performance metrics."""

@@ -216,8 +216,8 @@ async def get_association_rules(
     Returns:
         List of association rules with metrics and insights
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             from sqlalchemy import and_, desc, select
 
             # Build query with filters
@@ -243,7 +243,7 @@ async def get_association_rules(
             # Convert to response format
             rule_list = []
             for rule in rules:
-            rule_dict = {
+                rule_dict = {
                 "id": rule.id,
                 "antecedents": rule.antecedents,
                 "consequents": rule.consequents,
@@ -259,8 +259,8 @@ async def get_association_rules(
             }
             rule_list.append(rule_dict)
 
-        logger.info(f"Retrieved {len(rule_list)} association rules")
-        return rule_list
+            logger.info(f"Retrieved {len(rule_list)} association rules")
+            return rule_list
 
     except Exception as e:
         logger.error(f"Error retrieving association rules: {e}")
@@ -290,8 +290,8 @@ async def get_contextualized_patterns(
     Returns:
         Dictionary with contextualized patterns and recommendations
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             logger.info(f"Getting contextualized patterns for: {context_items}")
 
             # Get contextualized patterns using ML service
@@ -301,13 +301,13 @@ async def get_contextualized_patterns(
                 min_confidence=min_confidence,
             )
 
-        if "error" in results:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Contextualized pattern analysis failed: {results['error']}",
-            )
+            if "error" in results:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Contextualized pattern analysis failed: {results['error']}",
+                )
 
-        return results
+            return results
 
     except HTTPException:
         raise
@@ -332,8 +332,8 @@ async def get_discovery_runs(
     Returns:
         List of discovery run metadata
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             from sqlalchemy import desc, select
 
             query = select(AprioriPatternDiscovery)
@@ -345,31 +345,31 @@ async def get_discovery_runs(
             query = query.limit(limit)
 
             result = await session.execute(query)
-        runs = result.scalars().all()
+            runs = result.scalars().all()
 
-        run_list = []
-        for run in runs:
-            run_dict = {
-                "discovery_run_id": run.discovery_run_id,
-                "status": run.status,
-                "transaction_count": run.transaction_count,
-                "frequent_itemsets_count": run.frequent_itemsets_count,
-                "association_rules_count": run.association_rules_count,
-                "execution_time_seconds": run.execution_time_seconds,
-                "created_at": run.created_at.isoformat(),
-                "completed_at": run.completed_at.isoformat()
-                if run.completed_at
-                else None,
-                "config": {
-                    "min_support": run.min_support,
-                    "min_confidence": run.min_confidence,
-                    "min_lift": run.min_lift,
-                    "data_window_days": run.data_window_days,
-                },
-            }
-            run_list.append(run_dict)
+            run_list = []
+            for run in runs:
+                run_dict = {
+                    "discovery_run_id": run.discovery_run_id,
+                    "status": run.status,
+                    "transaction_count": run.transaction_count,
+                    "frequent_itemsets_count": run.frequent_itemsets_count,
+                    "association_rules_count": run.association_rules_count,
+                    "execution_time_seconds": run.execution_time_seconds,
+                    "created_at": run.created_at.isoformat(),
+                    "completed_at": run.completed_at.isoformat()
+                    if run.completed_at
+                    else None,
+                    "config": {
+                        "min_support": run.min_support,
+                        "min_confidence": run.min_confidence,
+                        "min_lift": run.min_lift,
+                        "data_window_days": run.data_window_days,
+                    },
+                }
+                run_list.append(run_dict)
 
-        return run_list
+            return run_list
 
     except Exception as e:
         logger.error(f"Error retrieving discovery runs: {e}")
@@ -391,8 +391,8 @@ async def get_discovery_insights(
     Returns:
         Detailed insights and patterns from the discovery run
     """
-    async with db_manager.get_async_session() as session:
-        try:
+    try:
+        async with db_manager.get_async_session() as session:
             from sqlalchemy import desc, select
 
             # Get discovery run metadata
@@ -418,45 +418,45 @@ async def get_discovery_insights(
             )
 
             rules_result = await session.execute(rules_query)
-        rules = rules_result.scalars().all()
+            rules = rules_result.scalars().all()
 
-        # Compile insights
-        insights = {
-            "discovery_run": {
-                "id": discovery_run.discovery_run_id,
-                "status": discovery_run.status,
-                "execution_time_seconds": discovery_run.execution_time_seconds,
-                "created_at": discovery_run.created_at.isoformat(),
-                "config": {
-                    "min_support": discovery_run.min_support,
-                    "min_confidence": discovery_run.min_confidence,
-                    "min_lift": discovery_run.min_lift,
-                    "data_window_days": discovery_run.data_window_days,
+            # Compile insights
+            insights = {
+                "discovery_run": {
+                    "id": discovery_run.discovery_run_id,
+                    "status": discovery_run.status,
+                    "execution_time_seconds": discovery_run.execution_time_seconds,
+                    "created_at": discovery_run.created_at.isoformat(),
+                    "config": {
+                        "min_support": discovery_run.min_support,
+                        "min_confidence": discovery_run.min_confidence,
+                        "min_lift": discovery_run.min_lift,
+                        "data_window_days": discovery_run.data_window_days,
+                    },
                 },
-            },
-            "summary": {
-                "transaction_count": discovery_run.transaction_count,
-                "frequent_itemsets_count": discovery_run.frequent_itemsets_count,
-                "association_rules_count": discovery_run.association_rules_count,
-                "top_patterns_summary": discovery_run.top_patterns_summary,
-            },
-            "top_rules": [
-                {
-                    "antecedents": rule.antecedents,
-                    "consequents": rule.consequents,
-                    "confidence": rule.confidence,
-                    "lift": rule.lift,
-                    "rule_strength": rule.rule_strength,
-                    "business_insight": rule.business_insight,
-                    "pattern_category": rule.pattern_category,
-                }
-                for rule in rules[:10]  # Top 10 rules
-            ],
-            "pattern_insights": discovery_run.pattern_insights,
-            "quality_metrics": discovery_run.quality_metrics,
-        }
+                "summary": {
+                    "transaction_count": discovery_run.transaction_count,
+                    "frequent_itemsets_count": discovery_run.frequent_itemsets_count,
+                    "association_rules_count": discovery_run.association_rules_count,
+                    "top_patterns_summary": discovery_run.top_patterns_summary,
+                },
+                "top_rules": [
+                    {
+                        "antecedents": rule.antecedents,
+                        "consequents": rule.consequents,
+                        "confidence": rule.confidence,
+                        "lift": rule.lift,
+                        "rule_strength": rule.rule_strength,
+                        "business_insight": rule.business_insight,
+                        "pattern_category": rule.pattern_category,
+                    }
+                    for rule in rules[:10]  # Top 10 rules
+                ],
+                "pattern_insights": discovery_run.pattern_insights,
+                "quality_metrics": discovery_run.quality_metrics,
+            }
 
-        return insights
+            return insights
 
     except HTTPException:
         raise

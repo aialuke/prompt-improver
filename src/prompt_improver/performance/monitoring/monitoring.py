@@ -538,7 +538,14 @@ class EnhancedRealTimeMonitor:
 
             # Start background collection if enabled
             if enable_background_collection:
-                asyncio.create_task(self._background_metrics_collection())
+                from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+                task_manager = get_background_task_manager()
+                await task_manager.submit_enhanced_task(
+                    task_id=f"monitoring_background_collection_{str(uuid.uuid4())[:8]}",
+                    coroutine=self._background_metrics_collection(),
+                    priority=TaskPriority.HIGH,
+                    tags={"service": "monitoring", "type": "metrics_collection", "component": "enhanced_realtime_monitor"}
+                )
 
             # Start dashboard if enabled
             if enable_dashboard:

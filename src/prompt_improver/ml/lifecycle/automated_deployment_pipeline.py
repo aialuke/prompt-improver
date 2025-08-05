@@ -30,6 +30,8 @@ from pydantic import BaseModel, Field
 
 from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, ModelStatus, ModelTier
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -311,32 +313,77 @@ class AutomatedDeploymentPipeline:
                                      deployment_config: DeploymentConfig) -> Dict[str, Any]:
         """Parallel build pipeline for 40% speed improvement."""
         
-        # Create parallel tasks
-        tasks = []
+        # Create parallel tasks using EnhancedBackgroundTaskManager for 40% faster deployment
+        task_manager = get_background_task_manager()
+        task_ids = []
         
-        # Task 1: Generate container build context
-        tasks.append(asyncio.create_task(
-            self._generate_build_context(model_id, deployment_config)
-        ))
+        # Task 1: Generate container build context with HIGH priority for deployment critical path
+        build_context_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_deploy_build_context_{model_id}_{str(uuid.uuid4())[:8]}",
+            coroutine=self._generate_build_context(model_id, deployment_config),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "deployment",
+                "component": "build_context",
+                "model_id": model_id,
+                "module": "automated_deployment_pipeline"
+            }
+        )
+        task_ids.append(build_context_task_id)
         
-        # Task 2: Prepare Kubernetes manifests (if needed)
+        # Task 2: Prepare Kubernetes manifests (if needed) with HIGH priority
+        k8s_task_id = None
         if deployment_config.target == DeploymentTarget.KUBERNETES:
-            tasks.append(asyncio.create_task(
-                self._generate_kubernetes_manifests(model_id, deployment_config)
-            ))
+            k8s_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_deploy_k8s_manifests_{model_id}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._generate_kubernetes_manifests(model_id, deployment_config),
+                priority=TaskPriority.HIGH,
+                tags={
+                    "service": "ml",
+                    "type": "deployment",
+                    "component": "k8s_manifests",
+                    "model_id": model_id,
+                    "module": "automated_deployment_pipeline"
+                }
+            )
+            task_ids.append(k8s_task_id)
         
-        # Task 3: Prepare monitoring configuration
-        tasks.append(asyncio.create_task(
-            self._generate_monitoring_config(model_id, deployment_config)
-        ))
+        # Task 3: Prepare monitoring configuration with NORMAL priority
+        monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_deploy_monitoring_{model_id}_{str(uuid.uuid4())[:8]}",
+            coroutine=self._generate_monitoring_config(model_id, deployment_config),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "deployment",
+                "component": "monitoring_config",
+                "model_id": model_id,
+                "module": "automated_deployment_pipeline"
+            }
+        )
+        task_ids.append(monitoring_task_id)
         
-        # Task 4: Pre-warm deployment environment
-        tasks.append(asyncio.create_task(
-            self._prepare_deployment_environment(model_id, deployment_config)
-        ))
+        # Task 4: Pre-warm deployment environment with NORMAL priority
+        env_prep_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_deploy_env_prep_{model_id}_{str(uuid.uuid4())[:8]}",
+            coroutine=self._prepare_deployment_environment(model_id, deployment_config),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "deployment",
+                "component": "env_preparation",
+                "model_id": model_id,
+                "module": "automated_deployment_pipeline"
+            }
+        )
+        task_ids.append(env_prep_task_id)
         
-        # Execute all tasks in parallel
-        results = await asyncio.gather(*tasks)
+        # Wait for all tasks to complete and collect results
+        results = []
+        for task_id in task_ids:
+            result = await task_manager.wait_for_completion(task_id)
+            results.append(result)
         
         # Combine results
         build_context = results[0]
@@ -479,7 +526,8 @@ ENV MKL_NUM_THREADS=1
 '''
         
         for key, value in deployment_config.environment_variables.items():
-            dockerfile += f"ENV {key}={value}\\n"
+            dockerfile += f"ENV {key}={value}\
+"
         
         dockerfile += f'''
 # Health check with optimized intervals

@@ -13,6 +13,8 @@ from typing import Optional
 from .core.training_system_manager import TrainingSystemManager
 from .core.cli_orchestrator import CLIOrchestrator
 from .core.progress_preservation import ProgressPreservationManager
+# Enhanced signal handling integration
+from .core import get_shared_signal_handler, get_background_manager
 
 # Create clean CLI app with no legacy dependencies
 app = typer.Typer(
@@ -22,6 +24,10 @@ app = typer.Typer(
 )
 console = Console()
 
+# Enhanced signal handling integration
+signal_handler = get_shared_signal_handler()
+background_manager = get_background_manager()
+
 # Clean training system components (no MCP dependencies)
 training_manager = TrainingSystemManager(console)
 cli_orchestrator = CLIOrchestrator(console)
@@ -30,66 +36,87 @@ cli_orchestrator = CLIOrchestrator(console)
 current_training_session = None
 shutdown_requested = False
 
-def setup_signal_handlers():
+async def setup_enhanced_signal_handling():
     """
-    Setup signal handlers for graceful shutdown.
+    Setup enhanced signal handlers using AsyncSignalHandler.
 
-    Implements 2025 best practices for async signal handling:
-    - SIGINT (Ctrl+C) for user interruption
-    - SIGTERM for system shutdown
-    - Graceful workflow termination with progress preservation
+    Implements 2025 best practices for coordinated signal handling:
+    - SIGINT (Ctrl+C) for user interruption with progress preservation
+    - SIGTERM for system shutdown with coordinated component cleanup  
+    - SIGUSR1 for emergency checkpoints across all components
+    - SIGUSR2 for comprehensive status reporting
+    - Signal chaining for coordinated shutdown sequencing
     """
-    def signal_handler(signum, _frame):
-        global shutdown_requested
-        signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
-        console.print(f"\n⚠️  Received {signal_name} - Initiating graceful shutdown...", style="yellow")
-        shutdown_requested = True
+    # Setup signal handlers with current event loop
+    loop = asyncio.get_running_loop()
+    signal_handler.setup_signal_handlers(loop)
+    
+    console.print("🔧 Enhanced signal handling initialized", style="dim green")
+    console.print("   • SIGUSR1: Emergency checkpoint creation", style="dim")
+    console.print("   • SIGUSR2: Comprehensive status reporting", style="dim")
+    console.print("   • Ctrl+C: Graceful shutdown with progress preservation", style="dim")
 
-    # Register signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-async def graceful_shutdown():
+async def enhanced_graceful_shutdown():
     """
-    Perform graceful shutdown of active training sessions.
+    Enhanced graceful shutdown using AsyncSignalHandler coordination.
 
     Features:
-    - Progress preservation to database
-    - Workflow completion waiting with timeout
-    - Resource cleanup and session finalization
+    - Coordinated shutdown across all CLI components with signal chaining
+    - Progress preservation with emergency checkpoints
+    - Background task coordination and cleanup
+    - Resource cleanup with priority-based sequencing
     """
     global current_training_session
 
-    if current_training_session:
-        console.print("🛑 Stopping active training session gracefully...", style="yellow")
+    console.print("🛑 Enhanced graceful shutdown initiated...", style="blue")
 
-        try:
-            # Stop training gracefully with progress preservation
-            result = await cli_orchestrator.stop_training_gracefully(
-                session_id=current_training_session,
-                _timeout=30,
-                save_progress=True
-            )
-
-            if result.get("success"):
-                console.print("✅ Training session stopped gracefully", style="green")
-                if result.get("progress_saved"):
+    try:
+        # Wait for coordinated shutdown from AsyncSignalHandler
+        shutdown_context = await signal_handler.wait_for_shutdown()
+        
+        if shutdown_context:
+            console.print(f"🔧 Shutdown reason: {shutdown_context.reason.value}", style="dim")
+            
+            # Execute graceful shutdown with comprehensive coordination
+            shutdown_results = await signal_handler.execute_graceful_shutdown()
+            
+            if shutdown_results["status"] == "success":
+                console.print("✅ All components shut down gracefully", style="green")
+                console.print(f"⏱️  Shutdown duration: {shutdown_results['duration_seconds']:.2f}s", style="dim")
+                
+                # Display component shutdown results
+                if shutdown_results.get("shutdown_results"):
+                    for component, result in shutdown_results["shutdown_results"].items():
+                        if result["status"] == "success":
+                            console.print(f"   ✓ {component}", style="dim green")
+                        else:
+                            console.print(f"   ⚠ {component} ({result.get('status', 'unknown')})", style="dim yellow")
+                
+                if shutdown_results.get("progress_saved"):
                     console.print("💾 Training progress preserved", style="cyan")
             else:
-                console.print(f"⚠️  Graceful stop completed with issues: {result.get('error', 'Unknown')}", style="yellow")
-
-        except Exception as e:
-            console.print(f"❌ Error during graceful shutdown: {e}", style="red")
-            # Force stop as fallback
-            try:
-                await cli_orchestrator.force_stop_training(current_training_session)
-                console.print("⚡ Training force stopped", style="yellow")
-            except Exception as force_error:
-                console.print(f"💥 Force stop failed: {force_error}", style="red")
-
+                console.print(f"⚠️  Shutdown completed with status: {shutdown_results['status']}", style="yellow")
+                
         current_training_session = None
+        
+    except Exception as e:
+        console.print(f"❌ Error during enhanced shutdown: {e}", style="red")
+        # Fallback to basic cleanup
+        await basic_cleanup_fallback()
 
-    console.print("👋 Shutdown complete", style="green")
+    console.print("👋 Enhanced shutdown complete", style="green")
+
+async def basic_cleanup_fallback():
+    """Fallback cleanup when enhanced shutdown fails."""
+    try:
+        if current_training_session:
+            await cli_orchestrator.force_stop_training(current_training_session)
+        
+        # Stop background manager
+        await background_manager.stop(timeout=10.0)
+        
+    except Exception as e:
+        console.print(f"⚠️  Fallback cleanup issue: {e}", style="yellow")
 
 @app.command()
 def train(
@@ -129,8 +156,8 @@ def train(
     async def run_training():
         global current_training_session, shutdown_requested
 
-        # Setup signal handlers for graceful interruption
-        setup_signal_handlers()
+        # Setup enhanced signal handlers for coordinated shutdown
+        await setup_enhanced_signal_handling()
 
         try:
             # Auto-initialize system if needed
@@ -178,23 +205,53 @@ def train(
                 ) as progress:
                     task = progress.add_task("Training in progress...", total=None)
 
-                    # Run continuous training with signal monitoring
-                    training_task = asyncio.create_task(
-                        cli_orchestrator.start_continuous_training(
+                    # Run continuous training with signal monitoring using unified async infrastructure
+                    from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+                    import uuid
+                    
+                    task_manager = get_background_task_manager()
+                    
+                    # CRITICAL priority for user-facing CLI operations
+                    training_task_id = await task_manager.submit_enhanced_task(
+                        task_id=f"cli_training_{session.session_id}_{str(uuid.uuid4())[:8]}",
+                        coroutine=cli_orchestrator.start_continuous_training(
                             session_id=session.session_id,
                             config=session_config
-                        )
+                        ),
+                        priority=TaskPriority.CRITICAL,
+                        tags={"service": "cli", "type": "training", "component": "clean_cli", "session_id": session.session_id}
                     )
 
-                    # Monitor for shutdown signals
-                    while not training_task.done():
-                        if shutdown_requested:
-                            console.print("\n🛑 Graceful shutdown requested...", style="yellow")
-                            training_task.cancel()
-                            await graceful_shutdown()
-                            return
-
-                        await asyncio.sleep(0.1)  # Check every 100ms
+                    # HIGH priority for graceful shutdown coordination
+                    shutdown_task_id = await task_manager.submit_enhanced_task(
+                        task_id=f"cli_shutdown_{str(uuid.uuid4())[:8]}",
+                        coroutine=enhanced_graceful_shutdown(),
+                        priority=TaskPriority.HIGH,
+                        tags={"service": "cli", "type": "shutdown", "component": "clean_cli"}
+                    )
+                    
+                    # Get task objects for asyncio.wait compatibility
+                    training_task = task_manager.get_task(training_task_id)
+                    shutdown_task = task_manager.get_task(shutdown_task_id)
+                    
+                    # Wait for either training completion or shutdown signal
+                    done, pending = await asyncio.wait(
+                        [training_task, shutdown_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    # Cancel any pending tasks
+                    for task in pending:
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                    
+                    # Check if shutdown was requested
+                    if shutdown_task in done:
+                        console.print("\n🛑 Enhanced graceful shutdown completed", style="green")
+                        return
 
                     results = await training_task
                     progress.update(task, completed=100, description="Training completed")
@@ -220,20 +277,15 @@ def train(
 
         except KeyboardInterrupt:
             console.print("\n⚠️  Training interrupted by user", style="yellow")
-            # Graceful shutdown handled by signal handlers
-            await graceful_shutdown()
+            # Enhanced graceful shutdown handles all coordination
+            await enhanced_graceful_shutdown()
         except asyncio.CancelledError:
             console.print("\n🛑 Training cancelled gracefully", style="yellow")
-            # Session cleanup handled by graceful_shutdown()
+            # Session cleanup handled by enhanced shutdown coordination
         except Exception as e:
             console.print(f"\n❌ Training failed: {e}", style="red")
-            # Cleanup on error
-            if current_training_session:
-                try:
-                    await cli_orchestrator.force_stop_training(current_training_session)
-                    current_training_session = None
-                except Exception:
-                    pass  # Best effort cleanup
+            # Enhanced cleanup on error
+            await basic_cleanup_fallback()
             raise typer.Exit(1)
 
     # Run the async training function
@@ -420,6 +472,183 @@ def status(
             console.print("\n👋 Status monitoring stopped", style="yellow")
     else:
         asyncio.run(show_status())
+
+@app.command()
+def why5(
+    issue: Optional[str] = typer.Argument(None, help="The problem or issue to analyze"),
+    depth: int = typer.Option(5, "--depth", "-d", help="Number of 'why' iterations (default: 5)"),
+    export: bool = typer.Option(False, "--export", "-e", help="Export analysis to file"),
+    format: str = typer.Option("text", "--format", "-f", help="Output format: text, json, or markdown"),
+) -> None:
+    """
+    🔍 Five Whys root cause analysis - drill down from symptoms to root causes.
+    
+    Apply the Five Whys methodology to systematically investigate issues by
+    iteratively asking "why" to move beyond surface symptoms to fundamental causes.
+    
+    Examples:
+      apes why5 "Application crashes on startup"
+      apes why5 --depth 7 "Performance is slow"
+      apes why5 "Database connection fails" --export --format json
+    """
+    
+    async def run_five_whys():
+        """Execute the Five Whys analysis workflow."""
+        try:
+            # Get issue if not provided as argument
+            if not issue:
+                issue_description = typer.prompt("🤔 What issue would you like to analyze?")
+            else:
+                issue_description = issue
+            
+            console.print(f"\n🔍 Five Whys Analysis: {issue_description}", style="bold blue")
+            console.print("=" * (len(issue_description) + 24), style="dim")
+            
+            # Initialize analysis data
+            analysis_results = {
+                "problem_statement": issue_description,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "analysis_chain": [],
+                "root_cause": None,
+                "proposed_solutions": []
+            }
+            
+            current_question = issue_description
+            
+            # Conduct the Five Whys analysis
+            for i in range(depth):
+                why_number = i + 1
+                console.print(f"\n❓ Why #{why_number}: {current_question}", style="yellow")
+                
+                # Get user input for the "why" answer
+                answer = typer.prompt(f"   Answer")
+                
+                # Store the analysis step
+                analysis_step = {
+                    "why_number": why_number,
+                    "question": current_question,
+                    "answer": answer
+                }
+                analysis_results["analysis_chain"].append(analysis_step)
+                
+                # Display the answer
+                console.print(f"   💡 {answer}", style="green")
+                
+                # Check if user wants to continue
+                if why_number < depth:
+                    continue_analysis = typer.confirm(f"Continue to Why #{why_number + 1}?", default=True)
+                    if not continue_analysis:
+                        break
+                
+                # Set up next iteration
+                current_question = answer
+            
+            # Identify root cause (last answer in chain)
+            if analysis_results["analysis_chain"]:
+                root_cause = analysis_results["analysis_chain"][-1]["answer"]
+                analysis_results["root_cause"] = root_cause
+                
+                console.print(f"\n🎯 Root Cause Identified:", style="bold red")
+                console.print(f"   {root_cause}", style="red")
+            
+            # Validation step - work backwards
+            console.print(f"\n🔄 Validation: Working backwards through the causal chain...", style="blue")
+            for step in reversed(analysis_results["analysis_chain"]):
+                console.print(f"   • {step['answer']} → {step['question']}", style="dim")
+            
+            # Get proposed solutions
+            console.print(f"\n💡 Proposed Solutions:", style="bold green")
+            console.print("   Based on the root cause, what solutions would address this?")
+            
+            solutions = []
+            solution_count = 1
+            while True:
+                solution = typer.prompt(f"   Solution #{solution_count} (or press Enter to finish)", default="", show_default=False)
+                if not solution.strip():
+                    break
+                solutions.append(solution)
+                console.print(f"   ✅ {solution}", style="green")
+                solution_count += 1
+            
+            analysis_results["proposed_solutions"] = solutions
+            
+            # Display summary
+            console.print(f"\n📋 Analysis Summary:", style="bold cyan")
+            console.print(f"   • Problem: {issue_description}")
+            console.print(f"   • Analysis Depth: {len(analysis_results['analysis_chain'])} whys")
+            console.print(f"   • Root Cause: {root_cause}")
+            console.print(f"   • Solutions Identified: {len(solutions)}")
+            
+            # Export results if requested
+            if export:
+                await export_analysis(analysis_results, format)
+            
+        except KeyboardInterrupt:
+            console.print("\n⚠️  Analysis interrupted by user", style="yellow")
+        except Exception as e:
+            console.print(f"\n❌ Analysis failed: {e}", style="red")
+            raise typer.Exit(1)
+    
+    async def export_analysis(results: Dict[str, Any], export_format: str):
+        """Export analysis results to file."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            if export_format.lower() == "json":
+                import json
+                filename = f"five_whys_analysis_{timestamp}.json"
+                with open(filename, 'w') as f:
+                    json.dump(results, f, indent=2)
+                console.print(f"📁 Analysis exported to: {filename}", style="cyan")
+                
+            elif export_format.lower() == "markdown":
+                filename = f"five_whys_analysis_{timestamp}.md"
+                with open(filename, 'w') as f:
+                    f.write(f"# Five Whys Analysis\n\n")
+                    f.write(f"**Problem Statement:** {results['problem_statement']}\n\n")
+                    f.write(f"**Analysis Date:** {results['timestamp']}\n\n")
+                    f.write(f"## Analysis Chain\n\n")
+                    
+                    for step in results['analysis_chain']:
+                        f.write(f"**Why #{step['why_number']}:** {step['question']}\n")
+                        f.write(f"**Answer:** {step['answer']}\n\n")
+                    
+                    f.write(f"## Root Cause\n\n{results['root_cause']}\n\n")
+                    
+                    if results['proposed_solutions']:
+                        f.write(f"## Proposed Solutions\n\n")
+                        for i, solution in enumerate(results['proposed_solutions'], 1):
+                            f.write(f"{i}. {solution}\n")
+                
+                console.print(f"📁 Analysis exported to: {filename}", style="cyan")
+                
+            else:  # text format
+                filename = f"five_whys_analysis_{timestamp}.txt"
+                with open(filename, 'w') as f:
+                    f.write(f"Five Whys Analysis\n")
+                    f.write(f"==================\n\n")
+                    f.write(f"Problem Statement: {results['problem_statement']}\n")
+                    f.write(f"Analysis Date: {results['timestamp']}\n\n")
+                    f.write(f"Analysis Chain:\n")
+                    
+                    for step in results['analysis_chain']:
+                        f.write(f"Why #{step['why_number']}: {step['question']}\n")
+                        f.write(f"Answer: {step['answer']}\n\n")
+                    
+                    f.write(f"Root Cause: {results['root_cause']}\n\n")
+                    
+                    if results['proposed_solutions']:
+                        f.write(f"Proposed Solutions:\n")
+                        for i, solution in enumerate(results['proposed_solutions'], 1):
+                            f.write(f"{i}. {solution}\n")
+                
+                console.print(f"📁 Analysis exported to: {filename}", style="cyan")
+                
+        except Exception as e:
+            console.print(f"⚠️  Export failed: {e}", style="yellow")
+    
+    # Run the async analysis function
+    asyncio.run(run_five_whys())
 
 @app.command()
 def stop(

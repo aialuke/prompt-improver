@@ -11,11 +11,15 @@ import functools
 import inspect
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager, contextmanager
 from typing import (
     Any, Awaitable, Callable, Dict, Optional, TypeVar, Union, 
     ParamSpec, Concatenate, overload
 )
+
+# Import background task manager for proper task management
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 try:
     from opentelemetry import trace
@@ -379,14 +383,24 @@ async def propagate_context_async(
     if context is None:
         context = get_current()
     
-    # Create a new task with the context
-    task = asyncio.create_task(coro)
+    # Use background task manager with context propagation
+    task_manager = get_background_task_manager()
     
-    # Copy context to the task
-    if hasattr(task, 'set_context'):
-        task.set_context(context)
+    # Submit task with OpenTelemetry context and appropriate priority
+    task_id = await task_manager.submit_enhanced_task(
+        task_id=f"otel_context_propagation_{str(uuid.uuid4())[:8]}",
+        coroutine=coro,
+        priority=TaskPriority.HIGH,
+        tags={
+            "service": "monitoring",
+            "type": "tracing",
+            "component": "opentelemetry",
+            "operation": "context_propagation"
+        }
+    )
     
-    return await task
+    # Wait for task completion and return result
+    return await task_manager.wait_for_task(task_id)
 
 def _capture_function_args(
     span: Span,

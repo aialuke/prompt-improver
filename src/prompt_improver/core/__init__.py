@@ -19,7 +19,7 @@ try:
         is_startup_complete
     )
     from .services.manager import APESServiceManager
-    from .services.security import PromptDataProtection
+    # Removed PromptDataProtection import to fix circular import - security must be foundational
     from .setup.initializer import SystemInitializer
     from .setup.migration import MigrationManager
 

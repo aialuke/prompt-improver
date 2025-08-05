@@ -12,6 +12,8 @@ from typing import Dict, List, Optional, Any, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime, timezone
+import uuid
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from ..config.orchestrator_config import OrchestratorConfig
 from ..events.event_types import EventType, MLEvent
@@ -472,7 +474,20 @@ class ResourceManager:
             return
         
         self.is_monitoring = True
-        self.monitoring_task = asyncio.create_task(self._monitoring_loop())
+        
+        # Start resource monitoring with HIGH priority for resource management
+        task_manager = get_background_task_manager()
+        self.monitoring_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_resource_monitor_{str(uuid.uuid4())[:8]}",
+            coroutine=self._monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "resource_monitor",
+                "module": "resource_manager"
+            }
+        )
         
         self.logger.info("Started resource monitoring")
     

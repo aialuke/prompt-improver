@@ -32,6 +32,8 @@ from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, Model
 from .experiment_tracker import ExperimentTracker, ExperimentConfig, Trial, ExperimentResults
 from prompt_improver.ml.types import features, labels, hyper_parameters, metrics_dict
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+import uuid
 
 # Optional Ray import for distributed computing
 try:
@@ -483,8 +485,8 @@ class EnhancedExperimentOrchestrator:
         # Thread pool for orchestration tasks
         self._executor = ThreadPoolExecutor(max_workers=8)
         
-        # Start background scheduler
-        self._scheduler_task = None
+        # Background task tracking for EnhancedBackgroundTaskManager
+        self._background_task_ids: List[str] = []
         self._is_running = False
         
         logger.info("Enhanced Experiment Orchestrator (2025) initialized")
@@ -498,14 +500,50 @@ class EnhancedExperimentOrchestrator:
         
         self._is_running = True
         
-        # Start background scheduler
-        self._scheduler_task = asyncio.create_task(self._experiment_scheduler())
+        # Get background task manager for ML operations
+        task_manager = get_background_task_manager()
         
-        # Start resource monitor
-        asyncio.create_task(self._resource_monitor())
+        # Start background scheduler with HIGH priority for real-time experiment coordination
+        scheduler_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_scheduler_{str(uuid.uuid4())[:8]}",
+            coroutine=self._experiment_scheduler(),
+            priority=TaskPriority.HIGH,
+            tags={
+                "service": "ml",
+                "type": "orchestration", 
+                "component": "experiment_scheduler",
+                "module": "enhanced_experiment_orchestrator"
+            }
+        )
         
-        # Start throughput tracker
-        asyncio.create_task(self._throughput_tracker())
+        # Start resource monitor with NORMAL priority for monitoring
+        resource_monitor_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_resource_monitor_{str(uuid.uuid4())[:8]}",
+            coroutine=self._resource_monitor(),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "monitoring",
+                "component": "resource_monitor",
+                "module": "enhanced_experiment_orchestrator"
+            }
+        )
+        
+        # Start throughput tracker with NORMAL priority for metrics collection
+        throughput_tracker_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"ml_throughput_tracker_{str(uuid.uuid4())[:8]}",
+            coroutine=self._throughput_tracker(),
+            priority=TaskPriority.NORMAL,
+            tags={
+                "service": "ml",
+                "type": "metrics",
+                "component": "throughput_tracker",
+                "module": "enhanced_experiment_orchestrator"
+            }
+        )
+        
+        # Store task IDs for cleanup
+        self._background_task_ids = [scheduler_task_id, resource_monitor_task_id, throughput_tracker_task_id]
         
         logger.info("Experiment orchestrator started")
     
@@ -513,12 +551,11 @@ class EnhancedExperimentOrchestrator:
         """Stop the experiment orchestrator."""
         self._is_running = False
         
-        if self._scheduler_task:
-            self._scheduler_task.cancel()
-            try:
-                await self._scheduler_task
-            except asyncio.CancelledError:
-                pass
+        # Cancel background tasks using task manager
+        task_manager = get_background_task_manager()
+        for task_id in self._background_task_ids:
+            await task_manager.cancel_task(task_id)
+        self._background_task_ids.clear()
         
         # Shutdown Ray if initialized
         if self.enable_distributed and ray.is_initialized():
@@ -603,9 +640,19 @@ class EnhancedExperimentOrchestrator:
                             queue_item.experiment_id, 
                             queue_item.resource_requirements
                         ):
-                            # Start experiment execution
-                            asyncio.create_task(
-                                self._execute_experiment(queue_item.experiment_id)
+                            # Start experiment execution with CRITICAL priority for user-facing training operations
+                            task_manager = get_background_task_manager()
+                            experiment_task_id = await task_manager.submit_enhanced_task(
+                                task_id=f"ml_experiment_{queue_item.experiment_id}_{str(uuid.uuid4())[:8]}",
+                                coroutine=self._execute_experiment(queue_item.experiment_id),
+                                priority=TaskPriority.CRITICAL,
+                                tags={
+                                    "service": "ml",
+                                    "type": "training",
+                                    "component": "experiment_execution",
+                                    "experiment_id": queue_item.experiment_id,
+                                    "module": "enhanced_experiment_orchestrator"
+                                }
                             )
                     else:
                         # Put back in queue if resources not available

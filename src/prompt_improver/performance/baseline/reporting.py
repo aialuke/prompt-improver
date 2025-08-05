@@ -24,4 +24,990 @@ try:
     import pandas as pd
     import numpy as np
     PANDAS_AVAILABLE = True
-except ImportError:\n    PANDAS_AVAILABLE = False\n\n# Report generation\ntry:\n    from jinja2 import Template, Environment, FileSystemLoader\n    JINJA2_AVAILABLE = True\nexcept ImportError:\n    JINJA2_AVAILABLE = False\n\nfrom .models import BaselineMetrics, PerformanceTrend, RegressionAlert, get_metric_definition\nfrom .statistical_analyzer import StatisticalAnalyzer\nfrom .baseline_collector import BaselineCollector\nfrom .regression_detector import RegressionDetector\n\nlogger = logging.getLogger(__name__)\n\nclass ReportConfig:\n    \"\"\"Configuration for baseline reporting.\"\"\"\n    \n    def __init__(\n        self,\n        output_directory: Optional[Path] = None,\n        include_charts: bool = True,\n        include_capacity_planning: bool = True,\n        include_recommendations: bool = True,\n        chart_format: str = 'png',\n        chart_dpi: int = 150,\n        report_formats: List[str] = None,  # ['html', 'json', 'text']\n        capacity_forecast_days: int = 30,\n        performance_sla_targets: Optional[Dict[str, float]] = None\n    ):\n        \"\"\"Initialize report configuration.\n        \n        Args:\n            output_directory: Directory for report outputs\n            include_charts: Generate performance charts\n            include_capacity_planning: Include capacity planning analysis\n            include_recommendations: Include optimization recommendations\n            chart_format: Format for charts ('png', 'svg', 'pdf')\n            chart_dpi: Chart resolution (dots per inch)\n            report_formats: Output formats for reports\n            capacity_forecast_days: Days to forecast for capacity planning\n            performance_sla_targets: SLA targets for different metrics\n        \"\"\"\n        self.output_directory = output_directory or Path(\"./reports\")\n        self.output_directory.mkdir(parents=True, exist_ok=True)\n        \n        self.include_charts = include_charts and MATPLOTLIB_AVAILABLE\n        self.include_capacity_planning = include_capacity_planning\n        self.include_recommendations = include_recommendations\n        self.chart_format = chart_format\n        self.chart_dpi = chart_dpi\n        self.report_formats = report_formats or ['html', 'json']\n        self.capacity_forecast_days = capacity_forecast_days\n        \n        # Default SLA targets\n        self.performance_sla_targets = performance_sla_targets or {\n            'response_time_p95': 200.0,  # ms\n            'error_rate': 1.0,           # %\n            'cpu_utilization': 70.0,     # %\n            'memory_utilization': 80.0,  # %\n            'availability': 99.9         # %\n        }\n\nclass PerformanceReport:\n    \"\"\"Comprehensive performance report.\"\"\"\n    \n    def __init__(\n        self,\n        report_id: str,\n        report_type: str,\n        generation_time: datetime,\n        time_period: Tuple[datetime, datetime]\n    ):\n        self.report_id = report_id\n        self.report_type = report_type\n        self.generation_time = generation_time\n        self.time_period = time_period\n        \n        # Report sections\n        self.executive_summary: Dict[str, Any] = {}\n        self.performance_overview: Dict[str, Any] = {}\n        self.trend_analysis: Dict[str, Any] = {}\n        self.capacity_planning: Dict[str, Any] = {}\n        self.alerts_summary: Dict[str, Any] = {}\n        self.recommendations: List[Dict[str, Any]] = []\n        self.appendices: Dict[str, Any] = {}\n        \n        # Generated assets\n        self.charts: Dict[str, str] = {}  # chart_name -> file_path\n        self.data_files: Dict[str, str] = {}  # data_type -> file_path\n    \n    def to_dict(self) -> Dict[str, Any]:\n        \"\"\"Convert report to dictionary.\"\"\"\n        return {\n            'report_id': self.report_id,\n            'report_type': self.report_type,\n            'generation_time': self.generation_time.isoformat(),\n            'time_period': {\n                'start': self.time_period[0].isoformat(),\n                'end': self.time_period[1].isoformat()\n            },\n            'executive_summary': self.executive_summary,\n            'performance_overview': self.performance_overview,\n            'trend_analysis': self.trend_analysis,\n            'capacity_planning': self.capacity_planning,\n            'alerts_summary': self.alerts_summary,\n            'recommendations': self.recommendations,\n            'appendices': self.appendices,\n            'charts': self.charts,\n            'data_files': self.data_files\n        }\n\nclass BaselineReporter:\n    \"\"\"Automated reporting and capacity planning system.\n    \n    Generates comprehensive performance reports with trend analysis,\n    capacity planning, and actionable recommendations.\n    \"\"\"\n    \n    def __init__(\n        self,\n        config: Optional[ReportConfig] = None,\n        collector: Optional[BaselineCollector] = None,\n        analyzer: Optional[StatisticalAnalyzer] = None,\n        detector: Optional[RegressionDetector] = None\n    ):\n        \"\"\"Initialize baseline reporter.\n        \n        Args:\n            config: Report configuration\n            collector: Baseline collector for data access\n            analyzer: Statistical analyzer for trend analysis\n            detector: Regression detector for alert data\n        \"\"\"\n        self.config = config or ReportConfig()\n        self.collector = collector or BaselineCollector()\n        self.analyzer = analyzer or StatisticalAnalyzer()\n        self.detector = detector or RegressionDetector()\n        \n        # Setup Jinja2 environment if available\n        self.jinja_env = None\n        if JINJA2_AVAILABLE:\n            template_dir = Path(__file__).parent / \"templates\"\n            if template_dir.exists():\n                self.jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))\n        \n        logger.info(f\"BaselineReporter initialized (charts: {self.config.include_charts})\")\n\n    async def generate_daily_report(self, report_date: Optional[datetime] = None) -> PerformanceReport:\n        \"\"\"Generate daily performance report.\n        \n        Args:\n            report_date: Date for the report (defaults to yesterday)\n            \n        Returns:\n            Generated performance report\n        \"\"\"\n        if report_date is None:\n            report_date = datetime.now(timezone.utc) - timedelta(days=1)\n        \n        # Define time period (24 hours)\n        start_time = report_date.replace(hour=0, minute=0, second=0, microsecond=0)\n        end_time = start_time + timedelta(days=1)\n        \n        return await self._generate_report(\n            report_type=\"daily\",\n            time_period=(start_time, end_time),\n            comparison_period_days=7\n        )\n\n    async def generate_weekly_report(self, week_start: Optional[datetime] = None) -> PerformanceReport:\n        \"\"\"Generate weekly performance report.\n        \n        Args:\n            week_start: Start of the week for the report\n            \n        Returns:\n            Generated performance report\n        \"\"\"\n        if week_start is None:\n            # Start of last week (Monday)\n            today = datetime.now(timezone.utc).date()\n            days_since_monday = today.weekday()\n            week_start = datetime.combine(\n                today - timedelta(days=days_since_monday + 7),\n                datetime.min.time()\n            ).replace(tzinfo=timezone.utc)\n        \n        end_time = week_start + timedelta(days=7)\n        \n        return await self._generate_report(\n            report_type=\"weekly\",\n            time_period=(week_start, end_time),\n            comparison_period_days=28\n        )\n\n    async def generate_monthly_report(self, month_start: Optional[datetime] = None) -> PerformanceReport:\n        \"\"\"Generate monthly performance report.\n        \n        Args:\n            month_start: Start of the month for the report\n            \n        Returns:\n            Generated performance report\n        \"\"\"\n        if month_start is None:\n            # Start of last month\n            today = datetime.now(timezone.utc).date()\n            if today.month == 1:\n                month_start = datetime(today.year - 1, 12, 1, tzinfo=timezone.utc)\n            else:\n                month_start = datetime(today.year, today.month - 1, 1, tzinfo=timezone.utc)\n        \n        # End of month\n        if month_start.month == 12:\n            end_time = datetime(month_start.year + 1, 1, 1, tzinfo=timezone.utc)\n        else:\n            end_time = datetime(month_start.year, month_start.month + 1, 1, tzinfo=timezone.utc)\n        \n        return await self._generate_report(\n            report_type=\"monthly\",\n            time_period=(month_start, end_time),\n            comparison_period_days=90\n        )\n\n    async def generate_capacity_planning_report(\n        self,\n        forecast_days: Optional[int] = None\n    ) -> PerformanceReport:\n        \"\"\"Generate capacity planning report.\n        \n        Args:\n            forecast_days: Days to forecast (defaults to config value)\n            \n        Returns:\n            Generated capacity planning report\n        \"\"\"\n        forecast_days = forecast_days or self.config.capacity_forecast_days\n        \n        # Use last 30 days of data\n        end_time = datetime.now(timezone.utc)\n        start_time = end_time - timedelta(days=30)\n        \n        report = await self._generate_report(\n            report_type=\"capacity_planning\",\n            time_period=(start_time, end_time),\n            comparison_period_days=60\n        )\n        \n        # Add detailed capacity analysis\n        await self._add_detailed_capacity_analysis(report, forecast_days)\n        \n        return report\n\n    async def _generate_report(\n        self,\n        report_type: str,\n        time_period: Tuple[datetime, datetime],\n        comparison_period_days: int\n    ) -> PerformanceReport:\n        \"\"\"Generate a performance report for the specified period.\"\"\"\n        report_id = str(uuid.uuid4())\n        generation_time = datetime.now(timezone.utc)\n        \n        logger.info(f\"Generating {report_type} report for period {time_period[0]} to {time_period[1]}\")\n        \n        # Create report\n        report = PerformanceReport(\n            report_id=report_id,\n            report_type=report_type,\n            generation_time=generation_time,\n            time_period=time_period\n        )\n        \n        # Load baseline data for the period\n        period_hours = int((time_period[1] - time_period[0]).total_seconds() / 3600)\n        baselines = await self._load_baselines_for_period(time_period[0], period_hours)\n        \n        if not baselines:\n            logger.warning(f\"No baselines found for period {time_period}\")\n            report.executive_summary['status'] = 'insufficient_data'\n            return report\n        \n        # Load comparison data\n        comparison_start = time_period[0] - timedelta(days=comparison_period_days)\n        comparison_baselines = await self._load_baselines_for_period(\n            comparison_start, \n            int((time_period[0] - comparison_start).total_seconds() / 3600)\n        )\n        \n        # Generate report sections\n        await self._generate_executive_summary(report, baselines, comparison_baselines)\n        await self._generate_performance_overview(report, baselines)\n        await self._generate_trend_analysis(report, baselines, comparison_baselines)\n        \n        if self.config.include_capacity_planning:\n            await self._generate_capacity_planning(report, baselines)\n        \n        await self._generate_alerts_summary(report, time_period)\n        \n        if self.config.include_recommendations:\n            await self._generate_recommendations(report, baselines)\n        \n        # Generate charts\n        if self.config.include_charts:\n            await self._generate_charts(report, baselines)\n        \n        # Save report\n        await self._save_report(report)\n        \n        logger.info(f\"Generated {report_type} report: {report_id}\")\n        return report\n\n    async def _load_baselines_for_period(\n        self, \n        start_time: datetime, \n        hours: int\n    ) -> List[BaselineMetrics]:\n        \"\"\"Load baselines for a specific time period.\"\"\"\n        # Implementation would depend on how baselines are stored\n        # For now, use the collector's method\n        return await self.collector.load_recent_baselines(hours)\n\n    async def _generate_executive_summary(\n        self,\n        report: PerformanceReport,\n        baselines: List[BaselineMetrics],\n        comparison_baselines: List[BaselineMetrics]\n    ) -> None:\n        \"\"\"Generate executive summary section.\"\"\"\n        if not baselines:\n            report.executive_summary = {'status': 'no_data'}\n            return\n        \n        # Calculate key metrics\n        latest_baseline = baselines[-1]\n        \n        # Performance score\n        try:\n            performance_score = await self.analyzer.calculate_performance_score(latest_baseline)\n            overall_grade = performance_score.get('grade', 'N/A')\n            overall_score = performance_score.get('overall_score', 0)\n        except Exception as e:\n            logger.error(f\"Failed to calculate performance score: {e}\")\n            overall_grade = 'N/A'\n            overall_score = 0\n        \n        # SLA compliance\n        sla_compliance = self._calculate_sla_compliance(baselines)\n        \n        # Key trends\n        key_trends = await self._calculate_key_trends(baselines, comparison_baselines)\n        \n        # Active issues\n        active_alerts = self.detector.get_active_alerts()\n        critical_alerts = [alert for alert in active_alerts if alert.severity.value == 'critical']\n        \n        report.executive_summary = {\n            'status': 'generated',\n            'period_summary': {\n                'total_baselines': len(baselines),\n                'baseline_frequency_hours': self._calculate_baseline_frequency(baselines)\n            },\n            'performance_grade': overall_grade,\n            'performance_score': overall_score,\n            'sla_compliance': sla_compliance,\n            'key_trends': key_trends,\n            'active_issues': {\n                'total_alerts': len(active_alerts),\n                'critical_alerts': len(critical_alerts),\n                'top_issues': [alert.metric_name for alert in critical_alerts[:3]]\n            },\n            'recommendations_count': 0  # Will be updated later\n        }\n\n    async def _generate_performance_overview(\n        self,\n        report: PerformanceReport,\n        baselines: List[BaselineMetrics]\n    ) -> None:\n        \"\"\"Generate performance overview section.\"\"\"\n        if not baselines:\n            return\n        \n        # Aggregate metrics across all baselines\n        aggregated_metrics = self._aggregate_baseline_metrics(baselines)\n        \n        # Calculate percentiles and statistics\n        metrics_stats = {}\n        for metric_name, values in aggregated_metrics.items():\n            if values:\n                metrics_stats[metric_name] = {\n                    'count': len(values),\n                    'mean': statistics.mean(values),\n                    'median': statistics.median(values),\n                    'min': min(values),\n                    'max': max(values),\n                    'p95': self._percentile(values, 95),\n                    'p99': self._percentile(values, 99),\n                    'std_dev': statistics.stdev(values) if len(values) > 1 else 0\n                }\n        \n        # Resource utilization analysis\n        resource_analysis = self._analyze_resource_utilization(baselines)\n        \n        # Performance distribution\n        performance_distribution = self._analyze_performance_distribution(baselines)\n        \n        report.performance_overview = {\n            'metrics_statistics': metrics_stats,\n            'resource_analysis': resource_analysis,\n            'performance_distribution': performance_distribution,\n            'baseline_quality': {\n                'completeness_score': self._calculate_completeness_score(baselines),\n                'consistency_score': self._calculate_consistency_score(baselines)\n            }\n        }\n\n    async def _generate_trend_analysis(\n        self,\n        report: PerformanceReport,\n        baselines: List[BaselineMetrics],\n        comparison_baselines: List[BaselineMetrics]\n    ) -> None:\n        \"\"\"Generate trend analysis section.\"\"\"\n        trends = {}\n        \n        # Analyze trends for key metrics\n        key_metrics = ['response_time', 'error_rate', 'throughput', 'cpu_utilization', 'memory_utilization']\n        \n        for metric_name in key_metrics:\n            try:\n                # Calculate trend over the report period\n                trend = await self.analyzer.analyze_trend(\n                    metric_name, \n                    baselines, \n                    timeframe_hours=len(baselines)\n                )\n                \n                trends[metric_name] = {\n                    'direction': trend.direction.value,\n                    'magnitude': trend.magnitude,\n                    'confidence_score': trend.confidence_score,\n                    'is_significant': trend.is_significant(),\n                    'sample_count': trend.sample_count,\n                    'predicted_24h': trend.predicted_value_24h,\n                    'predicted_7d': trend.predicted_value_7d\n                }\n            except Exception as e:\n                logger.error(f\"Failed to analyze trend for {metric_name}: {e}\")\n                trends[metric_name] = {'error': str(e)}\n        \n        # Identify most significant trends\n        significant_trends = [\n            (metric, data) for metric, data in trends.items()\n            if isinstance(data, dict) and data.get('is_significant', False)\n        ]\n        \n        # Sort by magnitude\n        significant_trends.sort(key=lambda x: abs(x[1].get('magnitude', 0)), reverse=True)\n        \n        report.trend_analysis = {\n            'all_trends': trends,\n            'significant_trends': dict(significant_trends[:5]),  # Top 5\n            'trend_summary': {\n                'improving_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'improving']),\n                'degrading_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'degrading']),\n                'stable_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'stable'])\n            }\n        }\n\n    async def _generate_capacity_planning(\n        self,\n        report: PerformanceReport,\n        baselines: List[BaselineMetrics]\n    ) -> None:\n        \"\"\"Generate capacity planning section.\"\"\"\n        if not baselines:\n            return\n        \n        # Analyze resource trends\n        resource_forecasts = await self._forecast_resource_usage(baselines)\n        \n        # Calculate capacity recommendations\n        capacity_recommendations = self._calculate_capacity_recommendations(baselines, resource_forecasts)\n        \n        # Growth analysis\n        growth_analysis = self._analyze_growth_patterns(baselines)\n        \n        report.capacity_planning = {\n            'resource_forecasts': resource_forecasts,\n            'capacity_recommendations': capacity_recommendations,\n            'growth_analysis': growth_analysis,\n            'scaling_recommendations': self._generate_scaling_recommendations(resource_forecasts)\n        }\n\n    async def _generate_alerts_summary(\n        self,\n        report: PerformanceReport,\n        time_period: Tuple[datetime, datetime]\n    ) -> None:\n        \"\"\"Generate alerts summary section.\"\"\"\n        # Get alerts for the period\n        active_alerts = self.detector.get_active_alerts()\n        alert_stats = self.detector.get_alert_statistics()\n        \n        # Categorize alerts by severity\n        alerts_by_severity = {\n            'critical': 0,\n            'warning': 0,\n            'info': 0\n        }\n        \n        alerts_by_metric = {}\n        \n        for alert in active_alerts:\n            severity = alert.severity.value\n            if severity in alerts_by_severity:\n                alerts_by_severity[severity] += 1\n            \n            metric = alert.metric_name\n            if metric not in alerts_by_metric:\n                alerts_by_metric[metric] = 0\n            alerts_by_metric[metric] += 1\n        \n        # Most problematic metrics\n        top_problem_metrics = sorted(\n            alerts_by_metric.items(),\n            key=lambda x: x[1],\n            reverse=True\n        )[:5]\n        \n        report.alerts_summary = {\n            'total_active_alerts': len(active_alerts),\n            'alerts_by_severity': alerts_by_severity,\n            'alerts_by_metric': alerts_by_metric,\n            'top_problem_metrics': dict(top_problem_metrics),\n            'alert_statistics': alert_stats\n        }\n\n    async def _generate_recommendations(\n        self,\n        report: PerformanceReport,\n        baselines: List[BaselineMetrics]\n    ) -> None:\n        \"\"\"Generate actionable recommendations.\"\"\"\n        recommendations = []\n        \n        # Analyze current performance against SLA targets\n        sla_violations = self._identify_sla_violations(baselines)\n        \n        for metric, violation_data in sla_violations.items():\n            recommendation = {\n                'id': str(uuid.uuid4()),\n                'category': 'sla_compliance',\n                'priority': 'high' if violation_data['severity'] > 0.5 else 'medium',\n                'title': f\"Address {metric.replace('_', ' ').title()} SLA Violations\",\n                'description': f\"The {metric} metric is exceeding SLA targets by {violation_data['excess_percentage']:.1f}%\",\n                'action_items': self._generate_sla_action_items(metric, violation_data),\n                'expected_impact': violation_data['impact_assessment'],\n                'implementation_effort': 'medium'\n            }\n            recommendations.append(recommendation)\n        \n        # Capacity-based recommendations\n        capacity_recs = self._generate_capacity_recommendations_detailed(baselines)\n        recommendations.extend(capacity_recs)\n        \n        # Performance optimization recommendations\n        optimization_recs = self._generate_optimization_recommendations(baselines)\n        recommendations.extend(optimization_recs)\n        \n        # Sort by priority\n        priority_order = {'high': 0, 'medium': 1, 'low': 2}\n        recommendations.sort(key=lambda x: priority_order.get(x['priority'], 3))\n        \n        report.recommendations = recommendations\n        \n        # Update executive summary\n        report.executive_summary['recommendations_count'] = len(recommendations)\n\n    async def _generate_charts(self, report: PerformanceReport, baselines: List[BaselineMetrics]) -> None:\n        \"\"\"Generate performance charts.\"\"\"\n        if not MATPLOTLIB_AVAILABLE or not baselines:\n            return\n        \n        charts_dir = self.config.output_directory / \"charts\" / report.report_id\n        charts_dir.mkdir(parents=True, exist_ok=True)\n        \n        # Time series data\n        timestamps = [b.collection_timestamp for b in baselines]\n        \n        # Response time chart\n        if any(b.response_times for b in baselines):\n            chart_path = await self._create_time_series_chart(\n                timestamps,\n                [statistics.mean(b.response_times) if b.response_times else 0 for b in baselines],\n                \"Response Time Trend\",\n                \"Response Time (ms)\",\n                str(charts_dir / f\"response_time.{self.config.chart_format}\")\n            )\n            report.charts['response_time'] = str(chart_path)\n        \n        # Resource utilization chart\n        cpu_data = [statistics.mean(b.cpu_utilization) if b.cpu_utilization else 0 for b in baselines]\n        memory_data = [statistics.mean(b.memory_utilization) if b.memory_utilization else 0 for b in baselines]\n        \n        if any(cpu_data) or any(memory_data):\n            chart_path = await self._create_dual_line_chart(\n                timestamps,\n                cpu_data,\n                memory_data,\n                \"Resource Utilization\",\n                \"CPU Usage (%)\",\n                \"Memory Usage (%)\",\n                str(charts_dir / f\"resource_utilization.{self.config.chart_format}\")\n            )\n            report.charts['resource_utilization'] = str(chart_path)\n        \n        # Error rate chart\n        error_data = [statistics.mean(b.error_rates) if b.error_rates else 0 for b in baselines]\n        if any(error_data):\n            chart_path = await self._create_time_series_chart(\n                timestamps,\n                error_data,\n                \"Error Rate Trend\",\n                \"Error Rate (%)\",\n                str(charts_dir / f\"error_rate.{self.config.chart_format}\")\n            )\n            report.charts['error_rate'] = str(chart_path)\n\n    async def _create_time_series_chart(\n        self,\n        timestamps: List[datetime],\n        values: List[float],\n        title: str,\n        ylabel: str,\n        output_path: str\n    ) -> Path:\n        \"\"\"Create a time series chart.\"\"\"\n        plt.figure(figsize=(12, 6), dpi=self.config.chart_dpi)\n        plt.plot(timestamps, values, linewidth=2, marker='o', markersize=3)\n        plt.title(title, fontsize=14, fontweight='bold')\n        plt.ylabel(ylabel, fontsize=12)\n        plt.xlabel('Time', fontsize=12)\n        plt.grid(True, alpha=0.3)\n        \n        # Format x-axis\n        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))\n        plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))\n        plt.xticks(rotation=45)\n        \n        plt.tight_layout()\n        plt.savefig(output_path, format=self.config.chart_format, dpi=self.config.chart_dpi, bbox_inches='tight')\n        plt.close()\n        \n        return Path(output_path)\n\n    async def _create_dual_line_chart(\n        self,\n        timestamps: List[datetime],\n        values1: List[float],\n        values2: List[float],\n        title: str,\n        ylabel1: str,\n        ylabel2: str,\n        output_path: str\n    ) -> Path:\n        \"\"\"Create a dual-line chart.\"\"\"\n        fig, ax1 = plt.subplots(figsize=(12, 6), dpi=self.config.chart_dpi)\n        \n        # First line\n        color1 = 'tab:blue'\n        ax1.set_xlabel('Time', fontsize=12)\n        ax1.set_ylabel(ylabel1, color=color1, fontsize=12)\n        ax1.plot(timestamps, values1, color=color1, linewidth=2, marker='o', markersize=3, label=ylabel1)\n        ax1.tick_params(axis='y', labelcolor=color1)\n        ax1.grid(True, alpha=0.3)\n        \n        # Second line\n        ax2 = ax1.twinx()\n        color2 = 'tab:red'\n        ax2.set_ylabel(ylabel2, color=color2, fontsize=12)\n        ax2.plot(timestamps, values2, color=color2, linewidth=2, marker='s', markersize=3, label=ylabel2)\n        ax2.tick_params(axis='y', labelcolor=color2)\n        \n        # Format x-axis\n        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))\n        ax1.xaxis.set_major_locator(mdates.HourLocator(interval=6))\n        plt.xticks(rotation=45)\n        \n        plt.title(title, fontsize=14, fontweight='bold')\n        plt.tight_layout()\n        plt.savefig(output_path, format=self.config.chart_format, dpi=self.config.chart_dpi, bbox_inches='tight')\n        plt.close()\n        \n        return Path(output_path)\n\n    async def _save_report(self, report: PerformanceReport) -> None:\n        \"\"\"Save report in configured formats.\"\"\"\n        report_dir = self.config.output_directory / report.report_id\n        report_dir.mkdir(parents=True, exist_ok=True)\n        \n        # Save JSON version\n        if 'json' in self.config.report_formats:\n            json_path = report_dir / \"report.json\"\n            with open(json_path, 'w') as f:\n                json.dump(report.to_dict(), f, indent=2, default=str)\n            report.data_files['json'] = str(json_path)\n        \n        # Save HTML version\n        if 'html' in self.config.report_formats:\n            html_path = report_dir / \"report.html\"\n            html_content = self._generate_html_report(report)\n            with open(html_path, 'w') as f:\n                f.write(html_content)\n            report.data_files['html'] = str(html_path)\n        \n        # Save text version\n        if 'text' in self.config.report_formats:\n            text_path = report_dir / \"report.txt\"\n            text_content = self._generate_text_report(report)\n            with open(text_path, 'w') as f:\n                f.write(text_content)\n            report.data_files['text'] = str(text_path)\n\n    def _generate_html_report(self, report: PerformanceReport) -> str:\n        \"\"\"Generate HTML version of the report.\"\"\"\n        if self.jinja_env:\n            try:\n                template = self.jinja_env.get_template('performance_report.html')\n                return template.render(report=report)\n            except Exception as e:\n                logger.warning(f\"Failed to use Jinja template: {e}\")\n        \n        # Fallback HTML generation\n        html = f\"\"\"\n<!DOCTYPE html>\n<html>\n<head>\n    <title>Performance Report - {report.report_type.title()}</title>\n    <style>\n        body {{ font-family: Arial, sans-serif; margin: 20px; }}\n        h1 {{ color: #333; }}\n        h2 {{ color: #666; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}\n        .metric {{ margin: 10px 0; }}\n        .alert {{ color: red; font-weight: bold; }}\n        .good {{ color: green; }}\n        table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}\n        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}\n        th {{ background-color: #f2f2f2; }}\n    </style>\n</head>\n<body>\n    <h1>Performance Report - {report.report_type.title()}</h1>\n    <p><strong>Report ID:</strong> {report.report_id}</p>\n    <p><strong>Generated:</strong> {report.generation_time.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>\n    <p><strong>Period:</strong> {report.time_period[0].strftime('%Y-%m-%d %H:%M')} to {report.time_period[1].strftime('%Y-%m-%d %H:%M')}</p>\n    \n    <h2>Executive Summary</h2>\n    <div class=\"metric\"><strong>Performance Grade:</strong> {report.executive_summary.get('performance_grade', 'N/A')}</div>\n    <div class=\"metric\"><strong>Active Issues:</strong> {report.executive_summary.get('active_issues', {}).get('total_alerts', 0)} alerts</div>\n    \n    <h2>Performance Overview</h2>\n    <!-- Performance metrics would be displayed here -->\n    \n    <h2>Recommendations</h2>\n    <ul>\n    {''.join(f'<li><strong>{rec[\"title\"]}:</strong> {rec[\"description\"]}</li>' for rec in report.recommendations)}\n    </ul>\n</body>\n</html>\n\"\"\"\n        return html\n\n    def _generate_text_report(self, report: PerformanceReport) -> str:\n        \"\"\"Generate text version of the report.\"\"\"\n        lines = [\n            f\"PERFORMANCE REPORT - {report.report_type.upper()}\",\n            \"=\" * 60,\n            f\"Report ID: {report.report_id}\",\n            f\"Generated: {report.generation_time.strftime('%Y-%m-%d %H:%M:%S UTC')}\",\n            f\"Period: {report.time_period[0].strftime('%Y-%m-%d %H:%M')} to {report.time_period[1].strftime('%Y-%m-%d %H:%M')}\",\n            \"\",\n            \"EXECUTIVE SUMMARY\",\n            \"-\" * 20,\n            f\"Performance Grade: {report.executive_summary.get('performance_grade', 'N/A')}\",\n            f\"Active Issues: {report.executive_summary.get('active_issues', {}).get('total_alerts', 0)} alerts\",\n            \"\",\n            \"RECOMMENDATIONS\",\n            \"-\" * 15\n        ]\n        \n        for i, rec in enumerate(report.recommendations, 1):\n            lines.extend([\n                f\"{i}. {rec['title']}\",\n                f\"   Priority: {rec['priority'].upper()}\",\n                f\"   Description: {rec['description']}\",\n                \"\"\n            ])\n        \n        return \"\\n\".join(lines)\n\n    # Helper methods for calculations and analysis\n    \n    def _aggregate_baseline_metrics(self, baselines: List[BaselineMetrics]) -> Dict[str, List[float]]:\n        \"\"\"Aggregate metrics from all baselines.\"\"\"\n        aggregated = {\n            'response_time': [],\n            'error_rate': [],\n            'throughput': [],\n            'cpu_utilization': [],\n            'memory_utilization': []\n        }\n        \n        for baseline in baselines:\n            aggregated['response_time'].extend(baseline.response_times)\n            aggregated['error_rate'].extend(baseline.error_rates)\n            aggregated['throughput'].extend(baseline.throughput_values)\n            aggregated['cpu_utilization'].extend(baseline.cpu_utilization)\n            aggregated['memory_utilization'].extend(baseline.memory_utilization)\n        \n        return aggregated\n    \n    def _calculate_sla_compliance(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Calculate SLA compliance metrics.\"\"\"\n        compliance = {}\n        aggregated = self._aggregate_baseline_metrics(baselines)\n        \n        for metric_name, target in self.config.performance_sla_targets.items():\n            if metric_name.replace('_p95', '') in aggregated:\n                base_metric = metric_name.replace('_p95', '')\n                values = aggregated[base_metric]\n                \n                if values:\n                    if metric_name.endswith('_p95'):\n                        current_value = self._percentile(values, 95)\n                    else:\n                        current_value = statistics.mean(values)\n                    \n                    # Calculate compliance (percentage of time within SLA)\n                    if metric_name in ['response_time_p95', 'error_rate', 'cpu_utilization', 'memory_utilization']:\n                        compliant_values = [v for v in values if v <= target]\n                    else:  # availability and other \"higher is better\" metrics\n                        compliant_values = [v for v in values if v >= target]\n                    \n                    compliance_percentage = (len(compliant_values) / len(values)) * 100\n                    \n                    compliance[metric_name] = {\n                        'target': target,\n                        'current_value': current_value,\n                        'compliance_percentage': compliance_percentage,\n                        'is_compliant': compliance_percentage >= 95.0  # 95% SLA threshold\n                    }\n        \n        return compliance\n    \n    async def _calculate_key_trends(self, baselines: List[BaselineMetrics], comparison_baselines: List[BaselineMetrics]) -> Dict[str, str]:\n        \"\"\"Calculate key performance trends.\"\"\"\n        trends = {}\n        \n        key_metrics = ['response_time', 'error_rate', 'cpu_utilization', 'memory_utilization']\n        \n        for metric in key_metrics:\n            try:\n                trend = await self.analyzer.analyze_trend(metric, baselines, len(baselines))\n                trends[metric] = trend.direction.value\n            except Exception:\n                trends[metric] = 'unknown'\n        \n        return trends\n    \n    def _percentile(self, values: List[float], percentile: float) -> float:\n        \"\"\"Calculate percentile of values.\"\"\"\n        if not values:\n            return 0.0\n        \n        sorted_values = sorted(values)\n        index = (percentile / 100) * (len(sorted_values) - 1)\n        \n        if index.is_integer():\n            return sorted_values[int(index)]\n        else:\n            lower = sorted_values[int(index)]\n            upper = sorted_values[int(index) + 1]\n            return lower + (upper - lower) * (index - int(index))\n    \n    def _calculate_baseline_frequency(self, baselines: List[BaselineMetrics]) -> float:\n        \"\"\"Calculate average frequency of baselines in hours.\"\"\"\n        if len(baselines) < 2:\n            return 0.0\n        \n        time_deltas = []\n        for i in range(1, len(baselines)):\n            delta = baselines[i].collection_timestamp - baselines[i-1].collection_timestamp\n            time_deltas.append(delta.total_seconds() / 3600)  # Convert to hours\n        \n        return statistics.mean(time_deltas) if time_deltas else 0.0\n    \n    # Additional helper methods would be implemented here...\n    # (For brevity, including placeholder implementations)\n    \n    def _analyze_resource_utilization(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Analyze resource utilization patterns.\"\"\"\n        return {'placeholder': 'resource_analysis'}\n    \n    def _analyze_performance_distribution(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Analyze performance distribution.\"\"\"\n        return {'placeholder': 'performance_distribution'}\n    \n    def _calculate_completeness_score(self, baselines: List[BaselineMetrics]) -> float:\n        \"\"\"Calculate data completeness score.\"\"\"\n        return 95.0  # Placeholder\n    \n    def _calculate_consistency_score(self, baselines: List[BaselineMetrics]) -> float:\n        \"\"\"Calculate data consistency score.\"\"\"\n        return 90.0  # Placeholder\n    \n    async def _forecast_resource_usage(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Forecast future resource usage.\"\"\"\n        return {'placeholder': 'resource_forecasts'}\n    \n    def _calculate_capacity_recommendations(self, baselines: List[BaselineMetrics], forecasts: Dict[str, Any]) -> List[Dict[str, Any]]:\n        \"\"\"Calculate capacity recommendations.\"\"\"\n        return []\n    \n    def _analyze_growth_patterns(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Analyze growth patterns.\"\"\"\n        return {'placeholder': 'growth_analysis'}\n    \n    def _generate_scaling_recommendations(self, forecasts: Dict[str, Any]) -> List[Dict[str, Any]]:\n        \"\"\"Generate scaling recommendations.\"\"\"\n        return []\n    \n    def _identify_sla_violations(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:\n        \"\"\"Identify SLA violations.\"\"\"\n        return {}\n    \n    def _generate_sla_action_items(self, metric: str, violation_data: Dict[str, Any]) -> List[str]:\n        \"\"\"Generate action items for SLA violations.\"\"\"\n        return []\n    \n    def _generate_capacity_recommendations_detailed(self, baselines: List[BaselineMetrics]) -> List[Dict[str, Any]]:\n        \"\"\"Generate detailed capacity recommendations.\"\"\"\n        return []\n    \n    def _generate_optimization_recommendations(self, baselines: List[BaselineMetrics]) -> List[Dict[str, Any]]:\n        \"\"\"Generate optimization recommendations.\"\"\"\n        return []\n    \n    async def _add_detailed_capacity_analysis(self, report: PerformanceReport, forecast_days: int) -> None:\n        \"\"\"Add detailed capacity analysis to the report.\"\"\"\n        pass\n\n# Global reporter instance\n_global_reporter: Optional[BaselineReporter] = None\n\ndef get_baseline_reporter() -> BaselineReporter:\n    \"\"\"Get the global baseline reporter instance.\"\"\"\n    global _global_reporter\n    if _global_reporter is None:\n        _global_reporter = BaselineReporter()\n    return _global_reporter\n\ndef set_baseline_reporter(reporter: BaselineReporter) -> None:\n    \"\"\"Set the global baseline reporter instance.\"\"\"\n    global _global_reporter\n    _global_reporter = reporter\n\n# Convenience functions\nasync def generate_daily_performance_report(date: Optional[datetime] = None) -> PerformanceReport:\n    \"\"\"Generate a daily performance report.\"\"\"\n    reporter = get_baseline_reporter()\n    return await reporter.generate_daily_report(date)\n\nasync def generate_weekly_performance_report(week_start: Optional[datetime] = None) -> PerformanceReport:\n    \"\"\"Generate a weekly performance report.\"\"\"\n    reporter = get_baseline_reporter()\n    return await reporter.generate_weekly_report(week_start)\n\nasync def generate_capacity_planning_report(forecast_days: Optional[int] = None) -> PerformanceReport:\n    \"\"\"Generate a capacity planning report.\"\"\"\n    reporter = get_baseline_reporter()\n    return await reporter.generate_capacity_planning_report(forecast_days)
+except ImportError:
+    PANDAS_AVAILABLE = False
+
+# Report generation
+try:
+    from jinja2 import Template, Environment, FileSystemLoader
+    JINJA2_AVAILABLE = True
+except ImportError:
+    JINJA2_AVAILABLE = False
+
+from .models import BaselineMetrics, PerformanceTrend, RegressionAlert, get_metric_definition
+from .statistical_analyzer import StatisticalAnalyzer
+from .baseline_collector import BaselineCollector
+from .regression_detector import RegressionDetector
+
+logger = logging.getLogger(__name__)
+
+class ReportConfig:
+    """Configuration for baseline reporting."""
+    
+    def __init__(
+        self,
+        output_directory: Optional[Path] = None,
+        include_charts: bool = True,
+        include_capacity_planning: bool = True,
+        include_recommendations: bool = True,
+        chart_format: str = 'png',
+        chart_dpi: int = 150,
+        report_formats: List[str] = None,  # ['html', 'json', 'text']
+        capacity_forecast_days: int = 30,
+        performance_sla_targets: Optional[Dict[str, float]] = None
+    ):
+        """Initialize report configuration.
+        
+        Args:
+            output_directory: Directory for report outputs
+            include_charts: Generate performance charts
+            include_capacity_planning: Include capacity planning analysis
+            include_recommendations: Include optimization recommendations
+            chart_format: Format for charts ('png', 'svg', 'pdf')
+            chart_dpi: Chart resolution (dots per inch)
+            report_formats: Output formats for reports
+            capacity_forecast_days: Days to forecast for capacity planning
+            performance_sla_targets: SLA targets for different metrics
+        """
+        self.output_directory = output_directory or Path("./reports")
+        self.output_directory.mkdir(parents=True, exist_ok=True)
+        
+        self.include_charts = include_charts and MATPLOTLIB_AVAILABLE
+        self.include_capacity_planning = include_capacity_planning
+        self.include_recommendations = include_recommendations
+        self.chart_format = chart_format
+        self.chart_dpi = chart_dpi
+        self.report_formats = report_formats or ['html', 'json']
+        self.capacity_forecast_days = capacity_forecast_days
+        
+        # Default SLA targets
+        self.performance_sla_targets = performance_sla_targets or {
+            'response_time_p95': 200.0,  # ms
+            'error_rate': 1.0,           # %
+            'cpu_utilization': 70.0,     # %
+            'memory_utilization': 80.0,  # %
+            'availability': 99.9         # %
+        }
+
+class PerformanceReport:
+    """Comprehensive performance report."""
+    
+    def __init__(
+        self,
+        report_id: str,
+        report_type: str,
+        generation_time: datetime,
+        time_period: Tuple[datetime, datetime]
+    ):
+        self.report_id = report_id
+        self.report_type = report_type
+        self.generation_time = generation_time
+        self.time_period = time_period
+        
+        # Report sections
+        self.executive_summary: Dict[str, Any] = {}
+        self.performance_overview: Dict[str, Any] = {}
+        self.trend_analysis: Dict[str, Any] = {}
+        self.capacity_planning: Dict[str, Any] = {}
+        self.alerts_summary: Dict[str, Any] = {}
+        self.recommendations: List[Dict[str, Any]] = []
+        self.appendices: Dict[str, Any] = {}
+        
+        # Generated assets
+        self.charts: Dict[str, str] = {}  # chart_name -> file_path
+        self.data_files: Dict[str, str] = {}  # data_type -> file_path
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert report to dictionary."""
+        return {
+            'report_id': self.report_id,
+            'report_type': self.report_type,
+            'generation_time': self.generation_time.isoformat(),
+            'time_period': {
+                'start': self.time_period[0].isoformat(),
+                'end': self.time_period[1].isoformat()
+            },
+            'executive_summary': self.executive_summary,
+            'performance_overview': self.performance_overview,
+            'trend_analysis': self.trend_analysis,
+            'capacity_planning': self.capacity_planning,
+            'alerts_summary': self.alerts_summary,
+            'recommendations': self.recommendations,
+            'appendices': self.appendices,
+            'charts': self.charts,
+            'data_files': self.data_files
+        }
+
+class BaselineReporter:
+    """Automated reporting and capacity planning system.
+    
+    Generates comprehensive performance reports with trend analysis,
+    capacity planning, and actionable recommendations.
+    """
+    
+    def __init__(
+        self,
+        config: Optional[ReportConfig] = None,
+        collector: Optional[BaselineCollector] = None,
+        analyzer: Optional[StatisticalAnalyzer] = None,
+        detector: Optional[RegressionDetector] = None
+    ):
+        """Initialize baseline reporter.
+        
+        Args:
+            config: Report configuration
+            collector: Baseline collector for data access
+            analyzer: Statistical analyzer for trend analysis
+            detector: Regression detector for alert data
+        """
+        self.config = config or ReportConfig()
+        self.collector = collector or BaselineCollector()
+        self.analyzer = analyzer or StatisticalAnalyzer()
+        self.detector = detector or RegressionDetector()
+        
+        # Setup Jinja2 environment if available
+        self.jinja_env = None
+        if JINJA2_AVAILABLE:
+            template_dir = Path(__file__).parent / "templates"
+            if template_dir.exists():
+                self.jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+        
+        logger.info(f"BaselineReporter initialized (charts: {self.config.include_charts})")
+
+    async def generate_daily_report(self, report_date: Optional[datetime] = None) -> PerformanceReport:
+        """Generate daily performance report.
+        
+        Args:
+            report_date: Date for the report (defaults to yesterday)
+            
+        Returns:
+            Generated performance report
+        """
+        if report_date is None:
+            report_date = datetime.now(timezone.utc) - timedelta(days=1)
+        
+        # Define time period (24 hours)
+        start_time = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_time = start_time + timedelta(days=1)
+        
+        return await self._generate_report(
+            report_type="daily",
+            time_period=(start_time, end_time),
+            comparison_period_days=7
+        )
+
+    async def generate_weekly_report(self, week_start: Optional[datetime] = None) -> PerformanceReport:
+        """Generate weekly performance report.
+        
+        Args:
+            week_start: Start of the week for the report
+            
+        Returns:
+            Generated performance report
+        """
+        if week_start is None:
+            # Start of last week (Monday)
+            today = datetime.now(timezone.utc).date()
+            days_since_monday = today.weekday()
+            week_start = datetime.combine(
+                today - timedelta(days=days_since_monday + 7),
+                datetime.min.time()
+            ).replace(tzinfo=timezone.utc)
+        
+        end_time = week_start + timedelta(days=7)
+        
+        return await self._generate_report(
+            report_type="weekly",
+            time_period=(week_start, end_time),
+            comparison_period_days=28
+        )
+
+    async def generate_monthly_report(self, month_start: Optional[datetime] = None) -> PerformanceReport:
+        """Generate monthly performance report.
+        
+        Args:
+            month_start: Start of the month for the report
+            
+        Returns:
+            Generated performance report
+        """
+        if month_start is None:
+            # Start of last month
+            today = datetime.now(timezone.utc).date()
+            if today.month == 1:
+                month_start = datetime(today.year - 1, 12, 1, tzinfo=timezone.utc)
+            else:
+                month_start = datetime(today.year, today.month - 1, 1, tzinfo=timezone.utc)
+        
+        # End of month
+        if month_start.month == 12:
+            end_time = datetime(month_start.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_time = datetime(month_start.year, month_start.month + 1, 1, tzinfo=timezone.utc)
+        
+        return await self._generate_report(
+            report_type="monthly",
+            time_period=(month_start, end_time),
+            comparison_period_days=90
+        )
+
+    async def generate_capacity_planning_report(
+        self,
+        forecast_days: Optional[int] = None
+    ) -> PerformanceReport:
+        """Generate capacity planning report.
+        
+        Args:
+            forecast_days: Days to forecast (defaults to config value)
+            
+        Returns:
+            Generated capacity planning report
+        """
+        forecast_days = forecast_days or self.config.capacity_forecast_days
+        
+        # Use last 30 days of data
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(days=30)
+        
+        report = await self._generate_report(
+            report_type="capacity_planning",
+            time_period=(start_time, end_time),
+            comparison_period_days=60
+        )
+        
+        # Add detailed capacity analysis
+        await self._add_detailed_capacity_analysis(report, forecast_days)
+        
+        return report
+
+    async def _generate_report(
+        self,
+        report_type: str,
+        time_period: Tuple[datetime, datetime],
+        comparison_period_days: int
+    ) -> PerformanceReport:
+        """Generate a performance report for the specified period."""
+        report_id = str(uuid.uuid4())
+        generation_time = datetime.now(timezone.utc)
+        
+        logger.info(f"Generating {report_type} report for period {time_period[0]} to {time_period[1]}")
+        
+        # Create report
+        report = PerformanceReport(
+            report_id=report_id,
+            report_type=report_type,
+            generation_time=generation_time,
+            time_period=time_period
+        )
+        
+        # Load baseline data for the period
+        period_hours = int((time_period[1] - time_period[0]).total_seconds() / 3600)
+        baselines = await self._load_baselines_for_period(time_period[0], period_hours)
+        
+        if not baselines:
+            logger.warning(f"No baselines found for period {time_period}")
+            report.executive_summary['status'] = 'insufficient_data'
+            return report
+        
+        # Load comparison data
+        comparison_start = time_period[0] - timedelta(days=comparison_period_days)
+        comparison_baselines = await self._load_baselines_for_period(
+            comparison_start, 
+            int((time_period[0] - comparison_start).total_seconds() / 3600)
+        )
+        
+        # Generate report sections
+        await self._generate_executive_summary(report, baselines, comparison_baselines)
+        await self._generate_performance_overview(report, baselines)
+        await self._generate_trend_analysis(report, baselines, comparison_baselines)
+        
+        if self.config.include_capacity_planning:
+            await self._generate_capacity_planning(report, baselines)
+        
+        await self._generate_alerts_summary(report, time_period)
+        
+        if self.config.include_recommendations:
+            await self._generate_recommendations(report, baselines)
+        
+        # Generate charts
+        if self.config.include_charts:
+            await self._generate_charts(report, baselines)
+        
+        # Save report
+        await self._save_report(report)
+        
+        logger.info(f"Generated {report_type} report: {report_id}")
+        return report
+
+    async def _load_baselines_for_period(
+        self, 
+        start_time: datetime, 
+        hours: int
+    ) -> List[BaselineMetrics]:
+        """Load baselines for a specific time period."""
+        # Implementation would depend on how baselines are stored
+        # For now, use the collector's method
+        return await self.collector.load_recent_baselines(hours)
+
+    async def _generate_executive_summary(
+        self,
+        report: PerformanceReport,
+        baselines: List[BaselineMetrics],
+        comparison_baselines: List[BaselineMetrics]
+    ) -> None:
+        """Generate executive summary section."""
+        if not baselines:
+            report.executive_summary = {'status': 'no_data'}
+            return
+        
+        # Calculate key metrics
+        latest_baseline = baselines[-1]
+        
+        # Performance score
+        try:
+            performance_score = await self.analyzer.calculate_performance_score(latest_baseline)
+            overall_grade = performance_score.get('grade', 'N/A')
+            overall_score = performance_score.get('overall_score', 0)
+        except Exception as e:
+            logger.error(f"Failed to calculate performance score: {e}")
+            overall_grade = 'N/A'
+            overall_score = 0
+        
+        # SLA compliance
+        sla_compliance = self._calculate_sla_compliance(baselines)
+        
+        # Key trends
+        key_trends = await self._calculate_key_trends(baselines, comparison_baselines)
+        
+        # Active issues
+        active_alerts = self.detector.get_active_alerts()
+        critical_alerts = [alert for alert in active_alerts if alert.severity.value == 'critical']
+        
+        report.executive_summary = {
+            'status': 'generated',
+            'period_summary': {
+                'total_baselines': len(baselines),
+                'baseline_frequency_hours': self._calculate_baseline_frequency(baselines)
+            },
+            'performance_grade': overall_grade,
+            'performance_score': overall_score,
+            'sla_compliance': sla_compliance,
+            'key_trends': key_trends,
+            'active_issues': {
+                'total_alerts': len(active_alerts),
+                'critical_alerts': len(critical_alerts),
+                'top_issues': [alert.metric_name for alert in critical_alerts[:3]]
+            },
+            'recommendations_count': 0  # Will be updated later
+        }
+
+    async def _generate_performance_overview(
+        self,
+        report: PerformanceReport,
+        baselines: List[BaselineMetrics]
+    ) -> None:
+        """Generate performance overview section."""
+        if not baselines:
+            return
+        
+        # Aggregate metrics across all baselines
+        aggregated_metrics = self._aggregate_baseline_metrics(baselines)
+        
+        # Calculate percentiles and statistics
+        metrics_stats = {}
+        for metric_name, values in aggregated_metrics.items():
+            if values:
+                metrics_stats[metric_name] = {
+                    'count': len(values),
+                    'mean': statistics.mean(values),
+                    'median': statistics.median(values),
+                    'min': min(values),
+                    'max': max(values),
+                    'p95': self._percentile(values, 95),
+                    'p99': self._percentile(values, 99),
+                    'std_dev': statistics.stdev(values) if len(values) > 1 else 0
+                }
+        
+        # Resource utilization analysis
+        resource_analysis = self._analyze_resource_utilization(baselines)
+        
+        # Performance distribution
+        performance_distribution = self._analyze_performance_distribution(baselines)
+        
+        report.performance_overview = {
+            'metrics_statistics': metrics_stats,
+            'resource_analysis': resource_analysis,
+            'performance_distribution': performance_distribution,
+            'baseline_quality': {
+                'completeness_score': self._calculate_completeness_score(baselines),
+                'consistency_score': self._calculate_consistency_score(baselines)
+            }
+        }
+
+    async def _generate_trend_analysis(
+        self,
+        report: PerformanceReport,
+        baselines: List[BaselineMetrics],
+        comparison_baselines: List[BaselineMetrics]
+    ) -> None:
+        """Generate trend analysis section."""
+        trends = {}
+        
+        # Analyze trends for key metrics
+        key_metrics = ['response_time', 'error_rate', 'throughput', 'cpu_utilization', 'memory_utilization']
+        
+        for metric_name in key_metrics:
+            try:
+                # Calculate trend over the report period
+                trend = await self.analyzer.analyze_trend(
+                    metric_name, 
+                    baselines, 
+                    timeframe_hours=len(baselines)
+                )
+                
+                trends[metric_name] = {
+                    'direction': trend.direction.value,
+                    'magnitude': trend.magnitude,
+                    'confidence_score': trend.confidence_score,
+                    'is_significant': trend.is_significant(),
+                    'sample_count': trend.sample_count,
+                    'predicted_24h': trend.predicted_value_24h,
+                    'predicted_7d': trend.predicted_value_7d
+                }
+            except Exception as e:
+                logger.error(f"Failed to analyze trend for {metric_name}: {e}")
+                trends[metric_name] = {'error': str(e)}
+        
+        # Identify most significant trends
+        significant_trends = [
+            (metric, data) for metric, data in trends.items()
+            if isinstance(data, dict) and data.get('is_significant', False)
+        ]
+        
+        # Sort by magnitude
+        significant_trends.sort(key=lambda x: abs(x[1].get('magnitude', 0)), reverse=True)
+        
+        report.trend_analysis = {
+            'all_trends': trends,
+            'significant_trends': dict(significant_trends[:5]),  # Top 5
+            'trend_summary': {
+                'improving_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'improving']),
+                'degrading_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'degrading']),
+                'stable_metrics': len([t for t in trends.values() if isinstance(t, dict) and t.get('direction') == 'stable'])
+            }
+        }
+
+    async def _generate_capacity_planning(
+        self,
+        report: PerformanceReport,
+        baselines: List[BaselineMetrics]
+    ) -> None:
+        """Generate capacity planning section."""
+        if not baselines:
+            return
+        
+        # Analyze resource trends
+        resource_forecasts = await self._forecast_resource_usage(baselines)
+        
+        # Calculate capacity recommendations
+        capacity_recommendations = self._calculate_capacity_recommendations(baselines, resource_forecasts)
+        
+        # Growth analysis
+        growth_analysis = self._analyze_growth_patterns(baselines)
+        
+        report.capacity_planning = {
+            'resource_forecasts': resource_forecasts,
+            'capacity_recommendations': capacity_recommendations,
+            'growth_analysis': growth_analysis,
+            'scaling_recommendations': self._generate_scaling_recommendations(resource_forecasts)
+        }
+
+    async def _generate_alerts_summary(
+        self,
+        report: PerformanceReport,
+        time_period: Tuple[datetime, datetime]
+    ) -> None:
+        """Generate alerts summary section."""
+        # Get alerts for the period
+        active_alerts = self.detector.get_active_alerts()
+        alert_stats = self.detector.get_alert_statistics()
+        
+        # Categorize alerts by severity
+        alerts_by_severity = {
+            'critical': 0,
+            'warning': 0,
+            'info': 0
+        }
+        
+        alerts_by_metric = {}
+        
+        for alert in active_alerts:
+            severity = alert.severity.value
+            if severity in alerts_by_severity:
+                alerts_by_severity[severity] += 1
+            
+            metric = alert.metric_name
+            if metric not in alerts_by_metric:
+                alerts_by_metric[metric] = 0
+            alerts_by_metric[metric] += 1
+        
+        # Most problematic metrics
+        top_problem_metrics = sorted(
+            alerts_by_metric.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:5]
+        
+        report.alerts_summary = {
+            'total_active_alerts': len(active_alerts),
+            'alerts_by_severity': alerts_by_severity,
+            'alerts_by_metric': alerts_by_metric,
+            'top_problem_metrics': dict(top_problem_metrics),
+            'alert_statistics': alert_stats
+        }
+
+    async def _generate_recommendations(
+        self,
+        report: PerformanceReport,
+        baselines: List[BaselineMetrics]
+    ) -> None:
+        """Generate actionable recommendations."""
+        recommendations = []
+        
+        # Analyze current performance against SLA targets
+        sla_violations = self._identify_sla_violations(baselines)
+        
+        for metric, violation_data in sla_violations.items():
+            recommendation = {
+                'id': str(uuid.uuid4()),
+                'category': 'sla_compliance',
+                'priority': 'high' if violation_data['severity'] > 0.5 else 'medium',
+                'title': f"Address {metric.replace('_', ' ').title()} SLA Violations",
+                'description': f"The {metric} metric is exceeding SLA targets by {violation_data['excess_percentage']:.1f}%",
+                'action_items': self._generate_sla_action_items(metric, violation_data),
+                'expected_impact': violation_data['impact_assessment'],
+                'implementation_effort': 'medium'
+            }
+            recommendations.append(recommendation)
+        
+        # Capacity-based recommendations
+        capacity_recs = self._generate_capacity_recommendations_detailed(baselines)
+        recommendations.extend(capacity_recs)
+        
+        # Performance optimization recommendations
+        optimization_recs = self._generate_optimization_recommendations(baselines)
+        recommendations.extend(optimization_recs)
+        
+        # Sort by priority
+        priority_order = {'high': 0, 'medium': 1, 'low': 2}
+        recommendations.sort(key=lambda x: priority_order.get(x['priority'], 3))
+        
+        report.recommendations = recommendations
+        
+        # Update executive summary
+        report.executive_summary['recommendations_count'] = len(recommendations)
+
+    async def _generate_charts(self, report: PerformanceReport, baselines: List[BaselineMetrics]) -> None:
+        """Generate performance charts."""
+        if not MATPLOTLIB_AVAILABLE or not baselines:
+            return
+        
+        charts_dir = self.config.output_directory / "charts" / report.report_id
+        charts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Time series data
+        timestamps = [b.collection_timestamp for b in baselines]
+        
+        # Response time chart
+        if any(b.response_times for b in baselines):
+            chart_path = await self._create_time_series_chart(
+                timestamps,
+                [statistics.mean(b.response_times) if b.response_times else 0 for b in baselines],
+                "Response Time Trend",
+                "Response Time (ms)",
+                str(charts_dir / f"response_time.{self.config.chart_format}")
+            )
+            report.charts['response_time'] = str(chart_path)
+        
+        # Resource utilization chart
+        cpu_data = [statistics.mean(b.cpu_utilization) if b.cpu_utilization else 0 for b in baselines]
+        memory_data = [statistics.mean(b.memory_utilization) if b.memory_utilization else 0 for b in baselines]
+        
+        if any(cpu_data) or any(memory_data):
+            chart_path = await self._create_dual_line_chart(
+                timestamps,
+                cpu_data,
+                memory_data,
+                "Resource Utilization",
+                "CPU Usage (%)",
+                "Memory Usage (%)",
+                str(charts_dir / f"resource_utilization.{self.config.chart_format}")
+            )
+            report.charts['resource_utilization'] = str(chart_path)
+        
+        # Error rate chart
+        error_data = [statistics.mean(b.error_rates) if b.error_rates else 0 for b in baselines]
+        if any(error_data):
+            chart_path = await self._create_time_series_chart(
+                timestamps,
+                error_data,
+                "Error Rate Trend",
+                "Error Rate (%)",
+                str(charts_dir / f"error_rate.{self.config.chart_format}")
+            )
+            report.charts['error_rate'] = str(chart_path)
+
+    async def _create_time_series_chart(
+        self,
+        timestamps: List[datetime],
+        values: List[float],
+        title: str,
+        ylabel: str,
+        output_path: str
+    ) -> Path:
+        """Create a time series chart."""
+        plt.figure(figsize=(12, 6), dpi=self.config.chart_dpi)
+        plt.plot(timestamps, values, linewidth=2, marker='o', markersize=3)
+        plt.title(title, fontsize=14, fontweight='bold')
+        plt.ylabel(ylabel, fontsize=12)
+        plt.xlabel('Time', fontsize=12)
+        plt.grid(True, alpha=0.3)
+        
+        # Format x-axis
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+        plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+        plt.xticks(rotation=45)
+        
+        plt.tight_layout()
+        plt.savefig(output_path, format=self.config.chart_format, dpi=self.config.chart_dpi, bbox_inches='tight')
+        plt.close()
+        
+        return Path(output_path)
+
+    async def _create_dual_line_chart(
+        self,
+        timestamps: List[datetime],
+        values1: List[float],
+        values2: List[float],
+        title: str,
+        ylabel1: str,
+        ylabel2: str,
+        output_path: str
+    ) -> Path:
+        """Create a dual-line chart."""
+        fig, ax1 = plt.subplots(figsize=(12, 6), dpi=self.config.chart_dpi)
+        
+        # First line
+        color1 = 'tab:blue'
+        ax1.set_xlabel('Time', fontsize=12)
+        ax1.set_ylabel(ylabel1, color=color1, fontsize=12)
+        ax1.plot(timestamps, values1, color=color1, linewidth=2, marker='o', markersize=3, label=ylabel1)
+        ax1.tick_params(axis='y', labelcolor=color1)
+        ax1.grid(True, alpha=0.3)
+        
+        # Second line
+        ax2 = ax1.twinx()
+        color2 = 'tab:red'
+        ax2.set_ylabel(ylabel2, color=color2, fontsize=12)
+        ax2.plot(timestamps, values2, color=color2, linewidth=2, marker='s', markersize=3, label=ylabel2)
+        ax2.tick_params(axis='y', labelcolor=color2)
+        
+        # Format x-axis
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+        ax1.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+        plt.xticks(rotation=45)
+        
+        plt.title(title, fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig(output_path, format=self.config.chart_format, dpi=self.config.chart_dpi, bbox_inches='tight')
+        plt.close()
+        
+        return Path(output_path)
+
+    async def _save_report(self, report: PerformanceReport) -> None:
+        """Save report in configured formats."""
+        report_dir = self.config.output_directory / report.report_id
+        report_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save JSON version
+        if 'json' in self.config.report_formats:
+            json_path = report_dir / "report.json"
+            with open(json_path, 'w') as f:
+                json.dump(report.to_dict(), f, indent=2, default=str)
+            report.data_files['json'] = str(json_path)
+        
+        # Save HTML version
+        if 'html' in self.config.report_formats:
+            html_path = report_dir / "report.html"
+            html_content = self._generate_html_report(report)
+            with open(html_path, 'w') as f:
+                f.write(html_content)
+            report.data_files['html'] = str(html_path)
+        
+        # Save text version
+        if 'text' in self.config.report_formats:
+            text_path = report_dir / "report.txt"
+            text_content = self._generate_text_report(report)
+            with open(text_path, 'w') as f:
+                f.write(text_content)
+            report.data_files['text'] = str(text_path)
+
+    def _generate_html_report(self, report: PerformanceReport) -> str:
+        """Generate HTML version of the report."""
+        if self.jinja_env:
+            try:
+                template = self.jinja_env.get_template('performance_report.html')
+                return template.render(report=report)
+            except Exception as e:
+                logger.warning(f"Failed to use Jinja template: {e}")
+        
+        # Fallback HTML generation
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Report - {report.report_type.title()}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        h1 {{ color: #333; }}
+        h2 {{ color: #666; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}
+        .metric {{ margin: 10px 0; }}
+        .alert {{ color: red; font-weight: bold; }}
+        .good {{ color: green; }}
+        table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        th {{ background-color: #f2f2f2; }}
+    </style>
+</head>
+<body>
+    <h1>Performance Report - {report.report_type.title()}</h1>
+    <p><strong>Report ID:</strong> {report.report_id}</p>
+    <p><strong>Generated:</strong> {report.generation_time.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+    <p><strong>Period:</strong> {report.time_period[0].strftime('%Y-%m-%d %H:%M')} to {report.time_period[1].strftime('%Y-%m-%d %H:%M')}</p>
+    
+    <h2>Executive Summary</h2>
+    <div class="metric"><strong>Performance Grade:</strong> {report.executive_summary.get('performance_grade', 'N/A')}</div>
+    <div class="metric"><strong>Active Issues:</strong> {report.executive_summary.get('active_issues', {}).get('total_alerts', 0)} alerts</div>
+    
+    <h2>Performance Overview</h2>
+    <!-- Performance metrics would be displayed here -->
+    
+    <h2>Recommendations</h2>
+    <ul>
+    {''.join(f'<li><strong>{rec["title"]}:</strong> {rec["description"]}</li>' for rec in report.recommendations)}
+    </ul>
+</body>
+</html>
+"""
+        return html
+
+    def _generate_text_report(self, report: PerformanceReport) -> str:
+        """Generate text version of the report."""
+        lines = [
+            f"PERFORMANCE REPORT - {report.report_type.upper()}",
+            "=" * 60,
+            f"Report ID: {report.report_id}",
+            f"Generated: {report.generation_time.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+            f"Period: {report.time_period[0].strftime('%Y-%m-%d %H:%M')} to {report.time_period[1].strftime('%Y-%m-%d %H:%M')}",
+            "",
+            "EXECUTIVE SUMMARY",
+            "-" * 20,
+            f"Performance Grade: {report.executive_summary.get('performance_grade', 'N/A')}",
+            f"Active Issues: {report.executive_summary.get('active_issues', {}).get('total_alerts', 0)} alerts",
+            "",
+            "RECOMMENDATIONS",
+            "-" * 15
+        ]
+        
+        for i, rec in enumerate(report.recommendations, 1):
+            lines.extend([
+                f"{i}. {rec['title']}",
+                f"   Priority: {rec['priority'].upper()}",
+                f"   Description: {rec['description']}",
+                ""
+            ])
+        
+        return "\
+".join(lines)
+
+    # Helper methods for calculations and analysis
+    
+    def _aggregate_baseline_metrics(self, baselines: List[BaselineMetrics]) -> Dict[str, List[float]]:
+        """Aggregate metrics from all baselines."""
+        aggregated = {
+            'response_time': [],
+            'error_rate': [],
+            'throughput': [],
+            'cpu_utilization': [],
+            'memory_utilization': []
+        }
+        
+        for baseline in baselines:
+            aggregated['response_time'].extend(baseline.response_times)
+            aggregated['error_rate'].extend(baseline.error_rates)
+            aggregated['throughput'].extend(baseline.throughput_values)
+            aggregated['cpu_utilization'].extend(baseline.cpu_utilization)
+            aggregated['memory_utilization'].extend(baseline.memory_utilization)
+        
+        return aggregated
+    
+    def _calculate_sla_compliance(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Calculate SLA compliance metrics."""
+        compliance = {}
+        aggregated = self._aggregate_baseline_metrics(baselines)
+        
+        for metric_name, target in self.config.performance_sla_targets.items():
+            if metric_name.replace('_p95', '') in aggregated:
+                base_metric = metric_name.replace('_p95', '')
+                values = aggregated[base_metric]
+                
+                if values:
+                    if metric_name.endswith('_p95'):
+                        current_value = self._percentile(values, 95)
+                    else:
+                        current_value = statistics.mean(values)
+                    
+                    # Calculate compliance (percentage of time within SLA)
+                    if metric_name in ['response_time_p95', 'error_rate', 'cpu_utilization', 'memory_utilization']:
+                        compliant_values = [v for v in values if v <= target]
+                    else:  # availability and other "higher is better" metrics
+                        compliant_values = [v for v in values if v >= target]
+                    
+                    compliance_percentage = (len(compliant_values) / len(values)) * 100
+                    
+                    compliance[metric_name] = {
+                        'target': target,
+                        'current_value': current_value,
+                        'compliance_percentage': compliance_percentage,
+                        'is_compliant': compliance_percentage >= 95.0  # 95% SLA threshold
+                    }
+        
+        return compliance
+    
+    async def _calculate_key_trends(self, baselines: List[BaselineMetrics], comparison_baselines: List[BaselineMetrics]) -> Dict[str, str]:
+        """Calculate key performance trends."""
+        trends = {}
+        
+        key_metrics = ['response_time', 'error_rate', 'cpu_utilization', 'memory_utilization']
+        
+        for metric in key_metrics:
+            try:
+                trend = await self.analyzer.analyze_trend(metric, baselines, len(baselines))
+                trends[metric] = trend.direction.value
+            except Exception:
+                trends[metric] = 'unknown'
+        
+        return trends
+    
+    def _percentile(self, values: List[float], percentile: float) -> float:
+        """Calculate percentile of values."""
+        if not values:
+            return 0.0
+        
+        sorted_values = sorted(values)
+        index = (percentile / 100) * (len(sorted_values) - 1)
+        
+        if index.is_integer():
+            return sorted_values[int(index)]
+        else:
+            lower = sorted_values[int(index)]
+            upper = sorted_values[int(index) + 1]
+            return lower + (upper - lower) * (index - int(index))
+    
+    def _calculate_baseline_frequency(self, baselines: List[BaselineMetrics]) -> float:
+        """Calculate average frequency of baselines in hours."""
+        if len(baselines) < 2:
+            return 0.0
+        
+        time_deltas = []
+        for i in range(1, len(baselines)):
+            delta = baselines[i].collection_timestamp - baselines[i-1].collection_timestamp
+            time_deltas.append(delta.total_seconds() / 3600)  # Convert to hours
+        
+        return statistics.mean(time_deltas) if time_deltas else 0.0
+    
+    # Additional helper methods would be implemented here...
+    # (For brevity, including placeholder implementations)
+    
+    def _analyze_resource_utilization(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Analyze resource utilization patterns."""
+        return {'placeholder': 'resource_analysis'}
+    
+    def _analyze_performance_distribution(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Analyze performance distribution."""
+        return {'placeholder': 'performance_distribution'}
+    
+    def _calculate_completeness_score(self, baselines: List[BaselineMetrics]) -> float:
+        """Calculate data completeness score."""
+        return 95.0  # Placeholder
+    
+    def _calculate_consistency_score(self, baselines: List[BaselineMetrics]) -> float:
+        """Calculate data consistency score."""
+        return 90.0  # Placeholder
+    
+    async def _forecast_resource_usage(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Forecast future resource usage."""
+        return {'placeholder': 'resource_forecasts'}
+    
+    def _calculate_capacity_recommendations(self, baselines: List[BaselineMetrics], forecasts: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Calculate capacity recommendations."""
+        return []
+    
+    def _analyze_growth_patterns(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Analyze growth patterns."""
+        return {'placeholder': 'growth_analysis'}
+    
+    def _generate_scaling_recommendations(self, forecasts: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate scaling recommendations."""
+        return []
+    
+    def _identify_sla_violations(self, baselines: List[BaselineMetrics]) -> Dict[str, Any]:
+        """Identify SLA violations."""
+        return {}
+    
+    def _generate_sla_action_items(self, metric: str, violation_data: Dict[str, Any]) -> List[str]:
+        """Generate action items for SLA violations."""
+        return []
+    
+    def _generate_capacity_recommendations_detailed(self, baselines: List[BaselineMetrics]) -> List[Dict[str, Any]]:
+        """Generate detailed capacity recommendations."""
+        return []
+    
+    def _generate_optimization_recommendations(self, baselines: List[BaselineMetrics]) -> List[Dict[str, Any]]:
+        """Generate optimization recommendations."""
+        return []
+    
+    async def _add_detailed_capacity_analysis(self, report: PerformanceReport, forecast_days: int) -> None:
+        """Add detailed capacity analysis to the report."""
+        pass
+
+# Global reporter instance
+_global_reporter: Optional[BaselineReporter] = None
+
+def get_baseline_reporter() -> BaselineReporter:
+    """Get the global baseline reporter instance."""
+    global _global_reporter
+    if _global_reporter is None:
+        _global_reporter = BaselineReporter()
+    return _global_reporter
+
+def set_baseline_reporter(reporter: BaselineReporter) -> None:
+    """Set the global baseline reporter instance."""
+    global _global_reporter
+    _global_reporter = reporter
+
+# Convenience functions
+async def generate_daily_performance_report(date: Optional[datetime] = None) -> PerformanceReport:
+    """Generate a daily performance report."""
+    reporter = get_baseline_reporter()
+    return await reporter.generate_daily_report(date)
+
+async def generate_weekly_performance_report(week_start: Optional[datetime] = None) -> PerformanceReport:
+    """Generate a weekly performance report."""
+    reporter = get_baseline_reporter()
+    return await reporter.generate_weekly_report(week_start)
+
+async def generate_capacity_planning_report(forecast_days: Optional[int] = None) -> PerformanceReport:
+    """Generate a capacity planning report."""
+    reporter = get_baseline_reporter()
+    return await reporter.generate_capacity_planning_report(forecast_days)

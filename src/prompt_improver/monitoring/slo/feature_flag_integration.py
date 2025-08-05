@@ -106,16 +106,27 @@ class FeatureFlagManager:
         self.deployment_callbacks: List[Callable] = []
     
     async def get_redis_client(self) -> Optional[coredis.Redis]:
-        """Get Redis client for distributed flag management"""
-        if not REDIS_AVAILABLE or not self.redis_url:
+        """Get Redis client for distributed flag management via UnifiedConnectionManager"""
+        if not REDIS_AVAILABLE:
             return None
             
         if self._redis_client is None:
             try:
-                self._redis_client = coredis.Redis.from_url(self.redis_url, decode_responses=True)
-                await self._redis_client.ping()
+                # Use UnifiedConnectionManager for consistent Redis management
+                from ...database.unified_connection_manager import get_unified_manager, ManagerMode
+                unified_manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+                if not unified_manager._is_initialized:
+                    await unified_manager.initialize()
+                
+                # Access underlying Redis client
+                if hasattr(unified_manager, '_redis_master') and unified_manager._redis_master:
+                    self._redis_client = unified_manager._redis_master
+                    await self._redis_client.ping()
+                else:
+                    logger.warning("Redis client not available via UnifiedConnectionManager")
+                    return None
             except Exception as e:
-                logger.warning(f"Failed to connect to Redis: {e}")
+                logger.warning(f"Failed to connect to Redis via UnifiedConnectionManager: {e}")
                 return None
         
         return self._redis_client

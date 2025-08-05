@@ -10,6 +10,10 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+import uuid
+
+# Enhanced background task management
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 # Dashboard frameworks
 try:
@@ -90,13 +94,23 @@ class PerformanceDashboard:
         
         self.running = True
         
-        # Start real-time data collection
-        data_task = asyncio.create_task(self._collect_real_time_data())
+        # Start real-time data collection using EnhancedBackgroundTaskManager
+        task_manager = get_background_task_manager()
+        data_task_id = await task_manager.submit_enhanced_task(
+            task_id=f"dashboard_data_collection_{str(uuid.uuid4())[:8]}",
+            coroutine=self._collect_real_time_data(),
+            priority=TaskPriority.NORMAL,
+            tags={"service": "performance", "type": "dashboard", "component": "data_collection"}
+        )
         
         # Start WebSocket server for real-time updates
+        websocket_task_id = None
         if WEBSOCKETS_AVAILABLE:
-            websocket_task = asyncio.create_task(
-                self._start_websocket_server(port + 1)
+            websocket_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"dashboard_websocket_{port + 1}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._start_websocket_server(port + 1),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "performance", "type": "dashboard", "component": "websocket", "port": str(port + 1)}
             )
         
         logger.info(f"Dashboard server started on port {port}")
@@ -108,9 +122,9 @@ class PerformanceDashboard:
         except Exception as e:
             logger.error(f"Dashboard server error: {e}")
         finally:
-            data_task.cancel()
-            if WEBSOCKETS_AVAILABLE:
-                websocket_task.cancel()
+            await task_manager.cancel_task(data_task_id)
+            if websocket_task_id:
+                await task_manager.cancel_task(websocket_task_id)
     
     async def _collect_real_time_data(self) -> None:
         """Collect real-time performance data for dashboard."""

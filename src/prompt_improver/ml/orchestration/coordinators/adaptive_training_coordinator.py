@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -146,10 +147,23 @@ class AdaptiveTrainingCoordinator:
             self.active_sessions[session_id] = first_iteration
             self.session_history[session_id] = [first_iteration]
 
-            # 4. Start continuous training loop
-            asyncio.create_task(self._run_continuous_training_loop(
-                session_id, initial_data, focus_areas
-            ))
+            # 4. Start continuous training loop with CRITICAL priority for ML training operations
+            task_manager = get_background_task_manager()
+            training_task_id = await task_manager.submit_enhanced_task(
+                task_id=f"ml_adaptive_training_{session_id}_{str(uuid.uuid4())[:8]}",
+                coroutine=self._run_continuous_training_loop(session_id, initial_data, focus_areas),
+                priority=TaskPriority.CRITICAL,
+                tags={
+                    "service": "ml",
+                    "type": "training",
+                    "component": "adaptive_training_coordinator",
+                    "session_id": session_id,
+                    "module": "adaptive_training_coordinator"
+                }
+            )
+            
+            # Store task ID for tracking
+            self.active_training_tasks[session_id] = training_task_id
 
             self.logger.info(f"Adaptive training session started: {session_id}")
             return session_id

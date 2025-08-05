@@ -13,8 +13,10 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 import statistics
 from collections import defaultdict, deque
+import uuid
 
 from ..performance.monitoring.metrics_registry import get_metrics_registry
+from ..performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
 
 class FeatureCategory(Enum):
     """Categories of features for adoption tracking."""
@@ -212,11 +214,12 @@ class BusinessIntelligenceMetricsCollector:
 
         self._initialize_prometheus_metrics()
 
-        # Background processing
+        # Background processing using EnhancedBackgroundTaskManager
         self.is_running = False
-        self.aggregation_task = None
-        self.cost_monitoring_task = None
-        self.roi_calculation_task = None
+        self.aggregation_task_id: Optional[str] = None
+        self.cost_monitoring_task_id: Optional[str] = None
+        self.roi_calculation_task_id: Optional[str] = None
+        self.task_manager = get_background_task_manager()
 
     def _initialize_prometheus_metrics(self):
         """Initialize Prometheus metrics for business intelligence."""
@@ -336,11 +339,29 @@ class BusinessIntelligenceMetricsCollector:
             return
 
         self.is_running = True
-        self.aggregation_task = asyncio.create_task(self._aggregation_loop())
-        self.cost_monitoring_task = asyncio.create_task(self._cost_monitoring_loop())
+        
+        # Submit background tasks with high priority for critical business metrics
+        self.aggregation_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"bi_aggregation_{str(uuid.uuid4())[:8]}",
+            coroutine=self._aggregation_loop(),
+            priority=TaskPriority.HIGH,
+            tags={"service": "metrics", "type": "aggregation", "component": "business_intelligence"}
+        )
+        
+        self.cost_monitoring_task_id = await self.task_manager.submit_enhanced_task(
+            task_id=f"bi_cost_monitoring_{str(uuid.uuid4())[:8]}",
+            coroutine=self._cost_monitoring_loop(),
+            priority=TaskPriority.HIGH,
+            tags={"service": "metrics", "type": "monitoring", "component": "cost_tracking"}
+        )
 
         if self.roi_calculation_enabled:
-            self.roi_calculation_task = asyncio.create_task(self._roi_calculation_loop())
+            self.roi_calculation_task_id = await self.task_manager.submit_enhanced_task(
+                task_id=f"bi_roi_calculation_{str(uuid.uuid4())[:8]}",
+                coroutine=self._roi_calculation_loop(),
+                priority=TaskPriority.NORMAL,
+                tags={"service": "metrics", "type": "calculation", "component": "roi_analysis"}
+            )
 
         self.logger.info("Started business intelligence metrics collection")
 
@@ -350,13 +371,19 @@ class BusinessIntelligenceMetricsCollector:
             return
 
         self.is_running = False
-        for task in [self.aggregation_task, self.cost_monitoring_task, self.roi_calculation_task]:
-            if task:
-                task.cancel()
+        
+        # Cancel all submitted tasks
+        for task_id in [self.aggregation_task_id, self.cost_monitoring_task_id, self.roi_calculation_task_id]:
+            if task_id:
                 try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    await self.task_manager.cancel_task(task_id)
+                except Exception as e:
+                    self.logger.warning(f"Failed to cancel task {task_id}: {e}")
+
+        # Clear task IDs
+        self.aggregation_task_id = None
+        self.cost_monitoring_task_id = None
+        self.roi_calculation_task_id = None
 
         self.logger.info("Stopped business intelligence metrics collection")
 

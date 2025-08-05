@@ -391,7 +391,8 @@ def get_metrics() -> str:
     try:
         # OpenTelemetry metrics are exported via OTLP/Prometheus exporters
         # This function is kept for compatibility but metrics are now exported automatically
-        return "# OpenTelemetry metrics are exported via configured exporters\\n"
+        return "# OpenTelemetry metrics are exported via configured exporters\
+"
     except Exception as e:
         logger.error(f"Error generating metrics: {e}")
         return ""
@@ -927,7 +928,7 @@ if __name__ == "__main__":
             print("\n2. Initialize OpenTelemetry in your application:")
             print("   from prompt_improver.monitoring.opentelemetry import init_telemetry")
             print("   init_telemetry(service_name='apes-ml-pipeline')")
-            print("\n3. Integrate metrics into your FastAPI application:")
+            print("3. Integrate metrics into your FastAPI application:")
             print("   See examples/monitoring_integration.py")
             print("\n4. Add health check endpoints to your router")
             print("\n5. Configure OpenTelemetry exporters:")

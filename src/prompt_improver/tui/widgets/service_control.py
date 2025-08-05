@@ -20,6 +20,9 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Button, Static
 
+# Enhanced background task management imports
+from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+
 class ServiceControlWidget(Static):
     """
     Widget for controlling system services with 2025 best practices.
@@ -53,7 +56,7 @@ class ServiceControlWidget(Static):
 
         self.console = Console()
         self.data_provider: Optional[Any] = None
-        self._update_task: Optional[asyncio.Task] = None
+        self._task_id: Optional[str] = None
         self._is_updating = False
         self._pending_content: Optional[Any] = None
 
@@ -67,7 +70,7 @@ class ServiceControlWidget(Static):
                 yield Button("Stop All", id="stop-all-services", variant="error")
                 yield Button("Auto-Refresh", id="toggle-auto-refresh", variant="default")
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """Initialize the widget when mounted with error handling."""
         try:
             # Apply any pending content
@@ -80,7 +83,8 @@ class ServiceControlWidget(Static):
 
             # Start auto-refresh if data provider is available
             if self.data_provider:
-                self._start_auto_refresh()
+                # Start auto-refresh after mount completes
+                await self._start_auto_refresh()
         except Exception as e:
             self.service_data = {"error": f"Mount error: {str(e)}"}
             self.update_display()
@@ -243,17 +247,18 @@ class ServiceControlWidget(Static):
     @on(Button.Pressed, "#toggle-auto-refresh")
     async def toggle_auto_refresh(self) -> None:
         """Toggle auto-refresh functionality."""
-        if self._update_task and not self._update_task.done():
+        if self._task_id:
             # Stop auto-refresh
-            self._update_task.cancel()
-            self._update_task = None
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._task_id)
+            self._task_id = None
             self.app.notify("Auto-refresh disabled", severity="information")
             # Update button text
             button = self.query_one("#toggle-auto-refresh", Button)
             button.label = "Auto-Refresh"
         else:
             # Start auto-refresh
-            self._start_auto_refresh()
+            await self._start_auto_refresh()
             self.app.notify("Auto-refresh enabled", severity="information")
             # Update button text
             button = self.query_one("#toggle-auto-refresh", Button)
@@ -348,15 +353,25 @@ class ServiceControlWidget(Static):
         # Refresh data after operations
         await self._fetch_service_data()
 
-    def _start_auto_refresh(self) -> None:
+    async def _start_auto_refresh(self) -> None:
         """Start auto-refresh task with proper error handling."""
-        if self._update_task and not self._update_task.done():
+        if self._task_id:
             return  # Already running
 
         if not self.data_provider:
             return  # No data provider available
 
-        self._update_task = asyncio.create_task(self._auto_refresh_loop())
+        # Use centralized background task manager for better resource efficiency
+        task_manager = get_background_task_manager()
+        widget_id = f"{self.__class__.__name__}_{id(self)}"
+        task_id = await task_manager.submit_enhanced_task(
+            task_id=f"tui_refresh_{widget_id}",
+            coroutine=self._auto_refresh_loop,
+            priority=TaskPriority.LOW,
+            tags={"service": "tui_widgets", "type": "auto_refresh", "widget": "service_control"}
+        )
+        # Store task ID for cleanup
+        self._task_id = task_id
 
     async def _auto_refresh_loop(self) -> None:
         """Auto-refresh loop with error handling and graceful shutdown."""
@@ -376,12 +391,10 @@ class ServiceControlWidget(Static):
 
     async def on_unmount(self) -> None:
         """Clean up resources when widget is unmounted."""
-        if self._update_task and not self._update_task.done():
-            self._update_task.cancel()
-            try:
-                await self._update_task
-            except asyncio.CancelledError:
-                pass
+        if self._task_id:
+            task_manager = get_background_task_manager()
+            await task_manager.cancel_task(self._task_id)
+            self._task_id = None
 
     def _get_service_status_color(self, status: str) -> str:
         """Get color for service status."""

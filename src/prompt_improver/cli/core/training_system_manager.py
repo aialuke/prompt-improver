@@ -22,6 +22,7 @@ from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestr
 from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from ...ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 from ...core.services.analytics_factory import get_analytics_interface
+from ...utils.unified_session_manager import get_unified_session_manager
 from .rule_validation_service import RuleValidationService
 
 class TrainingSystemManager:
@@ -38,6 +39,9 @@ class TrainingSystemManager:
     def __init__(self, console: Console | None = None):
         self.console = console or Console()
         self.logger = logging.getLogger("apes.training_system")
+
+        # Unified session manager for consolidated session management
+        self._unified_session_manager = None
 
         # Signal handling integration - lazy import to avoid circular dependency
         self.signal_handler = None
@@ -94,6 +98,107 @@ class TrainingSystemManager:
         except ImportError as e:
             self.logger.warning(f"Signal handling integration not available: {e}")
             # Continue without signal handling
+    
+    async def _ensure_unified_session_manager(self):
+        """Ensure unified session manager is available."""
+        if self._unified_session_manager is None:
+            self._unified_session_manager = await get_unified_session_manager()
+    
+    async def create_training_session(self, training_config: Dict[str, Any]) -> str:
+        """Create training session using unified session management.
+        
+        Args:
+            training_config: Training configuration
+            
+        Returns:
+            Created training session ID
+        """
+        try:
+            await self._ensure_unified_session_manager()
+            
+            # Generate session ID
+            import uuid
+            session_id = f"training_{uuid.uuid4().hex[:8]}"
+            
+            # Create session in unified manager
+            success = await self._unified_session_manager.create_training_session(
+                session_id=session_id,
+                training_config=training_config
+            )
+            
+            if success:
+                self._training_session_id = session_id
+                self._training_status = "running"
+                self.logger.info(f"Created training session: {session_id}")
+                return session_id
+            else:
+                raise Exception("Failed to create training session in unified manager")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to create training session: {e}")
+            raise
+    
+    async def update_training_progress(
+        self,
+        iteration: int,
+        performance_metrics: Dict[str, float],
+        improvement_score: float = 0.0
+    ) -> bool:
+        """Update training progress using unified session management.
+        
+        Args:
+            iteration: Current iteration
+            performance_metrics: Performance metrics
+            improvement_score: Improvement score
+            
+        Returns:
+            True if updated successfully
+        """
+        if not self._training_session_id:
+            self.logger.warning("No active training session for progress update")
+            return False
+            
+        try:
+            await self._ensure_unified_session_manager()
+            
+            success = await self._unified_session_manager.update_training_progress(
+                session_id=self._training_session_id,
+                iteration=iteration,
+                performance_metrics=performance_metrics,
+                improvement_score=improvement_score
+            )
+            
+            if success:
+                self.logger.debug(f"Updated training progress: iteration {iteration}")
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update training progress: {e}")
+            return False
+    
+    async def get_training_session_context(self) -> Optional[Dict[str, Any]]:
+        """Get current training session context from unified manager.
+        
+        Returns:
+            Training session context if available
+        """
+        if not self._training_session_id:
+            return None
+            
+        try:
+            await self._ensure_unified_session_manager()
+            
+            context = await self._unified_session_manager.get_training_session(self._training_session_id)
+            
+            if context:
+                return context.to_dict()
+            else:
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get training session context: {e}")
+            return None
             
     def _register_signal_handlers(self):
         """Register TrainingSystemManager-specific signal handlers."""

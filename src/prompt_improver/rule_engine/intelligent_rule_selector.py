@@ -21,7 +21,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.rule_engine.models import PromptCharacteristics
-from prompt_improver.utils.multi_level_cache import get_cache
+# Using UnifiedConnectionManager instead of standalone multi_level_cache
+from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode, create_security_context
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +87,10 @@ class IntelligentRuleSelector:
         self.min_confidence_level = 0.6
         self.effectiveness_threshold = 0.6
 
-        # Caching configuration
+        # Caching configuration (using UnifiedConnectionManager)
         self.cache_hit_rate_target = 0.95
         self._cache_stats = {"hits": 0, "misses": 0}
-        self.cache = get_cache()
+        self.cache = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
 
     async def select_optimal_rules(
         self,

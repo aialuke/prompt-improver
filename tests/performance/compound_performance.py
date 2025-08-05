@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Core system imports
 from prompt_improver.database import get_session_context
-from prompt_improver.database.psycopg_client import PostgresAsyncClient
+from prompt_improver.database import get_unified_manager, ManagerMode
 from prompt_improver.database.cache_layer import DatabaseCacheLayer, CachePolicy, CacheStrategy
 from prompt_improver.database.unified_connection_manager import get_connection_pool_optimizer
 from prompt_improver.database.query_optimizer import get_query_executor
@@ -250,17 +250,11 @@ class TestCompoundPerformance:
     
     @pytest.fixture
     async def db_client(self):
-        """Database client for performance testing."""
-        client = PostgresAsyncClient(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", 5432)),
-            database=os.getenv("POSTGRES_DB", "prompt_improver_test"),
-            user=os.getenv("POSTGRES_USER", "test_user"),
-            password=os.getenv("POSTGRES_PASSWORD", "test_password")
-        )
-        await client.connect()
-        yield client
-        await client.disconnect()
+        """Database client for performance testing - using UnifiedConnectionManager."""
+        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        await manager.initialize()
+        yield manager
+        await manager.shutdown()
     
     @pytest.fixture
     async def cache_layer(self):
@@ -301,7 +295,7 @@ class TestCompoundPerformance:
     async def test_database_compound_performance(
         self,
         compound_metrics: CompoundPerformanceMetrics,
-        db_client: PostgresAsyncClient,
+        db_client,  # UnifiedConnectionManager
         cache_layer: DatabaseCacheLayer,
         connection_optimizer
     ):
@@ -944,7 +938,7 @@ class TestCompoundPerformance:
     async def test_overall_system_compound_performance(
         self,
         compound_metrics: CompoundPerformanceMetrics,
-        db_client: PostgresAsyncClient,
+        db_client,  # UnifiedConnectionManager
         cache_layer: DatabaseCacheLayer,
         ml_orchestrator: MLPipelineOrchestrator
     ):
