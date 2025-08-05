@@ -135,6 +135,47 @@ The framework consists of 6 core phases:
 - **Database Layer** - PostgreSQL with async support
 - **MCP Integration** - Model Context Protocol support
 
+## 🔧 External Tools
+
+### Voyage AI Semantic Search Tool
+
+A powerful standalone semantic code search system has been extracted as an independent tool for enhanced code analysis capabilities.
+
+**Repository**: `voyage-ai-semantic-search/` (standalone)
+
+**Features**:
+- 🧠 AI-powered code comprehension with voyage-code-3
+- ⚡ High-performance binary rescoring + Voyage AI reranking
+- 🔍 Hybrid search combining semantic + lexical search
+- 🤖 Claude Code CLI integration
+- 📊 Incremental embedding updates
+- 🎯 Context-aware embeddings
+
+**Quick Setup**:
+```bash
+cd voyage-ai-semantic-search
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env and add your VOYAGE_API_KEY
+python src/generate_embeddings.py /path/to/your/project
+```
+
+**Usage**:
+```bash
+# Basic semantic search
+python src/search_integration.py "database models" --format-claude
+
+# Analysis types
+python src/search_integration.py "error handling" --analysis explain --format-claude
+python src/search_integration.py "performance" --analysis optimize --format-claude
+```
+
+**Claude Code Integration**:
+See `.claude/external_tools.md` for complete integration instructions.
+
+**Migration Guide**:
+If you previously used integrated voyage-search commands, they have been moved to the standalone tool. Update your workflows to use the external tool path or follow the integration guide to re-enable commands.
+
 ## 📊 Testing Strategy
 
 ### Integration Test Categories
