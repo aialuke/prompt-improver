@@ -272,7 +272,7 @@ python3 -m ruff check src/ --select=D --fix
 - [ ] All CRITICAL issues resolved (0 remaining)
 - [ ] HIGH priority issues < 10 remaining  
 - [ ] Security scan passes (no S-category violations)
-- [ ] Type checking passes with mypy
+- [ ] Type checking passes with pyright
 - [ ] All tests pass with new changes
 
 ### Monitoring
@@ -284,7 +284,7 @@ python3 -m ruff check src/ --statistics
 python3 -m ruff check src/ --select=S
 
 # Type safety check  
-python3 -m mypy src/prompt_improver/
+pyright
 ```
 
 ## Risk Assessment
@@ -314,7 +314,7 @@ python3 -m mypy src/prompt_improver/
 
 ### **Tools Required**
 - ruff (already configured)
-- mypy for type checking
+- pyright for type checking
 - pre-commit hooks for quality gates
 
 ## Success Metrics

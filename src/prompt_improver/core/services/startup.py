@@ -7,20 +7,22 @@ graceful shutdown, and component health monitoring.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
-from ...ml.optimization.batch import (
-    UnifiedBatchProcessor as BatchProcessor,
+from prompt_improver.ml.optimization.batch import (
     UnifiedBatchConfig as BatchProcessorConfig,
+    UnifiedBatchProcessor as BatchProcessor,
 )
-from ...performance.monitoring.health.background_manager import (
+from prompt_improver.performance.monitoring.health.background_manager import (
     EnhancedBackgroundTaskManager,
-    init_background_task_manager,
-    shutdown_background_task_manager,
+    get_background_task_manager,
 )
+
 # Lazy import to avoid circular dependency - imported in functions where needed
-from ...utils.session_store import SessionStore
+if TYPE_CHECKING:
+    from prompt_improver.utils.session_store import SessionStore
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -30,12 +32,13 @@ _startup_tasks: set[asyncio.Task] = set()
 _startup_complete = False
 _shutdown_event = asyncio.Event()
 
+
 async def init_startup_tasks(
     max_concurrent_tasks: int = 10,
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
     batch_config: BatchProcessorConfig | None = None,
-    session_store: SessionStore | None = None,
+    session_store: "SessionStore | None" = None,
 ) -> dict[str, any]:
     """Initialize and start all core system components.
 
@@ -71,25 +74,24 @@ async def init_startup_tasks(
     startup_errors = []
 
     try:
-        # Step 1: Initialize EnhancedBackgroundTaskManager
-        logger.info("📋 Initializing EnhancedBackgroundTaskManager...")
+        # Step 1: Get unified background task manager
+        logger.info("📋 Getting unified background task manager...")
         try:
-            background_manager = await init_background_task_manager(
-                max_concurrent_tasks=max_concurrent_tasks
-            )
+            background_manager = await get_background_task_manager()
             components["background_manager"] = background_manager
-            logger.info(
-                f"✅ EnhancedBackgroundTaskManager started (max_tasks: {max_concurrent_tasks})"
-            )
+            logger.info("✅ Unified background task manager ready")
         except Exception as e:
             startup_errors.append(f"EnhancedBackgroundTaskManager failed: {e}")
-            logger.error(f"❌ EnhancedBackgroundTaskManager startup failed: {e}")
+            logger.error("❌ EnhancedBackgroundTaskManager startup failed: %s", e)
             raise
 
         # Step 2: Initialize SessionStore with cleanup
         logger.info("💾 Initializing SessionStore with automatic cleanup...")
         try:
             if session_store is None:
+                # Lazy import to avoid circular dependency
+                from prompt_improver.utils.session_store import SessionStore
+
                 # Create new session store with provided configuration
                 session_store = SessionStore(
                     maxsize=1000, ttl=session_ttl, cleanup_interval=cleanup_interval
@@ -101,13 +103,13 @@ async def init_startup_tasks(
             else:
                 # Use injected session store (already configured and potentially started)
                 logger.info(
-                    f"✅ SessionStore injected from external source (pre-configured)"
+                    "✅ SessionStore injected from external source (pre-configured)"
                 )
-            
+
             components["session_store"] = session_store
         except Exception as e:
             startup_errors.append(f"SessionStore failed: {e}")
-            logger.error(f"❌ SessionStore startup failed: {e}")
+            logger.error("❌ SessionStore startup failed: %s", e)
             raise
 
         # Step 3: Initialize Batch Processor
@@ -128,7 +130,7 @@ async def init_startup_tasks(
             )
         except Exception as e:
             startup_errors.append(f"Batch Processor failed: {e}")
-            logger.error(f"❌ Batch Processor startup failed: {e}")
+            logger.error("❌ Batch Processor startup failed: %s", e)
             raise
 
         # Step 4: Start Periodic Batch Processing Task
@@ -146,13 +148,16 @@ async def init_startup_tasks(
             logger.info("✅ Periodic batch processing started")
         except Exception as e:
             startup_errors.append(f"Periodic batch processing failed: {e}")
-            logger.error(f"❌ Periodic batch processing startup failed: {e}")
+            logger.error("❌ Periodic batch processing startup failed: %s", e)
             raise
 
         # Step 5: Initialize Health Monitor
         logger.info("🏥 Initializing Health Monitor...")
         try:
-            from ...performance.monitoring.health.unified_health_system import get_unified_health_monitor
+            from prompt_improver.performance.monitoring.health.unified_health_system import (
+                get_unified_health_monitor,
+            )
+
             health_monitor = get_unified_health_monitor()
 
             # Start health monitoring task
@@ -169,7 +174,7 @@ async def init_startup_tasks(
             logger.info("✅ Health Monitor started")
         except Exception as e:
             startup_errors.append(f"Health Monitor failed: {e}")
-            logger.error(f"❌ Health Monitor startup failed: {e}")
+            logger.error("❌ Health Monitor startup failed: %s", e)
             raise
 
         # Step 6: Verify all components are healthy
@@ -186,14 +191,14 @@ async def init_startup_tasks(
                 )
         except Exception as e:
             startup_errors.append(f"Health check failed: {e}")
-            logger.warning(f"⚠️ Initial health check failed: {e}")
+            logger.warning("⚠️ Initial health check failed: %s", e)
             # Don't fail startup for health check issues
 
         # Mark startup as complete
         _startup_complete = True
         startup_time = (time.time() - startup_start_time) * 1000
 
-        logger.info(f"🎉 APES startup completed successfully in {startup_time:.2f}ms")
+        logger.info("🎉 APES startup completed successfully in %.2f ms", startup_time)
 
         return {
             "status": "success",
@@ -210,7 +215,7 @@ async def init_startup_tasks(
         }
 
     except Exception as e:
-        logger.error(f"💥 APES startup failed: {e}")
+        logger.error("💥 APES startup failed: %s", e)
 
         # Attempt graceful cleanup of partially initialized components
         await cleanup_partial_startup(components)
@@ -222,6 +227,7 @@ async def init_startup_tasks(
             "components": {},
             "errors": startup_errors + [str(e)],
         }
+
 
 async def health_monitor_coroutine(health_monitor) -> None:
     """Continuous health monitoring coroutine.
@@ -258,16 +264,17 @@ async def health_monitor_coroutine(health_monitor) -> None:
                 for component in failed_components:
                     if component in health_result.checks:
                         error = health_result.checks[component].error
-                        logger.error(f"   - {component}: {error}")
+                        logger.error("   - {component}: %s", error)
 
         except asyncio.CancelledError:
             logger.info("🏥 Health monitor cancelled")
             break
         except Exception as e:
-            logger.error(f"🏥 Health monitor error: {e}")
+            logger.error("🏥 Health monitor error: %s", e)
             await asyncio.sleep(30)  # Retry after error
 
     logger.info("🏥 Health monitor stopped")
+
 
 async def cleanup_partial_startup(components: dict) -> None:
     """Clean up partially initialized components during startup failure.
@@ -283,13 +290,16 @@ async def cleanup_partial_startup(components: dict) -> None:
             # Only stop cleanup if this was a locally created session store
             # External session stores (like from APESMCPServer) manage their own lifecycle
             session_store_instance = components["session_store"]
-            if hasattr(session_store_instance, '_cleanup_task') and session_store_instance._cleanup_task:
+            if (
+                hasattr(session_store_instance, "_cleanup_task")
+                and session_store_instance._cleanup_task
+            ):
                 await session_store_instance.stop_cleanup_task()
                 logger.debug("✅ SessionStore cleanup stopped")
             else:
                 logger.debug("✅ SessionStore cleanup managed externally")
         except Exception as e:
-            logger.error(f"❌ Error stopping SessionStore: {e}")
+            logger.error("❌ Error stopping SessionStore: %s", e)
 
     # Cancel any started background tasks
     for task in _startup_tasks:
@@ -299,16 +309,18 @@ async def cleanup_partial_startup(components: dict) -> None:
     if _startup_tasks:
         try:
             await asyncio.gather(*_startup_tasks, return_exceptions=True)
-            logger.debug(f"✅ Cancelled {len(_startup_tasks)} background tasks")
+            logger.debug("✅ Cancelled %s background tasks", len(_startup_tasks))
         except Exception as e:
-            logger.error(f"❌ Error cancelling background tasks: {e}")
+            logger.error("❌ Error cancelling background tasks: %s", e)
 
-    # Shutdown background manager if initialized
+    # Shutdown unified background manager if initialized
     try:
-        await shutdown_background_task_manager(timeout=10.0)
-        logger.debug("✅ EnhancedBackgroundTaskManager shutdown")
+        background_manager = await get_background_task_manager()
+        await background_manager.shutdown()
+        logger.debug("✅ Unified background task manager shutdown")
     except Exception as e:
-        logger.error(f"❌ Error shutting down EnhancedBackgroundTaskManager: {e}")
+        logger.error("❌ Error shutting down unified background task manager: %s", e)
+
 
 async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
     """Gracefully shutdown all startup tasks and components.
@@ -335,7 +347,7 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
 
     try:
         # Cancel all startup tasks
-        logger.info(f"🔄 Cancelling {len(_startup_tasks)} background tasks...")
+        logger.info("🔄 Cancelling %s background tasks...", len(_startup_tasks))
         tasks_to_cancel = []
         for task in _startup_tasks:
             if not task.done():
@@ -355,19 +367,22 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
                 logger.warning("⚠️ Some background tasks did not cancel within timeout")
                 shutdown_errors.append("Background task cancellation timeout")
 
-        # Shutdown EnhancedBackgroundTaskManager
+        # Shutdown unified background task manager
         try:
-            await shutdown_background_task_manager(timeout=timeout / 2)
-            logger.info("✅ EnhancedBackgroundTaskManager shutdown")
+            background_manager = await get_background_task_manager()
+            await background_manager.shutdown()
+            logger.info("✅ Unified background task manager shutdown")
         except Exception as e:
-            shutdown_errors.append(f"EnhancedBackgroundTaskManager shutdown failed: {e}")
-            logger.error(f"❌ EnhancedBackgroundTaskManager shutdown error: {e}")
+            shutdown_errors.append(
+                f"Unified background task manager shutdown failed: {e}"
+            )
+            logger.error("❌ Unified background task manager shutdown error: %s", e)
 
         shutdown_time = (time.time() - shutdown_start_time) * 1000
         _startup_complete = False
         _startup_tasks.clear()
 
-        logger.info(f"✅ APES shutdown completed in {shutdown_time:.2f}ms")
+        logger.info("✅ APES shutdown completed in %.2f ms", shutdown_time)
 
         return {
             "status": "success",
@@ -377,7 +392,7 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
 
     except Exception as e:
         shutdown_time = (time.time() - shutdown_start_time) * 1000
-        logger.error(f"💥 APES shutdown failed: {e}")
+        logger.error("💥 APES shutdown failed: %s", e)
 
         return {
             "status": "failed",
@@ -386,13 +401,14 @@ async def shutdown_startup_tasks(timeout: float = 30.0) -> dict[str, any]:
             "errors": shutdown_errors + [str(e)],
         }
 
+
 @asynccontextmanager
 async def startup_context(
     max_concurrent_tasks: int = 10,
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
     batch_config: BatchProcessorConfig | None = None,
-    session_store: SessionStore | None = None,
+    session_store: "SessionStore | None" = None,
 ):
     """Async context manager for APES startup/shutdown lifecycle.
 
@@ -420,6 +436,7 @@ async def startup_context(
     finally:
         await shutdown_startup_tasks()
 
+
 def is_startup_complete() -> bool:
     """Check if startup tasks have been completed successfully.
 
@@ -427,6 +444,7 @@ def is_startup_complete() -> bool:
         True if startup is complete, False otherwise
     """
     return _startup_complete
+
 
 def get_startup_task_count() -> int:
     """Get the number of active startup tasks.
@@ -436,9 +454,9 @@ def get_startup_task_count() -> int:
     """
     return len(_startup_tasks)
 
+
 class StartupOrchestrator:
-    """
-    Modern startup orchestrator following 2025 best practices.
+    """Modern startup orchestrator following 2025 best practices.
 
     Implements:
     - Asynchronous dependency injection pattern
@@ -450,9 +468,9 @@ class StartupOrchestrator:
 
     def __init__(self):
         """Initialize the orchestrator with empty state."""
-        self._initialized_components: Dict[str, Any] = {}
-        self._startup_tasks: Set[asyncio.Task] = set()
-        self._shutdown_callbacks: List[Callable] = []
+        self._initialized_components: dict[str, Any] = {}
+        self._startup_tasks: set[asyncio.Task] = set()
+        self._shutdown_callbacks: list[Callable] = []
         self._is_running = False
         self._startup_complete = False
 
@@ -465,13 +483,14 @@ class StartupOrchestrator:
         """Async context manager exit - graceful shutdown."""
         await self.shutdown()
 
-    async def startup(self,
-                     batch_processor: Optional[BatchProcessor] = None,
-                     health_service: Optional[Any] = None,
-                     session_store: Optional[SessionStore] = None,
-                     startup_delay: float = 2.0) -> Dict[str, Any]:
-        """
-        Initialize all services with proper dependency injection.
+    async def startup(
+        self,
+        batch_processor: BatchProcessor | None = None,
+        health_service: Any | None = None,
+        session_store: Optional["SessionStore"] = None,
+        startup_delay: float = 2.0,
+    ) -> dict[str, Any]:
+        """Initialize all services with proper dependency injection.
 
         Args:
             batch_processor: Optional batch processor instance
@@ -490,9 +509,7 @@ class StartupOrchestrator:
 
         try:
             # Use existing init_startup_tasks function with session_store injection
-            components = await init_startup_tasks(
-                session_store=session_store
-            )
+            components = await init_startup_tasks(session_store=session_store)
 
             self._initialized_components = components
             self._startup_complete = True
@@ -506,13 +523,12 @@ class StartupOrchestrator:
             return components
 
         except Exception as e:
-            logger.error(f"Startup failed: {e}")
+            logger.error("Startup failed: %s", e)
             await self._cleanup_partial_startup()
             raise
 
-    async def shutdown(self, timeout: float = 30.0) -> Dict[str, Any]:
-        """
-        Gracefully shutdown all services.
+    async def shutdown(self, timeout: float = 30.0) -> dict[str, Any]:
+        """Gracefully shutdown all services.
 
         Args:
             timeout: Maximum time to wait for shutdown
@@ -532,7 +548,7 @@ class StartupOrchestrator:
                 try:
                     callback()
                 except Exception as e:
-                    logger.error(f"Shutdown callback error: {e}")
+                    logger.error("Shutdown callback error: %s", e)
 
             self._is_running = False
             self._startup_complete = False
@@ -541,7 +557,7 @@ class StartupOrchestrator:
             return results
 
         except Exception as e:
-            logger.error(f"Shutdown error: {e}")
+            logger.error("Shutdown error: %s", e)
             raise
 
     async def _cleanup_partial_startup(self):
@@ -557,13 +573,12 @@ class StartupOrchestrator:
         return self._is_running and is_startup_complete()
 
     @property
-    def components(self) -> Dict[str, Any]:
+    def components(self) -> dict[str, Any]:
         """Get initialized components."""
         return self._initialized_components.copy()
 
-    def get_component(self, name: str) -> Optional[Any]:
-        """
-        Get a specific initialized component.
+    def get_component(self, name: str) -> Any | None:
+        """Get a specific initialized component.
 
         Args:
             name: Component name

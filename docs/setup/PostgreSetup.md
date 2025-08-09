@@ -366,7 +366,7 @@ from .mcp_client import MCPPostgreSQLClient
 __all__ = ['HybridDatabaseClient', 'DirectPostgreSQLClient', 'MCPPostgreSQLClient']
 
 # src/prompt_improver/database/config.py
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import Optional
 
 class DatabaseConfig(BaseSettings):

@@ -13,32 +13,38 @@ Key Features (2025 Standards):
 - Comprehensive observability and tracing
 """
 
-import logging
-import json
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from enum import Enum
+import json
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-from rich.text import Text
-from rich.layout import Layout
+from sqlmodel import SQLModel, Field
+
 from rich.columns import Columns
-from rich.tree import Tree
+from rich.console import Console
+from rich.layout import Layout
 from rich.markdown import Markdown
-
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
+from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, func, text
 from sqlalchemy.orm import selectinload
 
-from ...database.models import TrainingSession, TrainingIteration, GenerationSession
-from .performance_improvement_calculator import PerformanceImprovementCalculator
+from ...database.models import GenerationSession, TrainingIteration, TrainingSession
 from ...utils.datetime_utils import naive_utc_now
+from .performance_improvement_calculator import PerformanceImprovementCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -59,90 +65,87 @@ class UserRole(Enum):
     OPERATOR = "operator"
 
 
-@dataclass
-class SessionSummary:
+class SessionSummary(SQLModel):
     """Comprehensive session summary following 2025 best practices"""
     # Core identification
-    session_id: str
-    session_type: str
-    status: str
+    session_id: str = Field(description="Training session identifier")
+    session_type: str = Field(description="Type of training session")
+    status: str = Field(description="Current session status")
 
     # Executive KPIs (3-5 key metrics per 2025 standards)
-    performance_score: float  # Weighted overall performance
-    improvement_velocity: float  # Rate of improvement
-    efficiency_rating: float  # Resource utilization efficiency
-    quality_index: float  # Data generation quality
-    success_rate: float  # Iteration success percentage
+    performance_score: float = Field(ge=0.0, le=1.0, description="Weighted overall performance")
+    improvement_velocity: float = Field(ge=0.0, description="Rate of improvement")
+    efficiency_rating: float = Field(ge=0.0, le=1.0, description="Resource utilization efficiency")
+    quality_index: float = Field(ge=0.0, le=1.0, description="Data generation quality")
+    success_rate: float = Field(ge=0.0, le=1.0, description="Iteration success percentage")
 
     # Timing information
-    started_at: datetime
-    completed_at: Optional[datetime]
-    total_duration_hours: float
+    started_at: datetime = Field(description="Session start timestamp")
+    completed_at: Optional[datetime] = Field(default=None, description="Session completion timestamp")
+    total_duration_hours: float = Field(ge=0.0, description="Total session duration in hours")
 
     # Performance metrics with context
-    initial_performance: Optional[float]
-    final_performance: Optional[float]
-    best_performance: Optional[float]
-    total_improvement: float
-    improvement_rate: float
-    performance_trend: str  # "improving", "declining", "stable"
+    initial_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Initial performance score")
+    final_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Final performance score")
+    best_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Best performance achieved")
+    total_improvement: float = Field(description="Total performance improvement")
+    improvement_rate: float = Field(description="Rate of improvement per hour")
+    performance_trend: str = Field(description="Performance trend direction")
 
     # Training statistics
-    total_iterations: int
-    successful_iterations: int
-    failed_iterations: int
-    average_iteration_duration: float
+    total_iterations: int = Field(ge=0, description="Total number of iterations")
+    successful_iterations: int = Field(ge=0, description="Number of successful iterations")
+    failed_iterations: int = Field(ge=0, description="Number of failed iterations")
+    average_iteration_duration: float = Field(ge=0.0, description="Average iteration duration in seconds")
 
     # Data generation statistics
-    total_samples_generated: int
-    generation_sessions: int
-    average_generation_quality: float
+    total_samples_generated: int = Field(ge=0, description="Total synthetic samples generated")
+    generation_sessions: int = Field(ge=0, description="Number of data generation sessions")
+    average_generation_quality: float = Field(ge=0.0, le=1.0, description="Average quality of generated data")
 
     # Resource utilization
-    total_training_time_hours: float
-    average_memory_usage_mb: float
-    peak_memory_usage_mb: float
+    total_training_time_hours: float = Field(ge=0.0, description="Total training time in hours")
+    average_memory_usage_mb: float = Field(ge=0.0, description="Average memory usage in MB")
+    peak_memory_usage_mb: float = Field(ge=0.0, description="Peak memory usage in MB")
 
     # AI-generated insights (2025 feature)
-    key_insights: List[str]
-    recommendations: List[str]
-    anomalies_detected: List[str]
+    key_insights: List[str] = Field(default_factory=list, description="AI-generated key insights")
+    recommendations: List[str] = Field(default_factory=list, description="AI-generated recommendations")
+    anomalies_detected: List[str] = Field(default_factory=list, description="Detected anomalies")
 
     # Configuration and metadata
-    configuration: Dict[str, Any]
-    stopping_reason: Optional[str]
+    configuration: Dict[str, Any] = Field(default_factory=dict, description="Session configuration")
+    stopping_reason: Optional[str] = Field(default=None, description="Reason for session termination")
 
     # Observability metrics
-    error_rate: float
-    alert_count: int
-    performance_alerts: List[str]
+    error_rate: float = Field(ge=0.0, le=1.0, description="Error rate across iterations")
+    alert_count: int = Field(ge=0, description="Number of alerts triggered")
+    performance_alerts: List[str] = Field(default_factory=list, description="Performance-related alerts")
 
 
-@dataclass
-class IterationBreakdown:
+class IterationBreakdown(SQLModel):
     """Detailed iteration breakdown for comprehensive analysis"""
-    iteration: int
-    started_at: datetime
-    duration_seconds: float
-    performance_metrics: Dict[str, Any]
-    improvement_score: float
-    synthetic_data_generated: int
-    status: str
-    error_message: Optional[str]
-    resource_usage: Dict[str, float]
-    generation_quality: float
+    iteration: int = Field(ge=0, description="Iteration number")
+    started_at: datetime = Field(description="Iteration start timestamp")
+    duration_seconds: float = Field(ge=0.0, description="Iteration duration in seconds")
+    performance_metrics: Dict[str, Any] = Field(default_factory=dict, description="Performance metrics for iteration")
+    improvement_score: float = Field(description="Improvement score for iteration")
+    synthetic_data_generated: int = Field(ge=0, description="Number of synthetic samples generated")
+    status: str = Field(description="Iteration status")
+    error_message: Optional[str] = Field(default=None, description="Error message if iteration failed")
+    resource_usage: Dict[str, float] = Field(default_factory=dict, description="Resource usage metrics")
+    generation_quality: float = Field(ge=0.0, le=1.0, description="Quality of generated data")
 
 
-@dataclass
-class ExecutiveSummary:
+class ExecutiveSummary(SQLModel):
     """Executive-focused summary with key insights (2025 standard)"""
-    session_id: str
-    overall_status: str
-    key_achievements: List[str]
-    critical_issues: List[str]
-    performance_highlights: Dict[str, float]
-    next_actions: List[str]
-    roi_metrics: Dict[str, float]
+    session_id: str = Field(description="Training session identifier")
+    overall_status: str = Field(description="Overall session status")
+    key_achievements: List[str] = Field(default_factory=list, description="Key achievements during session")
+    critical_issues: List[str] = Field(default_factory=list, description="Critical issues identified")
+    performance_highlights: Dict[str, float] = Field(default_factory=dict, description="Key performance highlights")
+    next_actions: List[str] = Field(default_factory=list, description="Recommended next actions")
+    roi_metrics: Dict[str, float] = Field(default_factory=dict, description="Return on investment metrics")
 
 
 class SessionSummaryReporter:
@@ -293,12 +296,12 @@ class SessionSummaryReporter:
             # Performance monitoring (2025 standard)
             generation_time = (datetime.now() - start_time).total_seconds()
             if generation_time > self.performance_targets["max_report_generation_seconds"]:
-                self.logger.warning(f"Report generation took {generation_time:.2f}s, exceeds target")
+                self.logger.warning("Report generation took %.2fs, exceeds target", generation_time)
 
             return summary
 
         except Exception as e:
-            self.logger.error(f"Error generating session summary for {session_id}: {e}")
+            self.logger.error("Error generating session summary for {session_id}: %s", e)
             raise
 
     async def generate_executive_summary(self, session_id: str) -> ExecutiveSummary:
@@ -364,7 +367,7 @@ class SessionSummaryReporter:
             )
 
         except Exception as e:
-            self.logger.error(f"Error generating executive summary: {e}")
+            self.logger.error("Error generating executive summary: %s", e)
             raise
 
     async def display_executive_dashboard(
@@ -652,7 +655,7 @@ class SessionSummaryReporter:
             result = await self.db_session.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            self.logger.error(f"Error getting training session: {e}")
+            self.logger.error("Error getting training session: %s", e)
             return None
 
     async def _get_session_iterations(self, session_id: str) -> List[TrainingIteration]:
@@ -666,7 +669,7 @@ class SessionSummaryReporter:
             result = await self.db_session.execute(query)
             return result.scalars().all()
         except Exception as e:
-            self.logger.error(f"Error getting session iterations: {e}")
+            self.logger.error("Error getting session iterations: %s", e)
             return []
 
     async def _get_generation_sessions(self, session_id: str) -> List[GenerationSession]:
@@ -680,7 +683,7 @@ class SessionSummaryReporter:
             result = await self.db_session.execute(query)
             return result.scalars().all()
         except Exception as e:
-            self.logger.error(f"Error getting generation sessions: {e}")
+            self.logger.error("Error getting generation sessions: %s", e)
             return []
 
     async def _calculate_executive_kpis(
@@ -736,7 +739,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error calculating executive KPIs: {e}")
+            self.logger.error("Error calculating executive KPIs: %s", e)
             return {
                 "performance_score": 0.0,
                 "improvement_velocity": 0.0,
@@ -789,7 +792,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error calculating performance metrics: {e}")
+            self.logger.error("Error calculating performance metrics: %s", e)
             return {
                 "total_improvement": 0.0,
                 "improvement_rate": 0.0,
@@ -826,7 +829,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error calculating resource utilization: {e}")
+            self.logger.error("Error calculating resource utilization: %s", e)
             return {
                 "average_memory": 0.0,
                 "peak_memory": 0.0
@@ -854,7 +857,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error calculating generation statistics: {e}")
+            self.logger.error("Error calculating generation statistics: %s", e)
             return {
                 "total_samples": 0,
                 "session_count": 0,
@@ -911,7 +914,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error generating AI insights: {e}")
+            self.logger.error("Error generating AI insights: %s", e)
             return {
                 "insights": [],
                 "recommendations": [],
@@ -950,7 +953,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error(f"Error calculating observability metrics: {e}")
+            self.logger.error("Error calculating observability metrics: %s", e)
             return {
                 "error_rate": 0.0,
                 "alert_count": 0,
@@ -1068,7 +1071,7 @@ class SessionSummaryReporter:
 
             # Prepare export data
             export_data = {
-                "session_summary": asdict(summary),
+                "session_summary": summary.model_dump(),
                 "iterations": [
                     {
                         "iteration": it.iteration,
@@ -1107,7 +1110,7 @@ class SessionSummaryReporter:
             return output_path
 
         except Exception as e:
-            self.logger.error(f"Error exporting session report: {e}")
+            self.logger.error("Error exporting session report: %s", e)
             raise
 
     async def _export_json(self, data: Dict[str, Any], output_path: str) -> None:

@@ -12,21 +12,22 @@ This service:
 """
 
 import asyncio
+from datetime import datetime, timezone
 import hashlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.connection import get_session_context
-from prompt_improver.rule_engine.models import PromptCharacteristics
 
 # Import existing ML components (allowed in ML background service)
-from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import AdvancedPatternDiscovery
+from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
+    AdvancedPatternDiscovery,
+)
 from prompt_improver.ml.optimization.algorithms.rule_optimizer import RuleOptimizer
 
 # 2025 Circuit Breaker Integration for ML Resilience
@@ -34,8 +35,9 @@ from prompt_improver.performance.monitoring.health.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpen,
-    CircuitState
+    CircuitState,
 )
+from prompt_improver.rule_engine.models import PromptCharacteristics
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +140,10 @@ class MLIntelligenceProcessor:
         # Update processing stats for monitoring
         if new_state.value == "open":
             self.processing_stats[f"{component_name}_circuit_open"] = True
-            logger.error(f"ML component {component_name} circuit breaker OPEN - degraded mode activated")
+            logger.error("ML component %s circuit breaker OPEN - degraded mode activated", component_name)
         elif new_state.value == "closed":
             self.processing_stats[f"{component_name}_circuit_open"] = False
-            logger.info(f"ML component {component_name} circuit breaker CLOSED - normal operation restored")
+            logger.info("ML component %s circuit breaker CLOSED - normal operation restored", component_name)
 
     async def run_intelligence_processing(self) -> Dict[str, Any]:
         """Run complete ML intelligence processing pipeline with 2025 circuit breaker protection.
@@ -225,7 +227,7 @@ class MLIntelligenceProcessor:
 
         except CircuitBreakerOpen as e:
             # Database circuit breaker is open - complete failure
-            logger.error(f"Database circuit breaker open - ML processing completely unavailable: {e}")
+            logger.error("Database circuit breaker open - ML processing completely unavailable: %s", e)
             results.update({
                 "status": "failed_circuit_breaker",
                 "error": str(e),
@@ -235,7 +237,7 @@ class MLIntelligenceProcessor:
             })
             return results
         except Exception as e:
-            logger.error(f"ML intelligence processing failed: {e}")
+            logger.error("ML intelligence processing failed: %s", e)
             results.update({
                 "status": "failed",
                 "error": str(e),
@@ -315,7 +317,7 @@ class MLIntelligenceProcessor:
             try:
                 characteristics = PromptCharacteristics(**characteristics_data)
             except Exception as e:
-                logger.warning(f"Failed to parse characteristics: {e}")
+                logger.warning("Failed to parse characteristics: %s", e)
                 continue
 
             # Generate characteristics hash
@@ -389,7 +391,7 @@ class MLIntelligenceProcessor:
             }
 
         except Exception as e:
-            logger.warning(f"Pattern discovery failed for rule {rule_data.rule_id}: {e}")
+            logger.warning("Pattern discovery failed for rule {rule_data.rule_id}: %s", e)
             characteristic_match_score = 0.5
             pattern_insights = {}
 
@@ -408,7 +410,7 @@ class MLIntelligenceProcessor:
             performance_trend = optimization_results.get("trend", "stable")
 
         except Exception as e:
-            logger.warning(f"Rule optimization failed for rule {rule_data.rule_id}: {e}")
+            logger.warning("Rule optimization failed for rule {rule_data.rule_id}: %s", e)
             optimization_recommendations = []
             performance_trend = "stable"
 
@@ -629,7 +631,7 @@ class MLIntelligenceProcessor:
             }
 
         except Exception as e:
-            logger.error(f"Pattern discovery failed: {e}")
+            logger.error("Pattern discovery failed: %s", e)
             return {"patterns_discovered": 0, "error": str(e)}
 
     async def _process_ml_predictions(self, db_session: AsyncSession) -> Dict[str, Any]:
@@ -644,7 +646,7 @@ class MLIntelligenceProcessor:
         result = await db_session.execute(cleanup_query)
         deleted_count = result.scalar()
 
-        logger.info(f"Cleaned up {deleted_count} expired cache entries")
+        logger.info("Cleaned up %s expired cache entries", deleted_count)
         return {"deleted_entries": deleted_count}
 
     def _hash_characteristics(self, characteristics: PromptCharacteristics) -> str:
@@ -820,7 +822,7 @@ class MLIntelligenceProcessor:
             }
 
         except Exception as e:
-            logger.warning(f"ML prediction generation failed for rule {rule_data.rule_id}: {e}")
+            logger.warning("ML prediction generation failed for rule {rule_data.rule_id}: %s", e)
             return {"confidence": 0.1, "predictions": {"error": str(e)}}
 
     async def _process_batch_with_semaphore(
@@ -835,7 +837,7 @@ class MLIntelligenceProcessor:
             start_offset = batch_info["start_offset"]
             batch_size = batch_info["batch_size"]
 
-            logger.info(f"Processing batch {batch_id}: offset {start_offset}, size {batch_size}")
+            logger.info("Processing batch {batch_id}: offset {start_offset}, size %s", batch_size)
 
             try:
                 # Process rules in this batch
@@ -866,10 +868,10 @@ class MLIntelligenceProcessor:
                         await self._process_rule_with_incremental_update(db_session, rule_data)
                         rules_processed += 1
                     except Exception as e:
-                        logger.warning(f"Failed to process rule {rule_data.rule_id} in batch {batch_id}: {e}")
+                        logger.warning("Failed to process rule {rule_data.rule_id} in batch {batch_id}: %s", e)
                         continue
 
-                logger.info(f"Batch {batch_id} completed: {rules_processed} rules processed")
+                logger.info("Batch {batch_id} completed: %s rules processed", rules_processed)
                 return {
                     "batch_id": batch_id,
                     "rules_processed": rules_processed,
@@ -877,7 +879,7 @@ class MLIntelligenceProcessor:
                 }
 
             except Exception as e:
-                logger.error(f"Batch {batch_id} failed: {e}")
+                logger.error("Batch {batch_id} failed: %s", e)
                 return {
                     "batch_id": batch_id,
                     "rules_processed": 0,
@@ -897,7 +899,7 @@ class MLIntelligenceProcessor:
         needs_update = await self._check_incremental_update_needed(db_session, rule_id)
 
         if not needs_update:
-            logger.debug(f"Rule {rule_id} skipped - no significant changes detected")
+            logger.debug("Rule %s skipped - no significant changes detected", rule_id)
             return
 
         # Process rule with ML prediction pipeline
@@ -915,10 +917,10 @@ class MLIntelligenceProcessor:
                 db_session, rule_data, characteristics_hash, ml_predictions
             )
 
-            logger.debug(f"Rule {rule_id} updated with ML predictions (confidence: {ml_predictions.get('confidence', 0):.2f})")
+            logger.debug("Rule {rule_id} updated with ML predictions (confidence: %s)", ml_predictions.get('confidence', 0):.2f)
 
         except Exception as e:
-            logger.warning(f"Failed to process rule {rule_id} incrementally: {e}")
+            logger.warning("Failed to process rule {rule_id} incrementally: %s", e)
 
     async def _update_rule_intelligence_incremental(
         self,
@@ -933,7 +935,7 @@ class MLIntelligenceProcessor:
 
         # Only update if confidence meets threshold
         if confidence < self.min_confidence_threshold:
-            logger.debug(f"Skipping update for rule {rule_data.rule_id} - confidence too low: {confidence:.2f}")
+            logger.debug("Skipping update for rule {rule_data.rule_id} - confidence too low: %s", confidence:.2f)
             return
 
         update_query = text("""
@@ -960,7 +962,7 @@ class MLIntelligenceProcessor:
     async def run_parallel_batch_processing(self) -> Dict[str, Any]:
         """Run parallel batch processing with 2025 performance optimization patterns."""
         start_time = time.time()
-        logger.info(f"Starting parallel batch processing with {self.max_parallel_workers} workers")
+        logger.info("Starting parallel batch processing with %s workers", self.max_parallel_workers)
 
         try:
             async with get_session_context() as db_session:
@@ -979,7 +981,7 @@ class MLIntelligenceProcessor:
 
                 # Calculate batch ranges for parallel processing
                 batches = self._calculate_batch_ranges(total_rules)
-                logger.info(f"Processing {total_rules} rules in {len(batches)} parallel batches")
+                logger.info("Processing {total_rules} rules in %s parallel batches", len(batches))
 
                 # Create semaphore to limit concurrent workers
                 semaphore = asyncio.Semaphore(self.max_parallel_workers)
@@ -998,12 +1000,12 @@ class MLIntelligenceProcessor:
 
                 for i, result in enumerate(batch_results):
                     if isinstance(result, Exception):
-                        logger.error(f"Batch {i} failed: {result}")
+                        logger.error("Batch {i} failed: %s", result)
                         total_errors += 1
                     elif isinstance(result, dict):
                         total_processed += result.get("rules_processed", 0)
                     else:
-                        logger.warning(f"Batch {i} returned unexpected result type: {type(result)}")
+                        logger.warning("Batch {i} returned unexpected result type: %s", type(result))
                         total_errors += 1
 
                 processing_time = (time.time() - start_time) * 1000
@@ -1018,7 +1020,7 @@ class MLIntelligenceProcessor:
                 }
 
         except Exception as e:
-            logger.error(f"Parallel batch processing failed: {e}")
+            logger.error("Parallel batch processing failed: %s", e)
             return {
                 "status": "failed",
                 "error": str(e),
@@ -1034,13 +1036,13 @@ async def run_intelligence_processor():
     while True:
         try:
             results = await processor.run_intelligence_processing()
-            logger.info(f"Intelligence processing completed: {results['status']}")
+            logger.info("Intelligence processing completed: %s", results['status'])
 
             # Wait for next processing cycle
             await asyncio.sleep(processor.processing_interval_hours * 3600)
 
         except Exception as e:
-            logger.error(f"Intelligence processing failed: {e}")
+            logger.error("Intelligence processing failed: %s", e)
             # Wait shorter time on error before retrying
             await asyncio.sleep(300)  # 5 minutes
 

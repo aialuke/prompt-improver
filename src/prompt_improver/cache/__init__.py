@@ -1,5 +1,4 @@
-"""
-Cache Module
+"""Cache Module
 
 This module provides comprehensive caching and Redis health monitoring capabilities.
 
@@ -18,42 +17,5 @@ Features:
 - Slow log analysis for performance optimization
 - Real-time metrics collection with circuit breaker protection
 """
-
-from .redis_health import (
-    RedisHealthMonitor,
-    RedisHealthChecker,
-    get_redis_health_summary,
-    create_redis_health_checker,
-    RedisHealthStatus,
-    RedisRole,
-    MemoryMetrics,
-    PerformanceMetrics,
-    PersistenceMetrics,
-    ReplicationMetrics,
-    ConnectionMetrics,
-    KeyspaceMetrics,
-    SlowLogMetrics,
-)
-
-__all__ = [
-    # Main classes
-    "RedisHealthMonitor",
-    "RedisHealthChecker",
-    
-    # Functions
-    "get_redis_health_summary",
-    "create_redis_health_checker",
-    
-    # Enums
-    "RedisHealthStatus",
-    "RedisRole",
-    
-    # Metrics classes
-    "MemoryMetrics",
-    "PerformanceMetrics", 
-    "PersistenceMetrics",
-    "ReplicationMetrics",
-    "ConnectionMetrics",
-    "KeyspaceMetrics",
-    "SlowLogMetrics",
-]
+from prompt_improver.cache.redis_health import ConnectionMetrics, KeyspaceMetrics, MemoryMetrics, PerformanceMetrics, PersistenceMetrics, RedisHealthChecker, RedisHealthMonitor, RedisHealthStatus, RedisRole, ReplicationMetrics, SlowLogMetrics, create_redis_health_checker, get_redis_health_summary
+__all__ = ['RedisHealthMonitor', 'RedisHealthChecker', 'get_redis_health_summary', 'create_redis_health_checker', 'RedisHealthStatus', 'RedisRole', 'MemoryMetrics', 'PerformanceMetrics', 'PersistenceMetrics', 'ReplicationMetrics', 'ConnectionMetrics', 'KeyspaceMetrics', 'SlowLogMetrics']

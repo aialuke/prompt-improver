@@ -1,41 +1,35 @@
-"""
-Centralized logging utility to eliminate duplicate logger initialization patterns.
+"""Centralized logging utility to eliminate duplicate logger initialization patterns.
 
 Consolidates the pattern: logger = logging.getLogger(__name__)
 Found in 100+ files across the codebase.
 """
-
 import logging
-from typing import Optional, Any
 from functools import lru_cache
+from typing import Any, Optional
 
 @lru_cache(maxsize=128)
-def get_logger(name: Optional[str] = None, level: Optional[str] = None) -> logging.Logger:
-    """
-    Get a configured logger instance with caching to avoid duplicate initialization.
-    
+def get_logger(name: str | None=None, level: str | None=None) -> logging.Logger:
+    """Get a configured logger instance with caching to avoid duplicate initialization.
+
     Args:
         name: Logger name (defaults to caller's __name__)
         level: Optional log level override
-        
+
     Returns:
         Configured logger instance
-        
+
     Example:
         # Old pattern (duplicated everywhere):
         logger = logging.getLogger(__name__)
-        
+
         # New pattern (consolidated):
         from prompt_improver.core.common import get_logger
         logger = get_logger(__name__)
     """
     import inspect
-    
     if name is None:
-        # Get caller's module name automatically
         frame = inspect.currentframe()
         try:
-            # Handle cases where frame inspection might not be available
             if frame is not None:
                 caller_frame = frame.f_back
                 if caller_frame is not None:
@@ -45,27 +39,16 @@ def get_logger(name: Optional[str] = None, level: Optional[str] = None) -> loggi
             else:
                 name = 'unknown'
         finally:
-            # Safely delete frame reference to prevent memory leaks
             if frame is not None:
                 del frame
-    
     logger = logging.getLogger(name)
-    
-    # Set level if specified
     if level:
         logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    
     return logger
 
-def configure_logging(
-    level: str = "INFO",
-    format_string: Optional[str] = None,
-    include_timestamp: bool = True,
-    include_module: bool = True
-) -> None:
-    """
-    Configure logging for the entire application.
-    
+def configure_logging(level: str='INFO', format_string: str | None=None, include_timestamp: bool=True, include_module: bool=True) -> None:
+    """Configure logging for the entire application.
+
     Args:
         level: Default logging level
         format_string: Custom format string
@@ -75,45 +58,39 @@ def configure_logging(
     if format_string is None:
         parts = []
         if include_timestamp:
-            parts.append("%(asctime)s")
-        parts.append("%(levelname)s")
+            parts.append('%(asctime)s')
+        parts.append('%(levelname)s')
         if include_module:
-            parts.append("%(name)s")
-        parts.append("%(message)s")
-        format_string = " - ".join(parts)
-    
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format=format_string,
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+            parts.append('%(name)s')
+        parts.append('%(message)s')
+        format_string = ' - '.join(parts)
+    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO), format=format_string, datefmt='%Y-%m-%d %H:%M:%S')
 
 class LoggerMixin:
-    """
-    Mixin class to provide consistent logger access pattern.
-    
+    """Mixin class to provide consistent logger access pattern.
+
     Eliminates the need for manual logger initialization in classes.
     """
-    
+
     @property
     def logger(self) -> logging.Logger:
         """Get logger for this class."""
-        return get_logger(f"{self.__class__.__module__}.{self.__class__.__name__}")
-    
+        return get_logger(f'{self.__class__.__module__}.{self.__class__.__name__}')
+
     def log_method_entry(self, method_name: str, **kwargs) -> None:
         """Log method entry with parameters."""
         if kwargs:
-            self.logger.debug(f"Entering {method_name} with: {kwargs}")
+            self.logger.debug('Entering {method_name} with: %s', kwargs)
         else:
-            self.logger.debug(f"Entering {method_name}")
-    
-    def log_method_exit(self, method_name: str, result: Any = None) -> None:
+            self.logger.debug('Entering %s', method_name)
+
+    def log_method_exit(self, method_name: str, result: Any=None) -> None:
         """Log method exit with result."""
         if result is not None:
-            self.logger.debug(f"Exiting {method_name} with result: {type(result).__name__}")
+            self.logger.debug('Exiting %s with result: %s', method_name, type(result).__name__)
         else:
-            self.logger.debug(f"Exiting {method_name}")
-    
+            self.logger.debug('Exiting %s', method_name)
+
     def log_error(self, method_name: str, error: Exception) -> None:
         """Log error with context."""
-        self.logger.error(f"Error in {method_name}: {type(error).__name__}: {error}")
+        self.logger.error('Error in {method_name}: {type(error).__name__}: %s', error)

@@ -799,7 +799,7 @@ class APESInitializer:
 # Database
 postgresql = ">=13.0"
 asyncpg = ">=0.27.0"        # High-performance PostgreSQL driver
-alembic = ">=1.7.0"         # Database migrations
+# Database migrations handled via SQL files
 ```
 
 ---

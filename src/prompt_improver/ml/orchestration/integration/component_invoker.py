@@ -5,13 +5,14 @@ Invokes methods on loaded ML components and handles results.
 """
 
 import asyncio
-import inspect
-import logging
-from typing import Any, Dict, List, Optional, Union, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import inspect
+import logging
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .direct_component_loader import DirectComponentLoader, LoadedComponent
+
 
 @dataclass
 class InvocationResult:
@@ -150,7 +151,7 @@ class ComponentInvoker:
                 timestamp=start_time
             )
             
-            self.logger.info(f"Successfully invoked {component_name}.{method_name} in {execution_time:.3f}s")
+            self.logger.info("Successfully invoked %s.%s in %.3fs", component_name, method_name, execution_time)
             self.invocation_history.append(invocation_result)
             
             return invocation_result
@@ -199,7 +200,7 @@ class ComponentInvoker:
         """
         if not self.retry_manager:
             # Fallback to regular invocation if retry manager not available
-            self.logger.warning(f"Retry manager not available for {component_name}.{method_name}, using direct invocation")
+            self.logger.warning("Retry manager not available for {component_name}.%s, using direct invocation", method_name)
             return await self.invoke_component_method(component_name, method_name, *args, **kwargs)
 
         operation_name = f"{component_name}.{method_name}"
@@ -227,7 +228,7 @@ class ComponentInvoker:
             # Execute with retry
             result = await self.retry_manager.retry_async(component_operation, config=retry_config)
 
-            self.logger.info(f"Successfully invoked {operation_name} with retry support")
+            self.logger.info("Successfully invoked %s with retry support", operation_name)
             return result
 
         except Exception as e:
@@ -235,7 +236,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Resilient invocation failed after retries: {str(e)}"
-            self.logger.error(f"Failed to invoke {operation_name} with retry: {e}")
+            self.logger.error("Failed to invoke {operation_name} with retry: %s", e)
 
             invocation_result = InvocationResult(
                 component_name=component_name,
@@ -320,7 +321,7 @@ class ComponentInvoker:
                 args = tuple(validated_args)
                 kwargs = validated_kwargs
 
-                self.logger.info(f"Security validation passed for {component_name}.{method_name}")
+                self.logger.info("Security validation passed for {component_name}.%s", method_name)
 
             # Invoke the component method with validated arguments
             if self.retry_manager:
@@ -337,7 +338,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Secure component invocation failed: {str(e)}"
-            self.logger.error(f"Failed to securely invoke {component_name}.{method_name}: {e}")
+            self.logger.error("Failed to securely invoke {component_name}.{method_name}: %s", e)
 
             invocation_result = InvocationResult(
                 component_name=component_name,
@@ -668,7 +669,7 @@ class ComponentInvoker:
                         )
             else:
                 # Fallback to other invocation methods if memory guard not available
-                self.logger.warning(f"Memory guard not available for {operation_name}, using fallback invocation")
+                self.logger.warning("Memory guard not available for %s, using fallback invocation", operation_name)
 
                 if self.input_sanitizer:
                     return await self.invoke_component_method_secure(
@@ -688,7 +689,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Memory-monitored component invocation failed: {str(e)}"
-            self.logger.error(f"Failed to invoke {operation_name} with memory monitoring: {e}")
+            self.logger.error("Failed to invoke {operation_name} with memory monitoring: %s", e)
 
             invocation_result = InvocationResult(
                 component_name=component_name,

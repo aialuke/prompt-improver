@@ -1,5 +1,4 @@
-"""
-Common utilities and shared patterns to eliminate code duplication.
+"""Common utilities and shared patterns to eliminate code duplication.
 
 This module provides centralized implementations for frequently duplicated patterns:
 - Logger initialization
@@ -11,44 +10,9 @@ This module provides centralized implementations for frequently duplicated patte
 Author: Claude Code
 Date: 2025-07-27
 """
-
-from .logging_utils import get_logger
-from .config_utils import ConfigMixin, get_config_safely
-from .metrics_utils import MetricsMixin, get_metrics_safely
-from .base_classes import (
-    BaseHealthChecker,
-    BaseConfigModel,
-    BaseService,
-    BaseMonitor
-)
-from .error_handling import (
-    safe_config_load,
-    handle_initialization_error,
-    ErrorCategory,
-    InitializationError
-)
-
-__all__ = [
-    # Logging utilities
-    'get_logger',
-    
-    # Configuration utilities
-    'ConfigMixin',
-    'get_config_safely',
-    
-    # Metrics utilities
-    'MetricsMixin', 
-    'get_metrics_safely',
-    
-    # Base classes
-    'BaseHealthChecker',
-    'BaseConfigModel',
-    'BaseService',
-    'BaseMonitor',
-    
-    # Error handling
-    'safe_config_load',
-    'handle_initialization_error',
-    'ErrorCategory',
-    'InitializationError'
-]
+from prompt_improver.core.common.base_classes import BaseConfigModel, BaseHealthChecker, BaseMonitor, BaseService
+from prompt_improver.core.common.config_utils import ConfigMixin, get_config_safely
+from prompt_improver.core.common.error_handling import ErrorCategory, InitializationError, handle_initialization_error, safe_config_load
+from prompt_improver.core.common.logging_utils import get_logger
+from prompt_improver.core.common.metrics_utils import MetricsMixin, get_metrics_safely
+__all__ = ['get_logger', 'ConfigMixin', 'get_config_safely', 'MetricsMixin', 'get_metrics_safely', 'BaseHealthChecker', 'BaseConfigModel', 'BaseService', 'BaseMonitor', 'safe_config_load', 'handle_initialization_error', 'ErrorCategory', 'InitializationError']

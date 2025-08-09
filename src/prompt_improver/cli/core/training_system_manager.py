@@ -1,5 +1,4 @@
-"""
-Clean Training System Manager - Independent of MCP Server
+"""Clean Training System Manager - Independent of MCP Server
 Implements pure training-focused lifecycle management for the 3-command CLI.
 """
 
@@ -7,27 +6,50 @@ import logging
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 
 from rich.console import Console
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...database import get_sessionmanager
+from prompt_improver.cli.core.rule_validation_service import RuleValidationService
+
 # Signal handling integration - avoiding circular import
-from .signal_handler import SignalOperation
-from ...ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from ...ml.orchestration.config.orchestrator_config import OrchestratorConfig
-from ...ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
-from ...core.services.analytics_factory import get_analytics_interface
-from ...utils.unified_session_manager import get_unified_session_manager
-from .rule_validation_service import RuleValidationService
+from prompt_improver.cli.core.signal_handler import SignalOperation
+from prompt_improver.core.di.ml_container import MLServiceContainer
+
+# NEW: Modern factory and protocol imports
+from prompt_improver.core.factories.ml_pipeline_factory import (
+    MLPipelineOrchestratorFactory,
+)
+from prompt_improver.core.protocols.ml_protocols import (
+    ComponentFactoryProtocol,
+    ServiceContainerProtocol,
+)
+from prompt_improver.core.services.analytics_factory import get_analytics_interface
+from prompt_improver.database import get_sessionmanager
+from prompt_improver.database.unified_connection_manager import (
+    ManagerMode,
+    get_unified_manager,
+)
+from prompt_improver.ml.orchestration.config.external_services_config import (
+    ExternalServicesConfig,
+)
+from prompt_improver.ml.orchestration.config.orchestrator_config import (
+    OrchestratorConfig,
+)
+from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
+    MLPipelineOrchestrator,
+)
+from prompt_improver.ml.preprocessing.orchestrator import (
+    ProductionSyntheticDataGenerator,
+)
+
 
 class TrainingSystemManager:
-    """
-    Pure training system lifecycle management - completely independent of MCP server.
+    """Pure training system lifecycle management - completely independent of MCP server.
 
     Implements clean break strategy with:
     - Zero MCP server dependencies
@@ -47,23 +69,23 @@ class TrainingSystemManager:
         self.signal_handler = None
         self.background_manager = None
         self._shutdown_priority = 5  # High priority for training system
-        
+
         # Training-specific state (no MCP state)
         self._training_status = "stopped"
-        self._training_session_id: Optional[str] = None
-        self._orchestrator: Optional[MLPipelineOrchestrator] = None
-        self._analytics: Optional[Any] = None
-        self._data_generator: Optional[ProductionSyntheticDataGenerator] = None
-        self._rule_validator: Optional[RuleValidationService] = None
+        self._training_session_id: str | None = None
+        self._orchestrator: MLPipelineOrchestrator | None = None
+        self._analytics: Any | None = None
+        self._data_generator: ProductionSyntheticDataGenerator | None = None
+        self._rule_validator: RuleValidationService | None = None
 
         # Performance tracking
-        self._startup_time: Optional[float] = None
+        self._startup_time: float | None = None
         self._resource_usage = {"memory_mb": 0, "cpu_percent": 0}
 
         # Training system data directory (separate from MCP)
         self.training_data_dir = Path.home() / ".local" / "share" / "apes" / "training"
         self.training_data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize signal handling integration (lazy)
         self._init_signal_handlers()
 
@@ -71,294 +93,354 @@ class TrainingSystemManager:
         """Initialize signal handler with lazy import to avoid circular dependency."""
         try:
             # Lazy import to avoid circular dependency
-            from ...performance.monitoring.health.background_manager import get_background_task_manager
-            from .signal_handler import AsyncSignalHandler
             from rich.console import Console
-            
+
+            from prompt_improver.cli.core.signal_handler import AsyncSignalHandler
+            from prompt_improver.performance.monitoring.health.background_manager import (
+                get_background_task_manager,
+            )
+
             # Initialize signal handler if not already done
             if self.signal_handler is None:
                 self.signal_handler = AsyncSignalHandler(console=Console())
-                
+
                 # Setup signal handlers with asyncio loop if available
                 try:
                     import asyncio
+
                     loop = asyncio.get_running_loop()
                     self.signal_handler.setup_signal_handlers(loop)
                 except RuntimeError:
                     # No running loop - will be set up when loop starts
                     pass
-            
+
             # Initialize background manager
             if self.background_manager is None:
                 self.background_manager = get_background_task_manager()
-            
+
             # Register handlers
             self._register_signal_handlers()
-            
+
         except ImportError as e:
-            self.logger.warning(f"Signal handling integration not available: {e}")
+            self.logger.warning("Signal handling integration not available: %s", e)
             # Continue without signal handling
-    
-    async def _ensure_unified_session_manager(self):
-        """Ensure unified session manager is available."""
+
+    async def _ensure_unified_connection_manager(self):
+        """Ensure unified connection manager is available."""
         if self._unified_session_manager is None:
-            self._unified_session_manager = await get_unified_session_manager()
-    
-    async def create_training_session(self, training_config: Dict[str, Any]) -> str:
-        """Create training session using unified session management.
-        
+            self._unified_session_manager = await get_unified_manager(
+                ManagerMode.MCP_SERVER
+            )
+
+    async def create_training_session(self, training_config: dict[str, Any]) -> str:
+        """Create training session using unified connection management.
+
         Args:
             training_config: Training configuration
-            
+
         Returns:
             Created training session ID
         """
         try:
-            await self._ensure_unified_session_manager()
-            
+            await self._ensure_unified_connection_manager()
+
             # Generate session ID
             import uuid
+
             session_id = f"training_{uuid.uuid4().hex[:8]}"
-            
-            # Create session in unified manager
-            success = await self._unified_session_manager.create_training_session(
-                session_id=session_id,
-                training_config=training_config
-            )
-            
-            if success:
-                self._training_session_id = session_id
-                self._training_status = "running"
-                self.logger.info(f"Created training session: {session_id}")
-                return session_id
-            else:
-                raise Exception("Failed to create training session in unified manager")
-                
+
+            # Store session data directly in database using unified connection manager
+            async with self._unified_session_manager.get_async_session() as db_session:
+                from sqlalchemy import text
+
+                # Insert training session record
+                query = text("""
+                    INSERT INTO training_sessions (session_id, config, status, created_at)
+                    VALUES (:session_id, :config, 'initializing', :created_at)
+                """)
+
+                import json
+
+                await db_session.execute(
+                    query,
+                    {
+                        "session_id": session_id,
+                        "config": json.dumps(training_config),
+                        "created_at": time.time(),
+                    },
+                )
+                await db_session.commit()
+
+            self._training_session_id = session_id
+            self._training_status = "running"
+            self.logger.info("Created training session: %s", session_id)
+            return session_id
+
         except Exception as e:
-            self.logger.error(f"Failed to create training session: {e}")
+            self.logger.error("Failed to create training session: %s", e)
             raise
-    
+
     async def update_training_progress(
         self,
         iteration: int,
-        performance_metrics: Dict[str, float],
-        improvement_score: float = 0.0
+        performance_metrics: dict[str, float],
+        improvement_score: float = 0.0,
     ) -> bool:
-        """Update training progress using unified session management.
-        
+        """Update training progress using unified connection management.
+
         Args:
             iteration: Current iteration
             performance_metrics: Performance metrics
             improvement_score: Improvement score
-            
+
         Returns:
             True if updated successfully
         """
         if not self._training_session_id:
             self.logger.warning("No active training session for progress update")
             return False
-            
+
         try:
-            await self._ensure_unified_session_manager()
-            
-            success = await self._unified_session_manager.update_training_progress(
-                session_id=self._training_session_id,
-                iteration=iteration,
-                performance_metrics=performance_metrics,
-                improvement_score=improvement_score
-            )
-            
-            if success:
-                self.logger.debug(f"Updated training progress: iteration {iteration}")
-            
-            return success
-            
+            await self._ensure_unified_connection_manager()
+
+            # Update training session progress in database
+            async with self._unified_session_manager.get_async_session() as db_session:
+                from sqlalchemy import text
+
+                query = text("""
+                    UPDATE training_sessions 
+                    SET current_iteration = :iteration,
+                        performance_metrics = :metrics,
+                        improvement_score = :score,
+                        updated_at = :updated_at
+                    WHERE session_id = :session_id
+                """)
+
+                import json
+
+                await db_session.execute(
+                    query,
+                    {
+                        "iteration": iteration,
+                        "metrics": json.dumps(performance_metrics),
+                        "score": improvement_score,
+                        "updated_at": time.time(),
+                        "session_id": self._training_session_id,
+                    },
+                )
+                await db_session.commit()
+
+            self.logger.debug("Updated training progress: iteration %s", iteration)
+            return True
+
         except Exception as e:
-            self.logger.error(f"Failed to update training progress: {e}")
+            self.logger.error("Failed to update training progress: %s", e)
             return False
-    
-    async def get_training_session_context(self) -> Optional[Dict[str, Any]]:
-        """Get current training session context from unified manager.
-        
+
+    async def get_training_session_context(self) -> dict[str, Any] | None:
+        """Get current training session context from database.
+
         Returns:
             Training session context if available
         """
         if not self._training_session_id:
             return None
-            
+
         try:
-            await self._ensure_unified_session_manager()
-            
-            context = await self._unified_session_manager.get_training_session(self._training_session_id)
-            
-            if context:
-                return context.to_dict()
-            else:
+            await self._ensure_unified_connection_manager()
+
+            # Get session data from database
+            async with self._unified_session_manager.get_async_session() as db_session:
+                from sqlalchemy import text
+
+                query = text("""
+                    SELECT session_id, config, status, current_iteration, 
+                           performance_metrics, improvement_score, created_at, updated_at
+                    FROM training_sessions 
+                    WHERE session_id = :session_id
+                """)
+
+                result = await db_session.execute(
+                    query, {"session_id": self._training_session_id}
+                )
+                row = result.first()
+
+                if row:
+                    import json
+
+                    return {
+                        "session_id": row[0],
+                        "config": json.loads(row[1]) if row[1] else {},
+                        "status": row[2],
+                        "current_iteration": row[3],
+                        "performance_metrics": json.loads(row[4]) if row[4] else {},
+                        "improvement_score": row[5],
+                        "created_at": row[6],
+                        "updated_at": row[7],
+                    }
                 return None
-                
+
         except Exception as e:
-            self.logger.error(f"Failed to get training session context: {e}")
+            self.logger.error("Failed to get training session context: %s", e)
             return None
-            
+
     def _register_signal_handlers(self):
         """Register TrainingSystemManager-specific signal handlers."""
         if self.signal_handler is None:
-            self.logger.warning("Signal handler not initialized, skipping signal registration")
+            self.logger.warning(
+                "Signal handler not initialized, skipping signal registration"
+            )
             return
-            
+
         import signal
-        
+
         # Shutdown coordination with high priority
         self.signal_handler.register_shutdown_handler(
-            "TrainingSystemManager_shutdown", 
-            self.graceful_shutdown_handler
+            "TrainingSystemManager_shutdown", self.graceful_shutdown_handler
         )
-        
+
         # Emergency checkpoint creation (SIGUSR1)
         self.signal_handler.register_operation_handler(
-            SignalOperation.CHECKPOINT,
-            self.create_training_emergency_checkpoint
+            SignalOperation.CHECKPOINT, self.create_training_emergency_checkpoint
         )
-        
+
         # Status reporting (SIGUSR2)
         self.signal_handler.register_operation_handler(
-            SignalOperation.STATUS_REPORT,
-            self.generate_training_status_report
+            SignalOperation.STATUS_REPORT, self.generate_training_status_report
         )
-        
+
         # Signal chaining for coordinated shutdown preparation
         self.signal_handler.add_signal_chain_handler(
             signal.SIGTERM,
             self.prepare_training_shutdown,
-            priority=self._shutdown_priority
+            priority=self._shutdown_priority,
         )
-        
+
         # SIGINT coordination for graceful training interruption
         self.signal_handler.add_signal_chain_handler(
             signal.SIGINT,
             self.prepare_training_interruption,
-            priority=self._shutdown_priority
+            priority=self._shutdown_priority,
         )
-        
+
         self.logger.info("TrainingSystemManager signal handlers registered")
 
     async def graceful_shutdown_handler(self, shutdown_context):
         """Handle graceful shutdown with training progress preservation."""
         self.logger.info("TrainingSystemManager graceful shutdown initiated")
-        
+
         try:
             # Stop training system with progress preservation
             success = await self.stop_training_system(graceful=True)
-            
+
             # Additional training-specific cleanup
             await self._emergency_training_cleanup()
-            
+
             return {
-                "status": "success" if success else "partial", 
+                "status": "success" if success else "partial",
                 "component": "TrainingSystemManager",
                 "training_stopped": success,
-                "progress_preserved": self._training_session_id is not None
+                "progress_preserved": self._training_session_id is not None,
             }
         except Exception as e:
-            self.logger.error(f"TrainingSystemManager shutdown error: {e}")
+            self.logger.error("TrainingSystemManager shutdown error: %s", e)
             return {
                 "status": "error",
-                "component": "TrainingSystemManager", 
-                "error": str(e)
+                "component": "TrainingSystemManager",
+                "error": str(e),
             }
 
     async def create_training_emergency_checkpoint(self, signal_context):
         """Create emergency training checkpoint on SIGUSR1 signal."""
         self.logger.info("Creating emergency training checkpoint")
-        
+
         try:
             if not self._training_session_id:
                 return {
                     "status": "no_active_session",
-                    "message": "No active training session for checkpoint"
+                    "message": "No active training session for checkpoint",
                 }
-            
+
             # Save current training progress immediately
             await self._save_training_progress()
-            
+
             # Get current performance metrics
             performance_metrics = await self._get_current_performance_metrics()
-            
+
             # Create checkpoint via progress preservation
-            from .progress_preservation import ProgressPreservationManager
+            from prompt_improver.cli.core.progress_preservation import (
+                ProgressPreservationManager,
+            )
+
             progress_manager = ProgressPreservationManager()
-            checkpoint_id = await progress_manager.create_checkpoint(self._training_session_id)
-            
+            checkpoint_id = await progress_manager.create_checkpoint(
+                self._training_session_id
+            )
+
             return {
                 "status": "checkpoint_created",
                 "checkpoint_id": checkpoint_id,
                 "session_id": self._training_session_id,
                 "performance_metrics": performance_metrics,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Emergency checkpoint creation failed: {e}")
-            return {
-                "status": "error",
-                "error": str(e)
-            }
+            self.logger.error("Emergency checkpoint creation failed: %s", e)
+            return {"status": "error", "error": str(e)}
 
     async def generate_training_status_report(self, signal_context):
         """Generate comprehensive training status report on SIGUSR2 signal."""
         self.logger.info("Generating training status report")
-        
+
         try:
             # Get comprehensive system status
             system_status = await self.get_system_status()
-            
+
             # Get training-specific metrics
             training_metrics = await self._get_detailed_training_metrics()
-            
+
             return {
                 "status": "report_generated",
                 "system_status": system_status,
                 "training_metrics": training_metrics,
                 "resource_usage": await self._get_resource_usage(),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Status report generation failed: {e}")
-            return {
-                "status": "error",
-                "error": str(e)
-            }
+            self.logger.error("Status report generation failed: %s", e)
+            return {"status": "error", "error": str(e)}
 
     def prepare_training_shutdown(self, signum, signal_name):
         """Prepare training system for coordinated shutdown."""
-        self.logger.info(f"Preparing training system for shutdown ({signal_name})")
-        
+        self.logger.info("Preparing training system for shutdown (%s)", signal_name)
+
         try:
             # Set training status to indicate shutdown preparation
             if self._training_status == "running":
                 self._training_status = "shutting_down"
-            
+
             # If training is active, prepare for progress preservation
             preparation_status = {
                 "prepared": True,
                 "component": "TrainingSystemManager",
                 "training_status": self._training_status,
                 "active_session": self._training_session_id is not None,
-                "orchestrator_active": self._orchestrator is not None
+                "orchestrator_active": self._orchestrator is not None,
             }
-            
+
             return preparation_status
         except Exception as e:
-            self.logger.error(f"Training shutdown preparation failed: {e}")
+            self.logger.error("Training shutdown preparation failed: %s", e)
             return {
                 "prepared": False,
                 "component": "TrainingSystemManager",
-                "error": str(e)
+                "error": str(e),
             }
 
     def prepare_training_interruption(self, signum, signal_name):
         """Prepare training system for user interruption (Ctrl+C)."""
-        self.logger.info(f"Preparing training system for interruption ({signal_name})")
-        
+        self.logger.info("Preparing training system for interruption (%s)", signal_name)
+
         try:
             # For user interruption, prioritize progress preservation
             preparation_status = {
@@ -367,16 +449,16 @@ class TrainingSystemManager:
                 "interruption_type": "user_requested",
                 "progress_preservation_ready": True,
                 "active_session": self._training_session_id,
-                "can_resume": True
+                "can_resume": True,
             }
-            
+
             return preparation_status
         except Exception as e:
-            self.logger.error(f"Training interruption preparation failed: {e}")
+            self.logger.error("Training interruption preparation failed: %s", e)
             return {
                 "prepared": False,
                 "component": "TrainingSystemManager",
-                "error": str(e)
+                "error": str(e),
             }
 
     async def _emergency_training_cleanup(self):
@@ -387,65 +469,65 @@ class TrainingSystemManager:
                 try:
                     await self._orchestrator.shutdown()
                 except Exception as e:
-                    self.logger.warning(f"Orchestrator emergency shutdown failed: {e}")
-            
+                    self.logger.warning("Orchestrator emergency shutdown failed: %s", e)
+
             # Emergency save of any remaining training data
             if self._training_session_id:
                 try:
                     await self._save_training_progress()
                 except Exception as e:
-                    self.logger.warning(f"Emergency progress save failed: {e}")
-            
+                    self.logger.warning("Emergency progress save failed: %s", e)
+
             # Release any background tasks
             try:
                 await self.background_manager.stop(timeout=5.0)
             except Exception as e:
-                self.logger.warning(f"Background task cleanup failed: {e}")
-                
+                self.logger.warning("Background task cleanup failed: %s", e)
+
             self.logger.info("Emergency training cleanup completed")
         except Exception as e:
-            self.logger.error(f"Emergency cleanup failed: {e}")
+            self.logger.error("Emergency cleanup failed: %s", e)
 
-    async def _get_current_performance_metrics(self) -> Dict[str, Any]:
+    async def _get_current_performance_metrics(self) -> dict[str, Any]:
         """Get current training performance metrics for checkpoints."""
         try:
             if not self._orchestrator:
                 return {"error": "No orchestrator available"}
-            
+
             # Get orchestrator health and metrics
             health = await self._orchestrator.health_check()
-            
+
             return {
                 "orchestrator_health": health,
                 "training_status": self._training_status,
                 "session_id": self._training_session_id,
-                "resource_usage": await self._get_resource_usage()
+                "resource_usage": await self._get_resource_usage(),
             }
         except Exception as e:
             return {"error": str(e)}
 
-    async def _get_detailed_training_metrics(self) -> Dict[str, Any]:
+    async def _get_detailed_training_metrics(self) -> dict[str, Any]:
         """Get detailed training metrics for status reports."""
         try:
             metrics = {
                 "training_status": self._training_status,
                 "session_id": self._training_session_id,
                 "startup_time": self._startup_time,
-                "resource_usage": await self._get_resource_usage()
+                "resource_usage": await self._get_resource_usage(),
             }
-            
+
             # Add orchestrator metrics if available
             if self._orchestrator:
                 try:
                     health = await self._orchestrator.health_check()
                     metrics["orchestrator_health"] = health
-                    
+
                     # Get workflow information
                     workflows = await self._orchestrator.list_workflows()
                     metrics["active_workflows"] = len(workflows)
                 except Exception as e:
                     metrics["orchestrator_error"] = str(e)
-            
+
             # Add analytics metrics if available
             if self._analytics:
                 try:
@@ -453,14 +535,13 @@ class TrainingSystemManager:
                     metrics["performance_summary"] = performance
                 except Exception as e:
                     metrics["analytics_error"] = str(e)
-            
+
             return metrics
         except Exception as e:
             return {"error": str(e)}
 
-    async def start_training_system(self) -> Dict[str, Any]:
-        """
-        Start training system components ONLY - no MCP server management.
+    async def start_training_system(self) -> dict[str, Any]:
+        """Start training system components ONLY - no MCP server management.
 
         Returns:
             Training system startup results with performance metrics
@@ -497,28 +578,29 @@ class TrainingSystemManager:
                     "database_connections",
                     "ml_orchestrator",
                     "analytics_service",
-                    "synthetic_data_orchestrator"
+                    "synthetic_data_orchestrator",
                 ],
                 "health_status": health_status,
                 "resource_usage": await self._get_resource_usage(),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
-            self.logger.info(f"Training system started successfully in {self._startup_time:.2f}s")
+            self.logger.info(
+                f"Training system started successfully in {self._startup_time:.2f}s"
+            )
             return startup_results
 
         except Exception as e:
             self._training_status = "failed"
-            self.logger.error(f"Failed to start training system: {e}")
+            self.logger.error("Failed to start training system: %s", e)
             return {
                 "status": "failed",
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def stop_training_system(self, graceful: bool = True) -> bool:
-        """
-        Stop training system gracefully with progress preservation.
+        """Stop training system gracefully with progress preservation.
 
         Args:
             graceful: Whether to perform graceful shutdown
@@ -526,7 +608,7 @@ class TrainingSystemManager:
         Returns:
             True if shutdown successful, False otherwise
         """
-        self.logger.info(f"Stopping training system (graceful={graceful})")
+        self.logger.info("Stopping training system (graceful=%s)", graceful)
 
         try:
             self._training_status = "stopping"
@@ -553,12 +635,11 @@ class TrainingSystemManager:
             return True
 
         except Exception as e:
-            self.logger.error(f"Error stopping training system: {e}")
+            self.logger.error("Error stopping training system: %s", e)
             return False
 
-    async def get_training_status(self) -> Dict[str, Any]:
-        """
-        Get training system status - independent of MCP server status.
+    async def get_training_status(self) -> dict[str, Any]:
+        """Get training system status - independent of MCP server status.
 
         Returns:
             Training system status and metrics
@@ -566,14 +647,16 @@ class TrainingSystemManager:
         status = {
             "training_system_status": self._training_status,
             "training_session_id": self._training_session_id,
-            "uptime_seconds": time.time() - self._startup_time if self._startup_time else 0,
+            "uptime_seconds": time.time() - self._startup_time
+            if self._startup_time
+            else 0,
             "resource_usage": await self._get_resource_usage(),
             "components": {
                 "orchestrator": "running" if self._orchestrator else "stopped",
                 "analytics": "running" if self._analytics else "stopped",
-                "data_generator": "running" if self._data_generator else "stopped"
+                "data_generator": "running" if self._data_generator else "stopped",
             },
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Add active workflow status if orchestrator is running
@@ -593,7 +676,9 @@ class TrainingSystemManager:
         async with session_manager.get_async_session() as db_session:
             # Verify training-related tables exist
             result = await db_session.execute(
-                text("SELECT table_name FROM information_schema.tables WHERE table_name IN ('improvement_sessions', 'rule_performance')")
+                text(
+                    "SELECT table_name FROM information_schema.tables WHERE table_name IN ('improvement_sessions', 'rule_performance')"
+                )
             )
             tables = [row[0] for row in result.fetchall()]
 
@@ -611,7 +696,7 @@ class TrainingSystemManager:
             max_concurrent_workflows=3,  # Optimized for training workloads
             training_timeout=1800,  # 30 minutes for training workflows
             debug_mode=False,
-            verbose_logging=False
+            verbose_logging=False,
         )
 
         self._orchestrator = MLPipelineOrchestrator(config)
@@ -637,7 +722,7 @@ class TrainingSystemManager:
 
         self.logger.info("Synthetic data generator initialized")
 
-    async def _verify_training_health(self) -> Dict[str, Any]:
+    async def _verify_training_health(self) -> dict[str, Any]:
         """Verify training system health and performance."""
         health_start = time.time()
 
@@ -647,7 +732,7 @@ class TrainingSystemManager:
             "analytics_status": False,
             "data_generator_status": False,
             "overall_health": False,
-            "response_time_ms": 0
+            "response_time_ms": 0,
         }
 
         try:
@@ -661,8 +746,8 @@ class TrainingSystemManager:
             if self._orchestrator:
                 # Check if orchestrator is initialized and in a good state
                 health_status["orchestrator_status"] = (
-                    self._orchestrator._is_initialized and
-                    self._orchestrator.state.name in ["IDLE", "RUNNING"]
+                    self._orchestrator._is_initialized
+                    and self._orchestrator.state.name in ["IDLE", "RUNNING"]
                 )
 
             # Test analytics
@@ -676,27 +761,28 @@ class TrainingSystemManager:
                 health_status["database_connectivity"],
                 health_status["orchestrator_status"],
                 health_status["analytics_status"],
-                health_status["data_generator_status"]
+                health_status["data_generator_status"],
             ])
 
             health_status["response_time_ms"] = (time.time() - health_start) * 1000
 
         except Exception as e:
-            self.logger.error(f"Health check failed: {e}")
+            self.logger.error("Health check failed: %s", e)
             health_status["error"] = str(e)
 
         return health_status
 
-    async def _get_resource_usage(self) -> Dict[str, float]:
+    async def _get_resource_usage(self) -> dict[str, float]:
         """Get current resource usage for training system."""
         try:
             import psutil
+
             process = psutil.Process()
 
             return {
                 "memory_mb": process.memory_info().rss / 1024 / 1024,
                 "cpu_percent": process.cpu_percent(),
-                "open_files": len(process.open_files())
+                "open_files": len(process.open_files()),
             }
         except ImportError:
             return {"memory_mb": 0, "cpu_percent": 0, "open_files": 0}
@@ -706,7 +792,9 @@ class TrainingSystemManager:
         if not self._training_session_id:
             return
 
-        self.logger.info(f"Saving training progress for session {self._training_session_id}")
+        self.logger.info(
+            f"Saving training progress for session {self._training_session_id}"
+        )
         # Implementation for saving training state
 
     async def _cleanup_training_resources(self):
@@ -722,9 +810,8 @@ class TrainingSystemManager:
         self._analytics = None
         self._data_generator = None
 
-    async def smart_initialize(self) -> Dict[str, Any]:
-        """
-        Enhanced smart initialization with comprehensive system state detection.
+    async def smart_initialize(self) -> dict[str, Any]:
+        """Enhanced smart initialization with comprehensive system state detection.
 
         Implements 2025 best practices for ML system initialization:
         - Comprehensive system state detection and validation
@@ -737,7 +824,9 @@ class TrainingSystemManager:
             Detailed initialization results with system state analysis
         """
         initialization_start = time.time()
-        self.logger.info("Starting enhanced smart initialization with comprehensive detection")
+        self.logger.info(
+            "Starting enhanced smart initialization with comprehensive detection"
+        )
 
         try:
             # Phase 1: System State Detection
@@ -758,7 +847,9 @@ class TrainingSystemManager:
             )
 
             # Phase 6: Execute Initialization
-            execution_results = await self._execute_initialization_plan(initialization_plan)
+            execution_results = await self._execute_initialization_plan(
+                initialization_plan
+            )
 
             # Phase 7: Post-Initialization Validation
             final_validation = await self._validate_post_initialization()
@@ -776,24 +867,25 @@ class TrainingSystemManager:
                 "initialization_plan": initialization_plan,
                 "execution_results": execution_results,
                 "final_validation": final_validation,
-                "components_initialized": execution_results.get("components_initialized", []),
+                "components_initialized": execution_results.get(
+                    "components_initialized", []
+                ),
                 "recommendations": execution_results.get("recommendations", []),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
-            self.logger.error(f"Enhanced smart initialization failed: {e}")
+            self.logger.error("Enhanced smart initialization failed: %s", e)
             return {
                 "success": False,
                 "error": str(e),
                 "initialization_time_seconds": time.time() - initialization_start,
                 "components_initialized": [],
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
-    async def _detect_system_state(self) -> Dict[str, Any]:
-        """
-        Comprehensive system state detection using 2025 best practices.
+    async def _detect_system_state(self) -> dict[str, Any]:
+        """Comprehensive system state detection using 2025 best practices.
 
         Returns:
             Detailed system state information
@@ -809,26 +901,27 @@ class TrainingSystemManager:
                 "platform": sys.platform,
                 "working_directory": str(Path.cwd()),
                 "data_directory": str(self.training_data_dir),
-                "data_directory_exists": self.training_data_dir.exists()
+                "data_directory_exists": self.training_data_dir.exists(),
             },
-            "detection_time_ms": 0
+            "detection_time_ms": 0,
         }
 
         # Check for existing configuration files
         config_files = {
             "training_config": (self.training_data_dir / "config.json").exists(),
             "model_cache": (self.training_data_dir / "models").exists(),
-            "logs": (self.training_data_dir / "logs").exists()
+            "logs": (self.training_data_dir / "logs").exists(),
         }
         system_state["configuration_files"] = config_files
 
         # Check system resources
         try:
             import psutil
+
             system_state["system_resources"] = {
                 "available_memory_gb": psutil.virtual_memory().available / (1024**3),
                 "cpu_count": psutil.cpu_count(),
-                "disk_free_gb": psutil.disk_usage('.').free / (1024**3)
+                "disk_free_gb": psutil.disk_usage(".").free / (1024**3),
             }
         except ImportError:
             system_state["system_resources"] = {"status": "psutil_not_available"}
@@ -836,9 +929,8 @@ class TrainingSystemManager:
         system_state["detection_time_ms"] = (time.time() - state_start) * 1000
         return system_state
 
-    async def _validate_components(self) -> Dict[str, Any]:
-        """
-        Validate all training system components with health checks.
+    async def _validate_components(self) -> dict[str, Any]:
+        """Validate all training system components with health checks.
 
         Returns:
             Component validation results
@@ -849,7 +941,7 @@ class TrainingSystemManager:
             "orchestrator": {"status": "not_initialized", "details": {}},
             "analytics": {"status": "not_initialized", "details": {}},
             "data_generator": {"status": "not_initialized", "details": {}},
-            "validation_time_ms": 0
+            "validation_time_ms": 0,
         }
 
         # Validate orchestrator
@@ -858,12 +950,12 @@ class TrainingSystemManager:
                 health = await self._orchestrator.health_check()
                 component_status["orchestrator"] = {
                     "status": "healthy" if health.get("healthy") else "unhealthy",
-                    "details": health
+                    "details": health,
                 }
             except Exception as e:
                 component_status["orchestrator"] = {
                     "status": "error",
-                    "details": {"error": str(e)}
+                    "details": {"error": str(e)},
                 }
 
         # Validate analytics
@@ -872,12 +964,12 @@ class TrainingSystemManager:
                 # Test analytics functionality
                 component_status["analytics"] = {
                     "status": "healthy",
-                    "details": {"initialized": True}
+                    "details": {"initialized": True},
                 }
             except Exception as e:
                 component_status["analytics"] = {
                     "status": "error",
-                    "details": {"error": str(e)}
+                    "details": {"error": str(e)},
                 }
 
         # Validate data generator
@@ -888,21 +980,20 @@ class TrainingSystemManager:
                     "status": "healthy",
                     "details": {
                         "generation_method": self._data_generator.generation_method,
-                        "target_samples": self._data_generator.target_samples
-                    }
+                        "target_samples": self._data_generator.target_samples,
+                    },
                 }
             except Exception as e:
                 component_status["data_generator"] = {
                     "status": "error",
-                    "details": {"error": str(e)}
+                    "details": {"error": str(e)},
                 }
 
         component_status["validation_time_ms"] = (time.time() - validation_start) * 1000
         return component_status
 
-    async def _validate_database_and_rules(self) -> Dict[str, Any]:
-        """
-        Validate database connectivity, schema, and seeded rules.
+    async def _validate_database_and_rules(self) -> dict[str, Any]:
+        """Validate database connectivity, schema, and seeded rules.
 
         Returns:
             Database and rule validation results
@@ -914,7 +1005,7 @@ class TrainingSystemManager:
             "schema_validation": {"status": "unknown", "details": {}},
             "seeded_rules": {"status": "unknown", "details": {}},
             "rule_metadata": {"status": "unknown", "details": {}},
-            "validation_time_ms": 0
+            "validation_time_ms": 0,
         }
 
         try:
@@ -924,19 +1015,24 @@ class TrainingSystemManager:
                 await db_session.execute(text("SELECT 1"))
                 database_status["connectivity"] = {
                     "status": "healthy",
-                    "details": {"connection_successful": True}
+                    "details": {"connection_successful": True},
                 }
 
                 # Validate required tables exist
                 required_tables = [
-                    'improvement_sessions', 'rule_performance', 'rule_metadata',
-                    'training_prompts', 'discovered_patterns'
+                    "improvement_sessions",
+                    "rule_performance",
+                    "rule_metadata",
+                    "training_prompts",
+                    "discovered_patterns",
                 ]
 
                 # Use a simpler approach with text() and string formatting
                 table_list = "', '".join(required_tables)
                 result = await db_session.execute(
-                    text(f"SELECT table_name FROM information_schema.tables WHERE table_name IN ('{table_list}')")
+                    text(
+                        f"SELECT table_name FROM information_schema.tables WHERE table_name IN ('{table_list}')"
+                    )
                 )
                 existing_tables = [row[0] for row in result.fetchall()]
 
@@ -946,8 +1042,8 @@ class TrainingSystemManager:
                     "details": {
                         "required_tables": required_tables,
                         "existing_tables": existing_tables,
-                        "missing_tables": list(missing_tables)
-                    }
+                        "missing_tables": list(missing_tables),
+                    },
                 }
 
                 # Enhanced rule validation using RuleValidationService
@@ -961,28 +1057,31 @@ class TrainingSystemManager:
                     "details": {
                         "total_rules": rule_validation_report["rule_count"]["found"],
                         "valid_rules": rule_validation_report["rule_count"]["valid"],
-                        "expected_rules": rule_validation_report["rule_count"]["expected"],
-                        "validation_report": rule_validation_report
-                    }
+                        "expected_rules": rule_validation_report["rule_count"][
+                            "expected"
+                        ],
+                        "validation_report": rule_validation_report,
+                    },
                 }
 
                 database_status["rule_metadata"] = {
-                    "status": rule_validation_report["metadata_validation"]["overall_status"],
-                    "details": rule_validation_report["metadata_validation"]
+                    "status": rule_validation_report["metadata_validation"][
+                        "overall_status"
+                    ],
+                    "details": rule_validation_report["metadata_validation"],
                 }
 
         except Exception as e:
             database_status["connectivity"] = {
                 "status": "error",
-                "details": {"error": str(e)}
+                "details": {"error": str(e)},
             }
 
         database_status["validation_time_ms"] = (time.time() - validation_start) * 1000
         return database_status
 
-    async def _assess_data_availability(self) -> Dict[str, Any]:
-        """
-        Comprehensive training data availability assessment.
+    async def _assess_data_availability(self) -> dict[str, Any]:
+        """Comprehensive training data availability assessment.
 
         Returns:
             Data availability analysis with quality metrics
@@ -994,7 +1093,7 @@ class TrainingSystemManager:
             "synthetic_data": {"status": "unknown", "details": {}},
             "data_quality": {"status": "unknown", "details": {}},
             "minimum_requirements": {"status": "unknown", "details": {}},
-            "assessment_time_ms": 0
+            "assessment_time_ms": 0,
         }
 
         try:
@@ -1010,12 +1109,16 @@ class TrainingSystemManager:
 
                 # Assess by data source
                 synthetic_count_result = await db_session.execute(
-                    text("SELECT COUNT(*) FROM training_prompts WHERE data_source = 'synthetic'")
+                    text(
+                        "SELECT COUNT(*) FROM training_prompts WHERE data_source = 'synthetic'"
+                    )
                 )
                 synthetic_count = synthetic_count_result.scalar() or 0
 
                 user_count_result = await db_session.execute(
-                    text("SELECT COUNT(*) FROM training_prompts WHERE data_source = 'user'")
+                    text(
+                        "SELECT COUNT(*) FROM training_prompts WHERE data_source = 'user'"
+                    )
                 )
                 user_count = user_count_result.scalar() or 0
 
@@ -1032,26 +1135,35 @@ class TrainingSystemManager:
                         "synthetic_prompts": synthetic_count,
                         "user_prompts": user_count,
                         "prompt_sessions": session_count,
-                        "minimum_required": 100
-                    }
+                        "minimum_required": 100,
+                    },
                 }
 
                 data_status["synthetic_data"] = {
                     "status": "available" if synthetic_count > 0 else "missing",
                     "details": {
                         "synthetic_count": synthetic_count,
-                        "percentage_synthetic": (synthetic_count / max(training_count, 1)) * 100
-                    }
+                        "percentage_synthetic": (
+                            synthetic_count / max(training_count, 1)
+                        )
+                        * 100,
+                    },
                 }
 
                 # Enhanced quality assessment with comprehensive scoring
                 if training_count > 0:
-                    quality_assessment = await self._perform_comprehensive_quality_assessment(db_session, training_count)
+                    quality_assessment = (
+                        await self._perform_comprehensive_quality_assessment(
+                            db_session, training_count
+                        )
+                    )
                     data_status["data_quality"] = quality_assessment
                 else:
                     data_status["data_quality"] = {
                         "status": "no_data",
-                        "details": {"message": "No training data available for quality assessment"}
+                        "details": {
+                            "message": "No training data available for quality assessment"
+                        },
                     }
 
                 # Minimum requirements check
@@ -1059,33 +1171,28 @@ class TrainingSystemManager:
                     "training_data_count": training_count >= 100,
                     "synthetic_data_available": synthetic_count > 0,
                     "user_data_available": user_count > 0,
-                    "quality_acceptable": data_status["data_quality"]["status"] in ["good", "unknown"]
+                    "quality_acceptable": data_status["data_quality"]["status"]
+                    in ["good", "unknown"],
                 }
 
                 data_status["minimum_requirements"] = {
                     "status": "met" if all(requirements_met.values()) else "not_met",
-                    "details": requirements_met
+                    "details": requirements_met,
                 }
 
         except Exception as e:
-            self.logger.error(f"Data availability assessment failed: {e}")
+            self.logger.error("Data availability assessment failed: %s", e)
             data_status.update({
                 "training_data": {
                     "status": "error",
-                    "details": {"error": str(e), "total_training_prompts": 0}
+                    "details": {"error": str(e), "total_training_prompts": 0},
                 },
-                "synthetic_data": {
-                    "status": "error",
-                    "details": {"error": str(e)}
-                },
-                "data_quality": {
-                    "status": "error",
-                    "details": {"error": str(e)}
-                },
+                "synthetic_data": {"status": "error", "details": {"error": str(e)}},
+                "data_quality": {"status": "error", "details": {"error": str(e)}},
                 "minimum_requirements": {
                     "status": "error",
-                    "details": {"error": str(e)}
-                }
+                    "details": {"error": str(e)},
+                },
             })
 
         data_status["assessment_time_ms"] = (time.time() - assessment_start) * 1000
@@ -1093,9 +1200,8 @@ class TrainingSystemManager:
 
     async def _perform_comprehensive_quality_assessment(
         self, db_session: AsyncSession, training_count: int
-    ) -> Dict[str, Any]:
-        """
-        Perform comprehensive quality assessment of training data.
+    ) -> dict[str, Any]:
+        """Perform comprehensive quality assessment of training data.
 
         Implements 2025 best practices for data quality evaluation:
         - Multi-dimensional quality scoring
@@ -1128,7 +1234,7 @@ class TrainingSystemManager:
             "data_source_distribution": {},
             "priority_distribution": {},
             "metadata_quality": [],
-            "enhancement_quality": []
+            "enhancement_quality": [],
         }
 
         # Analyze each sample
@@ -1141,23 +1247,36 @@ class TrainingSystemManager:
 
                 # Feature completeness analysis
                 required_fields = ["enhanced_prompt", "effectiveness_score", "metadata"]
-                present_fields = sum(1 for field in required_fields if field in enhancement_result)
+                present_fields = sum(
+                    1 for field in required_fields if field in enhancement_result
+                )
                 completeness = present_fields / len(required_fields)
                 quality_metrics["feature_completeness"].append(completeness)
 
                 # Metadata quality analysis
                 metadata = enhancement_result.get("metadata", {})
                 if isinstance(metadata, dict):
-                    metadata_fields = ["source", "domain", "generation_timestamp", "feature_names"]
-                    metadata_completeness = sum(1 for field in metadata_fields if field in metadata) / len(metadata_fields)
+                    metadata_fields = [
+                        "source",
+                        "domain",
+                        "generation_timestamp",
+                        "feature_names",
+                    ]
+                    metadata_completeness = sum(
+                        1 for field in metadata_fields if field in metadata
+                    ) / len(metadata_fields)
                     quality_metrics["metadata_quality"].append(metadata_completeness)
 
                 # Enhancement quality analysis
                 enhanced_prompt = enhancement_result.get("enhanced_prompt", "")
                 original_prompt = enhancement_result.get("original_prompt", "")
                 if enhanced_prompt and original_prompt:
-                    enhancement_ratio = len(enhanced_prompt) / max(len(original_prompt), 1)
-                    quality_metrics["enhancement_quality"].append(min(enhancement_ratio, 3.0))  # Cap at 3x
+                    enhancement_ratio = len(enhanced_prompt) / max(
+                        len(original_prompt), 1
+                    )
+                    quality_metrics["enhancement_quality"].append(
+                        min(enhancement_ratio, 3.0)
+                    )  # Cap at 3x
 
             # Data source distribution
             quality_metrics["data_source_distribution"][data_source] = (
@@ -1165,23 +1284,45 @@ class TrainingSystemManager:
             )
 
             # Priority distribution
-            priority_range = "high" if priority >= 80 else "medium" if priority >= 50 else "low"
+            priority_range = (
+                "high" if priority >= 80 else "medium" if priority >= 50 else "low"
+            )
             quality_metrics["priority_distribution"][priority_range] = (
                 quality_metrics["priority_distribution"].get(priority_range, 0) + 1
             )
 
         # Calculate quality scores
-        avg_effectiveness = sum(quality_metrics["effectiveness_scores"]) / len(quality_metrics["effectiveness_scores"]) if quality_metrics["effectiveness_scores"] else 0
-        avg_completeness = sum(quality_metrics["feature_completeness"]) / len(quality_metrics["feature_completeness"]) if quality_metrics["feature_completeness"] else 0
-        avg_metadata_quality = sum(quality_metrics["metadata_quality"]) / len(quality_metrics["metadata_quality"]) if quality_metrics["metadata_quality"] else 0
-        avg_enhancement_quality = sum(quality_metrics["enhancement_quality"]) / len(quality_metrics["enhancement_quality"]) if quality_metrics["enhancement_quality"] else 0
+        avg_effectiveness = (
+            sum(quality_metrics["effectiveness_scores"])
+            / len(quality_metrics["effectiveness_scores"])
+            if quality_metrics["effectiveness_scores"]
+            else 0
+        )
+        avg_completeness = (
+            sum(quality_metrics["feature_completeness"])
+            / len(quality_metrics["feature_completeness"])
+            if quality_metrics["feature_completeness"]
+            else 0
+        )
+        avg_metadata_quality = (
+            sum(quality_metrics["metadata_quality"])
+            / len(quality_metrics["metadata_quality"])
+            if quality_metrics["metadata_quality"]
+            else 0
+        )
+        avg_enhancement_quality = (
+            sum(quality_metrics["enhancement_quality"])
+            / len(quality_metrics["enhancement_quality"])
+            if quality_metrics["enhancement_quality"]
+            else 0
+        )
 
         # Overall quality score (weighted average)
         overall_quality = (
-            avg_effectiveness * 0.4 +
-            avg_completeness * 0.3 +
-            avg_metadata_quality * 0.2 +
-            avg_enhancement_quality * 0.1
+            avg_effectiveness * 0.4
+            + avg_completeness * 0.3
+            + avg_metadata_quality * 0.2
+            + avg_enhancement_quality * 0.1
         )
 
         # Determine quality status
@@ -1202,55 +1343,81 @@ class TrainingSystemManager:
                 "effectiveness_metrics": {
                     "average_score": avg_effectiveness,
                     "score_count": len(quality_metrics["effectiveness_scores"]),
-                    "min_score": min(quality_metrics["effectiveness_scores"]) if quality_metrics["effectiveness_scores"] else 0,
-                    "max_score": max(quality_metrics["effectiveness_scores"]) if quality_metrics["effectiveness_scores"] else 0
+                    "min_score": min(quality_metrics["effectiveness_scores"])
+                    if quality_metrics["effectiveness_scores"]
+                    else 0,
+                    "max_score": max(quality_metrics["effectiveness_scores"])
+                    if quality_metrics["effectiveness_scores"]
+                    else 0,
                 },
                 "completeness_metrics": {
                     "average_completeness": avg_completeness,
                     "metadata_quality": avg_metadata_quality,
-                    "enhancement_quality": avg_enhancement_quality
+                    "enhancement_quality": avg_enhancement_quality,
                 },
                 "distribution_analysis": {
                     "data_sources": quality_metrics["data_source_distribution"],
-                    "priority_levels": quality_metrics["priority_distribution"]
+                    "priority_levels": quality_metrics["priority_distribution"],
                 },
                 "quality_recommendations": self._generate_quality_recommendations(
-                    overall_quality, avg_effectiveness, avg_completeness, quality_metrics
-                )
-            }
+                    overall_quality,
+                    avg_effectiveness,
+                    avg_completeness,
+                    quality_metrics,
+                ),
+            },
         }
 
     def _generate_quality_recommendations(
-        self, overall_quality: float, avg_effectiveness: float, avg_completeness: float, metrics: Dict
-    ) -> List[str]:
+        self,
+        overall_quality: float,
+        avg_effectiveness: float,
+        avg_completeness: float,
+        metrics: dict,
+    ) -> list[str]:
         """Generate recommendations for improving data quality."""
         recommendations = []
 
         if overall_quality < 0.7:
-            recommendations.append("Overall data quality is below optimal. Consider regenerating synthetic data with improved parameters.")
+            recommendations.append(
+                "Overall data quality is below optimal. Consider regenerating synthetic data with improved parameters."
+            )
 
         if avg_effectiveness < 0.6:
-            recommendations.append("Low effectiveness scores detected. Review and improve prompt enhancement algorithms.")
+            recommendations.append(
+                "Low effectiveness scores detected. Review and improve prompt enhancement algorithms."
+            )
 
         if avg_completeness < 0.8:
-            recommendations.append("Incomplete feature data detected. Ensure all required fields are populated during data generation.")
+            recommendations.append(
+                "Incomplete feature data detected. Ensure all required fields are populated during data generation."
+            )
 
         # Check data source diversity
         source_dist = metrics["data_source_distribution"]
         if len(source_dist) == 1:
-            recommendations.append("Limited data source diversity. Consider adding user-generated data alongside synthetic data.")
+            recommendations.append(
+                "Limited data source diversity. Consider adding user-generated data alongside synthetic data."
+            )
 
-        synthetic_percentage = source_dist.get("synthetic", 0) / sum(source_dist.values()) * 100
+        synthetic_percentage = (
+            source_dist.get("synthetic", 0) / sum(source_dist.values()) * 100
+        )
         if synthetic_percentage > 90:
-            recommendations.append("High reliance on synthetic data. Consider collecting real user data for better model performance.")
+            recommendations.append(
+                "High reliance on synthetic data. Consider collecting real user data for better model performance."
+            )
 
         return recommendations
 
     async def _create_initialization_plan(
-        self, system_state: Dict, component_status: Dict, database_status: Dict, data_status: Dict
-    ) -> Dict[str, Any]:
-        """
-        Create intelligent initialization plan based on system analysis.
+        self,
+        system_state: dict,
+        component_status: dict,
+        database_status: dict,
+        data_status: dict,
+    ) -> dict[str, Any]:
+        """Create intelligent initialization plan based on system analysis.
 
         Returns:
             Detailed initialization plan with prioritized actions
@@ -1261,7 +1428,7 @@ class TrainingSystemManager:
             "estimated_time_seconds": 0,
             "requirements_met": True,
             "blocking_issues": [],
-            "recommendations": []
+            "recommendations": [],
         }
 
         # Analyze current state and determine required actions
@@ -1270,7 +1437,7 @@ class TrainingSystemManager:
                 "action": "start_training_system",
                 "priority": 1,
                 "estimated_time": 30,
-                "description": "Initialize core training system components"
+                "description": "Initialize core training system components",
             })
 
         # Database issues
@@ -1287,7 +1454,7 @@ class TrainingSystemManager:
                 "action": "validate_and_load_rules",
                 "priority": 2,
                 "estimated_time": 10,
-                "description": "Validate and load seeded rules from database"
+                "description": "Validate and load seeded rules from database",
             })
 
         # Data availability issues
@@ -1298,7 +1465,7 @@ class TrainingSystemManager:
                     "action": "generate_synthetic_data",
                     "priority": 3,
                     "estimated_time": 60,
-                    "description": "Generate initial synthetic training data"
+                    "description": "Generate initial synthetic training data",
                 })
 
         # Component issues
@@ -1308,24 +1475,31 @@ class TrainingSystemManager:
                     "action": f"initialize_{component}",
                     "priority": 2,
                     "estimated_time": 15,
-                    "description": f"Initialize {component} component"
+                    "description": f"Initialize {component} component",
                 })
 
         # Calculate total estimated time
-        plan["estimated_time_seconds"] = sum(action["estimated_time"] for action in plan["actions"])
+        plan["estimated_time_seconds"] = sum(
+            action["estimated_time"] for action in plan["actions"]
+        )
 
         # Generate recommendations
         if data_status["data_quality"]["status"] == "needs_improvement":
-            plan["recommendations"].append("Consider regenerating synthetic data with higher quality parameters")
+            plan["recommendations"].append(
+                "Consider regenerating synthetic data with higher quality parameters"
+            )
 
         if system_state["system_resources"].get("available_memory_gb", 0) < 2:
-            plan["recommendations"].append("Low memory detected - consider reducing batch sizes")
+            plan["recommendations"].append(
+                "Low memory detected - consider reducing batch sizes"
+            )
 
         return plan
 
-    async def _execute_initialization_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute the initialization plan with progress tracking.
+    async def _execute_initialization_plan(
+        self, plan: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Execute the initialization plan with progress tracking.
 
         Returns:
             Execution results with component status
@@ -1339,7 +1513,7 @@ class TrainingSystemManager:
             "actions_completed": [],
             "actions_failed": [],
             "recommendations": plan.get("recommendations", []),
-            "execution_time_seconds": 0
+            "execution_time_seconds": 0,
         }
 
         # Check for blocking issues
@@ -1350,7 +1524,7 @@ class TrainingSystemManager:
                 "components_initialized": [],
                 "actions_completed": [],
                 "actions_failed": plan["blocking_issues"],
-                "execution_time_seconds": time.time() - execution_start
+                "execution_time_seconds": time.time() - execution_start,
             }
 
         # Execute actions in priority order
@@ -1363,7 +1537,9 @@ class TrainingSystemManager:
                 if action["action"] == "start_training_system":
                     startup_result = await self.start_training_system()
                     if startup_result["status"] == "success":
-                        results["components_initialized"].extend(startup_result["components_initialized"])
+                        results["components_initialized"].extend(
+                            startup_result["components_initialized"]
+                        )
                         results["actions_completed"].append(action["action"])
                     else:
                         results["actions_failed"].append(action["action"])
@@ -1380,9 +1556,13 @@ class TrainingSystemManager:
                     generation_results = await self._generate_initial_data(data_status)
                     if generation_results["success"]:
                         results["actions_completed"].append(action["action"])
-                        results["components_initialized"].append("synthetic_data_generation")
+                        results["components_initialized"].append(
+                            "synthetic_data_generation"
+                        )
                         if generation_results.get("recommendations"):
-                            results["recommendations"].extend(generation_results["recommendations"])
+                            results["recommendations"].extend(
+                                generation_results["recommendations"]
+                            )
                     else:
                         results["actions_failed"].append(action["action"])
                         results["success"] = False
@@ -1390,27 +1570,28 @@ class TrainingSystemManager:
                 elif action["action"].startswith("initialize_"):
                     component_name = action["action"].replace("initialize_", "")
                     # Component initialization handled by start_training_system
-                    self.logger.debug(f"Initializing component: {component_name}")
+                    self.logger.debug("Initializing component: %s", component_name)
                     results["actions_completed"].append(action["action"])
 
                 action_time = time.time() - action_start
-                self.logger.info(f"Completed {action['action']} in {action_time:.2f}s")
+                self.logger.info("Completed %s in %.2fs", action["action"], action_time)
 
             except Exception as e:
-                self.logger.error(f"Failed to execute {action['action']}: {e}")
+                self.logger.error("Failed to execute {action['action']}: %s", e)
                 results["actions_failed"].append(action["action"])
                 results["success"] = False
 
         results["execution_time_seconds"] = time.time() - execution_start
 
         if results["actions_failed"]:
-            results["message"] = f"Initialization completed with {len(results['actions_failed'])} failures"
+            results["message"] = (
+                f"Initialization completed with {len(results['actions_failed'])} failures"
+            )
 
         return results
 
-    async def _validate_post_initialization(self) -> Dict[str, Any]:
-        """
-        Validate system state after initialization.
+    async def _validate_post_initialization(self) -> dict[str, Any]:
+        """Validate system state after initialization.
 
         Returns:
             Post-initialization validation results
@@ -1421,7 +1602,7 @@ class TrainingSystemManager:
             "overall_health": False,
             "component_health": {},
             "training_readiness": False,
-            "validation_time_ms": 0
+            "validation_time_ms": 0,
         }
 
         try:
@@ -1432,7 +1613,7 @@ class TrainingSystemManager:
                 "database": health_status.get("database_connectivity", False),
                 "orchestrator": health_status.get("orchestrator_status", False),
                 "analytics": health_status.get("analytics_status", False),
-                "data_generator": health_status.get("data_generator_status", False)
+                "data_generator": health_status.get("data_generator_status", False),
             }
 
             # Check training readiness
@@ -1445,8 +1626,7 @@ class TrainingSystemManager:
         return validation
 
     async def validate_ready_for_training(self) -> bool:
-        """
-        Validate that the system is ready for training.
+        """Validate that the system is ready for training.
 
         Returns:
             True if ready for training, False otherwise
@@ -1483,12 +1663,11 @@ class TrainingSystemManager:
             return True
 
         except Exception as e:
-            self.logger.error(f"Training readiness validation failed: {e}")
+            self.logger.error("Training readiness validation failed: %s", e)
             return False
 
-    async def create_training_session(self, config: Dict[str, Any]) -> Any:
-        """
-        Create a new training session with the given configuration.
+    async def create_training_session(self, config: dict[str, Any]) -> Any:
+        """Create a new training session with the given configuration.
 
         Args:
             config: Training session configuration
@@ -1496,8 +1675,12 @@ class TrainingSystemManager:
         Returns:
             TrainingSession object
         """
-        from ...database.models import TrainingSession, TrainingSessionCreate
         import uuid
+
+        from prompt_improver.database.models import (
+            TrainingSession,
+            TrainingSessionCreate,
+        )
 
         try:
             # Generate unique session ID
@@ -1510,7 +1693,7 @@ class TrainingSystemManager:
                 max_iterations=config.get("max_iterations"),
                 improvement_threshold=config.get("improvement_threshold", 0.02),
                 timeout_seconds=config.get("timeout", 3600),
-                auto_init_enabled=config.get("auto_init", True)
+                auto_init_enabled=config.get("auto_init", True),
             )
 
             # Save to database
@@ -1524,16 +1707,15 @@ class TrainingSystemManager:
                 # Set as current training session
                 self._training_session_id = session_id
 
-                self.logger.info(f"Created training session: {session_id}")
+                self.logger.info("Created training session: %s", session_id)
                 return db_session
 
         except Exception as e:
-            self.logger.error(f"Failed to create training session: {e}")
+            self.logger.error("Failed to create training session: %s", e)
             raise
 
-    async def get_system_status(self) -> Dict[str, Any]:
-        """
-        Get comprehensive system status including health and active sessions.
+    async def get_system_status(self) -> dict[str, Any]:
+        """Get comprehensive system status including health and active sessions.
 
         Returns:
             System status dictionary
@@ -1548,7 +1730,9 @@ class TrainingSystemManager:
 
             if self._orchestrator:
                 orchestrator_health = await self._orchestrator.health_check()
-                components["orchestrator"] = "healthy" if orchestrator_health.get("healthy") else "unhealthy"
+                components["orchestrator"] = (
+                    "healthy" if orchestrator_health.get("healthy") else "unhealthy"
+                )
             else:
                 components["orchestrator"] = "not_initialized"
 
@@ -1572,13 +1756,17 @@ class TrainingSystemManager:
                 components["database"] = "unhealthy"
 
             # Overall health
-            healthy = all(status in ["healthy", "running"] for status in components.values())
+            healthy = all(
+                status in ["healthy", "running"] for status in components.values()
+            )
 
             # Get recent performance if available
             recent_performance = {}
             if self._analytics:
                 try:
-                    recent_performance = await self._analytics.get_recent_performance_summary()
+                    recent_performance = (
+                        await self._analytics.get_recent_performance_summary()
+                    )
                 except Exception:
                     pass
 
@@ -1589,30 +1777,31 @@ class TrainingSystemManager:
                     {
                         "session_id": session.session_id,
                         "status": session.status,
-                        "started_at": session.started_at.isoformat() if session.started_at else None,
+                        "started_at": session.started_at.isoformat()
+                        if session.started_at
+                        else None,
                         "iterations": session.current_iteration,
-                        "current_performance": session.current_performance
+                        "current_performance": session.current_performance,
                     }
                     for session in active_sessions
                 ],
                 "components": components,
                 "recent_performance": recent_performance,
                 "resource_usage": await self._get_resource_usage(),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to get system status: {e}")
+            self.logger.error("Failed to get system status: %s", e)
             return {
                 "healthy": False,
                 "status": "error",
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def get_active_sessions(self) -> list:
-        """
-        Get all active training sessions.
+        """Get all active training sessions.
 
         Returns:
             List of active TrainingSession objects
@@ -1624,14 +1813,16 @@ class TrainingSystemManager:
             async with session_manager.get_async_session() as session:
                 # Query for active sessions using raw SQL
                 result = await session.execute(
-                    text("SELECT * FROM training_sessions WHERE status IN ('initializing', 'running', 'paused')")
+                    text(
+                        "SELECT * FROM training_sessions WHERE status IN ('initializing', 'running', 'paused')"
+                    )
                 )
                 active_sessions = result.fetchall()
 
                 return list(active_sessions)
 
         except Exception as e:
-            self.logger.error(f"Failed to get active sessions: {e}")
+            self.logger.error("Failed to get active sessions: %s", e)
             return []
 
     async def _needs_synthetic_data(self) -> bool:
@@ -1652,9 +1843,10 @@ class TrainingSystemManager:
         except Exception:
             return True  # Generate data if we can't check
 
-    async def _generate_initial_data(self, data_status: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Enhanced synthetic data generation with smart initialization and targeted generation.
+    async def _generate_initial_data(
+        self, data_status: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Enhanced synthetic data generation with smart initialization and targeted generation.
 
         Implements 2025 best practices for intelligent data generation:
         - Gap-based targeting based on data availability assessment
@@ -1676,7 +1868,7 @@ class TrainingSystemManager:
             "generation_method": "statistical",
             "quality_score": 0.0,
             "generation_time_seconds": 0,
-            "recommendations": []
+            "recommendations": [],
         }
 
         if not self._data_generator:
@@ -1691,10 +1883,14 @@ class TrainingSystemManager:
             await self._configure_generator_for_strategy(generation_strategy)
 
             # Execute targeted generation
-            generation_data = await self._execute_targeted_generation(generation_strategy)
+            generation_data = await self._execute_targeted_generation(
+                generation_strategy
+            )
 
             # Validate generated data quality
-            quality_assessment = await self._validate_generated_data_quality(generation_data)
+            quality_assessment = await self._validate_generated_data_quality(
+                generation_data
+            )
 
             generation_results.update({
                 "success": True,
@@ -1704,7 +1900,7 @@ class TrainingSystemManager:
                 "generation_time_seconds": time.time() - generation_start,
                 "strategy_used": generation_strategy,
                 "quality_assessment": quality_assessment,
-                "recommendations": generation_strategy.get("recommendations", [])
+                "recommendations": generation_strategy.get("recommendations", []),
             })
 
             self.logger.info(
@@ -1714,14 +1910,17 @@ class TrainingSystemManager:
 
         except Exception as e:
             generation_results["error"] = str(e)
-            generation_results["generation_time_seconds"] = time.time() - generation_start
-            self.logger.error(f"Enhanced data generation failed: {e}")
+            generation_results["generation_time_seconds"] = (
+                time.time() - generation_start
+            )
+            self.logger.error("Enhanced data generation failed: %s", e)
 
         return generation_results
 
-    async def _determine_generation_strategy(self, data_status: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Determine optimal generation strategy based on data gaps and system state.
+    async def _determine_generation_strategy(
+        self, data_status: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Determine optimal generation strategy based on data gaps and system state.
 
         Returns:
             Generation strategy with method, parameters, and targeting
@@ -1731,7 +1930,7 @@ class TrainingSystemManager:
             "target_samples": 100,
             "focus_areas": [],
             "quality_target": 0.8,
-            "recommendations": []
+            "recommendations": [],
         }
 
         if data_status:
@@ -1753,28 +1952,37 @@ class TrainingSystemManager:
             # Analyze quality gaps
             if quality_data.get("overall_quality_score", 0) < 0.7:
                 strategy["quality_target"] = 0.85  # Higher quality target
-                strategy["recommendations"].append("Targeting higher quality generation due to low existing data quality")
+                strategy["recommendations"].append(
+                    "Targeting higher quality generation due to low existing data quality"
+                )
 
             # Analyze data source diversity
-            distribution = quality_data.get("distribution_analysis", {}).get("data_sources", {})
+            distribution = quality_data.get("distribution_analysis", {}).get(
+                "data_sources", {}
+            )
             if len(distribution) == 1 and "synthetic" in distribution:
                 strategy["focus_areas"].append("domain_diversity")
-                strategy["recommendations"].append("Focusing on domain diversity to reduce synthetic data bias")
+                strategy["recommendations"].append(
+                    "Focusing on domain diversity to reduce synthetic data bias"
+                )
 
         # System resource considerations
         try:
             import psutil
+
             available_memory = psutil.virtual_memory().available / (1024**3)  # GB
             if available_memory < 2:
                 strategy["target_samples"] = min(strategy["target_samples"], 50)
                 strategy["method"] = "statistical"  # Less memory intensive
-                strategy["recommendations"].append("Reduced batch size due to limited memory")
+                strategy["recommendations"].append(
+                    "Reduced batch size due to limited memory"
+                )
         except ImportError:
             pass
 
         return strategy
 
-    async def _configure_generator_for_strategy(self, strategy: Dict[str, Any]) -> None:
+    async def _configure_generator_for_strategy(self, strategy: dict[str, Any]) -> None:
         """Configure the data generator based on the determined strategy."""
         if not self._data_generator:
             return
@@ -1786,12 +1994,16 @@ class TrainingSystemManager:
         self._data_generator.target_samples = strategy["target_samples"]
 
         # Configure quality parameters
-        if hasattr(self._data_generator, 'use_enhanced_scoring'):
+        if hasattr(self._data_generator, "use_enhanced_scoring"):
             self._data_generator.use_enhanced_scoring = strategy["quality_target"] > 0.8
 
-        self.logger.info(f"Configured generator: method={strategy['method']}, samples={strategy['target_samples']}")
+        self.logger.info(
+            f"Configured generator: method={strategy['method']}, samples={strategy['target_samples']}"
+        )
 
-    async def _execute_targeted_generation(self, strategy: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_targeted_generation(
+        self, strategy: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute the targeted data generation based on strategy."""
         if not self._data_generator:
             raise RuntimeError("Data generator not available")
@@ -1801,25 +2013,31 @@ class TrainingSystemManager:
         target_samples = strategy.get("target_samples", 100)
 
         # Execute generation using the configured method
-        self.logger.info(f"Executing targeted generation: method={method}, target_samples={target_samples}")
+        self.logger.info(
+            f"Executing targeted generation: method={method}, target_samples={target_samples}"
+        )
         generation_data = await self._data_generator.generate_data()
 
         return generation_data
 
-    async def _validate_generated_data_quality(self, generation_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _validate_generated_data_quality(
+        self, generation_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Validate the quality of newly generated data."""
         quality_assessment = {
             "overall_quality": 0.0,
             "effectiveness_distribution": {},
             "feature_completeness": 0.0,
-            "domain_diversity": 0.0
+            "domain_diversity": 0.0,
         }
 
         try:
             # Analyze effectiveness scores
             effectiveness_scores = generation_data.get("effectiveness_scores", [])
             if effectiveness_scores:
-                avg_effectiveness = sum(effectiveness_scores) / len(effectiveness_scores)
+                avg_effectiveness = sum(effectiveness_scores) / len(
+                    effectiveness_scores
+                )
                 quality_assessment["overall_quality"] = avg_effectiveness
 
                 # Distribution analysis
@@ -1838,11 +2056,18 @@ class TrainingSystemManager:
             features = generation_data.get("features", [])
             if features:
                 # Check if features have expected dimensions
-                expected_features = ["clarity", "specificity", "complexity", "actionability"]
+                expected_features = [
+                    "clarity",
+                    "specificity",
+                    "complexity",
+                    "actionability",
+                ]
                 if len(features) > 0 and len(features[0]) >= len(expected_features):
                     quality_assessment["feature_completeness"] = 1.0
                 else:
-                    quality_assessment["feature_completeness"] = len(features[0]) / len(expected_features) if features else 0.0
+                    quality_assessment["feature_completeness"] = (
+                        len(features[0]) / len(expected_features) if features else 0.0
+                    )
 
             # Analyze domain diversity
             metadata = generation_data.get("metadata", {})
@@ -1853,13 +2078,16 @@ class TrainingSystemManager:
                 if total_samples > 0:
                     entropy = -sum(
                         (count / total_samples) * math.log2(count / total_samples)
-                        for count in domain_distribution.values() if count > 0
+                        for count in domain_distribution.values()
+                        if count > 0
                     )
                     max_entropy = math.log2(len(domain_distribution))
-                    quality_assessment["domain_diversity"] = entropy / max_entropy if max_entropy > 0 else 0.0
+                    quality_assessment["domain_diversity"] = (
+                        entropy / max_entropy if max_entropy > 0 else 0.0
+                    )
 
         except Exception as e:
-            self.logger.warning(f"Quality validation failed: {e}")
+            self.logger.warning("Quality validation failed: %s", e)
 
         return quality_assessment
 
@@ -1871,7 +2099,9 @@ class TrainingSystemManager:
             async with session_manager.get_async_session() as session:
                 # Check if training_sessions table exists
                 result = await session.execute(
-                    text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'training_sessions')")
+                    text(
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'training_sessions')"
+                    )
                 )
                 return bool(result.scalar())
         except Exception:

@@ -44,7 +44,7 @@ git config --global core.editor "code --wait"
 echo "Creating project directories..."
 mkdir -p /workspace/logs
 mkdir -p /workspace/data/ml_studies
-mkdir -p /workspace/.mypy_cache
+# Pyright uses different cache mechanism - no cache directory needed
 mkdir -p /workspace/.ruff_cache
 mkdir -p /workspace/.pytest_cache
 

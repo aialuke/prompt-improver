@@ -1,40 +1,51 @@
 """Production Synthetic Data Generator Orchestrator
 
-Main orchestration module for synthetic data generation with backward compatibility.
+Main orchestration module for synthetic data generation.
 Decomposed from synthetic_data_generator.py (3,389 lines) into focused generators.
 
-This module maintains the public API with ProductionSyntheticDataGenerator
+This module provides the public API with ProductionSyntheticDataGenerator
 while delegating specialized generation to focused sub-modules.
 """
 
 import asyncio
+from dataclasses import dataclass
+from datetime import UTC, datetime
 import logging
 import time
-from dataclasses import dataclass
-from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import numpy as np
+
 from ...database.models import TrainingPrompt
-from ..learning.quality.enhanced_scorer import EnhancedQualityMetrics, EnhancedQualityScorer
-from ..optimization.batch import UnifiedBatchProcessor, UnifiedBatchConfig, ProcessingStrategy
-from ..analytics.generation_analytics import GenerationHistoryTracker, GenerationAnalytics
+from ..analytics.generation_analytics import (
+    GenerationAnalytics,
+    GenerationHistoryTracker,
+)
+from ..learning.quality.enhanced_scorer import (
+    EnhancedQualityMetrics,
+    EnhancedQualityScorer,
+)
+from ..optimization.batch import (
+    ProcessingStrategy,
+    UnifiedBatchConfig,
+    UnifiedBatchProcessor,
+)
 
 # Import specialized generators
 from .generators.statistical_generator import (
-    StatisticalDataGenerator,
-    StatisticalQualityAssessor,
     GenerationMethodMetrics,
     MethodPerformanceTracker,
+    StatisticalDataGenerator,
+    StatisticalQualityAssessor,
 )
 
 # Import neural generators with optional availability
 try:
     from .generators.neural_generator import (
-        NeuralSyntheticGenerator,
         DiffusionSyntheticGenerator,
+        NeuralSyntheticGenerator,
     )
     NEURAL_AVAILABLE = True
 except ImportError:
@@ -43,10 +54,10 @@ except ImportError:
 # Import GAN generators with optional availability  
 try:
     from .generators.gan_generator import (
+        HybridGenerationSystem,
+        TabularDiffusion,
         TabularGAN,
         TabularVAE,
-        TabularDiffusion,
-        HybridGenerationSystem,
     )
     GAN_AVAILABLE = True
 except ImportError:
@@ -229,7 +240,7 @@ class ProductionSyntheticDataGenerator:
                     device=self.neural_device
                 )
         except Exception as e:
-            logger.warning(f"Failed to initialize neural generators: {e}")
+            logger.warning("Failed to initialize neural generators: %s", e)
             self.generation_method = "statistical"  # Fallback
 
     def _initialize_domain_configs(self) -> dict[str, DomainConfig]:
@@ -479,7 +490,7 @@ class ProductionSyntheticDataGenerator:
 
     async def generate_comprehensive_training_data(self) -> dict[str, Any]:
         """Generate comprehensive training data using statistical methods (primary method)"""
-        logger.info(f"Starting comprehensive generation of {self.target_samples} samples")
+        logger.info("Starting comprehensive generation of %s samples", self.target_samples)
         start_time = time.time()
 
         try:
@@ -493,7 +504,7 @@ class ProductionSyntheticDataGenerator:
                 sample_count = max(1, int(self.target_samples * domain_config.ratio))  # Ensure at least 1 sample
                 domain_counts[domain_name] = sample_count
 
-                logger.info(f"Generating {sample_count} samples for {domain_name} domain")
+                logger.info("Generating {sample_count} samples for %s domain", domain_name)
 
                 # Generate domain-specific features
                 features, effectiveness = self.statistical_generator.generate_domain_statistical_features(
@@ -549,11 +560,11 @@ class ProductionSyntheticDataGenerator:
                 }
             }
 
-            logger.info(f"Generated {len(all_features)} samples in {generation_time:.2f}s")
+            logger.info("Generated %d samples in %.2fs", len(all_features), generation_time)
             return result
 
         except Exception as e:
-            logger.error(f"Comprehensive generation failed: {e}")
+            logger.error("Comprehensive generation failed: %s", e)
             raise
 
     async def generate_neural_training_data(self) -> dict[str, Any]:
@@ -562,7 +573,7 @@ class ProductionSyntheticDataGenerator:
             logger.warning("Neural generation not available, falling back to statistical generation")
             return await self.generate_comprehensive_training_data()
 
-        logger.info(f"Starting neural generation of {self.target_samples} samples using {self.neural_model_type}")
+        logger.info("Starting neural generation of {self.target_samples} samples using %s", self.neural_model_type)
 
         try:
             # First generate a base dataset using statistical methods for training the neural model
@@ -612,7 +623,7 @@ class ProductionSyntheticDataGenerator:
             return result
 
         except Exception as e:
-            logger.error(f"Neural generation failed: {e}")
+            logger.error("Neural generation failed: %s", e)
             # Fallback to statistical generation
             return await self.generate_comprehensive_training_data()
 
@@ -622,7 +633,7 @@ class ProductionSyntheticDataGenerator:
             logger.warning("Hybrid generation not available, falling back to statistical generation")
             return await self.generate_comprehensive_training_data()
 
-        logger.info(f"Starting hybrid generation of {self.target_samples} samples")
+        logger.info("Starting hybrid generation of %s samples", self.target_samples)
 
         try:
             # Use the hybrid generation system
@@ -674,7 +685,7 @@ class ProductionSyntheticDataGenerator:
             return formatted_result
 
         except Exception as e:
-            logger.error(f"Hybrid generation failed: {e}")
+            logger.error("Hybrid generation failed: %s", e)
             # Fallback to statistical generation
             return await self.generate_comprehensive_training_data()
 
@@ -684,7 +695,7 @@ class ProductionSyntheticDataGenerator:
             logger.warning("Diffusion generation not available, falling back to statistical generation")
             return await self.generate_comprehensive_training_data()
 
-        logger.info(f"Starting diffusion generation of {self.target_samples} samples")
+        logger.info("Starting diffusion generation of %s samples", self.target_samples)
 
         try:
             # First generate a base dataset using statistical methods for training the diffusion model
@@ -733,7 +744,7 @@ class ProductionSyntheticDataGenerator:
             return result
 
         except Exception as e:
-            logger.error(f"Diffusion generation failed: {e}")
+            logger.error("Diffusion generation failed: %s", e)
             # Fallback to statistical generation
             return await self.generate_comprehensive_training_data()
 
@@ -798,7 +809,7 @@ class ProductionSyntheticDataGenerator:
         session_id: str
     ) -> dict[str, Any]:
         """Generate data with history tracking"""
-        logger.info(f"Generating data with history tracking for session: {session_id}")
+        logger.info("Generating data with history tracking for session: %s", session_id)
         
         self.current_session_id = session_id
         
@@ -883,7 +894,7 @@ class ProductionSyntheticDataGenerator:
             )
             
         except Exception as e:
-            logger.warning(f"Quality assessment failed: {e}")
+            logger.warning("Quality assessment failed: %s", e)
             return QualityMetrics(
                 distribution_quality=0.7,
                 feature_diversity=0.7,

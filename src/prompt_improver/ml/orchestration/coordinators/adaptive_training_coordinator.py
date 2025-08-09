@@ -4,24 +4,43 @@ Integrates adaptive data generation with continuous training workflows.
 """
 
 import asyncio
-import logging
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+from datetime import datetime, timezone
+import logging
+from typing import Any, Dict, List, Optional, Tuple
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....database import get_sessionmanager
 from ....database.models import TrainingSession, TrainingSessionUpdate
-from ..core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from ...analysis.performance_gap_analyzer import PerformanceGapAnalyzer, GapAnalysisResult
-from ...analysis.generation_strategy_analyzer import GenerationStrategyAnalyzer, StrategyRecommendation
-from ...analysis.difficulty_distribution_analyzer import DifficultyDistributionAnalyzer, DifficultyProfile
+from ....performance.monitoring.health.background_manager import (
+    TaskPriority,
+    get_background_task_manager,
+)
+from ...analysis.difficulty_distribution_analyzer import (
+    DifficultyDistributionAnalyzer,
+    DifficultyProfile,
+)
+from ...analysis.generation_strategy_analyzer import (
+    GenerationStrategyAnalyzer,
+    StrategyRecommendation,
+)
+from ...analysis.performance_gap_analyzer import (
+    GapAnalysisResult,
+    PerformanceGapAnalyzer,
+)
+from ...analytics.generation_analytics import (
+    GenerationAnalytics,
+    GenerationHistoryTracker,
+)
+from ...optimization.batch import (
+    ProcessingStrategy,
+    UnifiedBatchConfig,
+    UnifiedBatchProcessor,
+)
 from ...preprocessing.orchestrator import ProductionSyntheticDataGenerator
-from ...analytics.generation_analytics import GenerationHistoryTracker, GenerationAnalytics
-from ...optimization.batch import UnifiedBatchProcessor, UnifiedBatchConfig, ProcessingStrategy
+from ..core.ml_pipeline_orchestrator import MLPipelineOrchestrator
 
 
 @dataclass
@@ -125,7 +144,7 @@ class AdaptiveTrainingCoordinator:
             Session ID for tracking
         """
         session_id = f"adaptive_training_{uuid.uuid4().hex[:8]}"
-        self.logger.info(f"Starting adaptive training session: {session_id}")
+        self.logger.info("Starting adaptive training session: %s", session_id)
 
         try:
             # 1. Create database session record
@@ -165,11 +184,11 @@ class AdaptiveTrainingCoordinator:
             # Store task ID for tracking
             self.active_training_tasks[session_id] = training_task_id
 
-            self.logger.info(f"Adaptive training session started: {session_id}")
+            self.logger.info("Adaptive training session started: %s", session_id)
             return session_id
 
         except Exception as e:
-            self.logger.error(f"Failed to start adaptive training session: {e}")
+            self.logger.error("Failed to start adaptive training session: %s", e)
             raise
 
     async def _run_continuous_training_loop(
@@ -180,7 +199,7 @@ class AdaptiveTrainingCoordinator:
     ) -> None:
         """Run the main continuous training loop with adaptive data generation."""
 
-        self.logger.info(f"Starting continuous training loop for session: {session_id}")
+        self.logger.info("Starting continuous training loop for session: %s", session_id)
         iteration_count = 0
 
         try:
@@ -188,7 +207,7 @@ class AdaptiveTrainingCoordinator:
                 iteration_count += 1
                 iteration_id = f"{session_id}_iter_{iteration_count}"
 
-                self.logger.info(f"Starting iteration {iteration_count} for session {session_id}")
+                self.logger.info("Starting iteration {iteration_count} for session %s", session_id)
 
                 # Create new iteration
                 current_iteration = AdaptiveTrainingIteration(
@@ -199,40 +218,40 @@ class AdaptiveTrainingCoordinator:
 
                 try:
                     # Step 1: Analyze performance gaps
-                    self.logger.info(f"Analyzing performance gaps for iteration {iteration_count}")
+                    self.logger.info("Analyzing performance gaps for iteration %s", iteration_count)
                     gap_analysis = await self._analyze_performance_gaps(session_id, focus_areas)
                     current_iteration.performance_gaps = gap_analysis
 
                     # Step 2: Check stopping criteria
                     if gap_analysis.stopping_criteria_met:
-                        self.logger.info(f"Stopping criteria met for session {session_id}")
+                        self.logger.info("Stopping criteria met for session %s", session_id)
                         current_iteration.stopping_criteria_met = True
                         await self._complete_training_session(session_id, "stopping_criteria_met")
                         break
 
                     # Step 3: Determine generation strategy
-                    self.logger.info(f"Determining generation strategy for iteration {iteration_count}")
+                    self.logger.info("Determining generation strategy for iteration %s", iteration_count)
                     strategy_recommendation = await self._determine_generation_strategy(
                         gap_analysis, focus_areas
                     )
                     current_iteration.strategy_recommendation = strategy_recommendation
 
                     # Step 4: Analyze difficulty distribution
-                    self.logger.info(f"Analyzing difficulty distribution for iteration {iteration_count}")
+                    self.logger.info("Analyzing difficulty distribution for iteration %s", iteration_count)
                     difficulty_profile = await self._analyze_difficulty_distribution(
                         gap_analysis, focus_areas
                     )
                     current_iteration.difficulty_profile = difficulty_profile
 
                     # Step 5: Generate targeted synthetic data
-                    self.logger.info(f"Generating targeted data for iteration {iteration_count}")
+                    self.logger.info("Generating targeted data for iteration %s", iteration_count)
                     generated_data = await self._generate_targeted_data(
                         gap_analysis, strategy_recommendation, difficulty_profile, session_id
                     )
                     current_iteration.generated_data_count = len(generated_data.get("features", []))
 
                     # Step 6: Execute training with new data
-                    self.logger.info(f"Executing training for iteration {iteration_count}")
+                    self.logger.info("Executing training for iteration %s", iteration_count)
                     training_results = await self._execute_training_iteration(
                         session_id, generated_data, current_iteration
                     )
@@ -256,10 +275,10 @@ class AdaptiveTrainingCoordinator:
                     if iteration_count % self.config["checkpoint_frequency"] == 0:
                         await self._checkpoint_session(session_id)
 
-                    self.logger.info(f"Completed iteration {iteration_count} for session {session_id}")
+                    self.logger.info("Completed iteration {iteration_count} for session %s", session_id)
 
                 except Exception as e:
-                    self.logger.error(f"Error in iteration {iteration_count} for session {session_id}: {e}")
+                    self.logger.error("Error in iteration {iteration_count} for session {session_id}: %s", e)
                     current_iteration.metadata = {"error": str(e)}
                     await self._handle_iteration_error(session_id, current_iteration, e)
 
@@ -273,7 +292,7 @@ class AdaptiveTrainingCoordinator:
                 await self._complete_training_session(session_id, "max_iterations_reached")
 
         except Exception as e:
-            self.logger.error(f"Critical error in continuous training loop for session {session_id}: {e}")
+            self.logger.error("Critical error in continuous training loop for session {session_id}: %s", e)
             await self._complete_training_session(session_id, "error", str(e))
 
     async def _analyze_performance_gaps(
@@ -379,7 +398,7 @@ class AdaptiveTrainingCoordinator:
         # Log generation results
         sample_count = len(generated_data.get("features", []))
         generation_method = generated_data.get("metadata", {}).get("generation_method", "unknown")
-        self.logger.info(f"Generated {sample_count} samples using {generation_method} method")
+        self.logger.info("Generated {sample_count} samples using %s method", generation_method)
 
         return generated_data
 
@@ -411,21 +430,21 @@ class AdaptiveTrainingCoordinator:
             )
 
             # Log key insights
-            self.logger.info(f"Analytics Report for Session {session_id} (Iteration {iteration_count}):")
-            self.logger.info(f"  Overall Effectiveness: {effectiveness_report['overall_effectiveness']['effectiveness_score']:.3f}")
-            self.logger.info(f"  Best Method: {method_comparison.get('best_method', 'N/A')}")
-            self.logger.info(f"  Quality Trend: {performance_trends['trends']['quality_trend']:.3f}")
-            self.logger.info(f"  Efficiency Trend: {performance_trends['trends']['efficiency_trend']:.3f}")
+            self.logger.info("Analytics Report for Session {session_id} (Iteration %s):", iteration_count)
+            self.logger.info("  Overall Effectiveness: %s", effectiveness_report['overall_effectiveness']['effectiveness_score']:.3f)
+            self.logger.info("  Best Method: %s", method_comparison.get('best_method', 'N/A'))
+            self.logger.info("  Quality Trend: %s", performance_trends['trends']['quality_trend']:.3f)
+            self.logger.info("  Efficiency Trend: %s", performance_trends['trends']['efficiency_trend']:.3f)
 
             # Log recommendations
             recommendations = effectiveness_report.get('recommendations', [])
             if recommendations:
                 self.logger.info("  Recommendations:")
                 for rec in recommendations[:3]:  # Top 3 recommendations
-                    self.logger.info(f"    - {rec}")
+                    self.logger.info("    - %s", rec)
 
         except Exception as e:
-            self.logger.error(f"Failed to generate analytics report: {e}")
+            self.logger.error("Failed to generate analytics report: %s", e)
 
     async def _execute_training_iteration(
         self,
@@ -500,7 +519,7 @@ class AdaptiveTrainingCoordinator:
             )
 
             if existing_session.scalar_one_or_none():
-                self.logger.warning(f"Training session {session_id} already exists")
+                self.logger.warning("Training session %s already exists", session_id)
                 return
 
             # Create new training session
@@ -522,7 +541,7 @@ class AdaptiveTrainingCoordinator:
             db_session.add(training_session)
             await db_session.commit()
 
-            self.logger.info(f"Created training session record: {session_id}")
+            self.logger.info("Created training session record: %s", session_id)
 
     async def _update_training_session(
         self,
@@ -541,7 +560,7 @@ class AdaptiveTrainingCoordinator:
             training_session = result.scalar_one_or_none()
 
             if not training_session:
-                self.logger.error(f"Training session {session_id} not found for update")
+                self.logger.error("Training session %s not found for update", session_id)
                 return
 
             # Update session with iteration data
@@ -572,7 +591,7 @@ class AdaptiveTrainingCoordinator:
 
             await db_session.commit()
 
-            self.logger.info(f"Updated training session {session_id} with iteration results")
+            self.logger.info("Updated training session %s with iteration results", session_id)
 
     async def _checkpoint_session(self, session_id: str) -> None:
         """Create checkpoint for session recovery."""
@@ -603,7 +622,7 @@ class AdaptiveTrainingCoordinator:
                 training_session.last_checkpoint_at = datetime.now(timezone.utc)
                 await db_session.commit()
 
-                self.logger.info(f"Created checkpoint for session {session_id}")
+                self.logger.info("Created checkpoint for session %s", session_id)
 
     async def _complete_training_session(
         self,
@@ -613,7 +632,7 @@ class AdaptiveTrainingCoordinator:
     ) -> None:
         """Complete and finalize training session."""
 
-        self.logger.info(f"Completing training session {session_id}: {completion_reason}")
+        self.logger.info("Completing training session {session_id}: %s", completion_reason)
 
         async with get_sessionmanager().get_session() as db_session:
             from sqlalchemy import select
@@ -639,7 +658,7 @@ class AdaptiveTrainingCoordinator:
         if session_id in self.active_sessions:
             del self.active_sessions[session_id]
 
-        self.logger.info(f"Training session {session_id} completed successfully")
+        self.logger.info("Training session %s completed successfully", session_id)
 
     async def _handle_iteration_error(
         self,
@@ -649,7 +668,7 @@ class AdaptiveTrainingCoordinator:
     ) -> None:
         """Handle errors during training iterations."""
 
-        self.logger.error(f"Handling iteration error for session {session_id}: {error}")
+        self.logger.error("Handling iteration error for session {session_id}: %s", error)
 
         # Update session error tracking
         async with get_sessionmanager().get_session() as db_session:

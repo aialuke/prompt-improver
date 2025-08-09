@@ -250,7 +250,7 @@ Execute the comprehensive test suite:
 
 ```bash
 # Run the complete real-behavior test suite
-./scripts/run_real_behavior_tests.sh
+./scripts/run_tests.sh
 
 # Run specific test categories
 pytest tests/integration/test_psycopg_real_error_behavior.py::test_real_connection_error_classification -v

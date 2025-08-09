@@ -3,13 +3,28 @@ Implements Task 3: Production Service Management from Phase 2.
 """
 
 import asyncio
+import json
+import logging
 import os
 import signal
 import sys
+from datetime import datetime
 from pathlib import Path
-from prompt_improver.performance.monitoring.health.background_manager import (
-    get_background_task_manager, TaskPriority
+from typing import Any, Optional
+
+from rich.console import Console
+
+# Modern ML service integration imports
+from prompt_improver.core.di.ml_container import MLServiceContainer
+from prompt_improver.core.factories.ml_pipeline_factory import (
+    MLPipelineOrchestratorFactory,
 )
+from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
+from prompt_improver.performance.monitoring.health.background_manager import (
+    TaskPriority,
+    get_background_task_manager,
+)
+from prompt_improver.utils.subprocess_security import ensure_running
 
 # Optional psutil import
 try:
@@ -47,25 +62,21 @@ except ImportError:
                 return False
 
     psutil = MockPsutil()
-import json
-import logging
-from datetime import datetime
-from typing import Any, Optional
 
-from rich.console import Console
 
 # Lazy import to avoid circular dependency
 # from ...database import get_session, get_sessionmanager
 
+
 def _get_database_functions():
     """Lazy import of database functions to avoid circular imports."""
-    from ...database import get_session, get_sessionmanager
+    from prompt_improver.database import get_session, get_sessionmanager
+
     return get_session, get_sessionmanager
-from ...utils.subprocess_security import ensure_running
+
 
 class APESServiceManager:
-    """
-    Production service management with process monitoring.
+    """Production service management with process monitoring.
 
     Implements 2025 best practices for service orchestration integration:
     - Async lifecycle management with proper resource cleanup
@@ -86,9 +97,9 @@ class APESServiceManager:
         self.event_bus = event_bus
         self._is_initialized = False
         self._service_status = "stopped"
-        
+
         # Enhanced task management
-        self._health_monitoring_task_id: Optional[str] = None
+        self._health_monitoring_task_id: str | None = None
 
         # Setup logging
         self.setup_logging()
@@ -113,8 +124,7 @@ class APESServiceManager:
         self.logger = logging.getLogger("apes.service")
 
     async def start_service(self, detach: bool = False) -> dict[str, Any]:
-        """
-        Start APES service with orchestrator integration.
+        """Start APES service with orchestrator integration.
 
         This is the main entry point for orchestrator-managed service startup.
         Implements 2025 best practices for async service lifecycle management.
@@ -186,28 +196,30 @@ class APESServiceManager:
             )
 
             # Emit service started event for orchestrator
-            await self._emit_service_event("service.started", {
-                "status": "running",
-                "mcp_response_time": health_status.get('mcp_response_time'),
-                "postgresql_status": service_results.get("postgresql_status"),
-                "is_daemon": detach
-            })
+            await self._emit_service_event(
+                "service.started",
+                {
+                    "status": "running",
+                    "mcp_response_time": health_status.get("mcp_response_time"),
+                    "postgresql_status": service_results.get("postgresql_status"),
+                    "is_daemon": detach,
+                },
+            )
 
             # If daemon mode, start monitoring loop
             if detach:
                 await self.run_monitoring_loop()
 
         except Exception as e:
-            self.logger.error(f"Failed to start background service: {e}")
+            self.logger.error("Failed to start background service: %s", e)
             service_results["error"] = str(e)
             self._service_status = "failed"
             self.console.print(f"❌ Failed to start service: {e}", style="red")
 
             # Emit service failed event for orchestrator
-            await self._emit_service_event("service.failed", {
-                "error": str(e),
-                "status": "failed"
-            })
+            await self._emit_service_event(
+                "service.failed", {"error": str(e), "status": "failed"}
+            )
 
         return service_results
 
@@ -264,13 +276,13 @@ class APESServiceManager:
         with self.pid_file.open("w", encoding="utf-8") as f:
             json.dump(pid_data, f, indent=2)
 
-        self.logger.info(f"PID file written: {self.pid_file} (PID: {pid})")
+        self.logger.info("PID file written: {self.pid_file} (PID: %s)", pid)
 
     async def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
 
         def signal_handler(signum, frame):
-            self.logger.info(f"Received signal {signum}, initiating shutdown")
+            self.logger.info("Received signal %s, initiating shutdown", signum)
             self.shutdown_event.set()
 
         signal.signal(signal.SIGTERM, signal_handler)
@@ -282,7 +294,7 @@ class APESServiceManager:
             # Test database connection
             from sqlalchemy import text
 
-            from ..database import scalar
+            from prompt_improver.core.database import scalar
 
             get_session, _ = _get_database_functions()
             async with get_session() as session:
@@ -291,7 +303,7 @@ class APESServiceManager:
                 return "connected"
 
         except Exception as e:
-            self.logger.warning(f"PostgreSQL connection failed: {e}")
+            self.logger.warning("PostgreSQL connection failed: %s", e)
 
             # Try to start PostgreSQL service (system-dependent)
             try:
@@ -320,7 +332,7 @@ class APESServiceManager:
                 return "failed_to_start"
 
             except Exception as e:
-                self.logger.error(f"Failed to start PostgreSQL: {e}")
+                self.logger.error("Failed to start PostgreSQL: %s", e)
                 return "failed_to_start"
 
     async def start_mcp_server(self):
@@ -332,7 +344,7 @@ class APESServiceManager:
             self.logger.info("MCP server initialized")
 
         except Exception as e:
-            self.logger.error(f"Failed to start MCP server: {e}")
+            self.logger.error("Failed to start MCP server: %s", e)
             raise
 
     async def initialize_performance_monitoring(self):
@@ -345,29 +357,43 @@ class APESServiceManager:
             task_id=f"service_health_monitoring_{id(self)}",
             coroutine=self.monitor_service_health_background,
             priority=TaskPriority.HIGH,
-            tags={"service": "service_manager", "type": "health_monitoring", "component": "core"}
+            tags={
+                "service": "service_manager",
+                "type": "health_monitoring",
+                "component": "core",
+            },
         )
-        
+
         # Store task ID for potential cleanup
         self._health_monitoring_task_id = task_id
-        self.logger.info("Started service health monitoring with enhanced task management")
+        self.logger.info(
+            "Started service health monitoring with enhanced task management"
+        )
 
     async def verify_service_health(self) -> dict[str, Any]:
         """Verify service health and performance using unified health monitor"""
         try:
-            from ...performance.monitoring.health.unified_health_system import get_unified_health_monitor
+            from prompt_improver.performance.monitoring.health.unified_health_system import (
+                get_unified_health_monitor,
+            )
 
             health_monitor = get_unified_health_monitor()
             check_results = await health_monitor.check_health()
             overall_result = await health_monitor.get_overall_health()
 
-            # Convert to legacy format for compatibility
+            # Convert to required format
             health_status = {
                 "database_connection": check_results.get(
-                    "database", type('obj', (), {'status': type('Status', (), {'value': 'unhealthy'})()})()
-                ).status.value == "healthy",
+                    "database",
+                    type(
+                        "obj",
+                        (),
+                        {"status": type("Status", (), {"value": "unhealthy"})()},
+                    )(),
+                ).status.value
+                == "healthy",
                 "mcp_response_time": check_results.get(
-                    "mcp_server", type('obj', (), {'duration_ms': None})()
+                    "mcp_server", type("obj", (), {"duration_ms": None})()
                 ).duration_ms,
                 "memory_usage_mb": 0,
                 "cpu_usage_percent": 0,
@@ -387,7 +413,7 @@ class APESServiceManager:
             return health_status
 
         except Exception as e:
-            self.logger.error(f"Health service check failed: {e}")
+            self.logger.error("Health service check failed: %s", e)
             # Fallback to basic health status
             return {
                 "database_connection": False,
@@ -410,13 +436,15 @@ class APESServiceManager:
             async with get_session() as session:
                 # Reset any long-running queries
                 await session.execute(
-                    text("SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '30 seconds'")
+                    text(
+                        "SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '30 seconds'"
+                    )
                 )
 
             self.logger.info("Performance optimizations applied")
 
         except Exception as e:
-            self.logger.error(f"Failed to apply optimizations: {e}")
+            self.logger.error("Failed to apply optimizations: %s", e)
 
     async def monitor_service_health_background(self, alert_threshold_ms: int = 250):
         """Background service monitoring with alerting using unified health service"""
@@ -426,7 +454,9 @@ class APESServiceManager:
 
         while not self.shutdown_event.is_set():
             try:
-                from ...performance.monitoring.health.unified_health_system import get_unified_health_monitor
+                from prompt_improver.performance.monitoring.health.unified_health_system import (
+                    get_unified_health_monitor,
+                )
 
                 health_monitor = get_unified_health_monitor()
                 check_results = await health_monitor.check_health()
@@ -457,21 +487,27 @@ class APESServiceManager:
                 if system_check and system_check.details:
                     memory_percent = system_check.details.get("memory_usage_percent", 0)
                     if memory_percent > 80:
-                        self.logger.warning(f"High memory usage: {memory_percent:.1f}%")
+                        self.logger.warning("High memory usage: %.1f%%", memory_percent)
 
                 # Log health status for structured analysis
-                self.logger.info(f"Health status: {overall_result.status.value}")
+                self.logger.info("Health status: %s", overall_result.status.value)
 
                 # Check for any failed components
-                failed_checks = [name for name, result in check_results.items()
-                               if result.status.value == 'unhealthy']
+                failed_checks = [
+                    name
+                    for name, result in check_results.items()
+                    if result.status.value == "unhealthy"
+                ]
                 if failed_checks:
                     self.logger.error(
                         f"Failed health checks: {', '.join(failed_checks)}"
                     )
 
-                warning_checks = [name for name, result in check_results.items()
-                                if result.status.value == 'degraded']
+                warning_checks = [
+                    name
+                    for name, result in check_results.items()
+                    if result.status.value == "degraded"
+                ]
                 if warning_checks:
                     self.logger.warning(
                         f"Warning health checks: {', '.join(warning_checks)}"
@@ -481,7 +517,7 @@ class APESServiceManager:
                 await asyncio.sleep(30)  # 30-second monitoring interval
 
             except Exception as e:
-                self.logger.error(f"Monitoring cycle failed: {e}")
+                self.logger.error("Monitoring cycle failed: %s", e)
                 await asyncio.sleep(60)  # Longer delay on error
 
     async def collect_performance_metrics(self) -> dict[str, Any]:
@@ -498,7 +534,7 @@ class APESServiceManager:
             # Database metrics
             from sqlalchemy import text
 
-            from ..database import scalar
+            from prompt_improver.core.database import scalar
 
             get_session, _ = _get_database_functions()
             async with get_session() as session:
@@ -520,13 +556,13 @@ class APESServiceManager:
             metrics["cpu_usage_percent"] = process.cpu_percent()
 
         except Exception as e:
-            self.logger.error(f"Failed to collect metrics: {e}")
+            self.logger.error("Failed to collect metrics: %s", e)
 
         return metrics
 
     async def send_performance_alert(self, message: str):
         """Send performance alert"""
-        self.logger.warning(f"PERFORMANCE ALERT: {message}")
+        self.logger.warning("PERFORMANCE ALERT: %s", message)
 
         # In a full implementation, this could send notifications
         # For now, just log the alert
@@ -541,20 +577,22 @@ class APESServiceManager:
             get_session, _ = _get_database_functions()
             async with get_session() as session:
                 # Close idle connections
-                await session.execute(text("""
+                await session.execute(
+                    text("""
                     SELECT pg_terminate_backend(pid)
                     FROM pg_stat_activity
                     WHERE state = 'idle'
                     AND state_change < NOW() - INTERVAL '5 minutes'
-                """))
+                """)
+                )
 
         except Exception as e:
-            self.logger.error(f"Connection pool optimization failed: {e}")
+            self.logger.error("Connection pool optimization failed: %s", e)
 
     async def log_performance_metrics(self, metrics: dict[str, Any]):
         """Log performance metrics in structured format"""
         # Log metrics as JSON for easy parsing
-        self.logger.info(f"METRICS: {json.dumps(metrics)}")
+        self.logger.info("METRICS: %s", json.dumps(metrics))
 
     async def run_monitoring_loop(self):
         """Main monitoring loop for daemon mode"""
@@ -565,7 +603,7 @@ class APESServiceManager:
             await self.shutdown_event.wait()
 
         except Exception as e:
-            self.logger.error(f"Monitoring loop error: {e}")
+            self.logger.error("Monitoring loop error: %s", e)
 
         finally:
             await self.shutdown_service()
@@ -575,7 +613,9 @@ class APESServiceManager:
         self.logger.info("Initiating graceful shutdown")
 
         # Emit service stopping event for orchestrator
-        await self._emit_service_event("service.stopping", {"reason": "graceful_shutdown"})
+        await self._emit_service_event(
+            "service.stopping", {"reason": "graceful_shutdown"}
+        )
         self._service_status = "stopping"
 
         try:
@@ -596,8 +636,10 @@ class APESServiceManager:
             await self._emit_service_event("service.stopped", {"status": "stopped"})
 
         except Exception as e:
-            self.logger.error(f"Shutdown error: {e}")
-            await self._emit_service_event("service.failed", {"error": str(e), "during": "shutdown"})
+            self.logger.error("Shutdown error: %s", e)
+            await self._emit_service_event(
+                "service.failed", {"error": str(e), "during": "shutdown"}
+            )
 
     def stop_service(self, timeout: int = 30) -> dict[str, Any]:
         """Stop running APES service"""
@@ -643,15 +685,17 @@ class APESServiceManager:
             return {"status": "error", "message": str(e)}
 
     async def _emit_service_event(self, event_type: str, data: dict):
-        """
-        Emit service event to orchestrator event bus.
+        """Emit service event to orchestrator event bus.
 
         Implements 2025 best practice for event-driven service integration.
         """
         if self.event_bus:
             try:
                 # Import here to avoid circular dependencies
-                from ...ml.orchestration.events.event_types import MLEvent, EventType
+                from prompt_improver.ml.orchestration.events.event_types import (
+                    EventType,
+                    MLEvent,
+                )
 
                 # Map service events to orchestrator event types
                 event_type_mapping = {
@@ -662,19 +706,21 @@ class APESServiceManager:
                     "service.stopped": EventType.COMPONENT_STOPPED,
                 }
 
-                orchestrator_event_type = event_type_mapping.get(event_type, EventType.COMPONENT_STARTED)
+                orchestrator_event_type = event_type_mapping.get(
+                    event_type, EventType.COMPONENT_STARTED
+                )
 
                 event = MLEvent(
                     event_type=orchestrator_event_type,
                     source="apes_service_manager",
-                    data=data
+                    data=data,
                 )
 
                 await self.event_bus.emit(event)
-                self.logger.debug(f"Emitted service event: {event_type}")
+                self.logger.debug("Emitted service event: %s", event_type)
 
             except Exception as e:
-                self.logger.warning(f"Failed to emit service event {event_type}: {e}")
+                self.logger.warning("Failed to emit service event {event_type}: %s", e)
 
     def get_service_status(self) -> dict[str, Any]:
         """Get current service status with enhanced orchestrator integration"""
@@ -685,8 +731,8 @@ class APESServiceManager:
             "uptime_seconds": None,
             "memory_usage_mb": None,
             # Enhanced orchestrator integration fields
-            "service_status": getattr(self, '_service_status', 'unknown'),
-            "is_initialized": getattr(self, '_is_initialized', False),
+            "service_status": getattr(self, "_service_status", "unknown"),
+            "is_initialized": getattr(self, "_is_initialized", False),
             "event_bus_connected": self.event_bus is not None,
             "orchestrator_integration": True,  # Indicates 2025 integration patterns
         }

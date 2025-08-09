@@ -15,19 +15,20 @@ features:
 """
 
 import asyncio
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from enum import Enum
 import logging
 import time
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
-from enum import Enum
+
+from sqlmodel import SQLModel, Field
 
 import numpy as np
 
-from .linguistic_feature_extractor import LinguisticFeatureExtractor
-from .domain_feature_extractor import DomainFeatureExtractor
 from .context_feature_extractor import ContextFeatureExtractor
+from .domain_feature_extractor import DomainFeatureExtractor
+from .linguistic_feature_extractor import LinguisticFeatureExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -43,73 +44,56 @@ class CircuitBreakerState(Enum):
     OPEN = "open"
     HALF_OPEN = "half_open"
 
-@dataclass
-class FeatureExtractionConfig:
+class FeatureExtractionConfig(SQLModel):
     """Enhanced 2025 configuration for composite feature extraction."""
 
     # Feature extractor enablement
-    enable_linguistic: bool = True
-    enable_domain: bool = True
-    enable_context: bool = True
+    enable_linguistic: bool = Field(default=True, description="Enable linguistic feature extraction")
+    enable_domain: bool = Field(default=True, description="Enable domain feature extraction")
+    enable_context: bool = Field(default=True, description="Enable context feature extraction")
 
     # Feature weights with validation
-    linguistic_weight: float = field(default=1.0)
-    domain_weight: float = field(default=1.0)
-    context_weight: float = field(default=1.0)
+    linguistic_weight: float = Field(default=1.0, ge=0.0, le=10.0, description="Weight for linguistic features")
+    domain_weight: float = Field(default=1.0, ge=0.0, le=10.0, description="Weight for domain features")
+    context_weight: float = Field(default=1.0, ge=0.0, le=10.0, description="Weight for context features")
 
     # 2025: Advanced caching configuration
-    cache_enabled: bool = True
-    cache_ttl_seconds: int = 3600
-    cache_max_size: int = 10000
-    cache_invalidation_strategy: str = "lru"  # lru, ttl, adaptive
+    cache_enabled: bool = Field(default=True, description="Enable feature extraction caching")
+    cache_ttl_seconds: int = Field(default=3600, ge=0, description="Cache time-to-live in seconds")
+    cache_max_size: int = Field(default=10000, ge=1, description="Maximum cache size")
+    cache_invalidation_strategy: str = Field(default="lru", description="Cache invalidation strategy")
 
     # 2025: Processing configuration with resource awareness
-    execution_mode: ExtractionMode = ExtractionMode.ADAPTIVE
-    max_concurrent_extractions: int = 3
-    timeout_seconds: float = 30.0
-    memory_limit_mb: int = 1024
+    execution_mode: ExtractionMode = Field(default=ExtractionMode.ADAPTIVE, description="Feature extraction execution mode")
+    max_concurrent_extractions: int = Field(default=3, ge=1, le=20, description="Maximum concurrent extractions")
+    timeout_seconds: float = Field(default=30.0, gt=0.0, description="Extraction timeout in seconds")
+    memory_limit_mb: int = Field(default=1024, ge=128, description="Memory limit in MB")
 
     # 2025: Circuit breaker configuration
-    circuit_breaker_enabled: bool = True
-    failure_threshold: int = 5
-    recovery_timeout: int = 60
+    circuit_breaker_enabled: bool = Field(default=True, description="Enable circuit breaker pattern")
+    failure_threshold: int = Field(default=5, ge=1, description="Circuit breaker failure threshold")
+    recovery_timeout: int = Field(default=60, ge=1, description="Circuit breaker recovery timeout")
 
     # Quality thresholds with enhanced validation
-    min_text_length: int = 10
-    max_text_length: int = 100000
-    min_confidence_threshold: float = 0.5
+    min_text_length: int = Field(default=10, ge=0, description="Minimum text length for processing")
+    max_text_length: int = Field(default=100000, ge=1, description="Maximum text length for processing")
+    min_confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence threshold")
 
     # 2025: Observability configuration
-    enable_metrics: bool = True
-    enable_tracing: bool = True
-    log_level: str = "INFO"
+    enable_metrics: bool = Field(default=True, description="Enable metrics collection")
+    enable_tracing: bool = Field(default=True, description="Enable distributed tracing")
+    log_level: str = Field(default="INFO", description="Logging level")
 
-    def __post_init__(self):
-        """Validate configuration parameters."""
-        if not 0.0 <= self.linguistic_weight <= 10.0:
-            raise ValueError("linguistic_weight must be between 0.0 and 10.0")
-        if not 0.0 <= self.domain_weight <= 10.0:
-            raise ValueError("domain_weight must be between 0.0 and 10.0")
-        if not 0.0 <= self.context_weight <= 10.0:
-            raise ValueError("context_weight must be between 0.0 and 10.0")
-        if self.min_text_length < 0:
-            raise ValueError("min_text_length must be non-negative")
-        if self.max_text_length <= self.min_text_length:
-            raise ValueError("max_text_length must be greater than min_text_length")
-        if not 0.0 <= self.min_confidence_threshold <= 1.0:
-            raise ValueError("min_confidence_threshold must be between 0.0 and 1.0")
-
-@dataclass
-class ExtractionMetrics:
+class ExtractionMetrics(SQLModel):
     """Metrics for feature extraction operations."""
-    total_extractions: int = 0
-    successful_extractions: int = 0
-    failed_extractions: int = 0
-    total_processing_time: float = 0.0
-    average_processing_time: float = 0.0
-    cache_hits: int = 0
-    cache_misses: int = 0
-    circuit_breaker_trips: int = 0
+    total_extractions: int = Field(default=0, ge=0, description="Total number of extractions")
+    successful_extractions: int = Field(default=0, ge=0, description="Number of successful extractions")
+    failed_extractions: int = Field(default=0, ge=0, description="Number of failed extractions")
+    total_processing_time: float = Field(default=0.0, ge=0.0, description="Total processing time")
+    average_processing_time: float = Field(default=0.0, ge=0.0, description="Average processing time")
+    cache_hits: int = Field(default=0, ge=0, description="Number of cache hits")
+    cache_misses: int = Field(default=0, ge=0, description="Number of cache misses")
+    circuit_breaker_trips: int = Field(default=0, ge=0, description="Number of circuit breaker trips")
 
     def update_success(self, processing_time: float):
         """Update metrics for successful extraction."""
@@ -172,7 +156,9 @@ class CompositeFeatureExtractor:
         """Initialize feature extractors based on configuration."""
         if self.config.enable_linguistic:
             # Import the correct config class for LinguisticFeatureExtractor
-            from .linguistic_feature_extractor import FeatureExtractionConfig as LinguisticConfig
+            from .linguistic_feature_extractor import (
+                FeatureExtractionConfig as LinguisticConfig,
+            )
 
             linguistic_config = LinguisticConfig(
                 weight=self.config.linguistic_weight,
@@ -284,7 +270,7 @@ class CompositeFeatureExtractor:
             return result
             
         except Exception as e:
-            logger.error(f"Composite feature extraction failed: {e}")
+            logger.error("Composite feature extraction failed: %s", e)
             return self._get_default_result()
     
     def _validate_inputs(self, text: str, context_data: Optional[Dict[str, Any]]) -> bool:
@@ -296,11 +282,11 @@ class CompositeFeatureExtractor:
                 return False
             
             if len(text.strip()) < self.config.min_text_length:
-                logger.warning(f"Text too short: {len(text)} < {self.config.min_text_length}")
+                logger.warning("Text too short: {len(text)} < %s", self.config.min_text_length)
                 return False
             
             if len(text) > self.config.max_text_length:
-                logger.warning(f"Text too long: {len(text)} > {self.config.max_text_length}")
+                logger.warning("Text too long: {len(text)} > %s", self.config.max_text_length)
                 return False
             
             # Validate context data if provided
@@ -311,7 +297,7 @@ class CompositeFeatureExtractor:
             return True
             
         except Exception as e:
-            logger.error(f"Input validation failed: {e}")
+            logger.error("Input validation failed: %s", e)
             return False
     
     def _get_default_result(self) -> Dict[str, Any]:
@@ -377,7 +363,7 @@ class CompositeFeatureExtractor:
                 cleared_counts[name] = 0
         
         total_cleared = sum(cleared_counts.values())
-        logger.info(f"Cleared {total_cleared} total cached features across {len(cleared_counts)} extractors")
+        logger.info("Cleared {total_cleared} total cached features across %s extractors", len(cleared_counts))
         
         return cleared_counts
     
@@ -453,17 +439,17 @@ class CompositeFeatureExtractor:
                 processing_time = time.time() - start_time
                 self.metrics.update_success(processing_time)
 
-                logger.info(f"Feature extraction completed in {processing_time:.3f}s")
+                logger.info("Feature extraction completed in %.3fs", processing_time)
                 return result
 
         except asyncio.TimeoutError:
-            logger.error(f"Feature extraction timed out after {self.config.timeout_seconds}s")
+            logger.error("Feature extraction timed out after %ss", self.config.timeout_seconds)
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
             return self._get_default_result()
 
         except Exception as e:
-            logger.error(f"Async feature extraction failed: {e}")
+            logger.error("Async feature extraction failed: %s", e)
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
             return self._get_default_result()
@@ -505,10 +491,10 @@ class CompositeFeatureExtractor:
                         feature_names = [f"{extractor_name}_feature_{i}" for i in range(len(features))]
                     all_feature_names.extend(feature_names)
 
-                    logger.debug(f"Extracted {len(features)} features from {extractor_name}")
+                    logger.debug("Extracted {len(features)} features from %s", extractor_name)
 
             except Exception as e:
-                logger.error(f"Feature extraction failed for {extractor_name}: {e}")
+                logger.error("Feature extraction failed for {extractor_name}: %s", e)
                 continue
 
         return self._create_result(all_features, all_feature_names, extractor_results, text, context_data)
@@ -541,7 +527,7 @@ class CompositeFeatureExtractor:
                 extractor_name = extractor_names[i]
 
                 if isinstance(result, Exception):
-                    logger.error(f"Parallel extraction failed for {extractor_name}: {result}")
+                    logger.error("Parallel extraction failed for {extractor_name}: %s", result)
                     continue
 
                 if result and 'features' in result:
@@ -557,7 +543,7 @@ class CompositeFeatureExtractor:
             return self._create_result(all_features, all_feature_names, extractor_results, text, context_data)
 
         except Exception as e:
-            logger.error(f"Parallel feature extraction failed: {e}")
+            logger.error("Parallel feature extraction failed: %s", e)
             raise
 
     async def _extract_adaptive(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -598,7 +584,7 @@ class CompositeFeatureExtractor:
 
         if self.circuit_breaker_failures >= self.config.failure_threshold:
             self.circuit_breaker_state = CircuitBreakerState.OPEN
-            logger.warning(f"Circuit breaker opened after {self.circuit_breaker_failures} failures")
+            logger.warning("Circuit breaker opened after %s failures", self.circuit_breaker_failures)
 
     def _generate_cache_key(self, text: str, context_data: Optional[Dict[str, Any]]) -> str:
         """Generate cache key for text and context."""
@@ -629,11 +615,11 @@ class CompositeFeatureExtractor:
             return False
 
         if len(text) < self.config.min_text_length:
-            logger.warning(f"Text too short: {len(text)} < {self.config.min_text_length}")
+            logger.warning("Text too short: {len(text)} < %s", self.config.min_text_length)
             return False
 
         if len(text) > self.config.max_text_length:
-            logger.warning(f"Text too long: {len(text)} > {self.config.max_text_length}")
+            logger.warning("Text too long: {len(text)} > %s", self.config.max_text_length)
             # Truncate but continue processing
             return True
 
@@ -734,7 +720,7 @@ class CompositeFeatureExtractor:
                 }
 
         except Exception as e:
-            logger.error(f"Orchestrated analysis failed: {e}")
+            logger.error("Orchestrated analysis failed: %s", e)
             return {
                 "status": "error",
                 "error": str(e),

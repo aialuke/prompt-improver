@@ -154,7 +154,7 @@ wandb/
 *.code-workspace
 
 # Python tool caches
-.mypy_cache/
+# Pyright doesn't use a cache directory
 .ruff_cache/
 .bandit/
 .semgrep/

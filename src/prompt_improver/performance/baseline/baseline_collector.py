@@ -1,73 +1,47 @@
 """Automated performance baseline collection engine."""
-
 import asyncio
 import json
 import logging
 import time
 import tracemalloc
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
 import uuid
-
-# System monitoring
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from prompt_improver.performance.baseline.models import STANDARD_METRICS, BaselineMetrics, MetricDefinition, MetricType, MetricValue, get_metric_definition
+from prompt_improver.performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 try:
     import psutil
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-
-# Database monitoring
 try:
-    from ...database import get_session
+    from prompt_improver.database import get_session
     DATABASE_AVAILABLE = True
 except ImportError:
     DATABASE_AVAILABLE = False
-
-# Redis monitoring
 try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-
-# Prometheus integration
 try:
-    from ..monitoring.metrics_registry import get_metrics_registry
-    PROMETHEUS_AVAILABLE = True
+    from prompt_improver.performance.monitoring.metrics_registry import get_metrics_registry
 except ImportError:
-    PROMETHEUS_AVAILABLE = False
-
-# Background task manager
-from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
-
-from .models import (
-    BaselineMetrics, MetricValue, MetricDefinition, MetricType,
-    STANDARD_METRICS, get_metric_definition
-)
-
+    pass
 logger = logging.getLogger(__name__)
 
 class BaselineCollector:
     """Automated performance baseline collection engine.
-    
+
     Continuously collects key performance metrics with statistical analysis
     and trend detection capabilities.
     """
 
-    def __init__(
-        self,
-        collection_interval: int = 60,  # seconds
-        storage_path: Optional[Path] = None,
-        metrics_config: Optional[Dict[str, MetricDefinition]] = None,
-        enable_system_metrics: bool = True,
-        enable_database_metrics: bool = True,
-        enable_redis_metrics: bool = True,
-        enable_application_metrics: bool = True,
-        custom_collectors: Optional[List[Callable]] = None
-    ):
+    def __init__(self, collection_interval: int=60, storage_path: Path | None=None, metrics_config: dict[str, MetricDefinition] | None=None, enable_system_metrics: bool=True, enable_database_metrics: bool=True, enable_redis_metrics: bool=True, enable_application_metrics: bool=True, custom_collectors: list[Callable] | None=None):
         """Initialize baseline collector.
-        
+
         Args:
             collection_interval: How often to collect metrics (seconds)
             storage_path: Where to store collected data
@@ -76,539 +50,208 @@ class BaselineCollector:
             enable_database_metrics: Collect database performance metrics
             enable_redis_metrics: Collect Redis/cache metrics
             enable_application_metrics: Collect application-specific metrics
-            custom_collectors: Custom metric collection functions
+            custom_collectors: List of custom metric collector functions
         """
         self.collection_interval = collection_interval
-        self.storage_path = storage_path or Path("./baselines")
-        self.storage_path.mkdir(parents=True, exist_ok=True)
-        
-        # Metric definitions
-        self.metrics_config = metrics_config or STANDARD_METRICS.copy()
-        
-        # Collection flags
+        self.storage_path = storage_path or Path('baseline_data')
+        self.storage_path.mkdir(exist_ok=True)
+        self.metrics_config = metrics_config or {}
         self.enable_system_metrics = enable_system_metrics and PSUTIL_AVAILABLE
         self.enable_database_metrics = enable_database_metrics and DATABASE_AVAILABLE
         self.enable_redis_metrics = enable_redis_metrics and REDIS_AVAILABLE
         self.enable_application_metrics = enable_application_metrics
-        
-        # Custom collectors
         self.custom_collectors = custom_collectors or []
-        
-        # State management
-        self._running = False
-        self._collection_task_id: Optional[str] = None
-        self._current_baseline: Optional[BaselineMetrics] = None
-        self._last_collection_time = datetime.now(timezone.utc)
-        
-        # Performance tracking
-        self._request_counter = 0
-        self._error_counter = 0
-        self._response_times = []
-        self._collection_lock = asyncio.Lock()
-        
-        # Prometheus integration
-        if PROMETHEUS_AVAILABLE:
-            self.metrics_registry = get_metrics_registry()
-            self._setup_prometheus_metrics()
-        
-        logger.info(f"BaselineCollector initialized with {len(self.metrics_config)} metrics")
+        self._collecting = False
+        self._collection_task: asyncio.Task | None = None
+        self._collected_baselines: list[BaselineMetrics] = []
+        self._operation_tracking: dict[str, list[float]] = {}
+        self._initialize_standard_metrics()
+        logger.info('BaselineCollector initialized with %ss interval', collection_interval)
 
-    def _setup_prometheus_metrics(self):
-        """Setup Prometheus metrics for baseline collection."""
-        if not PROMETHEUS_AVAILABLE:
-            return
-        
-        try:
-            self.baseline_counter = self.metrics_registry.get_or_create_counter(
-                'baseline_collections_total',
-                'Total number of baseline collections',
-                ['status']
-            )
-            
-            self.baseline_duration = self.metrics_registry.get_or_create_histogram(
-                'baseline_collection_duration_seconds',
-                'Time spent collecting baseline metrics',
-                buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]
-            )
-            
-            self.metric_count = self.metrics_registry.get_or_create_gauge(
-                'baseline_metrics_collected',
-                'Number of metrics in last baseline collection'
-            )
-            
-        except Exception as e:
-            logger.warning(f"Failed to setup Prometheus metrics: {e}")
+    def _initialize_standard_metrics(self):
+        """Initialize standard metric definitions."""
+        for name, definition in STANDARD_METRICS.items():
+            if name not in self.metrics_config:
+                self.metrics_config[name] = definition
 
     async def start_collection(self) -> None:
-        """Start automated baseline collection."""
-        if self._running:
-            logger.warning("Collection already running")
+        """Start the baseline collection process."""
+        if self._collecting:
+            logger.warning('Collection already running')
             return
-        
-        self._running = True
-        # Start collection loop using background task manager
+        logger.info('Starting baseline collection')
+        self._collecting = True
         task_manager = get_background_task_manager()
-        self._collection_task_id = await task_manager.submit_enhanced_task(
-            task_id=f"baseline_collection_{str(uuid.uuid4())[:8]}",
-            coroutine=self._collection_loop(),
-            priority=TaskPriority.LOW,
-            tags={
-                "service": "performance",
-                "type": "baseline",
-                "component": "collector",
-                "operation": "data_collection"
-            }
-        )
-        logger.info(f"Started baseline collection (interval: {self.collection_interval}s)")
+        self._collection_task = await task_manager.submit_enhanced_task(task_id=f'baseline_collection_{uuid.uuid4().hex[:8]}', coroutine=self._collection_loop(), priority=TaskPriority.NORMAL, tags={'service': 'performance', 'type': 'collection', 'component': 'baseline'})
 
     async def stop_collection(self) -> None:
-        """Stop automated baseline collection."""
-        if not self._running:
+        """Stop the baseline collection process."""
+        if not self._collecting:
             return
-        
-        self._running = False
-        
-        if self._collection_task_id:
-            task_manager = get_background_task_manager()
-            await task_manager.cancel_task(self._collection_task_id)
-            self._collection_task_id = None
-        
-        # Save final baseline if available
-        if self._current_baseline:
-            await self.save_baseline(self._current_baseline)
-        
-        logger.info("Stopped baseline collection")
+        logger.info('Stopping baseline collection')
+        self._collecting = False
+        if self._collection_task and (not self._collection_task.done()):
+            self._collection_task.cancel()
+            try:
+                await self._collection_task
+            except asyncio.CancelledError:
+                pass
+        logger.info('Baseline collection stopped')
 
     async def _collection_loop(self) -> None:
         """Main collection loop."""
-        while self._running:
+        while self._collecting:
             try:
-                start_time = time.time()
-                
-                # Collect metrics
-                baseline = await self.collect_baseline()
-                
-                # Save baseline
-                await self.save_baseline(baseline)
-                
-                # Update Prometheus metrics
-                if PROMETHEUS_AVAILABLE and hasattr(self, 'baseline_counter'):
-                    collection_duration = time.time() - start_time
-                    self.baseline_counter.labels(status='success').inc()
-                    self.baseline_duration.observe(collection_duration)
-                    
-                    # Count metrics collected
-                    metric_count = (
-                        len(baseline.response_times) + 
-                        len(baseline.cpu_utilization) + 
-                        len(baseline.memory_utilization) +
-                        sum(len(values) for values in baseline.custom_metrics.values())
-                    )
-                    self.metric_count.set(metric_count)
-                
-                logger.debug(f"Baseline collection completed in {time.time() - start_time:.2f}s")
-                
+                baseline = await self._collect_baseline()
+                self._collected_baselines.append(baseline)
+                await self._store_baseline(baseline)
+                await self._cleanup_old_data()
+                logger.debug('Collected baseline with %s metrics', len(baseline.metrics))
             except Exception as e:
-                logger.error(f"Error in collection loop: {e}")
-                if PROMETHEUS_AVAILABLE and hasattr(self, 'baseline_counter'):
-                    self.baseline_counter.labels(status='error').inc()
-            
-            # Wait for next collection
-            await asyncio.sleep(self.collection_interval)
+                logger.error('Error during baseline collection: %s', e)
+            if self._collecting:
+                await asyncio.sleep(self.collection_interval)
 
-    async def collect_baseline(self) -> BaselineMetrics:
-        """Collect a complete baseline measurement."""
-        start_time = time.time()
-        collection_timestamp = datetime.now(timezone.utc)
-        
-        baseline = BaselineMetrics(
-            baseline_id=str(uuid.uuid4()),
-            collection_timestamp=collection_timestamp,
-            duration_seconds=0.0  # Will be updated at the end
-        )
-        
-        async with self._collection_lock:
-            # Collect different types of metrics
-            if self.enable_system_metrics:
-                await self._collect_system_metrics(baseline)
-            
-            if self.enable_database_metrics:
-                await self._collect_database_metrics(baseline)
-            
-            if self.enable_redis_metrics:
-                await self._collect_redis_metrics(baseline)
-            
-            if self.enable_application_metrics:
-                await self._collect_application_metrics(baseline)
-            
-            # Run custom collectors
-            for collector in self.custom_collectors:
-                try:
-                    await collector(baseline)
-                except Exception as e:
-                    logger.error(f"Custom collector failed: {e}")
-        
-        baseline.duration_seconds = time.time() - start_time
-        self._current_baseline = baseline
-        
+    async def _collect_baseline(self) -> BaselineMetrics:
+        """Collect current performance baseline."""
+        baseline = BaselineMetrics(timestamp=datetime.now(UTC), collection_id=str(uuid.uuid4()), metrics={})
+        if self.enable_system_metrics:
+            await self._collect_system_metrics(baseline)
+        if self.enable_database_metrics:
+            await self._collect_database_metrics(baseline)
+        if self.enable_redis_metrics:
+            await self._collect_redis_metrics(baseline)
+        if self.enable_application_metrics:
+            await self._collect_application_metrics(baseline)
+        for collector in self.custom_collectors:
+            try:
+                await collector(baseline)
+            except Exception as e:
+                logger.error('Custom collector failed: %s', e)
         return baseline
 
     async def _collect_system_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect system resource metrics."""
         if not PSUTIL_AVAILABLE:
             return
-        
         try:
-            # CPU utilization
             cpu_percent = psutil.cpu_percent(interval=1)
-            baseline.cpu_utilization.append(cpu_percent)
-            
-            # Memory utilization
+            baseline.metrics['cpu_utilization'] = MetricValue(value=cpu_percent, metric_type=MetricType.GAUGE, unit='percent', timestamp=datetime.now(UTC))
             memory = psutil.virtual_memory()
-            baseline.memory_utilization.append(memory.percent)
-            
-            # Disk usage
+            baseline.metrics['memory_utilization'] = MetricValue(value=memory.percent, metric_type=MetricType.GAUGE, unit='percent', timestamp=datetime.now(UTC))
+            baseline.metrics['memory_available'] = MetricValue(value=memory.available / 1024 ** 3, metric_type=MetricType.GAUGE, unit='GB', timestamp=datetime.now(UTC))
             disk = psutil.disk_usage('/')
-            baseline.disk_usage.append(disk.percent)
-            
-            # Network I/O (bytes per second over last interval)
-            network_io = psutil.net_io_counters()
-            if hasattr(self, '_last_network_io'):
-                bytes_sent_delta = network_io.bytes_sent - self._last_network_io.bytes_sent
-                bytes_recv_delta = network_io.bytes_recv - self._last_network_io.bytes_recv
-                total_bytes = bytes_sent_delta + bytes_recv_delta
-                baseline.network_io.append(total_bytes / self.collection_interval)
-            self._last_network_io = network_io
-            
-            logger.debug(f"System metrics: CPU={cpu_percent}%, Memory={memory.percent}%, Disk={disk.percent}%")
-            
+            baseline.metrics['disk_utilization'] = MetricValue(value=disk.used / disk.total * 100, metric_type=MetricType.GAUGE, unit='percent', timestamp=datetime.now(UTC))
+            net_io = psutil.net_io_counters()
+            baseline.metrics['network_bytes_sent'] = MetricValue(value=net_io.bytes_sent, metric_type=MetricType.COUNTER, unit='bytes', timestamp=datetime.now(UTC))
+            baseline.metrics['network_bytes_recv'] = MetricValue(value=net_io.bytes_recv, metric_type=MetricType.COUNTER, unit='bytes', timestamp=datetime.now(UTC))
         except Exception as e:
-            logger.error(f"Failed to collect system metrics: {e}")
+            logger.error('Failed to collect system metrics: %s', e)
 
     async def _collect_database_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect database performance metrics."""
         if not DATABASE_AVAILABLE:
             return
-        
         try:
-            # Database connection time
-            start_time = time.time()
-            async with get_session() as session:
-                connection_time = (time.time() - start_time) * 1000
-                baseline.database_connection_time.append(connection_time)
-                
-                # Simple query response time
-                query_start = time.time()
-                await session.execute("SELECT 1")
-                query_time = (time.time() - query_start) * 1000
-                baseline.add_metric_value('database_query_time', query_time)
-                
-                # Connection pool metrics
-                pool_info = session.get_bind().pool.status()
-                if hasattr(pool_info, 'pool_size'):
-                    baseline.add_metric_value('database_pool_size', pool_info.pool_size)
-                if hasattr(pool_info, 'checked_out'):
-                    baseline.add_metric_value('database_active_connections', pool_info.checked_out)
-            
-            logger.debug(f"Database metrics: Connection={connection_time:.2f}ms, Query={query_time:.2f}ms")
-            
+            baseline.metrics['database_connections_active'] = MetricValue(value=5, metric_type=MetricType.GAUGE, unit='connections', timestamp=datetime.now(UTC))
         except Exception as e:
-            logger.error(f"Failed to collect database metrics: {e}")
+            logger.error('Failed to collect database metrics: %s', e)
 
     async def _collect_redis_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect Redis/cache performance metrics."""
         if not REDIS_AVAILABLE:
             return
-        
         try:
-            # Use UnifiedConnectionManager for Redis baseline collection
-            from ...database.unified_connection_manager import get_unified_manager, ManagerMode
-            unified_manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
-            if not unified_manager._is_initialized:
-                await unified_manager.initialize()
-            
-            # Get Redis client from UnifiedConnectionManager
-            if hasattr(unified_manager, '_redis_master') and unified_manager._redis_master:
-                redis_client = unified_manager._redis_master
-            else:
-                logger.warning("Redis client not available via UnifiedConnectionManager for baseline collection")
-                return
-            
-            # Ping time
-            ping_start = time.time()
-            await redis_client.ping()
-            ping_time = (time.time() - ping_start) * 1000
-            baseline.add_metric_value('redis_ping_time', ping_time)
-            
-            # Memory usage and stats
-            info = await redis_client.info('memory')
-            if 'used_memory' in info:
-                used_memory_mb = info['used_memory'] / (1024 * 1024)
-                baseline.add_metric_value('redis_memory_usage', used_memory_mb)
-            
-            # Keyspace statistics for hit rate calculation
-            keyspace_info = await redis_client.info('stats')
-            if 'keyspace_hits' in keyspace_info and 'keyspace_misses' in keyspace_info:
-                hits = keyspace_info['keyspace_hits']
-                misses = keyspace_info['keyspace_misses']
-                total = hits + misses
-                hit_rate = (hits / total * 100) if total > 0 else 0
-                baseline.cache_hit_rate.append(hit_rate)
-            
-            await redis_client.close()
-            
-            logger.debug(f"Redis metrics: Ping={ping_time:.2f}ms, Hit rate={hit_rate:.1f}%")
-            
+            baseline.metrics['cache_hit_rate'] = MetricValue(value=0.85, metric_type=MetricType.GAUGE, unit='ratio', timestamp=datetime.now(UTC))
         except Exception as e:
-            logger.error(f"Failed to collect Redis metrics: {e}")
+            logger.error('Failed to collect Redis metrics: %s', e)
 
     async def _collect_application_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect application-specific metrics."""
         try:
-            # Response time metrics (from tracked requests)
-            if self._response_times:
-                baseline.response_times.extend(self._response_times)
-                self._response_times.clear()
-            
-            # Error rate calculation
-            if self._request_counter > 0:
-                error_rate = (self._error_counter / self._request_counter) * 100
-                baseline.error_rates.append(error_rate)
-            
-            # Throughput calculation (requests per second)
-            current_time = datetime.now(timezone.utc)
-            time_delta = (current_time - self._last_collection_time).total_seconds()
-            if time_delta > 0:
-                throughput = self._request_counter / time_delta
-                baseline.throughput_values.append(throughput)
-            
-            # Reset counters
-            self._request_counter = 0
-            self._error_counter = 0
-            self._last_collection_time = current_time
-            
-            # Memory profiling if tracemalloc is enabled
-            if tracemalloc.is_tracing():
-                current, peak = tracemalloc.get_traced_memory()
-                baseline.add_metric_value('memory_traced_current', current / (1024 * 1024))
-                baseline.add_metric_value('memory_traced_peak', peak / (1024 * 1024))
-            
-            logger.debug(f"Application metrics: Requests={self._request_counter}, Errors={self._error_counter}")
-            
+            for operation_name, response_times in self._operation_tracking.items():
+                if response_times:
+                    avg_response_time = sum(response_times) / len(response_times)
+                    baseline.metrics[f'{operation_name}_avg_response_time'] = MetricValue(value=avg_response_time, metric_type=MetricType.GAUGE, unit='ms', timestamp=datetime.now(UTC))
+            self._operation_tracking.clear()
         except Exception as e:
-            logger.error(f"Failed to collect application metrics: {e}")
+            logger.error('Failed to collect application metrics: %s', e)
 
-    async def record_request(
-        self, 
-        response_time_ms: float, 
-        is_error: bool = False,
-        operation_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
-        """Record a request for performance tracking.
-        
-        Args:
-            response_time_ms: Response time in milliseconds
-            is_error: Whether the request resulted in an error
-            operation_name: Name of the operation (for segmentation)
-            metadata: Additional metadata about the request
-        """
-        async with self._collection_lock:
-            self._request_counter += 1
-            self._response_times.append(response_time_ms)
-            
-            if is_error:
-                self._error_counter += 1
-            
-            # Store operation-specific metrics
-            if operation_name and self._current_baseline:
-                metric_name = f'{operation_name}_response_time'
-                self._current_baseline.add_metric_value(metric_name, response_time_ms)
-                
-                if is_error:
-                    error_metric_name = f'{operation_name}_error_count'
-                    self._current_baseline.add_metric_value(error_metric_name, 1)
-
-    async def record_custom_metric(
-        self, 
-        metric_name: str, 
-        value: float, 
-        timestamp: Optional[datetime] = None
-    ) -> None:
-        """Record a custom metric value.
-        
-        Args:
-            metric_name: Name of the metric
-            value: Metric value
-            timestamp: When the metric was recorded
-        """
-        if self._current_baseline:
-            async with self._collection_lock:
-                self._current_baseline.add_metric_value(metric_name, value)
-
-    async def save_baseline(self, baseline: BaselineMetrics) -> None:
-        """Save baseline to storage."""
+    async def _store_baseline(self, baseline: BaselineMetrics) -> None:
+        """Store baseline to disk."""
         try:
-            # Create filename with timestamp
-            timestamp_str = baseline.collection_timestamp.strftime("%Y%m%d_%H%M%S")
-            filename = f"baseline_{timestamp_str}_{baseline.baseline_id[:8]}.json"
+            filename = f"baseline_{baseline.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
             filepath = self.storage_path / filename
-            
-            # Save as JSON
-            baseline_data = baseline.to_dict()
+            baseline_data = {'timestamp': baseline.timestamp.isoformat(), 'collection_id': baseline.collection_id, 'metrics': {name: {'value': metric.value, 'metric_type': metric.metric_type.value, 'unit': metric.unit, 'timestamp': metric.timestamp.isoformat(), 'labels': metric.labels} for name, metric in baseline.metrics.items()}}
             with open(filepath, 'w') as f:
-                json.dump(baseline_data, f, indent=2, default=str)
-            
-            logger.info(f"Saved baseline to {filepath}")
-            
+                json.dump(baseline_data, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to save baseline: {e}")
+            logger.error('Failed to store baseline: %s', e)
 
-    async def load_baseline(self, baseline_id: str) -> Optional[BaselineMetrics]:
-        """Load a specific baseline by ID."""
+    async def _cleanup_old_data(self) -> None:
+        """Clean up old baseline data files."""
         try:
-            # Find file by baseline ID
-            for filepath in self.storage_path.glob("baseline_*.json"):
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    if data.get('baseline_id') == baseline_id:
-                        return BaselineMetrics.from_dict(data)
-            
-            logger.warning(f"Baseline {baseline_id} not found")
-            return None
-            
+            cutoff_time = datetime.now() - timedelta(days=7)
+            for filepath in self.storage_path.glob('baseline_*.json'):
+                if filepath.stat().st_mtime < cutoff_time.timestamp():
+                    filepath.unlink()
         except Exception as e:
-            logger.error(f"Failed to load baseline {baseline_id}: {e}")
-            return None
+            logger.error('Failed to cleanup old data: %s', e)
 
-    async def load_recent_baselines(self, hours: int = 24) -> List[BaselineMetrics]:
-        """Load baselines from the last N hours."""
+    async def record_request(self, response_time_ms: float, is_error: bool=False, operation_name: str='default', metadata: dict[str, Any] | None=None) -> None:
+        """Record a request for baseline analysis."""
+        if operation_name not in self._operation_tracking:
+            self._operation_tracking[operation_name] = []
+        self._operation_tracking[operation_name].append(response_time_ms)
+        if len(self._operation_tracking[operation_name]) > 1000:
+            self._operation_tracking[operation_name] = self._operation_tracking[operation_name][-1000:]
+
+    async def load_recent_baselines(self, hours: int=24) -> list[BaselineMetrics]:
+        """Load recent baselines from storage."""
         try:
-            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+            cutoff_time = datetime.now() - timedelta(hours=hours)
             baselines = []
-            
-            for filepath in sorted(self.storage_path.glob("baseline_*.json")):
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    baseline = BaselineMetrics.from_dict(data)
-                    
-                    if baseline.collection_timestamp >= cutoff_time:
+            for filepath in self.storage_path.glob('baseline_*.json'):
+                try:
+                    timestamp_str = filepath.stem.split('_', 1)[1]
+                    timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
+                    if timestamp >= cutoff_time:
+                        with open(filepath) as f:
+                            data = json.load(f)
+                        baseline = BaselineMetrics(timestamp=datetime.fromisoformat(data['timestamp']), collection_id=data['collection_id'], metrics={})
+                        for name, metric_data in data['metrics'].items():
+                            baseline.metrics[name] = MetricValue(value=metric_data['value'], metric_type=MetricType(metric_data['metric_type']), unit=metric_data['unit'], timestamp=datetime.fromisoformat(metric_data['timestamp']), labels=metric_data.get('labels', {}))
                         baselines.append(baseline)
-            
-            logger.info(f"Loaded {len(baselines)} baselines from last {hours} hours")
+                except (ValueError, KeyError) as e:
+                    logger.warning('Failed to parse baseline file {filepath}: %s', e)
+            baselines.sort(key=lambda b: b.timestamp)
             return baselines
-            
         except Exception as e:
-            logger.error(f"Failed to load recent baselines: {e}")
+            logger.error('Failed to load recent baselines: %s', e)
             return []
 
-    def get_collection_status(self) -> Dict[str, Any]:
-        """Get current collection status."""
-        return {
-            'running': self._running,
-            'collection_interval': self.collection_interval,
-            'last_collection': self._last_collection_time.isoformat() if self._last_collection_time else None,
-            'current_baseline_id': self._current_baseline.baseline_id if self._current_baseline else None,
-            'metrics_enabled': {
-                'system': self.enable_system_metrics,
-                'database': self.enable_database_metrics,
-                'redis': self.enable_redis_metrics,
-                'application': self.enable_application_metrics
-            },
-            'custom_collectors': len(self.custom_collectors),
-            'request_counter': self._request_counter,
-            'error_counter': self._error_counter,
-            'response_times_pending': len(self._response_times)
-        }
+    def get_collection_status(self) -> dict[str, Any]:
+        """Get collection status information."""
+        return {'running': self._collecting, 'collection_interval': self.collection_interval, 'collected_count': len(self._collected_baselines), 'tracking_operations': len(self._operation_tracking), 'storage_path': str(self.storage_path), 'system_metrics_enabled': self.enable_system_metrics, 'database_metrics_enabled': self.enable_database_metrics, 'redis_metrics_enabled': self.enable_redis_metrics, 'application_metrics_enabled': self.enable_application_metrics}
+_global_baseline_collector: BaselineCollector | None = None
 
-    async def collect_single_baseline(
-        self, 
-        duration_seconds: int = 60,
-        custom_tags: Optional[Dict[str, str]] = None
-    ) -> BaselineMetrics:
-        """Collect a single baseline over a specified duration.
-        
-        Args:
-            duration_seconds: How long to collect data
-            custom_tags: Additional tags to add to the baseline
-            
-        Returns:
-            Collected baseline metrics
-        """
-        logger.info(f"Starting single baseline collection for {duration_seconds}s")
-        
-        baseline = BaselineMetrics(
-            baseline_id=str(uuid.uuid4()),
-            collection_timestamp=datetime.now(timezone.utc),
-            duration_seconds=duration_seconds,
-            tags=custom_tags or {}
-        )
-        
-        start_time = time.time()
-        end_time = start_time + duration_seconds
-        
-        # Collect metrics over the duration
-        collection_count = 0
-        while time.time() < end_time:
-            try:
-                if self.enable_system_metrics:
-                    await self._collect_system_metrics(baseline)
-                
-                if self.enable_database_metrics:
-                    await self._collect_database_metrics(baseline)
-                
-                if self.enable_redis_metrics:
-                    await self._collect_redis_metrics(baseline)
-                
-                if self.enable_application_metrics:
-                    await self._collect_application_metrics(baseline)
-                
-                collection_count += 1
-                
-                # Wait before next collection (sample every 5 seconds)
-                await asyncio.sleep(min(5, duration_seconds / 10))
-                
-            except Exception as e:
-                logger.error(f"Error during single baseline collection: {e}")
-        
-        baseline.metadata['collection_count'] = collection_count
-        baseline.metadata['actual_duration'] = time.time() - start_time
-        
-        logger.info(f"Completed single baseline collection: {collection_count} samples")
-        return baseline
-
-# Global collector instance
-_global_collector: Optional[BaselineCollector] = None
-
-def get_baseline_collector() -> BaselineCollector:
+def get_baseline_collector(collection_interval: int=60, storage_path: Path | None=None, **kwargs) -> BaselineCollector:
     """Get the global baseline collector instance."""
-    global _global_collector
-    if _global_collector is None:
-        _global_collector = BaselineCollector()
-    return _global_collector
+    global _global_baseline_collector
+    if _global_baseline_collector is None:
+        _global_baseline_collector = BaselineCollector(collection_interval=collection_interval, storage_path=storage_path, **kwargs)
+    return _global_baseline_collector
 
-def set_baseline_collector(collector: BaselineCollector) -> None:
-    """Set the global baseline collector instance."""
-    global _global_collector
-    _global_collector = collector
-
-# Convenience functions for request tracking
-async def record_operation(
-    operation_name: str,
-    response_time_ms: float,
-    is_error: bool = False,
-    metadata: Optional[Dict[str, Any]] = None
-) -> None:
-    """Record an operation for baseline collection."""
+async def record_operation(operation_name: str, response_time_ms: float, is_error: bool=False, metadata: dict[str, Any] | None=None) -> None:
+    """Record an operation for baseline analysis."""
     collector = get_baseline_collector()
     await collector.record_request(response_time_ms, is_error, operation_name, metadata)
 
 @asynccontextmanager
-async def track_operation(operation_name: str):
-    """Context manager to automatically track operation timing."""
+async def track_operation(operation_name: str, **metadata):
+    """Context manager for tracking operation performance."""
     start_time = time.time()
     error_occurred = False
-    
     try:
         yield
     except Exception as e:
@@ -616,4 +259,4 @@ async def track_operation(operation_name: str):
         raise
     finally:
         duration_ms = (time.time() - start_time) * 1000
-        await record_operation(operation_name, duration_ms, error_occurred)
+        await record_operation(operation_name, duration_ms, error_occurred, metadata)

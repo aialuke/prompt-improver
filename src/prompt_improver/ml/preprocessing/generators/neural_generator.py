@@ -12,8 +12,8 @@ Note: This module requires PyTorch. Complex GAN/VAE models are in gan_generator.
 """
 
 import logging
-import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
+import warnings
 
 import numpy as np
 
@@ -152,7 +152,7 @@ class NeuralSyntheticGenerator:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"Simple VAE Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Simple VAE Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
     def _train_vae(self, X_scaled: np.ndarray):
         """Train VAE model (complex version from gan_generator)."""
@@ -174,7 +174,7 @@ class NeuralSyntheticGenerator:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"VAE Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("VAE Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
                 
     def _train_diffusion(self, X_scaled: np.ndarray):
         """Train diffusion model."""
@@ -205,7 +205,7 @@ class NeuralSyntheticGenerator:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"Diffusion Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Diffusion Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
     def _train_gan(self, X_scaled: np.ndarray):
         """Train GAN model (complex version from gan_generator)."""
@@ -247,7 +247,7 @@ class NeuralSyntheticGenerator:
                 self.optimizer_g.step()
 
             if epoch % 50 == 0:
-                logger.info(f"GAN Epoch {epoch}, D_Loss: {d_loss.item():.4f}, G_Loss: {g_loss.item():.4f}")
+                logger.info("GAN Epoch %d, D_Loss: %.4f, G_Loss: %.4f", epoch, d_loss.item(), g_loss.item())
 
     def generate(self, n_samples: int) -> np.ndarray:
         """Generate synthetic data samples."""
@@ -484,7 +484,7 @@ class DiffusionSyntheticGenerator:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"Diffusion Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Diffusion Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
         self.is_fitted = True
         return self

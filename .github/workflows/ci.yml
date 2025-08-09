@@ -81,16 +81,98 @@ jobs:
     - name: Ruff format check
       run: ruff format --check --diff
 
-    - name: MyPy type checking
-      run: mypy src/
-      continue-on-error: true  # Type checking improvements are ongoing
+    - name: Install Node.js for Pyright
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Pyright
+      run: npm install -g pyright
+
+    - name: Pyright type checking
+      run: |
+        echo "Starting Pyright type checking with performance measurement..."
+        START_TIME=$(date +%s%3N)
+        pyright src/ --outputjson > pyright_results.json 2>&1 || PYRIGHT_EXIT_CODE=$?
+        END_TIME=$(date +%s%3N)
+        DURATION=$((END_TIME - START_TIME))
+        
+        # Parse results and create performance metrics
+        python -c "
+        import json
+        import os
+        from datetime import datetime
+        
+        # Load Pyright results
+        try:
+            with open('pyright_results.json', 'r') as f:
+                results = json.load(f)
+        except:
+            results = {'summary': {'errorCount': 0, 'warningCount': 0, 'informationCount': 0}}
+        
+        summary = results.get('summary', {})
+        error_count = summary.get('errorCount', 0)
+        warning_count = summary.get('warningCount', 0)
+        info_count = summary.get('informationCount', 0)
+        
+        # Create performance metrics
+        duration_ms = int(os.environ.get('DURATION', '0'))
+        
+        metrics = {
+            'timestamp': datetime.now().isoformat(),
+            'service_name': 'apes-ci-pyright',
+            'metrics': {
+                'pyright_execution_time_ms': {
+                    'value': duration_ms,
+                    'type': 'gauge',
+                    'description': 'Pyright type checking execution time in milliseconds',
+                    'labels': {'tool': 'pyright', 'phase': 'ci'}
+                },
+                'pyright_errors_total': {
+                    'value': error_count,
+                    'type': 'gauge', 
+                    'description': 'Total number of Pyright type errors',
+                    'labels': {'severity': 'error'}
+                },
+                'pyright_warnings_total': {
+                    'value': warning_count,
+                    'type': 'gauge',
+                    'description': 'Total number of Pyright type warnings', 
+                    'labels': {'severity': 'warning'}
+                },
+                'pyright_performance_improvement': {
+                    'value': 1 if duration_ms < 30000 else 0,  # Target <30s for good performance
+                    'type': 'gauge',
+                    'description': 'Whether Pyright meets performance targets'
+                }
+            }
+        }
+        
+        with open('pyright_metrics.json', 'w') as f:
+            json.dump(metrics, f, indent=2)
+        
+        print(f'Pyright completed in {duration_ms}ms')
+        print(f'Errors: {error_count}, Warnings: {warning_count}, Info: {info_count}')
+        print(f'Performance improvement target: <30s (achieved: {duration_ms < 30000})')
+        "
+        
+        # Display results
+        cat pyright_results.json | python -m json.tool || echo "Could not parse Pyright JSON output"
+        
+        # Set environment variables for downstream steps
+        ERRORS=$(python -c "import json; print(json.load(open('pyright_results.json', 'r'))['summary']['errorCount'])" 2>/dev/null || echo "0")
+        echo "PYRIGHT_ERROR_COUNT=$ERRORS" >> $GITHUB_ENV
+        echo "PYRIGHT_DURATION_MS=$DURATION" >> $GITHUB_ENV
+        
+        # Continue on error to allow gradual migration
+        exit 0
 
     - name: Run database migrations
       run: |
         # Set up database connection for migrations
         export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_db"
         # Run migrations if needed
-        python -m alembic upgrade head || echo "No migrations to run"
+        # Database is initialized via Docker with SQL files
 
     - name: Run pytest with coverage
       run: |
@@ -189,6 +271,14 @@ jobs:
         name: ruff-metrics-${{ matrix.python-version }}
         path: ruff_metrics.json
         retention-days: 30
+
+    - name: Upload Pyright metrics artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: pyright-metrics-${{ matrix.python-version }}
+        path: pyright_metrics.json
+        retention-days: 30
+      if: always()  # Upload even if Pyright fails
 
   ml-drift-monitoring:
     name: ML Drift Monitoring (JSONB-Compatible)
@@ -661,6 +751,29 @@ jobs:
             except Exception as e:
                 print(f'Failed to process {metrics_file}: {e}')
 
+        # Process Pyright metrics from artifacts
+        total_pyright_errors = 0
+        pyright_metrics_by_version = {}
+        total_pyright_duration = 0
+
+        for metrics_file in glob.glob('artifacts/pyright-metrics-*/pyright_metrics.json'):
+            python_version = metrics_file.split('/')[-2].replace('pyright-metrics-', '')
+            try:
+                with open(metrics_file, 'r') as f:
+                    metrics_data = json.load(f)
+                    error_count = metrics_data['metrics']['pyright_errors_total']['value']
+                    duration_ms = metrics_data['metrics']['pyright_execution_time_ms']['value']
+                    pyright_metrics_by_version[python_version] = {
+                        'errors': error_count,
+                        'duration_ms': duration_ms,
+                        'performance_improved': metrics_data['metrics']['pyright_performance_improvement']['value']
+                    }
+                    total_pyright_errors += error_count
+                    total_pyright_duration += duration_ms
+                    print(f'Pyright for Python {python_version}: {error_count} errors, {duration_ms}ms')
+            except Exception as e:
+                print(f'Failed to process Pyright metrics {metrics_file}: {e}')
+
         # Add ruff metrics to OpenTelemetry export
         otel_metrics['metrics']['ci_ruff_errors_total'] = {
             'value': total_errors,
@@ -675,6 +788,29 @@ jobs:
             'type': 'gauge',
             'description': 'Whether ruff error count exceeds threshold (0)',
             'labels': {'threshold': '0'}
+        }
+
+        # Add Pyright metrics to OpenTelemetry export
+        otel_metrics['metrics']['ci_pyright_errors_total'] = {
+            'value': total_pyright_errors,
+            'type': 'gauge',
+            'description': 'Total Pyright type checking errors from CI',
+            'labels': {'aggregated': 'true'},
+            'by_version': pyright_metrics_by_version
+        }
+
+        otel_metrics['metrics']['ci_pyright_execution_time_avg_ms'] = {
+            'value': int(total_pyright_duration / len(pyright_metrics_by_version)) if pyright_metrics_by_version else 0,
+            'type': 'gauge',
+            'description': 'Average Pyright execution time across Python versions (ms)',
+            'labels': {'tool': 'pyright', 'metric': 'average_duration'}
+        }
+
+        otel_metrics['metrics']['ci_pyright_performance_improvement'] = {
+            'value': 1 if total_pyright_duration < 30000 * len(pyright_metrics_by_version) else 0,
+            'type': 'gauge', 
+            'description': 'Whether Pyright meets performance targets across versions',
+            'labels': {'target': '<30s_per_version'}
         }
 
         # Process ML drift results
@@ -753,6 +889,24 @@ jobs:
                     'metric': 'ci_ruff_errors_total'
                 },
                 {
+                    'name': 'PyrightTypeErrorsDetected',
+                    'condition': 'ci_pyright_errors_total > 0',
+                    'severity': 'warning',
+                    'component': 'type_checking',
+                    'description': 'Pyright type checking errors detected in CI',
+                    'threshold': 0,
+                    'metric': 'ci_pyright_errors_total'
+                },
+                {
+                    'name': 'PyrightPerformanceRegression',
+                    'condition': 'ci_pyright_performance_improvement < 1',
+                    'severity': 'warning',
+                    'component': 'type_checking_performance',
+                    'description': 'Pyright execution time exceeds expected performance baseline',
+                    'threshold': 30000,
+                    'metric': 'ci_pyright_execution_time_avg_ms'
+                },
+                {
                     'name': 'MLDriftDetected',
                     'condition': 'ci_ml_drift_detected > 0',
                     'severity': 'warning',
@@ -783,6 +937,9 @@ jobs:
 
         print('JSONB-compatible dashboard metrics and alerting rules generated')
         print(f'Total ruff errors: {total_errors} (threshold exceeded: {total_errors > 0})')
+        print(f'Total Pyright errors: {total_pyright_errors}')
+        print(f'Average Pyright execution time: {int(total_pyright_duration / len(pyright_metrics_by_version)) if pyright_metrics_by_version else 0}ms')
+        print(f'Pyright performance improvement achieved: {total_pyright_duration < 30000 * len(pyright_metrics_by_version) if pyright_metrics_by_version else False}')
         print(f'JSONB metrics exported to: ci_dashboard_metrics.json')
         print(f'JSONB alert rules exported to: ci_alerting_rules.json')
         "

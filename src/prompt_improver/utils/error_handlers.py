@@ -23,7 +23,6 @@ Usage:
         # Validation logic here
         pass
 """
-
 import asyncio
 import json
 import logging
@@ -33,85 +32,35 @@ import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Any, Literal
-
+from typing import Any, Literal, ParamSpec, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
-
 logger = logging.getLogger(__name__)
+
+# Generic type parameters for decorators and wrappers
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 class PIIRedactionFilter(logging.Filter):
     """Filter to redact PII from log records."""
 
     def __init__(self):
         super().__init__()
-        # Common PII patterns
-        self.patterns = [
-            # Email addresses
-            (
-                re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
-                "[EMAIL_REDACTED]",
-            ),
-            # Phone numbers (various formats)
-            (re.compile(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b"), "[PHONE_REDACTED]"),
-            # Credit card numbers
-            (
-                re.compile(r"\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b"),
-                "[CARD_REDACTED]",
-            ),
-            # Social Security Numbers
-            (re.compile(r"\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b"), "[SSN_REDACTED]"),
-            # IP addresses
-            (re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"), "[IP_REDACTED]"),
-            # API keys and tokens (common patterns)
-            (re.compile(r"\b[A-Za-z0-9]{32,}\b"), "[TOKEN_REDACTED]"),
-            # Passwords in URLs or key-value pairs
-            (
-                re.compile(
-                    r"(password|pwd|pass|secret|key|token)\s*[=:]\s*\S+", re.IGNORECASE
-                ),
-                lambda m: f"{m.group(1)}=[REDACTED]",
-            ),
-        ]
-
-        # PII field names to redact from structured logs
-        self.pii_fields = {
-            "password",
-            "pwd",
-            "pass",
-            "secret",
-            "key",
-            "token",
-            "api_key",
-            "email",
-            "phone",
-            "ssn",
-            "credit_card",
-            "address",
-            "full_name",
-            "first_name",
-            "last_name",
-            "birth_date",
-            "dob",
-        }
+        self.patterns = [(re.compile('\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b'), '[EMAIL_REDACTED]'), (re.compile('\\b\\d{3}[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b'), '[PHONE_REDACTED]'), (re.compile('\\b\\d{4}[-.\\s]?\\d{4}[-.\\s]?\\d{4}[-.\\s]?\\d{4}\\b'), '[CARD_REDACTED]'), (re.compile('\\b\\d{3}[-.\\s]?\\d{2}[-.\\s]?\\d{4}\\b'), '[SSN_REDACTED]'), (re.compile('\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b'), '[IP_REDACTED]'), (re.compile('\\b[A-Za-z0-9]{32,}\\b'), '[TOKEN_REDACTED]'), (re.compile('(password|pwd|pass|secret|key|token)\\s*[=:]\\s*\\S+', re.IGNORECASE), lambda m: f'{m.group(1)}=[REDACTED]')]
+        self.pii_fields = {'password', 'pwd', 'pass', 'secret', 'key', 'token', 'api_key', 'email', 'phone', 'ssn', 'credit_card', 'address', 'full_name', 'first_name', 'last_name', 'birth_date', 'dob'}
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Filter and redact PII from log records."""
-        # Redact PII from the message
-        if hasattr(record, "msg") and record.msg:
+        if hasattr(record, 'msg') and record.msg:
             record.msg = self._redact_message(record.msg)
-
-        # Redact PII from arguments
-        if hasattr(record, "args") and record.args:
-            record.args = tuple(self._redact_message(str(arg)) for arg in record.args)
-
-        # Redact PII from extra fields
-        if hasattr(record, "__dict__"):
+        if hasattr(record, 'args') and record.args:
+            record.args = tuple((self._redact_message(str(arg)) for arg in record.args))
+        if hasattr(record, '__dict__'):
             for key, value in record.__dict__.items():
                 if key.lower() in self.pii_fields:
-                    setattr(record, key, "[REDACTED]")
+                    setattr(record, key, '[REDACTED]')
                 elif isinstance(value, (str, dict)):
                     setattr(record, key, self._redact_message(value))
-
         return True
 
     def _redact_message(self, message: Any) -> Any:
@@ -126,31 +75,27 @@ class PIIRedactionFilter(logging.Filter):
         """Redact PII from dictionary data."""
         if not isinstance(data, dict):
             return data
-
         redacted = {}
         for key, value in data.items():
             if key.lower() in self.pii_fields:
-                redacted[key] = "[REDACTED]"
+                redacted[key] = '[REDACTED]'
             elif isinstance(value, dict):
                 redacted[key] = self._redact_dict(value)
             elif isinstance(value, str):
                 redacted[key] = self._redact_string(value)
             else:
                 redacted[key] = value
-
         return redacted
 
     def _redact_string(self, text: str) -> str:
         """Redact PII from string text."""
         if not isinstance(text, str):
             return text
-
         for pattern, replacement in self.patterns:
             if callable(replacement):
                 text = pattern.sub(replacement, text)
             else:
                 text = pattern.sub(replacement, text)
-
         return text
 
 class AsyncContextLogger:
@@ -167,32 +112,26 @@ class AsyncContextLogger:
 
     def _add_correlation_id(self, extra: dict[str, Any]) -> dict[str, Any]:
         """Add correlation ID for request tracing."""
-        if "correlation_id" not in extra:
-            extra["correlation_id"] = str(uuid.uuid4())[:8]
+        if 'correlation_id' not in extra:
+            extra['correlation_id'] = str(uuid.uuid4())[:8]
         return extra
 
     def _ensure_serializable(self, data: Any) -> Any:
         """Ensure data is JSON serializable."""
         if not self._ensure_json_serializable:
             return data
-
         try:
-            # Try to serialize to check if it's JSON serializable
             json.dumps(data)
             return data
         except (TypeError, ValueError):
-            # If not serializable, convert to string
             return str(data)
 
     def _prepare_extra(self, **kwargs) -> dict[str, Any]:
         """Prepare extra fields for logging."""
         extra = {**self._context_vars, **kwargs}
         extra = self._add_correlation_id(extra)
-
-        # Ensure all extra fields are JSON serializable
         if self._ensure_json_serializable:
             extra = {k: self._ensure_serializable(v) for k, v in extra.items()}
-
         return extra
 
     def info(self, msg: Any, **kwargs):
@@ -214,21 +153,12 @@ class AsyncContextLogger:
     def debug(self, msg: Any, **kwargs):
         extra = self._prepare_extra(**kwargs)
         self.logger.debug(msg, extra=extra)
-
-# Global async context logger instance
 async_logger = AsyncContextLogger(logger)
 
 class AsyncErrorBoundary:
     """Async context manager for wrapping background coroutines with centralized error handling."""
 
-    def __init__(
-        self,
-        operation_name: str,
-        logger: AsyncContextLogger | None = None,
-        reraise: bool = True,
-        fallback_result: Any = None,
-        timeout: float | None = None,
-    ):
+    def __init__(self, operation_name: str, logger: AsyncContextLogger | None=None, reraise: bool=True, fallback_result: Any=None, timeout: float | None=None):
         self.operation_name = operation_name
         self.logger = logger or async_logger
         self.reraise = reraise
@@ -240,60 +170,22 @@ class AsyncErrorBoundary:
 
     async def __aenter__(self):
         self.start_time = time.time()
-        self.logger.set_context(
-            operation=self.operation_name, correlation_id=self.correlation_id
-        )
-
-        self.logger.info(
-            f"Starting operation: {self.operation_name}",
-            operation_start=True,
-            timeout=self.timeout,
-        )
-
+        self.logger.set_context(operation=self.operation_name, correlation_id=self.correlation_id)
+        self.logger.info('Starting operation: %s', self.operation_name, operation_start=True, timeout=self.timeout)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         duration = time.time() - self.start_time if self.start_time else 0
-
         if exc_type is None:
-            # Success case
-            self.logger.info(
-                f"Operation completed successfully: {self.operation_name}",
-                operation_complete=True,
-                duration_seconds=duration,
-                status="success",
-            )
+            self.logger.info('Operation completed successfully: %s', self.operation_name, operation_complete=True, duration_seconds=duration, status='success')
             return False
-
-        # Error case
-        self.exception_info = {
-            "type": exc_type.__name__,
-            "message": str(exc_val),
-            "operation": self.operation_name,
-            "duration_seconds": duration,
-            "correlation_id": self.correlation_id,
-        }
-
+        self.exception_info = {'type': exc_type.__name__, 'message': str(exc_val), 'operation': self.operation_name, 'duration_seconds': duration, 'correlation_id': self.correlation_id}
         if exc_type == asyncio.TimeoutError:
-            self.logger.error(
-                f"Operation timed out: {self.operation_name}",
-                operation_timeout=True,
-                **self.exception_info,
-            )
+            self.logger.error('Operation timed out: %s', self.operation_name, operation_timeout=True, **self.exception_info)
         elif exc_type == asyncio.CancelledError:
-            self.logger.warning(
-                f"Operation cancelled: {self.operation_name}",
-                operation_cancelled=True,
-                **self.exception_info,
-            )
+            self.logger.warning('Operation cancelled: %s', self.operation_name, operation_cancelled=True, **self.exception_info)
         else:
-            self.logger.exception(
-                f"Operation failed: {self.operation_name}",
-                operation_failed=True,
-                **self.exception_info,
-            )
-
-        # Return True to suppress the exception if reraise is False
+            self.logger.exception('Operation failed: %s', self.operation_name, operation_failed=True, **self.exception_info)
         return not self.reraise
 
     def get_exception_info(self) -> dict[str, Any] | None:
@@ -301,13 +193,7 @@ class AsyncErrorBoundary:
         return self.exception_info
 
 @asynccontextmanager
-async def async_error_boundary(
-    operation_name: str,
-    logger: AsyncContextLogger | None = None,
-    reraise: bool = True,
-    fallback_result: Any = None,
-    timeout: float | None = None,
-):
+async def async_error_boundary(operation_name: str, logger: AsyncContextLogger | None=None, reraise: bool=True, fallback_result: Any=None, timeout: float | None=None):
     """Async context manager factory for wrapping background coroutines.
 
     Args:
@@ -322,23 +208,11 @@ async def async_error_boundary(
             result = await some_api_call()
             # Note: Cannot return values from within context manager
     """
-    boundary = AsyncErrorBoundary(
-        operation_name=operation_name,
-        logger=logger,
-        reraise=reraise,
-        fallback_result=fallback_result,
-        timeout=timeout,
-    )
-
+    boundary = AsyncErrorBoundary(operation_name=operation_name, logger=logger, reraise=reraise, fallback_result=fallback_result, timeout=timeout)
     async with boundary:
         yield boundary
 
-def configure_structured_logging(
-    logger_name: str = __name__,
-    level: int = logging.INFO,
-    enable_pii_redaction: bool = True,
-    json_format: bool = True,
-) -> AsyncContextLogger:
+def configure_structured_logging(logger_name: str=__name__, level: int=logging.INFO, enable_pii_redaction: bool=True, json_format: bool=True) -> AsyncContextLogger:
     """Configure structured logging with PII redaction.
 
     Args:
@@ -352,89 +226,40 @@ def configure_structured_logging(
     """
     base_logger = logging.getLogger(logger_name)
     base_logger.setLevel(level)
-
-    # Create formatter
     if json_format:
-        # Use a custom JSON formatter that handles extra fields properly
+
         class JsonFormatter(logging.Formatter):
+
             def format(self, record):
-                log_record = {
-                    "timestamp": self.formatTime(record),
-                    "level": record.levelname,
-                    "logger": record.name,
-                    "message": record.getMessage(),
-                    "correlation_id": getattr(record, "correlation_id", "unknown"),
-                }
-
-                # Add extra fields
+                log_record = {'timestamp': self.formatTime(record), 'level': record.levelname, 'logger': record.name, 'message': record.getMessage(), 'correlation_id': getattr(record, 'correlation_id', 'unknown')}
                 for key, value in record.__dict__.items():
-                    if key not in (
-                        "name",
-                        "msg",
-                        "args",
-                        "levelname",
-                        "levelno",
-                        "pathname",
-                        "filename",
-                        "module",
-                        "lineno",
-                        "funcName",
-                        "created",
-                        "msecs",
-                        "relativeCreated",
-                        "thread",
-                        "threadName",
-                        "processName",
-                        "process",
-                        "getMessage",
-                        "exc_info",
-                        "exc_text",
-                        "stack_info",
-                        "correlation_id",
-                    ):
+                    if key not in ('name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename', 'module', 'lineno', 'funcName', 'created', 'msecs', 'relativeCreated', 'thread', 'threadName', 'processName', 'process', 'getMessage', 'exc_info', 'exc_text', 'stack_info', 'correlation_id'):
                         log_record[key] = value
-
                 try:
                     import json
-
                     return json.dumps(log_record)
                 except (TypeError, ValueError):
-                    # Fallback to string representation if JSON serialization fails
                     return str(log_record)
-
         formatter = JsonFormatter()
     else:
-        # For non-JSON format, provide a default correlation_id if missing
+
         class StandardFormatter(logging.Formatter):
+
             def format(self, record):
-                if not hasattr(record, "correlation_id"):
-                    record.correlation_id = "unknown"
+                if not hasattr(record, 'correlation_id'):
+                    record.correlation_id = 'unknown'
                 return super().format(record)
-
-        formatter = StandardFormatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(correlation_id)s - %(message)s"
-        )
-
-    # Create handler if none exists
+        formatter = StandardFormatter('%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(correlation_id)s - %(message)s')
     if not base_logger.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         base_logger.addHandler(handler)
-
-    # Add PII redaction filter
     if enable_pii_redaction:
         pii_filter = PIIRedactionFilter()
         base_logger.addFilter(pii_filter)
-
     return AsyncContextLogger(base_logger)
 
-def handle_database_errors(
-    rollback_session: bool = True,
-    return_format: Literal["dict", "raise", "none"] = "dict",
-    operation_name: str | None = None,
-    retry_count: int = 0,
-    retry_delay: float = 1.0,
-):
+def handle_database_errors(rollback_session: bool=True, return_format: Literal['dict', 'raise', 'none']='dict', operation_name: str | None=None, retry_count: int=0, retry_delay: float=1.0):
     """Decorator for database operations with comprehensive error handling.
 
     Implements sophisticated error categorization patterns from ab_testing.py:
@@ -451,190 +276,126 @@ def handle_database_errors(
         retry_count: Number of retry attempts for transient errors
         retry_delay: Delay between retry attempts in seconds
     """
+    P = ParamSpec('P')
+    T = TypeVar('T')
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+
         @wraps(func)
-        async def async_wrapper(*args, **kwargs) -> Any:
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             operation = operation_name or func.__name__
             db_session = None
-
-            # Find database session in arguments
             if rollback_session:
                 for arg in args:
                     if isinstance(arg, AsyncSession):
                         db_session = arg
                         break
-                if not db_session and "db_session" in kwargs:
-                    db_session = kwargs["db_session"]
-
+                if not db_session and 'db_session' in kwargs:
+                    db_session = kwargs['db_session']
             attempts = 0
             max_attempts = retry_count + 1
-
             while attempts < max_attempts:
                 try:
                     return await func(*args, **kwargs)
-
                 except OSError as e:
-                    logger.error(f"Database I/O error in {operation}: {e}")
+                    logger.error('Database I/O error in {operation}: %s', e)
                     if db_session:
                         await db_session.rollback()
-
-                    # Retry for transient I/O errors
                     attempts += 1
                     if attempts < max_attempts:
-                        logger.info(
-                            f"Retrying {operation} (attempt {attempts + 1}/{max_attempts})"
-                        )
+                        logger.info('Retrying %s (attempt %s/%s)', operation, attempts + 1, max_attempts)
                         await asyncio.sleep(retry_delay)
                         continue
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "database_io",
-                        }
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'database_io'}
+                    if return_format == 'raise':
                         raise
                     return []
-
                 except (ValueError, TypeError) as e:
-                    logger.error(f"Data validation error in {operation}: {e}")
+                    logger.error('Data validation error in {operation}: %s', e)
                     if db_session:
                         await db_session.rollback()
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "validation",
-                        }
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'validation'}
+                    if return_format == 'raise':
                         raise
                     return []
-
                 except (AttributeError, KeyError) as e:
-                    logger.error(f"Data structure error in {operation}: {e}")
+                    logger.error('Data structure error in {operation}: %s', e)
                     if db_session:
                         await db_session.rollback()
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "data_structure",
-                        }
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'data_structure'}
+                    if return_format == 'raise':
                         raise
                     return []
-
                 except KeyboardInterrupt:
-                    logger.warning(f"{operation} cancelled by user")
+                    logger.warning('%s cancelled by user', operation)
                     if db_session:
                         await db_session.rollback()
                     raise
-
                 except Exception as e:
-                    logger.error(f"Unexpected error in {operation}: {e}")
-                    logging.exception(f"Unexpected error in {operation}")
+                    logger.error('Unexpected error in {operation}: %s', e)
+                    logging.exception('Unexpected error in %s', operation)
                     if db_session:
                         await db_session.rollback()
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "unexpected",
-                        }
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'}
+                    if return_format == 'raise':
                         raise
                     return []
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs) -> Any:
+        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             operation = operation_name or func.__name__
             attempts = 0
             max_attempts = retry_count + 1
-
             while attempts < max_attempts:
                 try:
                     return func(*args, **kwargs)
-
                 except OSError as e:
-                    logger.error(f"I/O error in {operation}: {e}")
-
-                    # Retry for transient I/O errors
+                    logger.error('I/O error in {operation}: %s', e)
                     attempts += 1
                     if attempts < max_attempts:
-                        logger.info(
-                            f"Retrying {operation} (attempt {attempts + 1}/{max_attempts})"
-                        )
+                        logger.info('Retrying %s (attempt %s/%s)', operation, attempts + 1, max_attempts)
                         time.sleep(retry_delay)
                         continue
-
-                    if return_format == "dict":
-                        return {"status": "error", "error": str(e), "error_type": "io"}
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'io'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except (ValueError, TypeError) as e:
-                    logger.error(f"Data validation error in {operation}: {e}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "validation",
-                        }
-                    if return_format == "raise":
+                    logger.error('Data validation error in {operation}: %s', e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'validation'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except (AttributeError, KeyError) as e:
-                    logger.error(f"Data structure error in {operation}: {e}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "data_structure",
-                        }
-                    if return_format == "raise":
+                    logger.error('Data structure error in {operation}: %s', e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'data_structure'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except KeyboardInterrupt:
-                    logger.warning(f"{operation} cancelled by user")
+                    logger.warning('%s cancelled by user', operation)
                     raise
-
                 except Exception as e:
-                    logger.error(f"Unexpected error in {operation}: {e}")
-                    logging.exception(f"Unexpected error in {operation}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "unexpected",
-                        }
-                    if return_format == "raise":
+                    logger.error('Unexpected error in {operation}: %s', e)
+                    logging.exception('Unexpected error in %s', operation)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'}
+                    if return_format == 'raise':
                         raise
                     return None
-
-        # Return appropriate wrapper based on function type
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
-
     return decorator
 
-def handle_filesystem_errors(
-    return_format: Literal["dict", "raise", "none"] = "dict",
-    operation_name: str | None = None,
-    retry_count: int = 0,
-    retry_delay: float = 0.5,
-):
+def handle_filesystem_errors(return_format: Literal['dict', 'raise', 'none']='dict', operation_name: str | None=None, retry_count: int=0, retry_delay: float=0.5):
     """Decorator for filesystem operations with error handling.
 
     Handles common filesystem errors:
@@ -650,101 +411,64 @@ def handle_filesystem_errors(
         retry_delay: Delay between retry attempts in seconds
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             operation = operation_name or func.__name__
             attempts = 0
             max_attempts = retry_count + 1
-
             while attempts < max_attempts:
                 try:
                     return func(*args, **kwargs)
-
                 except FileNotFoundError as e:
-                    logger.error(f"File not found in {operation}: {e}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "file_not_found",
-                        }
-                    if return_format == "raise":
+                    logger.error('File not found in {operation}: %s', e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'file_not_found'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except PermissionError as e:
-                    logger.error(f"Permission denied in {operation}: {e}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "permission_denied",
-                        }
-                    if return_format == "raise":
+                    logger.error('Permission denied in {operation}: %s', e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'permission_denied'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except OSError as e:
-                    logger.error(f"I/O error in {operation}: {e}")
-
-                    # Retry for transient I/O errors
+                    logger.error('I/O error in {operation}: %s', e)
                     attempts += 1
                     if attempts < max_attempts:
-                        logger.info(
-                            f"Retrying {operation} (attempt {attempts + 1}/{max_attempts})"
-                        )
+                        logger.info('Retrying %s (attempt %s/%s)', operation, attempts + 1, max_attempts)
                         time.sleep(retry_delay)
                         continue
-
-                    if return_format == "dict":
-                        return {"status": "error", "error": str(e), "error_type": "io"}
-                    if return_format == "raise":
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'io'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except ValueError as e:
-                    logger.error(f"Path validation error in {operation}: {e}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "path_validation",
-                        }
-                    if return_format == "raise":
+                    logger.error('Path validation error in {operation}: %s', e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'path_validation'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except KeyboardInterrupt:
-                    logger.warning(f"{operation} cancelled by user")
+                    logger.warning('%s cancelled by user', operation)
                     raise
-
                 except Exception as e:
-                    logger.error(f"Unexpected filesystem error in {operation}: {e}")
-                    logging.exception(f"Unexpected error in {operation}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "unexpected",
-                        }
-                    if return_format == "raise":
+                    logger.error('Unexpected filesystem error in {operation}: %s', e)
+                    logging.exception('Unexpected error in %s', operation)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'}
+                    if return_format == 'raise':
                         raise
                     return None
-
         return wrapper
-
     return decorator
 
-def handle_validation_errors(
-    return_format: Literal["dict", "raise", "none"] = "dict",
-    operation_name: str | None = None,
-    log_validation_details: bool = True,
-):
+def handle_validation_errors(return_format: Literal['dict', 'raise', 'none']='dict', operation_name: str | None=None, log_validation_details: bool=True):
     """Decorator for data validation operations with error handling.
 
     Handles validation-specific errors:
@@ -761,107 +485,66 @@ def handle_validation_errors(
     """
 
     def decorator(func: Callable) -> Callable:
+
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             operation = operation_name or func.__name__
-
             try:
                 result = func(*args, **kwargs)
-
                 if log_validation_details and result is not None:
-                    logger.debug(f"Validation successful in {operation}")
-
+                    logger.debug('Validation successful in %s', operation)
                 return result
-
             except ValueError as e:
-                logger.error(f"Value validation error in {operation}: {e}")
+                logger.error('Value validation error in {operation}: %s', e)
                 if log_validation_details:
-                    logger.debug(f"Validation args: {args}, kwargs: {kwargs}")
-
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "value_validation",
-                    }
-                if return_format == "raise":
+                    logger.debug('Validation args: {args}, kwargs: %s', kwargs)
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'value_validation'}
+                if return_format == 'raise':
                     raise
                 return None
-
             except TypeError as e:
-                logger.error(f"Type validation error in {operation}: {e}")
+                logger.error('Type validation error in {operation}: %s', e)
                 if log_validation_details:
-                    logger.debug(f"Validation args: {args}, kwargs: {kwargs}")
-
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "type_validation",
-                    }
-                if return_format == "raise":
+                    logger.debug('Validation args: {args}, kwargs: %s', kwargs)
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'type_validation'}
+                if return_format == 'raise':
                     raise
                 return None
-
             except AssertionError as e:
-                logger.error(f"Assertion validation error in {operation}: {e}")
+                logger.error('Assertion validation error in {operation}: %s', e)
                 if log_validation_details:
-                    logger.debug(f"Validation args: {args}, kwargs: {kwargs}")
-
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "assertion_validation",
-                    }
-                if return_format == "raise":
+                    logger.debug('Validation args: {args}, kwargs: %s', kwargs)
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'assertion_validation'}
+                if return_format == 'raise':
                     raise
                 return None
-
             except (KeyError, AttributeError) as e:
-                logger.error(f"Data structure validation error in {operation}: {e}")
+                logger.error('Data structure validation error in {operation}: %s', e)
                 if log_validation_details:
-                    logger.debug(f"Validation args: {args}, kwargs: {kwargs}")
-
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "structure_validation",
-                    }
-                if return_format == "raise":
+                    logger.debug('Validation args: {args}, kwargs: %s', kwargs)
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'structure_validation'}
+                if return_format == 'raise':
                     raise
                 return None
-
             except KeyboardInterrupt:
-                logger.warning(f"{operation} cancelled by user")
+                logger.warning('%s cancelled by user', operation)
                 raise
-
             except Exception as e:
-                logger.error(f"Unexpected validation error in {operation}: {e}")
-                logging.exception(f"Unexpected error in {operation}")
-
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "unexpected",
-                    }
-                if return_format == "raise":
+                logger.error('Unexpected validation error in {operation}: %s', e)
+                logging.exception('Unexpected error in %s', operation)
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'}
+                if return_format == 'raise':
                     raise
                 return None
-
         return wrapper
-
     return decorator
 
-def handle_network_errors(
-    return_format: Literal["dict", "raise", "none"] = "dict",
-    operation_name: str | None = None,
-    retry_count: int = 3,
-    retry_delay: float = 1.0,
-    backoff_multiplier: float = 2.0,
-):
+def handle_network_errors(return_format: Literal['dict', 'raise', 'none']='dict', operation_name: str | None=None, retry_count: int=3, retry_delay: float=1.0, backoff_multiplier: float=2.0):
     """Decorator for network operations with unified retry logic.
 
     Handles network-specific errors using the unified retry manager:
@@ -879,152 +562,80 @@ def handle_network_errors(
     """
 
     def decorator(func: Callable) -> Callable:
+
         @wraps(func)
-        async def async_wrapper(*args, **kwargs) -> Any:
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             operation = operation_name or func.__name__
-
-            # Use unified retry manager for network operations
-            from ..core.retry_manager import (
-                get_retry_manager, RetryConfig, RetryStrategy, RetryableErrorType
-            )
-
-            retry_config = RetryConfig(
-                max_attempts=retry_count + 1,
-                strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
-                base_delay=retry_delay,
-                backoff_multiplier=backoff_multiplier,
-                jitter=True,
-                retryable_errors=[RetryableErrorType.NETWORK, RetryableErrorType.TIMEOUT],
-                operation_name=operation
-            )
-
+            from prompt_improver.core.retry_manager import RetryableErrorType, RetryConfig, RetryStrategy, get_retry_manager
+            retry_config = RetryConfig(max_attempts=retry_count + 1, strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=retry_delay, backoff_multiplier=backoff_multiplier, jitter=True, retryable_errors=[RetryableErrorType.NETWORK, RetryableErrorType.TIMEOUT], operation_name=operation)
             retry_manager = get_retry_manager()
-
             try:
+
                 async def network_operation():
                     try:
                         return await func(*args, **kwargs)
                     except (ConnectionError, TimeoutError) as e:
-                        # These are retryable network errors
                         raise
                     except KeyboardInterrupt:
-                        logger.warning(f"{operation} cancelled by user")
+                        logger.warning('%s cancelled by user', operation)
                         raise
                     except Exception as e:
-                        logger.error(f"Unexpected network error in {operation}: {e}")
-                        logging.exception(f"Unexpected error in {operation}")
-                        if return_format == "raise":
+                        logger.error('Unexpected network error in {operation}: %s', e)
+                        logging.exception('Unexpected error in %s', operation)
+                        if return_format == 'raise':
                             raise
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "unexpected",
-                        } if return_format == "dict" else None
-
+                        return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'} if return_format == 'dict' else None
                 return await retry_manager.retry_async(network_operation, config=retry_config)
-
             except Exception as e:
-                if return_format == "dict":
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "error_type": "network",
-                    }
-                elif return_format == "raise":
+                if return_format == 'dict':
+                    return {'status': 'error', 'error': str(e), 'error_type': 'network'}
+                if return_format == 'raise':
                     raise
                 return None
 
         @wraps(func)
-        def sync_wrapper(*args, **kwargs) -> Any:
+        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             operation = operation_name or func.__name__
-
             for attempt in range(retry_count + 1):
                 try:
                     return func(*args, **kwargs)
-
                 except (ConnectionError, TimeoutError) as e:
                     if attempt < retry_count:
-                        delay = retry_delay * (backoff_multiplier**attempt)
-                        logger.warning(
-                            f"Network error in {operation} (attempt {attempt + 1}/{retry_count + 1}): {e}. "
-                            f"Retrying in {delay:.1f}s..."
-                        )
+                        delay = retry_delay * backoff_multiplier ** attempt
+                        logger.warning('Network error in %s (attempt %s/%s): %s. Retrying in %ss...', operation, attempt + 1, retry_count + 1, e, format(delay, '.1f'))
                         time.sleep(delay)
                         continue
-
-                    logger.error(
-                        f"Network error in {operation} after {retry_count + 1} attempts: {e}"
-                    )
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "network",
-                        }
-                    if return_format == "raise":
+                    logger.error('Network error in %s after %s attempts: %s', operation, retry_count + 1, e)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'network'}
+                    if return_format == 'raise':
                         raise
                     return None
-
                 except KeyboardInterrupt:
-                    logger.warning(f"{operation} cancelled by user")
+                    logger.warning('%s cancelled by user', operation)
                     raise
-
                 except Exception as e:
-                    logger.error(f"Unexpected network error in {operation}: {e}")
-                    logging.exception(f"Unexpected error in {operation}")
-
-                    if return_format == "dict":
-                        return {
-                            "status": "error",
-                            "error": str(e),
-                            "error_type": "unexpected",
-                        }
-                    if return_format == "raise":
+                    logger.error('Unexpected network error in {operation}: %s', e)
+                    logging.exception('Unexpected error in %s', operation)
+                    if return_format == 'dict':
+                        return {'status': 'error', 'error': str(e), 'error_type': 'unexpected'}
+                    if return_format == 'raise':
                         raise
                     return None
-
-        # Return appropriate wrapper based on function type
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
-
     return decorator
 
-# Convenience function for common error handling patterns
-def handle_common_errors(
-    rollback_session: bool = False,
-    return_format: Literal["dict", "raise", "none"] = "dict",
-    operation_name: str | None = None,
-    retry_count: int = 0,
-    retry_delay: float = 1.0,
-):
+def handle_common_errors(rollback_session: bool=False, return_format: Literal['dict', 'raise', 'none']='dict', operation_name: str | None=None, retry_count: int=0, retry_delay: float=1.0):
     """Convenience decorator that combines database, filesystem, and validation error handling.
 
     This is useful for operations that might encounter any combination of these error types.
     """
 
     def decorator(func: Callable) -> Callable:
-        # Apply multiple decorators in sequence
-        decorated_func = handle_validation_errors(
-            return_format=return_format, operation_name=operation_name
-        )(func)
-
-        decorated_func = handle_filesystem_errors(
-            return_format=return_format,
-            operation_name=operation_name,
-            retry_count=retry_count,
-            retry_delay=retry_delay,
-        )(decorated_func)
-
-        decorated_func = handle_database_errors(
-            rollback_session=rollback_session,
-            return_format=return_format,
-            operation_name=operation_name,
-            retry_count=retry_count,
-            retry_delay=retry_delay,
-        )(decorated_func)
-
+        decorated_func = handle_validation_errors(return_format=return_format, operation_name=operation_name)(func)
+        decorated_func = handle_filesystem_errors(return_format=return_format, operation_name=operation_name, retry_count=retry_count, retry_delay=retry_delay)(decorated_func)
+        decorated_func = handle_database_errors(rollback_session=rollback_session, return_format=return_format, operation_name=operation_name, retry_count=retry_count, retry_delay=retry_delay)(decorated_func)
         return decorated_func
-
     return decorator

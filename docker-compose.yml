@@ -17,6 +17,7 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql
       - ./monitoring/database/telemetry_schema.sql:/docker-entrypoint-initdb.d/03-telemetry.sql
+      - ./database/rule_seeds.sql:/docker-entrypoint-initdb.d/04-rule-seeds.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U apes_user -d apes_production"]

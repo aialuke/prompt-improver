@@ -36,14 +36,17 @@ repos:
       - id: name-tests-test
         args: [--pytest-test-first]
 
-  # MyPy type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+  # Pyright type checking
+  - repo: local
     hooks:
-      - id: mypy
-        additional_dependencies: [types-all]
-        args: [--ignore-missing-imports, --check-untyped-defs]
-        files: ^src/
+      - id: pyright
+        name: pyright type checking
+        entry: pyright
+        language: node
+        additional_dependencies: [pyright@latest]
+        args: [--outputjson]
+        files: ^src/.*\.py$
+        pass_filenames: false
 
   # Security scanning with Bandit
   - repo: https://github.com/PyCQA/bandit
@@ -53,12 +56,7 @@ repos:
         args: [-c, pyproject.toml]
         additional_dependencies: ["bandit[toml]"]
 
-  # Dockerfile linting
-  - repo: https://github.com/hadolint/hadolint
-    rev: v2.12.0
-    hooks:
-      - id: hadolint-docker
-        args: [--ignore, DL3008, --ignore, DL3009]
+  # Dockerfile linting removed - native deployment only
 
   # YAML formatting
   - repo: https://github.com/pre-commit/mirrors-prettier

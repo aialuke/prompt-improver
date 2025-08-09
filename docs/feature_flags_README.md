@@ -87,7 +87,7 @@ The system is pre-configured with flags for 6 technical debt cleanup phases:
 
 ### Phase 1: Configuration Externalization (Week 1)
 - **`phase1_config_externalization`** - Main phase flag (25% rollout)
-- **`phase1_pydantic_settings`** - Type-safe configuration (30% rollout)
+- **`phase1_sqlmodel_validation`** - Type-safe configuration (30% rollout)
 - **`phase1_environment_configs`** - Environment-specific configs (20% rollout)
 
 ### Phase 2: Health Check Implementation (Week 2)

@@ -7,123 +7,79 @@ Tests verify:
 - Database flushes between tests
 - Proper cleanup after tests
 """
-
-import pytest
 import coredis
-
-
+import pytest
 pytestmark = pytest.mark.redis_integration
-
 
 @pytest.mark.asyncio
 async def test_redis_fixture_basic_operations(redis_client):
     """Test basic Redis operations with the fixture."""
-    # Test SET operation
-    await redis_client.set("test_key", "test_value")
-    
-    # Test GET operation
-    value = await redis_client.get("test_key")
-    assert value == "test_value"
-    
-    # Test DELETE operation
-    await redis_client.delete(["test_key"])
-    deleted_value = await redis_client.get("test_key")
+    await redis_client.set('test_key', 'test_value')
+    value = await redis_client.get('test_key')
+    assert value == 'test_value'
+    await redis_client.delete(['test_key'])
+    deleted_value = await redis_client.get('test_key')
     assert deleted_value is None
-
 
 @pytest.mark.asyncio
 async def test_redis_fixture_isolation(redis_client):
     """Test that Redis database is clean between tests."""
-    # This test should not see data from previous test
-    value = await redis_client.get("test_key")
+    value = await redis_client.get('test_key')
     assert value is None
-    
-    # Set a value that should not persist to next test
-    await redis_client.set("isolation_test", "should_not_persist")
-    value = await redis_client.get("isolation_test")
-    assert value == "should_not_persist"
-
+    await redis_client.set('isolation_test', 'should_not_persist')
+    value = await redis_client.get('isolation_test')
+    assert value == 'should_not_persist'
 
 @pytest.mark.asyncio
 async def test_redis_fixture_isolation_verification(redis_client):
     """Test that verifies isolation by ensuring previous test data is gone."""
-    # This should not see data from previous test
-    value = await redis_client.get("isolation_test")
+    value = await redis_client.get('isolation_test')
     assert value is None
-
 
 @pytest.mark.asyncio
 async def test_redis_fixture_hash_operations(redis_client):
     """Test Redis hash operations with the fixture."""
-    # Test HSET operation - coredis expects a mapping
-    await redis_client.hset("test_hash", {"field1": "value1", "field2": "value2"})
-    
-    # Test HGET operation
-    value1 = await redis_client.hget("test_hash", "field1")
-    value2 = await redis_client.hget("test_hash", "field2")
-    assert value1 == "value1"
-    assert value2 == "value2"
-    
-    # Test HGETALL operation
-    all_fields = await redis_client.hgetall("test_hash")
-    assert all_fields == {"field1": "value1", "field2": "value2"}
-
+    await redis_client.hset('test_hash', {'field1': 'value1', 'field2': 'value2'})
+    value1 = await redis_client.hget('test_hash', 'field1')
+    value2 = await redis_client.hget('test_hash', 'field2')
+    assert value1 == 'value1'
+    assert value2 == 'value2'
+    all_fields = await redis_client.hgetall('test_hash')
+    assert all_fields == {'field1': 'value1', 'field2': 'value2'}
 
 @pytest.mark.asyncio
 async def test_redis_fixture_list_operations(redis_client):
     """Test Redis list operations with the fixture."""
-    # Test LPUSH operation - coredis expects a list of elements
-    await redis_client.lpush("test_list", ["item1", "item2", "item3"])
-    
-    # Test LRANGE operation
-    items = await redis_client.lrange("test_list", 0, -1)
-    assert items == ["item3", "item2", "item1"]  # LPUSH adds to front
-    
-    # Test RPOP operation
-    popped = await redis_client.rpop("test_list")
-    assert popped == "item1"
-    
-    # Verify list state after pop
-    remaining = await redis_client.lrange("test_list", 0, -1)
-    assert remaining == ["item3", "item2"]
-
+    await redis_client.lpush('test_list', ['item1', 'item2', 'item3'])
+    items = await redis_client.lrange('test_list', 0, -1)
+    assert items == ['item3', 'item2', 'item1']
+    popped = await redis_client.rpop('test_list')
+    assert popped == 'item1'
+    remaining = await redis_client.lrange('test_list', 0, -1)
+    assert remaining == ['item3', 'item2']
 
 @pytest.mark.asyncio
 async def test_redis_fixture_expiration(redis_client):
     """Test Redis key expiration with the fixture."""
-    # Set a key with expiration - coredis expects (key, value, seconds)
-    await redis_client.setex("expiring_key", "expiring_value", 1)
-    
-    # Verify key exists
-    value = await redis_client.get("expiring_key")
-    assert value == "expiring_value"
-    
-    # Check TTL
-    ttl = await redis_client.ttl("expiring_key")
+    await redis_client.setex('expiring_key', 'expiring_value', 1)
+    value = await redis_client.get('expiring_key')
+    assert value == 'expiring_value'
+    ttl = await redis_client.ttl('expiring_key')
     assert ttl > 0
-
 
 @pytest.mark.asyncio
 async def test_redis_fixture_pipeline_operations(redis_client):
     """Test Redis pipeline operations with the fixture."""
-    # Create a pipeline - coredis pipeline() is async
     pipe = await redis_client.pipeline()
-    
-    # Add multiple operations to pipeline
-    pipe.set("pipe_key1", "value1")
-    pipe.set("pipe_key2", "value2")
-    pipe.get("pipe_key1")
-    pipe.get("pipe_key2")
-    
-    # Execute pipeline
+    pipe.set('pipe_key1', 'value1')
+    pipe.set('pipe_key2', 'value2')
+    pipe.get('pipe_key1')
+    pipe.get('pipe_key2')
     results = await pipe.execute()
-    
-    # Verify results
-    assert results[0] is True  # SET result
-    assert results[1] is True  # SET result
-    assert results[2] == "value1"  # GET result
-    assert results[3] == "value2"  # GET result
-
+    assert results[0] is True
+    assert results[1] is True
+    assert results[2] == 'value1'
+    assert results[3] == 'value2'
 
 @pytest.mark.asyncio
 async def test_redis_container_connection_details(redis_container):
@@ -132,34 +88,22 @@ async def test_redis_container_connection_details(redis_container):
     port = redis_container.get_exposed_port(6379)
     assert host is not None
     assert port is not None
-    
-    # Test direct connection using the connection details
     direct_client = coredis.Redis(host=host, port=port, decode_responses=True)
-    await direct_client.set("direct_test", "direct_value")
-    value = await direct_client.get("direct_test")
-    assert value == "direct_value"
+    await direct_client.set('direct_test', 'direct_value')
+    value = await direct_client.get('direct_test')
+    assert value == 'direct_value'
     direct_client.connection_pool.disconnect()
-
 
 @pytest.mark.asyncio
 async def test_redis_fixture_concurrent_operations(redis_client):
     """Test concurrent Redis operations with the fixture."""
     import asyncio
-    
+
     async def set_value(key, value):
         await redis_client.set(key, value)
         return await redis_client.get(key)
-    
-    # Execute multiple operations concurrently
-    tasks = [
-        set_value("concurrent_key1", "value1"),
-        set_value("concurrent_key2", "value2"),
-        set_value("concurrent_key3", "value3"),
-    ]
-    
+    tasks = [set_value('concurrent_key1', 'value1'), set_value('concurrent_key2', 'value2'), set_value('concurrent_key3', 'value3')]
     results = await asyncio.gather(*tasks)
-    assert results == ["value1", "value2", "value3"]
-    
-    # Verify all keys exist
-    keys = await redis_client.keys("concurrent_key*")
+    assert results == ['value1', 'value2', 'value3']
+    keys = await redis_client.keys('concurrent_key*')
     assert len(keys) == 3

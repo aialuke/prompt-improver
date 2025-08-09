@@ -3,14 +3,11 @@
 This module provides helper functions for common database operations
 following SQLAlchemy 2.0 best practices with precise type narrowing.
 """
-
 from typing import Any, TypeVar
-
 from sqlalchemy import Executable
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
-
-T = TypeVar("T")
+T = TypeVar('T')
 
 async def scalar(session: AsyncSession, stmt: Executable) -> Any:
     """Execute a statement and return a scalar result.
@@ -59,8 +56,7 @@ async def scalar_with_type(session: AsyncSession, stmt: Executable) -> Row[tuple
 
         # Count query with precise typing
         row: Row[tuple[int]] | None = await scalar_with_type(
-            session,
-            select(func.count(Model.id))
+            session, select(func.count(Model.id))
         )
         if row is None:
             count = 0
@@ -91,7 +87,9 @@ async def fetch_one_row(session: AsyncSession, stmt: Executable) -> Row[Any] | N
         # Query with named columns
         row: Row[Any] | None = await fetch_one_row(
             session,
-            text("SELECT COUNT(*) as high_quality_count FROM rule_performance WHERE improvement_score > 0.8")
+            text(
+                "SELECT COUNT(*) as high_quality_count FROM rule_performance WHERE improvement_score > 0.8"
+            ),
         )
         if row is None:
             count = 0
@@ -102,7 +100,7 @@ async def fetch_one_row(session: AsyncSession, stmt: Executable) -> Row[Any] | N
     result = await session.execute(stmt)
     return result.first()
 
-async def fetch_all_rows(session: AsyncSession, stmt: Executable, parameters: dict[str, Any] | None = None) -> list[Row[Any]]:
+async def fetch_all_rows(session: AsyncSession, stmt: Executable, parameters: dict[str, Any] | None=None) -> list[Row[Any]]:
     """Execute a statement and return all rows with type narrowing.
 
     Provides precise type narrowing for multi-row queries.
@@ -123,8 +121,10 @@ async def fetch_all_rows(session: AsyncSession, stmt: Executable, parameters: di
         # Query multiple rows with named columns
         rows: list[Row[Any]] = await fetch_all_rows(
             session,
-            text("SELECT rule_id, AVG(improvement_score) as avg_score FROM rule_performance GROUP BY rule_id"),
-            {"cutoff_date": cutoff_date}
+            text(
+                "SELECT rule_id, AVG(improvement_score) as avg_score FROM rule_performance GROUP BY rule_id"
+            ),
+            {"cutoff_date": cutoff_date},
         )
         for row in rows:
             rule_id: str = row.rule_id

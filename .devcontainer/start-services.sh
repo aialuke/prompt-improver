@@ -26,7 +26,7 @@ if [ -f "/workspace/docker-compose.yml" ]; then
     echo "Running database migrations..."
     source /workspace/.venv/bin/activate
     cd /workspace
-    alembic upgrade head
+    # Database initialized automatically via Docker
     
     echo "Services started successfully!"
 else

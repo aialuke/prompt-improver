@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from ....security import MemoryGuard
 
+
 class ContextPerformanceMonitor:
     """Monitors performance metrics for context learning components."""
     
@@ -79,7 +80,7 @@ class ContextPerformanceMonitor:
         """Reset privacy budget tracking."""
         old_budget = self.privacy_budget_used
         self.privacy_budget_used = 0.0
-        self.logger.info(f"Reset privacy budget from {old_budget:.2f} to 0.0")
+        self.logger.info("Reset privacy budget from %s to 0.0", old_budget:.2f)
     
     def get_privacy_budget_status(self) -> Dict[str, float]:
         """Get current privacy budget status."""

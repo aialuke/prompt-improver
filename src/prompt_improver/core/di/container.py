@@ -15,79 +15,72 @@ Features:
 - Easy testing with mock services
 - Performance metrics collection
 """
-
 import asyncio
+import inspect
 import logging
-
-from typing import Dict, Type, Any, TypeVar, Callable, Optional, Set
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-import inspect
-from contextlib import asynccontextmanager
-
-# Dependency injector is available but not used in this implementation
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Type, TypeVar
+if TYPE_CHECKING:
+    from prompt_improver.core.events.ml_event_bus import MLEventBus
+from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
+from prompt_improver.core.interfaces.ml_interface import MLAnalysisInterface, MLHealthInterface, MLModelInterface, MLServiceInterface, MLTrainingInterface
+from prompt_improver.core.protocols.ml_protocols import CacheServiceProtocol, ComponentInvokerProtocol, ComponentLoaderProtocol, ComponentRegistryProtocol, DatabaseServiceProtocol, EventBusProtocol, ExternalServicesConfigProtocol, HealthMonitorProtocol, MLflowServiceProtocol, MLPipelineFactoryProtocol, ResourceManagerProtocol, ServiceConnectionInfo, WorkflowEngineProtocol
+from prompt_improver.core.protocols.retry_protocols import MetricsRegistryProtocol
+from prompt_improver.core.services.datetime_service import DateTimeService
+from prompt_improver.core.services.ml_service import EventBasedMLService
 DEPENDENCY_INJECTOR_AVAILABLE = False
-
-from ..interfaces.datetime_service import DateTimeServiceProtocol
-from ..services.datetime_service import DateTimeService
-from ..protocols.retry_protocols import MetricsRegistryProtocol
-from ..interfaces.ml_interface import (
-    MLServiceInterface,
-    MLAnalysisInterface,
-    MLTrainingInterface,
-    MLHealthInterface,
-    MLModelInterface
-)
-from ..events.ml_event_bus import MLEventBus, get_ml_event_bus
-from ..services.ml_service import EventBasedMLService
-
 T = TypeVar('T')
 
 class ServiceLifetime(Enum):
     """Service lifetime management options."""
-    SINGLETON = "singleton"
-    TRANSIENT = "transient"
-    SCOPED = "scoped"
-    RESOURCE = "resource"  # For resources requiring cleanup
+    SINGLETON = 'singleton'
+    TRANSIENT = 'transient'
+    SCOPED = 'scoped'
+    RESOURCE = 'resource'
 
 @dataclass
 class ServiceRegistration:
     """Enhanced service registration information."""
-    interface: Type[Any]
-    implementation: Optional[Type[Any]]
+    interface: type[Any]
+    implementation: type[Any] | None
     lifetime: ServiceLifetime
-    factory: Optional[Callable[[], Any]] = None
-    initializer: Optional[Callable[[Any], Any]] = None  # Async initializer
-    finalizer: Optional[Callable[[Any], Any]] = None    # Cleanup function
+    factory: Callable[[], Any] | None = None
+    initializer: Callable[[Any], Any] | None = None
+    finalizer: Callable[[Any], Any] | None = None
     initialized: bool = False
     instance: Any = None
-    dependencies: Set[Type[Any]] = field(default_factory=set)
-    tags: Set[str] = field(default_factory=set)
-    priority: int = 0  # For service ordering
-    health_check: Optional[Callable[[], Any]] = None
+    dependencies: set[type[Any]] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
+    priority: int = 0
+    health_check: Callable[[], Any] | None = None
 
 class CircularDependencyError(Exception):
     """Raised when circular dependencies are detected."""
+
     def __init__(self, cycle: str):
         self.cycle = cycle
-        super().__init__(f"Circular dependency detected: {cycle}")
+        super().__init__(f'Circular dependency detected: {cycle}')
 
 class ServiceNotRegisteredError(Exception):
     """Raised when attempting to resolve unregistered service."""
-    def __init__(self, service_type: Type[Any]):
+
+    def __init__(self, service_type: type[Any]):
         self.service_type = service_type
-        super().__init__(f"Service not registered: {service_type.__name__}")
+        super().__init__(f'Service not registered: {service_type.__name__}')
 
 class ServiceInitializationError(Exception):
     """Raised when service initialization fails."""
-    def __init__(self, service_type: Type[Any], original_error: Exception):
+
+    def __init__(self, service_type: type[Any], original_error: Exception):
         self.service_type = service_type
         self.original_error = original_error
-        super().__init__(f"Failed to initialize {service_type.__name__}: {original_error}")
+        super().__init__(f'Failed to initialize {service_type.__name__}: {original_error}')
 
 class ResourceManagementError(Exception):
     """Raised when resource management operations fail."""
-    pass
 
 class DIContainer:
     """Enhanced dependency injection container with 2025 best practices.
@@ -105,7 +98,7 @@ class DIContainer:
     - Integration with python-dependency-injector when available
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None, name: str = "default"):
+    def __init__(self, logger: logging.Logger | None=None, name: str='default'):
         """Initialize the enhanced DI container.
 
         Args:
@@ -114,39 +107,25 @@ class DIContainer:
         """
         self.name = name
         self.logger = logger or logging.getLogger(__name__)
-        self._services: Dict[Type[Any], ServiceRegistration] = {}
-        self._scoped_services: Dict[str, Dict[Type[Any], Any]] = {}  # scope_id -> services
-        self._resources: Set[Any] = set()  # Resources requiring cleanup
-        self._resolution_stack: Set[Type[Any]] = set()
+        self._services: dict[type[Any], ServiceRegistration] = {}
+        self._scoped_services: dict[str, dict[type[Any], Any]] = {}
+        self._resources: set[Any] = set()
+        self._resolution_stack: set[type[Any]] = set()
         self._lock = asyncio.Lock()
-        self._metrics_registry: Optional[MetricsRegistryProtocol] = None
-        self._health_checks: Dict[str, Callable[[], Any]] = {}
-
-        # Performance tracking
-        self._resolution_times: Dict[Type[Any], float] = {}
-        self._initialization_order: list[Type[Any]] = []
-
-        # Register default services
+        self._metrics_registry: MetricsRegistryProtocol | None = None
+        self._health_checks: dict[str, Callable[[], Any]] = {}
+        self._resolution_times: dict[type[Any], float] = {}
+        self._initialization_order: list[type[Any]] = []
         self._register_default_services()
-
-        self.logger.debug(f"Enhanced DIContainer '{self.name}' initialized")
+        self.logger.debug("Enhanced DIContainer '%s' initialized", self.name)
 
     def _register_default_services(self):
         """Register default system services."""
-        # Register datetime service as singleton
         self.register_singleton(DateTimeServiceProtocol, DateTimeService)
-
-        # Register container self-reference for dependency injection
         self.register_instance(DIContainer, self)
-
-        # Register ML interfaces with event bus communication
         self.register_ml_interfaces()
 
-    def register_singleton(self, interface: Type[T], implementation: Type[T],
-                          tags: Optional[Set[str]] = None,
-                          initializer: Optional[Callable[[Any], Any]] = None,
-                          finalizer: Optional[Callable[[Any], Any]] = None,
-                          health_check: Optional[Callable[[], Any]] = None) -> None:
+    def register_singleton(self, interface: type[T], implementation: type[T], tags: set[str] | None=None, initializer: Callable[[Any], Any] | None=None, finalizer: Callable[[Any], Any] | None=None, health_check: Callable[[], Any] | None=None) -> None:
         """Register a service as singleton.
 
         Args:
@@ -157,20 +136,10 @@ class DIContainer:
             finalizer: Optional cleanup function
             health_check: Optional health check function
         """
-        self._services[interface] = ServiceRegistration(
-            interface=interface,
-            implementation=implementation,
-            lifetime=ServiceLifetime.SINGLETON,
-            initializer=initializer,
-            finalizer=finalizer,
-            tags=tags or set(),
-            health_check=health_check
-        )
+        self._services[interface] = ServiceRegistration(interface=interface, implementation=implementation, lifetime=ServiceLifetime.SINGLETON, initializer=initializer, finalizer=finalizer, tags=tags or set(), health_check=health_check)
+        self.logger.debug('Registered singleton: %s -> %s', interface.__name__, implementation.__name__)
 
-        self.logger.debug(f"Registered singleton: {interface.__name__} -> {implementation.__name__}")
-
-    def register_transient(self, interface: Type[T], implementation: Type[T],
-                          tags: Optional[Set[str]] = None) -> None:
+    def register_transient(self, interface: type[T], implementation: type[T], tags: set[str] | None=None) -> None:
         """Register a service as transient (new instance each time).
 
         Args:
@@ -178,20 +147,10 @@ class DIContainer:
             implementation: Concrete implementation class
             tags: Optional tags for service categorization
         """
-        self._services[interface] = ServiceRegistration(
-            interface=interface,
-            implementation=implementation,
-            lifetime=ServiceLifetime.TRANSIENT,
-            tags=tags or set()
-        )
+        self._services[interface] = ServiceRegistration(interface=interface, implementation=implementation, lifetime=ServiceLifetime.TRANSIENT, tags=tags or set())
+        self.logger.debug('Registered transient: %s -> %s', interface.__name__, implementation.__name__)
 
-        self.logger.debug(f"Registered transient: {interface.__name__} -> {implementation.__name__}")
-
-    def register_factory(self, interface: Type[T], factory: Callable[[], T],
-                        lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
-                        tags: Optional[Set[str]] = None,
-                        initializer: Optional[Callable[[Any], Any]] = None,
-                        finalizer: Optional[Callable[[Any], Any]] = None) -> None:
+    def register_factory(self, interface: type[T], factory: Callable[[], T], lifetime: ServiceLifetime=ServiceLifetime.SINGLETON, tags: set[str] | None=None, initializer: Callable[[Any], Any] | None=None, finalizer: Callable[[Any], Any] | None=None) -> None:
         """Register a service with custom factory function.
 
         Args:
@@ -202,22 +161,10 @@ class DIContainer:
             initializer: Optional async initializer function
             finalizer: Optional cleanup function
         """
-        self._services[interface] = ServiceRegistration(
-            interface=interface,
-            implementation=None,
-            lifetime=lifetime,
-            factory=factory,
-            initializer=initializer,
-            finalizer=finalizer,
-            tags=tags or set()
-        )
+        self._services[interface] = ServiceRegistration(interface=interface, implementation=None, lifetime=lifetime, factory=factory, initializer=initializer, finalizer=finalizer, tags=tags or set())
+        self.logger.debug('Registered factory: %s (lifetime: %s)', interface.__name__, lifetime.value)
 
-        self.logger.debug(f"Registered factory: {interface.__name__} (lifetime: {lifetime.value})")
-
-    def register_instance(self, interface: Type[T], instance: T,
-                         tags: Optional[Set[str]] = None,
-                         finalizer: Optional[Callable[[Any], Any]] = None,
-                         health_check: Optional[Callable[[], Any]] = None) -> None:
+    def register_instance(self, interface: type[T], instance: T, tags: set[str] | None=None, finalizer: Callable[[Any], Any] | None=None, health_check: Callable[[], Any] | None=None) -> None:
         """Register a pre-created service instance.
 
         Args:
@@ -227,22 +174,11 @@ class DIContainer:
             finalizer: Optional cleanup function
             health_check: Optional health check function
         """
-        registration = ServiceRegistration(
-            interface=interface,
-            implementation=type(instance),
-            lifetime=ServiceLifetime.SINGLETON,
-            initialized=True,
-            instance=instance,
-            finalizer=finalizer,
-            tags=tags or set(),
-            health_check=health_check
-        )
-
+        registration = ServiceRegistration(interface=interface, implementation=type(instance), lifetime=ServiceLifetime.SINGLETON, initialized=True, instance=instance, finalizer=finalizer, tags=tags or set(), health_check=health_check)
         self._services[interface] = registration
+        self.logger.debug('Registered instance: %s', interface.__name__)
 
-        self.logger.debug(f"Registered instance: {interface.__name__}")
-
-    async def get(self, interface: Type[T], scope_id: Optional[str] = None) -> T:
+    async def get(self, interface: type[T], scope_id: str | None=None) -> T:
         """Resolve service instance.
 
         Args:
@@ -259,33 +195,20 @@ class DIContainer:
         """
         import time
         start_time = time.perf_counter()
-
         try:
             async with self._lock:
                 result = await self._resolve_service(interface, scope_id)
-
-                # Track resolution time for performance monitoring
                 resolution_time = time.perf_counter() - start_time
                 self._resolution_times[interface] = resolution_time
-
-                # Report metrics if available
                 if self._metrics_registry:
-                    self._metrics_registry.record_histogram(
-                        "di_container_resolution_time",
-                        resolution_time,
-                        {"service": interface.__name__, "container": self.name}
-                    )
-
+                    self._metrics_registry.record_histogram('di_container_resolution_time', resolution_time, {'service': interface.__name__, 'container': self.name})
                 return result
         except Exception as e:
             if self._metrics_registry:
-                self._metrics_registry.increment_counter(
-                    "di_container_resolution_errors",
-                    {"service": interface.__name__, "container": self.name, "error": type(e).__name__}
-                )
+                self._metrics_registry.increment_counter('di_container_resolution_errors', {'service': interface.__name__, 'container': self.name, 'error': type(e).__name__})
             raise
 
-    async def _resolve_service(self, interface: Type[T], scope_id: Optional[str] = None) -> T:
+    async def _resolve_service(self, interface: type[T], scope_id: str | None=None) -> T:
         """Internal service resolution with enhanced lifecycle management.
 
         Args:
@@ -295,41 +218,27 @@ class DIContainer:
         Returns:
             Service instance
         """
-        # Check if service is registered
         if interface not in self._services:
             raise ServiceNotRegisteredError(interface)
-
-        # Check for circular dependencies
         if interface in self._resolution_stack:
-            cycle = " -> ".join([t.__name__ for t in self._resolution_stack]) + f" -> {interface.__name__}"
+            cycle = ' -> '.join([t.__name__ for t in self._resolution_stack]) + f' -> {interface.__name__}'
             raise CircularDependencyError(cycle)
-
         registration = self._services[interface]
-
-        # Handle different service lifetimes
         if registration.lifetime == ServiceLifetime.SINGLETON:
-            # Return existing singleton instance if available
             if registration.initialized and registration.instance is not None:
                 return registration.instance
         elif registration.lifetime == ServiceLifetime.SCOPED:
-            # Handle scoped services
             if scope_id and scope_id in self._scoped_services:
                 if interface in self._scoped_services[scope_id]:
                     return self._scoped_services[scope_id][interface]
-
-        # Add to resolution stack for circular dependency detection
         self._resolution_stack.add(interface)
-
         try:
-            # Create new instance
             if registration.factory:
                 instance = await self._create_from_factory(registration.factory)
             elif registration.implementation:
                 instance = await self._create_from_class(registration.implementation)
             else:
-                raise ServiceInitializationError(interface, Exception("No factory or implementation provided"))
-
-            # Run initializer if present
+                raise ServiceInitializationError(interface, Exception('No factory or implementation provided'))
             if registration.initializer:
                 try:
                     if inspect.iscoroutinefunction(registration.initializer):
@@ -338,8 +247,6 @@ class DIContainer:
                         registration.initializer(instance)
                 except Exception as e:
                     raise ServiceInitializationError(interface, e)
-
-            # Store instance based on lifetime
             if registration.lifetime == ServiceLifetime.SINGLETON:
                 registration.instance = instance
                 registration.initialized = True
@@ -349,20 +256,16 @@ class DIContainer:
                     self._scoped_services[scope_id] = {}
                 self._scoped_services[scope_id][interface] = instance
             elif registration.lifetime == ServiceLifetime.RESOURCE:
-                # Track resources for cleanup
                 self._resources.add(instance)
                 registration.instance = instance
                 registration.initialized = True
-
-            self.logger.debug(f"Resolved service: {interface.__name__} (lifetime: {registration.lifetime.value})")
+            self.logger.debug('Resolved service: %s (lifetime: %s)', interface.__name__, registration.lifetime.value)
             return instance
-
         except Exception as e:
             if not isinstance(e, (ServiceInitializationError, CircularDependencyError)):
                 raise ServiceInitializationError(interface, e)
             raise
         finally:
-            # Remove from resolution stack
             self._resolution_stack.discard(interface)
 
     async def _create_from_factory(self, factory: Callable[[], Any]) -> Any:
@@ -376,10 +279,9 @@ class DIContainer:
         """
         if inspect.iscoroutinefunction(factory):
             return await factory()
-        else:
-            return factory()
+        return factory()
 
-    async def _create_from_class(self, implementation: Type[Any]) -> Any:
+    async def _create_from_class(self, implementation: type[Any]) -> Any:
         """Create service instance from class constructor.
 
         Args:
@@ -388,34 +290,22 @@ class DIContainer:
         Returns:
             Service instance
         """
-        # Get constructor signature
         sig = inspect.signature(implementation.__init__)
-
-        # Resolve constructor dependencies
         kwargs = {}
         for param_name, param in sig.parameters.items():
             if param_name == 'self':
                 continue
-
-            # Check if parameter has type annotation
             if param.annotation != inspect.Parameter.empty:
-                # Try to resolve dependency
                 try:
                     dependency = await self._resolve_service(param.annotation)
                     kwargs[param_name] = dependency
                 except ServiceNotRegisteredError:
-                    # Skip optional dependencies
                     if param.default != inspect.Parameter.empty:
                         continue
                     raise
-
-        # Create instance
         instance = implementation(**kwargs)
-
-        # Initialize if it has an async initialize method
         if hasattr(instance, 'initialize') and inspect.iscoroutinefunction(instance.initialize):
             await instance.initialize()
-
         return instance
 
     async def health_check(self) -> dict:
@@ -424,49 +314,25 @@ class DIContainer:
         Returns:
             dict: Health check results
         """
-        results = {
-            "container_status": "healthy",
-            "registered_services": len(self._services),
-            "services": {}
-        }
-
+        results = {'container_status': 'healthy', 'registered_services': len(self._services), 'services': {}}
         for interface, registration in self._services.items():
             service_name = interface.__name__
-
             try:
-                # Only check initialized singletons
-                if (registration.lifetime == ServiceLifetime.SINGLETON and
-                    registration.initialized and
-                    registration.instance is not None):
-
+                if registration.lifetime == ServiceLifetime.SINGLETON and registration.initialized and (registration.instance is not None):
                     instance = registration.instance
-
-                    # Check if service has health_check method
                     if hasattr(instance, 'health_check') and callable(instance.health_check):
                         if inspect.iscoroutinefunction(instance.health_check):
                             service_health = await instance.health_check()
                         else:
                             service_health = instance.health_check()
-
-                        results["services"][service_name] = service_health
+                        results['services'][service_name] = service_health
                     else:
-                        results["services"][service_name] = {
-                            "status": "healthy",
-                            "note": "No health check method available"
-                        }
+                        results['services'][service_name] = {'status': 'healthy', 'note': 'No health check method available'}
                 else:
-                    results["services"][service_name] = {
-                        "status": "not_initialized",
-                        "lifetime": registration.lifetime.value
-                    }
-
+                    results['services'][service_name] = {'status': 'not_initialized', 'lifetime': registration.lifetime.value}
             except Exception as e:
-                results["services"][service_name] = {
-                    "status": "unhealthy",
-                    "error": str(e)
-                }
-                results["container_status"] = "degraded"
-
+                results['services'][service_name] = {'status': 'unhealthy', 'error': str(e)}
+                results['container_status'] = 'degraded'
         return results
 
     def get_registration_info(self) -> dict:
@@ -476,21 +342,11 @@ class DIContainer:
             dict: Registration information
         """
         info = {}
-
         for interface, registration in self._services.items():
-            info[interface.__name__] = {
-                "implementation": registration.implementation.__name__ if registration.implementation else "Factory",
-                "lifetime": registration.lifetime.value,
-                "initialized": registration.initialized,
-                "has_instance": registration.instance is not None
-            }
-
+            info[interface.__name__] = {'implementation': registration.implementation.__name__ if registration.implementation else 'Factory', 'lifetime': registration.lifetime.value, 'initialized': registration.initialized, 'has_instance': registration.instance is not None}
         return info
 
-    # Enhanced methods for 2025 best practices
-
-    def register_scoped(self, interface: Type[T], implementation: Type[T],
-                       tags: Optional[Set[str]] = None) -> None:
+    def register_scoped(self, interface: type[T], implementation: type[T], tags: set[str] | None=None) -> None:
         """Register a service as scoped (one instance per scope).
 
         Args:
@@ -498,20 +354,10 @@ class DIContainer:
             implementation: Concrete implementation class
             tags: Optional tags for service categorization
         """
-        self._services[interface] = ServiceRegistration(
-            interface=interface,
-            implementation=implementation,
-            lifetime=ServiceLifetime.SCOPED,
-            tags=tags or set()
-        )
+        self._services[interface] = ServiceRegistration(interface=interface, implementation=implementation, lifetime=ServiceLifetime.SCOPED, tags=tags or set())
+        self.logger.debug('Registered scoped: %s -> %s', interface.__name__, implementation.__name__)
 
-        self.logger.debug(f"Registered scoped: {interface.__name__} -> {implementation.__name__}")
-
-    def register_resource(self, interface: Type[T],
-                         factory: Callable[[], T],
-                         initializer: Optional[Callable] = None,
-                         finalizer: Optional[Callable] = None,
-                         tags: Optional[Set[str]] = None) -> None:
+    def register_resource(self, interface: type[T], factory: Callable[[], T], initializer: Callable | None=None, finalizer: Callable | None=None, tags: set[str] | None=None) -> None:
         """Register a resource that requires lifecycle management.
 
         Args:
@@ -521,87 +367,261 @@ class DIContainer:
             finalizer: Required cleanup function for resource
             tags: Optional tags for service categorization
         """
-        self._services[interface] = ServiceRegistration(
-            interface=interface,
-            implementation=None,
-            lifetime=ServiceLifetime.RESOURCE,
-            factory=factory,
-            initializer=initializer,
-            finalizer=finalizer,
-            tags=tags or set()
-        )
+        self._services[interface] = ServiceRegistration(interface=interface, implementation=None, lifetime=ServiceLifetime.RESOURCE, factory=factory, initializer=initializer, finalizer=finalizer, tags=tags or set())
+        self.logger.debug('Registered resource: %s', interface.__name__)
 
-        self.logger.debug(f"Registered resource: {interface.__name__}")
-
-    def register_metrics_collector_factory(self, collector_type: str = "opentelemetry") -> None:
+    def register_metrics_collector_factory(self, collector_type: str='opentelemetry') -> None:
         """Register factory for metrics collectors optimized for ML workloads.
 
         Args:
-            collector_type: Type of metrics collector (opentelemetry, prometheus, etc.)
+            collector_type: Type of metrics collector (opentelemetry only)
         """
+
         def create_metrics_collector() -> MetricsRegistryProtocol:
-            if collector_type == "opentelemetry":
-                # Use modern OpenTelemetry-based unified metrics adapter
-                from ...core.metrics.unified_metrics_adapter import UnifiedMetricsAdapter
-                return UnifiedMetricsAdapter()
-            elif collector_type == "prometheus":
-                # Legacy fallback - use adapter to bridge the interface
-                from ...core.metrics.unified_metrics_adapter import UnifiedMetricsAdapter
-                return UnifiedMetricsAdapter(backend="prometheus")
-            else:
-                raise ValueError(f"Unsupported metrics collector type: {collector_type}")
-
-        self.register_factory(
-            MetricsRegistryProtocol,
-            create_metrics_collector,
-            ServiceLifetime.SINGLETON,
-            tags={"metrics", "monitoring"}
-        )
-
-        self.logger.debug(f"Registered metrics collector factory: {collector_type}")
+            if collector_type == 'opentelemetry':
+                from prompt_improver.performance.monitoring.metrics_registry import MetricsRegistry
+                return MetricsRegistry()
+            raise ValueError(f"Unsupported metrics collector type: {collector_type}. Only 'opentelemetry' is supported.")
+        self.register_factory(MetricsRegistryProtocol, create_metrics_collector, ServiceLifetime.SINGLETON, tags={'metrics', 'monitoring'})
+        self.logger.debug('Registered metrics collector factory: %s', collector_type)
 
     def register_health_monitor_factory(self) -> None:
         """Register factory for health monitors with circuit breaker patterns."""
+
         def create_health_monitor():
-            from ...performance.monitoring.health.unified_health_system import get_unified_health_monitor
+            from prompt_improver.performance.monitoring.health.unified_health_system import get_unified_health_monitor
             return get_unified_health_monitor()
+        from prompt_improver.performance.monitoring.health.unified_health_system import UnifiedHealthMonitor
+        self.register_factory(UnifiedHealthMonitor, create_health_monitor, ServiceLifetime.SINGLETON, tags={'health', 'monitoring'})
+        self.logger.debug('Registered health monitor factory')
 
-        from ...performance.monitoring.health.unified_health_system import UnifiedHealthMonitor
-        self.register_factory(
-            UnifiedHealthMonitor,
-            create_health_monitor,
-            ServiceLifetime.SINGLETON,
-            tags={"health", "monitoring"}
-        )
-
-        self.logger.debug("Registered health monitor factory")
-
-    def register_ml_model_factory(self, model_type: str = "sklearn") -> None:
-        """Register factory for ML model instances with proper lifecycle.
+    def register_mlflow_service_factory(self, config: ServiceConnectionInfo) -> None:
+        """Register factory for MLflow service with proper lifecycle management.
 
         Args:
-            model_type: Type of ML framework (sklearn, tensorflow, pytorch, etc.)
+            config: MLflow service connection configuration
         """
-        def create_ml_model():
-            # Factory will be implemented based on model_type
-            # This is a placeholder for the pattern
-            if model_type == "sklearn":
-                from ...ml.lifecycle.model_registry import EnhancedModelRegistry
-                return EnhancedModelRegistry()
-            else:
-                raise ValueError(f"Unsupported ML model type: {model_type}")
 
-        from ...ml.lifecycle.model_registry import EnhancedModelRegistry
-        self.register_factory(
-            EnhancedModelRegistry,
-            create_ml_model,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "model"},
-            finalizer=lambda instance: getattr(instance, 'cleanup', lambda: None)()
-        )
+        async def create_mlflow_service() -> MLflowServiceProtocol:
+            from prompt_improver.integrations.mlflow_service import MLflowService
+            service = MLflowService(config)
+            await service.initialize()
+            return service
 
-        self.logger.debug(f"Registered ML model factory: {model_type}")
+        async def cleanup_mlflow_service(service: MLflowServiceProtocol):
+            await service.shutdown()
+        self.register_factory(MLflowServiceProtocol, create_mlflow_service, ServiceLifetime.SINGLETON, tags={'mlflow', 'tracking', 'external'}, finalizer=cleanup_mlflow_service, health_check=lambda: asyncio.create_task(self._check_mlflow_health()))
+        self.logger.debug('Registered MLflow service factory')
 
+    def register_cache_service_factory(self, config: ServiceConnectionInfo) -> None:
+        """Register factory for Redis cache service with connection pooling.
+
+        Args:
+            config: Redis service connection configuration
+        """
+
+        async def create_cache_service() -> CacheServiceProtocol:
+            from prompt_improver.integrations.redis_service import RedisService
+            service = RedisService(config)
+            await service.initialize()
+            return service
+
+        async def cleanup_cache_service(service: CacheServiceProtocol):
+            await service.shutdown()
+        self.register_factory(CacheServiceProtocol, create_cache_service, ServiceLifetime.SINGLETON, tags={'redis', 'cache', 'external'}, finalizer=cleanup_cache_service, health_check=lambda: asyncio.create_task(self._check_cache_health()))
+        self.logger.debug('Registered cache service factory')
+
+    def register_database_service_factory(self, config: ServiceConnectionInfo) -> None:
+        """Register factory for PostgreSQL database service with connection pooling.
+
+        Args:
+            config: PostgreSQL service connection configuration
+        """
+
+        async def create_database_service() -> DatabaseServiceProtocol:
+            from prompt_improver.integrations.postgresql_service import PostgreSQLService
+            service = PostgreSQLService(config)
+            await service.initialize()
+            return service
+
+        async def cleanup_database_service(service: DatabaseServiceProtocol):
+            await service.shutdown()
+        self.register_factory(DatabaseServiceProtocol, create_database_service, ServiceLifetime.SINGLETON, tags={'postgresql', 'database', 'external'}, finalizer=cleanup_database_service, health_check=lambda: asyncio.create_task(self._check_database_health()))
+        self.logger.debug('Registered database service factory')
+
+    def register_external_services_config_factory(self, environment: str='production') -> None:
+        """Register factory for external services configuration.
+
+        Args:
+            environment: Deployment environment (development, staging, production)
+        """
+
+        def create_services_config() -> ExternalServicesConfigProtocol:
+            from prompt_improver.integrations.services_config import ExternalServicesConfigImpl
+            return ExternalServicesConfigImpl.from_environment(environment)
+        self.register_factory(ExternalServicesConfigProtocol, create_services_config, ServiceLifetime.SINGLETON, tags={'config', 'external'})
+        self.logger.debug('Registered external services config factory (env: %s)', environment)
+
+    def register_event_bus_factory(self, config: Any=None) -> None:
+        """Register factory for event bus with proper initialization.
+
+        Args:
+            config: Optional event bus configuration
+        """
+
+        async def create_event_bus() -> EventBusProtocol:
+            from prompt_improver.ml.orchestration.events.adaptive_event_bus import AdaptiveEventBus
+            event_bus = AdaptiveEventBus(config)
+            await event_bus.initialize()
+            return event_bus
+
+        async def cleanup_event_bus(event_bus: EventBusProtocol):
+            await event_bus.shutdown()
+        self.register_factory(EventBusProtocol, create_event_bus, ServiceLifetime.SINGLETON, tags={'events', 'messaging', 'core'}, finalizer=cleanup_event_bus)
+        self.logger.debug('Registered event bus factory')
+
+    def register_workflow_engine_factory(self, config: Any=None) -> None:
+        """Register factory for workflow execution engine.
+
+        Args:
+            config: Optional workflow engine configuration
+        """
+
+        async def create_workflow_engine() -> WorkflowEngineProtocol:
+            from prompt_improver.ml.orchestration.core.workflow_execution_engine import WorkflowExecutionEngine
+            engine = WorkflowExecutionEngine(config)
+            await engine.initialize()
+            return engine
+
+        async def cleanup_workflow_engine(engine: WorkflowEngineProtocol):
+            await engine.shutdown()
+        self.register_factory(WorkflowEngineProtocol, create_workflow_engine, ServiceLifetime.SINGLETON, tags={'workflow', 'execution', 'core'}, finalizer=cleanup_workflow_engine)
+        self.logger.debug('Registered workflow engine factory')
+
+    def register_resource_manager_factory(self, config: Any=None) -> None:
+        """Register factory for resource manager with monitoring capabilities.
+
+        Args:
+            config: Optional resource manager configuration
+        """
+
+        async def create_resource_manager() -> ResourceManagerProtocol:
+            from prompt_improver.ml.orchestration.core.resource_manager import ResourceManager
+            manager = ResourceManager(config)
+            await manager.initialize()
+            return manager
+
+        async def cleanup_resource_manager(manager: ResourceManagerProtocol):
+            await manager.shutdown()
+        self.register_factory(ResourceManagerProtocol, create_resource_manager, ServiceLifetime.SINGLETON, tags={'resources', 'monitoring', 'core'}, finalizer=cleanup_resource_manager)
+        self.logger.debug('Registered resource manager factory')
+
+    def register_component_registry_factory(self, config: Any=None) -> None:
+        """Register factory for ML component registry.
+
+        Args:
+            config: Optional component registry configuration
+        """
+
+        async def create_component_registry() -> ComponentRegistryProtocol:
+            from prompt_improver.ml.orchestration.core.component_registry import ComponentRegistry
+            registry = ComponentRegistry(config)
+            await registry.initialize()
+            return registry
+
+        async def cleanup_component_registry(registry: ComponentRegistryProtocol):
+            await registry.shutdown()
+        self.register_factory(ComponentRegistryProtocol, create_component_registry, ServiceLifetime.SINGLETON, tags={'components', 'registry', 'core'}, finalizer=cleanup_component_registry)
+        self.logger.debug('Registered component registry factory')
+
+    def register_component_loader_factory(self) -> None:
+        """Register factory for ML component loader."""
+
+        def create_component_loader() -> ComponentLoaderProtocol:
+            from prompt_improver.ml.orchestration.integration.direct_component_loader import DirectComponentLoader
+            return DirectComponentLoader()
+        self.register_factory(ComponentLoaderProtocol, create_component_loader, ServiceLifetime.SINGLETON, tags={'components', 'loader', 'integration'})
+        self.logger.debug('Registered component loader factory')
+
+    def register_component_invoker_factory(self) -> None:
+        """Register factory for ML component invoker with dependency injection."""
+
+        async def create_component_invoker() -> ComponentInvokerProtocol:
+            component_loader = await self.get(ComponentLoaderProtocol)
+            from prompt_improver.ml.orchestration.integration.component_invoker import ComponentInvoker
+            return ComponentInvoker(component_loader)
+        self.register_factory(ComponentInvokerProtocol, create_component_invoker, ServiceLifetime.SINGLETON, tags={'components', 'invoker', 'integration'})
+        self.logger.debug('Registered component invoker factory')
+
+    def register_ml_pipeline_factory(self) -> None:
+        """Register factory for complete ML pipeline orchestrator with all dependencies."""
+
+        async def create_ml_pipeline_orchestrator():
+            config = await self.get(ExternalServicesConfigProtocol)
+            event_bus = await self.get(EventBusProtocol)
+            workflow_engine = await self.get(WorkflowEngineProtocol)
+            resource_manager = await self.get(ResourceManagerProtocol)
+            component_registry = await self.get(ComponentRegistryProtocol)
+            component_loader = await self.get(ComponentLoaderProtocol)
+            component_invoker = await self.get(ComponentInvokerProtocol)
+            from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+            orchestrator = MLPipelineOrchestrator(config=config, event_bus=event_bus, workflow_engine=workflow_engine, resource_manager=resource_manager, component_registry=component_registry, component_loader=component_loader, component_invoker=component_invoker)
+            await orchestrator.initialize()
+            return orchestrator
+
+        async def cleanup_orchestrator(orchestrator):
+            await orchestrator.shutdown()
+        self.register_factory(MLPipelineFactoryProtocol, create_ml_pipeline_orchestrator, ServiceLifetime.SINGLETON, tags={'orchestrator', 'ml', 'pipeline', 'core'}, finalizer=cleanup_orchestrator)
+        self.logger.debug('Registered ML pipeline orchestrator factory')
+
+    def register_all_ml_services(self, environment: str='production') -> None:
+        """Register all ML pipeline services with proper dependency injection.
+
+        This method sets up the complete ML pipeline dependency graph following
+        2025 best practices with constructor injection and proper lifecycle management.
+
+        Args:
+            environment: Deployment environment for service configuration
+        """
+        self.logger.info('Registering ML pipeline services for %s environment', environment)
+        self.register_external_services_config_factory(environment)
+        config_placeholder = ServiceConnectionInfo(host='localhost', port=5432)
+        self.register_mlflow_service_factory(config_placeholder)
+        self.register_cache_service_factory(config_placeholder)
+        self.register_database_service_factory(config_placeholder)
+        self.register_event_bus_factory()
+        self.register_component_loader_factory()
+        self.register_workflow_engine_factory()
+        self.register_resource_manager_factory()
+        self.register_component_registry_factory()
+        self.register_component_invoker_factory()
+        self.register_health_monitor_factory()
+        self.register_ml_pipeline_factory()
+        self.logger.info('ML pipeline services registration complete')
+
+    async def _check_mlflow_health(self) -> dict[str, Any]:
+        """Check MLflow service health."""
+        try:
+            mlflow_service = await self.get(MLflowServiceProtocol)
+            return await mlflow_service.health_check()
+        except Exception as e:
+            return {'status': 'unhealthy', 'error': str(e)}
+
+    async def _check_cache_health(self) -> dict[str, Any]:
+        """Check cache service health."""
+        try:
+            cache_service = await self.get(CacheServiceProtocol)
+            return await cache_service.health_check()
+        except Exception as e:
+            return {'status': 'unhealthy', 'error': str(e)}
+
+    async def _check_database_health(self) -> dict[str, Any]:
+        """Check database service health."""
+        try:
+            db_service = await self.get(DatabaseServiceProtocol)
+            return await db_service.health_check()
+        except Exception as e:
+            return {'status': 'unhealthy', 'error': str(e)}
 
     def register_ml_interfaces(self) -> None:
         """Register ML interface factories that use event bus communication.
@@ -609,63 +629,27 @@ class DIContainer:
         This creates ML service interfaces that communicate via events without
         direct ML imports, ensuring clean MCP-ML boundary separation.
         """
-        # Register ML Event Bus as a resource
+
         async def create_ml_event_bus():
+            from prompt_improver.core.events.ml_event_bus import get_ml_event_bus
             return await get_ml_event_bus()
 
-        async def cleanup_ml_event_bus(event_bus: MLEventBus):
+        async def cleanup_ml_event_bus(event_bus: 'MLEventBus') -> None:
             await event_bus.shutdown()
 
-        self.register_factory(
-            MLEventBus,
-            create_ml_event_bus,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "events", "communication"},
-            finalizer=cleanup_ml_event_bus
-        )
+        def get_ml_event_bus_type():
+            from prompt_improver.core.events.ml_event_bus import MLEventBus
+            return MLEventBus
+        self.register_factory(get_ml_event_bus_type(), create_ml_event_bus, ServiceLifetime.SINGLETON, tags={'ml', 'events', 'communication'}, finalizer=cleanup_ml_event_bus)
 
-        # Register unified ML service that implements all ML interfaces
         def create_ml_service_interface():
             return EventBasedMLService()
-
-        # Register the unified ML service for all ML interfaces
-        self.register_factory(
-            MLServiceInterface,
-            create_ml_service_interface,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "unified"}
-        )
-
-        # Also register for individual interfaces (they all point to the same unified service)
-        self.register_factory(
-            MLAnalysisInterface,
-            create_ml_service_interface,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "analysis"}
-        )
-
-        self.register_factory(
-            MLTrainingInterface,
-            create_ml_service_interface,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "training"}
-        )
-
-        self.register_factory(
-            MLHealthInterface,
-            create_ml_service_interface,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "health"}
-        )
-
-        self.register_factory(
-            MLModelInterface,
-            create_ml_service_interface,
-            ServiceLifetime.SINGLETON,
-            tags={"ml", "model"}
-        )
-
-        self.logger.info("Registered ML interface factories with event bus communication")
+        self.register_factory(MLServiceInterface, create_ml_service_interface, ServiceLifetime.SINGLETON, tags={'ml', 'unified'})
+        self.register_factory(MLAnalysisInterface, create_ml_service_interface, ServiceLifetime.SINGLETON, tags={'ml', 'analysis'})
+        self.register_factory(MLTrainingInterface, create_ml_service_interface, ServiceLifetime.SINGLETON, tags={'ml', 'training'})
+        self.register_factory(MLHealthInterface, create_ml_service_interface, ServiceLifetime.SINGLETON, tags={'ml', 'health'})
+        self.register_factory(MLModelInterface, create_ml_service_interface, ServiceLifetime.SINGLETON, tags={'ml', 'model'})
+        self.logger.info('Registered ML interface factories with event bus communication')
 
     @asynccontextmanager
     async def scope(self, scope_id: str):
@@ -678,7 +662,6 @@ class DIContainer:
         try:
             yield
         finally:
-            # Clean up scoped services
             scoped_services = self._scoped_services.pop(scope_id, {})
             for service in scoped_services.values():
                 if hasattr(service, 'cleanup') and callable(service.cleanup):
@@ -688,7 +671,7 @@ class DIContainer:
                         else:
                             service.cleanup()
                     except Exception as e:
-                        self.logger.error(f"Error cleaning up scoped service: {e}")
+                        self.logger.error('Error cleaning up scoped service: %s', e)
 
     def set_metrics_registry(self, metrics_registry: MetricsRegistryProtocol) -> None:
         """Set the metrics registry for performance tracking.
@@ -697,9 +680,9 @@ class DIContainer:
             metrics_registry: Metrics registry implementation
         """
         self._metrics_registry = metrics_registry
-        self.logger.debug("Metrics registry set for DI container")
+        self.logger.debug('Metrics registry set for DI container')
 
-    def get_services_by_tag(self, tag: str) -> Dict[Type[Any], ServiceRegistration]:
+    def get_services_by_tag(self, tag: str) -> dict[type[Any], ServiceRegistration]:
         """Get all services registered with a specific tag.
 
         Args:
@@ -708,34 +691,21 @@ class DIContainer:
         Returns:
             Dictionary of service types to their registrations
         """
-        return {
-            service_type: registration
-            for service_type, registration in self._services.items()
-            if tag in registration.tags
-        }
+        return {service_type: registration for service_type, registration in self._services.items() if tag in registration.tags}
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """Get performance metrics for the DI container.
 
         Returns:
             Dictionary containing performance metrics
         """
-        return {
-            "resolution_times": dict(self._resolution_times),
-            "initialization_order": [t.__name__ for t in self._initialization_order],
-            "registered_services_count": len(self._services),
-            "scoped_contexts_count": len(self._scoped_services),
-            "active_resources_count": len(self._resources)
-        }
+        return {'resolution_times': dict(self._resolution_times), 'initialization_order': [t.__name__ for t in self._initialization_order], 'registered_services_count': len(self._services), 'scoped_contexts_count': len(self._scoped_services), 'active_resources_count': len(self._resources)}
 
     async def shutdown(self):
         """Enhanced shutdown with comprehensive resource cleanup."""
-        self.logger.info(f"Shutting down enhanced DI container '{self.name}'")
-
-        # Shutdown resources first (in reverse order of creation)
+        self.logger.info("Shutting down enhanced DI container '%s'", self.name)
         for resource in reversed(list(self._resources)):
             try:
-                # Find the registration for this resource
                 for registration in self._services.values():
                     if registration.instance is resource and registration.finalizer:
                         if inspect.iscoroutinefunction(registration.finalizer):
@@ -744,38 +714,31 @@ class DIContainer:
                             registration.finalizer(resource)
                         break
                 else:
-                    # Fallback to generic shutdown if available
                     if hasattr(resource, 'shutdown') and callable(resource.shutdown):
                         if inspect.iscoroutinefunction(resource.shutdown):
                             await resource.shutdown()
                         else:
                             resource.shutdown()
             except Exception as e:
-                self.logger.error(f"Error shutting down resource {type(resource).__name__}: {e}")
-
-        # Shutdown singleton services (in reverse initialization order)
+                self.logger.error('Error shutting down resource %s: %s', type(resource).__name__, e)
         for interface in reversed(self._initialization_order):
             registration = self._services.get(interface)
             if registration and registration.instance:
                 try:
-                    # Use finalizer if available
                     if registration.finalizer:
                         if inspect.iscoroutinefunction(registration.finalizer):
                             await registration.finalizer(registration.instance)
                         else:
                             registration.finalizer(registration.instance)
-                    # Fallback to generic shutdown
                     elif hasattr(registration.instance, 'shutdown') and callable(registration.instance.shutdown):
                         if inspect.iscoroutinefunction(registration.instance.shutdown):
                             await registration.instance.shutdown()
                         else:
                             registration.instance.shutdown()
                 except Exception as e:
-                    self.logger.error(f"Error shutting down service {interface.__name__}: {e}")
-
-        # Clean up all scoped services
+                    self.logger.error('Error shutting down service %s: %s', interface.__name__, e)
         for scope_id, scoped_services in self._scoped_services.items():
-            self.logger.debug(f"Cleaning up scoped services for scope: {scope_id}")
+            self.logger.debug('Cleaning up scoped services for scope: %s', scope_id)
             for service in scoped_services.values():
                 try:
                     if hasattr(service, 'cleanup') and callable(service.cleanup):
@@ -784,9 +747,7 @@ class DIContainer:
                         else:
                             service.cleanup()
                 except Exception as e:
-                    self.logger.error(f"Error cleaning up scoped service: {e}")
-
-        # Clear all collections
+                    self.logger.error('Error cleaning up scoped service: %s', e)
         self._services.clear()
         self._scoped_services.clear()
         self._resources.clear()
@@ -794,11 +755,8 @@ class DIContainer:
         self._resolution_times.clear()
         self._initialization_order.clear()
         self._health_checks.clear()
-
-        self.logger.info(f"Enhanced DI container '{self.name}' shutdown complete")
-
-# Global container instance
-_container: Optional[DIContainer] = None
+        self.logger.info("Enhanced DI container '%s' shutdown complete", self.name)
+_container: DIContainer | None = None
 
 async def get_container() -> DIContainer:
     """Get the global DI container instance.

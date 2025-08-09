@@ -1,52 +1,28 @@
 """Performance regression detection and alerting system."""
-
 import asyncio
 import json
 import logging
 import statistics
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Callable, Set, Tuple
 import uuid
-
-# Alerting and notifications
-try:
-    import smtplib
-    from email.mime.text import MimeText
-    from email.mime.multipart import MimeMultipart
-    EMAIL_AVAILABLE = True
-except ImportError:
-    EMAIL_AVAILABLE = False
-
-# Webhook notifications
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Set, Tuple
+from prompt_improver.performance.baseline.models import AlertSeverity, BaselineMetrics, MetricDefinition, PerformanceTrend, RegressionAlert, TrendDirection, get_metric_definition
+from prompt_improver.performance.baseline.statistical_analyzer import StatisticalAnalyzer
 try:
     import aiohttp
     WEBHOOK_AVAILABLE = True
 except ImportError:
     WEBHOOK_AVAILABLE = False
-
-from .models import (
-    BaselineMetrics, RegressionAlert, AlertSeverity, MetricDefinition,
-    get_metric_definition, PerformanceTrend, TrendDirection
-)
-from .statistical_analyzer import StatisticalAnalyzer
-
 logger = logging.getLogger(__name__)
 
 class RegressionThresholds:
     """Configuration for regression detection thresholds."""
-    
-    def __init__(
-        self,
-        warning_degradation_percent: float = 15.0,
-        critical_degradation_percent: float = 25.0,
-        emergency_degradation_percent: float = 50.0,
-        minimum_samples: int = 5,
-        significance_threshold: float = 0.05,
-        consecutive_violations: int = 3
-    ):
+
+    def __init__(self, warning_degradation_percent: float=15.0, critical_degradation_percent: float=25.0, emergency_degradation_percent: float=50.0, minimum_samples: int=5, significance_threshold: float=0.05, consecutive_violations: int=3):
         """Initialize regression thresholds.
-        
+
         Args:
             warning_degradation_percent: % degradation to trigger warning
             critical_degradation_percent: % degradation to trigger critical alert
@@ -64,25 +40,357 @@ class RegressionThresholds:
 
 class AlertChannel:
     """Base class for alert channels."""
-    
+
     async def send_alert(self, alert: RegressionAlert) -> bool:
         """Send alert through this channel."""
         raise NotImplementedError
 
 class LogAlertChannel(AlertChannel):
     """Log-based alert channel."""
-    
-    def __init__(self, logger_name: str = __name__):
+
+    def __init__(self, logger_name: str=__name__):
         self.logger = logging.getLogger(logger_name)
-    
+
     async def send_alert(self, alert: RegressionAlert) -> bool:
         """Send alert to logs."""
         try:
-            log_level = {
-                AlertSeverity.INFO: logging.INFO,
-                AlertSeverity.WARNING: logging.WARNING,
-                AlertSeverity.CRITICAL: logging.CRITICAL,
-                AlertSeverity.EMERGENCY: logging.CRITICAL
-            }.get(alert.severity, logging.WARNING)
-            
-            self.logger.log(\n                log_level,\n                f\"Performance Regression Detected: {alert.message} \"\n                f\"(Metric: {alert.metric_name}, Degradation: {alert.degradation_percentage:.1f}%)\"\n            )\n            return True\n        except Exception as e:\n            logger.error(f\"Failed to send log alert: {e}\")\n            return False\n\nclass WebhookAlertChannel(AlertChannel):\n    \"\"\"Webhook-based alert channel.\"\"\"\n    \n    def __init__(self, webhook_url: str, timeout: int = 30):\n        self.webhook_url = webhook_url\n        self.timeout = timeout\n    \n    async def send_alert(self, alert: RegressionAlert) -> bool:\n        \"\"\"Send alert via webhook.\"\"\"\n        if not WEBHOOK_AVAILABLE:\n            logger.warning(\"Webhook alerts not available (aiohttp not installed)\")\n            return False\n        \n        try:\n            payload = {\n                'alert_type': 'performance_regression',\n                'severity': alert.severity.value,\n                'metric_name': alert.metric_name,\n                'message': alert.message,\n                'current_value': alert.current_value,\n                'baseline_value': alert.baseline_value,\n                'degradation_percentage': alert.degradation_percentage,\n                'timestamp': alert.alert_timestamp.isoformat(),\n                'alert_id': alert.alert_id,\n                'affected_operations': alert.affected_operations,\n                'probable_causes': alert.probable_causes,\n                'remediation_suggestions': alert.remediation_suggestions\n            }\n            \n            async with aiohttp.ClientSession() as session:\n                async with session.post(\n                    self.webhook_url,\n                    json=payload,\n                    timeout=aiohttp.ClientTimeout(total=self.timeout)\n                ) as response:\n                    if response.status == 200:\n                        logger.info(f\"Webhook alert sent successfully for {alert.metric_name}\")\n                        return True\n                    else:\n                        logger.error(f\"Webhook alert failed with status {response.status}\")\n                        return False\n        \n        except Exception as e:\n            logger.error(f\"Failed to send webhook alert: {e}\")\n            return False\n\nclass EmailAlertChannel(AlertChannel):\n    \"\"\"Email-based alert channel.\"\"\"\n    \n    def __init__(\n        self, \n        smtp_server: str,\n        smtp_port: int,\n        username: str,\n        password: str,\n        from_email: str,\n        to_emails: List[str],\n        use_tls: bool = True\n    ):\n        self.smtp_server = smtp_server\n        self.smtp_port = smtp_port\n        self.username = username\n        self.password = password\n        self.from_email = from_email\n        self.to_emails = to_emails\n        self.use_tls = use_tls\n    \n    async def send_alert(self, alert: RegressionAlert) -> bool:\n        \"\"\"Send alert via email.\"\"\"\n        if not EMAIL_AVAILABLE:\n            logger.warning(\"Email alerts not available (smtplib not available)\")\n            return False\n        \n        try:\n            # Create email content\n            subject = f\"[{alert.severity.value.upper()}] Performance Regression: {alert.metric_name}\"\n            \n            body = f\"\"\"\nPerformance Regression Alert\n\nMetric: {alert.metric_name}\nSeverity: {alert.severity.value.upper()}\nCurrent Value: {alert.current_value:.2f}\nBaseline Value: {alert.baseline_value:.2f}\nDegradation: {alert.degradation_percentage:.1f}%\n\nMessage: {alert.message}\n\nDetection Time: {alert.detection_timestamp}\nAlert Time: {alert.alert_timestamp}\n\nAffected Operations:\n{chr(10).join('- ' + op for op in alert.affected_operations) if alert.affected_operations else '- None specified'}\n\nProbable Causes:\n{chr(10).join('- ' + cause for cause in alert.probable_causes) if alert.probable_causes else '- Analysis pending'}\n\nRemediation Suggestions:\n{chr(10).join('- ' + suggestion for suggestion in alert.remediation_suggestions) if alert.remediation_suggestions else '- Contact system administrator'}\n\nAlert ID: {alert.alert_id}\n\"\"\"\n            \n            # Create email message\n            msg = MimeMultipart()\n            msg['From'] = self.from_email\n            msg['To'] = ', '.join(self.to_emails)\n            msg['Subject'] = subject\n            msg.attach(MimeText(body, 'plain'))\n            \n            # Send email\n            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:\n                if self.use_tls:\n                    server.starttls()\n                server.login(self.username, self.password)\n                server.send_message(msg)\n            \n            logger.info(f\"Email alert sent successfully for {alert.metric_name}\")\n            return True\n        \n        except Exception as e:\n            logger.error(f\"Failed to send email alert: {e}\")\n            return False\n\nclass RegressionDetector:\n    \"\"\"Advanced performance regression detection with alerting.\n    \n    Monitors performance baselines and detects significant degradations,\n    sending alerts through configured channels.\n    \"\"\"\n    \n    def __init__(\n        self,\n        thresholds: Optional[RegressionThresholds] = None,\n        alert_channels: Optional[List[AlertChannel]] = None,\n        enable_statistical_analysis: bool = True,\n        cooldown_period: int = 300,  # 5 minutes\n        max_alerts_per_hour: int = 10\n    ):\n        \"\"\"Initialize regression detector.\n        \n        Args:\n            thresholds: Detection threshold configuration\n            alert_channels: List of alert channels to use\n            enable_statistical_analysis: Use statistical significance testing\n            cooldown_period: Minimum time between alerts for same metric (seconds)\n            max_alerts_per_hour: Maximum alerts per hour per metric\n        \"\"\"\n        self.thresholds = thresholds or RegressionThresholds()\n        self.alert_channels = alert_channels or [LogAlertChannel()]\n        self.enable_statistical_analysis = enable_statistical_analysis\n        self.cooldown_period = cooldown_period\n        self.max_alerts_per_hour = max_alerts_per_hour\n        \n        # State tracking\n        self._violation_counts: Dict[str, int] = {}  # Consecutive violations per metric\n        self._last_alert_times: Dict[str, datetime] = {}  # Last alert time per metric\n        self._alert_counts: Dict[str, List[datetime]] = {}  # Alert history per metric\n        self._active_alerts: Dict[str, RegressionAlert] = {}  # Active alerts\n        self._baseline_history: List[BaselineMetrics] = []  # Historical baselines\n        \n        # Statistical analyzer\n        if self.enable_statistical_analysis:\n            self.analyzer = StatisticalAnalyzer(\n                significance_threshold=self.thresholds.significance_threshold\n            )\n        \n        logger.info(f\"RegressionDetector initialized with {len(self.alert_channels)} channels\")\n    \n    async def check_for_regressions(\n        self,\n        current_baseline: BaselineMetrics,\n        reference_baselines: Optional[List[BaselineMetrics]] = None\n    ) -> List[RegressionAlert]:\n        \"\"\"Check current baseline for performance regressions.\n        \n        Args:\n            current_baseline: Current baseline to analyze\n            reference_baselines: Historical baselines for comparison\n            \n        Returns:\n            List of detected regression alerts\n        \"\"\"\n        alerts = []\n        \n        # Use stored history if no reference baselines provided\n        if reference_baselines is None:\n            reference_baselines = self._baseline_history[-20:]  # Last 20 baselines\n        \n        if len(reference_baselines) < self.thresholds.minimum_samples:\n            logger.debug(f\"Insufficient reference baselines ({len(reference_baselines)} < {self.thresholds.minimum_samples})\")\n            return alerts\n        \n        # Get metrics to check\n        metrics_to_check = self._get_metrics_to_check(current_baseline, reference_baselines)\n        \n        for metric_name in metrics_to_check:\n            try:\n                alert = await self._check_metric_regression(\n                    metric_name, current_baseline, reference_baselines\n                )\n                if alert:\n                    alerts.append(alert)\n            except Exception as e:\n                logger.error(f\"Error checking regression for {metric_name}: {e}\")\n        \n        # Store current baseline in history\n        self._baseline_history.append(current_baseline)\n        if len(self._baseline_history) > 100:  # Keep last 100 baselines\n            self._baseline_history = self._baseline_history[-100:]\n        \n        # Send alerts\n        for alert in alerts:\n            await self._process_alert(alert)\n        \n        return alerts\n    \n    async def _check_metric_regression(\n        self,\n        metric_name: str,\n        current_baseline: BaselineMetrics,\n        reference_baselines: List[BaselineMetrics]\n    ) -> Optional[RegressionAlert]:\n        \"\"\"Check a specific metric for regression.\"\"\"\n        \n        # Extract metric values\n        current_values = self._extract_metric_values(current_baseline, metric_name)\n        if not current_values:\n            return None\n        \n        # Get reference values\n        reference_values = []\n        for baseline in reference_baselines:\n            values = self._extract_metric_values(baseline, metric_name)\n            reference_values.extend(values)\n        \n        if len(reference_values) < self.thresholds.minimum_samples:\n            return None\n        \n        # Calculate means\n        current_mean = statistics.mean(current_values)\n        reference_mean = statistics.mean(reference_values)\n        \n        # Determine if metric should be lower or higher\n        metric_def = get_metric_definition(metric_name)\n        lower_is_better = metric_def.lower_is_better if metric_def else True\n        \n        # Calculate degradation percentage\n        if reference_mean == 0:\n            return None\n        \n        if lower_is_better:\n            # For metrics where lower is better, degradation is an increase\n            degradation_pct = ((current_mean - reference_mean) / reference_mean) * 100\n        else:\n            # For metrics where higher is better, degradation is a decrease\n            degradation_pct = ((reference_mean - current_mean) / reference_mean) * 100\n        \n        # Check if this is actually a degradation\n        if degradation_pct <= 0:\n            # Performance improved or stayed same\n            self._violation_counts[metric_name] = 0\n            return None\n        \n        # Determine severity\n        severity = self._determine_severity(degradation_pct)\n        if severity is None:\n            # Below warning threshold\n            self._violation_counts[metric_name] = 0\n            return None\n        \n        # Check for statistical significance if enabled\n        is_significant = True\n        if self.enable_statistical_analysis and len(current_values) > 1 and len(reference_values) > 1:\n            try:\n                trend = await self.analyzer.analyze_trend(\n                    metric_name, \n                    reference_baselines + [current_baseline]\n                )\n                is_significant = trend.is_significant()\n            except Exception as e:\n                logger.debug(f\"Statistical analysis failed for {metric_name}: {e}\")\n        \n        if not is_significant:\n            logger.debug(f\"Regression in {metric_name} not statistically significant\")\n            return None\n        \n        # Track consecutive violations\n        self._violation_counts[metric_name] = self._violation_counts.get(metric_name, 0) + 1\n        \n        # Check if we need consecutive violations\n        if self._violation_counts[metric_name] < self.thresholds.consecutive_violations:\n            logger.debug(f\"Regression in {metric_name}: {self._violation_counts[metric_name]}/{self.thresholds.consecutive_violations} violations\")\n            return None\n        \n        # Check cooldown period\n        if not self._is_alert_allowed(metric_name):\n            return None\n        \n        # Create regression alert\n        alert = RegressionAlert(\n            alert_id=str(uuid.uuid4()),\n            metric_name=metric_name,\n            severity=severity,\n            message=self._generate_alert_message(metric_name, degradation_pct, severity),\n            current_value=current_mean,\n            baseline_value=reference_mean,\n            threshold_value=self._get_threshold_value(degradation_pct),\n            degradation_percentage=degradation_pct,\n            detection_timestamp=current_baseline.collection_timestamp,\n            alert_timestamp=datetime.now(timezone.utc),\n            affected_operations=self._identify_affected_operations(metric_name, current_baseline),\n            probable_causes=self._identify_probable_causes(metric_name, degradation_pct),\n            remediation_suggestions=self._generate_remediation_suggestions(metric_name, severity)\n        )\n        \n        return alert\n    \n    def _extract_metric_values(self, baseline: BaselineMetrics, metric_name: str) -> List[float]:\n        \"\"\"Extract values for a specific metric from baseline.\"\"\"\n        # Use same logic as StatisticalAnalyzer\n        if metric_name == 'response_time' and baseline.response_times:\n            return baseline.response_times\n        elif metric_name == 'error_rate' and baseline.error_rates:\n            return baseline.error_rates\n        elif metric_name == 'throughput' and baseline.throughput_values:\n            return baseline.throughput_values\n        elif metric_name == 'cpu_utilization' and baseline.cpu_utilization:\n            return baseline.cpu_utilization\n        elif metric_name == 'memory_utilization' and baseline.memory_utilization:\n            return baseline.memory_utilization\n        elif metric_name == 'database_connection_time' and baseline.database_connection_time:\n            return baseline.database_connection_time\n        elif metric_name == 'cache_hit_rate' and baseline.cache_hit_rate:\n            return baseline.cache_hit_rate\n        elif metric_name in baseline.custom_metrics:\n            return baseline.custom_metrics[metric_name]\n        \n        return []\n    \n    def _get_metrics_to_check(self, current: BaselineMetrics, reference: List[BaselineMetrics]) -> List[str]:\n        \"\"\"Get list of metrics to check for regressions.\"\"\"\n        metrics = set()\n        \n        # Standard metrics\n        if current.response_times and any(b.response_times for b in reference):\n            metrics.add('response_time')\n        if current.error_rates and any(b.error_rates for b in reference):\n            metrics.add('error_rate')\n        if current.throughput_values and any(b.throughput_values for b in reference):\n            metrics.add('throughput')\n        if current.cpu_utilization and any(b.cpu_utilization for b in reference):\n            metrics.add('cpu_utilization')\n        if current.memory_utilization and any(b.memory_utilization for b in reference):\n            metrics.add('memory_utilization')\n        if current.database_connection_time and any(b.database_connection_time for b in reference):\n            metrics.add('database_connection_time')\n        if current.cache_hit_rate and any(b.cache_hit_rate for b in reference):\n            metrics.add('cache_hit_rate')\n        \n        # Custom metrics\n        for metric_name in current.custom_metrics:\n            if any(metric_name in b.custom_metrics for b in reference):\n                metrics.add(metric_name)\n        \n        return list(metrics)\n    \n    def _determine_severity(self, degradation_pct: float) -> Optional[AlertSeverity]:\n        \"\"\"Determine alert severity based on degradation percentage.\"\"\"\n        if degradation_pct >= self.thresholds.emergency_degradation_percent:\n            return AlertSeverity.EMERGENCY\n        elif degradation_pct >= self.thresholds.critical_degradation_percent:\n            return AlertSeverity.CRITICAL\n        elif degradation_pct >= self.thresholds.warning_degradation_percent:\n            return AlertSeverity.WARNING\n        else:\n            return None\n    \n    def _get_threshold_value(self, degradation_pct: float) -> float:\n        \"\"\"Get the threshold value that was exceeded.\"\"\"\n        if degradation_pct >= self.thresholds.emergency_degradation_percent:\n            return self.thresholds.emergency_degradation_percent\n        elif degradation_pct >= self.thresholds.critical_degradation_percent:\n            return self.thresholds.critical_degradation_percent\n        else:\n            return self.thresholds.warning_degradation_percent\n    \n    def _is_alert_allowed(self, metric_name: str) -> bool:\n        \"\"\"Check if alert is allowed based on cooldown and rate limits.\"\"\"\n        current_time = datetime.now(timezone.utc)\n        \n        # Check cooldown period\n        if metric_name in self._last_alert_times:\n            time_since_last = (current_time - self._last_alert_times[metric_name]).total_seconds()\n            if time_since_last < self.cooldown_period:\n                return False\n        \n        # Check rate limit (alerts per hour)\n        if metric_name not in self._alert_counts:\n            self._alert_counts[metric_name] = []\n        \n        # Remove alerts older than 1 hour\n        one_hour_ago = current_time - timedelta(hours=1)\n        self._alert_counts[metric_name] = [\n            alert_time for alert_time in self._alert_counts[metric_name]\n            if alert_time > one_hour_ago\n        ]\n        \n        # Check if under rate limit\n        if len(self._alert_counts[metric_name]) >= self.max_alerts_per_hour:\n            return False\n        \n        return True\n    \n    def _generate_alert_message(self, metric_name: str, degradation_pct: float, severity: AlertSeverity) -> str:\n        \"\"\"Generate human-readable alert message.\"\"\"\n        metric_display = metric_name.replace('_', ' ').title()\n        \n        if severity == AlertSeverity.EMERGENCY:\n            return f\"EMERGENCY: {metric_display} has severely degraded by {degradation_pct:.1f}%\"\n        elif severity == AlertSeverity.CRITICAL:\n            return f\"CRITICAL: {metric_display} has critically degraded by {degradation_pct:.1f}%\"\n        else:\n            return f\"WARNING: {metric_display} has degraded by {degradation_pct:.1f}%\"\n    \n    def _identify_affected_operations(self, metric_name: str, baseline: BaselineMetrics) -> List[str]:\n        \"\"\"Identify operations affected by the regression.\"\"\"\n        affected = []\n        \n        # Look for operation-specific metrics in custom metrics\n        for custom_metric in baseline.custom_metrics:\n            if metric_name in custom_metric and '_' in custom_metric:\n                operation = custom_metric.split('_')[0]\n                if operation not in affected:\n                    affected.append(operation)\n        \n        # Add general categories based on metric type\n        if metric_name in ['response_time', 'database_connection_time']:\n            affected.extend(['API endpoints', 'Database operations'])\n        elif metric_name == 'error_rate':\n            affected.extend(['All operations', 'User requests'])\n        elif metric_name in ['cpu_utilization', 'memory_utilization']:\n            affected.extend(['System performance', 'All operations'])\n        elif metric_name == 'cache_hit_rate':\n            affected.extend(['Cache operations', 'Data retrieval'])\n        \n        return list(set(affected))  # Remove duplicates\n    \n    def _identify_probable_causes(self, metric_name: str, degradation_pct: float) -> List[str]:\n        \"\"\"Identify probable causes of the regression.\"\"\"\n        causes = []\n        \n        # General causes based on metric type\n        if metric_name == 'response_time':\n            causes.extend([\n                'Increased load or traffic',\n                'Database performance issues',\n                'Network latency',\n                'Resource contention',\n                'Inefficient code changes'\n            ])\n        elif metric_name == 'error_rate':\n            causes.extend([\n                'Recent code deployment',\n                'External service failures',\n                'Database connectivity issues',\n                'Configuration changes',\n                'Resource exhaustion'\n            ])\n        elif metric_name in ['cpu_utilization', 'memory_utilization']:\n            causes.extend([\n                'Increased workload',\n                'Memory leaks',\n                'Inefficient algorithms',\n                'Resource-intensive operations',\n                'Background processes'\n            ])\n        elif metric_name == 'database_connection_time':\n            causes.extend([\n                'Database server overload',\n                'Network connectivity issues',\n                'Database configuration changes',\n                'Connection pool exhaustion'\n            ])\n        elif metric_name == 'cache_hit_rate':\n            causes.extend([\n                'Cache invalidation issues',\n                'Memory pressure',\n                'Cache configuration changes',\n                'Data access pattern changes'\n            ])\n        \n        # Severity-based causes\n        if degradation_pct > 50:\n            causes.extend([\n                'System outage or partial failure',\n                'Critical resource exhaustion',\n                'Major configuration error'\n            ])\n        \n        return causes\n    \n    def _generate_remediation_suggestions(self, metric_name: str, severity: AlertSeverity) -> List[str]:\n        \"\"\"Generate remediation suggestions.\"\"\"\n        suggestions = []\n        \n        # Immediate actions based on severity\n        if severity == AlertSeverity.EMERGENCY:\n            suggestions.extend([\n                'Investigate immediately - system may be in critical state',\n                'Consider rolling back recent changes',\n                'Check system resource availability',\n                'Escalate to on-call engineer'\n            ])\n        elif severity == AlertSeverity.CRITICAL:\n            suggestions.extend([\n                'Investigate within 30 minutes',\n                'Review recent deployments',\n                'Check system metrics and logs'\n            ])\n        \n        # Metric-specific suggestions\n        if metric_name == 'response_time':\n            suggestions.extend([\n                'Review database query performance',\n                'Check for resource bottlenecks',\n                'Analyze request patterns',\n                'Consider scaling resources'\n            ])\n        elif metric_name == 'error_rate':\n            suggestions.extend([\n                'Check application logs for error patterns',\n                'Verify external service status',\n                'Review recent code changes',\n                'Test critical user flows'\n            ])\n        elif metric_name in ['cpu_utilization', 'memory_utilization']:\n            suggestions.extend([\n                'Monitor resource usage trends',\n                'Identify resource-intensive processes',\n                'Consider horizontal scaling',\n                'Review application efficiency'\n            ])\n        \n        # General suggestions\n        suggestions.extend([\n            'Monitor metric trends for recovery',\n            'Document findings for future reference',\n            'Update monitoring thresholds if needed'\n        ])\n        \n        return suggestions\n    \n    async def _process_alert(self, alert: RegressionAlert) -> None:\n        \"\"\"Process and send an alert through all channels.\"\"\"\n        # Update tracking\n        self._last_alert_times[alert.metric_name] = alert.alert_timestamp\n        if alert.metric_name not in self._alert_counts:\n            self._alert_counts[alert.metric_name] = []\n        self._alert_counts[alert.metric_name].append(alert.alert_timestamp)\n        \n        # Store active alert\n        self._active_alerts[alert.alert_id] = alert\n        \n        # Send through all channels\n        for channel in self.alert_channels:\n            try:\n                success = await channel.send_alert(alert)\n                if success:\n                    logger.info(f\"Alert sent via {type(channel).__name__} for {alert.metric_name}\")\n                else:\n                    logger.error(f\"Failed to send alert via {type(channel).__name__}\")\n            except Exception as e:\n                logger.error(f\"Error sending alert via {type(channel).__name__}: {e}\")\n    \n    async def resolve_alert(self, alert_id: str, resolution_note: str = \"\") -> bool:\n        \"\"\"Mark an alert as resolved.\"\"\"\n        if alert_id in self._active_alerts:\n            alert = self._active_alerts[alert_id]\n            alert.metadata['resolved'] = True\n            alert.metadata['resolution_time'] = datetime.now(timezone.utc).isoformat()\n            alert.metadata['resolution_note'] = resolution_note\n            \n            # Reset violation count for this metric\n            self._violation_counts[alert.metric_name] = 0\n            \n            logger.info(f\"Alert {alert_id} resolved for metric {alert.metric_name}\")\n            return True\n        \n        return False\n    \n    def get_active_alerts(self) -> List[RegressionAlert]:\n        \"\"\"Get all active alerts.\"\"\"\n        return [\n            alert for alert in self._active_alerts.values()\n            if not alert.metadata.get('resolved', False)\n        ]\n    \n    def get_alert_statistics(self) -> Dict[str, Any]:\n        \"\"\"Get statistics about alert activity.\"\"\"\n        current_time = datetime.now(timezone.utc)\n        \n        # Count alerts in last 24 hours\n        alerts_24h = 0\n        for alert_times in self._alert_counts.values():\n            alerts_24h += len([\n                t for t in alert_times\n                if (current_time - t).total_seconds() < 24 * 3600\n            ])\n        \n        return {\n            'active_alerts': len(self.get_active_alerts()),\n            'total_alerts_24h': alerts_24h,\n            'metrics_with_violations': len([\n                metric for metric, count in self._violation_counts.items()\n                if count > 0\n            ]),\n            'alert_channels': len(self.alert_channels),\n            'violation_counts': self._violation_counts.copy(),\n            'thresholds': {\n                'warning': self.thresholds.warning_degradation_percent,\n                'critical': self.thresholds.critical_degradation_percent,\n                'emergency': self.thresholds.emergency_degradation_percent\n            }\n        }\n\n# Global detector instance\n_global_detector: Optional[RegressionDetector] = None\n\ndef get_regression_detector() -> RegressionDetector:\n    \"\"\"Get the global regression detector instance.\"\"\"\n    global _global_detector\n    if _global_detector is None:\n        _global_detector = RegressionDetector()\n    return _global_detector\n\ndef set_regression_detector(detector: RegressionDetector) -> None:\n    \"\"\"Set the global regression detector instance.\"\"\"\n    global _global_detector\n    _global_detector = detector\n\n# Convenience functions\nasync def check_baseline_for_regressions(\n    baseline: BaselineMetrics,\n    reference_baselines: Optional[List[BaselineMetrics]] = None\n) -> List[RegressionAlert]:\n    \"\"\"Check a baseline for regressions using the global detector.\"\"\"\n    detector = get_regression_detector()\n    return await detector.check_for_regressions(baseline, reference_baselines)\n\nasync def setup_webhook_alerts(webhook_url: str) -> None:\n    \"\"\"Setup webhook alerts for the global detector.\"\"\"\n    detector = get_regression_detector()\n    webhook_channel = WebhookAlertChannel(webhook_url)\n    detector.alert_channels.append(webhook_channel)\n    logger.info(f\"Added webhook alert channel: {webhook_url}\")
+            log_level = {AlertSeverity.INFO: logging.INFO, AlertSeverity.WARNING: logging.WARNING, AlertSeverity.CRITICAL: logging.CRITICAL, AlertSeverity.EMERGENCY: logging.CRITICAL}.get(alert.severity, logging.WARNING)
+            self.logger.log(log_level, f'Performance Regression Detected: {alert.message} (Metric: {alert.metric_name}, Degradation: {alert.degradation_percentage:.1f}%)')
+            return True
+        except Exception as e:
+            logger.error('Failed to send log alert: %s', e)
+            return False
+
+class WebhookAlertChannel(AlertChannel):
+    """Webhook-based alert channel."""
+
+    def __init__(self, webhook_url: str, timeout: int=30):
+        self.webhook_url = webhook_url
+        self.timeout = timeout
+
+    async def send_alert(self, alert: RegressionAlert) -> bool:
+        """Send alert via webhook."""
+        if not WEBHOOK_AVAILABLE:
+            logger.warning('Webhook alerts not available (aiohttp not installed)')
+            return False
+        try:
+            payload = {'alert_type': 'performance_regression', 'severity': alert.severity.value, 'metric_name': alert.metric_name, 'message': alert.message, 'current_value': alert.current_value, 'baseline_value': alert.baseline_value, 'degradation_percentage': alert.degradation_percentage, 'timestamp': alert.alert_timestamp.isoformat(), 'alert_id': alert.alert_id, 'affected_operations': alert.affected_operations, 'probable_causes': alert.probable_causes, 'remediation_suggestions': alert.remediation_suggestions}
+            async with aiohttp.ClientSession() as session, session.post(self.webhook_url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
+                if response.status == 200:
+                    logger.info('Webhook alert sent successfully for %s', alert.metric_name)
+                    return True
+                logger.error('Webhook alert failed with status %s', response.status)
+                return False
+        except Exception as e:
+            logger.error('Failed to send webhook alert: %s', e)
+            return False
+
+class RegressionDetector:
+    """Advanced performance regression detection with alerting.
+
+    Monitors performance baselines and detects significant degradations,
+    sending alerts through configured channels.
+    """
+
+    def __init__(self, thresholds: RegressionThresholds | None=None, alert_channels: list[AlertChannel] | None=None, enable_statistical_analysis: bool=True, cooldown_period: int=300, max_alerts_per_hour: int=10):
+        """Initialize regression detector.
+
+        Args:
+            thresholds: Detection threshold configuration
+            alert_channels: List of alert channels to use
+            enable_statistical_analysis: Use statistical significance testing
+            cooldown_period: Minimum time between alerts for same metric (seconds)
+            max_alerts_per_hour: Maximum alerts per hour per metric
+        """
+        self.thresholds = thresholds or RegressionThresholds()
+        self.alert_channels = alert_channels or [LogAlertChannel()]
+        self.enable_statistical_analysis = enable_statistical_analysis
+        self.cooldown_period = cooldown_period
+        self.max_alerts_per_hour = max_alerts_per_hour
+        self._violation_counts: dict[str, int] = {}
+        self._last_alert_times: dict[str, datetime] = {}
+        self._alert_counts: dict[str, list[datetime]] = {}
+        self._active_alerts: dict[str, RegressionAlert] = {}
+        self._baseline_history: list[BaselineMetrics] = []
+        if self.enable_statistical_analysis:
+            self.analyzer = StatisticalAnalyzer(significance_threshold=self.thresholds.significance_threshold)
+        logger.info('RegressionDetector initialized with %s channels', len(self.alert_channels))
+
+    async def check_for_regressions(self, current_baseline: BaselineMetrics, reference_baselines: list[BaselineMetrics] | None=None) -> list[RegressionAlert]:
+        """Check current baseline for performance regressions.
+
+        Args:
+            current_baseline: Current baseline to analyze
+            reference_baselines: Historical baselines for comparison
+
+        Returns:
+            List of detected regression alerts
+        """
+        alerts = []
+        if reference_baselines is None:
+            reference_baselines = self._baseline_history[-20:]
+        if len(reference_baselines) < self.thresholds.minimum_samples:
+            logger.debug('Insufficient reference baselines (%s < %s)', len(reference_baselines), self.thresholds.minimum_samples)
+            return alerts
+        metrics_to_check = self._get_metrics_to_check(current_baseline, reference_baselines)
+        for metric_name in metrics_to_check:
+            try:
+                alert = await self._check_metric_regression(metric_name, current_baseline, reference_baselines)
+                if alert:
+                    alerts.append(alert)
+            except Exception as e:
+                logger.error('Error checking regression for {metric_name}: %s', e)
+        self._baseline_history.append(current_baseline)
+        if len(self._baseline_history) > 100:
+            self._baseline_history = self._baseline_history[-100:]
+        for alert in alerts:
+            await self._process_alert(alert)
+        return alerts
+
+    async def _check_metric_regression(self, metric_name: str, current_baseline: BaselineMetrics, reference_baselines: list[BaselineMetrics]) -> RegressionAlert | None:
+        """Check a specific metric for regression."""
+        current_values = self._extract_metric_values(current_baseline, metric_name)
+        if not current_values:
+            return None
+        reference_values = []
+        for baseline in reference_baselines:
+            values = self._extract_metric_values(baseline, metric_name)
+            reference_values.extend(values)
+        if len(reference_values) < self.thresholds.minimum_samples:
+            return None
+        current_mean = statistics.mean(current_values)
+        reference_mean = statistics.mean(reference_values)
+        metric_def = get_metric_definition(metric_name)
+        lower_is_better = metric_def.lower_is_better if metric_def else True
+        if reference_mean == 0:
+            return None
+        if lower_is_better:
+            degradation_pct = (current_mean - reference_mean) / reference_mean * 100
+        else:
+            degradation_pct = (reference_mean - current_mean) / reference_mean * 100
+        if degradation_pct <= 0:
+            self._violation_counts[metric_name] = 0
+            return None
+        severity = self._determine_severity(degradation_pct)
+        if severity is None:
+            self._violation_counts[metric_name] = 0
+            return None
+        is_significant = True
+        if self.enable_statistical_analysis and len(current_values) > 1 and (len(reference_values) > 1):
+            try:
+                trend = await self.analyzer.analyze_trend(metric_name, reference_baselines + [current_baseline])
+                is_significant = trend.is_significant()
+            except Exception as e:
+                logger.debug('Statistical analysis failed for {metric_name}: %s', e)
+        if not is_significant:
+            logger.debug('Regression in %s not statistically significant', metric_name)
+            return None
+        self._violation_counts[metric_name] = self._violation_counts.get(metric_name, 0) + 1
+        if self._violation_counts[metric_name] < self.thresholds.consecutive_violations:
+            logger.debug('Regression in %s: %s/%s violations', metric_name, self._violation_counts[metric_name], self.thresholds.consecutive_violations)
+            return None
+        if not self._is_alert_allowed(metric_name):
+            return None
+        alert = RegressionAlert(alert_id=str(uuid.uuid4()), metric_name=metric_name, severity=severity, message=self._generate_alert_message(metric_name, degradation_pct, severity), current_value=current_mean, baseline_value=reference_mean, threshold_value=self._get_threshold_value(degradation_pct), degradation_percentage=degradation_pct, detection_timestamp=current_baseline.collection_timestamp, alert_timestamp=datetime.now(UTC), affected_operations=self._identify_affected_operations(metric_name, current_baseline), probable_causes=self._identify_probable_causes(metric_name, degradation_pct), remediation_suggestions=self._generate_remediation_suggestions(metric_name, severity))
+        return alert
+
+    def _extract_metric_values(self, baseline: BaselineMetrics, metric_name: str) -> list[float]:
+        """Extract values for a specific metric from baseline."""
+        if metric_name == 'response_time' and baseline.response_times:
+            return baseline.response_times
+        if metric_name == 'error_rate' and baseline.error_rates:
+            return baseline.error_rates
+        if metric_name == 'throughput' and baseline.throughput_values:
+            return baseline.throughput_values
+        if metric_name == 'cpu_utilization' and baseline.cpu_utilization:
+            return baseline.cpu_utilization
+        if metric_name == 'memory_utilization' and baseline.memory_utilization:
+            return baseline.memory_utilization
+        if metric_name == 'database_connection_time' and baseline.database_connection_time:
+            return baseline.database_connection_time
+        if metric_name == 'cache_hit_rate' and baseline.cache_hit_rate:
+            return baseline.cache_hit_rate
+        if metric_name in baseline.custom_metrics:
+            return baseline.custom_metrics[metric_name]
+        return []
+
+    def _get_metrics_to_check(self, current: BaselineMetrics, reference: list[BaselineMetrics]) -> list[str]:
+        """Get list of metrics to check for regressions."""
+        metrics = set()
+        if current.response_times and any((b.response_times for b in reference)):
+            metrics.add('response_time')
+        if current.error_rates and any((b.error_rates for b in reference)):
+            metrics.add('error_rate')
+        if current.throughput_values and any((b.throughput_values for b in reference)):
+            metrics.add('throughput')
+        if current.cpu_utilization and any((b.cpu_utilization for b in reference)):
+            metrics.add('cpu_utilization')
+        if current.memory_utilization and any((b.memory_utilization for b in reference)):
+            metrics.add('memory_utilization')
+        if current.database_connection_time and any((b.database_connection_time for b in reference)):
+            metrics.add('database_connection_time')
+        if current.cache_hit_rate and any((b.cache_hit_rate for b in reference)):
+            metrics.add('cache_hit_rate')
+        for metric_name in current.custom_metrics:
+            if any((metric_name in b.custom_metrics for b in reference)):
+                metrics.add(metric_name)
+        return list(metrics)
+
+    def _determine_severity(self, degradation_pct: float) -> AlertSeverity | None:
+        """Determine alert severity based on degradation percentage."""
+        if degradation_pct >= self.thresholds.emergency_degradation_percent:
+            return AlertSeverity.EMERGENCY
+        if degradation_pct >= self.thresholds.critical_degradation_percent:
+            return AlertSeverity.CRITICAL
+        if degradation_pct >= self.thresholds.warning_degradation_percent:
+            return AlertSeverity.WARNING
+        return None
+
+    def _get_threshold_value(self, degradation_pct: float) -> float:
+        """Get the threshold value that was exceeded."""
+        if degradation_pct >= self.thresholds.emergency_degradation_percent:
+            return self.thresholds.emergency_degradation_percent
+        if degradation_pct >= self.thresholds.critical_degradation_percent:
+            return self.thresholds.critical_degradation_percent
+        return self.thresholds.warning_degradation_percent
+
+    def _is_alert_allowed(self, metric_name: str) -> bool:
+        """Check if alert is allowed based on cooldown and rate limits."""
+        current_time = datetime.now(UTC)
+        if metric_name in self._last_alert_times:
+            time_since_last = (current_time - self._last_alert_times[metric_name]).total_seconds()
+            if time_since_last < self.cooldown_period:
+                return False
+        if metric_name not in self._alert_counts:
+            self._alert_counts[metric_name] = []
+        one_hour_ago = current_time - timedelta(hours=1)
+        self._alert_counts[metric_name] = [alert_time for alert_time in self._alert_counts[metric_name] if alert_time > one_hour_ago]
+        if len(self._alert_counts[metric_name]) >= self.max_alerts_per_hour:
+            return False
+        return True
+
+    def _generate_alert_message(self, metric_name: str, degradation_pct: float, severity: AlertSeverity) -> str:
+        """Generate human-readable alert message."""
+        metric_display = metric_name.replace('_', ' ').title()
+        if severity == AlertSeverity.EMERGENCY:
+            return f'EMERGENCY: {metric_display} has severely degraded by {degradation_pct:.1f}%'
+        if severity == AlertSeverity.CRITICAL:
+            return f'CRITICAL: {metric_display} has critically degraded by {degradation_pct:.1f}%'
+        return f'WARNING: {metric_display} has degraded by {degradation_pct:.1f}%'
+
+    def _identify_affected_operations(self, metric_name: str, baseline: BaselineMetrics) -> list[str]:
+        """Identify operations affected by the regression."""
+        affected = []
+        for custom_metric in baseline.custom_metrics:
+            if metric_name in custom_metric and '_' in custom_metric:
+                operation = custom_metric.split('_')[0]
+                if operation not in affected:
+                    affected.append(operation)
+        if metric_name in ['response_time', 'database_connection_time']:
+            affected.extend(['API endpoints', 'Database operations'])
+        elif metric_name == 'error_rate':
+            affected.extend(['All operations', 'User requests'])
+        elif metric_name in ['cpu_utilization', 'memory_utilization']:
+            affected.extend(['System performance', 'All operations'])
+        elif metric_name == 'cache_hit_rate':
+            affected.extend(['Cache operations', 'Data retrieval'])
+        return list(set(affected))
+
+    def _identify_probable_causes(self, metric_name: str, degradation_pct: float) -> list[str]:
+        """Identify probable causes of the regression."""
+        causes = []
+        if metric_name == 'response_time':
+            causes.extend(['Increased load or traffic', 'Database performance issues', 'Network latency', 'Resource contention', 'Inefficient code changes'])
+        elif metric_name == 'error_rate':
+            causes.extend(['Recent code deployment', 'External service failures', 'Database connectivity issues', 'Configuration changes', 'Resource exhaustion'])
+        elif metric_name in ['cpu_utilization', 'memory_utilization']:
+            causes.extend(['Increased workload', 'Memory leaks', 'Inefficient algorithms', 'Resource-intensive operations', 'Background processes'])
+        elif metric_name == 'database_connection_time':
+            causes.extend(['Database server overload', 'Network connectivity issues', 'Database configuration changes', 'Connection pool exhaustion'])
+        elif metric_name == 'cache_hit_rate':
+            causes.extend(['Cache invalidation issues', 'Memory pressure', 'Cache configuration changes', 'Data access pattern changes'])
+        if degradation_pct > 50:
+            causes.extend(['System outage or partial failure', 'Critical resource exhaustion', 'Major configuration error'])
+        return causes
+
+    def _generate_remediation_suggestions(self, metric_name: str, severity: AlertSeverity) -> list[str]:
+        """Generate remediation suggestions."""
+        suggestions = []
+        if severity == AlertSeverity.EMERGENCY:
+            suggestions.extend(['Investigate immediately - system may be in critical state', 'Consider rolling back recent changes', 'Check system resource availability', 'Escalate to on-call engineer'])
+        elif severity == AlertSeverity.CRITICAL:
+            suggestions.extend(['Investigate within 30 minutes', 'Review recent deployments', 'Check system metrics and logs'])
+        if metric_name == 'response_time':
+            suggestions.extend(['Review database query performance', 'Check for resource bottlenecks', 'Analyze request patterns', 'Consider scaling resources'])
+        elif metric_name == 'error_rate':
+            suggestions.extend(['Check application logs for error patterns', 'Verify external service status', 'Review recent code changes', 'Test critical user flows'])
+        elif metric_name in ['cpu_utilization', 'memory_utilization']:
+            suggestions.extend(['Monitor resource usage trends', 'Identify resource-intensive processes', 'Consider horizontal scaling', 'Review application efficiency'])
+        suggestions.extend(['Monitor metric trends for recovery', 'Document findings for future reference', 'Update monitoring thresholds if needed'])
+        return suggestions
+
+    async def _process_alert(self, alert: RegressionAlert) -> None:
+        """Process and send an alert through all channels."""
+        self._last_alert_times[alert.metric_name] = alert.alert_timestamp
+        if alert.metric_name not in self._alert_counts:
+            self._alert_counts[alert.metric_name] = []
+        self._alert_counts[alert.metric_name].append(alert.alert_timestamp)
+        self._active_alerts[alert.alert_id] = alert
+        for channel in self.alert_channels:
+            try:
+                success = await channel.send_alert(alert)
+                if success:
+                    logger.info('Alert sent via %s for %s', type(channel).__name__, alert.metric_name)
+                else:
+                    logger.error('Failed to send alert via %s', type(channel).__name__)
+            except Exception as e:
+                logger.error('Error sending alert via {type(channel).__name__}: %s', e)
+
+    async def resolve_alert(self, alert_id: str, resolution_note: str='') -> bool:
+        """Mark an alert as resolved."""
+        if alert_id in self._active_alerts:
+            alert = self._active_alerts[alert_id]
+            alert.metadata['resolved'] = True
+            alert.metadata['resolution_time'] = datetime.now(UTC).isoformat()
+            alert.metadata['resolution_note'] = resolution_note
+            self._violation_counts[alert.metric_name] = 0
+            logger.info('Alert {alert_id} resolved for metric %s', alert.metric_name)
+            return True
+        return False
+
+    def get_active_alerts(self) -> list[RegressionAlert]:
+        """Get all active alerts."""
+        return [alert for alert in self._active_alerts.values() if not alert.metadata.get('resolved', False)]
+
+    def get_alert_statistics(self) -> dict[str, Any]:
+        """Get statistics about alert activity."""
+        current_time = datetime.now(UTC)
+        alerts_24h = 0
+        for alert_times in self._alert_counts.values():
+            alerts_24h += len([t for t in alert_times if (current_time - t).total_seconds() < 24 * 3600])
+        return {'active_alerts': len(self.get_active_alerts()), 'total_alerts_24h': alerts_24h, 'metrics_with_violations': len([metric for metric, count in self._violation_counts.items() if count > 0]), 'alert_channels': len(self.alert_channels), 'violation_counts': self._violation_counts.copy(), 'thresholds': {'warning': self.thresholds.warning_degradation_percent, 'critical': self.thresholds.critical_degradation_percent, 'emergency': self.thresholds.emergency_degradation_percent}}
+_global_detector: RegressionDetector | None = None
+
+def get_regression_detector() -> RegressionDetector:
+    """Get the global regression detector instance."""
+    global _global_detector
+    if _global_detector is None:
+        _global_detector = RegressionDetector()
+    return _global_detector
+
+def set_regression_detector(detector: RegressionDetector) -> None:
+    """Set the global regression detector instance."""
+    global _global_detector
+    _global_detector = detector
+
+async def check_baseline_for_regressions(baseline: BaselineMetrics, reference_baselines: list[BaselineMetrics] | None=None) -> list[RegressionAlert]:
+    """Check a baseline for regressions using the global detector."""
+    detector = get_regression_detector()
+    return await detector.check_for_regressions(baseline, reference_baselines)
+
+async def setup_webhook_alerts(webhook_url: str) -> None:
+    """Setup webhook alerts for the global detector."""
+    detector = get_regression_detector()
+    webhook_channel = WebhookAlertChannel(webhook_url)
+    detector.alert_channels.append(webhook_channel)
+    logger.info('Added webhook alert channel: %s', webhook_url)

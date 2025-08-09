@@ -559,9 +559,9 @@ def feature_flag(flag_key: str, default_value: Any = False,
         default_value: Default value if flag evaluation fails
         user_id_attr: Attribute name to extract user_id from function args
     """
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             manager = get_feature_flag_manager()
             if not manager:
                 # Fall back to default behavior if manager not available

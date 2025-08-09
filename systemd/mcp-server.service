@@ -1,0 +1,149 @@
+#
+# MCP Server SystemD Service Configuration
+# Production-ready native deployment with comprehensive service management
+# 
+# Installation:
+#   sudo cp systemd/mcp-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable mcp-server
+#   sudo systemctl start mcp-server
+#
+# Management:
+#   Status: sudo systemctl status mcp-server
+#   Logs: sudo journalctl -u mcp-server -f
+#   Restart: sudo systemctl restart mcp-server
+#   Stop: sudo systemctl stop mcp-server
+#
+
+[Unit]
+Description=APES MCP Server - Adaptive Prompt Enhancement System
+Documentation=https://github.com/your-org/prompt-improver
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+Requires=postgresql.service redis.service
+
+# Service Dependencies
+BindsTo=postgresql.service redis.service
+PartOf=prompt-enhancement.target
+
+[Service]
+# Service Type and Execution
+Type=simple
+ExecStart=/opt/prompt-improver/scripts/start_mcp_native.sh --mode stdio --log-level INFO
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+# Process Management
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# User and Group (Security)
+User=mcp-server
+Group=mcp-server
+DynamicUser=false
+
+# Working Directory and Environment
+WorkingDirectory=/opt/prompt-improver
+Environment=PYTHONPATH=/opt/prompt-improver/src
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=MCP_LOG_LEVEL=INFO
+Environment=FASTMCP_LOG_LEVEL=INFO
+
+# Environment File
+EnvironmentFile=-/etc/mcp-server/environment
+EnvironmentFile=-/opt/prompt-improver/.env
+
+# Process Limits and Security
+LimitNOFILE=65536
+LimitNPROC=4096
+LimitMEMLOCK=64M
+
+# Security Hardening (Systemd Security Features)
+# Filesystem Protection
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/prompt-improver/logs /opt/prompt-improver/tmp /var/log/mcp-server
+ReadOnlyPaths=/opt/prompt-improver
+
+# Network Security  
+PrivateNetwork=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Process Security
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# System Call Filtering
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Capability Restrictions
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Memory Protection
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RemoveIPC=true
+
+# CPU and Memory Limits
+CPUQuota=200%
+MemoryMax=2G
+MemorySwapMax=0
+TasksMax=1024
+
+# I/O Limits
+IOSchedulingClass=2
+IOSchedulingPriority=4
+
+# Logging Configuration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-server
+
+# Process Monitoring and Health Checks
+WatchdogSec=60
+NotifyAccess=main
+
+# PID File Management  
+PIDFile=/var/run/mcp-server.pid
+RuntimeDirectory=mcp-server
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+Alias=prompt-enhancement-server.service
+
+#
+# Additional Configuration Files
+#
+
+# /etc/mcp-server/environment - Service-specific environment variables
+# DATABASE_URL=postgresql://user:pass@localhost:5432/prompt_db
+# REDIS_URL=redis://localhost:6379/0
+# MCP_MODE=stdio
+# MCP_LOG_LEVEL=INFO
+# PERFORMANCE_MONITORING=true
+
+# /etc/systemd/system/mcp-server.service.d/override.conf - Local overrides
+# [Service]
+# Environment=DATABASE_URL=postgresql://prod-user:prod-pass@db-server:5432/prod_db
+# MemoryMax=4G
+
+# Create custom target for related services:
+# /etc/systemd/system/prompt-enhancement.target
+# [Unit]
+# Description=Prompt Enhancement System Services
+# [Install]
+# WantedBy=multi-user.target

@@ -15,7 +15,7 @@ We use a clean, simple approach:
 Run the setup script to ensure proper configuration:
 
 ```bash
-./scripts/setup-dev-environment.sh
+./scripts/setup_development.sh
 ```
 
 This script:
@@ -110,7 +110,7 @@ print(f"Database URL: {config.database_url}")
 
 ### 1. **Use the Setup Script**
 
-Always run `./scripts/setup-dev-environment.sh` when setting up the project.
+Always run `./scripts/setup_development.sh` when setting up the project.
 
 ### 2. **Check Environment Variables**
 
@@ -167,7 +167,7 @@ If you're migrating from an existing setup:
 
 If you encounter persistent issues:
 
-1. Run the setup script: `./scripts/setup-dev-environment.sh`
+1. Run the setup script: `./scripts/setup_development.sh`
 2. Check Docker logs: `docker-compose logs postgres`
 3. Verify port configuration in `.env` file
 4. Test connection manually: `docker exec -it apes_postgres psql -U apes_user -d apes_production`

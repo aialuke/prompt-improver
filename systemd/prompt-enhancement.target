@@ -1,0 +1,23 @@
+#
+# Prompt Enhancement System Target
+# Groups all related services for coordinated management
+#
+# Installation:
+#   sudo cp systemd/prompt-enhancement.target /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable prompt-enhancement.target
+#
+# Usage:
+#   Start all services: sudo systemctl start prompt-enhancement.target
+#   Stop all services: sudo systemctl stop prompt-enhancement.target
+#   Status: sudo systemctl status prompt-enhancement.target
+#
+
+[Unit]
+Description=Prompt Enhancement System Services
+Documentation=https://github.com/your-org/prompt-improver
+Wants=mcp-server.service
+After=postgresql.service redis.service
+
+[Install]
+WantedBy=multi-user.target

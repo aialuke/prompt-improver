@@ -1,79 +1,15 @@
-"""
-Service Level Objective (SLO) and Service Level Agreement (SLA) Monitoring System
+"""Service Level Objective (SLO) and Service Level Agreement (SLA) Monitoring System
 
 This module provides comprehensive SLO/SLA monitoring following Google SRE practices:
 - Configurable SLO targets with multi-window calculations
-- Error budget tracking and burn rate alerting  
+- Error budget tracking and burn rate alerting
 - Customer-specific SLA monitoring
-- Integration with OpenTelemetry and Prometheus
+- Integration with OpenTelemetry
 - Automated reporting and dashboards
 """
-
-from .framework import (
-    SLODefinition,
-    SLOTarget,
-    SLOTimeWindow,
-    SLOType,
-    ErrorBudget,
-    BurnRate,
-)
-
-from .calculator import (
-    SLICalculator,
-    MultiWindowSLICalculator,
-    PercentileCalculator,
-    AvailabilityCalculator,
-)
-
-from .monitor import (
-    SLOMonitor,
-    SLAMonitor,
-    ErrorBudgetMonitor,
-    BurnRateAlert,
-)
-
-from .reporting import (
-    SLOReporter,
-    SLAReporter,
-    DashboardGenerator,
-    ExecutiveReporter,
-)
-
-from .integration import (
-    OpenTelemetryIntegration,
-    PrometheusRecordingRules,
-    MetricsCollector,
-)
-
-__all__ = [
-    # Framework
-    "SLODefinition",
-    "SLOTarget", 
-    "SLOTimeWindow",
-    "SLOType",
-    "ErrorBudget",
-    "BurnRate",
-    
-    # Calculators
-    "SLICalculator",
-    "MultiWindowSLICalculator", 
-    "PercentileCalculator",
-    "AvailabilityCalculator",
-    
-    # Monitors
-    "SLOMonitor",
-    "SLAMonitor", 
-    "ErrorBudgetMonitor",
-    "BurnRateAlert",
-    
-    # Reporting
-    "SLOReporter",
-    "SLAReporter",
-    "DashboardGenerator", 
-    "ExecutiveReporter",
-    
-    # Integration
-    "OpenTelemetryIntegration",
-    "PrometheusRecordingRules",
-    "MetricsCollector",
-]
+from prompt_improver.monitoring.slo.calculator import AvailabilityCalculator, MultiWindowSLICalculator, PercentileCalculator, SLICalculator
+from prompt_improver.monitoring.slo.framework import BurnRate, ErrorBudget, SLODefinition, SLOTarget, SLOTimeWindow, SLOType
+from prompt_improver.monitoring.opentelemetry.integration import MetricsIntegration as OpenTelemetryIntegration
+from prompt_improver.monitoring.slo.monitor import BurnRateAlert, ErrorBudgetMonitor, SLAMonitor, SLOMonitor
+from prompt_improver.monitoring.slo.reporting import DashboardGenerator, ExecutiveReporter, SLAReporter, SLOReporter
+__all__ = ['SLODefinition', 'SLOTarget', 'SLOTimeWindow', 'SLOType', 'ErrorBudget', 'BurnRate', 'SLICalculator', 'MultiWindowSLICalculator', 'PercentileCalculator', 'AvailabilityCalculator', 'SLOMonitor', 'SLAMonitor', 'ErrorBudgetMonitor', 'BurnRateAlert', 'SLOReporter', 'SLAReporter', 'DashboardGenerator', 'ExecutiveReporter', 'OpenTelemetryIntegration', 'MetricsCollector']

@@ -10,44 +10,19 @@ This package contains specialized generators for different types of synthetic da
 Decomposed from synthetic_data_generator.py (3,389 lines) into focused modules
 for better maintainability and separation of concerns.
 """
-
-from .statistical_generator import (
-    GenerationMethodMetrics,
-    MethodPerformanceTracker,
-)
-
-# Neural and GAN generators will be imported conditionally based on dependencies
+from .statistical_generator import GenerationMethodMetrics, MethodPerformanceTracker
 try:
-    from .neural_generator import NeuralSyntheticGenerator, DiffusionSyntheticGenerator
+    from .neural_generator import DiffusionSyntheticGenerator, NeuralSyntheticGenerator
     NEURAL_AVAILABLE = True
 except ImportError:
     NEURAL_AVAILABLE = False
-
 try:
-    from .gan_generator import (
-        TabularGAN,
-        TabularVAE, 
-        TabularDiffusion,
-        HybridGenerationSystem,
-    )
+    from .gan_generator import HybridGenerationSystem, TabularDiffusion, TabularGAN, TabularVAE
     GAN_AVAILABLE = True
 except ImportError:
     GAN_AVAILABLE = False
-
-__all__ = [
-    "GenerationMethodMetrics",
-    "MethodPerformanceTracker",
-    "NEURAL_AVAILABLE",
-    "GAN_AVAILABLE",
-]
-
+__all__ = ['GenerationMethodMetrics', 'MethodPerformanceTracker', 'NEURAL_AVAILABLE', 'GAN_AVAILABLE']
 if NEURAL_AVAILABLE:
-    __all__.extend(["NeuralSyntheticGenerator", "DiffusionSyntheticGenerator"])
-
+    __all__.extend(['NeuralSyntheticGenerator', 'DiffusionSyntheticGenerator'])
 if GAN_AVAILABLE:
-    __all__.extend([
-        "TabularGAN",
-        "TabularVAE",
-        "TabularDiffusion", 
-        "HybridGenerationSystem",
-    ])
+    __all__.extend(['TabularGAN', 'TabularVAE', 'TabularDiffusion', 'HybridGenerationSystem'])

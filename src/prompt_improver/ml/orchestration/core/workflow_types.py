@@ -3,53 +3,46 @@ Workflow type definitions for ML Pipeline orchestration.
 
 Separated to avoid circular imports.
 """
-
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from sqlmodel import SQLModel, Field
 
 class WorkflowStepStatus(Enum):
     """Status of individual workflow steps."""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-    RETRYING = "retrying"
+    PENDING = 'pending'
+    RUNNING = 'running'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+    SKIPPED = 'skipped'
+    RETRYING = 'retrying'
 
-@dataclass
-class WorkflowStep:
+class WorkflowStep(SQLModel):
     """Individual step in a workflow."""
-    step_id: str
-    name: str
-    component_name: str
-    parameters: Dict[str, Any]
-    dependencies: List[str] = field(default_factory=list)
-    timeout: Optional[int] = None
-    retry_count: int = 0
-    max_retries: int = 3
+    step_id: str = Field(description='Unique step identifier')
+    name: str = Field(description='Human-readable step name')
+    component_name: str = Field(description='Component to execute')
+    parameters: Dict[str, Any] = Field(default_factory=dict, description='Step parameters')
+    dependencies: List[str] = Field(default_factory=list, description='Step dependencies')
+    timeout: Optional[int] = Field(default=None, ge=1, description='Step timeout in seconds')
+    retry_count: int = Field(default=0, ge=0, description='Current retry count')
+    max_retries: int = Field(default=3, ge=0, description='Maximum retry attempts')
+    status: WorkflowStepStatus = Field(default=WorkflowStepStatus.PENDING, description='Current step status')
+    started_at: Optional[datetime] = Field(default=None, description='Step start timestamp')
+    completed_at: Optional[datetime] = Field(default=None, description='Step completion timestamp')
+    error_message: Optional[str] = Field(default=None, description='Error message if step failed')
+    result: Optional[Any] = Field(default=None, description='Step execution result')
 
-    # Runtime state
-    status: WorkflowStepStatus = WorkflowStepStatus.PENDING
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
-    result: Optional[Any] = None
-
-@dataclass
-class WorkflowDefinition:
+class WorkflowDefinition(SQLModel):
     """Definition of a complete workflow."""
-    workflow_type: str
-    name: str
-    description: str
-    steps: List[WorkflowStep]
-    global_timeout: Optional[int] = None
-    parallel_execution: bool = False
-    on_failure: str = "stop"  # "stop", "continue", "retry"
-
-    # Continuous training specific fields
-    max_iterations: Optional[int] = None
-    continuous: bool = False
-    retry_policy: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    workflow_type: str = Field(description='Type of workflow')
+    name: str = Field(description='Workflow name')
+    description: str = Field(description='Workflow description')
+    steps: List[WorkflowStep] = Field(default_factory=list, description='Workflow steps')
+    global_timeout: Optional[int] = Field(default=None, ge=1, description='Global workflow timeout in seconds')
+    parallel_execution: bool = Field(default=False, description='Whether to execute steps in parallel')
+    on_failure: str = Field(default='stop', description='Action on failure: stop, continue, or retry')
+    max_iterations: Optional[int] = Field(default=None, ge=1, description='Maximum iterations for continuous training')
+    continuous: bool = Field(default=False, description='Whether workflow is continuous')
+    retry_policy: Optional[Dict[str, Any]] = Field(default=None, description='Retry policy configuration')
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description='Additional workflow metadata')

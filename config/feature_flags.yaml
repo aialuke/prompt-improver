@@ -47,7 +47,7 @@ flags:
         - "config_hot_reload_working"
         - "startup_validation_passing"
 
-  phase1_pydantic_settings:
+  phase1_sqlmodel_validation:
     state: "rollout"
     default_variant: "off"
     variants:

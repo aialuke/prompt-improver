@@ -1,10 +1,3 @@
 """Shared types and data structures"""
-
-from .signals import SignalContext, SignalOperation, ShutdownReason, EmergencyOperation
-
-__all__ = [
-    "SignalContext",
-    "SignalOperation", 
-    "ShutdownReason",
-    "EmergencyOperation"
-]
+from prompt_improver.shared.types.signals import EmergencyOperation, ShutdownReason, SignalContext, SignalOperation
+__all__ = ['EmergencyOperation', 'ShutdownReason', 'SignalContext', 'SignalOperation']

@@ -12,33 +12,6 @@ Features:
 - Modern asyncio with TaskGroup
 - Clean, legacy-free implementation
 """
-
-# Unified processor with all functionality integrated
-from .unified_batch_processor import (
-    UnifiedBatchProcessor,
-    UnifiedBatchConfig,
-    ProcessingStrategy,
-    ProcessingResult,
-    DataCharacteristics,
-    UnifiedMetrics,
-    # Factory functions
-    create_batch_processor,
-    create_streaming_processor,
-    create_optimized_processor,
-    batch_processor
-)
-
-__all__ = [
-    # Unified processor (RECOMMENDED)
-    "UnifiedBatchProcessor",
-    "UnifiedBatchConfig", 
-    "ProcessingStrategy",
-    "ProcessingResult",
-    "DataCharacteristics",
-    "UnifiedMetrics",
-    # Factory functions
-    "create_batch_processor",
-    "create_streaming_processor",
-    "create_optimized_processor",
-    "batch_processor",
-]
+from .unified_batch_processor import ProcessingResult, ProcessingStrategy, UnifiedBatchConfig, UnifiedBatchProcessor, UnifiedMetrics, batch_processor, create_batch_processor, create_optimized_processor, create_streaming_processor
+from .unified_batch_processor import DataCharacteristics
+__all__ = ['UnifiedBatchProcessor', 'UnifiedBatchConfig', 'ProcessingStrategy', 'ProcessingResult', 'DataCharacteristics', 'UnifiedMetrics', 'create_batch_processor', 'create_streaming_processor', 'create_optimized_processor', 'batch_processor']

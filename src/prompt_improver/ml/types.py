@@ -3,62 +3,32 @@
 This module provides comprehensive type definitions for machine learning components,
 including proper numpy array typing and model interfaces.
 """
-
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Protocol,
-    Tuple,
-    TypeVar,
-    Union,
-    runtime_checkable,
-)
-
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Tuple, TypeVar, Union, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
-
-# Type aliases for common numpy array types (snake_case)
 float_array = NDArray[np.float64]
 int_array = NDArray[np.int64]
 bool_array = NDArray[np.bool]
-feature_array = NDArray[np.float64]  # Features are typically float arrays
-label_array = NDArray[np.int64]  # Labels are typically integer arrays
-
-# Generic array type for flexibility
-T = TypeVar("T", bound=np.generic)
+feature_array = NDArray[np.float64]
+label_array = NDArray[np.int64]
+T = TypeVar('T', bound=np.generic)
 generic_array = NDArray[T]
-
-# ML-specific type aliases
-features = float_array  # Input features for models
-labels = int_array  # Target labels for classification
-predictions = Union[int_array, float_array]  # Model predictions
-probabilities = float_array  # Probability distributions
-embeddings = float_array  # Vector embeddings
-weights = float_array  # Model weights or sample weights
-
-# Clustering specific types
+features = float_array
+labels = int_array
+predictions = Union[int_array, float_array]
+probabilities = float_array
+embeddings = float_array
+weights = float_array
 cluster_labels = int_array
 cluster_centers = float_array
 distance_matrix = float_array
-
-# Dimensionality reduction types
 reduced_features = float_array
 transform_matrix = float_array
-
-# Model configuration types
 model_config = Dict[str, Any]
 hyper_parameters = Dict[str, Union[int, float, str, bool]]
 metrics_dict = Dict[str, float]
-
-# Callback types
 progress_callback = Callable[[int, int], None]
 metrics_callback = Callable[[metrics_dict], None]
-
-# Pipeline types
 pipeline_step = Tuple[str, Any]
 pipeline_config = List[pipeline_step]
 
@@ -66,7 +36,7 @@ pipeline_config = List[pipeline_step]
 class Transformer(Protocol):
     """Protocol for feature transformers."""
 
-    def fit(self, X: features, y: Optional[labels] = None) -> "Transformer":
+    def fit(self, X: features, y: Optional[labels]=None) -> 'Transformer':
         """Fit the transformer to data."""
         ...
 
@@ -74,7 +44,7 @@ class Transformer(Protocol):
         """Transform the features."""
         ...
 
-    def fit_transform(self, X: features, y: Optional[labels] = None) -> features:
+    def fit_transform(self, X: features, y: Optional[labels]=None) -> features:
         """Fit and transform in one step."""
         ...
 
@@ -82,7 +52,7 @@ class Transformer(Protocol):
 class Clusterer(Protocol):
     """Protocol for clustering algorithms."""
 
-    def fit(self, X: features) -> "Clusterer":
+    def fit(self, X: features) -> 'Clusterer':
         """Fit the clusterer to data."""
         ...
 
@@ -98,12 +68,7 @@ class Clusterer(Protocol):
 class Optimizer(Protocol):
     """Protocol for optimization algorithms."""
 
-    def optimize(
-        self,
-        features: features,
-        labels: Optional[labels] = None,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
+    def optimize(self, features: features, labels: Optional[labels]=None, **kwargs: Any) -> Dict[str, Any]:
         """Optimize the given features."""
         ...
 
@@ -131,33 +96,19 @@ class ModelManager(Protocol):
         """Get the model pipeline."""
         ...
 
-# Training data types
 class TrainingBatch:
     """Type-safe container for training data batches."""
 
-    def __init__(
-        self,
-        features: features,
-        labels: labels,
-        sample_weights: Optional[weights] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ):
+    def __init__(self, features: features, labels: labels, sample_weights: Optional[weights]=None, metadata: Optional[Dict[str, Any]]=None):
         self.features = features
         self.labels = labels
         self.sample_weights = sample_weights
         self.metadata = metadata or {}
 
-# Result types
 class OptimizationResult:
     """Type-safe container for optimization results."""
 
-    def __init__(
-        self,
-        optimized_features: features,
-        metrics: metrics_dict,
-        model_params: Optional[hyper_parameters] = None,
-        execution_time: Optional[float] = None,
-    ):
+    def __init__(self, optimized_features: features, metrics: metrics_dict, model_params: Optional[hyper_parameters]=None, execution_time: Optional[float]=None):
         self.optimized_features = optimized_features
         self.metrics = metrics
         self.model_params = model_params
@@ -166,67 +117,42 @@ class OptimizationResult:
 class ClusteringResult:
     """Type-safe container for clustering results."""
 
-    def __init__(
-        self,
-        labels: cluster_labels,
-        centers: Optional[cluster_centers] = None,
-        metrics: Optional[metrics_dict] = None,
-        n_clusters: Optional[int] = None,
-    ):
+    def __init__(self, labels: cluster_labels, centers: Optional[cluster_centers]=None, metrics: Optional[metrics_dict]=None, n_clusters: Optional[int]=None):
         self.labels = labels
         self.centers = centers
         self.metrics = metrics or {}
         self.n_clusters = n_clusters or len(np.unique(labels))
-
-# Common metric types
 SilhouetteScore = float
 CalinskiHarabaszScore = float
 DaviesBouldinScore = float
 InertiaScore = float
-
-# Validation types
-ValidationSplit = Tuple[int_array, int_array]  # train_indices, test_indices
+ValidationSplit = Tuple[int_array, int_array]
 CrossValidationFolds = List[ValidationSplit]
 
-# Error types
 class MLError(Exception):
     """Base exception for ML module."""
-
     pass
 
 class DimensionalityError(MLError):
     """Raised when dimensionality requirements are not met."""
-
     pass
 
 class ConvergenceError(MLError):
     """Raised when algorithms fail to converge."""
-
     pass
 
 class DataValidationError(MLError):
     """Raised when input data validation fails."""
-
     pass
 
-# Type guards
 def is_valid_features(arr: Any) -> bool:
     """Check if array is valid features array."""
-    return (
-        isinstance(arr, np.ndarray)
-        and arr.ndim == 2
-        and np.issubdtype(arr.dtype, np.floating)
-    )
+    return isinstance(arr, np.ndarray) and arr.ndim == 2 and np.issubdtype(arr.dtype, np.floating)
 
 def is_valid_labels(arr: Any) -> bool:
     """Check if array is valid labels array."""
-    return (
-        isinstance(arr, np.ndarray)
-        and arr.ndim == 1
-        and np.issubdtype(arr.dtype, np.integer)
-    )
+    return isinstance(arr, np.ndarray) and arr.ndim == 1 and np.issubdtype(arr.dtype, np.integer)
 
-# Utility type functions
 def ensure_features(arr: Union[List, np.ndarray]) -> features:
     """Ensure input is proper features array."""
     arr = np.asarray(arr, dtype=np.float64)

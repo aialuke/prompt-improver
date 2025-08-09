@@ -11,7 +11,7 @@ This document defines the standardized Docker images used across the APES projec
 
 ### Python
 - **All Environments**: `python:3.11-slim-bookworm`
-- **Rationale**: Project requires Python >=3.11, mypy configured for 3.11
+- **Rationale**: Project requires Python >=3.11, Pyright configured for 3.13
 
 ### Redis (Testing Only)
 - **Testing**: `redis:7-alpine`

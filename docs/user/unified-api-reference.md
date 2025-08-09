@@ -18,24 +18,32 @@ from prompt_improver.core.protocols.connection_protocol import (
 
 #### Interface Definition
 ```python
+from typing import TypedDict
+from typing_extensions import Unpack
+
+class ConnectionOptions(TypedDict, total=False):
+    timeout: float
+    retries: int
+    readonly: bool
+
 class ConnectionManagerProtocol(Protocol):
     """Unified protocol for connection management"""
-    
+
     async def get_connection(
-        self, 
+        self,
         mode: ConnectionMode = ConnectionMode.READ_WRITE,
-        **kwargs
+        **kwargs: Unpack[ConnectionOptions]
     ) -> AsyncContextManager[Any]:
         """
         Get a connection with specified mode.
-        
+
         Args:
             mode: Connection operation mode (READ_ONLY, READ_WRITE, BATCH, TRANSACTIONAL)
             **kwargs: Additional connection parameters
-            
+
         Returns:
             Async context manager for the connection
-            
+
         Raises:
             ConnectionError: If connection cannot be established
             TimeoutError: If connection timeout exceeded
@@ -374,9 +382,9 @@ class UnifiedConnectionManagerV2:
         ...
     
     async def get_connection(
-        self, 
+        self,
         mode: ConnectionMode = ConnectionMode.READ_WRITE,
-        **kwargs
+        **kwargs: Unpack[ConnectionOptions]
     ) -> AsyncContextManager[AsyncConnection]:
         """Get connection with automatic failover and optimization"""
         ...

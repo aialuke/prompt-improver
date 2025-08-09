@@ -5,29 +5,27 @@ This module contains common types and enums used by both component_registry
 and component_definitions modules, following 2025 best practices for 
 dependency management.
 """
-
-from enum import Enum
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
-
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+if TYPE_CHECKING:
+    from datetime import datetime
 
 class ComponentTier(Enum):
     """Component tier classification for orchestration priority."""
-    TIER_1 = "tier_1"  # Critical path components
-    TIER_2 = "tier_2"  # Important but not critical
-    TIER_3 = "tier_3"  # Optional/experimental components
-
+    TIER_1 = 'tier_1'
+    TIER_2 = 'tier_2'
+    TIER_3 = 'tier_3'
 
 class ComponentCapability(Enum):
     """Component capability types for orchestration."""
-    DATA_PROCESSING = "data_processing"
-    MODEL_TRAINING = "model_training"
-    FEATURE_ENGINEERING = "feature_engineering"
-    VALIDATION = "validation"
-    OPTIMIZATION = "optimization"
-    MONITORING = "monitoring"
-    DEPLOYMENT = "deployment"
-
+    DATA_PROCESSING = 'data_processing'
+    MODEL_TRAINING = 'model_training'
+    FEATURE_ENGINEERING = 'feature_engineering'
+    VALIDATION = 'validation'
+    OPTIMIZATION = 'optimization'
+    MONITORING = 'monitoring'
+    DEPLOYMENT = 'deployment'
 
 @dataclass
 class ComponentInfo:
@@ -38,13 +36,20 @@ class ComponentInfo:
     dependencies: List[str] = None
     config: Dict[str, Any] = None
     enabled: bool = True
-    
+    status: Optional[str] = None
+    last_health_check: Optional['datetime'] = None
+    error_message: Optional[str] = None
+    health_check_endpoint: Optional[str] = None
+    registered_at: Optional['datetime'] = None
+
     def __post_init__(self):
         if self.dependencies is None:
             self.dependencies = []
         if self.config is None:
             self.config = {}
-
+        if self.registered_at is None:
+            from datetime import datetime, timezone
+            self.registered_at = datetime.now(timezone.utc)
 
 @dataclass
 class ComponentStatus:
@@ -55,11 +60,10 @@ class ComponentStatus:
     last_check: Optional[str] = None
     error_message: Optional[str] = None
     metrics: Dict[str, Any] = None
-    
+
     def __post_init__(self):
         if self.metrics is None:
             self.metrics = {}
-
 
 @dataclass
 class ComponentMetrics:

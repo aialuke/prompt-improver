@@ -10,35 +10,45 @@ Comprehensive benchmarking and validation system to verify performance improveme
 """
 
 import asyncio
-import json
-import logging
-import statistics
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+import json
+import logging
 from pathlib import Path
+import statistics
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import uuid
 
+from sqlmodel import SQLModel
+
 import numpy as np
-from pydantic import BaseModel
+
+from prompt_improver.utils.datetime_utils import aware_utc_now
+
+from ...performance.monitoring.health.background_manager import (
+    TaskPriority,
+    get_background_task_manager,
+)
+from .automated_deployment_pipeline import DeploymentConfig, DeploymentStrategy
+from .enhanced_experiment_orchestrator import (
+    EnhancedExperimentConfig,
+    ExperimentPriority,
+    OptimizationStrategy,
+)
+from .enhanced_model_registry import create_enhanced_registry
 
 # Platform components for testing
 from .ml_platform_integration import (
-    MLPlatformIntegration, WorkflowRequest, WorkflowType, 
-    create_ml_platform, create_experiment_to_production_request
+    MLPlatformIntegration,
+    WorkflowRequest,
+    WorkflowType,
+    create_experiment_to_production_request,
+    create_ml_platform,
 )
-from .enhanced_model_registry import create_enhanced_registry
-from .enhanced_experiment_orchestrator import (
-    EnhancedExperimentConfig, OptimizationStrategy, ExperimentPriority
-)
-from .automated_deployment_pipeline import DeploymentConfig, DeploymentStrategy
-from .model_serving_infrastructure import ServingConfig, ScalingStrategy
-
-from prompt_improver.utils.datetime_utils import aware_utc_now
-from ...performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
+from .model_serving_infrastructure import ScalingStrategy, ServingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -202,9 +212,9 @@ class PerformanceValidator:
             try:
                 with open(self.baseline_data_path, 'r') as f:
                     self.baseline_metrics = json.load(f)
-                logger.info(f"Loaded baseline metrics from {self.baseline_data_path}")
+                logger.info("Loaded baseline metrics from %s", self.baseline_data_path)
             except Exception as e:
-                logger.warning(f"Failed to load baseline metrics: {e}")
+                logger.warning("Failed to load baseline metrics: %s", e)
         
         # Set default baseline metrics if not loaded
         if not self.baseline_metrics:
@@ -231,7 +241,7 @@ class PerformanceValidator:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize test platform: {e}")
+            logger.error("Failed to initialize test platform: %s", e)
             return False
     
     async def run_comprehensive_validation(self) -> ValidationReport:
@@ -256,7 +266,7 @@ class PerformanceValidator:
             
             # Execute benchmarks
             for config in benchmark_configs:
-                logger.info(f"Running benchmark: {config.benchmark_type.value} - {config.scenario.value}")
+                logger.info("Running benchmark: {config.benchmark_type.value} - %s", config.scenario.value)
                 
                 result = await self._execute_benchmark(config)
                 self.benchmark_results.append(result)
@@ -275,10 +285,10 @@ class PerformanceValidator:
             # Save report
             await self._save_validation_report(report)
             
-            logger.info(f"✅ Validation completed: {report.passed_benchmarks}/{report.total_benchmarks} benchmarks passed")
+            logger.info("✅ Validation completed: {report.passed_benchmarks}/%s benchmarks passed", report.total_benchmarks)
             
         except Exception as e:
-            logger.error(f"Validation failed: {e}")
+            logger.error("Validation failed: %s", e)
             report.issues_found.append(f"Validation execution failed: {str(e)}")
         
         finally:
@@ -361,7 +371,7 @@ class PerformanceValidator:
         
         try:
             # Warmup iterations
-            logger.info(f"Running {config.warmup_iterations} warmup iterations...")
+            logger.info("Running %s warmup iterations...", config.warmup_iterations)
             for _ in range(config.warmup_iterations):
                 await self._execute_single_iteration(config, warmup=True)
             
@@ -370,7 +380,7 @@ class PerformanceValidator:
             resource_usage = []
             
             for i in range(config.iterations):
-                logger.info(f"Iteration {i+1}/{config.iterations}")
+                logger.info("Iteration {i+1}/%s", config.iterations)
                 
                 try:
                     measurement, resources = await self._execute_single_iteration(config)
@@ -381,7 +391,7 @@ class PerformanceValidator:
                 except Exception as e:
                     result.iterations_failed += 1
                     result.error_details.append(f"Iteration {i+1}: {str(e)}")
-                    logger.warning(f"Iteration {i+1} failed: {e}")
+                    logger.warning("Iteration {i+1} failed: %s", e)
             
             # Calculate statistics
             if measurements:
@@ -407,11 +417,11 @@ class PerformanceValidator:
             result.end_time = aware_utc_now()
             result.duration_seconds = (result.end_time - result.start_time).total_seconds()
             
-            logger.info(f"Benchmark completed: {result.avg_time_seconds:.2f}s avg, {result.improvement_percent:.1f}% improvement")
+            logger.info("Benchmark completed: {result.avg_time_seconds:.2f}s avg, %s% improvement", result.improvement_percent:.1f)
             
         except Exception as e:
             result.error_details.append(f"Benchmark execution failed: {str(e)}")
-            logger.error(f"Benchmark {config.benchmark_id} failed: {e}")
+            logger.error("Benchmark {config.benchmark_id} failed: %s", e)
         
         return result
     
@@ -451,7 +461,7 @@ class PerformanceValidator:
             
         except Exception as e:
             if not warmup:  # Only log errors for actual iterations
-                logger.error(f"Iteration failed: {e}")
+                logger.error("Iteration failed: %s", e)
             raise
     
     async def _benchmark_deployment_speed(self, config: BenchmarkConfig):
@@ -808,7 +818,7 @@ class PerformanceValidator:
         with open(report_path, 'w') as f:
             json.dump(report_data, f, indent=2)
         
-        logger.info(f"Validation report saved: {report_path}")
+        logger.info("Validation report saved: %s", report_path)
 
 # Factory Functions
 

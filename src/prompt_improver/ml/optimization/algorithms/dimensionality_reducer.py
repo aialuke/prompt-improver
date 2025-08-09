@@ -10,32 +10,24 @@ Enhanced with 2025 best practices:
 - Diffusion model integration
 """
 
+from dataclasses import dataclass
 import logging
 import time
-import warnings
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
-
-# Import ML-specific types
-from ...types import (
-    features,
-    labels,
-    reduced_features,
-    float_array,
-    metrics_dict,
-)
-from sklearn.decomposition import PCA, FastICA, KernelPCA, TruncatedSVD, IncrementalPCA
+from sklearn.decomposition import PCA, FastICA, IncrementalPCA, KernelPCA, TruncatedSVD
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.feature_selection import VarianceThreshold
-
 from sklearn.manifold import TSNE, Isomap
-
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import RobustScaler
 from sklearn.random_projection import GaussianRandomProjection, SparseRandomProjection
+
+# Import ML-specific types
+from ...types import features, float_array, labels, metrics_dict, reduced_features
 
 # Advanced dimensionality reduction imports
 try:
@@ -259,7 +251,7 @@ class NeuralDimensionalityReducer:
                 total_loss += loss.item()
 
             if epoch % 20 == 0:
-                logger.info(f"Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
         self.is_fitted = True
         return self
@@ -425,7 +417,7 @@ class DiffusionDimensionalityReducer:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"Diffusion Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Diffusion Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
         self.is_fitted = True
         return self
@@ -544,7 +536,7 @@ class ModernNeuralDimensionalityReducer:
                 total_loss += loss.item()
 
             if epoch % 50 == 0:
-                logger.info(f"Transformer Epoch {epoch}, Loss: {total_loss/len(dataloader):.4f}")
+                logger.info("Transformer Epoch %d, Loss: %.4f", epoch, total_loss/len(dataloader))
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """Transform data to lower dimensional space."""
@@ -987,7 +979,7 @@ class AdvancedDimensionalityReducer:
                 self.logger.warning("No features found in training data")
                 return {"status": "no_features"}
 
-            self.logger.info(f"Optimizing feature space on {full_features.shape[0]} samples with {full_features.shape[1]} dimensions")
+            self.logger.info("Optimizing feature space on {full_features.shape[0]} samples with %s dimensions", full_features.shape[1])
 
             # Try multiple reduction techniques and evaluate each
             results = {}
@@ -1001,9 +993,9 @@ class AdvancedDimensionalityReducer:
                         'variance_preserved': self._calculate_variance_preserved(reduced, full_features),
                         'dimensions': reduced.shape[1] if reduced.size > 0 else 0
                     }
-                    self.logger.info(f"{method.upper()} reduction: quality={quality_score:.3f}, dims={results[method]['dimensions']}")
+                    self.logger.info("{method.upper()} reduction: quality={quality_score:.3f}, dims=%s", results[method]['dimensions'])
                 except Exception as e:
-                    self.logger.warning(f"Failed to evaluate method {method}: {e}")
+                    self.logger.warning("Failed to evaluate method {method}: %s", e)
                     results[method] = {'quality_score': 0.0, 'error': str(e)}
 
             # Select best method based on quality scores
@@ -1027,11 +1019,11 @@ class AdvancedDimensionalityReducer:
                 } for k, v in results.items()}
             }
 
-            self.logger.info(f"Feature space optimization completed. Best method: {best_method[0]} (score: {best_method[1].get('quality_score', 0.0):.3f})")
+            self.logger.info("Feature space optimization completed. Best method: %s (score: %.3f)", best_method[0], best_method[1].get('quality_score', 0.0))
             return result
 
         except Exception as e:
-            self.logger.error(f"Failed to optimize feature space: {e}")
+            self.logger.error("Failed to optimize feature space: %s", e)
             return {"status": "error", "error": str(e)}
 
     async def adaptive_reduction(self, new_data: np.ndarray, db_session) -> dict[str, Any]:
@@ -1059,7 +1051,7 @@ class AdvancedDimensionalityReducer:
 
             # Update reducer if needed
             if optimal_dims != self.config.target_dimensions:
-                self.logger.info(f"Updating target dimensions from {self.config.target_dimensions} to {optimal_dims}")
+                self.logger.info("Updating target dimensions from {self.config.target_dimensions} to %s", optimal_dims)
                 self.config.target_dimensions = optimal_dims
                 self.reducer = await self._update_reducer(optimal_dims)
 
@@ -1075,11 +1067,11 @@ class AdvancedDimensionalityReducer:
                 "reduced_data": reduced_new_data.reduced_data if hasattr(reduced_new_data, 'reduced_data') else None
             }
 
-            self.logger.info(f"Adaptive reduction completed with {optimal_dims} dimensions")
+            self.logger.info("Adaptive reduction completed with %s dimensions", optimal_dims)
             return result
 
         except Exception as e:
-            self.logger.error(f"Failed to perform adaptive reduction: {e}")
+            self.logger.error("Failed to perform adaptive reduction: %s", e)
             return {"status": "error", "error": str(e)}
 
     async def _reduce_dimensions_method(self, features: np.ndarray, method: str) -> np.ndarray:
@@ -1131,7 +1123,7 @@ class AdvancedDimensionalityReducer:
                 return reducer.fit_transform(features)
 
         except Exception as e:
-            self.logger.error(f"Failed to apply {method} reduction: {e}")
+            self.logger.error("Failed to apply {method} reduction: %s", e)
             return np.array([])
 
     async def _evaluate_reduction_quality(self, reduced_data: np.ndarray, original_data: np.ndarray) -> float:
@@ -1153,7 +1145,7 @@ class AdvancedDimensionalityReducer:
             return quality_score
 
         except Exception as e:
-            self.logger.debug(f"Failed to evaluate reduction quality: {e}")
+            self.logger.debug("Failed to evaluate reduction quality: %s", e)
             return 0.0
 
     def _calculate_variance_preserved(self, reduced_data: np.ndarray, original_data: np.ndarray) -> float:
@@ -1171,7 +1163,7 @@ class AdvancedDimensionalityReducer:
             return min(1.0, reduced_var / original_var)
 
         except Exception as e:
-            self.logger.debug(f"Failed to calculate variance preserved: {e}")
+            self.logger.debug("Failed to calculate variance preserved: %s", e)
             return 0.0
 
     def _update_config_with_best_method(self, method: str, results: dict):
@@ -1191,17 +1183,17 @@ class AdvancedDimensionalityReducer:
             if abs(optimal_dims - self.config.target_dimensions) > 2:
                 self.config.target_dimensions = optimal_dims
 
-            self.logger.info(f"Configuration updated with best method: {method}")
+            self.logger.info("Configuration updated with best method: %s", method)
 
         except Exception as e:
-            self.logger.error(f"Failed to update config: {e}")
+            self.logger.error("Failed to update config: %s", e)
 
     async def _merge_with_training_data(self, new_data: np.ndarray, existing_data: np.ndarray) -> np.ndarray:
         """Merge new data with existing training data"""
         try:
             # Ensure compatible shapes
             if new_data.shape[1] != existing_data.shape[1]:
-                self.logger.warning(f"Feature dimension mismatch: new={new_data.shape[1]}, existing={existing_data.shape[1]}")
+                self.logger.warning("Feature dimension mismatch: new={new_data.shape[1]}, existing=%s", existing_data.shape[1])
                 # Truncate to smaller dimension
                 min_features = min(new_data.shape[1], existing_data.shape[1])
                 new_data = new_data[:, :min_features]
@@ -1212,7 +1204,7 @@ class AdvancedDimensionalityReducer:
             return combined
 
         except Exception as e:
-            self.logger.error(f"Failed to merge data: {e}")
+            self.logger.error("Failed to merge data: %s", e)
             return new_data
 
     async def _find_optimal_dimensions(self, data: np.ndarray) -> int:
@@ -1235,14 +1227,14 @@ class AdvancedDimensionalityReducer:
             return optimal_dims
 
         except Exception as e:
-            self.logger.error(f"Failed to find optimal dimensions: {e}")
+            self.logger.error("Failed to find optimal dimensions: %s", e)
             return self.config.target_dimensions
 
     async def _update_reducer(self, new_dimensions: int):
         """Update the reducer with new target dimensions"""
         # Placeholder for updating the active reducer
         # In a real implementation, this would retrain the reducer
-        self.logger.info(f"Reducer updated for {new_dimensions} dimensions")
+        self.logger.info("Reducer updated for %s dimensions", new_dimensions)
         return None
 
     async def _reduce_new_data_only(self, new_data: np.ndarray) -> dict[str, Any]:
@@ -1322,7 +1314,7 @@ class AdvancedDimensionalityReducer:
             # Check cache
             cache_key = self._generate_cache_key(X, method)
             if self.config.enable_caching and cache_key in self.cache:
-                self.logger.debug(f"Using cached result for method '{method}'")
+                self.logger.debug("Using cached result for method '%s'", method)
                 return self.cache[cache_key]
 
             # Perform dimensionality reduction
@@ -1516,7 +1508,7 @@ class AdvancedDimensionalityReducer:
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to apply method '{method}': {e}")
+            self.logger.error("Failed to apply method '{method}': %s", e)
             raise
 
     def _calculate_reconstruction_error(
@@ -1542,7 +1534,7 @@ class AdvancedDimensionalityReducer:
             return float(normalized_error)
 
         except Exception as e:
-            self.logger.warning(f"Could not calculate reconstruction error: {e}")
+            self.logger.warning("Could not calculate reconstruction error: %s", e)
             return 0.5  # Default moderate error
 
     async def _evaluate_reduction_quality_detailed(
@@ -1582,7 +1574,7 @@ class AdvancedDimensionalityReducer:
                             labels_orig, labels_reduced
                         )
                 except Exception as e:
-                    self.logger.debug(f"Clustering quality evaluation failed: {e}")
+                    self.logger.debug("Clustering quality evaluation failed: %s", e)
                     metrics["clustering_preservation"] = 0.5
 
             # 3. Classification quality preservation (if labels available)
@@ -1605,7 +1597,7 @@ class AdvancedDimensionalityReducer:
                         np.mean(scores_orig) + 1e-8
                     )
                 except Exception as e:
-                    self.logger.debug(f"Classification quality evaluation failed: {e}")
+                    self.logger.debug("Classification quality evaluation failed: %s", e)
                     metrics["classification_preservation"] = 0.5
 
             # 4. Neighborhood preservation
@@ -1643,11 +1635,11 @@ class AdvancedDimensionalityReducer:
 
                     metrics["neighborhood_preservation"] = np.mean(preservation_scores)
             except Exception as e:
-                self.logger.debug(f"Neighborhood preservation evaluation failed: {e}")
+                self.logger.debug("Neighborhood preservation evaluation failed: %s", e)
                 metrics["neighborhood_preservation"] = 0.5
 
         except Exception as e:
-            self.logger.warning(f"Quality evaluation failed: {e}")
+            self.logger.warning("Quality evaluation failed: %s", e)
             # Return default metrics
             metrics = {
                 "variance_preservation": 0.5,
@@ -1715,7 +1707,7 @@ class AdvancedDimensionalityReducer:
             return 0.5  # Default score
 
         except Exception as e:
-            self.logger.warning(f"Quality score computation failed: {e}")
+            self.logger.warning("Quality score computation failed: %s", e)
             return 0.5
 
     def _generate_cache_key(self, X: np.ndarray, method: str) -> str:

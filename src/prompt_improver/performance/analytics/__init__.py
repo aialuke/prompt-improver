@@ -8,23 +8,7 @@ Use the analytics factory for service access:
 - Real-time: get_analytics_router() from analytics_factory
 - Reporting: get_session_reporter() from analytics_factory
 """
-
-# Direct imports to modern components
-from ...ml.analytics.session_summary_reporter import SessionSummaryReporter
-from ...database.analytics_query_interface import AnalyticsQueryInterface
-from ...core.services.analytics_factory import (
-    get_analytics_interface,
-    get_analytics_router,
-    get_session_reporter
-)
-
-__all__ = [
-    # Modern service factory functions
-    "get_analytics_interface",
-    "get_analytics_router",
-    "get_session_reporter",
-
-    # Modern analytics components
-    "SessionSummaryReporter",
-    "AnalyticsQueryInterface",
-]
+from prompt_improver.core.services.analytics_factory import get_analytics_interface, get_analytics_router, get_session_reporter
+from prompt_improver.database.analytics_query_interface import AnalyticsQueryInterface
+from prompt_improver.ml.analytics.session_summary_reporter import SessionSummaryReporter
+__all__ = ['get_analytics_interface', 'get_analytics_router', 'get_session_reporter', 'SessionSummaryReporter', 'AnalyticsQueryInterface']

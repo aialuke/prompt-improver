@@ -5,23 +5,14 @@ Unified Connection Manager (Default):
 Uses consolidated UnifiedConnectionManager for all database operations.
 Clean, direct implementation without legacy compatibility layers.
 """
-
-from typing import Annotated
 import contextlib
-
+from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from ..core.config import AppConfig
-
-# Use unified connection manager by default (no feature flag needed)
-from .unified_connection_manager import (
-    get_unified_manager,
-    ManagerMode,
-    UnifiedConnectionManager,
-)
-
-# Global manager instance (lazy-loaded to avoid import-time blocking)
+from prompt_improver.core.config import AppConfig
+from prompt_improver.database.models import ABExperiment, DiscoveredPattern, ImprovementSession, MLModelPerformance, RuleMetadata, RulePerformance, UserFeedback
+from prompt_improver.database.unified_connection_manager import ConnectionMode, ManagerMode, UnifiedConnectionManager, get_mcp_session, get_unified_manager
+from prompt_improver.database.utils import scalar
 _global_manager = None
 
 def _get_global_manager():
@@ -31,9 +22,6 @@ def _get_global_manager():
         _global_manager = UnifiedConnectionManager(ManagerMode.ASYNC_MODERN)
     return _global_manager
 
-# Note: DatabaseManager and DatabaseSessionManager aliases removed - use UnifiedConnectionManager directly
-
-# Session providers using unified manager directly
 @contextlib.asynccontextmanager
 async def get_session():
     """Database session factory using unified manager"""
@@ -60,35 +48,8 @@ def _get_global_sessionmanager():
 def get_sessionmanager():
     """Get the global session manager (UnifiedConnectionManager)"""
     return _get_global_manager()
-
-# Type aliases for compatibility
-# AsyncSessionFactory = type(get_async_session_factory())  # Lazy-loaded, defined when needed
-
-# Protocol import - Unified manager is the SessionProvider
 SessionProvider = UnifiedConnectionManager
-
-print("🔄 Using UnifiedConnectionManager (default, consolidated connection management)")
-
-# Direct imports without aliases
-from .unified_connection_manager import (
-    ManagerMode,
-    get_unified_manager,
-)
-# Import ConnectionMode from unified_connection_manager to avoid circular imports
-from .unified_connection_manager import ConnectionMode
-
-# Import session functions from their respective modules
-from .unified_connection_manager import get_mcp_session
-from .models import (
-    ABExperiment,
-    DiscoveredPattern,
-    ImprovementSession,
-    MLModelPerformance,
-    RuleMetadata,
-    RulePerformance,
-    UserFeedback,
-)
-from .utils import scalar
+print('🔄 Using UnifiedConnectionManager (default, consolidated connection management)')
 
 def get_sessionmanager() -> UnifiedConnectionManager:
     """Get the global database session manager.
@@ -101,9 +62,7 @@ def get_sessionmanager() -> UnifiedConnectionManager:
     """
     return _get_global_sessionmanager()
 
-# ========== FastAPI Dependency Functions ==========
-
-def get_unified_manager_dependency(mode: ManagerMode = ManagerMode.ASYNC_MODERN) -> UnifiedConnectionManager:
+def get_unified_manager_dependency(mode: ManagerMode=ManagerMode.ASYNC_MODERN) -> UnifiedConnectionManager:
     """FastAPI dependency function to get unified manager instance"""
     return get_unified_manager(mode)
 
@@ -118,46 +77,6 @@ def get_unified_manager_ml_training() -> UnifiedConnectionManager:
 def get_unified_manager_mcp_server() -> UnifiedConnectionManager:
     """FastAPI dependency for MCP_SERVER mode"""
     return get_unified_manager(ManagerMode.MCP_SERVER)
-
-# Annotated types for use in FastAPI endpoints
 db_session = Annotated[AsyncSession, Depends(get_session)]
 unified_manager = Annotated[UnifiedConnectionManager, Depends(get_unified_manager_async_modern)]
-
-__all__ = [
-    # Models
-    "RulePerformance",
-    "UserFeedback",
-    "ImprovementSession",
-    "MLModelPerformance",
-    "DiscoveredPattern",
-    "RuleMetadata",
-    "ABExperiment",
-    # Core classes (use UnifiedConnectionManager directly)
-    # Unified Manager
-    "UnifiedConnectionManager",
-    "get_unified_manager",
-    "ManagerMode",
-    # Type aliases
-    "AsyncSessionFactory",
-    # Protocols
-    "SessionProvider",
-    # Main session providers
-    "get_session",
-    "get_session_context",
-    "get_async_session_factory",
-    "get_sessionmanager",
-    # FastAPI dependency functions
-    "get_unified_manager_dependency",
-    "get_unified_manager_async_modern",
-    "get_unified_manager_ml_training",
-    "get_unified_manager_mcp_server",
-    # Annotated types for endpoints
-    "db_session",
-    "unified_manager",
-    # Configuration (access via AppConfig)
-    "AppConfig",
-    # Utilities
-    "scalar",
-    # MCP session support
-    "get_mcp_session",
-]
+__all__ = ['RulePerformance', 'UserFeedback', 'ImprovementSession', 'MLModelPerformance', 'DiscoveredPattern', 'RuleMetadata', 'ABExperiment', 'UnifiedConnectionManager', 'get_unified_manager', 'ManagerMode', 'AsyncSessionFactory', 'SessionProvider', 'get_session', 'get_session_context', 'get_async_session_factory', 'get_sessionmanager', 'get_unified_manager_dependency', 'get_unified_manager_async_modern', 'get_unified_manager_ml_training', 'get_unified_manager_mcp_server', 'db_session', 'unified_manager', 'AppConfig', 'scalar', 'get_mcp_session']

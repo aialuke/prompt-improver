@@ -11,34 +11,16 @@ Key features:
 - Registry inspection utilities
 - Best practices for SQLModel integration
 """
-
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
-
+from typing import Any
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase, registry
 from sqlmodel import SQLModel
-
 logger = logging.getLogger(__name__)
-
-# Create a centralized registry
-_centralized_registry = registry(
-    type_annotation_map={
-        # Add any custom type mappings here if needed
-    }
-)
-
-# Create centralized metadata
-_centralized_metadata = MetaData(
-    naming_convention={
-        "ix": "ix_%(column_0_label)s",
-        "uq": "uq_%(table_name)s_%(column_0_name)s",
-        "ck": "ck_%(table_name)s_%(column_0_name)s",
-        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-        "pk": "pk_%(table_name)s"
-    }
-)
+_centralized_registry = registry(type_annotation_map={})
+_centralized_metadata = MetaData(naming_convention={'ix': 'ix_%(column_0_label)s', 'uq': 'uq_%(table_name)s_%(column_0_name)s', 'ck': 'ck_%(table_name)s_%(column_0_name)s', 'fk': 'fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s', 'pk': 'pk_%(table_name)s'})
 
 class PromptImproverBase(DeclarativeBase):
     """Single declarative base for all prompt improver models.
@@ -48,8 +30,6 @@ class PromptImproverBase(DeclarativeBase):
     - Providing centralized metadata access
     - Supporting proper table extension for tests
     """
-
-    # Use the centralized registry
     registry = _centralized_registry
     metadata = _centralized_metadata
 
@@ -62,7 +42,7 @@ class RegistryManager:
     - Resolve class path conflicts
     """
 
-    def __init__(self, base_class: type[DeclarativeBase] = PromptImproverBase):
+    def __init__(self, base_class: type[DeclarativeBase]=PromptImproverBase):
         self.base_class = base_class
         self.registry = base_class.registry
 
@@ -73,16 +53,11 @@ class RegistryManager:
         that import models multiple times.
         """
         try:
-            # Clear the class registry
             self.registry._class_registry.clear()
-
-            # Clear the metadata
             self.registry.metadata.clear()
-
-            logger.info("Registry cleared successfully")
-
+            logger.info('Registry cleared successfully')
         except Exception as e:
-            logger.error(f"Failed to clear registry: {e}")
+            logger.error('Failed to clear registry: %s', e)
             raise
 
     def get_registered_classes(self) -> dict[str, type]:
@@ -124,10 +99,8 @@ class RegistryManager:
         Returns:
             Fully qualified class path
         """
-        # For prompt improver models, use the full module path
         if class_name in ['RulePerformance', 'PromptSession', 'RuleMetadata']:
-            return f"prompt_improver.database.models.{class_name}"
-
+            return f'prompt_improver.database.models.{class_name}'
         return class_name
 
     @contextmanager
@@ -137,16 +110,12 @@ class RegistryManager:
         This is particularly useful for tests that need to ensure
         clean registry state.
         """
-        # Save current state
         original_registry = dict(self.registry._class_registry)
         original_metadata = self.registry.metadata
-
         try:
-            # Clear for isolation
             self.clear_registry()
             yield
         finally:
-            # Restore original state
             self.registry._class_registry.update(original_registry)
             self.registry.metadata = original_metadata
 
@@ -158,28 +127,13 @@ class RegistryManager:
         """
         conflicts = {}
         registered_classes = self.get_registered_classes()
-
-        # Check for duplicate registrations
         class_counts = {}
         for class_name in registered_classes:
             class_counts[class_name] = class_counts.get(class_name, 0) + 1
-
-        # Find conflicts
         for class_name, count in class_counts.items():
             if count > 1:
-                conflicts[class_name] = {
-                    'count': count,
-                    'class_object': registered_classes.get(class_name),
-                    'suggested_fix': self.resolve_class_path_conflict(class_name)
-                }
-
-        return {
-            'conflicts': conflicts,
-            'total_registered': len(registered_classes),
-            'registry_size': len(self.registry._class_registry)
-        }
-
-# Global registry manager instance
+                conflicts[class_name] = {'count': count, 'class_object': registered_classes.get(class_name), 'suggested_fix': self.resolve_class_path_conflict(class_name)}
+        return {'conflicts': conflicts, 'total_registered': len(registered_classes), 'registry_size': len(self.registry._class_registry)}
 _registry_manager: RegistryManager | None = None
 
 def get_registry_manager() -> RegistryManager:
@@ -190,7 +144,6 @@ def get_registry_manager() -> RegistryManager:
     """
     global _registry_manager
     if _registry_manager is None:
-        # Apply SQLModel patch before creating registry manager
         patch_sqlmodel_registry()
         _registry_manager = RegistryManager()
     return _registry_manager
@@ -201,19 +154,14 @@ def clear_registry() -> None:
     This is a convenience function for test setup.
     """
     get_registry_manager().clear_registry()
-
-    # Also clear Python's module cache for database models to prevent re-registration
     import sys
     modules_to_clear = []
     for module_name in list(sys.modules.keys()):
         if 'prompt_improver.database.models' in module_name:
             modules_to_clear.append(module_name)
-
     for module_name in modules_to_clear:
         if module_name in sys.modules:
             del sys.modules[module_name]
-
-    # Force reload of SQLModel patching to ensure clean state
     global _registry_manager
     _registry_manager = None
     patch_sqlmodel_registry()
@@ -226,7 +174,6 @@ def diagnose_registry() -> dict[str, Any]:
     """
     return get_registry_manager().diagnose_registry_conflicts()
 
-# Integrate with SQLModel
 def patch_sqlmodel_registry():
     """Patch SQLModel to use our centralized registry.
 
@@ -234,14 +181,8 @@ def patch_sqlmodel_registry():
     ensures all models use the same registry.
     """
     try:
-        # Replace SQLModel's registry with our centralized one
         SQLModel.registry = PromptImproverBase.registry
         SQLModel.metadata = PromptImproverBase.metadata
-
-        logger.info("SQLModel registry patched to use centralized registry")
+        logger.info('SQLModel registry patched to use centralized registry')
     except Exception as e:
-        logger.warning(f"Failed to patch SQLModel registry: {e}")
-        # Continue without patching - not critical for basic functionality
-
-# Apply the patch lazily to avoid import-time blocking
-# patch_sqlmodel_registry()  # Now called lazily when needed
+        logger.warning('Failed to patch SQLModel registry: %s', e)

@@ -3,29 +3,17 @@
 Tools for optimizing async operations, response times, and batch processing.
 Note: OptimizationValidator has been moved to ml.optimization.validation for enhanced 2025 features.
 """
+from prompt_improver.performance.optimization.async_optimizer import AsyncBatchProcessor
+from prompt_improver.performance.optimization.performance_optimizer import PerformanceOptimizer, get_performance_optimizer
+from prompt_improver.performance.optimization.response_optimizer import CompressionResult, FastJSONSerializer, ResponseOptimizer
 
-from .async_optimizer import AsyncBatchProcessor
-from .performance_optimizer import get_performance_optimizer, PerformanceOptimizer
-from .response_optimizer import ResponseOptimizer, FastJSONSerializer, CompressionResult
-
-# Lazy import to avoid circular dependency with ml module
 def get_batch_processor():
     """Lazy import of batch processor to avoid circular imports."""
-    from ...ml.optimization.batch import UnifiedBatchProcessor as BatchProcessor
+    from prompt_improver.ml.optimization.batch import UnifiedBatchProcessor as BatchProcessor
     return BatchProcessor
 
 def get_batch_config():
     """Lazy import of batch config to avoid circular imports."""
-    from ...ml.optimization.batch import UnifiedBatchConfig as BatchProcessorConfig
+    from prompt_improver.ml.optimization.batch import UnifiedBatchConfig as BatchProcessorConfig
     return BatchProcessorConfig
-
-__all__ = [
-    "AsyncBatchProcessor",
-    "get_performance_optimizer",
-    "PerformanceOptimizer",
-    "ResponseOptimizer",
-    "FastJSONSerializer",
-    "CompressionResult",
-    "get_batch_processor",
-    "get_batch_config",
-]
+__all__ = ['AsyncBatchProcessor', 'CompressionResult', 'FastJSONSerializer', 'PerformanceOptimizer', 'ResponseOptimizer', 'get_batch_config', 'get_batch_processor', 'get_performance_optimizer']

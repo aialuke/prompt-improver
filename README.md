@@ -91,8 +91,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Set up database
-createdb prompt_improver
-python -m alembic upgrade head
+# Database is automatically initialized via Docker Compose
+docker-compose up -d postgres
 
 # Run tests to verify installation
 pytest tests/ -v

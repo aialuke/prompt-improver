@@ -4,27 +4,39 @@ Comprehensive validation tests for security hardening changes.
 Tests input validation, memory guards, cache management, and performance monitoring.
 """
 
-import sys
-import numpy as np
 import asyncio
+import logging
 from pathlib import Path
+import sys
+
+import numpy as np
 
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 try:
+    from prompt_improver.ml.learning.algorithms.context_cache_manager import (
+        ContextCacheManager,
+    )
+    from prompt_improver.ml.learning.algorithms.context_learner import (
+        ContextConfig,
+        ContextSpecificLearner,
+    )
+    from prompt_improver.ml.learning.algorithms.context_performance_monitor import (
+        ContextPerformanceMonitor,
+    )
+    from prompt_improver.ml.orchestration.integration.component_invoker import (
+        ComponentInvoker,
+        InvocationResult,
+    )
     from prompt_improver.security import InputValidator, MemoryGuard, ValidationError
-    from prompt_improver.ml.learning.algorithms.context_cache_manager import ContextCacheManager
-    from prompt_improver.ml.learning.algorithms.context_performance_monitor import ContextPerformanceMonitor
-    from prompt_improver.ml.orchestration.integration.component_invoker import ComponentInvoker, InvocationResult
-    from prompt_improver.ml.learning.algorithms.context_learner import ContextSpecificLearner, ContextConfig
 except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure you're running from project root")
     sys.exit(1)
 
-import logging
+
 logging.basicConfig(level=logging.INFO)
 
 

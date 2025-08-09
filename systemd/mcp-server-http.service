@@ -1,0 +1,92 @@
+#
+# MCP Server HTTP Mode SystemD Service Configuration  
+# Production-ready HTTP transport deployment
+#
+# Installation:
+#   sudo cp systemd/mcp-server-http.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable mcp-server-http
+#   sudo systemctl start mcp-server-http
+#
+
+[Unit]
+Description=APES MCP Server (HTTP Mode) - Adaptive Prompt Enhancement System
+Documentation=https://github.com/your-org/prompt-improver
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+Requires=postgresql.service redis.service
+
+# Service Dependencies
+BindsTo=postgresql.service redis.service
+PartOf=prompt-enhancement.target
+Conflicts=mcp-server.service
+
+[Service]
+# Service Type and Execution
+Type=simple
+ExecStart=/opt/prompt-improver/scripts/start_mcp_native.sh --mode http --host 0.0.0.0 --port 8080 --log-level INFO
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+# Process Management
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# User and Group (Security)
+User=mcp-server
+Group=mcp-server
+DynamicUser=false
+
+# Working Directory and Environment
+WorkingDirectory=/opt/prompt-improver
+Environment=PYTHONPATH=/opt/prompt-improver/src
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=MCP_MODE=http
+Environment=MCP_HOST=0.0.0.0
+Environment=MCP_PORT=8080
+Environment=MCP_LOG_LEVEL=INFO
+Environment=FASTMCP_LOG_LEVEL=INFO
+
+# Environment File
+EnvironmentFile=-/etc/mcp-server/environment
+EnvironmentFile=-/opt/prompt-improver/.env
+
+# HTTP-specific Security
+PrivateNetwork=false
+RestrictAddressFamilies=AF_INET AF_INET6
+
+# Allow binding to ports (requires CAP_NET_BIND_SERVICE for ports < 1024)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# Same security hardening as stdio mode
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/prompt-improver/logs /opt/prompt-improver/tmp /var/log/mcp-server
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+MemoryDenyWriteExecute=true
+
+# Resource Limits
+CPUQuota=200%
+MemoryMax=2G
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-server-http
+
+# Health Monitoring
+WatchdogSec=60
+NotifyAccess=main
+
+[Install]
+WantedBy=multi-user.target
+Alias=mcp-http.service

@@ -6,16 +6,19 @@ Enhanced with production model registry, alias-based deployment, and Apriori pat
 """
 
 import asyncio
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 import glob
 import json
 import logging
 import os
-import time
-from dataclasses import dataclass
-from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import mlflow
 import mlflow.sklearn
@@ -32,21 +35,13 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
-# Lazy import to avoid circular dependency
-# from ...database import get_unified_manager, ManagerMode
-
-def _get_database_manager():
-    """Lazy import of database manager to avoid circular imports."""
-    from ...database import get_unified_manager, ManagerMode
-    return get_unified_manager, ManagerMode
-from ...database.models import MLModelPerformance, RuleMetadata, RulePerformance
 from ...core.config import AppConfig  # Redis functionality redis_client
+from ...database.models import MLModelPerformance, RuleMetadata, RulePerformance
 from ...security.input_validator import InputValidator, ValidationError
+
 # AdvancedPatternDiscovery imported lazily to break circular imports
 from ..models.production_registry import (
     DeploymentStrategy,
@@ -56,6 +51,15 @@ from ..models.production_registry import (
     ProductionModelRegistry,
     get_production_registry,
 )
+
+# Lazy import to avoid circular dependency
+# from ...database import get_unified_manager, ManagerMode
+
+def _get_database_manager():
+    """Lazy import of database manager to avoid circular imports."""
+    from ...database import ManagerMode, get_unified_manager
+    return get_unified_manager, ManagerMode
+
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +104,12 @@ class InMemoryModelRegistry:
                 return None
 
             if entry.is_expired():
-                logger.info(f"Model {model_id} expired, removing from cache")
+                logger.info("Model %s expired, removing from cache", model_id)
                 self._remove_entry(model_id)
                 return None
 
             entry.update_access()
-            logger.debug(f"Model {model_id} cache hit (access #{entry.access_count})")
+            logger.debug("Model {model_id} cache hit (access #%s)", entry.access_count)
             return entry.model
 
     def add_model(
@@ -138,7 +142,7 @@ class InMemoryModelRegistry:
             self._cache[model_id] = entry
             self._total_cache_size_mb += memory_size
 
-            logger.info(f"Cached model {model_id} ({memory_size:.1f}MB, TTL: {ttl}min)")
+            logger.info("Cached model {model_id} ({memory_size:.1f}MB, TTL: %smin)", ttl)
             return True
 
     def remove_model(self, model_id: str) -> bool:
@@ -151,7 +155,7 @@ class InMemoryModelRegistry:
         entry = self._cache.pop(model_id, None)
         if entry:
             self._total_cache_size_mb -= entry.memory_size_mb
-            logger.debug(f"Removed model {model_id} from cache")
+            logger.debug("Removed model %s from cache", model_id)
             return True
         return False
 
@@ -171,7 +175,7 @@ class InMemoryModelRegistry:
             self._remove_entry(model_id)
             evicted_count += 1
 
-        logger.info(f"Evicted {evicted_count} models, freed {freed_space:.1f}MB")
+        logger.info("Evicted %d models, freed %.1f MB", evicted_count, freed_space)
 
     def _estimate_model_memory(self, model: Any) -> float:
         """Estimate model memory usage in MB"""
@@ -238,7 +242,7 @@ class InMemoryModelRegistry:
                 self._remove_entry(model_id)
 
             if expired_ids:
-                logger.info(f"Cleaned up {len(expired_ids)} expired models")
+                logger.info("Cleaned up %s expired models", len(expired_ids))
 
             return len(expired_ids)
 
@@ -285,7 +289,9 @@ class MLModelService:
 
         # Initialize advanced pattern discovery with proper sync database manager
         # Lazy import to break circular dependency
-        from ..learning.patterns.advanced_pattern_discovery import AdvancedPatternDiscovery
+        from ..learning.patterns.advanced_pattern_discovery import (
+            AdvancedPatternDiscovery,
+        )
 
         if db_manager:
             # Use unified manager for sync operations
@@ -309,8 +315,9 @@ class MLModelService:
         if self.orchestrator_event_bus:
             try:
                 # Import here to avoid circular imports
-                from ..orchestration.events.event_types import EventType, MLEvent
                 from datetime import datetime, timezone
+
+                from ..orchestration.events.event_types import EventType, MLEvent
 
                 # Map string event type to enum
                 event_type_map = {
@@ -331,7 +338,7 @@ class MLModelService:
                     ))
             except Exception as e:
                 # Log error but don't fail the operation
-                logger.warning(f"Failed to emit orchestrator event {event_type_name}: {e}")
+                logger.warning("Failed to emit orchestrator event {event_type_name}: %s", e)
 
     async def enable_production_deployment(
         self, tracking_uri: str | None = None
@@ -362,7 +369,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to enable production deployment: {e}")
+            logger.error("Failed to enable production deployment: %s", e)
             return {"status": "failed", "error": str(e)}
 
     async def deploy_to_production(
@@ -412,7 +419,7 @@ class MLModelService:
             return result
 
         except Exception as e:
-            logger.error(f"Production deployment failed: {e}")
+            logger.error("Production deployment failed: %s", e)
             return {"status": "failed", "error": str(e), "rollback_required": True}
 
     async def rollback_production(
@@ -439,11 +446,11 @@ class MLModelService:
                 model_name=model_name, alias=alias, reason=reason
             )
 
-            logger.warning(f"Production rollback completed: {model_name}@{alias.value}")
+            logger.warning("Production rollback completed: {model_name}@%s", alias.value)
             return result
 
         except Exception as e:
-            logger.error(f"Production rollback failed: {e}")
+            logger.error("Production rollback failed: %s", e)
             return {"status": "failed", "error": str(e)}
 
     async def monitor_production_health(
@@ -483,7 +490,7 @@ class MLModelService:
             return health_result
 
         except Exception as e:
-            logger.error(f"Production health monitoring failed: {e}")
+            logger.error("Production health monitoring failed: %s", e)
             return {"healthy": False, "error": str(e)}
 
     async def get_production_model(
@@ -508,7 +515,7 @@ class MLModelService:
             )
 
         except Exception as e:
-            logger.error(f"Failed to load production model: {e}")
+            logger.error("Failed to load production model: %s", e)
             # Fallback to regular model loading
             return await self._lazy_load_model(f"{model_name}:{alias.value}")
 
@@ -525,7 +532,7 @@ class MLModelService:
             return await self.production_registry.list_deployments()
 
         except Exception as e:
-            logger.error(f"Failed to list production deployments: {e}")
+            logger.error("Failed to list production deployments: %s", e)
             return []
 
     async def optimize_rules(
@@ -799,9 +806,9 @@ class MLModelService:
                             "cache_prefixes": ["apes:pattern:", "rule:", "ml:model:"]
                         })
                         await redis_client.publish('pattern.invalidate', event_data)
-                        logger.info(f"Emitted pattern.invalidate event for model training completion: {model_id}")
+                        logger.info("Emitted pattern.invalidate event for model training completion: %s", model_id)
                     except Exception as e:
-                        logger.warning(f"Failed to emit pattern.invalidate event: {e}")
+                        logger.warning("Failed to emit pattern.invalidate event: %s", e)
 
                     return {
                         "status": "success",
@@ -817,7 +824,7 @@ class MLModelService:
                     }
 
                 except Exception as e:
-                    logger.error(f"ML optimization failed: {e}")
+                    logger.error("ML optimization failed: %s", e)
                     mlflow.log_params({"error": str(e)})
                     return {
                         "status": "error",
@@ -825,7 +832,7 @@ class MLModelService:
                         "processing_time_ms": (time.time() - start_time) * 1000,
                     }
         except Exception as e:
-            logger.error(f"ML service error: {e}")
+            logger.error("ML service error: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -908,7 +915,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Prediction failed: {e}")
+            logger.error("Prediction failed: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -1068,9 +1075,9 @@ class MLModelService:
                             "cache_prefixes": ["apes:pattern:", "rule:", "ml:model:"]
                         })
                         await redis_client.publish('pattern.invalidate', event_data)
-                        logger.info(f"Emitted pattern.invalidate event for model training completion: {model_id}")
+                        logger.info("Emitted pattern.invalidate event for model training completion: %s", model_id)
                     except Exception as e:
-                        logger.warning(f"Failed to emit pattern.invalidate event: {e}")
+                        logger.warning("Failed to emit pattern.invalidate event: %s", e)
 
                     return {
                         "status": "success",
@@ -1083,14 +1090,14 @@ class MLModelService:
                     }
 
                 except Exception as e:
-                    logger.error(f"Ensemble optimization failed: {e}")
+                    logger.error("Ensemble optimization failed: %s", e)
                     return {
                         "status": "error",
                         "error": str(e),
                         "processing_time_ms": (time.time() - start_time) * 1000,
                     }
         except Exception as e:
-            logger.error(f"Ensemble service error: {e}")
+            logger.error("Ensemble service error: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -1214,7 +1221,7 @@ class MLModelService:
             return results
 
         except Exception as e:
-            logger.error(f"Enhanced pattern discovery failed: {e}")
+            logger.error("Enhanced pattern discovery failed: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -1299,7 +1306,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Traditional pattern discovery failed: {e}")
+            logger.error("Traditional pattern discovery failed: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -1376,7 +1383,7 @@ class MLModelService:
             return validation
 
         except Exception as e:
-            logger.error(f"Cross-validation failed: {e}")
+            logger.error("Cross-validation failed: %s", e)
             return validation
 
     def _patterns_overlap(
@@ -1464,7 +1471,7 @@ class MLModelService:
             return recommendations[:10]  # Top 10 recommendations
 
         except Exception as e:
-            logger.error(f"Error generating unified recommendations: {e}")
+            logger.error("Error generating unified recommendations: %s", e)
             return []
 
     def _generate_business_insights(self, results: dict[str, Any]) -> dict[str, Any]:
@@ -1519,7 +1526,7 @@ class MLModelService:
             return insights
 
         except Exception as e:
-            logger.error(f"Error generating business insights: {e}")
+            logger.error("Error generating business insights: %s", e)
             return insights
 
     def _count_total_patterns(self, results: dict[str, Any]) -> int:
@@ -1631,7 +1638,7 @@ class MLModelService:
             return results
 
         except Exception as e:
-            logger.error(f"Error getting contextualized patterns: {e}")
+            logger.error("Error getting contextualized patterns: %s", e)
             return {"error": f"Contextualized pattern analysis failed: {e!s}"}
 
     async def _get_traditional_context_patterns(
@@ -1678,7 +1685,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Error getting traditional context patterns: {e}")
+            logger.error("Error getting traditional context patterns: %s", e)
             return {"recommendations": [], "context_match": 0.0}
 
     def _combine_context_recommendations(
@@ -1745,7 +1752,7 @@ class MLModelService:
                     db_session.add(rule)
 
             await db_session.commit()
-            logger.info(f"Updated {len(rule_ids)} rules with ML-optimized parameters")
+            logger.info("Updated %s rules with ML-optimized parameters", len(rule_ids))
 
             # Emit pattern.invalidate event for cache invalidation
             try:
@@ -1758,12 +1765,12 @@ class MLModelService:
                     "cache_prefixes": ["apes:pattern:", "rule:"]
                 })
                 await redis_client.publish('pattern.invalidate', event_data)
-                logger.info(f"Emitted cache invalidation event for rule IDs: {rule_ids}")
+                logger.info("Emitted cache invalidation event for rule IDs: %s", rule_ids)
             except Exception as e:
-                logger.warning(f"Failed to emit cache invalidation event: {e}")
+                logger.warning("Failed to emit cache invalidation event: %s", e)
 
         except Exception as e:
-            logger.error(f"Failed to update rule parameters: {e}")
+            logger.error("Failed to update rule parameters: %s", e)
             await db_session.rollback()
 
     async def _store_model_performance(
@@ -1791,7 +1798,7 @@ class MLModelService:
             await db_session.commit()
 
         except Exception as e:
-            logger.error(f"Failed to store model performance: {e}")
+            logger.error("Failed to store model performance: %s", e)
             await db_session.rollback()
 
     def _configure_ml_performance(self):
@@ -1811,15 +1818,15 @@ class MLModelService:
             # Configure scikit-learn parallel processing
             os.environ.setdefault("SKLEARN_N_JOBS", str(optimal_threads))
 
-            logger.info(f"ML performance configured: {optimal_threads} threads")
+            logger.info("ML performance configured: %s threads", optimal_threads)
 
         except Exception as e:
-            logger.warning(f"Failed to configure ML performance: {e}")
+            logger.warning("Failed to configure ML performance: %s", e)
 
     async def _lazy_load_model(self, model_id: str) -> Any | None:
         """Lazy load model from MLflow when not in cache"""
         try:
-            logger.info(f"Lazy loading model {model_id} from MLflow")
+            logger.info("Lazy loading model %s from MLflow", model_id)
 
             # Search for model in MLflow registry
             model_versions = self.mlflow_client.search_model_versions(
@@ -1848,14 +1855,14 @@ class MLModelService:
                     ttl_minutes=90,  # 1.5 hours for lazy-loaded models
                 )
 
-                logger.info(f"Successfully lazy-loaded model {model_id}")
+                logger.info("Successfully lazy-loaded model %s", model_id)
                 return loaded_model
 
-            logger.warning(f"Model {model_id} not found in MLflow registry")
+            logger.warning("Model %s not found in MLflow registry", model_id)
             return None
 
         except Exception as e:
-            logger.error(f"Failed to lazy load model {model_id}: {e}")
+            logger.error("Failed to lazy load model {model_id}: %s", e)
             return None
 
     async def get_model_cache_stats(self) -> dict[str, Any]:
@@ -1883,7 +1890,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get cache stats: {e}")
+            logger.error("Failed to get cache stats: %s", e)
             return {"status": "error", "error": str(e)}
 
     def _generate_cache_recommendations(self, stats: dict[str, Any]) -> list[str]:
@@ -1936,7 +1943,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Cache optimization failed: {e}")
+            logger.error("Cache optimization failed: %s", e)
             return {"status": "error", "error": str(e)}
 
     async def send_training_batch(self, batch: list[dict]) -> dict[str, Any]:
@@ -1993,7 +2000,7 @@ class MLModelService:
 
             processing_time = (time.time() - start_time) * 1000
 
-            logger.info(f"Saved training batch to {batch_path} ({len(batch)} records)")
+            logger.info("Saved training batch to {batch_path} (%s records)", len(batch))
 
             return {
                 "status": "success",
@@ -2003,7 +2010,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to save training batch: {e}")
+            logger.error("Failed to save training batch: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -2040,7 +2047,7 @@ class MLModelService:
             model_filename = os.path.basename(latest_model)
             version = model_filename.replace("model_v", "").replace(".bin", "")
 
-            logger.info(f"Found latest model: {latest_model}")
+            logger.info("Found latest model: %s", latest_model)
 
             return {
                 "status": "success",
@@ -2054,7 +2061,7 @@ class MLModelService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to fetch latest model: {e}")
+            logger.error("Failed to fetch latest model: %s", e)
             return {
                 "status": "error",
                 "error": str(e),
@@ -2083,7 +2090,7 @@ class MLModelService:
             operation = config.get("operation", "train")
             output_path = config.get("output_path", "./outputs/ml_models")
 
-            logger.info(f"Starting orchestrated ML operation: {operation}")
+            logger.info("Starting orchestrated ML operation: %s", operation)
 
             result = None
             operation_metadata = {}
@@ -2214,12 +2221,12 @@ class MLModelService:
                 "execution_time": execution_time
             })
 
-            logger.info(f"Orchestrated ML operation completed: {operation} in {execution_time:.2f}s")
+            logger.info("Orchestrated ML operation completed: %s in %.2fs", operation, execution_time)
             return orchestrator_result
 
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"Orchestrated ML operation failed: {e}")
+            logger.error("Orchestrated ML operation failed: %s", e)
 
             # Emit error event if available
             await self._emit_orchestrator_event("OPERATION_FAILED", {

@@ -3,12 +3,10 @@
 This module provides utilities for managing NLTK resources including
 automatic downloading with fallback handling for production environments.
 """
-
 import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Set
-
 import nltk
 
 class NLTKResourceManager:
@@ -21,7 +19,7 @@ class NLTKResourceManager:
     - Cache management for resource availability
     """
 
-    def __init__(self, download_dir: str | None = None):
+    def __init__(self, download_dir: str | None=None):
         """Initialize the NLTK resource manager.
 
         Args:
@@ -30,24 +28,11 @@ class NLTKResourceManager:
         self.logger = logging.getLogger(__name__)
         self.download_dir = download_dir
         self._resource_cache: dict[str, bool] = {}
-
-        # Set custom download directory if provided
         if download_dir:
             nltk.data.path.insert(0, download_dir)
+        self.required_resources = {'punkt', 'averaged_perceptron_tagger', 'maxent_ne_chunker', 'words', 'stopwords', 'wordnet', 'vader_lexicon', 'punkt_tab'}
 
-        # Common required resources
-        self.required_resources = {
-            "punkt",  # Sentence tokenization
-            "averaged_perceptron_tagger",  # POS tagging
-            "maxent_ne_chunker",  # Named entity chunking
-            "words",  # Word corpus
-            "stopwords",  # Stop words
-            "wordnet",  # WordNet corpus
-            "vader_lexicon",  # Sentiment analysis
-            "punkt_tab",  # Updated punkt tokenizer
-        }
-
-    def ensure_resources(self, resources: set[str] | None = None) -> dict[str, bool]:
+    def ensure_resources(self, resources: set[str] | None=None) -> dict[str, bool]:
         """Ensure required NLTK resources are available.
 
         Args:
@@ -58,28 +43,20 @@ class NLTKResourceManager:
         """
         if resources is None:
             resources = self.required_resources
-
         results = {}
-
         for resource in resources:
             try:
-                if self._is_resource_available(resource) or self._download_resource(
-                    resource
-                ):
+                if self._is_resource_available(resource) or self._download_resource(resource):
                     results[resource] = True
                     self._resource_cache[resource] = True
                 else:
                     results[resource] = False
                     self._resource_cache[resource] = False
-                    self.logger.warning(
-                        f"NLTK resource '{resource}' is not available and could not be downloaded"
-                    )
-
+                    self.logger.warning("NLTK resource '%s' is not available and could not be downloaded", resource)
             except Exception as e:
-                self.logger.error(f"Error checking NLTK resource '{resource}': {e}")
+                self.logger.error("Error checking NLTK resource '{resource}': %s", e)
                 results[resource] = False
                 self._resource_cache[resource] = False
-
         return results
 
     def _is_resource_available(self, resource: str) -> bool:
@@ -91,26 +68,22 @@ class NLTKResourceManager:
         Returns:
             True if resource is available, False otherwise
         """
-        # Check cache first
         if resource in self._resource_cache:
             return self._resource_cache[resource]
-
         try:
-            # Try to find the resource
-            nltk.data.find(f"tokenizers/{resource}")
+            nltk.data.find(f'tokenizers/{resource}')
             return True
         except LookupError:
             try:
-                # Try other common paths
-                nltk.data.find(f"taggers/{resource}")
+                nltk.data.find(f'taggers/{resource}')
                 return True
             except LookupError:
                 try:
-                    nltk.data.find(f"chunkers/{resource}")
+                    nltk.data.find(f'chunkers/{resource}')
                     return True
                 except LookupError:
                     try:
-                        nltk.data.find(f"corpora/{resource}")
+                        nltk.data.find(f'corpora/{resource}')
                         return True
                     except LookupError:
                         return False
@@ -125,19 +98,15 @@ class NLTKResourceManager:
             True if download succeeded, False otherwise
         """
         try:
-            self.logger.info(f"Downloading NLTK resource: {resource}")
-
-            # Try to download with quiet mode
+            self.logger.info('Downloading NLTK resource: %s', resource)
             success = nltk.download(resource, quiet=True, raise_on_error=False)
-
             if success:
-                self.logger.info(f"Successfully downloaded NLTK resource: {resource}")
+                self.logger.info('Successfully downloaded NLTK resource: %s', resource)
                 return True
-            self.logger.warning(f"Failed to download NLTK resource: {resource}")
+            self.logger.warning('Failed to download NLTK resource: %s', resource)
             return False
-
         except Exception as e:
-            self.logger.error(f"Error downloading NLTK resource '{resource}': {e}")
+            self.logger.error("Error downloading NLTK resource '{resource}': %s", e)
             return False
 
     def get_resource_status(self) -> dict[str, Any]:
@@ -146,24 +115,15 @@ class NLTKResourceManager:
         Returns:
             Dictionary with resource status information
         """
-        status = {
-            "available": [],
-            "missing": [],
-            "total_required": len(self.required_resources),
-            "availability_rate": 0.0,
-        }
-
+        status = {'available': [], 'missing': [], 'total_required': len(self.required_resources), 'availability_rate': 0.0}
         available_count = 0
-
         for resource in self.required_resources:
             if self._is_resource_available(resource):
-                status["available"].append(resource)
+                status['available'].append(resource)
                 available_count += 1
             else:
-                status["missing"].append(resource)
-
-        status["availability_rate"] = available_count / len(self.required_resources)
-
+                status['missing'].append(resource)
+        status['availability_rate'] = available_count / len(self.required_resources)
         return status
 
     def setup_for_production(self) -> bool:
@@ -175,38 +135,20 @@ class NLTKResourceManager:
         Returns:
             True if setup succeeded, False if critical resources are missing
         """
-        self.logger.info("Setting up NLTK resources for production")
-
-        # First, try to ensure all resources
+        self.logger.info('Setting up NLTK resources for production')
         results = self.ensure_resources()
-
-        # Check if critical resources are available
-        critical_resources = {"punkt", "averaged_perceptron_tagger"}
-        critical_available = all(
-            results.get(resource, False) for resource in critical_resources
-        )
-
+        critical_resources = {'punkt', 'averaged_perceptron_tagger'}
+        critical_available = all((results.get(resource, False) for resource in critical_resources))
         if not critical_available:
-            self.logger.error(
-                "Critical NLTK resources are missing and could not be downloaded"
-            )
+            self.logger.error('Critical NLTK resources are missing and could not be downloaded')
             return False
-
-        # Log status
         status = self.get_resource_status()
-        self.logger.info(
-            f"NLTK resource availability: {status['availability_rate']:.1%} "
-            f"({len(status['available'])}/{status['total_required']})"
-        )
-
-        if status["missing"]:
-            self.logger.warning(f"Missing NLTK resources: {status['missing']}")
-
+        self.logger.info('NLTK resource availability: %s (%s/%s)', format(status['availability_rate'], '.1%'), len(status['available']), status['total_required'])
+        if status['missing']:
+            self.logger.warning('Missing NLTK resources: %s', status['missing'])
         return True
 
-    def safe_nltk_operation(
-        self, operation_func, fallback_func=None, required_resources=None
-    ):
+    def safe_nltk_operation(self, operation_func, fallback_func=None, required_resources=None):
         """Execute an NLTK operation with resource checking and fallback.
 
         Args:
@@ -220,29 +162,22 @@ class NLTKResourceManager:
         if required_resources:
             resource_status = self.ensure_resources(required_resources)
             if not all(resource_status.values()):
-                self.logger.warning(
-                    f"Some NLTK resources are missing: {required_resources}"
-                )
+                self.logger.warning('Some NLTK resources are missing: %s', required_resources)
                 if fallback_func:
-                    self.logger.info("Using fallback operation")
+                    self.logger.info('Using fallback operation')
                     return fallback_func()
-                raise RuntimeError(
-                    f"Required NLTK resources not available: {required_resources}"
-                )
-
+                raise RuntimeError(f'Required NLTK resources not available: {required_resources}')
         try:
             return operation_func()
         except Exception as e:
-            self.logger.error(f"NLTK operation failed: {e}")
+            self.logger.error('NLTK operation failed: %s', e)
             if fallback_func:
-                self.logger.info("Using fallback operation due to error")
+                self.logger.info('Using fallback operation due to error')
                 return fallback_func()
             raise
-
-# Global instance for convenience
 _global_manager = None
 
-def get_nltk_manager(download_dir: str | None = None) -> NLTKResourceManager:
+def get_nltk_manager(download_dir: str | None=None) -> NLTKResourceManager:
     """Get the global NLTK resource manager instance.
 
     Args:
@@ -252,13 +187,11 @@ def get_nltk_manager(download_dir: str | None = None) -> NLTKResourceManager:
         Global NLTKResourceManager instance
     """
     global _global_manager
-
     if _global_manager is None:
         _global_manager = NLTKResourceManager(download_dir)
-
     return _global_manager
 
-def ensure_nltk_resources(resources: set[str] | None = None) -> dict[str, bool]:
+def ensure_nltk_resources(resources: set[str] | None=None) -> dict[str, bool]:
     """Convenience function to ensure NLTK resources are available.
 
     Args:

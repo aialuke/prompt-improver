@@ -207,21 +207,8 @@ fi
 
 # Set up database if needed
 print_status "Setting up database..."
-if command -v python >/dev/null 2>&1; then
-    if python -c "import alembic" 2>/dev/null; then
-        if [ -f "alembic.ini" ]; then
-            print_status "Running database migrations..."
-            python -m alembic upgrade head
-            print_success "Database migrations completed"
-        else
-            print_warning "No alembic.ini found, skipping migrations"
-        fi
-    else
-        print_warning "Alembic not installed, skipping migrations"
-    fi
-else
-    print_warning "Python not found, skipping database setup"
-fi
+# Database is initialized via Docker with SQL files
+print_info "Database schema initialized automatically via Docker"
 
 # Create frontend directory structure
 print_status "Setting up frontend directory structure..."
@@ -285,7 +272,7 @@ echo "  • npm run dev       - Start Vite development server with HMR"
 echo "  • npm run build     - Build for production"
 echo "  • npm run lint      - Run ESLint"
 echo "  • python -m pytest  - Run Python tests"
-echo "  • alembic upgrade head - Run database migrations"
+echo "  • docker-compose up -d postgres - Start database with automatic schema"
 echo ""
 echo "🌐 Development URLs:"
 echo "  • Vite Dev Server:   http://localhost:5173"

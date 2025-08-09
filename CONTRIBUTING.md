@@ -75,7 +75,8 @@ pip install -r requirements-dev.txt
 
 # Setup database
 createdb prompt_improver_dev
-python -m alembic upgrade head
+# Database is automatically initialized via Docker Compose
+docker-compose up -d postgres
 
 # Verify installation
 pytest tests/integration/ -v
@@ -285,7 +286,8 @@ pytest tests/integration/test_db_connection.py -v
 # Reset test database
 dropdb prompt_improver_test
 createdb prompt_improver_test
-python -m alembic upgrade head
+# Database is automatically initialized via Docker Compose
+docker-compose up -d postgres
 ```
 
 ## 📚 Documentation Standards

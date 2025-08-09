@@ -3,46 +3,10 @@
 Advanced learning algorithms for context awareness, failure analysis,
 and insights generation, along with feature engineering components.
 """
-
-# Learning algorithms
-from .algorithms import ContextLearner, FailureAnalyzer, InsightGenerationEngine, RuleAnalyzer
-
-# Core learning components
-from .algorithms import ContextLearner, ContextConfig
-from .features import (
-    CompositeFeatureExtractor,
-    LinguisticFeatureExtractor,
-    DomainFeatureExtractor,
-    ContextFeatureExtractor,
-    FeatureExtractionConfig
-)
-# ContextClusteringEngine merged into ClusteringOptimizer - use enhanced version
 from ..optimization.algorithms.clustering_optimizer import ClusteringOptimizer as ContextClusteringEngine
-from .clustering import ClusteringConfig
-
-# Feature engineering
+from .algorithms import ContextConfig, ContextLearner, InsightGenerationEngine, RuleAnalyzer
 from .algorithms.context_aware_weighter import ContextAwareFeatureWeighter
-
-# Quality assessment
+from .clustering import ClusteringConfig
+from .features import CompositeFeatureExtractor, ContextFeatureExtractor, DomainFeatureExtractor, FeatureExtractionConfig, LinguisticFeatureExtractor
 from .quality.enhanced_scorer import EnhancedQualityScorer
-
-__all__ = [
-    # Algorithms
-    "ContextLearner",
-    "ContextConfig",
-    "FailureAnalyzer",
-    "InsightGenerationEngine",
-    "RuleAnalyzer",
-    # features
-    "CompositeFeatureExtractor",
-    "LinguisticFeatureExtractor",
-    "DomainFeatureExtractor",
-    "ContextFeatureExtractor",
-    "FeatureExtractionConfig",
-    "ContextAwareFeatureWeighter",
-    # Clustering
-    "ContextClusteringEngine",
-    "ClusteringConfig",
-    # Quality
-    "EnhancedQualityScorer",
-]
+__all__ = ['ContextLearner', 'ContextConfig', 'InsightGenerationEngine', 'RuleAnalyzer', 'CompositeFeatureExtractor', 'LinguisticFeatureExtractor', 'DomainFeatureExtractor', 'ContextFeatureExtractor', 'FeatureExtractionConfig', 'ContextAwareFeatureWeighter', 'ContextClusteringEngine', 'ClusteringConfig', 'EnhancedQualityScorer']

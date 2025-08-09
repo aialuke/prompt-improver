@@ -253,7 +253,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.server = server
         self.extensions = extensions or {'.py', '.yaml', '.yml', '.toml', '.json', '.sql'}
         self.ignore_patterns = {
-            '__pycache__', '.git', '.mypy_cache', '.pytest_cache', 
+            '__pycache__', '.git', '.pytest_cache', 
             '.ruff_cache', 'htmlcov', '.coverage', 'mlruns'
         }
         

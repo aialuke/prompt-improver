@@ -2,10 +2,5 @@
 
 Tools for validating performance targets and benchmarking system capabilities.
 """
-
-from .performance_validation import PerformanceValidator, PerformanceValidationResult
-
-__all__ = [
-    "PerformanceValidator",
-    "PerformanceValidationResult",
-]
+from prompt_improver.performance.validation.performance_validation import PerformanceValidationResult, PerformanceValidator
+__all__ = ['PerformanceValidationResult', 'PerformanceValidator']

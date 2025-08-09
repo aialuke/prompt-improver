@@ -14,22 +14,7 @@ Architecture follows 2025 AutoML patterns:
 - Persistence with RDBStorage patterns
 - Multi-objective Pareto optimization
 """
-
-from .callbacks import (
-                        AutoMLCallback,
-                        ExperimentCallback,
-                        ModelSelectionCallback,
-                        RealTimeAnalyticsCallback,
-)
+from .callbacks import AutoMLCallback, ExperimentCallback, ModelSelectionCallback, RealTimeAnalyticsCallback
 from .orchestrator import AutoMLOrchestrator
-
-__all__ = [
-    "AutoMLCallback",
-    "AutoMLOrchestrator",
-    "ExperimentCallback",
-    "ModelSelectionCallback",
-    "RealTimeAnalyticsCallback",
-]
-
-# Version following semantic versioning
-__version__ = "1.0.0"
+__all__ = ['AutoMLCallback', 'AutoMLOrchestrator', 'ExperimentCallback', 'ModelSelectionCallback', 'RealTimeAnalyticsCallback']
+__version__ = '1.0.0'

@@ -6,17 +6,18 @@ performance tracking, and resource utilization monitoring.
 """
 
 import asyncio
-import logging
-import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 from threading import Lock
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import psutil
+
+import numpy as np
 
 from ...utils.datetime_utils import aware_utc_now
 
@@ -138,7 +139,7 @@ class MLHealthMonitor:
             logger.info("GPU monitoring enabled via pynvml")
             return pynvml
         except (ImportError, Exception) as e:
-            logger.info(f"GPU monitoring not available: {e}. Using CPU-only monitoring.")
+            logger.info("GPU monitoring not available: %s. Using CPU-only monitoring.", e)
             self._gpu_available = False
             return None
     
@@ -174,11 +175,11 @@ class MLHealthMonitor:
                 if model_id not in self._model_metrics:
                     self._model_metrics[model_id] = InferenceMetrics()
                 
-                logger.info(f"Registered model {model_id} for health monitoring ({memory_mb:.1f}MB)")
+                logger.info("Registered model {model_id} for health monitoring (%sMB)", memory_mb:.1f)
                 return True
                 
         except Exception as e:
-            logger.error(f"Failed to register model {model_id}: {e}")
+            logger.error("Failed to register model {model_id}: %s", e)
             return False
     
     async def unregister_model(self, model_id: str) -> bool:
@@ -187,11 +188,11 @@ class MLHealthMonitor:
             with self._lock:
                 if model_id in self._loaded_models:
                     del self._loaded_models[model_id]
-                    logger.info(f"Unregistered model {model_id}")
+                    logger.info("Unregistered model %s", model_id)
                     return True
                 return False
         except Exception as e:
-            logger.error(f"Failed to unregister model {model_id}: {e}")
+            logger.error("Failed to unregister model {model_id}: %s", e)
             return False
     
     async def record_inference(
@@ -232,7 +233,7 @@ class MLHealthMonitor:
                 })
                 
         except Exception as e:
-            logger.error(f"Failed to record inference for {model_id}: {e}")
+            logger.error("Failed to record inference for {model_id}: %s", e)
     
     async def get_model_health(self, model_id: str) -> Optional[ModelHealthMetrics]:
         """Get comprehensive health metrics for a specific model"""
@@ -271,7 +272,7 @@ class MLHealthMonitor:
                 )
                 
         except Exception as e:
-            logger.error(f"Failed to get health for model {model_id}: {e}")
+            logger.error("Failed to get health for model {model_id}: %s", e)
             return None
     
     async def get_all_models_health(self) -> List[ModelHealthMetrics]:
@@ -327,7 +328,7 @@ class MLHealthMonitor:
             }
             
         except Exception as e:
-            logger.error(f"Failed to get system health: {e}")
+            logger.error("Failed to get system health: %s", e)
             return {
                 "healthy": False,
                 "error": str(e),
@@ -364,7 +365,7 @@ class MLHealthMonitor:
             return resources
             
         except Exception as e:
-            logger.error(f"Failed to get resource metrics: {e}")
+            logger.error("Failed to get resource metrics: %s", e)
             return {
                 "error": str(e),
                 "timestamp": aware_utc_now().isoformat()
@@ -419,7 +420,7 @@ class MLHealthMonitor:
             return gpu_metrics
             
         except Exception as e:
-            logger.error(f"Failed to get GPU metrics: {e}")
+            logger.error("Failed to get GPU metrics: %s", e)
             return {"gpu_error": str(e)}
     
     async def _calculate_system_health_score(self) -> float:
@@ -463,7 +464,7 @@ class MLHealthMonitor:
             return sum(health_factors) / len(health_factors) if health_factors else 0.0
             
         except Exception as e:
-            logger.error(f"Failed to calculate health score: {e}")
+            logger.error("Failed to calculate health score: %s", e)
             return 0.0
     
     def _estimate_model_memory(self, model: Any) -> float:
@@ -505,7 +506,7 @@ class MLHealthMonitor:
             return 5.0
             
         except Exception as e:
-            logger.warning(f"Could not estimate model memory: {e}")
+            logger.warning("Could not estimate model memory: %s", e)
             return 5.0
     
     async def cleanup_stale_models(self, max_age_hours: int = 24) -> int:
@@ -527,12 +528,12 @@ class MLHealthMonitor:
                         del self._model_metrics[model_id]
             
             if stale_models:
-                logger.info(f"Cleaned up {len(stale_models)} stale models")
+                logger.info("Cleaned up %s stale models", len(stale_models))
             
             return len(stale_models)
             
         except Exception as e:
-            logger.error(f"Failed to cleanup stale models: {e}")
+            logger.error("Failed to cleanup stale models: %s", e)
             return 0
     
     async def get_performance_summary(self, hours: int = 24) -> Dict[str, Any]:
@@ -604,7 +605,7 @@ class MLHealthMonitor:
             }
             
         except Exception as e:
-            logger.error(f"Failed to get performance summary: {e}")
+            logger.error("Failed to get performance summary: %s", e)
             return {
                 "error": str(e),
                 "period_hours": hours,

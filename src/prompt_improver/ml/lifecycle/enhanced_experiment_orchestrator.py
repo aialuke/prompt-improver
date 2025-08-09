@@ -10,30 +10,39 @@ Advanced experiment orchestration incorporating 2025 best practices:
 """
 
 import asyncio
-import json
-import logging
-import time
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+import json
+import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from queue import PriorityQueue
+import time
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import uuid
 
+from sqlmodel import SQLModel, Field
+
 import numpy as np
-from pydantic import BaseModel, Field as PydanticField, ConfigDict
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
-from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, ModelStatus
-from .experiment_tracker import ExperimentTracker, ExperimentConfig, Trial, ExperimentResults
-from prompt_improver.ml.types import features, labels, hyper_parameters, metrics_dict
+from prompt_improver.ml.types import features, hyper_parameters, labels, metrics_dict
 from prompt_improver.utils.datetime_utils import aware_utc_now
-from ....performance.monitoring.health.background_manager import get_background_task_manager, TaskPriority
-import uuid
+
+from ....performance.monitoring.health.background_manager import (
+    TaskPriority,
+    get_background_task_manager,
+)
+from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, ModelStatus
+from .experiment_tracker import (
+    ExperimentConfig,
+    ExperimentResults,
+    ExperimentTracker,
+    Trial,
+)
 
 # Optional Ray import for distributed computing
 try:
@@ -47,8 +56,8 @@ except ImportError:
 # Optional Optuna import for advanced optimization
 try:
     import optuna
-    from optuna.samplers import TPESampler, CmaEsSampler
-    from optuna.pruners import MedianPruner, HyperbandPruner
+    from optuna.pruners import HyperbandPruner, MedianPruner
+    from optuna.samplers import CmaEsSampler, TPESampler
     OPTUNA_AVAILABLE = True
 except ImportError:
     OPTUNA_AVAILABLE = False
@@ -254,7 +263,7 @@ class ResourcePool:
         
         del self.allocations[experiment_id]
         
-        logger.info(f"Released resources for {experiment_id}")
+        logger.info("Released resources for %s", experiment_id)
         return True
     
     def get_utilization(self) -> Dict[str, float]:
@@ -479,7 +488,7 @@ class EnhancedExperimentOrchestrator:
                     ray.init(ignore_reinit_error=True)
                 logger.info("Ray distributed computing initialized")
             except Exception as e:
-                logger.warning(f"Failed to initialize Ray: {e}")
+                logger.warning("Failed to initialize Ray: %s", e)
                 self.enable_distributed = False
         
         # Thread pool for orchestration tasks
@@ -491,7 +500,7 @@ class EnhancedExperimentOrchestrator:
         
         logger.info("Enhanced Experiment Orchestrator (2025) initialized")
         logger.info(f"Target: 10x experiment throughput improvement")
-        logger.info(f"Distributed computing: {'enabled' if self.enable_distributed else 'disabled'}")
+        logger.info("Distributed computing: %s", 'enabled' if self.enable_distributed else 'disabled')
     
     async def start_orchestrator(self):
         """Start the experiment orchestrator with background scheduling."""
@@ -613,9 +622,9 @@ class EnhancedExperimentOrchestrator:
             None, self.experiment_queue.put, queue_item
         )
         
-        logger.info(f"Submitted experiment {experiment_id} with priority {config.priority.name}")
-        logger.info(f"Estimated duration: {estimated_duration:.2f} hours")
-        logger.info(f"Queue size: {self.experiment_queue.qsize()}")
+        logger.info("Submitted experiment {experiment_id} with priority %s", config.priority.name)
+        logger.info("Estimated duration: %s hours", estimated_duration:.2f)
+        logger.info("Queue size: %s", self.experiment_queue.qsize())
         
         return experiment_id
     
@@ -664,7 +673,7 @@ class EnhancedExperimentOrchestrator:
                 await asyncio.sleep(5)  # 5 second scheduling interval
                 
             except Exception as e:
-                logger.error(f"Scheduler error: {e}")
+                logger.error("Scheduler error: %s", e)
                 await asyncio.sleep(10)
     
     async def _execute_experiment(self, experiment_id: str):
@@ -672,7 +681,7 @@ class EnhancedExperimentOrchestrator:
         
         config = self.active_experiments.get(experiment_id)
         if not config:
-            logger.error(f"Experiment {experiment_id} not found")
+            logger.error("Experiment %s not found", experiment_id)
             return
         
         start_time = time.time()
@@ -698,12 +707,12 @@ class EnhancedExperimentOrchestrator:
             
             execution_time = time.time() - start_time
             
-            logger.info(f"Experiment {experiment_id} completed in {execution_time:.2f}s")
-            logger.info(f"Total trials: {len(results)}")
-            logger.info(f"Successful trials: {sum(1 for r in results if r.status == 'completed')}")
+            logger.info("Experiment {experiment_id} completed in %ss", execution_time:.2f)
+            logger.info("Total trials: %s", len(results))
+            logger.info("Successful trials: %s", sum(1 for r in results if r.status == 'completed'))
             
         except Exception as e:
-            logger.error(f"Experiment {experiment_id} failed: {e}")
+            logger.error("Experiment {experiment_id} failed: %s", e)
         
         finally:
             # Release resources
@@ -766,7 +775,7 @@ class EnhancedExperimentOrchestrator:
             # Check early stopping
             if config.early_stopping_enabled and completed_trials >= config.min_trials_before_stopping:
                 if await self._should_stop_early(experiment_id, results, config):
-                    logger.info(f"Early stopping triggered for experiment {experiment_id}")
+                    logger.info("Early stopping triggered for experiment %s", experiment_id)
                     break
         
         return results
@@ -832,9 +841,9 @@ class EnhancedExperimentOrchestrator:
     
     def _mock_training(self, train_data, validation_data, params):
         """Mock training function for demonstration."""
-        import time
         import random
-        
+        import time
+
         # Simulate training time
         time.sleep(random.uniform(0.1, 0.5))
         

@@ -1,5 +1,4 @@
-"""
-Enhanced Memory Safety Guard for ML Pipeline Orchestration.
+"""Enhanced Memory Safety Guard for ML Pipeline Orchestration.
 
 Implements 2025 memory management best practices including:
 - Async memory monitoring patterns
@@ -14,23 +13,26 @@ import gc
 import logging
 import resource
 import time
-from datetime import datetime, timezone
-from typing import Any, Optional, Union, Dict, List
-from dataclasses import dataclass
+from datetime import UTC, datetime, timezone
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
+from sqlmodel import Field, SQLModel
 
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
+
 class MemoryThreatLevel(Enum):
     """Memory threat levels for resource monitoring."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3
@@ -56,24 +58,22 @@ class MemoryThreatLevel(Enum):
             return self.value >= other.value
         return NotImplemented
 
-@dataclass
-class MemoryEvent:
+
+class MemoryEvent(SQLModel):
     """Memory event for monitoring and alerting."""
+
     event_type: str
     threat_level: MemoryThreatLevel
     memory_usage_mb: float
-    operation_name: Optional[str] = None
-    component_name: Optional[str] = None
-    memory_delta_mb: Optional[float] = None
-    timestamp: datetime = None
+    operation_name: str | None = Field(default=None)
+    component_name: str | None = Field(default=None)
+    memory_delta_mb: float | None = Field(default=None)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc)
 
-@dataclass
-class ResourceStats:
+class ResourceStats(SQLModel):
     """Comprehensive resource statistics."""
+
     current_memory_mb: float
     peak_memory_mb: float
     initial_memory_mb: float
@@ -83,15 +83,11 @@ class ResourceStats:
     threat_level: MemoryThreatLevel
     gc_collections: int
     active_operations: int
-    timestamp: datetime = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc)
 
 class MemoryGuard:
-    """
-    Enhanced memory safety and monitoring for ML pipeline orchestration.
+    """Enhanced memory safety and monitoring for ML pipeline orchestration.
 
     features:
     - Async memory monitoring patterns
@@ -101,7 +97,12 @@ class MemoryGuard:
     - Comprehensive resource monitoring
     """
 
-    def __init__(self, max_memory_mb: int = 500, max_buffer_size: int = 100 * 1024 * 1024, event_bus=None):
+    def __init__(
+        self,
+        max_memory_mb: int = 500,
+        max_buffer_size: int = 100 * 1024 * 1024,
+        event_bus=None,
+    ):
         self.max_memory_mb = max_memory_mb
         self.max_buffer_size = max_buffer_size  # 100MB default
         self.event_bus = event_bus
@@ -112,14 +113,14 @@ class MemoryGuard:
         self.peak_memory = self.initial_memory
 
         # Enhanced monitoring
-        self.memory_events: List[MemoryEvent] = []
-        self.active_operations: Dict[str, datetime] = {}
+        self.memory_events: list[MemoryEvent] = []
+        self.active_operations: dict[str, datetime] = {}
         self.gc_collections = 0
         self._monitoring_stats = {
             "total_operations": 0,
             "memory_warnings": 0,
             "memory_errors": 0,
-            "gc_forced": 0
+            "gc_forced": 0,
         }
 
     def set_event_bus(self, event_bus):
@@ -134,7 +135,10 @@ class MemoryGuard:
         if self.event_bus:
             try:
                 # Import here to avoid circular imports
-                from ..ml.orchestration.events.event_types import MLEvent, EventType
+                from prompt_improver.ml.orchestration.events.event_types import (
+                    EventType,
+                    MLEvent,
+                )
 
                 # Choose specific event type based on threat level
                 if event.threat_level == MemoryThreatLevel.CRITICAL:
@@ -154,18 +158,22 @@ class MemoryGuard:
                         "memory_delta_mb": event.memory_delta_mb,
                         "operation_name": event.operation_name,
                         "component_name": event.component_name,
-                        "timestamp": event.timestamp.isoformat()
-                    }
+                        "timestamp": event.timestamp.isoformat(),
+                    },
                 )
                 await self.event_bus.emit(ml_event)
             except Exception as e:
-                logger.error(f"Failed to emit memory event: {e}")
+                logger.error("Failed to emit memory event: %s", e)
 
         # Log memory events
         if event.threat_level in [MemoryThreatLevel.HIGH, MemoryThreatLevel.CRITICAL]:
-            logger.error(f"MEMORY ALERT: {event.event_type} - {event.threat_level.name.lower()} - Usage: {event.memory_usage_mb:.1f}MB")
+            logger.error(
+                f"MEMORY ALERT: {event.event_type} - {event.threat_level.name.lower()} - Usage: {event.memory_usage_mb:.1f}MB"
+            )
         else:
-            logger.info(f"Memory event: {event.event_type} - {event.threat_level.name.lower()} - Usage: {event.memory_usage_mb:.1f}MB")
+            logger.info(
+                f"Memory event: {event.event_type} - {event.threat_level.name.lower()} - Usage: {event.memory_usage_mb:.1f}MB"
+            )
 
     def get_resource_stats(self) -> ResourceStats:
         """Get comprehensive resource statistics."""
@@ -192,7 +200,7 @@ class MemoryGuard:
             usage_percent=usage_percent,
             threat_level=threat_level,
             gc_collections=self.gc_collections,
-            active_operations=len(self.active_operations)
+            active_operations=len(self.active_operations),
         )
 
     def check_memory_usage(self) -> dict[str, float]:
@@ -206,16 +214,20 @@ class MemoryGuard:
             "initial_mb": self.initial_memory,
             "allocated_mb": current_memory - self.initial_memory,
             "limit_mb": self.max_memory_mb,
-            "usage_percent": (current_memory / self.max_memory_mb) * 100
+            "usage_percent": (current_memory / self.max_memory_mb) * 100,
         }
 
         # Log warning if approaching limit
         if memory_stats["usage_percent"] > 80:
-            self.logger.warning(f"High memory usage: {memory_stats['usage_percent']:.1f}%")
+            self.logger.warning(
+                f"High memory usage: {memory_stats['usage_percent']:.1f}%"
+            )
 
         return memory_stats
 
-    async def check_memory_usage_async(self, operation_name: str = "unknown", component_name: str = None) -> ResourceStats:
+    async def check_memory_usage_async(
+        self, operation_name: str = "unknown", component_name: str = None
+    ) -> ResourceStats:
         """Async memory usage check with event emission."""
         stats = self.get_resource_stats()
         self._monitoring_stats["total_operations"] += 1
@@ -225,13 +237,15 @@ class MemoryGuard:
             if stats.threat_level >= MemoryThreatLevel.HIGH:
                 self._monitoring_stats["memory_warnings"] += 1
 
-            await self._emit_memory_event(MemoryEvent(
-                event_type="memory_check",
-                threat_level=stats.threat_level,
-                memory_usage_mb=stats.current_memory_mb,
-                operation_name=operation_name,
-                component_name=component_name
-            ))
+            await self._emit_memory_event(
+                MemoryEvent(
+                    event_type="memory_check",
+                    threat_level=stats.threat_level,
+                    memory_usage_mb=stats.current_memory_mb,
+                    operation_name=operation_name,
+                    component_name=component_name,
+                )
+            )
 
         return stats
 
@@ -239,7 +253,9 @@ class MemoryGuard:
         """Async context manager for monitoring memory during operations."""
         return AsyncMemoryMonitor(self, operation_name, component_name)
 
-    def validate_buffer_size(self, data: Union[bytes, np.ndarray, Any], operation: str = "unknown") -> bool:
+    def validate_buffer_size(
+        self, data: bytes | np.ndarray | Any, operation: str = "unknown"
+    ) -> bool:
         """Validate buffer size before operations to prevent overflow.
 
         Args:
@@ -268,7 +284,9 @@ class MemoryGuard:
 
         return True
 
-    def safe_frombuffer(self, buffer: bytes, dtype: np.dtype, count: int = -1) -> np.ndarray:
+    def safe_frombuffer(
+        self, buffer: bytes, dtype: np.dtype, count: int = -1
+    ) -> np.ndarray:
         """Safely create numpy array from buffer with validation.
 
         Args:
@@ -289,25 +307,39 @@ class MemoryGuard:
         # Validate buffer size matches dtype requirements
         dtype_size = np.dtype(dtype).itemsize
         if len(buffer) % dtype_size != 0:
-            raise ValueError(f"Buffer size {len(buffer)} not divisible by dtype size {dtype_size}")
+            raise ValueError(
+                f"Buffer size {len(buffer)} not divisible by dtype size {dtype_size}"
+            )
 
         # Calculate expected element count
         expected_count = len(buffer) // dtype_size
         if count != -1 and count > expected_count:
-            raise ValueError(f"Requested count {count} exceeds available elements {expected_count}")
+            raise ValueError(
+                f"Requested count {count} exceeds available elements {expected_count}"
+            )
 
         # Additional safety: limit array size
-        max_elements = min(1_000_000, self.max_buffer_size // dtype_size)  # 1M elements or buffer limit
-        actual_count = min(expected_count, max_elements) if count == -1 else min(count, max_elements)
+        max_elements = min(
+            1_000_000, self.max_buffer_size // dtype_size
+        )  # 1M elements or buffer limit
+        actual_count = (
+            min(expected_count, max_elements)
+            if count == -1
+            else min(count, max_elements)
+        )
 
         if actual_count < expected_count:
-            self.logger.warning(f"Truncating array from {expected_count} to {actual_count} elements for safety")
+            self.logger.warning(
+                f"Truncating array from {expected_count} to {actual_count} elements for safety"
+            )
 
         # Create array safely
         try:
-            return np.frombuffer(buffer[:actual_count * dtype_size], dtype=dtype, count=actual_count)
+            return np.frombuffer(
+                buffer[: actual_count * dtype_size], dtype=dtype, count=actual_count
+            )
         except Exception as e:
-            self.logger.error(f"Failed to create array from buffer: {e}")
+            self.logger.error("Failed to create array from buffer: %s", e)
             raise
 
     def safe_tobytes(self, array: np.ndarray) -> bytes:
@@ -327,7 +359,7 @@ class MemoryGuard:
         try:
             return array.tobytes()
         except Exception as e:
-            self.logger.error(f"Failed to convert array to bytes: {e}")
+            self.logger.error("Failed to convert array to bytes: %s", e)
             raise
 
     def monitor_operation(self, operation_name: str):
@@ -347,16 +379,18 @@ class MemoryGuard:
         self._monitoring_stats["gc_forced"] += 1
 
         if freed_mb > 0:
-            self.logger.info(f"Async garbage collection freed {freed_mb:.1f}MB")
+            self.logger.info("Async garbage collection freed %.1f MB", freed_mb)
 
             # Emit memory event for significant cleanup
-            await self._emit_memory_event(MemoryEvent(
-                event_type="garbage_collection",
-                threat_level=MemoryThreatLevel.LOW,
-                memory_usage_mb=memory_after,
-                memory_delta_mb=-freed_mb,
-                operation_name=operation_name
-            ))
+            await self._emit_memory_event(
+                MemoryEvent(
+                    event_type="garbage_collection",
+                    threat_level=MemoryThreatLevel.LOW,
+                    memory_usage_mb=memory_after,
+                    memory_delta_mb=-freed_mb,
+                    operation_name=operation_name,
+                )
+            )
 
         return freed_mb
 
@@ -369,13 +403,14 @@ class MemoryGuard:
         self.gc_collections += 1
 
         if freed_mb > 0:
-            self.logger.info(f"Garbage collection freed {freed_mb:.1f}MB")
+            self.logger.info("Garbage collection freed %.1f MB", freed_mb)
 
         return freed_mb
 
-    async def validate_ml_operation_memory(self, data: Any, operation_name: str, component_name: str = None) -> bool:
-        """
-        Validate memory requirements for ML operations with 2025 best practices.
+    async def validate_ml_operation_memory(
+        self, data: Any, operation_name: str, component_name: str = None
+    ) -> bool:
+        """Validate memory requirements for ML operations with 2025 best practices.
 
         Args:
             data: ML data to validate (arrays, tensors, etc.)
@@ -396,13 +431,15 @@ class MemoryGuard:
             self.validate_buffer_size(data, operation_name)
         except MemoryError as e:
             self._monitoring_stats["memory_errors"] += 1
-            await self._emit_memory_event(MemoryEvent(
-                event_type="memory_validation_failed",
-                threat_level=MemoryThreatLevel.CRITICAL,
-                memory_usage_mb=stats.current_memory_mb,
-                operation_name=operation_name,
-                component_name=component_name
-            ))
+            await self._emit_memory_event(
+                MemoryEvent(
+                    event_type="memory_validation_failed",
+                    threat_level=MemoryThreatLevel.CRITICAL,
+                    memory_usage_mb=stats.current_memory_mb,
+                    operation_name=operation_name,
+                    component_name=component_name,
+                )
+            )
             raise
 
         # Check for ML-specific memory patterns
@@ -415,13 +452,15 @@ class MemoryGuard:
                     self.logger.error(error_msg)
                     self._monitoring_stats["memory_errors"] += 1
 
-                    await self._emit_memory_event(MemoryEvent(
-                        event_type="large_array_risk",
-                        threat_level=MemoryThreatLevel.HIGH,
-                        memory_usage_mb=stats.current_memory_mb,
-                        operation_name=operation_name,
-                        component_name=component_name
-                    ))
+                    await self._emit_memory_event(
+                        MemoryEvent(
+                            event_type="large_array_risk",
+                            threat_level=MemoryThreatLevel.HIGH,
+                            memory_usage_mb=stats.current_memory_mb,
+                            operation_name=operation_name,
+                            component_name=component_name,
+                        )
+                    )
 
                     raise MemoryError(error_msg)
 
@@ -438,7 +477,9 @@ class MemoryGuard:
 
         # Fallback to resource module
         try:
-            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # Linux: KB to MB
+            return (
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+            )  # Linux: KB to MB
         except Exception:
             return 0.0
 
@@ -446,18 +487,20 @@ class MemoryGuard:
         """Get size of data in bytes."""
         if isinstance(data, bytes):
             return len(data)
-        elif isinstance(data, np.ndarray):
+        if isinstance(data, np.ndarray):
             return data.nbytes
-        elif hasattr(data, '__sizeof__'):
+        if hasattr(data, "__sizeof__"):
             return data.__sizeof__()
-        else:
-            # Rough estimate for other types
-            return len(str(data).encode('utf-8'))
+        # Rough estimate for other types
+        return len(str(data).encode("utf-8"))
+
 
 class AsyncMemoryMonitor:
     """Async context manager for monitoring memory usage during operations."""
 
-    def __init__(self, memory_guard: MemoryGuard, operation_name: str, component_name: str = None):
+    def __init__(
+        self, memory_guard: MemoryGuard, operation_name: str, component_name: str = None
+    ):
         self.guard = memory_guard
         self.operation_name = operation_name
         self.component_name = component_name
@@ -470,18 +513,22 @@ class AsyncMemoryMonitor:
         self.start_time = time.time()
 
         # Register active operation
-        self.guard.active_operations[self.operation_id] = datetime.now(timezone.utc)
+        self.guard.active_operations[self.operation_id] = datetime.now(UTC)
 
-        self.guard.logger.debug(f"Starting async {self.operation_name} - Memory: {self.start_memory:.1f}MB")
+        self.guard.logger.debug(
+            f"Starting async {self.operation_name} - Memory: {self.start_memory:.1f}MB"
+        )
 
         # Emit start event
-        await self.guard._emit_memory_event(MemoryEvent(
-            event_type="operation_started",
-            threat_level=MemoryThreatLevel.LOW,
-            memory_usage_mb=self.start_memory,
-            operation_name=self.operation_name,
-            component_name=self.component_name
-        ))
+        await self.guard._emit_memory_event(
+            MemoryEvent(
+                event_type="operation_started",
+                threat_level=MemoryThreatLevel.LOW,
+                memory_usage_mb=self.start_memory,
+                operation_name=self.operation_name,
+                component_name=self.component_name,
+            )
+        )
 
         return self
 
@@ -503,29 +550,40 @@ class AsyncMemoryMonitor:
         else:
             threat_level = MemoryThreatLevel.LOW
 
-        level = logging.WARNING if memory_delta > 50 else logging.INFO if memory_delta > 10 else logging.DEBUG
+        level = (
+            logging.WARNING
+            if memory_delta > 50
+            else logging.INFO
+            if memory_delta > 10
+            else logging.DEBUG
+        )
         self.guard.logger.log(
             level,
             f"Completed async {self.operation_name} - Memory: {end_memory:.1f}MB "
-            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s"
+            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
         )
 
         # Update peak memory
         self.guard.peak_memory = max(self.guard.peak_memory, end_memory)
 
         # Emit completion event
-        await self.guard._emit_memory_event(MemoryEvent(
-            event_type="operation_completed",
-            threat_level=threat_level,
-            memory_usage_mb=end_memory,
-            memory_delta_mb=memory_delta,
-            operation_name=self.operation_name,
-            component_name=self.component_name
-        ))
+        await self.guard._emit_memory_event(
+            MemoryEvent(
+                event_type="operation_completed",
+                threat_level=threat_level,
+                memory_usage_mb=end_memory,
+                memory_delta_mb=memory_delta,
+                operation_name=self.operation_name,
+                component_name=self.component_name,
+            )
+        )
 
         # Force cleanup if memory delta is significant
         if memory_delta > 50:  # 50MB threshold
-            await self.guard.force_garbage_collection_async(f"cleanup_{self.operation_name}")
+            await self.guard.force_garbage_collection_async(
+                f"cleanup_{self.operation_name}"
+            )
+
 
 class MemoryMonitor:
     """Context manager for monitoring memory usage during operations."""
@@ -539,11 +597,14 @@ class MemoryMonitor:
     def __enter__(self):
         self.start_memory = self.guard._get_memory_usage()
         self.start_time = time.time()
-        self.guard.logger.debug(f"Starting {self.operation_name} - Memory: {self.start_memory:.1f}MB")
+        self.guard.logger.debug(
+            f"Starting {self.operation_name} - Memory: {self.start_memory:.1f}MB"
+        )
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         import time
+
         end_memory = self.guard._get_memory_usage()
         end_time = time.time()
 
@@ -554,7 +615,7 @@ class MemoryMonitor:
         self.guard.logger.log(
             level,
             f"Completed {self.operation_name} - Memory: {end_memory:.1f}MB "
-            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s"
+            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
         )
 
         # Update peak memory
@@ -564,8 +625,10 @@ class MemoryMonitor:
         if memory_delta > 50:  # 50MB threshold
             self.guard.force_garbage_collection()
 
+
 # Global memory guard instance
 _default_memory_guard = None
+
 
 def get_memory_guard() -> MemoryGuard:
     """Get global memory guard instance."""

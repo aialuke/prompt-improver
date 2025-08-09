@@ -26,15 +26,6 @@
         "FASTMCP_MASK_ERROR_DETAILS": "true"
       }
     },
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/Users/lukemckenzie/Desktop",
-        "/Users/lukemckenzie/prompt-improver"
-      ]
-    },
     "sequential-thinking": {
       "command": "npx",
       "args": [

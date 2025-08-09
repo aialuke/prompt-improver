@@ -85,7 +85,7 @@
         "ms-python.black-formatter",
         "ms-python.isort",
         "ms-python.flake8",
-        "ms-python.mypy-type-checker",
+        // Pyright is already included in ms-python.vscode-pylance
         "ms-python.debugpy",
         "ms-python.pytest",
         
@@ -236,7 +236,7 @@
   "updateContentCommand": [
     "pip install -r requirements.txt",
     "npm install",
-    "python -m alembic upgrade head"
+    "echo 'Database initialized automatically via Docker'"
   ],
   "postStartCommand": [
     "bash scripts/setup-dev-environment.sh",

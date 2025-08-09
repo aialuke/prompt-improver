@@ -100,21 +100,16 @@ environments:
     redis_pool_strategy: "minimal_resources"
 
 # =============================================================================
-# DOCKER CONFIGURATION STANDARDIZATION
+# NATIVE DEPLOYMENT CONFIGURATION STANDARDIZATION
 # =============================================================================
 
-docker_env_vars:
-  # Remove hardcoded values, use environment variable passthrough
-  hardcoded_removal:
-    - "ENV MCP_DB_POOL_SIZE=20"      # Remove hardcoded value
-    - "ENV MCP_DB_MAX_OVERFLOW=10"   # Remove hardcoded value
-    
-  # Replace with environment variable references
-  environment_passthrough:
-    - "ENV DB_POOL_MIN_SIZE=${DB_POOL_MIN_SIZE:-4}"
-    - "ENV DB_POOL_MAX_SIZE=${DB_POOL_MAX_SIZE:-16}"
-    - "ENV DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-10}"
-    - "ENV REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-20}"
+native_env_vars:
+  # Environment variable configuration for native deployment
+  database_pool_settings:
+    - "DB_POOL_MIN_SIZE=${DB_POOL_MIN_SIZE:-4}"
+    - "DB_POOL_MAX_SIZE=${DB_POOL_MAX_SIZE:-16}"
+    - "DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-10}"
+    - "REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-20}"
 
 # =============================================================================
 # VALIDATION REQUIREMENTS
@@ -122,8 +117,8 @@ docker_env_vars:
 
 validation_checks:
   - name: "no_hardcoded_values"
-    description: "Ensure no hardcoded pool sizes in Docker files"
-    files: ["Dockerfile.mcp", "docker-compose.yml"]
+    description: "Ensure no hardcoded pool sizes in native configuration"
+    files: ["config/mcp_config.yaml", "config/external_services.yaml"]
     
   - name: "consistent_naming"
     description: "All pool settings use DB_POOL_* convention"
@@ -145,7 +140,7 @@ implementation_steps:
   1: "Update .mcp.json to use standard DB_POOL_* variables"
   2: "Update .env.template with consistent naming"
   3: "Update .env.test with environment-appropriate values"  
-  4: "Remove hardcoded values from Dockerfile.mcp"
+  4: "Update native configuration with standardized environment variables"
   5: "Update test files to use standard variables"
   6: "Validate configuration consistency"
   7: "Update documentation references"

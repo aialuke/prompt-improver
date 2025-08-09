@@ -3,29 +3,10 @@
 Tools for optimizing system performance, monitoring metrics,
 and validating performance targets.
 """
-
-# Performance optimization
-from .optimization.async_optimizer import AsyncBatchProcessor
-from .optimization.performance_optimizer import get_performance_optimizer
-from .optimization.response_optimizer import ResponseOptimizer, FastJSONSerializer
-
-# Performance monitoring
-from .monitoring.performance_monitor import get_performance_monitor, EnhancedPerformanceMonitor
-from .monitoring.performance_benchmark import MCPPerformanceBenchmark
-
-# Performance validation
-from .validation.performance_validation import PerformanceValidator
-
-__all__ = [
-    # Optimization
-    "AsyncBatchProcessor",
-    "get_performance_optimizer",
-    "ResponseOptimizer",
-    "FastJSONSerializer",
-    # Monitoring
-    "get_performance_monitor",
-    "EnhancedPerformanceMonitor",
-    "MCPPerformanceBenchmark",
-    # Validation
-    "PerformanceValidator",
-]
+from prompt_improver.performance.monitoring import UnifiedHealthMonitor, get_unified_health_monitor
+from prompt_improver.performance.monitoring.performance_benchmark import MCPPerformanceBenchmark
+from prompt_improver.performance.optimization.async_optimizer import AsyncBatchProcessor
+from prompt_improver.performance.optimization.performance_optimizer import get_performance_optimizer
+from prompt_improver.performance.optimization.response_optimizer import FastJSONSerializer, ResponseOptimizer
+from prompt_improver.performance.validation.performance_validation import PerformanceValidator
+__all__ = ['AsyncBatchProcessor', 'get_performance_optimizer', 'ResponseOptimizer', 'FastJSONSerializer', 'get_unified_health_monitor', 'UnifiedHealthMonitor', 'MCPPerformanceBenchmark', 'PerformanceValidator']

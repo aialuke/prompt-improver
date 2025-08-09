@@ -105,7 +105,6 @@ RUN pip install --no-cache-dir --upgrade \
     black \
     isort \
     flake8 \
-    mypy \
     # Testing
     pytest \
     pytest-cov \
@@ -165,7 +164,7 @@ RUN echo 'export PATH="$PATH:/workspaces/prompt-improver/scripts"' >> ~/.bashrc 
     && echo 'alias dev="npm run dev"' >> ~/.bashrc \
     && echo 'alias build="npm run build"' >> ~/.bashrc \
     && echo 'alias test="pytest tests/ -v"' >> ~/.bashrc \
-    && echo 'alias lint="ruff check . && mypy src/"' >> ~/.bashrc
+    && echo 'alias lint="ruff check . && pyright"' >> ~/.bashrc
 
 # Install Oh My Zsh for enhanced terminal experience
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \
@@ -174,7 +173,7 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     && echo 'alias dev="npm run dev"' >> ~/.zshrc \
     && echo 'alias build="npm run build"' >> ~/.zshrc \
     && echo 'alias test="pytest tests/ -v"' >> ~/.zshrc \
-    && echo 'alias lint="ruff check . && mypy src/"' >> ~/.zshrc
+    && echo 'alias lint="ruff check . && pyright"' >> ~/.zshrc
 
 # Create directories for development caches
 RUN mkdir -p ~/.cache/pip ~/.npm ~/.local/bin
