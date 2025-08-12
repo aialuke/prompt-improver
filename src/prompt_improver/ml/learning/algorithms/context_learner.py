@@ -6,6 +6,7 @@ for feature extraction and clustering analysis.
 import logging
 from typing import Any, Dict, List, Optional
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from ....security.input_validator import InputValidator, ValidationError
 from ....security.memory_guard import MemoryGuard, get_memory_guard
@@ -15,7 +16,7 @@ from ..clustering import ClusteringConfig as OriginalClusteringConfig
 from ..features import CompositeFeatureExtractor, FeatureExtractionConfig, FeatureExtractorFactory
 logger = logging.getLogger(__name__)
 
-class ContextConfig(SQLModel):
+class ContextConfig(BaseModel):
     """Configuration for context learner."""
     enable_linguistic_features: bool = Field(default=True, description='Enable linguistic feature extraction')
     enable_domain_features: bool = Field(default=True, description='Enable domain-specific feature extraction')
@@ -31,14 +32,14 @@ class ContextConfig(SQLModel):
     min_sample_size: int = Field(default=20, ge=1, description='Minimum sample size for learning')
     min_silhouette_score: float = Field(default=0.3, ge=0.0, le=1.0, description='Minimum silhouette score threshold')
 
-class ContextLearningResult(SQLModel):
+class ContextLearningResult(BaseModel):
     """Result of context learning operation."""
     clusters_found: int = Field(ge=0, description='Number of clusters found')
     features_extracted: int = Field(ge=0, description='Number of features extracted')
     silhouette_score: float = Field(ge=-1.0, le=1.0, description='Silhouette score for clustering quality')
     processing_time: float = Field(ge=0.0, description='Processing time in seconds')
-    quality_metrics: Dict[str, float] = Field(default_factory=dict, description='Quality assessment metrics')
-    recommendations: List[str] = Field(default_factory=list, description='Learning recommendations')
+    quality_metrics: dict[str, float] = Field(default_factory=dict, description='Quality assessment metrics')
+    recommendations: list[str] = Field(default_factory=list, description='Learning recommendations')
 
 class ContextLearner:
     """Context-specific learning engine using specialized components.
@@ -50,7 +51,7 @@ class ContextLearner:
     - Separation of concerns for maintainability
     """
 
-    def __init__(self, config: Optional[ContextConfig]=None, training_loader=None):
+    def __init__(self, config: ContextConfig | None=None, training_loader=None):
         """Initialize context learner.
 
         Args:
@@ -65,7 +66,7 @@ class ContextLearner:
         self._initialize_clustering_engine()
         self.training_loader = training_loader
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for context learning (2025 pattern)
 
         Args:
@@ -97,8 +98,8 @@ class ContextLearner:
         except Exception as e:
             self.logger.error('Orchestrated context learning failed: %s', e)
             return {'orchestrator_compatible': True, 'component_result': {'error': str(e), 'clusters_discovered': 0}, 'local_metadata': {'execution_time': (aware_utc_now() - start_time).total_seconds(), 'error': True, 'component_version': '1.0.0'}}
-        self.context_patterns: Dict[str, Any] = {}
-        self.cluster_results: Optional[ClusteringResult] = None
+        self.context_patterns: dict[str, Any] = {}
+        self.cluster_results: ClusteringResult | None = None
         logger.info('ContextLearner initialized with specialized components')
 
     def _initialize_feature_extractor(self) -> None:
@@ -113,7 +114,7 @@ class ContextLearner:
         self.clustering_engine = ClusteringOptimizer(clustering_config)
         logger.info('Clustering engine initialized')
 
-    async def learn_from_data(self, training_data: List[Dict[str, Any]]) -> ContextLearningResult:
+    async def learn_from_data(self, training_data: list[dict[str, Any]]) -> ContextLearningResult:
         """Learn context patterns from training data.
         
         Args:
@@ -142,7 +143,7 @@ class ContextLearner:
             logger.error('Context learning failed: %s', e)
             return self._get_default_result()
 
-    def _validate_training_data(self, training_data: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+    def _validate_training_data(self, training_data: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
         """Validate and sanitize training data."""
         try:
             if not training_data or not isinstance(training_data, list):
@@ -173,7 +174,7 @@ class ContextLearner:
             logger.error('Training data validation failed: %s', e)
             return None
 
-    async def _extract_features_batch(self, training_data: List[Dict[str, Any]]) -> Optional[np.ndarray]:
+    async def _extract_features_batch(self, training_data: list[dict[str, Any]]) -> np.ndarray | None:
         """Extract features from batch of training examples."""
         try:
             features_list = []
@@ -191,7 +192,7 @@ class ContextLearner:
             logger.error('Batch feature extraction failed: %s', e)
             return None
 
-    def _analyze_cluster_patterns(self, cluster_result: ClusteringResult, training_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_cluster_patterns(self, cluster_result: ClusteringResult, training_data: list[dict[str, Any]]) -> dict[str, Any]:
         """Analyze patterns within clusters."""
         try:
             patterns = {}
@@ -207,7 +208,7 @@ class ContextLearner:
             logger.error('Pattern analysis failed: %s', e)
             return {}
 
-    def _calculate_avg_performance(self, examples: List[Dict[str, Any]]) -> float:
+    def _calculate_avg_performance(self, examples: list[dict[str, Any]]) -> float:
         """Calculate average performance for cluster examples."""
         try:
             scores = []
@@ -219,7 +220,7 @@ class ContextLearner:
         except Exception:
             return 0.5
 
-    def _find_common_project_types(self, examples: List[Dict[str, Any]]) -> List[str]:
+    def _find_common_project_types(self, examples: list[dict[str, Any]]) -> list[str]:
         """Find most common project types in cluster."""
         try:
             project_types = [example.get('project_type', 'unknown') for example in examples]
@@ -229,11 +230,11 @@ class ContextLearner:
         except Exception:
             return ['unknown']
 
-    def _identify_typical_features(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _identify_typical_features(self, examples: list[dict[str, Any]]) -> dict[str, Any]:
         """Identify typical features for cluster."""
         return {'avg_text_length': np.mean([len(str(ex.get('text', ''))) for ex in examples]), 'complexity_level': 'medium', 'domain_focus': 'general'}
 
-    def _generate_cluster_recommendations(self, examples: List[Dict[str, Any]]) -> List[str]:
+    def _generate_cluster_recommendations(self, examples: list[dict[str, Any]]) -> list[str]:
         """Generate recommendations for cluster."""
         avg_performance = self._calculate_avg_performance(examples)
         recommendations = []
@@ -243,7 +244,7 @@ class ContextLearner:
             recommendations.append('Large cluster - consider sub-clustering')
         return recommendations
 
-    def _generate_recommendations(self, cluster_result: ClusteringResult, patterns: Dict[str, Any]) -> List[str]:
+    def _generate_recommendations(self, cluster_result: ClusteringResult, patterns: dict[str, Any]) -> list[str]:
         """Generate overall recommendations based on clustering results."""
         recommendations = []
         if cluster_result.silhouette_score < self.config.min_silhouette_score:
@@ -261,11 +262,11 @@ class ContextLearner:
         """Get default result when learning fails."""
         return ContextLearningResult(clusters_found=0, features_extracted=0, silhouette_score=0.0, processing_time=0.0, quality_metrics={}, recommendations=['Learning failed - check input data quality'])
 
-    def get_context_patterns(self) -> Dict[str, Any]:
+    def get_context_patterns(self) -> dict[str, Any]:
         """Get learned context patterns."""
         return self.context_patterns.copy()
 
-    def get_cluster_info(self) -> Optional[Dict[str, Any]]:
+    def get_cluster_info(self) -> dict[str, Any] | None:
         """Get information about current clusters."""
         if self.cluster_results is None:
             return None

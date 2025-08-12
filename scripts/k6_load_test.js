@@ -90,7 +90,7 @@ export const options = {
 };
 
 // Base URL configuration
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5000';
+const BASE_URL = __ENV.BASE_URL || `http://${__ENV.API_HOST || 'localhost'}:${__ENV.API_PORT || '5000'}`;
 
 // Test data for realistic load simulation
 const testData = {

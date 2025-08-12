@@ -111,13 +111,13 @@ class ClusteringResult:
     """Structured result of clustering operation (merged from ContextClusteringEngine)."""
     
     cluster_labels: cluster_labels
-    cluster_centers: Optional[cluster_centers]
+    cluster_centers: cluster_centers | None
     n_clusters: int
     silhouette_score: float
     algorithm_used: str
     processing_time: float
-    quality_metrics: Dict[str, float]
-    metadata: Dict[str, Any]
+    quality_metrics: dict[str, float]
+    metadata: dict[str, Any]
 
 @dataclass
 class ClusteringMetrics:
@@ -138,7 +138,7 @@ class ClusteringMetrics:
 class ClusteringOptimizer:
     """High-performance clustering optimizer for linguistic features."""
 
-    def __init__(self, config: Optional[ClusteringConfig] = None, training_loader: Optional[Any] = None) -> None:
+    def __init__(self, config: ClusteringConfig | None = None, training_loader: Any | None = None) -> None:
         """Initialize clustering optimizer.
 
         Args:
@@ -154,10 +154,10 @@ class ClusteringOptimizer:
         self.logger.info("Clustering optimizer integrated with training data pipeline")
 
         # Initialize components
-        self.scaler: Optional[Union[StandardScaler, RobustScaler]] = None
-        self.dimensionality_reducer: Optional[Union[PCA, Any]] = None  # umap.UMAP
-        self.feature_selector: Optional[SelectKBest] = None
-        self.clusterer: Optional[Any] = None  # hdbscan.HDBSCAN
+        self.scaler: StandardScaler | RobustScaler | None = None
+        self.dimensionality_reducer: PCA | Any | None = None  # umap.UMAP
+        self.feature_selector: SelectKBest | None = None
+        self.clusterer: Any | None = None  # hdbscan.HDBSCAN
 
         # Performance tracking
         self.performance_metrics: list[ClusteringMetrics] = []
@@ -179,7 +179,7 @@ class ClusteringOptimizer:
             f"Clustering optimizer initialized with {self.config.target_dimensions}D target (advanced={ADVANCED_CLUSTERING_AVAILABLE})"
         )
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for clustering optimization (2025 pattern)
 
         Args:
@@ -300,7 +300,7 @@ class ClusteringOptimizer:
             }
 
         except ValueError as e:
-            self.logger.error("Validation error in orchestrated clustering optimization: %s", e)
+            self.logger.error(f"Validation error in orchestrated clustering optimization: {e}")
             return {
                 "orchestrator_compatible": True,
                 "component_result": {"error": f"Validation error: {str(e)}", "clustering_summary": {}},
@@ -312,7 +312,7 @@ class ClusteringOptimizer:
                 }
             }
         except Exception as e:
-            self.logger.error("Orchestrated clustering optimization failed: %s", e)
+            self.logger.error(f"Orchestrated clustering optimization failed: {e}")
             return {
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "clustering_summary": {}},
@@ -326,9 +326,9 @@ class ClusteringOptimizer:
     async def optimize_clustering(
         self,
         features: features,
-        labels: Optional[labels] = None,
-        sample_weights: Optional[weights] = None,
-    ) -> Dict[str, Any]:
+        labels: labels | None = None,
+        sample_weights: weights | None = None,
+    ) -> dict[str, Any]:
         """Optimize clustering for high-dimensional features.
 
         Args:
@@ -485,7 +485,7 @@ class ClusteringOptimizer:
                 self.logger.warning("No features found in training data")
                 return {"status": "no_features"}
             
-            self.logger.info("Optimizing clustering on {features.shape[0]} training samples with %s dimensions", features.shape[1])
+            self.logger.info(f"Optimizing clustering on {features.shape[0]} training samples with {features.shape[1]} dimensions")
             
             # Perform dimensionality analysis
             optimal_dims = await self._analyze_dimensionality(features)
@@ -542,7 +542,7 @@ class ClusteringOptimizer:
             return result
             
         except Exception as e:
-            self.logger.error("Failed to optimize with training data: %s", e)
+            self.logger.error(f"Failed to optimize with training data: {e}")
             return {"status": "error", "error": str(e)}
 
     async def discover_optimization_patterns(self, db_session) -> dict[str, Any]:
@@ -581,11 +581,11 @@ class ClusteringOptimizer:
                 "pattern_confidence": self._calculate_pattern_confidence(patterns)
             }
             
-            self.logger.info("Discovered %s optimization patterns", len(patterns))
+            self.logger.info(f"Discovered {len(patterns)} optimization patterns")
             return result
             
         except Exception as e:
-            self.logger.error("Failed to discover optimization patterns: %s", e)
+            self.logger.error(f"Failed to discover optimization patterns: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _analyze_dimensionality(self, features: np.ndarray) -> int:
@@ -602,11 +602,11 @@ class ClusteringOptimizer:
             # Ensure within reasonable bounds
             optimal_dims = max(2, min(optimal_dims, self.config.target_dimensions))
             
-            self.logger.info("Optimal dimensionality analysis: {optimal_dims} dimensions for %s% variance", self.config.variance_threshold*100)
+            self.logger.info(f"Optimal dimensionality analysis: {optimal_dims} dimensions for {self.config.variance_threshold*100}% variance")
             return optimal_dims
             
         except Exception as e:
-            self.logger.error("Dimensionality analysis failed: %s", e)
+            self.logger.error(f"Dimensionality analysis failed: {e}")
             return self.config.target_dimensions
 
     async def _grid_search_clustering(self, features: np.ndarray, param_grid: dict) -> dict[str, Any]:
@@ -620,12 +620,12 @@ class ClusteringOptimizer:
             
             # Check if preprocessing was successful
             if preprocessed.get("status") == "failed":
-                self.logger.error("Feature preprocessing failed: %s", preprocessed.get('error', 'Unknown error'))
+                self.logger.error(f"Feature preprocessing failed: {preprocessed.get('error')}")
                 return {"parameters": {}, "score": 0.0}
             
             processed_features = preprocessed["features"]
             
-            self.logger.info("Starting grid search with %s parameter combinations", len(param_grid))
+            self.logger.info(f"Starting grid search with {len(param_grid)} parameter combinations")
             
             for i, params in enumerate(self._generate_param_combinations(param_grid)):
                 try:
@@ -644,14 +644,14 @@ class ClusteringOptimizer:
                         self.logger.debug("Grid search progress: %d/%d (best score: %.3f)", i + 1, len(param_grid), best_score)
                         
                 except Exception as e:
-                    self.logger.debug("Parameter combination failed: {params}, error: %s", e)
+                    self.logger.debug(f"Parameter combination failed: {params}, error: {e}")
                     continue
             
             self.logger.info("Grid search completed. Best score: %.3f", best_score)
             return {"parameters": best_params, "score": best_score}
             
         except Exception as e:
-            self.logger.error("Grid search failed: %s", e)
+            self.logger.error(f"Grid search failed: {e}")
             return {"parameters": {}, "score": 0.0}
 
     def _get_clustering_param_grid(self) -> dict:
@@ -845,7 +845,7 @@ class ClusteringOptimizer:
             return result
 
         except Exception as e:
-            self.logger.error("Feature preprocessing failed: %s", e)
+            self.logger.error(f"Feature preprocessing failed: {e}")
             return {"status": "failed", "error": str(e)}
 
     async def _optimize_parameters(
@@ -896,7 +896,7 @@ class ClusteringOptimizer:
             # Note: Removed memory_efficient boolean - HDBSCAN memory param expects None or Memory object
         }
 
-        self.logger.debug("Optimized parameters: %s", optimal_params)
+        self.logger.debug(f"Optimized parameters: {optimal_params}")
         return optimal_params
 
     async def _perform_optimized_clustering(
@@ -974,7 +974,7 @@ class ClusteringOptimizer:
             return clustering_result
 
         except Exception as e:
-            self.logger.error("Optimized clustering failed: %s", e)
+            self.logger.error(f"Optimized clustering failed: {e}")
             raise
 
     def _assess_clustering_quality(
@@ -1079,7 +1079,7 @@ class ClusteringOptimizer:
                 )
 
             except Exception as e:
-                self.logger.warning("Error computing clustering metrics: %s", e)
+                self.logger.warning(f"Error computing clustering metrics: {e}")
                 convergence_achieved = False
 
         processing_time = time.time() - start_time
@@ -1123,7 +1123,7 @@ class ClusteringOptimizer:
             return float(np.mean(stability_scores)) if stability_scores else 0.0
 
         except Exception as e:
-            self.logger.warning("Error computing stability score: %s", e)
+            self.logger.warning(f"Error computing stability score: {e}")
             return 0.0
 
     def _analyze_performance(
@@ -1460,12 +1460,12 @@ class ClusteringOptimizer:
         self.logger.info(
             f"Adaptive noise threshold: {max_noise_threshold:.1%} (base: {base_noise_threshold:.1%})"
         )
-        self.logger.info("Success criteria: %s", success_criteria)
-        self.logger.info("Final decision: {status} - %s", message)
+        self.logger.info(f"Success criteria: {success_criteria}")
+        self.logger.info(f"Final decision: {status} - {message}")
 
         return status, message
 
-    def get_algorithm_info(self) -> Dict[str, Any]:
+    def get_algorithm_info(self) -> dict[str, Any]:
         """Get information about available clustering algorithms (from ContextClusteringEngine)."""
         return {
             'advanced_clustering_available': ADVANCED_CLUSTERING_AVAILABLE,
@@ -1523,7 +1523,7 @@ class ClusteringOptimizer:
             )
                 
         except Exception as e:
-            self.logger.error("Clustering failed: %s", e)
+            self.logger.error(f"Clustering failed: {e}")
             return self._get_default_result(features.shape[0])
     
     def _validate_features_simple(self, features: np.ndarray) -> bool:
@@ -1534,11 +1534,11 @@ class ClusteringOptimizer:
                 return False
             
             if len(features.shape) != 2:
-                self.logger.warning("Invalid feature matrix shape: %s", features.shape)
+                self.logger.warning(f"Invalid feature matrix shape: {features.shape}")
                 return False
             
             if features.shape[0] < 3:
-                self.logger.warning("Too few samples for clustering: %s", features.shape[0])
+                self.logger.warning(f"Too few samples for clustering: {features.shape[0]}")
                 return False
             
             # Check for NaN or infinite values
@@ -1549,7 +1549,7 @@ class ClusteringOptimizer:
             return True
             
         except Exception as e:
-            self.logger.error("Feature validation failed: %s", e)
+            self.logger.error(f"Feature validation failed: {e}")
             return False
 
 # Factory function for easy integration

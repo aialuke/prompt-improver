@@ -31,7 +31,7 @@ class PerformanceSnapshot:
     timeout_rate: float
     cpu_usage_percent: float
     memory_usage_mb: float
-    gpu_memory_mb: Optional[float] = None
+    gpu_memory_mb: float | None = None
     sample_count: int = 0
 
 @dataclass
@@ -44,7 +44,7 @@ class ModelPerformanceHistory:
         """Add a new performance snapshot"""
         self.snapshots.append(snapshot)
 
-    def get_recent_snapshots(self, hours: int=24) -> List[PerformanceSnapshot]:
+    def get_recent_snapshots(self, hours: int=24) -> list[PerformanceSnapshot]:
         """Get snapshots from the last N hours"""
         cutoff_time = aware_utc_now() - timedelta(hours=hours)
         return [snapshot for snapshot in self.snapshots if snapshot.timestamp > cutoff_time]
@@ -59,13 +59,13 @@ class ModelPerformanceTracker:
 
     def __init__(self, snapshot_interval_seconds: int=60):
         self.snapshot_interval_seconds = snapshot_interval_seconds
-        self._performance_history: Dict[str, ModelPerformanceHistory] = defaultdict(lambda: ModelPerformanceHistory(''))
-        self._active_requests: Dict[str, Dict[str, Any]] = defaultdict(dict)
-        self._request_counters: Dict[str, Dict[str, int]] = defaultdict(lambda: {'total': 0, 'success': 0, 'error': 0, 'timeout': 0})
-        self._performance_baselines: Dict[str, Dict[str, float]] = {}
+        self._performance_history: dict[str, ModelPerformanceHistory] = defaultdict(lambda: ModelPerformanceHistory(''))
+        self._active_requests: dict[str, dict[str, Any]] = defaultdict(dict)
+        self._request_counters: dict[str, dict[str, int]] = defaultdict(lambda: {'total': 0, 'success': 0, 'error': 0, 'timeout': 0})
+        self._performance_baselines: dict[str, dict[str, float]] = {}
         logger.info('Model Performance Tracker initialized')
 
-    async def start_request_tracking(self, model_id: str, request_id: str, metadata: Optional[Dict[str, Any]]=None) -> None:
+    async def start_request_tracking(self, model_id: str, request_id: str, metadata: dict[str, Any] | None=None) -> None:
         """Start tracking a new inference request"""
         try:
             self._active_requests[model_id][request_id] = {'start_time': time.time(), 'metadata': metadata or {}, 'status': 'active'}
@@ -73,7 +73,7 @@ class ModelPerformanceTracker:
         except Exception as e:
             logger.error('Failed to start request tracking: %s', e)
 
-    async def end_request_tracking(self, model_id: str, request_id: str, success: bool, error_type: Optional[str]=None) -> Optional[float]:
+    async def end_request_tracking(self, model_id: str, request_id: str, success: bool, error_type: str | None=None) -> float | None:
         """End tracking for an inference request and return latency"""
         try:
             if request_id not in self._active_requests[model_id]:
@@ -93,7 +93,7 @@ class ModelPerformanceTracker:
             logger.error('Failed to end request tracking: %s', e)
             return None
 
-    async def create_performance_snapshot(self, model_id: str, cpu_usage: Optional[float]=None, memory_usage_mb: Optional[float]=None, gpu_memory_mb: Optional[float]=None) -> Optional[PerformanceSnapshot]:
+    async def create_performance_snapshot(self, model_id: str, cpu_usage: float | None=None, memory_usage_mb: float | None=None, gpu_memory_mb: float | None=None) -> PerformanceSnapshot | None:
         """Create a performance snapshot for a model"""
         try:
             counters = self._request_counters[model_id]
@@ -123,7 +123,7 @@ class ModelPerformanceTracker:
             logger.error('Failed to create performance snapshot for {model_id}: %s', e)
             return None
 
-    async def get_model_performance_summary(self, model_id: str, hours: int=24) -> Dict[str, Any]:
+    async def get_model_performance_summary(self, model_id: str, hours: int=24) -> dict[str, Any]:
         """Get comprehensive performance summary for a model"""
         try:
             history = self._performance_history[model_id]
@@ -136,12 +136,12 @@ class ModelPerformanceTracker:
             rps_values = [s.requests_per_second for s in recent_snapshots]
             performance_trend = self._calculate_performance_trend(recent_snapshots)
             degradation_detected, degradation_score = await self._detect_performance_degradation(model_id, recent_snapshots)
-            return {'model_id': model_id, 'period_hours': hours, 'timestamp': aware_utc_now().isoformat(), 'snapshot_count': len(recent_snapshots), 'latency_summary': {'avg_ms': float(np.mean(latencies)), 'min_ms': float(np.min(latencies)), 'max_ms': float(np.max(latencies)), 'p95_ms': float(np.percentile(latencies, 95)), 'p99_ms': float(np.percentile(latencies, 99)), 'std_ms': float(np.std(latencies))}, 'throughput_summary': {'avg_rps': float(np.mean(rps_values)), 'max_rps': float(np.max(rps_values)), 'total_requests': sum((s.sample_count for s in recent_snapshots))}, 'quality_summary': {'avg_success_rate': float(np.mean(success_rates)), 'min_success_rate': float(np.min(success_rates)), 'avg_error_rate': float(np.mean(error_rates)), 'max_error_rate': float(np.max(error_rates))}, 'performance_trend': performance_trend, 'degradation_detected': degradation_detected, 'degradation_score': degradation_score, 'current_status': self._assess_current_performance(recent_snapshots[-1]), 'recommendations': self._generate_performance_recommendations(recent_snapshots, degradation_detected, performance_trend)}
+            return {'model_id': model_id, 'period_hours': hours, 'timestamp': aware_utc_now().isoformat(), 'snapshot_count': len(recent_snapshots), 'latency_summary': {'avg_ms': float(np.mean(latencies)), 'min_ms': float(np.min(latencies)), 'max_ms': float(np.max(latencies)), 'p95_ms': float(np.percentile(latencies, 95)), 'p99_ms': float(np.percentile(latencies, 99)), 'std_ms': float(np.std(latencies))}, 'throughput_summary': {'avg_rps': float(np.mean(rps_values)), 'max_rps': float(np.max(rps_values)), 'total_requests': sum(s.sample_count for s in recent_snapshots)}, 'quality_summary': {'avg_success_rate': float(np.mean(success_rates)), 'min_success_rate': float(np.min(success_rates)), 'avg_error_rate': float(np.mean(error_rates)), 'max_error_rate': float(np.max(error_rates))}, 'performance_trend': performance_trend, 'degradation_detected': degradation_detected, 'degradation_score': degradation_score, 'current_status': self._assess_current_performance(recent_snapshots[-1]), 'recommendations': self._generate_performance_recommendations(recent_snapshots, degradation_detected, performance_trend)}
         except Exception as e:
             logger.error('Failed to get performance summary for {model_id}: %s', e)
             return {'model_id': model_id, 'error': str(e), 'timestamp': aware_utc_now().isoformat()}
 
-    async def get_all_models_performance(self) -> List[Dict[str, Any]]:
+    async def get_all_models_performance(self) -> list[dict[str, Any]]:
         """Get performance summaries for all monitored models"""
         summaries = []
         for model_id in self._performance_history.keys():
@@ -149,7 +149,7 @@ class ModelPerformanceTracker:
             summaries.append(summary)
         return summaries
 
-    def _calculate_performance_trend(self, snapshots: List[PerformanceSnapshot]) -> Dict[str, Any]:
+    def _calculate_performance_trend(self, snapshots: list[PerformanceSnapshot]) -> dict[str, Any]:
         """Calculate performance trend from snapshots"""
         if len(snapshots) < 3:
             return {'trend': 'insufficient_data', 'direction': 'stable'}
@@ -174,7 +174,7 @@ class ModelPerformanceTracker:
             logger.error('Failed to calculate performance trend: %s', e)
             return {'trend': 'error', 'direction': 'unknown'}
 
-    async def _detect_performance_degradation(self, model_id: str, recent_snapshots: List[PerformanceSnapshot]) -> Tuple[bool, float]:
+    async def _detect_performance_degradation(self, model_id: str, recent_snapshots: list[PerformanceSnapshot]) -> tuple[bool, float]:
         """Detect performance degradation using baseline comparison"""
         try:
             if len(recent_snapshots) < 5:
@@ -195,7 +195,7 @@ class ModelPerformanceTracker:
             logger.error('Failed to detect performance degradation: %s', e)
             return (False, 0.0)
 
-    async def _establish_performance_baseline(self, model_id: str, snapshots: List[PerformanceSnapshot]) -> Optional[Dict[str, float]]:
+    async def _establish_performance_baseline(self, model_id: str, snapshots: list[PerformanceSnapshot]) -> dict[str, float] | None:
         """Establish performance baseline for a model"""
         try:
             if len(snapshots) < 10:
@@ -210,7 +210,7 @@ class ModelPerformanceTracker:
             logger.error('Failed to establish baseline for {model_id}: %s', e)
             return None
 
-    def _assess_current_performance(self, latest_snapshot: PerformanceSnapshot) -> Dict[str, Any]:
+    def _assess_current_performance(self, latest_snapshot: PerformanceSnapshot) -> dict[str, Any]:
         """Assess current performance status"""
         status = 'good'
         issues = []
@@ -232,7 +232,7 @@ class ModelPerformanceTracker:
             issues.append('Low success rate detected')
         return {'status': status, 'issues': issues, 'metrics': {'avg_latency_ms': latest_snapshot.avg_latency_ms, 'p95_latency_ms': latest_snapshot.p95_latency_ms, 'success_rate': latest_snapshot.success_rate, 'error_rate': latest_snapshot.error_rate, 'requests_per_second': latest_snapshot.requests_per_second}}
 
-    def _generate_performance_recommendations(self, snapshots: List[PerformanceSnapshot], degradation_detected: bool, performance_trend: Dict[str, Any]) -> List[str]:
+    def _generate_performance_recommendations(self, snapshots: list[PerformanceSnapshot], degradation_detected: bool, performance_trend: dict[str, Any]) -> list[str]:
         """Generate performance optimization recommendations"""
         recommendations = []
         if not snapshots:
@@ -258,7 +258,7 @@ class ModelPerformanceTracker:
         if not recommendations:
             recommendations.append('✅ Performance metrics within normal ranges')
         return recommendations
-_performance_tracker: Optional[ModelPerformanceTracker] = None
+_performance_tracker: ModelPerformanceTracker | None = None
 
 async def get_performance_tracker() -> ModelPerformanceTracker:
     """Get or create global performance tracker instance"""

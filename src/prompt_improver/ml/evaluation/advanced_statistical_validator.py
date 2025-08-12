@@ -97,7 +97,7 @@ class AdvancedStatisticalValidator:
         self.min_effect_size = min_effect_size
         self.bootstrap_samples = bootstrap_samples
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for advanced statistical validation (2025 pattern)
 
         Args:
@@ -130,7 +130,7 @@ class AdvancedStatisticalValidator:
                 correction_method = CorrectionMethod(correction_method_str)
             except ValueError:
                 correction_method = CorrectionMethod.BENJAMINI_HOCHBERG
-                logger.warning("Unknown correction method '%s', using benjamini_hochberg", correction_method_str)
+                logger.warning(f"Unknown correction method '{correction_method_str}', using benjamini_hochberg")
             validation_result = self.validate_ab_test(control_data=control_data, treatment_data=treatment_data, test_names=test_names, correction_method=correction_method, validate_assumptions=validate_assumptions, include_bootstrap=include_bootstrap, include_sensitivity=include_sensitivity)
             result = {'primary_test': {'test_name': validation_result.primary_test.test_name, 'statistic': validation_result.primary_test.statistic, 'p_value': validation_result.primary_test.p_value, 'effect_size': validation_result.primary_test.effect_size, 'effect_size_type': validation_result.primary_test.effect_size_type, 'confidence_interval': validation_result.primary_test.confidence_interval, 'power': validation_result.primary_test.power, 'assumptions_met': validation_result.primary_test.assumptions_met}, 'effect_size_analysis': {'magnitude': validation_result.effect_size_magnitude.value, 'practical_significance': validation_result.practical_significance, 'clinical_significance': validation_result.clinical_significance}, 'multiple_testing': {'correction_applied': validation_result.multiple_testing_correction is not None, 'method': correction_method.value, 'family_wise_error_rate': validation_result.multiple_testing_correction.family_wise_error_rate if validation_result.multiple_testing_correction else None, 'false_discovery_rate': validation_result.multiple_testing_correction.false_discovery_rate if validation_result.multiple_testing_correction else None}, 'power_analysis': {'post_hoc_power': validation_result.post_hoc_power, 'prospective_power': validation_result.prospective_power}, 'quality_assessment': {'validation_quality_score': validation_result.validation_quality_score, 'recommendations': validation_result.recommendations, 'warnings': validation_result.warnings}}
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -232,7 +232,7 @@ class AdvancedStatisticalValidator:
                 return 0.0
             return mean_diff / pooled_std
         except Exception as e:
-            logger.warning("Error calculating Cohen's d: %s", e)
+            logger.warning(f"Error calculating Cohen's d: {e}")
             return 0.0
 
     def _calculate_difference_ci(self, control: np.ndarray, treatment: np.ndarray, confidence_level: float=0.95) -> tuple[float, float]:
@@ -468,11 +468,11 @@ class AdvancedStatisticalValidator:
                 if not any(result.multiple_testing_correction.rejected):
                     warnings.append('⚠️ No significant results after multiple testing correction')
             if result.normality_tests:
-                violations = sum((1 for test in result.normality_tests.values() if test.p_value < 0.05))
+                violations = sum(1 for test in result.normality_tests.values() if test.p_value < 0.05)
                 if violations > 0:
                     warnings.append(f'⚠️ {violations} normality assumption violation(s) detected')
             if result.homogeneity_tests:
-                violations = sum((1 for test in result.homogeneity_tests.values() if test.p_value < 0.05))
+                violations = sum(1 for test in result.homogeneity_tests.values() if test.p_value < 0.05)
                 if violations > 0:
                     warnings.append(f'⚠️ {violations} homogeneity assumption violation(s) detected')
             if result.sensitivity_analysis and 'effect_size_comparison' in result.sensitivity_analysis:
@@ -499,7 +499,7 @@ class AdvancedStatisticalValidator:
                 score_components.append(('power', power_score, 0.2))
             assumption_score = 1.0
             if result.normality_tests:
-                violations = sum((1 for test in result.normality_tests.values() if test.p_value < 0.05))
+                violations = sum(1 for test in result.normality_tests.values() if test.p_value < 0.05)
                 assumption_score *= max(0.5, 1.0 - violations * 0.2)
             score_components.append(('assumptions', assumption_score, 0.15))
             robustness_score = 1.0

@@ -29,7 +29,7 @@ class SystemMetrics:
     memory_total: float
     disk_usage: float
     disk_total: float
-    network_io: Dict[str, int]
+    network_io: dict[str, int]
     process_count: int
     thread_count: int
     timestamp: datetime
@@ -44,7 +44,7 @@ class OrchestratorMetrics:
     event_queue_size: int
     event_processing_rate: float
     average_workflow_duration: float
-    resource_utilization: Dict[str, float]
+    resource_utilization: dict[str, float]
     timestamp: datetime
 
 class OrchestratorMonitor:
@@ -65,8 +65,8 @@ class OrchestratorMonitor:
         self.monitor_task = None
         self.current_health = HealthStatus.UNKNOWN
         self.last_health_check = None
-        self.system_metrics_history: List[SystemMetrics] = []
-        self.orchestrator_metrics_history: List[OrchestratorMetrics] = []
+        self.system_metrics_history: list[SystemMetrics] = []
+        self.orchestrator_metrics_history: list[OrchestratorMetrics] = []
         self.cpu_threshold = self.config.get('cpu_threshold', 80.0)
         self.memory_threshold = self.config.get('memory_threshold', 85.0)
         self.disk_threshold = self.config.get('disk_threshold', 90.0)
@@ -254,13 +254,13 @@ class OrchestratorMonitor:
                 await self.event_bus.emit(MLEvent(event_type=EventType.ORCHESTRATOR_ALERT, source='orchestrator_monitor', data={'alert_type': alert_type, 'message': message, 'category': category, 'severity': 'warning', 'timestamp': now.isoformat()}))
             self.last_alerts[alert_type] = now
 
-    async def get_current_status(self) -> Dict[str, Any]:
+    async def get_current_status(self) -> dict[str, Any]:
         """Get current orchestrator status."""
         latest_system = self.system_metrics_history[-1] if self.system_metrics_history else None
         latest_orchestrator = self.orchestrator_metrics_history[-1] if self.orchestrator_metrics_history else None
         return {'health_status': self.current_health.value, 'is_monitoring': self.is_monitoring, 'last_health_check': self.last_health_check.isoformat() if self.last_health_check else None, 'system_metrics': asdict(latest_system) if latest_system else None, 'orchestrator_metrics': asdict(latest_orchestrator) if latest_orchestrator else None, 'metrics_history_count': {'system': len(self.system_metrics_history), 'orchestrator': len(self.orchestrator_metrics_history)}}
 
-    async def get_metrics_history(self, metric_type: str, limit: int=100) -> List[Dict[str, Any]]:
+    async def get_metrics_history(self, metric_type: str, limit: int=100) -> list[dict[str, Any]]:
         """Get metrics history."""
         if metric_type == 'system':
             history = self.system_metrics_history[-limit:]
@@ -271,6 +271,6 @@ class OrchestratorMonitor:
         else:
             return []
 
-    async def get_health_summary(self) -> Dict[str, Any]:
+    async def get_health_summary(self) -> dict[str, Any]:
         """Get health summary."""
         return {'current_health': self.current_health.value, 'last_check': self.last_health_check.isoformat() if self.last_health_check else None, 'monitoring_active': self.is_monitoring, 'alert_thresholds': {'cpu': self.cpu_threshold, 'memory': self.memory_threshold, 'disk': self.disk_threshold, 'queue_size': self.queue_size_threshold}, 'recent_alerts': len([alert_time for alert_time in self.last_alerts.values() if (datetime.now(timezone.utc) - alert_time).total_seconds() < 3600])}

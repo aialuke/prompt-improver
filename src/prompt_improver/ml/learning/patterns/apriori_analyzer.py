@@ -10,7 +10,9 @@ import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
-from ....database import ManagerMode, get_unified_manager
+from ....database import ManagerMode, get_database_services
+from ....repositories.factory import get_ml_repository
+from ....repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
 from ....utils.error_handlers import handle_common_errors as handle_errors
 try:
     from mlxtend.frequent_patterns import apriori, association_rules
@@ -41,16 +43,18 @@ class AprioriAnalyzer:
     - Context features (from the 31-dimensional feature pipeline)
     """
 
-    def __init__(self, db_manager=None, config: Optional[AprioriConfig]=None):
+    def __init__(self, db_manager=None, config: AprioriConfig | None=None, ml_repository: MLRepositoryProtocol | None=None):
         """Initialize the Apriori analyzer.
         
         Args:
-            db_manager: Database connection manager
+            db_manager: Database connection manager (legacy, prefer ml_repository)
             config: Configuration parameters for Apriori algorithm
+            ml_repository: ML repository for clean architecture (preferred over db_manager)
         """
         if not MLXTEND_AVAILABLE:
             raise ImportError('mlxtend library is required. Install with: pip install mlxtend')
-        self.db_manager = db_manager or get_unified_manager(ManagerMode.ML_TRAINING)
+        self.db_manager = db_manager or get_database_services(ManagerMode.ML_TRAINING)
+        self.ml_repository = ml_repository  # Repository injection for clean architecture
         self.config = config or AprioriConfig()
         self.logger = logging.getLogger(__name__)
         self._frequent_itemsets_cache = {}
@@ -58,8 +62,8 @@ class AprioriAnalyzer:
         self._last_analysis_time = None
 
     @handle_errors(return_format='dict')
-    def extract_transactions_from_database(self, window_days: int=30, min_sessions: int=10) -> list[list[str]]:
-        """Extract transaction data from the database for Apriori analysis.
+    async def extract_transactions_from_database(self, window_days: int=30, min_sessions: int=10) -> list[list[str]]:
+        """Extract transaction data using repository pattern for Apriori analysis.
         
         Args:
             window_days: Number of days to look back for session data
@@ -67,6 +71,8 @@ class AprioriAnalyzer:
             
         Returns:
             List of transactions, where each transaction is a list of items
+            
+        Migrated to use repository pattern instead of raw SQL queries.
         """
         if self.db_manager is None:
             self.logger.warning('Database manager not available, returning mock transactions')
@@ -74,16 +80,106 @@ class AprioriAnalyzer:
         cutoff_date = datetime.now() - timedelta(days=window_days)
         query = '\n        SELECT \n            ps.session_id,\n            ps.prompt_text,\n            ps.quality_score,\n            pp.rule_name,\n            pp.performance_score,\n            uf.rating\n        FROM prompt_sessions ps\n        LEFT JOIN prompt_performance pp ON ps.session_id = pp.session_id\n        LEFT JOIN user_feedback uf ON ps.session_id = uf.session_id\n        WHERE ps.created_at > %s\n        ORDER BY ps.session_id, pp.rule_name\n        '
         try:
-            with self.db_manager.get_connection() as conn:
-                df = pd.read_sql_query(query, conn, params=[cutoff_date])
-            if len(df['session_id'].unique()) < min_sessions:
-                self.logger.warning('Insufficient session data: %s sessions', len(df['session_id'].unique()))
+            # Use repository if available, otherwise fall back to legacy approach
+            if self.ml_repository is not None:
+                # Get data using repository pattern
+                characteristic_data = await self.ml_repository.get_prompt_characteristics_batch(
+                    batch_size=min_sessions * 10  # Get more data for better transactions
+                )
+                
+                if len(characteristic_data) < min_sessions:
+                    self.logger.warning(f'Insufficient session data from repository: {len(characteristic_data)} sessions')
+                    return self._generate_mock_transactions()
+                
+                return self._process_repository_transactions(characteristic_data)
+            
+            # Legacy database manager approach
+            elif self.db_manager is not None:
+                with self.db_manager.get_connection() as conn:
+                    df = pd.read_sql_query(query, conn, params=[cutoff_date])
+                if len(df['session_id'].unique()) < min_sessions:
+                    self.logger.warning(f'Insufficient session data: {len(df["session_id"].unique())} sessions')
+                    return self._generate_mock_transactions()
+                return self._process_database_transactions(df)
+            
+            else:
+                self.logger.warning('Neither repository nor database manager available, returning mock transactions')
                 return self._generate_mock_transactions()
-            return self._process_database_transactions(df)
+                
         except Exception as e:
-            self.logger.error('Database query failed: %s, returning mock transactions', e)
+            self.logger.error(f'Transaction extraction failed: {e}, returning mock transactions')
             return self._generate_mock_transactions()
 
+    def _process_repository_transactions(self, characteristic_data: list[dict[str, Any]]) -> list[list[str]]:
+        """Process repository data into transaction format.
+        
+        Args:
+            characteristic_data: List of characteristic data from repository
+            
+        Returns:
+            List of transactions for Apriori analysis
+        """
+        transactions = []
+        
+        for session_data in characteristic_data:
+            transaction = []
+            
+            # Convert improvement score to quality category
+            improvement_score = session_data.get('improvement_score', 0.0)
+            if improvement_score >= 0.8:
+                transaction.append('quality_high')
+            elif improvement_score >= 0.6:
+                transaction.append('quality_medium') 
+            else:
+                transaction.append('quality_low')
+            
+            # Add length category based on prompt length
+            original_prompt = session_data.get('original_prompt', '')
+            prompt_length = len(original_prompt)
+            if prompt_length > 200:
+                transaction.append('length_long')
+            elif prompt_length > 100:
+                transaction.append('length_medium')
+            else:
+                transaction.append('length_short')
+            
+            # Add confidence category
+            confidence = session_data.get('confidence_level', 0.0)
+            if confidence >= 0.8:
+                transaction.append('confidence_high')
+            elif confidence >= 0.6:
+                transaction.append('confidence_medium')
+            else:
+                transaction.append('confidence_low')
+            
+            # Add performance category based on quality score
+            quality_score = session_data.get('quality_score', 0.0)
+            if quality_score >= 0.7:
+                transaction.append('performance_high')
+            elif quality_score >= 0.5:
+                transaction.append('performance_medium')
+            else:
+                transaction.append('performance_low')
+            
+            # Add domain based on prompt characteristics (simplified)
+            if 'technical' in original_prompt.lower() or 'code' in original_prompt.lower():
+                transaction.append('domain_technical')
+            elif 'creative' in original_prompt.lower() or 'story' in original_prompt.lower():
+                transaction.append('domain_creative')
+            else:
+                transaction.append('domain_general')
+            
+            # Add rule indicators (simplified - would need actual rule usage data)
+            if improvement_score > 0.7:
+                transaction.append('rule_clarity')  # Assume clarity rule was effective
+            if prompt_length > 150:
+                transaction.append('rule_specificity')  # Assume specificity rule was used
+            
+            if len(transaction) >= 2:  # Only include transactions with at least 2 items
+                transactions.append(transaction)
+        
+        return transactions
+    
     def _generate_mock_transactions(self) -> list[list[str]]:
         """Generate mock transaction data for testing when database is not available."""
         return [['rule_clarity', 'domain_technical', 'quality_high', 'length_medium'], ['rule_specificity', 'domain_creative', 'quality_medium', 'length_short'], ['rule_clarity', 'rule_specificity', 'quality_high', 'length_long'], ['domain_analytical', 'quality_medium', 'feedback_positive'], ['rule_clarity', 'domain_technical', 'performance_high'], ['rule_specificity', 'quality_high', 'feedback_positive', 'length_medium'], ['domain_creative', 'quality_medium', 'performance_medium'], ['rule_clarity', 'rule_specificity', 'domain_technical', 'quality_high'], ['quality_low', 'domain_general', 'feedback_negative'], ['rule_clarity', 'quality_high', 'performance_high', 'feedback_positive']]
@@ -144,21 +240,21 @@ class AprioriAnalyzer:
         elif question_count == 1:
             characteristics.append('complexity_single_question')
         sequential_patterns = ['step', 'first', 'then', 'next', 'after', 'before', 'finally', 'lastly', 'subsequently']
-        if any((word in text_lower for word in sequential_patterns)):
+        if any(word in text_lower for word in sequential_patterns):
             characteristics.append('complexity_sequential')
         example_patterns = ['example', 'instance', 'like', 'such as', 'for instance', 'e.g.', 'demonstrate', 'illustrate']
-        if any((pattern in text_lower for pattern in example_patterns)):
+        if any(pattern in text_lower for pattern in example_patterns):
             characteristics.append('pattern_examples')
-        if any((word in text_lower for word in ['list', 'bullet', 'numbered', 'format', 'structure', 'organize'])):
+        if any(word in text_lower for word in ['list', 'bullet', 'numbered', 'format', 'structure', 'organize']):
             characteristics.append('pattern_structured')
-        if any((word in text_lower for word in ['compare', 'contrast', 'versus', 'vs', 'difference', 'similar', 'alike'])):
+        if any(word in text_lower for word in ['compare', 'contrast', 'versus', 'vs', 'difference', 'similar', 'alike']):
             characteristics.append('pattern_comparison')
         technical_keywords = ['code', 'programming', 'function', 'method', 'class', 'variable', 'array', 'loop', 'algorithm', 'debug', 'syntax', 'compile', 'execute', 'runtime', 'api', 'framework', 'library', 'module', 'package', 'import', 'export', 'interface', 'database', 'machine learning', 'ml', 'ai', 'artificial intelligence', 'neural network', 'deep learning', 'data science', 'analytics', 'statistics', 'regression', 'classification', 'clustering', 'optimization', 'automation', 'deployment', 'devops', 'cloud', 'microservices', 'containerization', 'kubernetes', 'docker', 'ci/cd', 'git', 'version control', 'integration', 'testing', 'unit test', 'debugging', 'refactoring', 'scalability', 'performance', 'security', 'encryption', 'authentication', 'authorization', 'monitoring', 'logging', 'error handling', 'exception', 'configuration']
         creative_keywords = ['write', 'story', 'creative', 'narrative', 'fiction', 'character', 'plot', 'dialogue', 'poetry', 'poem', 'verse', 'prose', 'script', 'screenplay', 'novel', 'essay', 'blog', 'article', 'content', 'copywriting', 'brainstorm', 'ideate', 'imagine', 'storytelling', 'metaphor', 'symbolism', 'theme', 'genre', 'style', 'voice', 'tone', 'mood', 'setting', 'description', 'imagery']
         analytical_keywords = ['analyze', 'research', 'study', 'investigate', 'examine', 'evaluate', 'assess', 'review', 'survey', 'report', 'findings', 'data', 'statistics', 'trends', 'patterns', 'correlation', 'causation', 'hypothesis', 'methodology', 'conclusion', 'evidence', 'proof', 'verify', 'validate', 'metrics', 'kpi', 'benchmark', 'insights', 'interpretation', 'synthesis', 'critique', 'summarize']
         business_keywords = ['business', 'strategy', 'marketing', 'sales', 'revenue', 'profit', 'roi', 'customer', 'client', 'stakeholder', 'management', 'leadership', 'team', 'project', 'planning', 'execution', 'budget', 'finance', 'investment', 'growth', 'expansion', 'market', 'competition', 'analysis', 'proposal', 'presentation', 'meeting', 'negotiation', 'contract', 'agreement']
         educational_keywords = ['learn', 'teach', 'education', 'explain', 'understand', 'concept', 'theory', 'practice', 'exercise', 'lesson', 'tutorial', 'course', 'training', 'skill', 'knowledge', 'information', 'facts', 'definition', 'clarify', 'simplify', 'beginner', 'advanced', 'intermediate', 'step-by-step', 'guide', 'instruction']
-        domain_scores = {'technical': sum((1 for keyword in technical_keywords if keyword in text_lower)), 'creative': sum((1 for keyword in creative_keywords if keyword in text_lower)), 'analytical': sum((1 for keyword in analytical_keywords if keyword in text_lower)), 'business': sum((1 for keyword in business_keywords if keyword in text_lower)), 'educational': sum((1 for keyword in educational_keywords if keyword in text_lower))}
+        domain_scores = {'technical': sum(1 for keyword in technical_keywords if keyword in text_lower), 'creative': sum(1 for keyword in creative_keywords if keyword in text_lower), 'analytical': sum(1 for keyword in analytical_keywords if keyword in text_lower), 'business': sum(1 for keyword in business_keywords if keyword in text_lower), 'educational': sum(1 for keyword in educational_keywords if keyword in text_lower)}
         max_score = max(domain_scores.values()) if domain_scores.values() else 0
         if max_score == 0:
             characteristics.append('domain_general')
@@ -167,25 +263,25 @@ class AprioriAnalyzer:
             for domain, score in domain_scores.items():
                 if score >= threshold:
                     characteristics.append(f'domain_{domain}')
-        if any((word in text_lower for word in ['how', 'what', 'why', 'when', 'where', 'which'])):
+        if any(word in text_lower for word in ['how', 'what', 'why', 'when', 'where', 'which']):
             characteristics.append('intent_question')
-        if any((word in text_lower for word in ['create', 'make', 'build', 'generate', 'produce', 'develop'])):
+        if any(word in text_lower for word in ['create', 'make', 'build', 'generate', 'produce', 'develop']):
             characteristics.append('intent_creation')
-        if any((word in text_lower for word in ['improve', 'optimize', 'enhance', 'fix', 'solve', 'resolve'])):
+        if any(word in text_lower for word in ['improve', 'optimize', 'enhance', 'fix', 'solve', 'resolve']):
             characteristics.append('intent_improvement')
-        if any((word in text_lower for word in ['explain', 'describe', 'define', 'clarify', 'elaborate'])):
+        if any(word in text_lower for word in ['explain', 'describe', 'define', 'clarify', 'elaborate']):
             characteristics.append('intent_explanation')
-        if any((word in text_lower for word in ['urgent', 'asap', 'immediately', 'priority', 'critical', 'important'])):
+        if any(word in text_lower for word in ['urgent', 'asap', 'immediately', 'priority', 'critical', 'important']):
             characteristics.append('priority_high')
-        elif any((word in text_lower for word in ['quick', 'fast', 'rapid', 'soon'])):
+        elif any(word in text_lower for word in ['quick', 'fast', 'rapid', 'soon']):
             characteristics.append('priority_medium')
         else:
             characteristics.append('priority_normal')
         positive_words = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'perfect']
         negative_words = ['bad', 'terrible', 'awful', 'horrible', 'wrong', 'error', 'problem', 'issue']
-        if any((word in text_lower for word in positive_words)):
+        if any(word in text_lower for word in positive_words):
             characteristics.append('sentiment_positive')
-        elif any((word in text_lower for word in negative_words)):
+        elif any(word in text_lower for word in negative_words):
             characteristics.append('sentiment_negative')
         else:
             characteristics.append('sentiment_neutral')

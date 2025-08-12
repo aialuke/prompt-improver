@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 
 class EventType(Enum):
     """ML Pipeline event types."""
@@ -94,14 +95,14 @@ class EventType(Enum):
     DATABASE_PERFORMANCE_IMPROVED = 'database.performance_improved'
     DATABASE_RESOURCE_ANALYSIS_COMPLETED = 'database.resource_analysis_completed'
 
-class MLEvent(SQLModel):
+class MLEvent(BaseModel):
     """ML Pipeline event."""
     event_type: EventType = Field(description='Type of ML pipeline event')
     source: str = Field(description='Event source component')
-    data: Dict[str, Any] = Field(default_factory=dict, description='Event data payload')
-    timestamp: Optional[datetime] = Field(default=None, description='Event timestamp')
-    event_id: Optional[str] = Field(default=None, description='Unique event identifier')
-    correlation_id: Optional[str] = Field(default=None, description='Correlation ID for event tracing')
+    data: dict[str, Any] = Field(default_factory=dict, description='Event data payload')
+    timestamp: datetime | None = Field(default=None, description='Event timestamp')
+    event_id: str | None = Field(default=None, description='Unique event identifier')
+    correlation_id: str | None = Field(default=None, description='Correlation ID for event tracing')
 
     def model_post_init(self, __context: Any) -> None:
         """Set default values after initialization."""
@@ -111,12 +112,12 @@ class MLEvent(SQLModel):
             ts_str = self.timestamp.strftime('%Y%m%d_%H%M%S_%f')
             self.event_id = f'{self.source}_{ts_str}'
 
-    def to_dict(self) -> Dict[str, Any]:
+    def model_dump(self) -> dict[str, Any]:
         """Convert event to dictionary."""
         return {'event_type': self.event_type.value, 'source': self.source, 'data': self.data, 'timestamp': self.timestamp.isoformat() if self.timestamp else None, 'event_id': self.event_id, 'correlation_id': self.correlation_id}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MLEvent':
+    def from_dict(cls, data: dict[str, Any]) -> 'MLEvent':
         """Create event from dictionary."""
         timestamp = None
         if data.get('timestamp'):

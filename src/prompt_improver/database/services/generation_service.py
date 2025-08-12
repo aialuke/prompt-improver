@@ -3,15 +3,30 @@
 Provides comprehensive database operations for generation metadata,
 performance tracking, and analytics with bulk operations support.
 """
+
 import logging
 import uuid
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
+
 from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
+
+from ...common.error_handling import handle_repository_errors
+from ...common.exceptions import DatabaseError, ValidationError
 from ...utils.datetime_utils import naive_utc_now
-from ..models import GenerationAnalytics, GenerationBatch, GenerationMethodPerformance, GenerationQualityAssessment, GenerationSession, SyntheticDataSample
+from ..models import (
+    GenerationAnalytics,
+    GenerationBatch,
+    GenerationMethodPerformance,
+    GenerationQualityAssessment,
+    GenerationSession,
+    SyntheticDataSample,
+)
+
 logger = logging.getLogger(__name__)
+
 
 class GenerationDatabaseService:
     """Database service for generation metadata and analytics"""
@@ -19,49 +34,197 @@ class GenerationDatabaseService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def create_generation_session(self, generation_method: str, target_samples: int, session_type: str='synthetic_data', training_session_id: str | None=None, configuration: dict[str, Any] | None=None, performance_gaps: dict[str, float] | None=None, focus_areas: list[str] | None=None, quality_threshold: float=0.7) -> GenerationSession:
+    @handle_repository_errors()
+    async def create_generation_session(
+        self,
+        generation_method: str,
+        target_samples: int,
+        session_type: str = "synthetic_data",
+        training_session_id: str | None = None,
+        configuration: dict[str, Any] | None = None,
+        performance_gaps: dict[str, float] | None = None,
+        focus_areas: list[str] | None = None,
+        quality_threshold: float = 0.7,
+    ) -> GenerationSession:
         """Create a new generation session"""
-        session = GenerationSession(session_id=str(uuid.uuid4()), session_type=session_type, training_session_id=training_session_id, generation_method=generation_method, target_samples=target_samples, quality_threshold=quality_threshold, performance_gaps=performance_gaps, focus_areas=focus_areas, configuration=configuration, status='running')
-        self.db_session.add(session)
-        await self.db_session.commit()
-        await self.db_session.refresh(session)
-        logger.info('Created generation session %s for %s samples', session.session_id, target_samples)
-        return session
+        # Input validation
+        if target_samples <= 0:
+            raise ValidationError(
+                "Target samples must be positive",
+                field="target_samples",
+                value=target_samples,
+                validation_rule="positive_integer"
+            )
+        
+        if not generation_method.strip():
+            raise ValidationError(
+                "Generation method cannot be empty",
+                field="generation_method",
+                value=generation_method
+            )
+        
+        if quality_threshold < 0 or quality_threshold > 1:
+            raise ValidationError(
+                "Quality threshold must be between 0 and 1",
+                field="quality_threshold",
+                value=quality_threshold,
+                validation_rule="range_0_to_1"
+            )
+        
+        try:
+            session = GenerationSession(
+                session_id=str(uuid.uuid4()),
+                session_type=session_type,
+                training_session_id=training_session_id,
+                generation_method=generation_method,
+                target_samples=target_samples,
+                quality_threshold=quality_threshold,
+                performance_gaps=performance_gaps,
+                focus_areas=focus_areas,
+                configuration=configuration,
+                status="running",
+            )
+            self.db_session.add(session)
+            await self.db_session.commit()
+            await self.db_session.refresh(session)
+            
+            logger.info(
+                f"Created generation session {session.session_id} for {target_samples} samples"
+            )
+            return session
+            
+        except SQLAlchemyError as exc:
+            await self.db_session.rollback()
+            raise DatabaseError(
+                f"Failed to create generation session: {exc}",
+                operation="create_generation_session",
+                table="generation_sessions"
+            ) from exc
 
-    async def update_session_status(self, session_id: str, status: str, error_message: str | None=None, final_sample_count: int | None=None) -> None:
+    @handle_repository_errors()
+    async def update_session_status(
+        self,
+        session_id: str,
+        status: str,
+        error_message: str | None = None,
+        final_sample_count: int | None = None,
+    ) -> None:
         """Update session status and completion info"""
-        result = await self.db_session.execute(select(GenerationSession).where(GenerationSession.session_id == session_id))
-        session = result.scalar_one_or_none()
-        if not session:
-            raise ValueError(f'Generation session {session_id} not found')
-        session.status = status
-        session.updated_at = naive_utc_now()
-        if status in ['completed', 'failed', 'cancelled']:
-            session.completed_at = naive_utc_now()
-            if session.started_at:
-                duration = (session.completed_at - session.started_at).total_seconds()
-                session.total_duration_seconds = duration
-        if error_message:
-            session.error_message = error_message
-        if final_sample_count is not None:
-            session.final_sample_count = final_sample_count
-        await self.db_session.commit()
-        logger.info('Updated session {session_id} status to %s', status)
+        # Input validation
+        if not session_id.strip():
+            raise ValidationError(
+                "Session ID cannot be empty",
+                field="session_id",
+                value=session_id
+            )
+        
+        if not status.strip():
+            raise ValidationError(
+                "Status cannot be empty",
+                field="status",
+                value=status
+            )
+        
+        valid_statuses = ["running", "completed", "failed", "cancelled", "paused"]
+        if status not in valid_statuses:
+            raise ValidationError(
+                f"Invalid status '{status}'. Must be one of {valid_statuses}",
+                field="status",
+                value=status,
+                validation_rule="enum_status"
+            )
+        
+        try:
+            result = await self.db_session.execute(
+                select(GenerationSession).where(GenerationSession.session_id == session_id)
+            )
+            session = result.scalar_one_or_none()
+            
+            if not session:
+                raise ValidationError(
+                    f"Generation session not found",
+                    field="session_id",
+                    value=session_id,
+                    validation_rule="exists"
+                )
+            
+            session.status = status
+            session.updated_at = naive_utc_now()
+            
+            if status in ["completed", "failed", "cancelled"]:
+                session.completed_at = naive_utc_now()
+                if session.started_at:
+                    duration = (session.completed_at - session.started_at).total_seconds()
+                    session.total_duration_seconds = duration
+            
+            if error_message:
+                session.error_message = error_message
+            
+            if final_sample_count is not None:
+                if final_sample_count < 0:
+                    raise ValidationError(
+                        "Final sample count cannot be negative",
+                        field="final_sample_count",
+                        value=final_sample_count,
+                        validation_rule="non_negative"
+                    )
+                session.final_sample_count = final_sample_count
+                
+            await self.db_session.commit()
+            logger.info(f"Updated session {session_id} status to {status}")
+            
+        except SQLAlchemyError as exc:
+            await self.db_session.rollback()
+            raise DatabaseError(
+                f"Failed to update session status: {exc}",
+                operation="update_session_status",
+                table="generation_sessions",
+                query=f"UPDATE generation_sessions SET status = '{status}' WHERE session_id = '{session_id}'"
+            ) from exc
 
-    async def create_generation_batch(self, session_id: str, batch_number: int, batch_size: int, generation_method: str, samples_requested: int) -> GenerationBatch:
+    async def create_generation_batch(
+        self,
+        session_id: str,
+        batch_number: int,
+        batch_size: int,
+        generation_method: str,
+        samples_requested: int,
+    ) -> GenerationBatch:
         """Create a new generation batch"""
-        batch = GenerationBatch(batch_id=str(uuid.uuid4()), session_id=session_id, batch_number=batch_number, batch_size=batch_size, generation_method=generation_method, samples_requested=samples_requested)
+        batch = GenerationBatch(
+            batch_id=str(uuid.uuid4()),
+            session_id=session_id,
+            batch_number=batch_number,
+            batch_size=batch_size,
+            generation_method=generation_method,
+            samples_requested=samples_requested,
+        )
         self.db_session.add(batch)
         await self.db_session.commit()
         await self.db_session.refresh(batch)
         return batch
 
-    async def update_batch_performance(self, batch_id: str, processing_time_seconds: float, samples_generated: int, samples_filtered: int=0, error_count: int=0, memory_usage_mb: float | None=None, memory_peak_mb: float | None=None, efficiency_score: float | None=None, average_quality_score: float | None=None, diversity_score: float | None=None, batch_metadata: dict[str, Any] | None=None) -> None:
+    async def update_batch_performance(
+        self,
+        batch_id: str,
+        processing_time_seconds: float,
+        samples_generated: int,
+        samples_filtered: int = 0,
+        error_count: int = 0,
+        memory_usage_mb: float | None = None,
+        memory_peak_mb: float | None = None,
+        efficiency_score: float | None = None,
+        average_quality_score: float | None = None,
+        diversity_score: float | None = None,
+        batch_metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Update batch performance metrics"""
-        result = await self.db_session.execute(select(GenerationBatch).where(GenerationBatch.batch_id == batch_id))
+        result = await self.db_session.execute(
+            select(GenerationBatch).where(GenerationBatch.batch_id == batch_id)
+        )
         batch = result.scalar_one_or_none()
         if not batch:
-            raise ValueError(f'Generation batch {batch_id} not found')
+            raise ValueError(f"Generation batch {batch_id} not found")
         batch.processing_time_seconds = processing_time_seconds
         batch.samples_generated = samples_generated
         batch.samples_filtered = samples_filtered
@@ -76,77 +239,216 @@ class GenerationDatabaseService:
         if total_samples > 0:
             batch.success_rate = samples_generated / total_samples
         if processing_time_seconds > 0:
-            batch.throughput_samples_per_sec = samples_generated / processing_time_seconds
+            batch.throughput_samples_per_sec = (
+                samples_generated / processing_time_seconds
+            )
         await self.db_session.commit()
 
-    async def bulk_insert_samples(self, session_id: str, batch_id: str, samples_data: list[dict[str, Any]]) -> list[str]:
+    async def bulk_insert_samples(
+        self, session_id: str, batch_id: str, samples_data: list[dict[str, Any]]
+    ) -> list[str]:
         """Bulk insert synthetic data samples"""
         sample_ids = []
         samples = []
         for sample_data in samples_data:
             sample_id = str(uuid.uuid4())
             sample_ids.append(sample_id)
-            sample = SyntheticDataSample(sample_id=sample_id, session_id=session_id, batch_id=batch_id, feature_vector=sample_data.get('feature_vector', {}), effectiveness_score=sample_data.get('effectiveness_score'), quality_score=sample_data.get('quality_score'), domain_category=sample_data.get('domain_category'), difficulty_level=sample_data.get('difficulty_level'), focus_areas=sample_data.get('focus_areas'), generation_method=sample_data.get('generation_method'), generation_strategy=sample_data.get('generation_strategy'), targeting_info=sample_data.get('targeting_info'))
+            sample = SyntheticDataSample(
+                sample_id=sample_id,
+                session_id=session_id,
+                batch_id=batch_id,
+                feature_vector=sample_data.get("feature_vector", {}),
+                effectiveness_score=sample_data.get("effectiveness_score"),
+                quality_score=sample_data.get("quality_score"),
+                domain_category=sample_data.get("domain_category"),
+                difficulty_level=sample_data.get("difficulty_level"),
+                focus_areas=sample_data.get("focus_areas"),
+                generation_method=sample_data.get("generation_method"),
+                generation_strategy=sample_data.get("generation_strategy"),
+                targeting_info=sample_data.get("targeting_info"),
+            )
             samples.append(sample)
         self.db_session.add_all(samples)
         await self.db_session.commit()
-        logger.info('Bulk inserted {len(samples)} samples for session %s', session_id)
+        logger.info(f"Bulk inserted {len(samples)} samples for session {session_id}")
         return sample_ids
 
-    async def archive_old_samples(self, days_old: int=30, batch_size: int=1000) -> int:
+    async def archive_old_samples(
+        self, days_old: int = 30, batch_size: int = 1000
+    ) -> int:
         """Archive old samples to manage storage (data lifecycle management)"""
         cutoff_date = naive_utc_now() - timedelta(days=days_old)
         total_archived = 0
         while True:
-            result = await self.db_session.execute(select(SyntheticDataSample.id).where(and_(SyntheticDataSample.created_at < cutoff_date, SyntheticDataSample.status == 'active')).limit(batch_size))
+            result = await self.db_session.execute(
+                select(SyntheticDataSample.id)
+                .where(
+                    and_(
+                        SyntheticDataSample.created_at < cutoff_date,
+                        SyntheticDataSample.status == "active",
+                    )
+                )
+                .limit(batch_size)
+            )
             sample_ids = [row[0] for row in result.fetchall()]
             if not sample_ids:
                 break
-            await self.db_session.execute(text("\n                    UPDATE synthetic_data_samples\n                    SET status = 'archived', archived_at = NOW()\n                    WHERE id = ANY(:sample_ids)\n                "), {'sample_ids': sample_ids})
+            await self.db_session.execute(
+                text(
+                    "\n                    UPDATE synthetic_data_samples\n                    SET status = 'archived', archived_at = NOW()\n                    WHERE id = ANY(:sample_ids)\n                "
+                ),
+                {"sample_ids": sample_ids},
+            )
             total_archived += len(sample_ids)
             await self.db_session.commit()
-        logger.info('Archived %s old samples', total_archived)
+        logger.info(f"Archived {total_archived} old samples")
         return total_archived
 
-    async def record_method_performance(self, session_id: str, method_name: str, generation_time_seconds: float, quality_score: float, diversity_score: float, memory_usage_mb: float, success_rate: float, samples_generated: int, performance_gaps_addressed: dict[str, float] | None=None, batch_size: int | None=None, configuration: dict[str, Any] | None=None) -> None:
+    async def record_method_performance(
+        self,
+        session_id: str,
+        method_name: str,
+        generation_time_seconds: float,
+        quality_score: float,
+        diversity_score: float,
+        memory_usage_mb: float,
+        success_rate: float,
+        samples_generated: int,
+        performance_gaps_addressed: dict[str, float] | None = None,
+        batch_size: int | None = None,
+        configuration: dict[str, Any] | None = None,
+    ) -> None:
         """Record performance metrics for a generation method"""
-        performance = GenerationMethodPerformance(method_name=method_name, session_id=session_id, generation_time_seconds=generation_time_seconds, quality_score=quality_score, diversity_score=diversity_score, memory_usage_mb=memory_usage_mb, success_rate=success_rate, samples_generated=samples_generated, performance_gaps_addressed=performance_gaps_addressed, batch_size=batch_size, configuration=configuration)
+        performance = GenerationMethodPerformance(
+            method_name=method_name,
+            session_id=session_id,
+            generation_time_seconds=generation_time_seconds,
+            quality_score=quality_score,
+            diversity_score=diversity_score,
+            memory_usage_mb=memory_usage_mb,
+            success_rate=success_rate,
+            samples_generated=samples_generated,
+            performance_gaps_addressed=performance_gaps_addressed,
+            batch_size=batch_size,
+            configuration=configuration,
+        )
         self.db_session.add(performance)
         await self.db_session.commit()
 
-    async def get_method_performance_history(self, method_name: str, days_back: int=30, limit: int=100) -> list[GenerationMethodPerformance]:
+    async def get_method_performance_history(
+        self, method_name: str, days_back: int = 30, limit: int = 100
+    ) -> list[GenerationMethodPerformance]:
         """Get recent performance history for a method"""
         cutoff_date = naive_utc_now() - timedelta(days=days_back)
-        result = await self.db_session.execute(select(GenerationMethodPerformance).where(and_(GenerationMethodPerformance.method_name == method_name, GenerationMethodPerformance.recorded_at >= cutoff_date)).order_by(desc(GenerationMethodPerformance.recorded_at)).limit(limit))
+        result = await self.db_session.execute(
+            select(GenerationMethodPerformance)
+            .where(
+                and_(
+                    GenerationMethodPerformance.method_name == method_name,
+                    GenerationMethodPerformance.recorded_at >= cutoff_date,
+                )
+            )
+            .order_by(desc(GenerationMethodPerformance.recorded_at))
+            .limit(limit)
+        )
         return result.scalars().all()
 
-    async def record_quality_assessment(self, session_id: str, assessment_type: str, overall_quality_score: float, samples_assessed: int, samples_passed: int, samples_failed: int, batch_id: str | None=None, assessment_results: dict[str, Any] | None=None, recommendations: list[str] | None=None) -> GenerationQualityAssessment:
+    async def record_quality_assessment(
+        self,
+        session_id: str,
+        assessment_type: str,
+        overall_quality_score: float,
+        samples_assessed: int,
+        samples_passed: int,
+        samples_failed: int,
+        batch_id: str | None = None,
+        assessment_results: dict[str, Any] | None = None,
+        recommendations: list[str] | None = None,
+    ) -> GenerationQualityAssessment:
         """Record quality assessment results"""
-        assessment = GenerationQualityAssessment(assessment_id=str(uuid.uuid4()), session_id=session_id, batch_id=batch_id, assessment_type=assessment_type, overall_quality_score=overall_quality_score, samples_assessed=samples_assessed, samples_passed=samples_passed, samples_failed=samples_failed, assessment_results=assessment_results, recommendations=recommendations)
+        assessment = GenerationQualityAssessment(
+            assessment_id=str(uuid.uuid4()),
+            session_id=session_id,
+            batch_id=batch_id,
+            assessment_type=assessment_type,
+            overall_quality_score=overall_quality_score,
+            samples_assessed=samples_assessed,
+            samples_passed=samples_passed,
+            samples_failed=samples_failed,
+            assessment_results=assessment_results,
+            recommendations=recommendations,
+        )
         self.db_session.add(assessment)
         await self.db_session.commit()
         await self.db_session.refresh(assessment)
         return assessment
 
-    async def get_generation_statistics(self, days_back: int=7) -> dict[str, Any]:
+    async def get_generation_statistics(self, days_back: int = 7) -> dict[str, Any]:
         """Get comprehensive generation statistics"""
         cutoff_date = naive_utc_now() - timedelta(days=days_back)
-        session_stats = await self.db_session.execute(select(func.count(GenerationSession.id).label('total_sessions'), func.sum(GenerationSession.samples_generated).label('total_samples'), func.avg(GenerationSession.average_quality_score).label('avg_quality'), func.avg(GenerationSession.generation_efficiency).label('avg_efficiency')).where(GenerationSession.started_at >= cutoff_date))
+        session_stats = await self.db_session.execute(
+            select(
+                func.count(GenerationSession.id).label("total_sessions"),
+                func.sum(GenerationSession.samples_generated).label("total_samples"),
+                func.avg(GenerationSession.average_quality_score).label("avg_quality"),
+                func.avg(GenerationSession.generation_efficiency).label(
+                    "avg_efficiency"
+                ),
+            ).where(GenerationSession.started_at >= cutoff_date)
+        )
         stats = session_stats.first()
-        method_stats = await self.db_session.execute(select(GenerationMethodPerformance.method_name, func.count().label('executions'), func.avg(GenerationMethodPerformance.quality_score).label('avg_quality'), func.avg(GenerationMethodPerformance.success_rate).label('avg_success_rate')).where(GenerationMethodPerformance.recorded_at >= cutoff_date).group_by(GenerationMethodPerformance.method_name))
-        method_performance = {row[0]: {'executions': row[1], 'avg_quality': row[2], 'avg_success_rate': row[3]} for row in method_stats.fetchall()}
-        return {'period_days': days_back, 'total_sessions': stats[0] or 0, 'total_samples_generated': stats[1] or 0, 'average_quality_score': float(stats[2]) if stats[2] else 0.0, 'average_efficiency': float(stats[3]) if stats[3] else 0.0, 'method_performance': method_performance, 'generated_at': naive_utc_now().isoformat()}
+        method_stats = await self.db_session.execute(
+            select(
+                GenerationMethodPerformance.method_name,
+                func.count().label("executions"),
+                func.avg(GenerationMethodPerformance.quality_score).label(
+                    "avg_quality"
+                ),
+                func.avg(GenerationMethodPerformance.success_rate).label(
+                    "avg_success_rate"
+                ),
+            )
+            .where(GenerationMethodPerformance.recorded_at >= cutoff_date)
+            .group_by(GenerationMethodPerformance.method_name)
+        )
+        method_performance = {
+            row[0]: {
+                "executions": row[1],
+                "avg_quality": row[2],
+                "avg_success_rate": row[3],
+            }
+            for row in method_stats.fetchall()
+        }
+        return {
+            "period_days": days_back,
+            "total_sessions": stats[0] or 0,
+            "total_samples_generated": stats[1] or 0,
+            "average_quality_score": float(stats[2]) if stats[2] else 0.0,
+            "average_efficiency": float(stats[3]) if stats[3] else 0.0,
+            "method_performance": method_performance,
+            "generated_at": naive_utc_now().isoformat(),
+        }
 
-    async def cleanup_old_data(self, days_to_keep: int=90) -> dict[str, int]:
+    async def cleanup_old_data(self, days_to_keep: int = 90) -> dict[str, int]:
         """Clean up old generation data (data lifecycle management)"""
         cutoff_date = naive_utc_now() - timedelta(days=days_to_keep)
         cleanup_stats = {}
-        result = await self.db_session.execute(text('DELETE FROM generation_quality_assessments WHERE assessed_at < :cutoff_date'), {'cutoff_date': cutoff_date})
-        cleanup_stats['quality_assessments_deleted'] = result.rowcount
-        result = await self.db_session.execute(text('DELETE FROM generation_method_performance WHERE recorded_at < :cutoff_date'), {'cutoff_date': cutoff_date})
-        cleanup_stats['method_performance_deleted'] = result.rowcount
+        result = await self.db_session.execute(
+            text(
+                "DELETE FROM generation_quality_assessments WHERE assessed_at < :cutoff_date"
+            ),
+            {"cutoff_date": cutoff_date},
+        )
+        cleanup_stats["quality_assessments_deleted"] = result.rowcount
+        result = await self.db_session.execute(
+            text(
+                "DELETE FROM generation_method_performance WHERE recorded_at < :cutoff_date"
+            ),
+            {"cutoff_date": cutoff_date},
+        )
+        cleanup_stats["method_performance_deleted"] = result.rowcount
         archived_count = await self.archive_old_samples(days_to_keep)
-        cleanup_stats['samples_archived'] = archived_count
+        cleanup_stats["samples_archived"] = archived_count
         await self.db_session.commit()
-        logger.info('Cleaned up old generation data: %s', cleanup_stats)
+        logger.info(f"Cleaned up old generation data: {cleanup_stats}")
         return cleanup_stats

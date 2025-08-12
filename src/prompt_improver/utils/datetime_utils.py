@@ -7,7 +7,9 @@ Key functions:
 - naive_utc_now(): Returns naive UTC datetime for database compatibility
 - aware_utc_now(): Returns timezone-aware UTC datetime for services/logging
 """
+
 from datetime import UTC, datetime
+
 
 def naive_utc_now() -> datetime:
     """Get current UTC time as a naive datetime object.
@@ -25,6 +27,7 @@ def naive_utc_now() -> datetime:
         True
     """
     return datetime.now(UTC).replace(tzinfo=None)
+
 
 def aware_utc_now() -> datetime:
     """Get current UTC time as a timezone-aware datetime object.
@@ -45,6 +48,7 @@ def aware_utc_now() -> datetime:
     """
     return datetime.now(UTC)
 
+
 def naive_utc_from_timestamp(timestamp: float) -> datetime:
     """Convert Unix timestamp to naive UTC datetime.
 
@@ -64,6 +68,7 @@ def naive_utc_from_timestamp(timestamp: float) -> datetime:
     """
     return datetime.fromtimestamp(timestamp, UTC).replace(tzinfo=None)
 
+
 def aware_utc_from_timestamp(timestamp: float) -> datetime:
     """Convert Unix timestamp to timezone-aware UTC datetime.
 
@@ -82,6 +87,7 @@ def aware_utc_from_timestamp(timestamp: float) -> datetime:
         True
     """
     return datetime.fromtimestamp(timestamp, UTC)
+
 
 def ensure_naive_utc(dt: datetime) -> datetime:
     """Ensure datetime is naive UTC.
@@ -105,6 +111,7 @@ def ensure_naive_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt
     return dt.astimezone(UTC).replace(tzinfo=None)
+
 
 def ensure_aware_utc(dt: datetime) -> datetime:
     """Ensure datetime is timezone-aware UTC.

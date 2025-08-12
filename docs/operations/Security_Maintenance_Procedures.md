@@ -1,5 +1,5 @@
 # Security Maintenance Procedures
-**Comprehensive Security Management for UnifiedConnectionManager**
+**Comprehensive Security Management for DatabaseServices**
 
 **Version**: 2025.1  
 **Authority**: Security Operations Team  
@@ -10,7 +10,7 @@
 
 ## 🎯 Executive Summary
 
-This document provides comprehensive security maintenance procedures for the UnifiedConnectionManager system, ensuring the **4 CVSS vulnerabilities** (9.1, 8.7, 7.8, 7.5) remain fixed and the system maintains its security posture through ongoing operations.
+This document provides comprehensive security maintenance procedures for the DatabaseServices system, ensuring the **4 CVSS vulnerabilities** (9.1, 8.7, 7.8, 7.5) remain fixed and the system maintains its security posture through ongoing operations.
 
 ### Security Achievements
 - ✅ **CVSS 9.1 - Missing Redis Authentication**: FIXED with mandatory authentication
@@ -612,11 +612,11 @@ echo "   Configuration reload required"
 echo "4. Testing new credentials..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_credentials():
     try:
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        manager = get_database_services(ManagerMode.ASYNC_MODERN)
         await manager.initialize()
         
         # Test Redis
@@ -672,11 +672,11 @@ echo "   Restarting services with new credentials..."
 echo "3. Emergency verification..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def emergency_test():
     print('   Testing emergency credentials...')
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Quick verification
@@ -868,7 +868,7 @@ def generate_weekly_security_report():
             "type": "Weekly Security Report",
             "period": f"{week_start.strftime('%Y-%m-%d')} to {report_date.strftime('%Y-%m-%d')}",
             "generated": report_date.isoformat(),
-            "system": "UnifiedConnectionManager"
+            "system": "DatabaseServices"
         },
         "security_status": {
             "overall": "SECURE",
@@ -1063,7 +1063,7 @@ escalation:
 #### **Security Documentation References**
 - [Redis Consolidation Standard 2025](/REDIS_CONSOLIDATION_STANDARD_2025.md)
 - [Redis Security Fixes Summary](/REDIS_SECURITY_FIXES_SUMMARY.md)
-- [UnifiedConnectionManager Operational Runbook](/docs/operations/UnifiedConnectionManager_Operational_Runbook.md)
+- [DatabaseServices Operational Runbook](/docs/operations/UnifiedConnectionManager_Operational_Runbook.md)
 - [OWASP Security Guidelines](https://owasp.org/)
 - [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
 

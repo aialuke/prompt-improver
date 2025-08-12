@@ -16,9 +16,9 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from prompt_improver.database.unified_connection_manager import (
+from prompt_improver.database import (
     ManagerMode,
-    get_unified_manager,
+    get_database_services,
 )
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class IndexHealthAssessor:
     async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return get_unified_manager(ManagerMode.ASYNC_MODERN)
+            return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def assess_index_health(self) -> IndexHealthReport:
@@ -148,12 +148,12 @@ class IndexHealthAssessor:
             )
 
             assessment_time = (time.perf_counter() - start_time) * 1000
-            logger.info("Index health assessment completed in %sms", assessment_time:.2f)
+            logger.info("Index health assessment completed in %.2fms", assessment_time)
 
             return report
 
         except Exception as e:
-            logger.error("Index health assessment failed: %s", e)
+            logger.error(f"Index health assessment failed: {e}")
             report = IndexHealthReport()
             report.maintenance_recommendations = [f"Assessment failed: {e}"]
             return report
@@ -371,7 +371,7 @@ class IndexHealthAssessor:
                     suggestions.append(suggestion)
 
         except Exception as e:
-            logger.error("Failed to generate missing index suggestions: %s", e)
+            logger.error(f"Failed to generate missing index suggestions: {e}")
 
         return suggestions
 
@@ -508,7 +508,7 @@ class IndexHealthAssessor:
             }
 
         except Exception as e:
-            logger.error("Failed to get index health summary: %s", e)
+            logger.error(f"Failed to get index health summary: {e}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -594,7 +594,7 @@ class IndexHealthAssessor:
                 }
 
         except Exception as e:
-            logger.error("Index redundancy analysis failed: %s", e)
+            logger.error(f"Index redundancy analysis failed: {e}")
             return {"error": str(e)}
 
     def _get_redundancy_recommendation(self, row) -> str:

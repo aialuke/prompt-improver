@@ -1,0 +1,19 @@
+{
+  "hot_path_performance": {
+    "operations": 100000,
+    "time_per_op_us": 1.3775266701122746,
+    "ops_per_sec": 725938.7579904319,
+    "targets": {
+      "10k_ops_sec": true,
+      "100k_ops_sec": true,
+      "sub_10us_op": true
+    }
+  },
+  "comparison_with_json": {
+    "json_time_per_op_us": 4.069290840416215,
+    "msgspec_time_per_op_us": 1.2316274998011068,
+    "improvement_factor": 3.30399478825648,
+    "throughput_improvement": 3.30399478825648
+  },
+  "timestamp": "2025-08-10 01:52:17 UTC"
+}

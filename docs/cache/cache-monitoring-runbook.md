@@ -2,7 +2,7 @@
 
 ## Overview
 
-This runbook provides comprehensive operational guidance for the unified cache monitoring system that monitors all 34 consolidated cache implementations now integrated into UnifiedConnectionManager.
+This runbook provides comprehensive operational guidance for the unified cache monitoring system that monitors all 34 consolidated cache implementations now integrated into DatabaseServices.
 
 ## System Architecture
 
@@ -27,10 +27,10 @@ This runbook provides comprehensive operational guidance for the unified cache m
 
 ```python
 from prompt_improver.monitoring.cache import initialize_comprehensive_cache_monitoring
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 # Get unified manager instance
-unified_manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+unified_manager = get_database_services(ManagerMode.ASYNC_MODERN)
 
 # Initialize comprehensive monitoring
 await initialize_comprehensive_cache_monitoring(unified_manager)
@@ -312,9 +312,9 @@ print(f"L1 Usage: {l1_usage['count']} entries, {l1_usage['size_bytes']} bytes")
 
 ```python
 # Check L2 cache health
-if unified_manager._redis_master:
+if unified_manager.cache.redis_client:
     try:
-        await unified_manager._redis_master.ping()
+        await unified_manager.cache.redis_client.ping()
         print("Redis connection healthy")
     except Exception as e:
         print(f"Redis connection failed: {e}")

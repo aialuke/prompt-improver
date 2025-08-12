@@ -1,0 +1,305 @@
+name: Testing Architecture Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # Unit Tests - Fast, isolated, highly parallel
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install pytest-xdist pytest-timeout
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ \
+          -m unit \
+          -v \
+          --tb=short \
+          --timeout=5 \
+          -n 8 \
+          --cov=src/prompt_improver \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-fail-under=90
+    
+    - name: Upload unit test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unit-tests
+        name: unit-tests-coverage
+
+  # Integration Tests - Service boundaries with test containers
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install pytest-xdist pytest-timeout testcontainers
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ \
+          -m integration \
+          -v \
+          --tb=short \
+          --timeout=30 \
+          -n 4 \
+          --cov=src/prompt_improver \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-fail-under=85
+    
+    - name: Upload integration test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: integration-tests
+        name: integration-tests-coverage
+
+  # Contract Tests - API and protocol validation
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    
+    services:
+      # Start actual services for contract testing
+      api-server:
+        image: python:3.12-slim
+        ports:
+          - 8000:8000
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install pytest-timeout jsonschema requests
+    
+    - name: Start test API server
+      run: |
+        python -m prompt_improver.api.app &
+        sleep 10  # Wait for server startup
+      env:
+        TESTING: true
+        DATABASE_URL: sqlite:///test.db
+        REDIS_URL: redis://localhost:6379
+    
+    - name: Run contract tests
+      run: |
+        pytest tests/contract/ \
+          -m contract \
+          -v \
+          --tb=short \
+          --timeout=60 \
+          -n 2
+      env:
+        TEST_API_BASE_URL: http://localhost:8000
+    
+    - name: Upload contract test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: contract-test-results
+        path: contract-test-results.xml
+
+  # E2E Tests - Full workflow validation
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        options: >
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install pytest-timeout docker selenium webdriver-manager
+    
+    - name: Set up Chrome for UI tests
+      uses: browser-actions/setup-chrome@latest
+    
+    - name: Start full system
+      run: |
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 30  # Wait for full system startup
+    
+    - name: Run E2E tests
+      run: |
+        pytest tests/e2e/ \
+          -m e2e \
+          -v \
+          --tb=short \
+          --timeout=300 \
+          --durations=10
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+        TEST_API_BASE_URL: http://localhost:8000
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+    
+    - name: Upload E2E test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: e2e-test-results
+        path: |
+          test-results/
+          screenshots/
+
+  # Performance Tests - Validate performance requirements
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        pip install pytest-benchmark pytest-timeout
+    
+    - name: Run performance tests
+      run: |
+        pytest tests/ \
+          -m performance \
+          -v \
+          --tb=short \
+          --timeout=300 \
+          --benchmark-json=benchmark-results.json
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: benchmark-results.json
+
+  # Test Summary - Aggregate results
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, contract-tests, e2e-tests]
+    if: always()
+    
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Category | Status | Coverage |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Unit Tests | ${{ needs.unit-tests.result }} | 90%+ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Tests | ${{ needs.integration-tests.result }} | 85%+ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Contract Tests | ${{ needs.contract-tests.result }} | Schema Validation |" >> $GITHUB_STEP_SUMMARY
+        echo "| E2E Tests | ${{ needs.e2e-tests.result }} | Workflow Validation |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.unit-tests.result }}" == "success" ] && \
+           [ "${{ needs.integration-tests.result }}" == "success" ] && \
+           [ "${{ needs.contract-tests.result }}" == "success" ] && \
+           [ "${{ needs.e2e-tests.result }}" == "success" ]; then
+          echo "✅ All test categories passed successfully!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Some test categories failed. Please review the logs." >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Fail if critical tests failed
+      if: needs.unit-tests.result != 'success' || needs.integration-tests.result != 'success'
+      run: |
+        echo "Critical tests (unit or integration) failed"
+        exit 1

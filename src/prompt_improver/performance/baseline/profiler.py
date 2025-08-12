@@ -7,7 +7,6 @@ import io
 import logging
 import pstats
 import sys
-import threading
 import time
 import tracemalloc
 import uuid
@@ -126,7 +125,7 @@ class FunctionCallData:
         """Get average call time."""
         return self.total_time / self.call_count if self.call_count > 0 else 0.0
 
-    def to_dict(self) -> dict[str, Any]:
+    def model_dump(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "function_name": self.function_name,
@@ -159,7 +158,7 @@ class ContinuousProfiler:
         self.config = config or ProfilerConfig()
         self._running = False
         self._profiling_task: asyncio.Task | None = None
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
 
         # Profiling state
         self._current_profile: cProfile.Profile | None = None
@@ -294,8 +293,10 @@ def profile_block(name: str = "block"):
         stats.sort_stats("cumulative")
         stats.print_stats(20)  # Top 20 functions
 
-        logger.info("Profile block '{name}' completed in %ss", end_time - start_time:.3f)
-        logger.debug("Profile output:\n%s", stream.getvalue())
+        logger.info(
+            "Profile block '%s' completed in %.3fs", name, end_time - start_time
+        )
+        logger.debug(f"Profile output:\n{stream.getvalue()}")
 
 
 @asynccontextmanager
@@ -320,7 +321,7 @@ async def profile_async_block(name: str = "async_block"):
         logger.info(
             f"Async profile block '{name}' completed in {end_time - start_time:.3f}s"
         )
-        logger.debug("Profile output:\n%s", stream.getvalue())
+        logger.debug(f"Profile output:\n{stream.getvalue()}")
 
 
 # Decorator for profiling functions

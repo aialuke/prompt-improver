@@ -8,7 +8,7 @@ The APES system had evolved to contain 5 separate connection management systems,
 
 ### Existing Connection Managers
 1. **HAConnectionManager**: High availability and failover capabilities
-2. **UnifiedConnectionManager**: Multi-mode access control and optimization  
+2. **DatabaseServices**: Multi-mode access control and optimization  
 3. **DatabaseManager**: Synchronous database operations (16 usage locations)
 4. **DatabaseSessionManager**: Modern async SQLAlchemy 2.0 operations
 5. **RegistryManager**: SQLAlchemy registry management and conflict resolution
@@ -35,7 +35,7 @@ HAConnectionManager: 7 locations
 ├── Health monitoring: 2 usages
 └── Failover testing: 1 usage
 
-UnifiedConnectionManager: 12 locations
+DatabaseServices: 12 locations
 ├── MCP server: 5 usages
 ├── Performance monitoring: 4 usages
 ├── Analytics: 2 usages
@@ -43,7 +43,7 @@ UnifiedConnectionManager: 12 locations
 ```
 
 ## Decision
-We will implement a **Unified Connection Manager V2** that consolidates all connection management functionality into a single, protocol-based system:
+We will implement a **database services V2** that consolidates all connection management functionality into a single, protocol-based system:
 
 ### Core Architecture
 
@@ -71,7 +71,7 @@ class ConnectionManagerProtocol(Protocol):
 
 #### 2. Composition-Based Implementation
 ```python
-class UnifiedConnectionManagerV2:
+class DatabaseServices:
     """Consolidates all connection management features"""
     
     def __init__(self, config: DatabaseConfig):
@@ -107,7 +107,7 @@ class UnifiedConnectionManagerV2:
 
 #### Layer Structure
 ```
-UnifiedConnectionManagerV2/
+DatabaseServices/
 ├── core/
 │   ├── manager.py              # Main manager class
 │   ├── protocol.py             # Interface definitions
@@ -178,7 +178,7 @@ class UnifiedDatabaseConfig:
 - Establish configuration schema
 
 #### Phase 2: Core Implementation
-- Implement `UnifiedConnectionManagerV2` class
+- Implement `DatabaseServices` class
 - Integrate pooling and connection management
 - Add basic health monitoring
 
@@ -203,10 +203,10 @@ class UnifiedDatabaseConfig:
 class DatabaseManagerAdapter:
     """Adapter for legacy DatabaseManager usage"""
     
-    def __init__(self, unified_manager: UnifiedConnectionManagerV2):
+    def __init__(self, unified_manager: DatabaseServices):
         self._manager = unified_manager
         warnings.warn(
-            "DatabaseManager is deprecated. Use UnifiedConnectionManagerV2",
+            "DatabaseManager is deprecated. Use DatabaseServices",
             DeprecationWarning,
             stacklevel=2
         )
@@ -277,7 +277,7 @@ Phase 5: Migration & Cleanup     🔄 In Progress
 Usage Migration Status:
 - DatabaseManager: 16/16 locations migrated
 - HAConnectionManager: 7/7 locations migrated
-- UnifiedConnectionManager: 12/12 locations migrated
+- DatabaseServices: 12/12 locations migrated
 - DatabaseSessionManager: 8/8 locations migrated
 - RegistryManager: 5/5 locations migrated
 ```

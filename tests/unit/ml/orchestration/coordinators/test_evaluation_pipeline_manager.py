@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 import pytest
+from prompt_improver.ml.orchestration.metrics import EvaluationMetrics, EvaluationType
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.ml.orchestration.coordinators.evaluation_pipeline_manager import EvaluationPipelineManager
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import PipelineState
@@ -142,7 +143,7 @@ class TestEvaluationPipelineManager:
         tasks = [manager.start_evaluation_pipeline(eval_id, parameters) for eval_id in evaluation_ids]
         evaluations = await asyncio.gather(*tasks)
         assert len(evaluations) == 3
-        assert all((e.state == WorkflowState.RUNNING for e in evaluations))
+        assert all(e.state == WorkflowState.RUNNING for e in evaluations)
         active = await manager.list_active_evaluations()
         assert len(active) == 3
 
@@ -190,7 +191,7 @@ class TestEvaluationMetrics:
     def test_metrics_serialization(self):
         """Test metrics to/from dict conversion."""
         metrics = EvaluationMetrics(workflow_id='serialize-eval', evaluation_type=EvaluationType.STATISTICAL_VALIDATION, accuracy=0.88, precision=0.85, recall=0.9, f1_score=0.875, statistical_significance=False, p_value=0.08, effect_size=0.05)
-        metrics_dict = metrics.to_dict()
+        metrics_dict = metrics.model_dump()
         restored_metrics = EvaluationMetrics.from_dict(metrics_dict)
         assert restored_metrics.workflow_id == metrics.workflow_id
         assert restored_metrics.evaluation_type == metrics.evaluation_type

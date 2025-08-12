@@ -19,6 +19,7 @@ import logging
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 from scipy import stats
@@ -39,7 +40,7 @@ class AlphaSpendingFunction(Enum):
     WANG_TSIATIS = 'wang_tsiatis'
     CUSTOM = 'custom'
 
-class EarlyStoppingConfig(SQLModel):
+class EarlyStoppingConfig(BaseModel):
     """Configuration for early stopping mechanisms"""
     alpha: float = Field(default=0.05, gt=0.0, lt=1.0, description='Type I error rate')
     beta: float = Field(default=0.2, gt=0.0, lt=1.0, description='Type II error rate (1 - power)')
@@ -47,17 +48,17 @@ class EarlyStoppingConfig(SQLModel):
     effect_size_h1: float = Field(default=0.1, description='Alternative hypothesis effect size')
     max_looks: int = Field(default=10, ge=1, description='Maximum number of interim analyses')
     alpha_spending_function: AlphaSpendingFunction = Field(default=AlphaSpendingFunction.OBRIEN_FLEMING, description='Alpha spending function type')
-    information_fraction: List[float] = Field(default_factory=list, description='Custom timing fractions')
+    information_fraction: list[float] = Field(default_factory=list, description='Custom timing fractions')
     enable_futility_stopping: bool = Field(default=True, description='Enable futility stopping')
     futility_threshold: float = Field(default=0.1, ge=0.0, le=1.0, description='Conditional power threshold')
     min_sample_size: int = Field(default=30, ge=1, description='Minimum samples before stopping')
     max_duration_minutes: int = Field(default=60, ge=1, description='Maximum test duration')
     min_effect_detectable: float = Field(default=0.05, gt=0.0, description='Minimum detectable effect')
     enable_mixture_sprt: bool = Field(default=False, description='Enable mixture SPRT')
-    mixture_weights: List[float] = Field(default_factory=lambda: [0.5, 0.5], description='Mixture component weights')
-    mixture_effects: List[float] = Field(default_factory=lambda: [0.1, 0.2], description='Mixture effect sizes')
+    mixture_weights: list[float] = Field(default_factory=lambda: [0.5, 0.5], description='Mixture component weights')
+    mixture_effects: list[float] = Field(default_factory=lambda: [0.1, 0.2], description='Mixture effect sizes')
 
-class SPRTBounds(SQLModel):
+class SPRTBounds(BaseModel):
     """SPRT decision boundaries"""
     lower_bound: float = Field(description='Lower boundary - accept null hypothesis')
     upper_bound: float = Field(description='Upper boundary - accept alternative hypothesis')
@@ -65,16 +66,16 @@ class SPRTBounds(SQLModel):
     samples_analyzed: int = Field(ge=0, description='Number of samples analyzed')
     decision: StoppingDecision = Field(description='Current stopping decision')
 
-class GroupSequentialBounds(SQLModel):
+class GroupSequentialBounds(BaseModel):
     """Group sequential design boundaries"""
     look_number: int = Field(ge=1, description='Current look/analysis number')
     information_fraction: float = Field(ge=0.0, le=1.0, description='Fraction of total information')
     alpha_spent: float = Field(ge=0.0, le=1.0, description='Cumulative alpha spent')
     rejection_boundary: float = Field(description='Statistical boundary for rejection')
-    futility_boundary: Optional[float] = Field(default=None, description='Statistical boundary for futility')
+    futility_boundary: float | None = Field(default=None, description='Statistical boundary for futility')
     decision: StoppingDecision = Field(description='Current stopping decision')
 
-class EarlyStoppingResult(SQLModel):
+class EarlyStoppingResult(BaseModel):
     """Result of early stopping analysis"""
     test_id: str = Field(description='Test identifier')
     look_number: int = Field(ge=1, description='Analysis look number')
@@ -84,8 +85,8 @@ class EarlyStoppingResult(SQLModel):
     p_value: float = Field(ge=0.0, le=1.0, description='P-value from statistical test')
     effect_size: float = Field(description='Estimated effect size')
     conditional_power: float = Field(ge=0.0, le=1.0, description='Conditional power for continuation')
-    sprt_bounds: Optional[SPRTBounds] = Field(default=None, description='SPRT boundary results')
-    group_sequential_bounds: Optional[GroupSequentialBounds] = Field(default=None, description='Group sequential boundary results')
+    sprt_bounds: SPRTBounds | None = Field(default=None, description='SPRT boundary results')
+    group_sequential_bounds: GroupSequentialBounds | None = Field(default=None, description='Group sequential boundary results')
     decision: StoppingDecision = Field(default=StoppingDecision.CONTINUE, description='Stopping decision')
     stop_for_efficacy: bool = Field(default=False, description='Whether stopping for efficacy')
     stop_for_futility: bool = Field(default=False, description='Whether stopping for futility')
@@ -107,7 +108,7 @@ class AdvancedEarlyStoppingFramework:
         self.experiment_state: dict[str, dict[str, Any]] = {}
         self.stopping_history: list[EarlyStoppingResult] = []
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for early stopping analysis (2025 pattern)
 
         Args:
@@ -142,7 +143,7 @@ class AdvancedEarlyStoppingFramework:
                 alpha_spending_function = AlphaSpendingFunction(alpha_spending_str)
             except ValueError:
                 alpha_spending_function = AlphaSpendingFunction.OBRIEN_FLEMING
-                self.logger.warning("Unknown alpha spending function '%s', using obrien_fleming", alpha_spending_str)
+                self.logger.warning(f"Unknown alpha spending function '{alpha_spending_str}', using obrien_fleming")
             if stopping_criteria:
                 if 'alpha' in stopping_criteria:
                     self.config.alpha = stopping_criteria['alpha']

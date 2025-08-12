@@ -66,7 +66,7 @@ async def test_automl_background_integration():
                 "data": event.data,
                 "timestamp": event.timestamp,
             })
-            logger.info("📨 Captured event: %s", event.event_type.value)
+            logger.info(f"📨 Captured event: {event.event_type.value}")
 
         # Subscribe to AutoML events
         event_bus.subscribe(MLEventType.TRAINING_STARTED, event_collector)
@@ -102,7 +102,7 @@ async def test_automl_background_integration():
 
         # Get initial task manager stats
         initial_stats = task_manager.get_statistics()
-        logger.info("📊 Initial task manager stats: %s", initial_stats)
+        logger.info(f"📊 Initial task manager stats: {initial_stats}")
 
         logger.info("✅ Task manager integration validation successful")
 
@@ -128,15 +128,15 @@ async def test_automl_background_integration():
         end_time = time.time()
         execution_time = end_time - start_time
 
-        logger.info("⏱️ Optimization completed in %s seconds", execution_time:.2f)
-        logger.info("📊 Optimization result: %s", optimization_result)
+        logger.info(f"⏱️ Optimization completed in {execution_time:.2f} seconds")
+        logger.info(f"📊 Optimization result: {optimization_result}")
 
         # Test 4: Task Lifecycle Validation
         logger.info("📋 Test 4: Task Lifecycle Validation")
 
         # Get final task manager stats
         final_stats = task_manager.get_statistics()
-        logger.info("📊 Final task manager stats: %s", final_stats)
+        logger.info(f"📊 Final task manager stats: {final_stats}")
 
         # Validate that tasks were submitted to task manager
         tasks_submitted = final_stats.get("total_submitted", 0) - initial_stats.get(
@@ -145,13 +145,13 @@ async def test_automl_background_integration():
         assert tasks_submitted > 0, (
             f"No tasks were submitted to task manager (submitted: {tasks_submitted})"
         )
-        logger.info("✅ %s tasks submitted to task manager", tasks_submitted)
+        logger.info(f"✅ {tasks_submitted} tasks submitted to task manager")
 
         # Validate task completion
         tasks_completed = final_stats.get("total_completed", 0) - initial_stats.get(
             "total_completed", 0
         )
-        logger.info("✅ %s tasks completed", tasks_completed)
+        logger.info(f"✅ {tasks_completed} tasks completed")
 
         # Test 5: Event Bus Integration Validation
         logger.info("📋 Test 5: Event Bus Integration Validation")
@@ -161,7 +161,7 @@ async def test_automl_background_integration():
 
         # Validate events were emitted
         assert len(captured_events) > 0, "No ML events were captured"
-        logger.info("📨 Captured %s ML events", len(captured_events))
+        logger.info(f"📨 Captured {len(captured_events)} ML events")
 
         # Check for specific event types
         event_types = [event["type"] for event in captured_events]
@@ -171,7 +171,7 @@ async def test_automl_background_integration():
             e for e in captured_events if e["type"] == "ml.training.started"
         ]
         assert len(training_started_events) > 0, "No training started events captured"
-        logger.info("✅ %s training started events", len(training_started_events))
+        logger.info(f"✅ {len(training_started_events)} training started events")
 
         # Should have training completed or failed events
         completion_events = [
@@ -180,14 +180,14 @@ async def test_automl_background_integration():
             if e["type"] in ["ml.training.completed", "ml.training.failed"]
         ]
         assert len(completion_events) > 0, "No training completion events captured"
-        logger.info("✅ %s training completion events", len(completion_events))
+        logger.info(f"✅ {len(completion_events)} training completion events")
 
         # Test 6: Task Observability
         logger.info("📋 Test 6: Task Observability")
 
         # Get optimization status with enhanced task information
         status = await orchestrator.get_optimization_status()
-        logger.info("📊 Optimization status: %s", status)
+        logger.info(f"📊 Optimization status: {status}")
 
         # Validate enhanced status information
         assert "task_manager_stats" in status, "Task manager stats not in status"
@@ -222,11 +222,11 @@ async def test_automl_background_integration():
         # Check active tasks
         status_before_cancel = await orchestrator.get_optimization_status()
         active_tasks_before = status_before_cancel.get("active_tasks", 0)
-        logger.info("📊 Active tasks before cancellation: %s", active_tasks_before)
+        logger.info(f"📊 Active tasks before cancellation: {active_tasks_before}")
 
         # Stop optimization
         stop_result = await orchestrator.stop_optimization()
-        logger.info("🛑 Stop result: %s", stop_result)
+        logger.info(f"🛑 Stop result: {stop_result}")
 
         # Cancel the background task
         optimization_task.cancel()
@@ -238,7 +238,7 @@ async def test_automl_background_integration():
         # Verify cancellation worked
         status_after_cancel = await orchestrator.get_optimization_status()
         active_tasks_after = status_after_cancel.get("active_tasks", 0)
-        logger.info("📊 Active tasks after cancellation: %s", active_tasks_after)
+        logger.info(f"📊 Active tasks after cancellation: {active_tasks_after}")
 
         logger.info("✅ Task cancellation test completed")
 
@@ -296,7 +296,7 @@ async def test_automl_background_integration():
             },
         }
 
-        logger.info("📊 Integration Summary: %s", summary)
+        logger.info(f"📊 Integration Summary: {summary}")
 
         # Verify all success criteria met
         all_criteria_met = all(summary["success_criteria"].values())
@@ -309,7 +309,7 @@ async def test_automl_background_integration():
         return summary
 
     except Exception as e:
-        logger.error("❌ Test failed with error: %s", e)
+        logger.error(f"❌ Test failed with error: {e}")
         raise
     finally:
         # Cleanup
@@ -320,7 +320,7 @@ async def test_automl_background_integration():
                 await event_bus.shutdown()
             logger.info("🧹 Cleanup completed")
         except Exception as cleanup_error:
-            logger.error("⚠️ Cleanup error: %s", cleanup_error)
+            logger.error(f"⚠️ Cleanup error: {cleanup_error}")
 
 
 async def main():
@@ -339,11 +339,11 @@ async def main():
         logger.info("✅ SUCCESS CRITERIA VALIDATION:")
         for criterion, met in summary["success_criteria"].items():
             status = "✅ PASS" if met else "❌ FAIL"
-            logger.info("   {criterion}: %s", status)
+            logger.info(f"   {criterion}: {status}")
 
         logger.info("\n📊 INTEGRATION METRICS:")
         for metric, value in summary["metrics"].items():
-            logger.info("   {metric}: %s", value)
+            logger.info(f"   {metric}: {value}")
 
         logger.info(
             "\n🚀 AutoML Orchestrator successfully integrated with EnhancedBackgroundTaskManager!"
@@ -355,7 +355,7 @@ async def main():
         logger.error("=" * 60)
         logger.error("❌ INTEGRATION TEST FAILED!")
         logger.error("=" * 60)
-        logger.error("Error: %s", e)
+        logger.error(f"Error: {e}")
         raise
 
 

@@ -3,9 +3,12 @@
 Provides type-safe interface contracts for datetime operations,
 enabling dependency inversion and improved testability.
 """
-from datetime import datetime, timezone
-from typing import Protocol
 
+from datetime import datetime, timezone
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
 class DateTimeServiceProtocol(Protocol):
     """Protocol for datetime service operations"""
 
@@ -33,6 +36,8 @@ class DateTimeServiceProtocol(Protocol):
         """Parse ISO string to datetime"""
         ...
 
+
+@runtime_checkable
 class TimeZoneServiceProtocol(Protocol):
     """Protocol for timezone operations"""
 
@@ -48,5 +53,7 @@ class TimeZoneServiceProtocol(Protocol):
         """Check if datetime is timezone-aware"""
         ...
 
-class DateTimeUtilsProtocol(DateTimeServiceProtocol, TimeZoneServiceProtocol):
+
+@runtime_checkable
+class DateTimeUtilsProtocol(DateTimeServiceProtocol, TimeZoneServiceProtocol, Protocol):
     """Combined protocol for all datetime utilities"""

@@ -24,7 +24,7 @@ class DeploymentEventHandler:
         self.logger = logging.getLogger(__name__)
         self.events_processed = 0
         self.events_failed = 0
-        self.last_event_time: Optional[datetime] = None
+        self.last_event_time: datetime | None = None
         self.active_deployments = {}
         self.deployment_history = []
 
@@ -149,11 +149,11 @@ class DeploymentEventHandler:
             await self.event_bus.emit(MLEvent(event_type=EventType.ROLLBACK_EXECUTION_STARTED, source='deployment_handler', data={'deployment_id': deployment_id, 'rollback_strategy': event.data.get('rollback_strategy', 'immediate'), 'target_version': event.data.get('previous_version')}))
         self.logger.info('Rollback procedure initiated for deployment %s', deployment_id)
 
-    async def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any] | None:
         """Get status of a deployment."""
         return self.active_deployments.get(deployment_id, {}).copy()
 
-    async def list_active_deployments(self) -> Dict[str, Dict[str, Any]]:
+    async def list_active_deployments(self) -> dict[str, dict[str, Any]]:
         """List all active deployments."""
         active_deployments = {}
         for deployment_id, deployment in self.active_deployments.items():
@@ -161,7 +161,7 @@ class DeploymentEventHandler:
                 active_deployments[deployment_id] = deployment.copy()
         return active_deployments
 
-    async def get_deployment_health_summary(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+    async def get_deployment_health_summary(self, deployment_id: str) -> dict[str, Any] | None:
         """Get health summary for a deployment."""
         if deployment_id not in self.active_deployments:
             return None
@@ -170,13 +170,13 @@ class DeploymentEventHandler:
         if not health_checks:
             return {'status': 'unknown', 'checks_count': 0}
         recent_checks = health_checks[-10:]
-        healthy_count = sum((1 for check in recent_checks if check['status'] == 'healthy'))
+        healthy_count = sum(1 for check in recent_checks if check['status'] == 'healthy')
         return {'status': 'healthy' if healthy_count >= len(recent_checks) * 0.8 else 'unhealthy', 'checks_count': len(health_checks), 'recent_healthy_ratio': healthy_count / len(recent_checks), 'last_check': recent_checks[-1] if recent_checks else None}
 
-    async def get_handler_statistics(self) -> Dict[str, Any]:
+    async def get_handler_statistics(self) -> dict[str, Any]:
         """Get event handler statistics."""
         return {'events_processed': self.events_processed, 'events_failed': self.events_failed, 'success_rate': (self.events_processed - self.events_failed) / max(self.events_processed, 1), 'last_event_time': self.last_event_time, 'active_deployments': len([d for d in self.active_deployments.values() if d.get('status') in ['deploying', 'monitoring']]), 'total_deployments': len(self.active_deployments), 'deployment_history_count': len(self.deployment_history)}
 
-    def get_supported_events(self) -> List[EventType]:
+    def get_supported_events(self) -> list[EventType]:
         """Get list of supported event types."""
         return [EventType.DEPLOYMENT_STARTED, EventType.DEPLOYMENT_COMPLETED, EventType.DEPLOYMENT_FAILED, EventType.MODEL_DEPLOYED, EventType.DEPLOYMENT_HEALTH_CHECK, EventType.ROLLBACK_TRIGGERED]

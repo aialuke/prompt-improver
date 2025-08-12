@@ -75,14 +75,28 @@ def _get_database_functions():
     return get_session, get_sessionmanager
 
 
-class APESServiceManager:
-    """Production service management with process monitoring.
+class UnifiedOrchestrationManager:
+    """Unified Orchestration Manager - Complete Service Orchestration and Process Management.
 
-    Implements 2025 best practices for service orchestration integration:
-    - Async lifecycle management with proper resource cleanup
-    - Event-driven integration with orchestrator event bus
+    Consolidates all orchestration functionality following the unified manager pattern:
+    - Service lifecycle management with process monitoring
+    - Workflow orchestration and resource management
+    - Event-driven integration with ML orchestrator event bus
+    - Background task management and coordination
     - Health monitoring and performance tracking
-    - Graceful shutdown with signal handling
+    - Process management with graceful shutdown handling
+
+    Replaces and consolidates:
+    - APESServiceManager (service lifecycle)
+    - ResourceManager (resource orchestration)
+    - WorkflowManager (workflow coordination)
+    - ProcessManager (process management)
+
+    Implements 2025 best practices for unified orchestration:
+    - Async lifecycle management with proper resource cleanup
+    - Mode-based operation (MCP_SERVER, API, ML_TRAINING)
+    - Comprehensive health monitoring and metrics
+    - Integration with DatabaseServices for data persistence
     """
 
     def __init__(self, console: Console | None = None, event_bus=None):
@@ -211,7 +225,7 @@ class APESServiceManager:
                 await self.run_monitoring_loop()
 
         except Exception as e:
-            self.logger.error("Failed to start background service: %s", e)
+            self.logger.error(f"Failed to start background service: {e}")
             service_results["error"] = str(e)
             self._service_status = "failed"
             self.console.print(f"❌ Failed to start service: {e}", style="red")
@@ -276,13 +290,13 @@ class APESServiceManager:
         with self.pid_file.open("w", encoding="utf-8") as f:
             json.dump(pid_data, f, indent=2)
 
-        self.logger.info("PID file written: {self.pid_file} (PID: %s)", pid)
+        self.logger.info(f"PID file written: {self.pid_file} (PID: {pid})")
 
     async def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
 
         def signal_handler(signum, frame):
-            self.logger.info("Received signal %s, initiating shutdown", signum)
+            self.logger.info(f"Received signal {signum}, initiating shutdown")
             self.shutdown_event.set()
 
         signal.signal(signal.SIGTERM, signal_handler)
@@ -303,7 +317,7 @@ class APESServiceManager:
                 return "connected"
 
         except Exception as e:
-            self.logger.warning("PostgreSQL connection failed: %s", e)
+            self.logger.warning(f"PostgreSQL connection failed: {e}")
 
             # Try to start PostgreSQL service (system-dependent)
             try:
@@ -332,7 +346,7 @@ class APESServiceManager:
                 return "failed_to_start"
 
             except Exception as e:
-                self.logger.error("Failed to start PostgreSQL: %s", e)
+                self.logger.error(f"Failed to start PostgreSQL: {e}")
                 return "failed_to_start"
 
     async def start_mcp_server(self):
@@ -344,7 +358,7 @@ class APESServiceManager:
             self.logger.info("MCP server initialized")
 
         except Exception as e:
-            self.logger.error("Failed to start MCP server: %s", e)
+            self.logger.error(f"Failed to start MCP server: {e}")
             raise
 
     async def initialize_performance_monitoring(self):
@@ -413,7 +427,7 @@ class APESServiceManager:
             return health_status
 
         except Exception as e:
-            self.logger.error("Health service check failed: %s", e)
+            self.logger.error(f"Health service check failed: {e}")
             # Fallback to basic health status
             return {
                 "database_connection": False,
@@ -444,7 +458,7 @@ class APESServiceManager:
             self.logger.info("Performance optimizations applied")
 
         except Exception as e:
-            self.logger.error("Failed to apply optimizations: %s", e)
+            self.logger.error(f"Failed to apply optimizations: {e}")
 
     async def monitor_service_health_background(self, alert_threshold_ms: int = 250):
         """Background service monitoring with alerting using unified health service"""
@@ -490,7 +504,7 @@ class APESServiceManager:
                         self.logger.warning("High memory usage: %.1f%%", memory_percent)
 
                 # Log health status for structured analysis
-                self.logger.info("Health status: %s", overall_result.status.value)
+                self.logger.info(f"Health status: {overall_result.status.value}")
 
                 # Check for any failed components
                 failed_checks = [
@@ -517,7 +531,7 @@ class APESServiceManager:
                 await asyncio.sleep(30)  # 30-second monitoring interval
 
             except Exception as e:
-                self.logger.error("Monitoring cycle failed: %s", e)
+                self.logger.error(f"Monitoring cycle failed: {e}")
                 await asyncio.sleep(60)  # Longer delay on error
 
     async def collect_performance_metrics(self) -> dict[str, Any]:
@@ -556,13 +570,13 @@ class APESServiceManager:
             metrics["cpu_usage_percent"] = process.cpu_percent()
 
         except Exception as e:
-            self.logger.error("Failed to collect metrics: %s", e)
+            self.logger.error(f"Failed to collect metrics: {e}")
 
         return metrics
 
     async def send_performance_alert(self, message: str):
         """Send performance alert"""
-        self.logger.warning("PERFORMANCE ALERT: %s", message)
+        self.logger.warning(f"PERFORMANCE ALERT: {message}")
 
         # In a full implementation, this could send notifications
         # For now, just log the alert
@@ -587,12 +601,12 @@ class APESServiceManager:
                 )
 
         except Exception as e:
-            self.logger.error("Connection pool optimization failed: %s", e)
+            self.logger.error(f"Connection pool optimization failed: {e}")
 
     async def log_performance_metrics(self, metrics: dict[str, Any]):
         """Log performance metrics in structured format"""
         # Log metrics as JSON for easy parsing
-        self.logger.info("METRICS: %s", json.dumps(metrics))
+        self.logger.info(f"METRICS: {json.dumps(metrics)}")
 
     async def run_monitoring_loop(self):
         """Main monitoring loop for daemon mode"""
@@ -603,7 +617,7 @@ class APESServiceManager:
             await self.shutdown_event.wait()
 
         except Exception as e:
-            self.logger.error("Monitoring loop error: %s", e)
+            self.logger.error(f"Monitoring loop error: {e}")
 
         finally:
             await self.shutdown_service()
@@ -636,7 +650,7 @@ class APESServiceManager:
             await self._emit_service_event("service.stopped", {"status": "stopped"})
 
         except Exception as e:
-            self.logger.error("Shutdown error: %s", e)
+            self.logger.error(f"Shutdown error: {e}")
             await self._emit_service_event(
                 "service.failed", {"error": str(e), "during": "shutdown"}
             )
@@ -717,10 +731,10 @@ class APESServiceManager:
                 )
 
                 await self.event_bus.emit(event)
-                self.logger.debug("Emitted service event: %s", event_type)
+                self.logger.debug(f"Emitted service event: {event_type}")
 
             except Exception as e:
-                self.logger.warning("Failed to emit service event {event_type}: %s", e)
+                self.logger.warning(f"Failed to emit service event {event_type}: {e}")
 
     def get_service_status(self) -> dict[str, Any]:
         """Get current service status with enhanced orchestrator integration"""
@@ -764,3 +778,7 @@ class APESServiceManager:
             status["error"] = str(e)
 
         return status
+
+
+# Backward compatibility alias - to be removed in future version
+APESServiceManager = UnifiedOrchestrationManager

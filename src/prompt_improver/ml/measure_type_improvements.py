@@ -6,7 +6,7 @@ import subprocess
 import time
 from typing import Any, Dict, List
 
-def count_type_errors(directory: str, strict: bool=False) -> Dict[str, Any]:
+def count_type_errors(directory: str, strict: bool=False) -> dict[str, Any]:
     """Count type errors in a directory using pyright."""
     cmd = ['pyright', '--outputjson', directory]
     if strict:
@@ -44,7 +44,7 @@ def measure_compilation_time(directory: str) -> float:
     except:
         return -1.0
 
-def analyze_type_coverage(directory: str) -> Dict[str, Any]:
+def analyze_type_coverage(directory: str) -> dict[str, Any]:
     """Analyze type annotation coverage in Python files."""
     py_files = list(Path(directory).rglob('*.py'))
     stats = {'total_files': len(py_files), 'files_with_types': 0, 'total_functions': 0, 'typed_functions': 0, 'files_importing_types': 0}

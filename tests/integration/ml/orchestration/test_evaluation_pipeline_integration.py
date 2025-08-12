@@ -18,7 +18,8 @@ class TestEvaluationPipelineIntegration:
         """Create orchestrator for evaluation testing with Protocol-based DI."""
         config = OrchestratorConfig(max_concurrent_workflows=3, evaluation_timeout=180, component_health_check_interval=3)
         factory = MLPipelineFactory()
-        orchestrator = await factory.create_from_container(ml_service_container, config.to_dict())
+        from dataclasses import asdict
+        orchestrator = await factory.create_from_container(ml_service_container, asdict(config))
         await orchestrator.initialize()
         yield orchestrator
         await orchestrator.shutdown()

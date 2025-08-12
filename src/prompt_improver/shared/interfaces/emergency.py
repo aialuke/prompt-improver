@@ -1,6 +1,9 @@
 """Emergency operations interface to break circular dependencies"""
+
 from typing import Protocol
+
 from prompt_improver.shared.types.signals import OperationResult, SignalContext
+
 
 class IEmergencyOperations(Protocol):
     """Interface for emergency operations management
@@ -20,7 +23,9 @@ class IEmergencyOperations(Protocol):
         """
         ...
 
-    async def create_emergency_checkpoint(self, context: SignalContext) -> OperationResult:
+    async def create_emergency_checkpoint(
+        self, context: SignalContext
+    ) -> OperationResult:
         """Create emergency checkpoint triggered by signal
 
         Args:

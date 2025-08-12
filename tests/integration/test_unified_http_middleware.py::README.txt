@@ -1,0 +1,3 @@
+Note: Tests use Starlette TestClient to exercise the ASGI app synchronously, avoiding external HTTP clients.
+We validate OTEL metric emission using the safe testing side channels added to HttpMetrics and BusinessMetrics classes.
+

@@ -86,7 +86,7 @@ class InsightGenerationEngine:
             output_path = config.get('output_path', './outputs/insights')
             analysis_type = config.get('analysis_type', 'comprehensive')
             insights = await self.generate_insights(performance_data)
-            result = {'insights': [{'type': insight.type, 'description': insight.description, 'confidence': insight.confidence, 'impact': insight.impact, 'recommendations': insight.recommendations, 'evidence': insight.evidence} for insight in insights], 'summary': {'total_insights': len(insights), 'high_impact_insights': len([i for i in insights if i.impact == 'high']), 'avg_confidence': sum((i.confidence for i in insights)) / len(insights) if insights else 0.0}}
+            result = {'insights': [{'type': insight.type, 'description': insight.description, 'confidence': insight.confidence, 'impact': insight.impact, 'recommendations': insight.recommendations, 'evidence': insight.evidence} for insight in insights], 'summary': {'total_insights': len(insights), 'high_impact_insights': len([i for i in insights if i.impact == 'high']), 'avg_confidence': sum(i.confidence for i in insights) / len(insights) if insights else 0.0}}
             execution_time = (datetime.now() - start_time).total_seconds()
             return {'orchestrator_compatible': True, 'component_result': result, 'local_metadata': {'output_path': output_path, 'execution_time': execution_time, 'analysis_type': analysis_type, 'insights_generated': len(insights), 'causal_discovery_enabled': self.config.enable_causal_discovery, 'component_version': '1.0.0'}}
         except Exception as e:

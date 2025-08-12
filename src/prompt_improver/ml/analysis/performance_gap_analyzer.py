@@ -23,7 +23,7 @@ class PerformanceGap:
     gap_magnitude: float
     improvement_potential: float
     confidence: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 @dataclass
 class GapAnalysisResult:
@@ -31,13 +31,13 @@ class GapAnalysisResult:
     session_id: str
     analysis_timestamp: datetime
     total_gaps_detected: int
-    critical_gaps: List[PerformanceGap]
-    improvement_opportunities: List[PerformanceGap]
+    critical_gaps: list[PerformanceGap]
+    improvement_opportunities: list[PerformanceGap]
     stopping_criteria_met: bool
     correlation_score: float
     plateau_detected: bool
-    recommended_actions: List[str]
-    metadata: Dict[str, Any]
+    recommended_actions: list[str]
+    metadata: dict[str, Any]
 
 class PerformanceGapAnalyzer:
     """
@@ -55,7 +55,7 @@ class PerformanceGapAnalyzer:
         self.logger = logging.getLogger('apes.performance_gap_analyzer')
         self.config = {'effectiveness_threshold': 0.75, 'consistency_threshold': 0.85, 'coverage_threshold': 0.9, 'improvement_threshold': 0.02, 'plateau_window': 5, 'correlation_threshold': 0.95, 'confidence_interval': 0.95, 'min_samples': 20}
 
-    async def analyze_performance_gaps(self, session: AsyncSession, rule_ids: Optional[List[str]]=None, baseline_window: int=10) -> GapAnalysisResult:
+    async def analyze_performance_gaps(self, session: AsyncSession, rule_ids: list[str] | None=None, baseline_window: int=10) -> GapAnalysisResult:
         """
         Analyze performance gaps with 2025 best practices.
 
@@ -85,7 +85,7 @@ class PerformanceGapAnalyzer:
             self.logger.error('Error in performance gap analysis: %s', e)
             raise
 
-    async def _gather_performance_data(self, session: AsyncSession, rule_ids: Optional[List[str]], window: int) -> Dict[str, Any]:
+    async def _gather_performance_data(self, session: AsyncSession, rule_ids: list[str] | None, window: int) -> dict[str, Any]:
         """Gather comprehensive performance data for analysis."""
         sessions_query = select(ImprovementSession).order_by(ImprovementSession.created_at.desc()).limit(window)
         sessions_result = await session.execute(sessions_query)
@@ -100,7 +100,7 @@ class PerformanceGapAnalyzer:
         user_feedback = feedback_result.scalars().all()
         return {'sessions': recent_sessions, 'rule_performances': rule_performances, 'user_feedback': user_feedback, 'analysis_window': window}
 
-    async def _detect_performance_gaps(self, performance_data: Dict[str, Any]) -> List[PerformanceGap]:
+    async def _detect_performance_gaps(self, performance_data: dict[str, Any]) -> list[PerformanceGap]:
         """Detect performance gaps using statistical analysis."""
         gaps = []
         rule_performances = performance_data['rule_performances']
@@ -130,7 +130,7 @@ class PerformanceGapAnalyzer:
                     gaps.append(PerformanceGap(rule_id=rule_id, gap_type='consistency', severity=severity, current_performance=current_consistency, target_performance=target_consistency, gap_magnitude=gap_magnitude, improvement_potential=gap_magnitude * 0.7, confidence=self._calculate_confidence(consistency_scores), metadata={'sample_count': len(consistency_scores), 'std_dev': np.std(consistency_scores), 'variability': np.std(consistency_scores) / np.mean(consistency_scores)}))
         return gaps
 
-    async def _analyze_correlation_patterns(self, performance_data: Dict[str, Any]) -> float:
+    async def _analyze_correlation_patterns(self, performance_data: dict[str, Any]) -> float:
         """Analyze correlation patterns for stopping criteria."""
         try:
             sessions = performance_data['sessions']
@@ -149,7 +149,7 @@ class PerformanceGapAnalyzer:
             self.logger.warning('Error calculating correlation patterns: %s', e)
             return 0.0
 
-    async def _detect_performance_plateau(self, performance_data: Dict[str, Any]) -> bool:
+    async def _detect_performance_plateau(self, performance_data: dict[str, Any]) -> bool:
         """Detect if performance has plateaued using statistical analysis."""
         try:
             sessions = performance_data['sessions']
@@ -171,18 +171,18 @@ class PerformanceGapAnalyzer:
             self.logger.warning('Error detecting plateau: %s', e)
             return False
 
-    async def _evaluate_stopping_criteria(self, gaps: List[PerformanceGap], correlation_score: float, plateau_detected: bool) -> bool:
+    async def _evaluate_stopping_criteria(self, gaps: list[PerformanceGap], correlation_score: float, plateau_detected: bool) -> bool:
         """Evaluate whether stopping criteria are met using 2025 best practices."""
         critical_gaps = [gap for gap in gaps if gap.severity >= 0.7]
         no_critical_gaps = len(critical_gaps) == 0
         high_correlation = correlation_score >= self.config['correlation_threshold']
         plateau_criterion = plateau_detected
-        all_gaps_minor = all((gap.gap_magnitude < self.config['improvement_threshold'] for gap in gaps))
+        all_gaps_minor = all(gap.gap_magnitude < self.config['improvement_threshold'] for gap in gaps)
         stopping_criteria_met = no_critical_gaps and high_correlation or (plateau_criterion and all_gaps_minor) or (no_critical_gaps and all_gaps_minor)
         self.logger.info('Stopping criteria evaluation: no_critical_gaps=%s, high_correlation=%s, plateau=%s, all_gaps_minor=%s, stopping_met=%s', no_critical_gaps, high_correlation, plateau_criterion, all_gaps_minor, stopping_criteria_met)
         return stopping_criteria_met
 
-    async def _generate_recommendations(self, gaps: List[PerformanceGap], performance_data: Dict[str, Any]) -> List[str]:
+    async def _generate_recommendations(self, gaps: list[PerformanceGap], performance_data: dict[str, Any]) -> list[str]:
         """Generate actionable recommendations based on gap analysis."""
         recommendations = []
         effectiveness_gaps = [gap for gap in gaps if gap.gap_type == 'effectiveness']
@@ -203,7 +203,7 @@ class PerformanceGapAnalyzer:
             recommendations.append('Performance targets achieved - consider increasing thresholds')
         return recommendations
 
-    def _calculate_confidence(self, scores: List[float]) -> float:
+    def _calculate_confidence(self, scores: list[float]) -> float:
         """Calculate confidence score for performance measurements."""
         if len(scores) < 2:
             return 0.5
@@ -215,7 +215,7 @@ class PerformanceGapAnalyzer:
         confidence = max(0.0, min(1.0, 1.0 - cv))
         return confidence
 
-    def _calculate_trend(self, scores: List[float]) -> str:
+    def _calculate_trend(self, scores: list[float]) -> str:
         """Calculate performance trend direction."""
         if len(scores) < 2:
             return 'insufficient_data'
@@ -230,7 +230,7 @@ class PerformanceGapAnalyzer:
         else:
             return 'stable'
 
-    async def analyze_gaps_for_targeted_generation(self, session: AsyncSession, rule_ids: Optional[List[str]]=None, focus_areas: Optional[List[str]]=None) -> Dict[str, Any]:
+    async def analyze_gaps_for_targeted_generation(self, session: AsyncSession, rule_ids: list[str] | None=None, focus_areas: list[str] | None=None) -> dict[str, Any]:
         """
         Enhanced gap analysis specifically for targeted data generation (2025 best practice).
 
@@ -258,7 +258,7 @@ class PerformanceGapAnalyzer:
             self.logger.error('Error in enhanced gap analysis: %s', e)
             raise
 
-    async def _characterize_gaps_for_generation(self, gaps: List[PerformanceGap], session: AsyncSession, focus_areas: Optional[List[str]]) -> List[Dict[str, Any]]:
+    async def _characterize_gaps_for_generation(self, gaps: list[PerformanceGap], session: AsyncSession, focus_areas: list[str] | None) -> list[dict[str, Any]]:
         """Characterize gaps with additional metadata for targeted generation."""
         enhanced_gaps = []
         for gap in gaps:
@@ -272,7 +272,7 @@ class PerformanceGapAnalyzer:
         enhanced_gaps.sort(key=lambda x: x['priority_score'], reverse=True)
         return enhanced_gaps
 
-    async def _analyze_example_hardness(self, session: AsyncSession, rule_ids: Optional[List[str]]) -> Dict[str, Any]:
+    async def _analyze_example_hardness(self, session: AsyncSession, rule_ids: list[str] | None) -> dict[str, Any]:
         """Analyze example hardness for targeted generation (2025 best practice)."""
         try:
             performance_data = await self._gather_performance_data(session, rule_ids, 20)
@@ -300,7 +300,7 @@ class PerformanceGapAnalyzer:
             self.logger.warning('Error in hardness analysis: %s', e)
             return {'optimal_threshold': 0.7, 'distribution': {}, 'recommendations': []}
 
-    async def _prioritize_focus_areas(self, enhanced_gaps: List[Dict[str, Any]], focus_areas: Optional[List[str]]) -> Dict[str, Any]:
+    async def _prioritize_focus_areas(self, enhanced_gaps: list[dict[str, Any]], focus_areas: list[str] | None) -> dict[str, Any]:
         """Prioritize focus areas based on gap analysis."""
         if not enhanced_gaps:
             return {'top_areas': focus_areas or [], 'priorities': {}}
@@ -323,7 +323,7 @@ class PerformanceGapAnalyzer:
         top_areas = [area for area, _ in sorted_areas[:3]]
         return {'top_areas': top_areas, 'priorities': area_impacts, 'focus_distribution': {area: data['total_impact'] for area, data in area_impacts.items()}}
 
-    async def _recommend_generation_strategies(self, enhanced_gaps: List[Dict[str, Any]], hardness_analysis: Dict[str, Any], focus_priorities: Dict[str, Any]) -> Dict[str, Any]:
+    async def _recommend_generation_strategies(self, enhanced_gaps: list[dict[str, Any]], hardness_analysis: dict[str, Any], focus_priorities: dict[str, Any]) -> dict[str, Any]:
         """Recommend optimal generation strategies based on gap analysis."""
         if not enhanced_gaps:
             return {'primary_strategy': 'statistical', 'strategies': {}}
@@ -348,13 +348,13 @@ class PerformanceGapAnalyzer:
         primary_strategy = max(strategy_scores.items(), key=lambda x: x[1])[0]
         return {'primary_strategy': primary_strategy, 'strategy_scores': strategy_scores, 'recommendations': {'primary': primary_strategy, 'secondary': sorted(strategy_scores.items(), key=lambda x: x[1], reverse=True)[1][0], 'reasoning': self._generate_strategy_reasoning(strategy_scores, hardness_analysis)}}
 
-    async def _analyze_difficulty_distribution(self, session: AsyncSession, rule_ids: Optional[List[str]], enhanced_gaps: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _analyze_difficulty_distribution(self, session: AsyncSession, rule_ids: list[str] | None, enhanced_gaps: list[dict[str, Any]]) -> dict[str, Any]:
         """Analyze optimal difficulty distribution for targeted generation."""
         if not enhanced_gaps:
             return {'recommended_weights': {'easy': 0.33, 'medium': 0.34, 'hard': 0.33}}
         severities = [gap['original_gap'].severity for gap in enhanced_gaps]
-        high_severity_ratio = sum((1 for s in severities if s >= 0.7)) / len(severities)
-        medium_severity_ratio = sum((1 for s in severities if 0.3 <= s < 0.7)) / len(severities)
+        high_severity_ratio = sum(1 for s in severities if s >= 0.7) / len(severities)
+        medium_severity_ratio = sum(1 for s in severities if 0.3 <= s < 0.7) / len(severities)
         if high_severity_ratio > 0.5:
             weights = {'easy': 0.15, 'medium': 0.25, 'hard': 0.6}
         elif medium_severity_ratio > 0.6:
@@ -363,7 +363,7 @@ class PerformanceGapAnalyzer:
             weights = {'easy': 0.33, 'medium': 0.34, 'hard': 0.33}
         return {'recommended_weights': weights, 'gap_severity_distribution': {'high': high_severity_ratio, 'medium': medium_severity_ratio, 'low': 1.0 - high_severity_ratio - medium_severity_ratio}, 'reasoning': self._generate_difficulty_reasoning(high_severity_ratio, medium_severity_ratio)}
 
-    async def _get_rule_context(self, session: AsyncSession, rule_id: str) -> Dict[str, Any]:
+    async def _get_rule_context(self, session: AsyncSession, rule_id: str) -> dict[str, Any]:
         """Get additional context for a rule."""
         try:
             rule_perf_query = select(RulePerformance).where(RulePerformance.rule_id == rule_id).order_by(RulePerformance.created_at.desc()).limit(10)
@@ -383,7 +383,7 @@ class PerformanceGapAnalyzer:
             self.logger.warning('Error getting rule context for {rule_id}: %s', e)
             return {'performance_history': [], 'trend': 'unknown', 'stability': 0.5}
 
-    def _calculate_generation_difficulty(self, gap: PerformanceGap, rule_context: Dict[str, Any]) -> float:
+    def _calculate_generation_difficulty(self, gap: PerformanceGap, rule_context: dict[str, Any]) -> float:
         """Calculate how difficult it will be to generate data for this gap."""
         base_difficulty = gap.severity
         type_multipliers = {'effectiveness': 1.0, 'consistency': 1.2, 'coverage': 0.8}
@@ -398,7 +398,7 @@ class PerformanceGapAnalyzer:
             difficulty *= 0.9
         return max(0.0, min(1.0, difficulty))
 
-    def _determine_optimal_generation_method(self, gap: PerformanceGap, rule_context: Dict[str, Any]) -> str:
+    def _determine_optimal_generation_method(self, gap: PerformanceGap, rule_context: dict[str, Any]) -> str:
         """Determine the optimal generation method for this specific gap."""
         if gap.severity >= 0.8:
             return 'neural_enhanced'
@@ -409,7 +409,7 @@ class PerformanceGapAnalyzer:
         else:
             return 'statistical'
 
-    def _calculate_detailed_improvement_potential(self, gap: PerformanceGap, rule_context: Dict[str, Any]) -> Dict[str, float]:
+    def _calculate_detailed_improvement_potential(self, gap: PerformanceGap, rule_context: dict[str, Any]) -> dict[str, float]:
         """Calculate detailed improvement potential with confidence intervals."""
         base_potential = gap.improvement_potential
         trend = rule_context.get('trend', 'unknown')
@@ -424,7 +424,7 @@ class PerformanceGapAnalyzer:
         confidence_width = (1.0 - stability) * 0.3
         return {'expected': adjusted_potential, 'lower_bound': max(0.0, adjusted_potential - confidence_width), 'upper_bound': min(1.0, adjusted_potential + confidence_width), 'confidence': stability}
 
-    def _calculate_focus_area_relevance(self, gap: PerformanceGap, focus_areas: Optional[List[str]]) -> Dict[str, float]:
+    def _calculate_focus_area_relevance(self, gap: PerformanceGap, focus_areas: list[str] | None) -> dict[str, float]:
         """Calculate relevance of this gap to specified focus areas."""
         if not focus_areas:
             return {}
@@ -444,7 +444,7 @@ class PerformanceGapAnalyzer:
                     relevance_scores[area] = 0.3
         return relevance_scores
 
-    def _calculate_priority_score(self, gap: PerformanceGap, generation_difficulty: float, focus_relevance: Dict[str, float]) -> float:
+    def _calculate_priority_score(self, gap: PerformanceGap, generation_difficulty: float, focus_relevance: dict[str, float]) -> float:
         """Calculate overall priority score for gap addressing."""
         base_score = gap.severity * gap.improvement_potential
         difficulty_adjustment = 1.0 - generation_difficulty * 0.2
@@ -463,7 +463,7 @@ class PerformanceGapAnalyzer:
         estimated_samples = int(base_samples * difficulty_multiplier * type_multiplier)
         return max(50, min(2000, estimated_samples))
 
-    def _calculate_enhanced_confidence(self, gap: PerformanceGap, rule_context: Dict[str, Any]) -> float:
+    def _calculate_enhanced_confidence(self, gap: PerformanceGap, rule_context: dict[str, Any]) -> float:
         """Calculate enhanced confidence score incorporating rule context."""
         base_confidence = gap.confidence
         sample_count = rule_context.get('sample_count', 0)
@@ -478,16 +478,16 @@ class PerformanceGapAnalyzer:
         enhanced_confidence = base_confidence * sample_adjustment * stability_adjustment
         return max(0.0, min(1.0, enhanced_confidence))
 
-    def _calculate_optimal_sample_size(self, enhanced_gaps: List[Dict[str, Any]]) -> int:
+    def _calculate_optimal_sample_size(self, enhanced_gaps: list[dict[str, Any]]) -> int:
         """Calculate optimal total sample size for targeted generation."""
         if not enhanced_gaps:
             return 500
         top_gaps = enhanced_gaps[:5]
-        total_estimated = sum((gap['estimated_samples_needed'] for gap in top_gaps))
+        total_estimated = sum(gap['estimated_samples_needed'] for gap in top_gaps)
         total_with_buffer = int(total_estimated * 1.2)
         return max(200, min(2000, total_with_buffer))
 
-    def _generate_strategy_reasoning(self, strategy_scores: Dict[str, float], hardness_analysis: Dict[str, Any]) -> str:
+    def _generate_strategy_reasoning(self, strategy_scores: dict[str, float], hardness_analysis: dict[str, Any]) -> str:
         """Generate human-readable reasoning for strategy selection."""
         top_strategy = max(strategy_scores.items(), key=lambda x: x[1])[0]
         hard_ratio = hardness_analysis.get('distribution', {}).get('hard_examples_ratio', 0.3)

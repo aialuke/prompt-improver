@@ -5,7 +5,6 @@ various linguistic analysis tasks including NER, dependency parsing,
 complexity metrics, and readability assessment.
 """
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import lru_cache
 import logging
@@ -14,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import nltk
 from prompt_improver.core.textstat_config import get_textstat_wrapper
 from ..models.model_manager import ModelManager, get_lightweight_ner_pipeline, get_memory_optimized_config, get_ultra_lightweight_ner_pipeline, model_config
-from ..utils.nltk_manager import get_nltk_manager, setup_nltk_for_production
+from ..learning.features.english_nltk_manager import get_english_nltk_manager
 from .dependency_parser import DependencyParser
 from .ner_extractor import NERExtractor
 try:
@@ -95,18 +94,17 @@ class LinguisticAnalyzer:
         self.transformers_pipeline = None
         self.model_manager = None
         self.nltk_manager = None
-        self.executor = ThreadPoolExecutor(max_workers=self.config.max_workers)
+        # Remove ThreadPoolExecutor - use asyncio.to_thread instead
         self._setup_resource_managers()
         self._initialize_components()
 
     def _setup_resource_managers(self):
         """Setup NLTK and model resource managers."""
         try:
-            self.nltk_manager = get_nltk_manager()
-            if self.config.auto_download_nltk:
-                setup_success = self.nltk_manager.setup_for_production()
-                if not setup_success:
-                    self.logger.warning('NLTK setup incomplete, some features may be limited')
+            self.nltk_manager = get_english_nltk_manager()
+            # English NLTK manager handles setup automatically
+            if not self.nltk_manager._resources_checked:
+                self.logger.warning('NLTK resources not fully available, some features may be limited')
             if self.config.use_transformers_ner:
                 if self.config.use_ultra_lightweight_models or self.config.use_lightweight_models:
                     self.model_manager = None
@@ -241,7 +239,7 @@ class LinguisticAnalyzer:
                 except Exception as e:
                     self.logger.warning('Transformers NER failed: %s', e)
             if not entities and self.ner_extractor:
-                entities = await asyncio.get_event_loop().run_in_executor(self.executor, self.ner_extractor.extract_entities, text)
+                entities = await asyncio.to_thread(self.ner_extractor.extract_entities, text)
                 entity_types = {e['label'] for e in entities}
             technical_terms = self._extract_technical_terms(text)
             words = len(text.split())
@@ -256,7 +254,7 @@ class LinguisticAnalyzer:
         try:
             if not self.dependency_parser:
                 return {}
-            dependencies = await asyncio.get_event_loop().run_in_executor(self.executor, self.dependency_parser.parse, text)
+            dependencies = await asyncio.to_thread(self.dependency_parser.parse, text)
             complexity = self._calculate_syntactic_complexity(dependencies)
             structure_quality = self._assess_sentence_structure(dependencies)
             return {'dependencies': dependencies, 'syntactic_complexity': complexity, 'sentence_structure_quality': structure_quality}
@@ -270,10 +268,8 @@ class LinguisticAnalyzer:
             # Use optimized wrapper with warning suppression and caching
             textstat_wrapper = get_textstat_wrapper()
             
-            # Run in executor for thread safety, but wrapper handles optimization internally
-            loop = asyncio.get_event_loop()
-            analysis_result = await loop.run_in_executor(
-                self.executor, 
+            # Use asyncio.to_thread for thread safety
+            analysis_result = await asyncio.to_thread(
                 textstat_wrapper.comprehensive_analysis, 
                 text
             )
@@ -304,7 +300,7 @@ class LinguisticAnalyzer:
             words = nltk.word_tokenize(text)
             lexical_diversity = len(set(words)) / max(len(words), 1)
             avg_sentence_length = len(words) / max(len(sentences), 1)
-            avg_word_length = sum((len(word) for word in words)) / max(len(words), 1)
+            avg_word_length = sum(len(word) for word in words) / max(len(words), 1)
             # Use TextStat wrapper for syllable counting
             textstat_wrapper = get_textstat_wrapper()
             syllable_count = textstat_wrapper.syllable_count(text)
@@ -319,9 +315,9 @@ class LinguisticAnalyzer:
             instruction_patterns = ['\\b(please|write|create|generate|explain|describe|analyze|summarize)\\b', '\\b(you should|you need to|your task is|your goal is)\\b', '\\b(step by step|follow these|instructions|guidelines)\\b']
             example_patterns = ['\\b(for example|e\\.g\\.|such as|instance|example)\\b', "\\b(here\\'s an example|consider this|like this)\\b", '```.*?```', '\\".*?\\"']
             context_patterns = ['\\b(context|background|scenario|situation)\\b', '\\b(given that|assuming|in this case)\\b', '\\b(remember that|keep in mind|note that)\\b']
-            has_clear_instructions = any((re.search(pattern, text, re.IGNORECASE) for pattern in instruction_patterns))
-            has_examples = any((re.search(pattern, text, re.IGNORECASE | re.DOTALL) for pattern in example_patterns))
-            has_context = any((re.search(pattern, text, re.IGNORECASE) for pattern in context_patterns))
+            has_clear_instructions = any(re.search(pattern, text, re.IGNORECASE) for pattern in instruction_patterns)
+            has_examples = any(re.search(pattern, text, re.IGNORECASE | re.DOTALL) for pattern in example_patterns)
+            has_context = any(re.search(pattern, text, re.IGNORECASE) for pattern in context_patterns)
             clarity_score = self._calculate_instruction_clarity(text)
             return {'has_clear_instructions': has_clear_instructions, 'has_examples': has_examples, 'has_context': has_context, 'instruction_clarity_score': clarity_score}
         except Exception as e:
@@ -337,9 +333,9 @@ class LinguisticAnalyzer:
         """Calculate syntactic complexity score."""
         if not dependencies:
             return 0.0
-        dep_types = set((dep.get('relation', '') for dep in dependencies))
+        dep_types = {dep.get('relation', '') for dep in dependencies}
         complexity_score = len(dep_types) / max(len(dependencies), 1)
-        nested_count = sum((1 for dep in dependencies if dep.get('depth', 0) > 2))
+        nested_count = sum(1 for dep in dependencies if dep.get('depth', 0) > 2)
         complexity_score += nested_count / max(len(dependencies), 1)
         return min(complexity_score, 1.0)
 
@@ -347,9 +343,9 @@ class LinguisticAnalyzer:
         """Assess sentence structure quality."""
         if not dependencies:
             return 0.0
-        has_subject = any((dep.get('relation') == 'nsubj' for dep in dependencies))
-        has_predicate = any((dep.get('relation') == 'ROOT' for dep in dependencies))
-        has_object = any((dep.get('relation') == 'dobj' for dep in dependencies))
+        has_subject = any(dep.get('relation') == 'nsubj' for dep in dependencies)
+        has_predicate = any(dep.get('relation') == 'ROOT' for dep in dependencies)
+        has_object = any(dep.get('relation') == 'dobj' for dep in dependencies)
         structure_score = sum([has_subject, has_predicate, has_object]) / 3.0
         return structure_score
 
@@ -363,9 +359,9 @@ class LinguisticAnalyzer:
     def _calculate_instruction_clarity(self, text: str) -> float:
         """Calculate instruction clarity score."""
         imperative_verbs = ['write', 'create', 'generate', 'explain', 'describe', 'analyze', 'summarize', 'list', 'identify', 'compare', 'evaluate', 'discuss']
-        imperative_count = sum((len(re.findall(f'\\b{verb}\\b', text, re.IGNORECASE)) for verb in imperative_verbs))
+        imperative_count = sum(len(re.findall(f'\\b{verb}\\b', text, re.IGNORECASE)) for verb in imperative_verbs)
         structure_indicators = ['first', 'second', 'third', 'next', 'then', 'finally', 'step 1', 'step 2', 'part a', 'part b']
-        structure_count = sum((len(re.findall(f'\\b{indicator}\\b', text, re.IGNORECASE)) for indicator in structure_indicators))
+        structure_count = sum(len(re.findall(f'\\b{indicator}\\b', text, re.IGNORECASE)) for indicator in structure_indicators)
         words = len(text.split())
         clarity_score = (imperative_count + structure_count) / max(words / 10, 1)
         return min(clarity_score, 1.0)
@@ -416,8 +412,7 @@ class LinguisticAnalyzer:
                 self.model_manager.cleanup()
             if hasattr(self, 'transformers_pipeline'):
                 self.transformers_pipeline = None
-            if hasattr(self, 'executor') and self.executor:
-                self.executor.shutdown(wait=False)
+            # No more executor to clean up
             self.logger.info('LinguisticAnalyzer resources cleaned up')
         except Exception as e:
             self.logger.error('Error during cleanup: %s', e)

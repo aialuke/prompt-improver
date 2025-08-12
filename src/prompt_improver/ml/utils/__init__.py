@@ -1,6 +1,9 @@
 """ML Utilities
 
-Utility functions and managers for ML operations including NLTK resource management.
+Utility functions for ML operations.
+
+Note: NLTK resource management has been consolidated to EnglishNLTKManager 
+in ml.learning.features.english_nltk_manager for better performance and maintenance.
 """
-from .nltk_manager import NLTKResourceManager
-__all__ = ['NLTKResourceManager']
+
+__all__ = []

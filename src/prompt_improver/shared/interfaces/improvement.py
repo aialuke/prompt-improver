@@ -1,5 +1,7 @@
 """Interfaces for prompt improvement services following 2025 best practices"""
+
 from typing import Any, Dict, List, Protocol
+
 
 class IImprovementService(Protocol):
     """Interface for prompt improvement services
@@ -31,7 +33,9 @@ class IImprovementService(Protocol):
         """
         ...
 
-    async def validate_improvement(self, original: str, improved: str) -> dict[str, Any]:
+    async def validate_improvement(
+        self, original: str, improved: str
+    ) -> dict[str, Any]:
         """Validate that an improvement is actually better
 
         Args:
@@ -42,6 +46,7 @@ class IImprovementService(Protocol):
             Validation results with scores and metrics
         """
         ...
+
 
 class IMLService(Protocol):
     """Interface for ML services supporting prompt improvement
@@ -79,6 +84,7 @@ class IMLService(Protocol):
             Dictionary of metric names and values
         """
         ...
+
 
 class IRuleEngine(Protocol):
     """Interface for rule-based improvement engines"""

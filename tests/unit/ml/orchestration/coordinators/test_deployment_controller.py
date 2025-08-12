@@ -8,6 +8,7 @@ import pytest
 from prompt_improver.ml.orchestration.coordinators.deployment_controller import DeploymentConfig, DeploymentController
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import PipelineState
 from prompt_improver.ml.orchestration.events.event_types import EventType, MLEvent
+from prompt_improver.ml.orchestration.metrics import DeploymentMetrics, DeploymentStrategy
 
 class TestDeploymentController:
     """Test suite for Deployment Controller."""
@@ -183,7 +184,7 @@ class TestDeploymentController:
         tasks = [controller.start_deployment_workflow(deploy_id, parameters) for deploy_id in deployment_ids]
         deployments = await asyncio.gather(*tasks)
         assert len(deployments) == 3
-        assert all((d.state == WorkflowState.RUNNING for d in deployments))
+        assert all(d.state == WorkflowState.RUNNING for d in deployments)
         active = await controller.list_active_deployments()
         assert len(active) == 3
 
@@ -203,7 +204,7 @@ class TestDeploymentMetrics:
     def test_metrics_serialization(self):
         """Test metrics to/from dict conversion."""
         metrics = DeploymentMetrics(workflow_id='serialize-deploy', deployment_strategy=DeploymentStrategy.BLUE_GREEN, deployment_time=300.0, success_rate=0.99, rollback_count=0, health_check_duration=12.0, traffic_migration_time=45.0)
-        metrics_dict = metrics.to_dict()
+        metrics_dict = metrics.model_dump()
         restored_metrics = DeploymentMetrics.from_dict(metrics_dict)
         assert restored_metrics.workflow_id == metrics.workflow_id
         assert restored_metrics.deployment_strategy == metrics.deployment_strategy

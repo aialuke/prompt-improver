@@ -41,10 +41,10 @@ class DeploymentController:
         self.event_bus = event_bus
         self.resource_manager = resource_manager
         self.logger = logging.getLogger(__name__)
-        self.active_deployments: Dict[str, Dict[str, Any]] = {}
-        self.deployment_history: List[Dict[str, Any]] = []
+        self.active_deployments: dict[str, dict[str, Any]] = {}
+        self.deployment_history: list[dict[str, Any]] = []
 
-    async def start_deployment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def start_deployment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Start a new model deployment."""
         self.logger.info('Starting deployment %s', deployment_id)
         await self._validate_deployment_parameters(parameters)
@@ -65,7 +65,7 @@ class DeploymentController:
             await self._handle_deployment_failure(deployment_id, e)
             raise
 
-    async def _validate_deployment_parameters(self, parameters: Dict[str, Any]) -> None:
+    async def _validate_deployment_parameters(self, parameters: dict[str, Any]) -> None:
         """Validate deployment parameters."""
         required_params = ['model_version', 'model_artifact_path']
         missing_params = [param for param in required_params if param not in parameters]
@@ -77,7 +77,7 @@ class DeploymentController:
         except ValueError:
             raise ValueError(f'Invalid deployment strategy: {strategy}')
 
-    async def _prepare_deployment_environment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _prepare_deployment_environment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Prepare the deployment environment."""
         self.logger.info('Preparing deployment environment for %s', deployment_id)
         self.active_deployments[deployment_id]['current_step'] = 'environment_preparation'
@@ -87,7 +87,7 @@ class DeploymentController:
         self.active_deployments[deployment_id]['rollback_point'] = {'created_at': datetime.now(timezone.utc), 'previous_version': parameters.get('previous_model_version'), 'environment_snapshot': 'snapshot_data'}
         self.logger.info('Deployment environment prepared for %s', deployment_id)
 
-    async def _execute_deployment_strategy(self, deployment_id: str, strategy: DeploymentStrategy, parameters: Dict[str, Any]) -> None:
+    async def _execute_deployment_strategy(self, deployment_id: str, strategy: DeploymentStrategy, parameters: dict[str, Any]) -> None:
         """Execute the specific deployment strategy."""
         self.logger.info('Executing {strategy.value} deployment strategy for %s', deployment_id)
         self.active_deployments[deployment_id]['current_step'] = f'deployment_{strategy.value}'
@@ -101,30 +101,30 @@ class DeploymentController:
             await self._execute_immediate_deployment(deployment_id, parameters)
         self.logger.info('Deployment strategy {strategy.value} executed for %s', deployment_id)
 
-    async def _execute_blue_green_deployment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_blue_green_deployment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Execute blue-green deployment strategy."""
         await asyncio.sleep(0.1)
         await asyncio.sleep(0.05)
         self.active_deployments[deployment_id]['deployment_details'] = {'blue_environment': 'preserved', 'green_environment': 'active', 'traffic_switched': True}
 
-    async def _execute_canary_deployment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_canary_deployment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Execute canary deployment strategy."""
         traffic_percentage = parameters.get('canary_traffic', self.config.canary_traffic_percentage)
         await asyncio.sleep(0.1)
         await asyncio.sleep(0.05)
         self.active_deployments[deployment_id]['deployment_details'] = {'canary_deployed': True, 'traffic_percentage': traffic_percentage, 'monitoring_enabled': True}
 
-    async def _execute_rolling_deployment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_rolling_deployment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Execute rolling deployment strategy."""
         await asyncio.sleep(0.1)
         self.active_deployments[deployment_id]['deployment_details'] = {'rolling_strategy': 'gradual', 'instances_updated': 'all', 'zero_downtime': True}
 
-    async def _execute_immediate_deployment(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_immediate_deployment(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Execute immediate deployment strategy."""
         await asyncio.sleep(0.05)
         self.active_deployments[deployment_id]['deployment_details'] = {'immediate_replacement': True, 'downtime': 'minimal'}
 
-    async def _verify_deployment_health(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _verify_deployment_health(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Verify deployment health through health checks."""
         self.logger.info('Verifying deployment health for %s', deployment_id)
         self.active_deployments[deployment_id]['current_step'] = 'health_verification'
@@ -132,13 +132,13 @@ class DeploymentController:
             await asyncio.sleep(0.1)
             health_check = {'timestamp': datetime.now(timezone.utc), 'status': 'healthy', 'response_time': 0.05 + i * 0.01, 'error_rate': 0.0}
             self.active_deployments[deployment_id]['health_checks'].append(health_check)
-        avg_response_time = sum((hc['response_time'] for hc in self.active_deployments[deployment_id]['health_checks'])) / 3
-        overall_healthy = all((hc['status'] == 'healthy' for hc in self.active_deployments[deployment_id]['health_checks']))
+        avg_response_time = sum(hc['response_time'] for hc in self.active_deployments[deployment_id]['health_checks']) / 3
+        overall_healthy = all(hc['status'] == 'healthy' for hc in self.active_deployments[deployment_id]['health_checks'])
         if not overall_healthy or avg_response_time > 0.1:
             raise Exception(f'Deployment {deployment_id} failed health checks')
         self.logger.info('Deployment health verification passed for %s', deployment_id)
 
-    async def _register_with_production_registry(self, deployment_id: str, parameters: Dict[str, Any]) -> None:
+    async def _register_with_production_registry(self, deployment_id: str, parameters: dict[str, Any]) -> None:
         """Register deployment with production model registry."""
         self.logger.info('Registering deployment %s with production registry', deployment_id)
         self.active_deployments[deployment_id]['current_step'] = 'registry_registration'
@@ -175,16 +175,16 @@ class DeploymentController:
         self.active_deployments[deployment_id]['completed_at'] = datetime.now(timezone.utc)
         self.logger.info('Deployment %s stopped', deployment_id)
 
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get the status of a deployment."""
         if deployment_id not in self.active_deployments:
             raise ValueError(f'Deployment {deployment_id} not found')
         return self.active_deployments[deployment_id].copy()
 
-    async def list_active_deployments(self) -> List[str]:
+    async def list_active_deployments(self) -> list[str]:
         """List all active deployments."""
         return [dep_id for dep_id, dep_data in self.active_deployments.items() if dep_data['status'] == 'running']
 
-    async def get_deployment_history(self, limit: int=10) -> List[Dict[str, Any]]:
+    async def get_deployment_history(self, limit: int=10) -> list[dict[str, Any]]:
         """Get deployment history."""
         return self.deployment_history[-limit:] if limit > 0 else self.deployment_history

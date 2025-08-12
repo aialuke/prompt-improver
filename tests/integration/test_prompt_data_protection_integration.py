@@ -2,14 +2,20 @@
 Integration tests for PromptDataProtection component with ML Pipeline Orchestrator.
 Tests real behavior without mocks to ensure successful integration.
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
+
 import pytest
+
 from prompt_improver.core.services.security import PromptDataProtection
 from prompt_improver.ml.orchestration.core.component_registry import ComponentTier
-from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
+    MLPipelineOrchestrator,
+)
+
 
 class TestPromptDataProtectionIntegration:
     """Integration tests for PromptDataProtection with real behavior testing."""
@@ -35,126 +41,205 @@ class TestPromptDataProtectionIntegration:
         """Test component initializes successfully."""
         assert prompt_data_protection is not None
         health = await prompt_data_protection.health_check()
-        assert health['status'] == 'healthy'
-        assert health['component'] == 'PromptDataProtection'
-        assert health['version'] == '2025.1'
-        assert health['gdpr_enabled'] is True
-        assert health['differential_privacy_enabled'] is True
+        assert health["status"] == "healthy"
+        assert health["component"] == "PromptDataProtection"
+        assert health["version"] == "2025.1"
+        assert health["gdpr_enabled"] is True
+        assert health["differential_privacy_enabled"] is True
 
     @pytest.mark.asyncio
     async def test_orchestrator_component_loading(self, orchestrator):
         """Test component loads successfully through orchestrator."""
-        loaded_component = await orchestrator.component_loader.load_component('prompt_data_protection', ComponentTier.TIER_1)
+        loaded_component = await orchestrator.component_loader.load_component(
+            "prompt_data_protection", ComponentTier.TIER_1
+        )
         assert loaded_component is not None
-        assert loaded_component.name == 'prompt_data_protection'
-        assert loaded_component.component_class.__name__ == 'PromptDataProtection'
-        success = await orchestrator.component_loader.initialize_component('prompt_data_protection')
+        assert loaded_component.name == "prompt_data_protection"
+        assert loaded_component.component_class.__name__ == "PromptDataProtection"
+        success = await orchestrator.component_loader.initialize_component(
+            "prompt_data_protection"
+        )
         assert success is True
 
     @pytest.mark.asyncio
     async def test_sensitive_data_detection_real_behavior(self, prompt_data_protection):
         """Test real sensitive data detection without mocks."""
-        test_cases = [{'prompt': 'My API key is sk-1234567890abcdef1234567890abcdef12345678', 'expected_redactions': 1, 'expected_types': ['openai_api_key']}, {'prompt': 'Contact me at john.doe@example.com for more info', 'expected_redactions': 1, 'expected_types': ['email_address']}, {'prompt': 'My SSN is 123-45-6789 and credit card is 1234 5678 9012 3456', 'expected_redactions': 2, 'expected_types': ['ssn_pattern', 'credit_card']}, {'prompt': 'This is a clean prompt with no sensitive data', 'expected_redactions': 0, 'expected_types': []}]
+        test_cases = [
+            {
+                "prompt": "My API key is sk-1234567890abcdef1234567890abcdef12345678",
+                "expected_redactions": 1,
+                "expected_types": ["openai_api_key"],
+            },
+            {
+                "prompt": "Contact me at john.doe@example.com for more info",
+                "expected_redactions": 1,
+                "expected_types": ["email_address"],
+            },
+            {
+                "prompt": "My SSN is 123-45-6789 and credit card is 1234 5678 9012 3456",
+                "expected_redactions": 2,
+                "expected_types": ["ssn_pattern", "credit_card"],
+            },
+            {
+                "prompt": "This is a clean prompt with no sensitive data",
+                "expected_redactions": 0,
+                "expected_types": [],
+            },
+        ]
         for i, test_case in enumerate(test_cases):
-            session_id = f'test_session_{i}_{uuid.uuid4()}'
-            sanitized, summary = await prompt_data_protection.sanitize_prompt_before_storage(test_case['prompt'], session_id, user_consent=True)
-            assert summary['redactions_made'] == test_case['expected_redactions']
-            assert set(summary['redaction_types']) == set(test_case['expected_types'])
-            assert summary['gdpr_compliant'] is True
-            assert summary['processing_time_ms'] < 1000
-            if test_case['expected_redactions'] == 0:
-                assert summary['compliance_score'] == 100.0
+            session_id = f"test_session_{i}_{uuid.uuid4()}"
+            (
+                sanitized,
+                summary,
+            ) = await prompt_data_protection.sanitize_prompt_before_storage(
+                test_case["prompt"], session_id, user_consent=True
+            )
+            assert summary["redactions_made"] == test_case["expected_redactions"]
+            assert set(summary["redaction_types"]) == set(test_case["expected_types"])
+            assert summary["gdpr_compliant"] is True
+            assert summary["processing_time_ms"] < 1000
+            if test_case["expected_redactions"] == 0:
+                assert summary["compliance_score"] == 100.0
             else:
-                assert 0 <= summary['compliance_score'] <= 100
+                assert 0 <= summary["compliance_score"] <= 100
 
     @pytest.mark.asyncio
     async def test_orchestrator_component_invocation(self, orchestrator):
         """Test component invocation through orchestrator."""
-        await orchestrator.component_loader.load_component('prompt_data_protection', ComponentTier.TIER_1)
-        await orchestrator.component_loader.initialize_component('prompt_data_protection')
-        health_result = await orchestrator.invoke_component('prompt_data_protection', 'health_check')
-        assert health_result['status'] == 'healthy'
-        assert health_result['component'] == 'PromptDataProtection'
+        await orchestrator.component_loader.load_component(
+            "prompt_data_protection", ComponentTier.TIER_1
+        )
+        await orchestrator.component_loader.initialize_component(
+            "prompt_data_protection"
+        )
+        health_result = await orchestrator.invoke_component(
+            "prompt_data_protection", "health_check"
+        )
+        assert health_result["status"] == "healthy"
+        assert health_result["component"] == "PromptDataProtection"
 
     @pytest.mark.asyncio
     async def test_batch_processing_real_behavior(self, prompt_data_protection):
         """Test batch processing with real data."""
-        prompts = ['Clean prompt 1', 'API key: sk-1234567890abcdef1234567890abcdef12345678', 'Email: test@example.com', 'Another clean prompt']
-        session_ids = [f'batch_session_{i}_{uuid.uuid4()}' for i in range(len(prompts))]
+        prompts = [
+            "Clean prompt 1",
+            "API key: sk-1234567890abcdef1234567890abcdef12345678",
+            "Email: test@example.com",
+            "Another clean prompt",
+        ]
+        session_ids = [f"batch_session_{i}_{uuid.uuid4()}" for i in range(len(prompts))]
         results = await prompt_data_protection.process_batch(prompts, session_ids)
         assert len(results) == len(prompts)
-        assert results[0]['protection_summary']['redactions_made'] == 0
-        assert results[1]['protection_summary']['redactions_made'] == 1
-        assert 'openai_api_key' in results[1]['protection_summary']['redaction_types']
-        assert results[2]['protection_summary']['redactions_made'] == 1
-        assert 'email_address' in results[2]['protection_summary']['redaction_types']
-        assert results[3]['protection_summary']['redactions_made'] == 0
+        assert results[0]["protection_summary"]["redactions_made"] == 0
+        assert results[1]["protection_summary"]["redactions_made"] == 1
+        assert "openai_api_key" in results[1]["protection_summary"]["redaction_types"]
+        assert results[2]["protection_summary"]["redactions_made"] == 1
+        assert "email_address" in results[2]["protection_summary"]["redaction_types"]
+        assert results[3]["protection_summary"]["redactions_made"] == 0
 
     @pytest.mark.asyncio
     async def test_performance_monitoring_real_behavior(self, prompt_data_protection):
         """Test performance monitoring with real operations."""
         for i in range(10):
-            session_id = f'perf_test_{i}_{uuid.uuid4()}'
-            await prompt_data_protection.sanitize_prompt_before_storage(f'Test prompt {i} with no sensitive data', session_id, user_consent=True)
+            session_id = f"perf_test_{i}_{uuid.uuid4()}"
+            await prompt_data_protection.sanitize_prompt_before_storage(
+                f"Test prompt {i} with no sensitive data", session_id, user_consent=True
+            )
         metrics = await prompt_data_protection.get_performance_metrics()
-        assert metrics['total_operations'] == 10
-        assert metrics['avg_processing_time_ms'] > 0
-        assert metrics['min_processing_time_ms'] >= 0
-        assert metrics['max_processing_time_ms'] >= metrics['min_processing_time_ms']
-        assert 0 <= metrics['performance_score'] <= 100
+        assert metrics["total_operations"] == 10
+        assert metrics["avg_processing_time_ms"] > 0
+        assert metrics["min_processing_time_ms"] >= 0
+        assert metrics["max_processing_time_ms"] >= metrics["min_processing_time_ms"]
+        assert 0 <= metrics["performance_score"] <= 100
 
     @pytest.mark.asyncio
     async def test_enhanced_statistics_real_behavior(self, prompt_data_protection):
         """Test enhanced statistics with real data processing."""
-        test_prompts = [('Clean prompt', 'clean_session'), ('API key: sk-test123456789012345678901234567890123456', 'api_session'), ('Email: user@domain.com', 'email_session')]
+        test_prompts = [
+            ("Clean prompt", "clean_session"),
+            ("API key: sk-test123456789012345678901234567890123456", "api_session"),
+            ("Email: user@domain.com", "email_session"),
+        ]
         for prompt, session_id in test_prompts:
-            await prompt_data_protection.sanitize_prompt_before_storage(prompt, f'{session_id}_{uuid.uuid4()}', user_consent=True)
+            await prompt_data_protection.sanitize_prompt_before_storage(
+                prompt, f"{session_id}_{uuid.uuid4()}", user_consent=True
+            )
         stats = await prompt_data_protection.get_enhanced_statistics()
-        assert 'statistics' in stats
-        assert 'configuration' in stats
-        assert 'performance' in stats
-        assert 'compliance' in stats
-        assert stats['statistics']['total_prompts_processed'] == 3
-        assert stats['statistics']['prompts_with_sensitive_data'] >= 2
-        assert stats['configuration']['gdpr_enabled'] is True
-        assert stats['compliance']['framework_version'] == '2025.1'
+        assert "statistics" in stats
+        assert "configuration" in stats
+        assert "performance" in stats
+        assert "compliance" in stats
+        assert stats["statistics"]["total_prompts_processed"] == 3
+        assert stats["statistics"]["prompts_with_sensitive_data"] >= 2
+        assert stats["configuration"]["gdpr_enabled"] is True
+        assert stats["compliance"]["framework_version"] == "2025.1"
 
     @pytest.mark.asyncio
     async def test_gdpr_compliance_real_behavior(self, prompt_data_protection):
         """Test GDPR compliance features with real behavior."""
-        session_id = f'gdpr_test_{uuid.uuid4()}'
-        test_prompt = 'Email: gdpr.test@example.com'
-        sanitized_with_consent, summary_with_consent = await prompt_data_protection.sanitize_prompt_before_storage(test_prompt, session_id, user_consent=True)
-        assert summary_with_consent['gdpr_compliant'] is True
-        assert summary_with_consent['redactions_made'] == 1
-        sanitized_without_consent, summary_without_consent = await prompt_data_protection.sanitize_prompt_before_storage(test_prompt, f'{session_id}_no_consent', user_consent=False)
-        assert summary_without_consent['error'] == 'GDPR_CONSENT_REQUIRED'
-        assert summary_without_consent['processed'] is False
+        session_id = f"gdpr_test_{uuid.uuid4()}"
+        test_prompt = "Email: gdpr.test@example.com"
+        (
+            sanitized_with_consent,
+            summary_with_consent,
+        ) = await prompt_data_protection.sanitize_prompt_before_storage(
+            test_prompt, session_id, user_consent=True
+        )
+        assert summary_with_consent["gdpr_compliant"] is True
+        assert summary_with_consent["redactions_made"] == 1
+        (
+            sanitized_without_consent,
+            summary_without_consent,
+        ) = await prompt_data_protection.sanitize_prompt_before_storage(
+            test_prompt, f"{session_id}_no_consent", user_consent=False
+        )
+        assert summary_without_consent["error"] == "GDPR_CONSENT_REQUIRED"
+        assert summary_without_consent["processed"] is False
 
     @pytest.mark.asyncio
     async def test_component_capabilities(self, prompt_data_protection):
         """Test component capabilities reporting."""
         capabilities = await prompt_data_protection.get_capabilities()
-        expected_capabilities = ['data_protection', 'sensitive_data_detection', 'prompt_sanitization', 'gdpr_compliance', 'differential_privacy', 'audit_logging', 'performance_monitoring', 'real_time_processing', 'risk_assessment', 'privacy_by_design', 'orchestrator_compatible']
+        expected_capabilities = [
+            "data_protection",
+            "sensitive_data_detection",
+            "prompt_sanitization",
+            "gdpr_compliance",
+            "differential_privacy",
+            "audit_logging",
+            "performance_monitoring",
+            "real_time_processing",
+            "risk_assessment",
+            "privacy_by_design",
+            "orchestrator_compatible",
+        ]
         for capability in expected_capabilities:
             assert capability in capabilities
 
     @pytest.mark.asyncio
     async def test_integration_end_to_end(self, orchestrator):
         """End-to-end integration test with orchestrator."""
-        loaded_component = await orchestrator.component_loader.load_component('prompt_data_protection', ComponentTier.TIER_1)
+        loaded_component = await orchestrator.component_loader.load_component(
+            "prompt_data_protection", ComponentTier.TIER_1
+        )
         assert loaded_component is not None
-        init_success = await orchestrator.component_loader.initialize_component('prompt_data_protection')
+        init_success = await orchestrator.component_loader.initialize_component(
+            "prompt_data_protection"
+        )
         assert init_success is True
-        test_prompt = 'API key: sk-test123456789012345678901234567890123456'
-        session_id = f'e2e_test_{uuid.uuid4()}'
+        test_prompt = "API key: sk-test123456789012345678901234567890123456"
+        session_id = f"e2e_test_{uuid.uuid4()}"
         component_instance = loaded_component.instance
         assert component_instance is not None
-        sanitized, summary = await component_instance.sanitize_prompt_before_storage(test_prompt, session_id, user_consent=True)
-        assert summary['redactions_made'] == 1
-        assert 'openai_api_key' in summary['redaction_types']
-        assert summary['gdpr_compliant'] is True
+        sanitized, summary = await component_instance.sanitize_prompt_before_storage(
+            test_prompt, session_id, user_consent=True
+        )
+        assert summary["redactions_made"] == 1
+        assert "openai_api_key" in summary["redaction_types"]
+        assert summary["gdpr_compliant"] is True
         health = await component_instance.health_check()
-        assert health['status'] == 'healthy'
-if __name__ == '__main__':
-    asyncio.run(pytest.main([__file__, '-v']))
+        assert health["status"] == "healthy"
+
+
+if __name__ == "__main__":
+    asyncio.run(pytest.main([__file__, "-v"]))

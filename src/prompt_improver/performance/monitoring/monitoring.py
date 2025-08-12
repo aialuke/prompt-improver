@@ -9,6 +9,7 @@ Advanced real-time monitoring with 2025 best practices:
 - Service mesh observability
 - Custom metrics and dashboards
 """
+
 import asyncio
 import logging
 import statistics
@@ -20,14 +21,18 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
+
 try:
     from opentelemetry import metrics, trace
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
+        OTLPMetricExporter,
+    )
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.b3 import B3MultiFormat
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
     from opentelemetry.sdk.trace import TracerProvider
+
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False

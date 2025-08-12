@@ -382,7 +382,7 @@ class StatisticalAnalyzer:
             values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
             if len(values) > 0:
                 metric_matrix.append(values)
-        if len(metric_matrix) >= 2 and all((len(row) == len(metric_matrix[0]) for row in metric_matrix)):
+        if len(metric_matrix) >= 2 and all(len(row) == len(metric_matrix[0]) for row in metric_matrix):
             reliability['cronbachs_alpha'] = self._calculate_cronbachs_alpha(np.array(metric_matrix).T)
         if len(data.get('timestamps', [])) > 1:
             reliability['temporal_consistency'] = self._analyze_temporal_consistency(data)
@@ -555,7 +555,7 @@ class StatisticalAnalyzer:
             if isinstance(alpha_info, dict) and 'acceptable' in alpha_info:
                 summary['reliability_assessment'] = 'acceptable' if alpha_info['acceptable'] else 'questionable'
         if 'validity_analysis' in analysis and 'convergent_validity' in analysis['validity_analysis']:
-            valid_correlations = sum((1 for v in analysis['validity_analysis']['convergent_validity'].values() if isinstance(v, dict) and v.get('valid', False)))
+            valid_correlations = sum(1 for v in analysis['validity_analysis']['convergent_validity'].values() if isinstance(v, dict) and v.get('valid', False))
             total_correlations = len(analysis['validity_analysis']['convergent_validity'])
             if total_correlations > 0:
                 validity_ratio = valid_correlations / total_correlations

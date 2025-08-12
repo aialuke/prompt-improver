@@ -27,7 +27,7 @@ class EnglishNLTKManager:
         """Initialize English-only NLTK manager."""
         self.logger = logging.getLogger(__name__)
         self._resources_checked = False
-        self._available_resources: Set[str] = set()
+        self._available_resources: set[str] = set()
         self.english_resources = {'punkt', 'stopwords', 'wordnet'}
         self.optional_resources = {'averaged_perceptron_tagger', 'vader_lexicon'}
         self._tokenizer = None
@@ -116,7 +116,7 @@ class EnglishNLTKManager:
                 self.logger.warning('NLTK punkt tokenizer failed: %s', e)
         import re
 
-        def simple_sentence_tokenizer(text: str) -> List[str]:
+        def simple_sentence_tokenizer(text: str) -> list[str]:
             """Simple regex-based sentence tokenizer."""
             sentences = re.split('[.!?]+', text)
             sentences = [s.strip() for s in sentences if s.strip()]
@@ -134,14 +134,14 @@ class EnglishNLTKManager:
                 self.logger.warning('NLTK word tokenizer failed: %s', e)
         import re
 
-        def simple_word_tokenizer(text: str) -> List[str]:
+        def simple_word_tokenizer(text: str) -> list[str]:
             """Simple regex-based word tokenizer."""
             words = re.findall('\\b\\w+\\b', text.lower())
             return words
         self.logger.debug('Using fallback regex word tokenizer')
         return simple_word_tokenizer
 
-    def get_english_stopwords(self) -> Set[str]:
+    def get_english_stopwords(self) -> set[str]:
         """Get English stopwords with fallback."""
         if self._stopwords is not None:
             return self._stopwords
@@ -190,7 +190,7 @@ class EnglishNLTKManager:
         self.logger.debug('Using fallback simple lemmatizer')
         return self._lemmatizer
 
-    def get_resource_status(self) -> Dict[str, any]:
+    def get_resource_status(self) -> dict[str, any]:
         """Get status of English NLTK resources."""
         return {'available_resources': list(self._available_resources), 'required_available': len(self._available_resources & self.english_resources), 'required_total': len(self.english_resources), 'optional_available': len(self._available_resources & self.optional_resources), 'optional_total': len(self.optional_resources), 'fallback_mode': len(self._available_resources & self.english_resources) < len(self.english_resources)}
 
@@ -198,7 +198,7 @@ class EnglishNLTKManager:
         """Check if all required English resources are available."""
         return self.english_resources.issubset(self._available_resources)
 
-    def cleanup_unused_resources(self) -> Dict[str, int]:
+    def cleanup_unused_resources(self) -> dict[str, int]:
         """Identify non-English resources that could be removed to save space."""
         cleanup_info = {'non_english_languages': 0, 'unused_corpora': 0, 'potential_savings_mb': 0}
         try:
@@ -207,7 +207,7 @@ class EnglishNLTKManager:
                 non_english_dirs = [d for d in punkt_path.iterdir() if d.is_dir() and d.name != 'english']
                 cleanup_info['non_english_languages'] = len(non_english_dirs)
                 if non_english_dirs:
-                    total_size = sum((sum((f.stat().st_size for f in d.rglob('*') if f.is_file())) for d in non_english_dirs))
+                    total_size = sum(sum(f.stat().st_size for f in d.rglob('*') if f.is_file()) for d in non_english_dirs)
                     cleanup_info['potential_savings_mb'] = total_size / (1024 * 1024)
         except Exception as e:
             self.logger.debug('Error calculating cleanup info: %s', e)

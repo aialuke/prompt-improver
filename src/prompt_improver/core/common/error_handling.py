@@ -6,29 +6,36 @@ Consolidates common error handling patterns:
 - Database connection errors
 - Metrics collection errors
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Dict, Optional
+
 from prompt_improver.core.common.logging_utils import get_logger
+
 logger = get_logger(__name__)
+
 
 class ErrorCategory(str, Enum):
     """Categories of errors for consistent handling."""
-    CONFIGURATION = 'configuration'
-    DATABASE = 'database'
-    NETWORK = 'network'
-    AUTHENTICATION = 'authentication'
-    VALIDATION = 'validation'
-    TIMEOUT = 'timeout'
-    RESOURCE = 'resource'
-    EXTERNAL_SERVICE = 'external_service'
-    UNKNOWN = 'unknown'
+
+    CONFIGURATION = "configuration"
+    DATABASE = "database"
+    NETWORK = "network"
+    AUTHENTICATION = "authentication"
+    VALIDATION = "validation"
+    TIMEOUT = "timeout"
+    RESOURCE = "resource"
+    EXTERNAL_SERVICE = "external_service"
+    UNKNOWN = "unknown"
+
 
 @dataclass
 class ErrorContext:
     """Context information for error handling."""
+
     category: ErrorCategory
     component: str
     operation: str
@@ -38,24 +45,37 @@ class ErrorContext:
     fallback_available: bool = False
     critical: bool = False
 
+
 class InitializationError(Exception):
     """Custom exception for initialization failures."""
 
-    def __init__(self, message: str, category: ErrorCategory, component: str, cause: Exception | None=None):
+    def __init__(
+        self,
+        message: str,
+        category: ErrorCategory,
+        component: str,
+        cause: Exception | None = None,
+    ):
         super().__init__(message)
         self.category = category
         self.component = component
         self.cause = cause
         self.timestamp = datetime.now(UTC)
 
-def safe_config_load(loader_func: Callable, fallback_value: Any=None, component_name: str='unknown', required: bool=False) -> tuple[Any, bool, str | None]:
+
+def safe_config_load(
+    loader_func: Callable,
+    fallback_value: Any = None,
+    component_name: str = "unknown",
+    required: bool = False,
+) -> tuple[Any, bool, str | None]:
     """Safely load configuration with consistent error handling.
 
     Consolidates the pattern:
     try:
         config = load_config()
     except Exception as e:
-        logger.warning("Config load failed: %s", e)
+        logger.warning(f"Config load failed: {e}")
         config = fallback
 
     Args:
@@ -74,16 +94,21 @@ def safe_config_load(loader_func: Callable, fallback_value: Any=None, component_
         config = loader_func()
         return (config, True, None)
     except Exception as e:
-        error_msg = f'Failed to load configuration for {component_name}: {e}'
+        error_msg = f"Failed to load configuration for {component_name}: {e}"
         logger.warning(error_msg)
         if required and fallback_value is None:
-            raise InitializationError(error_msg, ErrorCategory.CONFIGURATION, component_name, e)
+            raise InitializationError(
+                error_msg, ErrorCategory.CONFIGURATION, component_name, e
+            )
         if fallback_value is not None:
-            logger.info('Using fallback configuration for %s', component_name)
+            logger.info(f"Using fallback configuration for {component_name}")
             return (fallback_value, False, error_msg)
         return (None, False, error_msg)
 
-def handle_initialization_error(error: Exception, context: ErrorContext, fallback_action: Callable | None=None) -> Any | None:
+
+def handle_initialization_error(
+    error: Exception, context: ErrorContext, fallback_action: Callable | None = None
+) -> Any | None:
     """Handle initialization errors with consistent logging and fallback.
 
     Args:
@@ -97,25 +122,36 @@ def handle_initialization_error(error: Exception, context: ErrorContext, fallbac
     Raises:
         InitializationError: If error is critical and no fallback available
     """
-    error_msg = f'Initialization failed for {context.component}.{context.operation}: {error}'
+    error_msg = (
+        f"Initialization failed for {context.component}.{context.operation}: {error}"
+    )
     if context.critical:
         logger.error(error_msg)
     else:
         logger.warning(error_msg)
-    logger.debug('Stack trace for %s error:', context.component, exc_info=True)
+    logger.debug(f"Stack trace for {context.component} error:")
     if fallback_action and context.fallback_available:
         try:
-            logger.info('Attempting fallback for %s', context.component)
+            logger.info(f"Attempting fallback for {context.component}")
             result = fallback_action()
-            logger.info('Fallback successful for %s', context.component)
+            logger.info(f"Fallback successful for {context.component}")
             return result
         except Exception as fallback_error:
-            logger.error('Fallback failed for {context.component}: %s', fallback_error)
+            logger.error(f"Fallback failed for {context.component}: {fallback_error}")
     if context.critical:
         raise InitializationError(error_msg, context.category, context.component, error)
     return None
 
-def safe_operation(operation: Callable, operation_name: str, component_name: str, category: ErrorCategory=ErrorCategory.UNKNOWN, fallback_value: Any=None, log_errors: bool=True, reraise: bool=False) -> tuple[Any, bool, str | None]:
+
+def safe_operation(
+    operation: Callable,
+    operation_name: str,
+    component_name: str,
+    category: ErrorCategory = ErrorCategory.UNKNOWN,
+    fallback_value: Any = None,
+    log_errors: bool = True,
+    reraise: bool = False,
+) -> tuple[Any, bool, str | None]:
     """Execute an operation safely with consistent error handling.
 
     Args:
@@ -134,15 +170,33 @@ def safe_operation(operation: Callable, operation_name: str, component_name: str
         result = operation()
         return (result, True, None)
     except Exception as e:
-        error_msg = f'{operation_name} failed in {component_name} [{category.value}]: {e}'
+        error_msg = (
+            f"{operation_name} failed in {component_name} [{category.value}]: {e}"
+        )
         if log_errors:
-            logger.error(error_msg, extra={'error_category': category.value, 'component': component_name, 'operation': operation_name, 'exception_type': type(e).__name__})
-            logger.debug('Stack trace for %s [%s]:', operation_name, category.value, exc_info=True)
+            logger.error(
+                error_msg,
+                extra={
+                    "error_category": category.value,
+                    "component": component_name,
+                    "operation": operation_name,
+                    "exception_type": type(e).__name__,
+                },
+            )
+            logger.debug(f"Stack trace for {operation_name} [{category.value}]:")
         if reraise:
             raise
         return (fallback_value, False, error_msg)
 
-def with_retry(operation: Callable, max_retries: int=3, delay: float=1.0, backoff_factor: float=2.0, operation_name: str='operation', component_name: str='unknown') -> Any:
+
+async def with_retry(
+    operation: Callable,
+    max_retries: int = 3,
+    delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    operation_name: str = "operation",
+    component_name: str = "unknown",
+) -> Any:
     """Execute operation with retry logic and consistent error handling.
 
     Args:
@@ -160,28 +214,36 @@ def with_retry(operation: Callable, max_retries: int=3, delay: float=1.0, backof
         Exception: Last exception if all retries fail
         ValueError: If max_retries is negative
     """
-    import time
+    import asyncio
+
     if max_retries < 0:
-        raise ValueError(f'max_retries must be non-negative, got {max_retries}')
+        raise ValueError(f"max_retries must be non-negative, got {max_retries}")
     last_exception = None
     current_delay = delay
     for attempt in range(max_retries + 1):
         try:
             result = operation()
             if attempt > 0:
-                logger.info('{operation_name} succeeded after %s retries', attempt)
+                logger.info(f"{operation_name} succeeded after {attempt} retries")
             return result
         except Exception as e:
             last_exception = e
             if attempt < max_retries:
-                logger.warning('%s failed in %s (attempt %s/%s): %s', operation_name, component_name, attempt + 1, max_retries + 1, e)
-                time.sleep(current_delay)
+                logger.warning(
+                    f"{operation_name} failed in {component_name} (attempt {attempt + 1}/{max_retries + 1}): {e}"
+                )
+                await asyncio.sleep(current_delay)
                 current_delay *= backoff_factor
             else:
-                logger.error('%s failed in %s after %s retries: %s', operation_name, component_name, max_retries, e)
+                logger.error(
+                    f"{operation_name} failed in {component_name} after {max_retries} retries: {e}"
+                )
     if last_exception is None:
-        raise RuntimeError(f'Operation {operation_name} failed with no exception recorded')
+        raise RuntimeError(
+            f"Operation {operation_name} failed with no exception recorded"
+        )
     raise last_exception
+
 
 class ErrorHandler:
     """Class for managing error handling context and patterns.
@@ -189,13 +251,24 @@ class ErrorHandler:
     Provides a consistent interface for error handling across components.
     """
 
-    def __init__(self, component_name: str, default_category: ErrorCategory=ErrorCategory.UNKNOWN):
+    def __init__(
+        self,
+        component_name: str,
+        default_category: ErrorCategory = ErrorCategory.UNKNOWN,
+    ):
         self.component_name = component_name
         self.default_category = default_category
         self.error_counts: dict[ErrorCategory, int] = {}
         self.last_errors: dict[ErrorCategory, str] = {}
 
-    def handle_error(self, error: Exception, operation: str, category: ErrorCategory | None=None, critical: bool=False, fallback_value: Any=None) -> Any:
+    def handle_error(
+        self,
+        error: Exception,
+        operation: str,
+        category: ErrorCategory | None = None,
+        critical: bool = False,
+        fallback_value: Any = None,
+    ) -> Any:
         """Handle an error with consistent logging and tracking.
 
         Args:
@@ -211,12 +284,26 @@ class ErrorHandler:
         error_category = category or self.default_category
         self.error_counts[error_category] = self.error_counts.get(error_category, 0) + 1
         self.last_errors[error_category] = str(error)
-        context = ErrorContext(category=error_category, component=self.component_name, operation=operation, timestamp=datetime.now(UTC), critical=critical, fallback_available=fallback_value is not None)
+        context = ErrorContext(
+            category=error_category,
+            component=self.component_name,
+            operation=operation,
+            timestamp=datetime.now(UTC),
+            critical=critical,
+            fallback_available=fallback_value is not None,
+        )
         if fallback_value is not None:
             return handle_initialization_error(error, context, lambda: fallback_value)
         handle_initialization_error(error, context)
 
-    def safe_execute(self, operation: Callable, operation_name: str, category: ErrorCategory | None=None, fallback_value: Any=None, critical: bool=False) -> tuple[Any, bool]:
+    def safe_execute(
+        self,
+        operation: Callable,
+        operation_name: str,
+        category: ErrorCategory | None = None,
+        fallback_value: Any = None,
+        critical: bool = False,
+    ) -> tuple[Any, bool]:
         """Execute operation safely with error handling.
 
         Args:
@@ -233,9 +320,16 @@ class ErrorHandler:
             result = operation()
             return (result, True)
         except Exception as e:
-            handled_result = self.handle_error(e, operation_name, category, critical, fallback_value)
+            handled_result = self.handle_error(
+                e, operation_name, category, critical, fallback_value
+            )
             return (handled_result, False)
 
     def get_error_summary(self) -> dict[str, Any]:
         """Get summary of errors handled by this handler."""
-        return {'component': self.component_name, 'error_counts': dict(self.error_counts), 'last_errors': dict(self.last_errors), 'total_errors': sum(self.error_counts.values())}
+        return {
+            "component": self.component_name,
+            "error_counts": dict(self.error_counts),
+            "last_errors": dict(self.last_errors),
+            "total_errors": sum(self.error_counts.values()),
+        }

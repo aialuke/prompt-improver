@@ -244,7 +244,7 @@ class PatternDetector:
         for rule_id, scores in rule_performance.items():
             if len(scores) >= 10:
                 avg_score = np.mean(scores)
-                failure_rate = sum((1 for s in scores if s < self.config.failure_threshold)) / len(scores)
+                failure_rate = sum(1 for s in scores if s < self.config.failure_threshold) / len(scores)
                 if failure_rate > 0.4:
                     systematic_issues.append({'issue_id': f'systematic_rule_{rule_id}', 'type': 'poor_rule_performance', 'scope': 'rule_specific', 'description': f'Rule {rule_id} has high failure rate', 'affected_rules': [rule_id], 'impact_magnitude': failure_rate, 'evidence': [f'Failure rate: {failure_rate:.3f}', f'Average score: {avg_score:.3f}', f'Sample size: {len(scores)}'], 'priority': 'critical' if failure_rate > 0.6 else 'high'})
         context_performance = defaultdict(list)
@@ -255,7 +255,7 @@ class PatternDetector:
             context_performance[context_key].append(score)
         for context_key, scores in context_performance.items():
             if len(scores) >= 15:
-                failure_rate = sum((1 for s in scores if s < self.config.failure_threshold)) / len(scores)
+                failure_rate = sum(1 for s in scores if s < self.config.failure_threshold) / len(scores)
                 if failure_rate > 0.3:
                     systematic_issues.append({'issue_id': f'systematic_context_{hash(context_key) % 10000}', 'type': 'context_performance', 'scope': 'context_specific', 'description': f'Context {context_key} has elevated failure rate', 'affected_contexts': [context_key], 'impact_magnitude': failure_rate, 'evidence': [f'Failure rate: {failure_rate:.3f}', f'Sample size: {len(scores)}'], 'priority': 'high' if failure_rate > 0.5 else 'medium'})
         return systematic_issues
@@ -315,7 +315,7 @@ class PatternDetector:
             suggestions.append('prompt_expansion')
         elif avg_length > 50:
             suggestions.append('prompt_condensation')
-        questions = sum((1 for f in failures if '?' in f.get('originalPrompt', '')))
+        questions = sum(1 for f in failures if '?' in f.get('originalPrompt', ''))
         if questions > len(failures) * 0.6:
             suggestions.append('question_optimization')
         if not suggestions:

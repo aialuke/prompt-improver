@@ -10,5 +10,19 @@ This package includes:
 - Performance metrics (database operations, cache performance)
 - Integration middleware for automatic instrumentation
 """
-from prompt_improver.metrics.system_metrics import SystemMetricsCollector, SystemMetricsConfig, get_metrics_collector, initialize_metrics_collection, shutdown_metrics_collection
-__all__ = ['SystemMetricsCollector', 'SystemMetricsConfig', 'get_metrics_collector', 'initialize_metrics_collection', 'shutdown_metrics_collection']
+
+from prompt_improver.metrics.system_metrics import (
+    SystemMetricsCollector,
+    SystemMetricsConfig,
+    get_metrics_collector,
+    initialize_metrics_collection,
+    shutdown_metrics_collection,
+)
+
+__all__ = [
+    "SystemMetricsCollector",
+    "SystemMetricsConfig",
+    "get_metrics_collector",
+    "initialize_metrics_collection",
+    "shutdown_metrics_collection",
+]

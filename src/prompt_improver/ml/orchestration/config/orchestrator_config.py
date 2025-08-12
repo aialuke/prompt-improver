@@ -47,32 +47,32 @@ class OrchestratorConfig:
     component_startup_timeout: int = 120
     component_shutdown_timeout: int = 60
     component_discovery_interval: int = 300
-    tier_configs: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {'tier1_core': {'priority': 1, 'resource_weight': 1.0, 'timeout_multiplier': 1.0}, 'tier2_optimization': {'priority': 2, 'resource_weight': 0.8, 'timeout_multiplier': 1.5}, 'tier3_evaluation': {'priority': 3, 'resource_weight': 0.6, 'timeout_multiplier': 1.2}, 'tier4_performance': {'priority': 4, 'resource_weight': 0.4, 'timeout_multiplier': 1.0}, 'tier5_infrastructure': {'priority': 5, 'resource_weight': 0.8, 'timeout_multiplier': 0.8}, 'tier6_security': {'priority': 6, 'resource_weight': 0.3, 'timeout_multiplier': 2.0}})
+    tier_configs: dict[str, dict[str, Any]] = field(default_factory=lambda: {'tier1_core': {'priority': 1, 'resource_weight': 1.0, 'timeout_multiplier': 1.0}, 'tier2_optimization': {'priority': 2, 'resource_weight': 0.8, 'timeout_multiplier': 1.5}, 'tier3_evaluation': {'priority': 3, 'resource_weight': 0.6, 'timeout_multiplier': 1.2}, 'tier4_performance': {'priority': 4, 'resource_weight': 0.4, 'timeout_multiplier': 1.0}, 'tier5_infrastructure': {'priority': 5, 'resource_weight': 0.8, 'timeout_multiplier': 0.8}, 'tier6_security': {'priority': 6, 'resource_weight': 0.3, 'timeout_multiplier': 2.0}})
     enable_auto_scaling: bool = True
     enable_resource_optimization: bool = True
     enable_predictive_scheduling: bool = False
     enable_cross_tier_coordination: bool = True
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> 'OrchestratorConfig':
+    def from_dict(cls, config_dict: dict[str, Any]) -> 'OrchestratorConfig':
         """Create config from dictionary."""
         return cls(**config_dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def model_dump(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
 
-    def get_tier_config(self, tier_name: str) -> Dict[str, Any]:
+    def get_tier_config(self, tier_name: str) -> dict[str, Any]:
         """Get configuration for a specific tier."""
         return self.tier_configs.get(tier_name, {})
 
-    def update_tier_config(self, tier_name: str, config_updates: Dict[str, Any]) -> None:
+    def update_tier_config(self, tier_name: str, config_updates: dict[str, Any]) -> None:
         """Update configuration for a specific tier."""
         if tier_name not in self.tier_configs:
             self.tier_configs[tier_name] = {}
         self.tier_configs[tier_name].update(config_updates)
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """
         Validate configuration settings.
         

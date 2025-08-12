@@ -25,7 +25,7 @@ class DatabaseEventHandler:
         self.logger = logging.getLogger(__name__)
         self.events_processed = 0
         self.events_failed = 0
-        self.last_event_time: Optional[datetime] = None
+        self.last_event_time: datetime | None = None
         self.performance_snapshots = []
         self.optimization_history = []
         self.alert_thresholds = {'cache_hit_ratio_min': 90.0, 'query_time_max_ms': 50.0, 'connection_count_max': 20}
@@ -154,6 +154,6 @@ class DatabaseEventHandler:
         if self.event_bus:
             await self.event_bus.emit(MLEvent(event_type=EventType.ALERT_TRIGGERED, source='database_handler', data={'alert_type': 'high_connection_count', 'connection_count': connection_count, 'threshold': self.alert_thresholds['connection_count_max'], 'severity': 'warning'}))
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get database event handler statistics."""
         return {'events_processed': self.events_processed, 'events_failed': self.events_failed, 'last_event_time': self.last_event_time.isoformat() if self.last_event_time else None, 'performance_snapshots_count': len(self.performance_snapshots), 'optimization_history_count': len(self.optimization_history), 'alert_thresholds': self.alert_thresholds}

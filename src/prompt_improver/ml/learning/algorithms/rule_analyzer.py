@@ -167,13 +167,13 @@ class RuleEffectivenessAnalyzer:
             scores = [dp['score'] for dp in data_points]
             overall_scores = [dp['overall_score'] for dp in data_points]
             total_applications = len(data_points)
-            success_rate = sum((1 for s in scores if s > 0.5)) / total_applications
+            success_rate = sum(1 for s in scores if s > 0.5) / total_applications
             avg_improvement = float(np.mean(scores))
             std_improvement = float(np.std(scores))
             median_improvement = float(np.median(scores))
             consistency_score = 1 - std_improvement / avg_improvement if avg_improvement > 0 else 0
             consistency_score = max(0, min(1, consistency_score))
-            contexts = list(set((self._get_context_key(dp['context']) for dp in data_points)))
+            contexts = list({self._get_context_key(dp['context']) for dp in data_points})
             all_combinations = [dp['other_rules'] for dp in data_points if dp['other_rules']]
             combination_counts = Counter()
             for combo in all_combinations:
@@ -210,7 +210,7 @@ class RuleEffectivenessAnalyzer:
                 synergy_score = avg_improvement - avg_individual_sum
             else:
                 synergy_score = 0.0
-            contexts = list(set((self._get_context_key(dp['context']) for dp in data_points)))
+            contexts = list({self._get_context_key(dp['context']) for dp in data_points})
             combination_metrics.append(RuleCombinationMetrics(combination_id=combo_key, rule_ids=rule_ids, frequency=frequency, avg_improvement=avg_improvement, synergy_score=synergy_score, contexts=contexts))
         combination_metrics.sort(key=lambda x: (x.frequency, x.avg_improvement), reverse=True)
         return combination_metrics[:self.config.max_rule_combinations]
@@ -755,7 +755,7 @@ class RuleEffectivenessAnalyzer:
             self.logger.warning('Bayesian modeling failed for {rule_id}: %s', e)
             return None
 
-    async def run_orchestrated_bayesian_analysis(self, orchestrator_config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_bayesian_analysis(self, orchestrator_config: dict[str, Any]) -> dict[str, Any]:
         """Run Bayesian analysis accessible through ML Pipeline Orchestrator.
 
         Args:
@@ -791,7 +791,7 @@ class RuleEffectivenessAnalyzer:
             self.logger.error('Orchestrated Bayesian analysis failed: %s', e)
             return {'orchestrator_compatible': True, 'error': str(e), 'fallback_analysis': await self._run_fallback_analysis(orchestrator_config)}
 
-    async def _bayesian_effectiveness_analysis(self, rule_id: str, performance_data: List[Dict[str, Any]]):
+    async def _bayesian_effectiveness_analysis(self, rule_id: str, performance_data: list[dict[str, Any]]):
         """Run Bayesian effectiveness analysis using existing PyMC implementation."""
         if not performance_data:
             return None
@@ -807,17 +807,17 @@ class RuleEffectivenessAnalyzer:
         data_points = [{'score': score, 'context': {'projectType': 'default'}} for score in scores]
         return self._fit_bayesian_model(data_points, rule_id)
 
-    async def _bayesian_time_series_analysis(self, rule_id: str, performance_data: List[Dict[str, Any]]):
+    async def _bayesian_time_series_analysis(self, rule_id: str, performance_data: list[dict[str, Any]]):
         """Run Bayesian time series analysis (placeholder for future implementation)."""
         self.logger.info('Time series Bayesian analysis not yet implemented for %s, using effectiveness analysis', rule_id)
         return await self._bayesian_effectiveness_analysis(rule_id, performance_data)
 
-    async def _bayesian_hierarchical_analysis(self, rule_id: str, performance_data: List[Dict[str, Any]]):
+    async def _bayesian_hierarchical_analysis(self, rule_id: str, performance_data: list[dict[str, Any]]):
         """Run Bayesian hierarchical analysis (placeholder for future implementation)."""
         self.logger.info('Hierarchical Bayesian analysis not yet implemented for %s, using effectiveness analysis', rule_id)
         return await self._bayesian_effectiveness_analysis(rule_id, performance_data)
 
-    async def _run_fallback_analysis(self, orchestrator_config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _run_fallback_analysis(self, orchestrator_config: dict[str, Any]) -> dict[str, Any]:
         """Run fallback analysis when Bayesian methods are not available."""
         rule_id = orchestrator_config.get('rule_id')
         performance_data = orchestrator_config.get('performance_data', [])
@@ -834,7 +834,7 @@ class RuleEffectivenessAnalyzer:
         std_score = np.std(scores)
         return {'method': 'basic_statistics', 'mean_effectiveness': float(mean_score), 'std_effectiveness': float(std_score), 'sample_size': len(scores), 'confidence_interval': {'lower': float(mean_score - 1.96 * std_score / np.sqrt(len(scores))), 'upper': float(mean_score + 1.96 * std_score / np.sqrt(len(scores)))}, 'recommendation': self._generate_basic_recommendation(mean_score, std_score)}
 
-    def _extract_uncertainty_metrics(self, analysis_result) -> Dict[str, Any]:
+    def _extract_uncertainty_metrics(self, analysis_result) -> dict[str, Any]:
         """Extract uncertainty quantification metrics from Bayesian analysis."""
         if analysis_result is None:
             return {'error': 'No analysis result available'}
@@ -862,7 +862,7 @@ class RuleEffectivenessAnalyzer:
         else:
             return 'high'
 
-    def _generate_orchestrator_recommendations(self, analysis_result) -> List[str]:
+    def _generate_orchestrator_recommendations(self, analysis_result) -> list[str]:
         """Generate recommendations for orchestrator based on Bayesian analysis."""
         if analysis_result is None:
             return ['Unable to generate recommendations - analysis failed']

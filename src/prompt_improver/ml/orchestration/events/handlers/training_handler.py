@@ -24,7 +24,7 @@ class TrainingEventHandler:
         self.logger = logging.getLogger(__name__)
         self.events_processed = 0
         self.events_failed = 0
-        self.last_event_time: Optional[datetime] = None
+        self.last_event_time: datetime | None = None
         self.active_training_sessions = {}
 
     async def handle_event(self, event: MLEvent) -> None:
@@ -143,11 +143,11 @@ class TrainingEventHandler:
         if optimization_progress:
             self.logger.info('Hyperparameter optimization progress for {workflow_id}: %s', optimization_progress)
 
-    async def get_training_session_status(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+    async def get_training_session_status(self, workflow_id: str) -> dict[str, Any] | None:
         """Get status of a training session."""
         return self.active_training_sessions.get(workflow_id, {}).copy()
 
-    async def list_active_training_sessions(self) -> Dict[str, Dict[str, Any]]:
+    async def list_active_training_sessions(self) -> dict[str, dict[str, Any]]:
         """List all active training sessions."""
         active_sessions = {}
         for workflow_id, session in self.active_training_sessions.items():
@@ -155,7 +155,7 @@ class TrainingEventHandler:
                 active_sessions[workflow_id] = session.copy()
         return active_sessions
 
-    async def get_handler_statistics(self) -> Dict[str, Any]:
+    async def get_handler_statistics(self) -> dict[str, Any]:
         """Get event handler statistics."""
         return {'events_processed': self.events_processed, 'events_failed': self.events_failed, 'success_rate': (self.events_processed - self.events_failed) / max(self.events_processed, 1), 'last_event_time': self.last_event_time, 'active_sessions': len([s for s in self.active_training_sessions.values() if s.get('status') in ['training', 'data_loading']]), 'total_sessions': len(self.active_training_sessions)}
 

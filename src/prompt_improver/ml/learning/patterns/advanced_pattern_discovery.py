@@ -5,8 +5,8 @@ Enhanced with Apriori Algorithm integration for association rule discovery
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from itertools import combinations
+import asyncio
 import logging
-import threading
 import time
 from typing import Any, Optional
 from sqlalchemy import select, text
@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn.cluster import DBSCAN
 from sklearn.metrics import calinski_harabasz_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
-from ....database import ManagerMode, get_unified_manager
+from ....database import ManagerMode, get_database_services
 from ....database.models import RuleMetadata, RulePerformance
 from .apriori_analyzer import AprioriAnalyzer, AprioriConfig
 try:
@@ -98,12 +98,12 @@ class AdvancedPatternDiscovery:
         self.min_confidence = 0.5
         self.min_effectiveness = 0.7
         self._configure_hdbscan_performance()
-        self._db_manager = db_manager or get_unified_manager(ManagerMode.ML_TRAINING)
+        self._db_manager = db_manager or get_database_services(ManagerMode.ML_TRAINING)
         self._apriori_analyzer = None
         self._training_loader = None
-        self._db_manager_lock = threading.Lock()
-        self._apriori_analyzer_lock = threading.Lock()
-        self._training_loader_lock = threading.Lock()
+        self._db_manager_lock = asyncio.Lock()
+        self._apriori_analyzer_lock = asyncio.Lock()
+        self._training_loader_lock = asyncio.Lock()
         logger.info('AdvancedPatternDiscovery initialized with lazy loading strategy')
 
     @property
@@ -113,7 +113,7 @@ class AdvancedPatternDiscovery:
             with self._db_manager_lock:
                 if self._db_manager is None:
                     try:
-                        self._db_manager = get_unified_manager(ManagerMode.ML_TRAINING)
+                        self._db_manager = get_database_services(ManagerMode.ML_TRAINING)
                         logger.info('DatabaseManager created via lazy initialization')
                     except Exception as e:
                         logger.error('Failed to create DatabaseManager: %s', e)
@@ -893,9 +893,9 @@ class AdvancedPatternDiscovery:
             consequents = rule['consequents']
             confidence = rule['confidence']
             lift = rule['lift']
-            if any(('quality_high' in consequent for consequent in consequents)):
+            if any('quality_high' in consequent for consequent in consequents):
                 recommendations.append({'type': 'quality_improvement', 'action': f"Apply pattern {rule['antecedents']} for quality improvement", 'confidence': confidence, 'expected_lift': lift, 'priority': 'high' if confidence > 0.8 else 'medium'})
-            if any(('performance_high' in consequent for consequent in consequents)):
+            if any('performance_high' in consequent for consequent in consequents):
                 recommendations.append({'type': 'performance_optimization', 'action': f"Use combination {rule['antecedents']} for performance gains", 'confidence': confidence, 'expected_lift': lift, 'priority': 'high' if lift > 2.0 else 'medium'})
         recommendations.sort(key=lambda x: (x['confidence'], x['expected_lift']), reverse=True)
         return recommendations[:10]
@@ -1003,7 +1003,7 @@ class AdvancedPatternDiscovery:
                 feature_importance.append({'feature_index': i, 'correlation': float(correlation), 'abs_correlation': float(abs(correlation)), 'feature_std': float(np.std(features[:, i])), 'feature_mean': float(np.mean(features[:, i]))})
             feature_importance.sort(key=lambda x: x['abs_correlation'], reverse=True)
             top_features = [f['feature_index'] for f in feature_importance[:10]]
-            return {'status': 'success', 'feature_importance': feature_importance, 'top_features': top_features, 'max_correlation': feature_importance[0]['abs_correlation'] if feature_importance else 0.0, 'n_significant_features': sum((1 for f in feature_importance if f['abs_correlation'] > 0.1))}
+            return {'status': 'success', 'feature_importance': feature_importance, 'top_features': top_features, 'max_correlation': feature_importance[0]['abs_correlation'] if feature_importance else 0.0, 'n_significant_features': sum(1 for f in feature_importance if f['abs_correlation'] > 0.1)}
         except Exception as e:
             logger.error('Error in feature importance pattern discovery: %s', e)
             return {'status': 'error', 'error': str(e)}

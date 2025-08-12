@@ -14,15 +14,15 @@ class TestSessionComparisonAnalyzer:
     """Test suite for session comparison analyzer with real behavior testing"""
 
     @pytest.fixture
-    async def mock_db_session(self):
-        """Create mock database session"""
-        session = AsyncMock()
-        return session
+    async def db_session(self, postgres_container):
+        """Create real database session with PostgreSQL testcontainer"""
+        async with postgres_container.get_session() as session:
+            yield session
 
     @pytest.fixture
-    def analyzer(self, mock_db_session):
-        """Create analyzer instance"""
-        return SessionComparisonAnalyzer(mock_db_session)
+    def analyzer(self, db_session):
+        """Create analyzer instance with real database session"""
+        return SessionComparisonAnalyzer(db_session)
 
     @pytest.fixture
     def sample_session_a(self):
@@ -217,7 +217,7 @@ class TestSessionComparisonAnalyzer:
         """Test comparison metrics extraction for different dimensions"""
         perf_metrics = await analyzer._extract_comparison_metrics(sample_session_a, sample_iterations_a, ComparisonDimension.PERFORMANCE)
         assert len(perf_metrics) > 0
-        assert all((isinstance(m, (int, float)) for m in perf_metrics))
+        assert all(isinstance(m, (int, float)) for m in perf_metrics)
         eff_metrics = await analyzer._extract_comparison_metrics(sample_session_a, sample_iterations_a, ComparisonDimension.EFFICIENCY)
         assert len(eff_metrics) > 0
         stab_metrics = await analyzer._extract_comparison_metrics(sample_session_a, sample_iterations_a, ComparisonDimension.STABILITY)
@@ -248,7 +248,7 @@ class TestSessionComparisonAnalyzer:
         clusters = await analyzer._perform_clustering_analysis(session_features)
         assert isinstance(clusters, dict)
         assert len(clusters) <= 3
-        total_sessions = sum((len(sessions) for sessions in clusters.values()))
+        total_sessions = sum(len(sessions) for sessions in clusters.values())
         assert total_sessions == 6
 
     @pytest.mark.asyncio

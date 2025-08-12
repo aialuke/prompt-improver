@@ -42,7 +42,7 @@ class MLHealthIntegrationManager:
             logger.error('Failed to initialize ML Health Integration Manager: %s', e)
             return False
 
-    async def register_model_for_monitoring(self, model_id: str, model: Any, model_type: str='unknown', version: Optional[str]=None, metadata: Optional[Dict[str, Any]]=None) -> bool:
+    async def register_model_for_monitoring(self, model_id: str, model: Any, model_type: str='unknown', version: str | None=None, metadata: dict[str, Any] | None=None) -> bool:
         """Register a model for comprehensive health monitoring"""
         try:
             if not self._initialized:
@@ -75,7 +75,7 @@ class MLHealthIntegrationManager:
             logger.error('Error unregistering model {model_id}: %s', e)
             return False
 
-    async def track_inference(self, model_id: str, request_id: str, prediction: Optional[float]=None, confidence: Optional[float]=None, features: Optional[list]=None, start_performance_tracking: bool=True) -> Optional[str]:
+    async def track_inference(self, model_id: str, request_id: str, prediction: float | None=None, confidence: float | None=None, features: list | None=None, start_performance_tracking: bool=True) -> str | None:
         """Start tracking an inference request"""
         try:
             if not self._initialized:
@@ -89,7 +89,7 @@ class MLHealthIntegrationManager:
             logger.error('Error starting inference tracking for {model_id}: %s', e)
             return None
 
-    async def complete_inference_tracking(self, model_id: str, request_id: str, success: bool, error_type: Optional[str]=None, latency_ms: Optional[float]=None) -> Optional[float]:
+    async def complete_inference_tracking(self, model_id: str, request_id: str, success: bool, error_type: str | None=None, latency_ms: float | None=None) -> float | None:
         """Complete tracking for an inference request"""
         try:
             if not self._initialized:
@@ -105,7 +105,7 @@ class MLHealthIntegrationManager:
             logger.error('Error completing inference tracking for {model_id}: %s', e)
             return None
 
-    async def get_model_health_summary(self, model_id: str) -> Optional[Dict[str, Any]]:
+    async def get_model_health_summary(self, model_id: str) -> dict[str, Any] | None:
         """Get comprehensive health summary for a model"""
         try:
             if not self._initialized:
@@ -129,7 +129,7 @@ class MLHealthIntegrationManager:
             logger.error('Error getting health summary for {model_id}: %s', e)
             return None
 
-    async def get_system_health_dashboard(self) -> Dict[str, Any]:
+    async def get_system_health_dashboard(self) -> dict[str, Any]:
         """Get comprehensive system health dashboard"""
         try:
             if not self._initialized:
@@ -156,7 +156,7 @@ class MLHealthIntegrationManager:
             logger.error('Error getting system health dashboard: %s', e)
             return {'error': str(e), 'timestamp': aware_utc_now().isoformat()}
 
-    def _assess_overall_health(self, components: Dict[str, Any]) -> bool:
+    def _assess_overall_health(self, components: dict[str, Any]) -> bool:
         """Assess overall health based on component data"""
         health_scores = []
         health_data = components.get('health', {})
@@ -187,7 +187,7 @@ class MLHealthIntegrationManager:
             return avg_score > 0.7
         return False
 
-    def _generate_system_alerts(self, dashboard: Dict[str, Any]) -> list:
+    def _generate_system_alerts(self, dashboard: dict[str, Any]) -> list:
         """Generate system-wide alerts"""
         alerts = []
         system_health = dashboard.get('system_health', {})
@@ -203,7 +203,7 @@ class MLHealthIntegrationManager:
             alerts.append({'level': 'warning', 'component': 'drift', 'message': f'{high_risk_models} models have high drift risk', 'timestamp': aware_utc_now().isoformat()})
         return alerts
 
-    def _generate_system_recommendations(self, dashboard: Dict[str, Any]) -> list:
+    def _generate_system_recommendations(self, dashboard: dict[str, Any]) -> list:
         """Generate system-wide recommendations"""
         recommendations = []
         system_health = dashboard.get('system_health', {})
@@ -218,7 +218,7 @@ class MLHealthIntegrationManager:
         if not recommendations:
             recommendations.append('ML system health is optimal - continue monitoring')
         return recommendations
-_integration_manager: Optional[MLHealthIntegrationManager] = None
+_integration_manager: MLHealthIntegrationManager | None = None
 
 async def get_ml_health_integration_manager() -> MLHealthIntegrationManager:
     """Get or create global ML health integration manager"""

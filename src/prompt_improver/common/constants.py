@@ -3,6 +3,7 @@
 This module contains all system-wide constants to prevent duplication
 and ensure consistency across modules.
 """
+
 DEFAULT_TIMEOUT = 30.0
 CONNECTION_TIMEOUT = 10.0
 REQUEST_TIMEOUT = 60.0

@@ -1,7 +1,6 @@
 """ML Lifecycle Monitoring
 
 Enhanced monitoring for ML model lifecycle with comprehensive tracking.
-# Legacy Prometheus reference removed - now using OpenTelemetry metrics
 """
 
 def create_sla_target(name, metric_name, target_value, compliance_threshold=0.95):

@@ -18,10 +18,11 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 import json
 import logging
+from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from sqlmodel import SQLModel, Field
+from pydantic import BaseModel, Field
 
 from rich.columns import Columns
 from rich.console import Console
@@ -65,7 +66,7 @@ class UserRole(Enum):
     OPERATOR = "operator"
 
 
-class SessionSummary(SQLModel):
+class SessionSummary(BaseModel):
     """Comprehensive session summary following 2025 best practices"""
     # Core identification
     session_id: str = Field(description="Training session identifier")
@@ -81,13 +82,13 @@ class SessionSummary(SQLModel):
 
     # Timing information
     started_at: datetime = Field(description="Session start timestamp")
-    completed_at: Optional[datetime] = Field(default=None, description="Session completion timestamp")
+    completed_at: datetime | None = Field(default=None, description="Session completion timestamp")
     total_duration_hours: float = Field(ge=0.0, description="Total session duration in hours")
 
     # Performance metrics with context
-    initial_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Initial performance score")
-    final_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Final performance score")
-    best_performance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Best performance achieved")
+    initial_performance: float | None = Field(default=None, ge=0.0, le=1.0, description="Initial performance score")
+    final_performance: float | None = Field(default=None, ge=0.0, le=1.0, description="Final performance score")
+    best_performance: float | None = Field(default=None, ge=0.0, le=1.0, description="Best performance achieved")
     total_improvement: float = Field(description="Total performance improvement")
     improvement_rate: float = Field(description="Rate of improvement per hour")
     performance_trend: str = Field(description="Performance trend direction")
@@ -109,43 +110,43 @@ class SessionSummary(SQLModel):
     peak_memory_usage_mb: float = Field(ge=0.0, description="Peak memory usage in MB")
 
     # AI-generated insights (2025 feature)
-    key_insights: List[str] = Field(default_factory=list, description="AI-generated key insights")
-    recommendations: List[str] = Field(default_factory=list, description="AI-generated recommendations")
-    anomalies_detected: List[str] = Field(default_factory=list, description="Detected anomalies")
+    key_insights: list[str] = Field(default_factory=list, description="AI-generated key insights")
+    recommendations: list[str] = Field(default_factory=list, description="AI-generated recommendations")
+    anomalies_detected: list[str] = Field(default_factory=list, description="Detected anomalies")
 
     # Configuration and metadata
-    configuration: Dict[str, Any] = Field(default_factory=dict, description="Session configuration")
-    stopping_reason: Optional[str] = Field(default=None, description="Reason for session termination")
+    configuration: dict[str, Any] = Field(default_factory=dict, description="Session configuration")
+    stopping_reason: str | None = Field(default=None, description="Reason for session termination")
 
     # Observability metrics
     error_rate: float = Field(ge=0.0, le=1.0, description="Error rate across iterations")
     alert_count: int = Field(ge=0, description="Number of alerts triggered")
-    performance_alerts: List[str] = Field(default_factory=list, description="Performance-related alerts")
+    performance_alerts: list[str] = Field(default_factory=list, description="Performance-related alerts")
 
 
-class IterationBreakdown(SQLModel):
+class IterationBreakdown(BaseModel):
     """Detailed iteration breakdown for comprehensive analysis"""
     iteration: int = Field(ge=0, description="Iteration number")
     started_at: datetime = Field(description="Iteration start timestamp")
     duration_seconds: float = Field(ge=0.0, description="Iteration duration in seconds")
-    performance_metrics: Dict[str, Any] = Field(default_factory=dict, description="Performance metrics for iteration")
+    performance_metrics: dict[str, Any] = Field(default_factory=dict, description="Performance metrics for iteration")
     improvement_score: float = Field(description="Improvement score for iteration")
     synthetic_data_generated: int = Field(ge=0, description="Number of synthetic samples generated")
     status: str = Field(description="Iteration status")
-    error_message: Optional[str] = Field(default=None, description="Error message if iteration failed")
-    resource_usage: Dict[str, float] = Field(default_factory=dict, description="Resource usage metrics")
+    error_message: str | None = Field(default=None, description="Error message if iteration failed")
+    resource_usage: dict[str, float] = Field(default_factory=dict, description="Resource usage metrics")
     generation_quality: float = Field(ge=0.0, le=1.0, description="Quality of generated data")
 
 
-class ExecutiveSummary(SQLModel):
+class ExecutiveSummary(BaseModel):
     """Executive-focused summary with key insights (2025 standard)"""
     session_id: str = Field(description="Training session identifier")
     overall_status: str = Field(description="Overall session status")
-    key_achievements: List[str] = Field(default_factory=list, description="Key achievements during session")
-    critical_issues: List[str] = Field(default_factory=list, description="Critical issues identified")
-    performance_highlights: Dict[str, float] = Field(default_factory=dict, description="Key performance highlights")
-    next_actions: List[str] = Field(default_factory=list, description="Recommended next actions")
-    roi_metrics: Dict[str, float] = Field(default_factory=dict, description="Return on investment metrics")
+    key_achievements: list[str] = Field(default_factory=list, description="Key achievements during session")
+    critical_issues: list[str] = Field(default_factory=list, description="Critical issues identified")
+    performance_highlights: dict[str, float] = Field(default_factory=dict, description="Key performance highlights")
+    next_actions: list[str] = Field(default_factory=list, description="Recommended next actions")
+    roi_metrics: dict[str, float] = Field(default_factory=dict, description="Return on investment metrics")
 
 
 class SessionSummaryReporter:
@@ -162,7 +163,7 @@ class SessionSummaryReporter:
     - Comprehensive observability and monitoring
     """
 
-    def __init__(self, db_session: AsyncSession, console: Optional[Console] = None):
+    def __init__(self, db_session: AsyncSession, console: Console | None = None):
         self.db_session = db_session
         self.console = console or Console()
         self.logger = logging.getLogger(__name__)
@@ -301,7 +302,7 @@ class SessionSummaryReporter:
             return summary
 
         except Exception as e:
-            self.logger.error("Error generating session summary for {session_id}: %s", e)
+            self.logger.error(f"Error generating session summary for {session_id}: {e}")
             raise
 
     async def generate_executive_summary(self, session_id: str) -> ExecutiveSummary:
@@ -367,7 +368,7 @@ class SessionSummaryReporter:
             )
 
         except Exception as e:
-            self.logger.error("Error generating executive summary: %s", e)
+            self.logger.error(f"Error generating executive summary: {e}")
             raise
 
     async def display_executive_dashboard(
@@ -648,17 +649,17 @@ class SessionSummaryReporter:
 
     # Helper methods for data retrieval and calculations
 
-    async def _get_training_session(self, session_id: str) -> Optional[TrainingSession]:
+    async def _get_training_session(self, session_id: str) -> TrainingSession | None:
         """Get training session from database with performance optimization"""
         try:
             query = select(TrainingSession).where(TrainingSession.session_id == session_id)
             result = await self.db_session.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            self.logger.error("Error getting training session: %s", e)
+            self.logger.error(f"Error getting training session: {e}")
             return None
 
-    async def _get_session_iterations(self, session_id: str) -> List[TrainingIteration]:
+    async def _get_session_iterations(self, session_id: str) -> list[TrainingIteration]:
         """Get all iterations for a session with optimized query"""
         try:
             query = (
@@ -669,10 +670,10 @@ class SessionSummaryReporter:
             result = await self.db_session.execute(query)
             return result.scalars().all()
         except Exception as e:
-            self.logger.error("Error getting session iterations: %s", e)
+            self.logger.error(f"Error getting session iterations: {e}")
             return []
 
-    async def _get_generation_sessions(self, session_id: str) -> List[GenerationSession]:
+    async def _get_generation_sessions(self, session_id: str) -> list[GenerationSession]:
         """Get all generation sessions for a training session"""
         try:
             query = (
@@ -683,14 +684,14 @@ class SessionSummaryReporter:
             result = await self.db_session.execute(query)
             return result.scalars().all()
         except Exception as e:
-            self.logger.error("Error getting generation sessions: %s", e)
+            self.logger.error(f"Error getting generation sessions: {e}")
             return []
 
     async def _calculate_executive_kpis(
         self,
         session: TrainingSession,
-        iterations: List[TrainingIteration]
-    ) -> Dict[str, float]:
+        iterations: list[TrainingIteration]
+    ) -> dict[str, float]:
         """Calculate executive KPIs following 2025 best practices"""
         try:
             # Performance Score (weighted average of key metrics)
@@ -739,7 +740,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error calculating executive KPIs: %s", e)
+            self.logger.error(f"Error calculating executive KPIs: {e}")
             return {
                 "performance_score": 0.0,
                 "improvement_velocity": 0.0,
@@ -751,8 +752,8 @@ class SessionSummaryReporter:
     async def _calculate_performance_metrics(
         self,
         session: TrainingSession,
-        iterations: List[TrainingIteration]
-    ) -> Dict[str, Any]:
+        iterations: list[TrainingIteration]
+    ) -> dict[str, Any]:
         """Calculate comprehensive performance metrics"""
         try:
             # Basic calculations
@@ -792,7 +793,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error calculating performance metrics: %s", e)
+            self.logger.error(f"Error calculating performance metrics: {e}")
             return {
                 "total_improvement": 0.0,
                 "improvement_rate": 0.0,
@@ -804,8 +805,8 @@ class SessionSummaryReporter:
 
     async def _calculate_resource_utilization(
         self,
-        iterations: List[TrainingIteration]
-    ) -> Dict[str, float]:
+        iterations: list[TrainingIteration]
+    ) -> dict[str, float]:
         """Calculate resource utilization metrics"""
         try:
             memory_usages = []
@@ -829,7 +830,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error calculating resource utilization: %s", e)
+            self.logger.error(f"Error calculating resource utilization: {e}")
             return {
                 "average_memory": 0.0,
                 "peak_memory": 0.0
@@ -837,8 +838,8 @@ class SessionSummaryReporter:
 
     async def _calculate_generation_statistics(
         self,
-        generation_sessions: List[GenerationSession]
-    ) -> Dict[str, Any]:
+        generation_sessions: list[GenerationSession]
+    ) -> dict[str, Any]:
         """Calculate data generation statistics"""
         try:
             total_samples = sum(gs.samples_generated for gs in generation_sessions)
@@ -857,7 +858,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error calculating generation statistics: %s", e)
+            self.logger.error(f"Error calculating generation statistics: {e}")
             return {
                 "total_samples": 0,
                 "session_count": 0,
@@ -867,9 +868,9 @@ class SessionSummaryReporter:
     async def _generate_ai_insights(
         self,
         session: TrainingSession,
-        iterations: List[TrainingIteration],
+        iterations: list[TrainingIteration],
         user_role: UserRole
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Generate AI-powered insights and recommendations (2025 feature)"""
         try:
             insights = []
@@ -914,7 +915,7 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error generating AI insights: %s", e)
+            self.logger.error(f"Error generating AI insights: {e}")
             return {
                 "insights": [],
                 "recommendations": [],
@@ -924,8 +925,8 @@ class SessionSummaryReporter:
     async def _calculate_observability_metrics(
         self,
         session: TrainingSession,
-        iterations: List[TrainingIteration]
-    ) -> Dict[str, Any]:
+        iterations: list[TrainingIteration]
+    ) -> dict[str, Any]:
         """Calculate observability and monitoring metrics"""
         try:
             # Error rate calculation
@@ -953,14 +954,14 @@ class SessionSummaryReporter:
             }
 
         except Exception as e:
-            self.logger.error("Error calculating observability metrics: %s", e)
+            self.logger.error(f"Error calculating observability metrics: {e}")
             return {
                 "error_rate": 0.0,
                 "alert_count": 0,
                 "alerts": []
             }
 
-    def _calculate_duration_hours(self, start_time: datetime, end_time: Optional[datetime]) -> float:
+    def _calculate_duration_hours(self, start_time: datetime, end_time: datetime | None) -> float:
         """Calculate duration in hours"""
         if not end_time:
             end_time = naive_utc_now()
@@ -1051,7 +1052,7 @@ class SessionSummaryReporter:
         self,
         session_id: str,
         format: ReportFormat = ReportFormat.JSON,
-        output_path: Optional[str] = None,
+        output_path: str | None = None,
         user_role: UserRole = UserRole.ANALYST
     ) -> str:
         """
@@ -1093,7 +1094,7 @@ class SessionSummaryReporter:
 
             # Generate filename if not provided
             if not output_path:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                timestamp = format_compact_timestamp(datetime.now())
                 output_path = f"session_report_{session_id}_{timestamp}.{format.value}"
 
             # Export based on format
@@ -1110,15 +1111,15 @@ class SessionSummaryReporter:
             return output_path
 
         except Exception as e:
-            self.logger.error("Error exporting session report: %s", e)
+            self.logger.error(f"Error exporting session report: {e}")
             raise
 
-    async def _export_json(self, data: Dict[str, Any], output_path: str) -> None:
+    async def _export_json(self, data: dict[str, Any], output_path: str) -> None:
         """Export data as JSON"""
         with open(output_path, 'w') as f:
             json.dump(data, f, indent=2, default=str)
 
-    async def _export_csv(self, data: Dict[str, Any], output_path: str) -> None:
+    async def _export_csv(self, data: dict[str, Any], output_path: str) -> None:
         """Export data as CSV (summary only)"""
         import csv
 
@@ -1162,7 +1163,7 @@ class SessionSummaryReporter:
 {chr(10).join([f"- {rec}" for rec in summary.recommendations])}
 
 ---
-*Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
+*Generated on {format_display_date(datetime.now())}*
 """
 
         with open(output_path, 'w') as f:
@@ -1208,7 +1209,7 @@ class SessionSummaryReporter:
         </ul>
     </div>
 
-    <p><em>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</em></p>
+    <p><em>Generated on {format_display_date(datetime.now())}</em></p>
 </body>
 </html>"""
 

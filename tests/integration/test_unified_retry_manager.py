@@ -4,11 +4,22 @@ Integration tests for the Unified Retry Manager.
 Tests real behavior of the unified retry manager with actual failures,
 circuit breaker functionality, and observability.
 """
+
 import asyncio
 from unittest.mock import AsyncMock
+
 import pytest
-from prompt_improver.core.retry_manager import RetryableErrorType, RetryConfig, RetryManager as UnifiedRetryManager, RetryStrategy, get_retry_manager
+
+from prompt_improver.core.retry_manager import (
+    RetryableErrorType,
+    RetryConfig,
+    RetryManager as UnifiedRetryManager,
+    RetryStrategy,
+    get_retry_manager,
+)
+
 CircuitBreakerOpenError = Exception
+
 
 class TestUnifiedRetryManager:
     """Test the unified retry manager with real behavior."""
@@ -16,7 +27,15 @@ class TestUnifiedRetryManager:
     @pytest.fixture
     def retry_manager(self):
         """Create a retry manager for testing."""
-        config = RetryConfig(max_attempts=3, strategy=RetryStrategy.EXPONENTIAL_BACKOFF, initial_delay_ms=10, max_delay_ms=100, enable_circuit_breaker=True, failure_threshold=2, recovery_timeout_ms=1000)
+        config = RetryConfig(
+            max_attempts=3,
+            strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
+            initial_delay_ms=10,
+            max_delay_ms=100,
+            enable_circuit_breaker=True,
+            failure_threshold=2,
+            recovery_timeout_ms=1000,
+        )
         return UnifiedRetryManager(config)
 
     @pytest.mark.asyncio
@@ -27,9 +46,10 @@ class TestUnifiedRetryManager:
         async def successful_operation():
             nonlocal call_count
             call_count += 1
-            return 'success'
+            return "success"
+
         result = await retry_manager.retry_async(successful_operation)
-        assert result == 'success'
+        assert result == "success"
         assert call_count == 1
 
     @pytest.mark.asyncio
@@ -41,11 +61,14 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                raise ConnectionError(f'Attempt {call_count} failed')
-            return f'success on attempt {call_count}'
-        config = RetryConfig(enable_circuit_breaker=False, operation_name='test_eventual_success')
+                raise ConnectionError(f"Attempt {call_count} failed")
+            return f"success on attempt {call_count}"
+
+        config = RetryConfig(
+            enable_circuit_breaker=False, operation_name="test_eventual_success"
+        )
         result = await retry_manager.retry_async(failing_then_success, config=config)
-        assert result == 'success on attempt 3'
+        assert result == "success on attempt 3"
         assert call_count == 3
 
     @pytest.mark.asyncio
@@ -56,11 +79,14 @@ class TestUnifiedRetryManager:
         async def always_failing():
             nonlocal call_count
             call_count += 1
-            raise ConnectionError(f'Attempt {call_count} failed')
-        config = RetryConfig(enable_circuit_breaker=False, operation_name='test_exhaustion')
+            raise ConnectionError(f"Attempt {call_count} failed")
+
+        config = RetryConfig(
+            enable_circuit_breaker=False, operation_name="test_exhaustion"
+        )
         with pytest.raises(ConnectionError) as exc_info:
             await retry_manager.retry_async(always_failing, config=config)
-        assert 'Attempt 3 failed' in str(exc_info.value)
+        assert "Attempt 3 failed" in str(exc_info.value)
         assert call_count == 3
 
     @pytest.mark.asyncio
@@ -71,8 +97,13 @@ class TestUnifiedRetryManager:
         async def syntax_error_operation():
             nonlocal call_count
             call_count += 1
-            raise SyntaxError('This is not retryable')
-        config = RetryConfig(max_attempts=3, retryable_errors=[RetryableErrorType.NETWORK], operation_name='syntax_test')
+            raise SyntaxError("This is not retryable")
+
+        config = RetryConfig(
+            max_attempts=3,
+            retryable_errors=[RetryableErrorType.NETWORK],
+            operation_name="syntax_test",
+        )
         with pytest.raises(SyntaxError):
             await retry_manager.retry_async(syntax_error_operation, config=config)
         assert call_count == 1
@@ -85,8 +116,13 @@ class TestUnifiedRetryManager:
         async def always_failing():
             nonlocal call_count
             call_count += 1
-            raise ConnectionError(f'Failure {call_count}')
-        config = RetryConfig(operation_name='circuit_breaker_test_unique', failure_threshold=2, max_attempts=2)
+            raise ConnectionError(f"Failure {call_count}")
+
+        config = RetryConfig(
+            operation_name="circuit_breaker_test_unique",
+            failure_threshold=2,
+            max_attempts=2,
+        )
         with pytest.raises(ConnectionError):
             await retry_manager.retry_async(always_failing, config=config)
         with pytest.raises(CircuitBreakerOpenError):
@@ -98,8 +134,16 @@ class TestUnifiedRetryManager:
         delays = []
 
         async def capture_delay_operation():
-            raise TimeoutError('Test timeout')
-        config = RetryConfig(max_attempts=3, strategy=RetryStrategy.EXPONENTIAL_BACKOFF, initial_delay_ms=100, multiplier=2.0, jitter=False, operation_name='delay_test')
+            raise TimeoutError("Test timeout")
+
+        config = RetryConfig(
+            max_attempts=3,
+            strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
+            initial_delay_ms=100,
+            multiplier=2.0,
+            jitter=False,
+            operation_name="delay_test",
+        )
         expected_delays = [100, 200]
         for i in range(2):
             delay = retry_manager._calculate_delay(i, config)
@@ -114,16 +158,17 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ConnectionError('Network error')
-            return 'success'
-        config = RetryConfig(operation_name='metrics_test')
+                raise ConnectionError("Network error")
+            return "success"
+
+        config = RetryConfig(operation_name="metrics_test")
         result = await retry_manager.retry_async(failing_operation, config=config)
-        assert result == 'success'
-        metrics = retry_manager.get_retry_metrics('metrics_test')
+        assert result == "success"
+        metrics = retry_manager.get_retry_metrics("metrics_test")
         assert metrics is not None
-        assert metrics['total_attempts'] >= 2
-        assert metrics['successful_attempts'] >= 1
-        assert metrics['success_rate'] > 0
+        assert metrics["total_attempts"] >= 2
+        assert metrics["successful_attempts"] >= 1
+        assert metrics["success_rate"] > 0
 
     @pytest.mark.asyncio
     async def test_context_manager_usage(self, retry_manager):
@@ -134,11 +179,12 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ConnectionError('Test error')
-            return 'context success'
-        async with retry_manager.with_retry('context_test') as executor:
+                raise ConnectionError("Test error")
+            return "context success"
+
+        async with retry_manager.with_retry("context_test") as executor:
             result = await executor.execute(test_operation)
-        assert result == 'context success'
+        assert result == "context success"
         assert call_count == 2
 
     @pytest.mark.asyncio
@@ -158,11 +204,12 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ConnectionError('Retry test error')
-            return 'retry success'
+                raise ConnectionError("Retry test error")
+            return "retry success"
+
         config = RetryConfig(max_attempts=2, base_delay=0.01)
         result = await retry_manager.retry_async(test_function, config)
-        assert result == 'retry success'
+        assert result == "retry success"
         assert call_count == 2
 
     @pytest.mark.asyncio
@@ -174,31 +221,46 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
-                raise ConnectionError(f'Failure {call_count}')
-            return 'recovered'
-        config = RetryConfig(operation_name='recovery_test_unique', failure_threshold=2, recovery_timeout_ms=100, max_attempts=2)
+                raise ConnectionError(f"Failure {call_count}")
+            return "recovered"
+
+        config = RetryConfig(
+            operation_name="recovery_test_unique",
+            failure_threshold=2,
+            recovery_timeout_ms=100,
+            max_attempts=2,
+        )
         with pytest.raises(ConnectionError):
             await retry_manager.retry_async(initially_failing, config=config)
         with pytest.raises(CircuitBreakerOpenError):
             await retry_manager.retry_async(initially_failing, config=config)
         await asyncio.sleep(0.2)
-        await retry_manager.reset_circuit_breaker('recovery_test_unique')
+        await retry_manager.reset_circuit_breaker("recovery_test_unique")
         result = await retry_manager.retry_async(initially_failing, config=config)
-        assert result == 'recovered'
+        assert result == "recovered"
 
     @pytest.mark.asyncio
     async def test_error_classification(self, retry_manager):
         """Test that error classification works correctly."""
-        network_error = ConnectionError('Connection failed')
-        error_type = retry_manager._classify_error(network_error, retry_manager.default_config)
+        network_error = ConnectionError("Connection failed")
+        error_type = retry_manager._classify_error(
+            network_error, retry_manager.default_config
+        )
         assert error_type == RetryableErrorType.NETWORK
-        timeout_error = TimeoutError('Operation timed out')
-        error_type = retry_manager._classify_error(timeout_error, retry_manager.default_config)
+        timeout_error = TimeoutError("Operation timed out")
+        error_type = retry_manager._classify_error(
+            timeout_error, retry_manager.default_config
+        )
         assert error_type == RetryableErrorType.TIMEOUT
 
     def test_retry_config_validation(self):
         """Test retry configuration validation."""
-        config = RetryConfig(max_attempts=5, strategy=RetryStrategy.FIBONACCI_BACKOFF, initial_delay_ms=50, max_delay_ms=5000)
+        config = RetryConfig(
+            max_attempts=5,
+            strategy=RetryStrategy.FIBONACCI_BACKOFF,
+            initial_delay_ms=50,
+            max_delay_ms=5000,
+        )
         assert config.max_attempts == 5
         assert config.strategy == RetryStrategy.FIBONACCI_BACKOFF
         assert config.initial_delay_ms == 50
@@ -213,12 +275,17 @@ class TestUnifiedRetryManager:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ConnectionError('Monitored failure')
-            return 'monitored success'
-        config = RetryConfig(operation_name='observability_test', enable_metrics=True, enable_tracing=True)
+                raise ConnectionError("Monitored failure")
+            return "monitored success"
+
+        config = RetryConfig(
+            operation_name="observability_test",
+            enable_metrics=True,
+            enable_tracing=True,
+        )
         result = await retry_manager.retry_async(monitored_operation, config=config)
-        assert result == 'monitored success'
-        metrics = retry_manager.get_retry_metrics('observability_test')
+        assert result == "monitored success"
+        metrics = retry_manager.get_retry_metrics("observability_test")
         assert metrics is not None
-        assert metrics['total_attempts'] == 2
-        assert metrics['failure_rate'] < 1.0
+        assert metrics["total_attempts"] == 2
+        assert metrics["failure_rate"] < 1.0

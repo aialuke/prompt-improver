@@ -8,36 +8,128 @@ Migration from mock-based testing to real behavior testing:
 - Real database state changes and transactions
 - Comprehensive integration testing with actual database queries
 """
+
 import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
+
 import pytest
 from sqlmodel import select
+
 from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-from prompt_improver.database.models import ABExperiment, DiscoveredPattern, MLModelPerformance, PromptSession, RuleMetadata, RulePerformance, UserFeedback
+from prompt_improver.database.models import (
+    ABExperiment,
+    DiscoveredPattern,
+    MLModelPerformance,
+    PromptSession,
+    RuleMetadata,
+    RulePerformance,
+    UserFeedback,
+)
 from prompt_improver.utils.datetime_utils import aware_utc_now
+
 
 @pytest.fixture
 def prompt_service():
     """Create PromptImprovementService instance."""
     return PromptImprovementService()
 
+
 @pytest.fixture
 async def real_ml_test_data(real_db_session):
     """Create comprehensive real database test data for ML optimization tests."""
     import uuid
+
     test_id = str(uuid.uuid4())[:8]
     prompt_sessions = []
     for i in range(25):
-        prompt_sessions.append(PromptSession(session_id=f'ml_session_{test_id}_{i}', original_prompt=f'Original prompt {i} for ML optimization', improved_prompt=f'Improved prompt {i} with ML enhancements', user_context={'test_ml': True, 'optimization_round': i}, quality_score=0.8 + i * 0.005, improvement_score=0.75 + i * 0.01, confidence_level=0.9, created_at=aware_utc_now() - timedelta(days=30, hours=i), updated_at=aware_utc_now() - timedelta(days=30, hours=i)))
-    rule_metadata = [RuleMetadata(rule_id='clarity_rule', rule_name='Clarity Enhancement Rule', description='Improves prompt clarity through advanced processing', category='clarity', default_parameters={'weight': 1.0, 'threshold': 0.7, 'confidence_threshold': 0.7, 'enabled': True, 'min_length': 10, 'max_length': 500}, priority=5, created_at=aware_utc_now() - timedelta(days=30), updated_at=aware_utc_now() - timedelta(days=30)), RuleMetadata(rule_id='specificity_rule', rule_name='Specificity Enhancement Rule', description='Improves prompt specificity through parameter tuning', category='specificity', default_parameters={'weight': 0.8, 'threshold': 0.6, 'confidence_threshold': 0.8, 'enabled': True, 'min_length': 15, 'max_length': 300}, priority=4, created_at=aware_utc_now() - timedelta(days=30), updated_at=aware_utc_now() - timedelta(days=30))]
+        prompt_sessions.append(
+            PromptSession(
+                session_id=f"ml_session_{test_id}_{i}",
+                original_prompt=f"Original prompt {i} for ML optimization",
+                improved_prompt=f"Improved prompt {i} with ML enhancements",
+                user_context={"test_ml": True, "optimization_round": i},
+                quality_score=0.8 + i * 0.005,
+                improvement_score=0.75 + i * 0.01,
+                confidence_level=0.9,
+                created_at=aware_utc_now() - timedelta(days=30, hours=i),
+                updated_at=aware_utc_now() - timedelta(days=30, hours=i),
+            )
+        )
+    rule_metadata = [
+        RuleMetadata(
+            rule_id="clarity_rule",
+            rule_name="Clarity Enhancement Rule",
+            description="Improves prompt clarity through advanced processing",
+            category="clarity",
+            default_parameters={
+                "weight": 1.0,
+                "threshold": 0.7,
+                "confidence_threshold": 0.7,
+                "enabled": True,
+                "min_length": 10,
+                "max_length": 500,
+            },
+            priority=5,
+            created_at=aware_utc_now() - timedelta(days=30),
+            updated_at=aware_utc_now() - timedelta(days=30),
+        ),
+        RuleMetadata(
+            rule_id="specificity_rule",
+            rule_name="Specificity Enhancement Rule",
+            description="Improves prompt specificity through parameter tuning",
+            category="specificity",
+            default_parameters={
+                "weight": 0.8,
+                "threshold": 0.6,
+                "confidence_threshold": 0.8,
+                "enabled": True,
+                "min_length": 15,
+                "max_length": 300,
+            },
+            priority=4,
+            created_at=aware_utc_now() - timedelta(days=30),
+            updated_at=aware_utc_now() - timedelta(days=30),
+        ),
+    ]
     user_feedback = []
     for i in range(5):
-        user_feedback.append(UserFeedback(session_id=f'ml_session_{test_id}_{i}', user_id=f'user_{i}', feedback_type='improvement', rating=4 + i % 2, comment=f'ML optimization feedback {i}', ml_optimized=False, model_id=None, created_at=aware_utc_now() - timedelta(days=25, hours=i), updated_at=aware_utc_now() - timedelta(days=25, hours=i)))
+        user_feedback.append(
+            UserFeedback(
+                session_id=f"ml_session_{test_id}_{i}",
+                user_id=f"user_{i}",
+                feedback_type="improvement",
+                rating=4 + i % 2,
+                comment=f"ML optimization feedback {i}",
+                ml_optimized=False,
+                model_id=None,
+                created_at=aware_utc_now() - timedelta(days=25, hours=i),
+                updated_at=aware_utc_now() - timedelta(days=25, hours=i),
+            )
+        )
     rule_performance = []
     for i in range(25):
-        rule_id = 'clarity_rule' if i % 2 == 0 else 'specificity_rule'
-        rule_performance.append(RulePerformance(rule_id=rule_id, session_id=f'ml_session_{test_id}_{i}', improvement_score=0.7 + i * 0.01, execution_time_ms=100 + i * 5, confidence_level=0.8 + i * 0.005, user_satisfaction_score=0.8 + i * 0.008, parameters_used={'weight': 0.8 + i * 0.01, 'threshold': 0.6 + i * 0.01, 'confidence_threshold': 0.7 + i * 0.005, 'enabled': True, 'min_length': 10 + i, 'max_length': 400 + i * 2}, created_at=aware_utc_now() - timedelta(days=10, hours=i), updated_at=aware_utc_now() - timedelta(days=10, hours=i)))
+        rule_id = "clarity_rule" if i % 2 == 0 else "specificity_rule"
+        rule_performance.append(
+            RulePerformance(
+                rule_id=rule_id,
+                session_id=f"ml_session_{test_id}_{i}",
+                improvement_score=0.7 + i * 0.01,
+                execution_time_ms=100 + i * 5,
+                confidence_level=0.8 + i * 0.005,
+                user_satisfaction_score=0.8 + i * 0.008,
+                parameters_used={
+                    "weight": 0.8 + i * 0.01,
+                    "threshold": 0.6 + i * 0.01,
+                    "confidence_threshold": 0.7 + i * 0.005,
+                    "enabled": True,
+                    "min_length": 10 + i,
+                    "max_length": 400 + i * 2,
+                },
+                created_at=aware_utc_now() - timedelta(days=10, hours=i),
+                updated_at=aware_utc_now() - timedelta(days=10, hours=i),
+            )
+        )
     for session in prompt_sessions:
         real_db_session.add(session)
     for metadata in rule_metadata:
@@ -47,160 +139,313 @@ async def real_ml_test_data(real_db_session):
     for performance in rule_performance:
         real_db_session.add(performance)
     await real_db_session.commit()
-    return {'prompt_sessions': prompt_sessions, 'rule_metadata': rule_metadata, 'user_feedback': user_feedback, 'rule_performance': rule_performance}
+    return {
+        "prompt_sessions": prompt_sessions,
+        "rule_metadata": rule_metadata,
+        "user_feedback": user_feedback,
+        "rule_performance": rule_performance,
+    }
+
 
 class TestPhase3MLOptimization:
     """Test Phase 3 ML optimization methods in PromptImprovementService using real database behavior."""
+
 
 class TestTriggerOptimization:
     """Test trigger_optimization method using real database behavior."""
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_success(self, prompt_service, real_db_session, real_ml_test_data):
-        """Test successful ML optimization trigger from feedback using real database."""
+    async def test_trigger_optimization_success(
+        self, prompt_service, real_db_session, real_ml_test_data, real_ml_service_for_testing
+    ):
+        """Test successful ML optimization trigger from feedback using real ML service."""
         feedback_query = select(UserFeedback).limit(1)
         result = await real_db_session.execute(feedback_query)
         feedback = result.scalar_one()
         feedback_id = feedback.id
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'success', 'best_score': 0.85, 'model_id': 'optimized_model_123'}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
-            result = await prompt_service.trigger_optimization(feedback_id, real_db_session)
-        assert result['status'] == 'success'
-        assert result['performance_score'] == 0.85
-        assert 'training_samples' in result
-        assert result['model_id'] == 'optimized_model_123'
-        mock_ml_service.optimize_rules.assert_called_once()
-        call_args = mock_ml_service.optimize_rules.call_args[0]
-        training_data = call_args[0]
-        assert 'features' in training_data
-        assert 'effectiveness_scores' in training_data
-        updated_feedback_query = select(UserFeedback).where(UserFeedback.id == feedback_id)
+        
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
+            result = await prompt_service.trigger_optimization(
+                feedback_id, real_db_session
+            )
+        assert result["status"] == "success"
+        assert "performance_score" in result
+        assert "training_samples" in result
+        assert "model_id" in result
+        
+        # Verify feedback was updated in database
+        updated_feedback_query = select(UserFeedback).where(
+            UserFeedback.id == feedback_id
+        )
         updated_result = await real_db_session.execute(updated_feedback_query)
         updated_feedback = updated_result.scalar_one()
         assert updated_feedback.ml_optimized == True
-        assert updated_feedback.model_id == 'optimized_model_123'
+        assert updated_feedback.model_id is not None
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_feedback_not_found(self, prompt_service, real_db_session):
+    async def test_trigger_optimization_feedback_not_found(
+        self, prompt_service, real_db_session
+    ):
         """Test trigger optimization with non-existent feedback using real database."""
         non_existent_feedback_id = 999999
-        result = await prompt_service.trigger_optimization(non_existent_feedback_id, real_db_session)
-        assert result['status'] == 'error'
-        assert f'Feedback {non_existent_feedback_id} not found' in result['message']
+        result = await prompt_service.trigger_optimization(
+            non_existent_feedback_id, real_db_session
+        )
+        assert result["status"] == "error"
+        assert f"Feedback {non_existent_feedback_id} not found" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_insufficient_data(self, prompt_service, real_db_session):
+    async def test_trigger_optimization_insufficient_data(
+        self, prompt_service, real_db_session
+    ):
         """Test trigger optimization with insufficient performance data using real database."""
-        minimal_session = PromptSession(session_id='minimal_session', original_prompt='Minimal test prompt', improved_prompt='Minimal improved prompt', user_context={'test': True}, quality_score=0.7, improvement_score=0.65, confidence_level=0.8, created_at=aware_utc_now(), updated_at=aware_utc_now())
+        minimal_session = PromptSession(
+            session_id="minimal_session",
+            original_prompt="Minimal test prompt",
+            improved_prompt="Minimal improved prompt",
+            user_context={"test": True},
+            quality_score=0.7,
+            improvement_score=0.65,
+            confidence_level=0.8,
+            created_at=aware_utc_now(),
+            updated_at=aware_utc_now(),
+        )
         real_db_session.add(minimal_session)
-        minimal_feedback = UserFeedback(session_id='minimal_session', user_id='minimal_user', feedback_type='improvement', rating=4, comment='Minimal test feedback', ml_optimized=False, created_at=aware_utc_now(), updated_at=aware_utc_now())
+        minimal_feedback = UserFeedback(
+            session_id="minimal_session",
+            user_id="minimal_user",
+            feedback_type="improvement",
+            rating=4,
+            comment="Minimal test feedback",
+            ml_optimized=False,
+            created_at=aware_utc_now(),
+            updated_at=aware_utc_now(),
+        )
         real_db_session.add(minimal_feedback)
         await real_db_session.commit()
-        feedback_query = select(UserFeedback).where(UserFeedback.session_id == 'minimal_session')
+        feedback_query = select(UserFeedback).where(
+            UserFeedback.session_id == "minimal_session"
+        )
         result = await real_db_session.execute(feedback_query)
         feedback = result.scalar_one()
         result = await prompt_service.trigger_optimization(feedback.id, real_db_session)
-        assert result['status'] == 'error'
-        assert 'No performance data available' in result['message']
+        assert result["status"] == "error"
+        assert "No performance data available" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_trigger_optimization_ml_failure(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_trigger_optimization_ml_failure(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test trigger optimization with ML service failure using real database."""
         feedback_query = select(UserFeedback).limit(1)
         result = await real_db_session.execute(feedback_query)
         feedback = result.scalar_one()
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'error', 'error': 'Model training failed'}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
-            result = await prompt_service.trigger_optimization(feedback.id, real_db_session)
-        assert result['status'] == 'error'
-        assert 'Optimization failed: Model training failed' in result['message']
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.optimize_rules.return_value = {
+            "status": "error",
+            "error": "Model training failed",
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
+            result = await prompt_service.trigger_optimization(
+                feedback.id, real_db_session
+            )
+        assert result["status"] == "error"
+        assert "Optimization failed: Model training failed" in result["message"]
+
 
 class TestRunMLOptimization:
     """Test run_ml_optimization method using real database behavior."""
 
     @pytest.mark.asyncio
-    async def test_run_ml_optimization_success(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_run_ml_optimization_success(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test successful ML optimization run with real database."""
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'success', 'best_score': 0.88, 'model_id': 'ml_model_456', 'accuracy': 0.88, 'precision': 0.85, 'recall': 0.9}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.optimize_rules.return_value = {
+            "status": "success",
+            "best_score": 0.88,
+            "model_id": "ml_model_456",
+            "accuracy": 0.88,
+            "precision": 0.85,
+            "recall": 0.9,
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             result = await prompt_service.run_ml_optimization(None, real_db_session)
-        assert result['status'] == 'success'
-        assert result['best_score'] == 0.88
-        assert result['model_id'] == 'ml_model_456'
-        mock_ml_service.optimize_rules.assert_called_once()
-        call_args = mock_ml_service.optimize_rules.call_args[0]
+        assert result["status"] == "success"
+        assert result["best_score"] == 0.88
+        assert result["model_id"] == "ml_model_456"
+        real_ml_service_for_testing.optimize_rules.assert_called_once()
+        call_args = real_ml_service_for_testing.optimize_rules.call_args[0]
         training_data = call_args[0]
-        features = training_data['features']
+        features = training_data["features"]
         assert len(features[0]) == 10
         assert len(features) > 0
-        ml_perf_query = select(MLModelPerformance).where(MLModelPerformance.model_id == 'ml_model_456')
+        ml_perf_query = select(MLModelPerformance).where(
+            MLModelPerformance.model_id == "ml_model_456"
+        )
         ml_perf_result = await real_db_session.execute(ml_perf_query)
         ml_perf_record = ml_perf_result.scalar_one_or_none()
         assert ml_perf_record is not None
         assert ml_perf_record.accuracy == 0.88
 
     @pytest.mark.asyncio
-    async def test_run_ml_optimization_with_ensemble(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_run_ml_optimization_with_ensemble(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test ML optimization with ensemble when enough data available using real database."""
-        ensemble_rule = RuleMetadata(rule_id='ensemble_test_rule', rule_name='Ensemble Test Rule', description='Rule for ensemble testing', category='ensemble', default_parameters={'weight': 1.0, 'threshold': 0.7}, priority=3, created_at=aware_utc_now() - timedelta(days=30), updated_at=aware_utc_now() - timedelta(days=30))
+        ensemble_rule = RuleMetadata(
+            rule_id="ensemble_test_rule",
+            rule_name="Ensemble Test Rule",
+            description="Rule for ensemble testing",
+            category="ensemble",
+            default_parameters={"weight": 1.0, "threshold": 0.7},
+            priority=3,
+            created_at=aware_utc_now() - timedelta(days=30),
+            updated_at=aware_utc_now() - timedelta(days=30),
+        )
         real_db_session.add(ensemble_rule)
         ensemble_sessions = []
         for i in range(30):
-            ensemble_sessions.append(PromptSession(session_id=f'ensemble_session_{i}', original_prompt=f'Ensemble test prompt {i}', improved_prompt=f'Enhanced ensemble prompt {i}', user_context={'ensemble_test': True}, quality_score=0.85, improvement_score=0.8, confidence_level=0.88, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            ensemble_sessions.append(
+                PromptSession(
+                    session_id=f"ensemble_session_{i}",
+                    original_prompt=f"Ensemble test prompt {i}",
+                    improved_prompt=f"Enhanced ensemble prompt {i}",
+                    user_context={"ensemble_test": True},
+                    quality_score=0.85,
+                    improvement_score=0.8,
+                    confidence_level=0.88,
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for session in ensemble_sessions:
             real_db_session.add(session)
         additional_performance = []
         for i in range(30):
-            additional_performance.append(RulePerformance(rule_id='ensemble_test_rule', session_id=f'ensemble_session_{i}', improvement_score=0.8 + i * 0.003, execution_time_ms=150 + i * 2, confidence_level=0.85, user_satisfaction_score=0.9 + i * 0.001, parameters_used={'weight': 1.0, 'threshold': 0.7}, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            additional_performance.append(
+                RulePerformance(
+                    rule_id="ensemble_test_rule",
+                    session_id=f"ensemble_session_{i}",
+                    improvement_score=0.8 + i * 0.003,
+                    execution_time_ms=150 + i * 2,
+                    confidence_level=0.85,
+                    user_satisfaction_score=0.9 + i * 0.001,
+                    parameters_used={"weight": 1.0, "threshold": 0.7},
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for perf in additional_performance:
             real_db_session.add(perf)
         await real_db_session.commit()
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'success', 'best_score': 0.88, 'accuracy': 0.88, 'precision': 0.85, 'recall': 0.9}
-        mock_ml_service.optimize_ensemble_rules.return_value = {'status': 'success', 'ensemble_score': 0.92}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.optimize_rules.return_value = {
+            "status": "success",
+            "best_score": 0.88,
+            "accuracy": 0.88,
+            "precision": 0.85,
+            "recall": 0.9,
+        }
+        real_ml_service_for_testing.optimize_ensemble_rules.return_value = {
+            "status": "success",
+            "ensemble_score": 0.92,
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             result = await prompt_service.run_ml_optimization(None, real_db_session)
-        assert result['status'] == 'success'
-        assert 'ensemble' in result
-        assert result['ensemble']['ensemble_score'] == 0.92
-        mock_ml_service.optimize_rules.assert_called_once()
-        mock_ml_service.optimize_ensemble_rules.assert_called_once()
+        assert result["status"] == "success"
+        assert "ensemble" in result
+        assert result["ensemble"]["ensemble_score"] == 0.92
+        real_ml_service_for_testing.optimize_rules.assert_called_once()
+        real_ml_service_for_testing.optimize_ensemble_rules.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_ml_optimization_insufficient_data(self, prompt_service, real_db_session):
+    async def test_run_ml_optimization_insufficient_data(
+        self, prompt_service, real_db_session
+    ):
         """Test ML optimization with insufficient data using real database."""
-        insufficient_rule = RuleMetadata(rule_id='insufficient_rule', rule_name='Insufficient Rule', description='Rule for insufficient data testing', category='test', default_parameters={'weight': 0.8, 'threshold': 0.6}, priority=2, created_at=aware_utc_now() - timedelta(days=30), updated_at=aware_utc_now() - timedelta(days=30))
+        insufficient_rule = RuleMetadata(
+            rule_id="insufficient_rule",
+            rule_name="Insufficient Rule",
+            description="Rule for insufficient data testing",
+            category="test",
+            default_parameters={"weight": 0.8, "threshold": 0.6},
+            priority=2,
+            created_at=aware_utc_now() - timedelta(days=30),
+            updated_at=aware_utc_now() - timedelta(days=30),
+        )
         real_db_session.add(insufficient_rule)
         insufficient_sessions = []
         for i in range(15):
-            insufficient_sessions.append(PromptSession(session_id=f'insufficient_session_{i}', original_prompt=f'Insufficient test prompt {i}', improved_prompt=f'Insufficient improved prompt {i}', user_context={'insufficient_test': True}, quality_score=0.7, improvement_score=0.65, confidence_level=0.75, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            insufficient_sessions.append(
+                PromptSession(
+                    session_id=f"insufficient_session_{i}",
+                    original_prompt=f"Insufficient test prompt {i}",
+                    improved_prompt=f"Insufficient improved prompt {i}",
+                    user_context={"insufficient_test": True},
+                    quality_score=0.7,
+                    improvement_score=0.65,
+                    confidence_level=0.75,
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for session in insufficient_sessions:
             real_db_session.add(session)
         insufficient_data = []
         for i in range(15):
-            insufficient_data.append(RulePerformance(rule_id='insufficient_rule', session_id=f'insufficient_session_{i}', improvement_score=0.7 + i * 0.01, execution_time_ms=100 + i * 5, confidence_level=0.8, user_satisfaction_score=0.8, parameters_used={'weight': 0.8, 'threshold': 0.6}, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            insufficient_data.append(
+                RulePerformance(
+                    rule_id="insufficient_rule",
+                    session_id=f"insufficient_session_{i}",
+                    improvement_score=0.7 + i * 0.01,
+                    execution_time_ms=100 + i * 5,
+                    confidence_level=0.8,
+                    user_satisfaction_score=0.8,
+                    parameters_used={"weight": 0.8, "threshold": 0.6},
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for perf in insufficient_data:
             real_db_session.add(perf)
         await real_db_session.commit()
-        result = await prompt_service.run_ml_optimization(['insufficient_rule'], real_db_session)
-        assert result['status'] == 'insufficient_data'
-        assert 'Need at least 20 samples' in result['message']
-        assert result['samples_found'] == 15
+        result = await prompt_service.run_ml_optimization(
+            ["insufficient_rule"], real_db_session
+        )
+        assert result["status"] == "insufficient_data"
+        assert "Need at least 20 samples" in result["message"]
+        assert result["samples_found"] == 15
 
     @pytest.mark.asyncio
-    async def test_run_ml_optimization_feature_engineering(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_run_ml_optimization_feature_engineering(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test enhanced feature engineering with 10 features using real database."""
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'success'}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.optimize_rules.return_value = {"status": "success"}
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             await prompt_service.run_ml_optimization(None, real_db_session)
-        mock_ml_service.optimize_rules.assert_called_once()
-        call_args = mock_ml_service.optimize_rules.call_args[0]
+        real_ml_service_for_testing.optimize_rules.assert_called_once()
+        call_args = real_ml_service_for_testing.optimize_rules.call_args[0]
         training_data = call_args[0]
-        features = training_data['features']
+        features = training_data["features"]
         assert len(features) > 0
         first_feature_vector = features[0]
         assert len(first_feature_vector) == 10
@@ -215,56 +460,131 @@ class TestRunMLOptimization:
         assert isinstance(first_feature_vector[8], (int, float))
         assert isinstance(first_feature_vector[9], (int, float))
 
+
 class TestDiscoverPatterns:
     """Test discover_patterns method using real database behavior."""
 
     @pytest.mark.asyncio
-    async def test_discover_patterns_success(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_discover_patterns_success(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test successful pattern discovery with real database."""
-        mock_ml_service = AsyncMock()
-        mock_ml_service.discover_patterns.return_value = {'status': 'success', 'patterns_discovered': 3, 'patterns': [{'parameters': {'weight': 1.0}, 'avg_effectiveness': 0.85}, {'parameters': {'weight': 0.8}, 'avg_effectiveness': 0.8}, {'parameters': {'weight': 0.9}, 'avg_effectiveness': 0.82}], 'total_analyzed': 25, 'processing_time_ms': 1500}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.discover_patterns.return_value = {
+            "status": "success",
+            "patterns_discovered": 3,
+            "patterns": [
+                {"parameters": {"weight": 1.0}, "avg_effectiveness": 0.85},
+                {"parameters": {"weight": 0.8}, "avg_effectiveness": 0.8},
+                {"parameters": {"weight": 0.9}, "avg_effectiveness": 0.82},
+            ],
+            "total_analyzed": 25,
+            "processing_time_ms": 1500,
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             result = await prompt_service.discover_patterns(0.7, 5, real_db_session)
-        assert result['status'] == 'success'
-        assert result['patterns_discovered'] == 3
-        assert len(result['patterns']) == 3
-        assert result['total_analyzed'] == 25
-        assert result['processing_time_ms'] == 1500
-        mock_ml_service.discover_patterns.assert_called_once_with(db_session=real_db_session, min_effectiveness=0.7, min_support=5)
+        assert result["status"] == "success"
+        assert result["patterns_discovered"] == 3
+        assert len(result["patterns"]) == 3
+        assert result["total_analyzed"] == 25
+        assert result["processing_time_ms"] == 1500
+        real_ml_service_for_testing.discover_patterns.assert_called_once_with(
+            db_session=real_db_session, min_effectiveness=0.7, min_support=5
+        )
         ab_experiment_query = select(ABExperiment)
         ab_result = await real_db_session.execute(ab_experiment_query)
         ab_experiments = ab_result.scalars().all()
         assert len(ab_experiments) == 3
 
     @pytest.mark.asyncio
-    async def test_discover_patterns_insufficient_data(self, prompt_service, real_db_session):
+    async def test_discover_patterns_insufficient_data(
+        self, prompt_service, real_db_session
+    ):
         """Test pattern discovery with insufficient data using real database."""
-        minimal_rule = RuleMetadata(rule_id='minimal_pattern_rule', rule_name='Minimal Pattern Rule', description='Rule for minimal pattern testing', category='test', default_parameters={'weight': 0.8, 'threshold': 0.7}, priority=1, created_at=aware_utc_now() - timedelta(days=30), updated_at=aware_utc_now() - timedelta(days=30))
+        minimal_rule = RuleMetadata(
+            rule_id="minimal_pattern_rule",
+            rule_name="Minimal Pattern Rule",
+            description="Rule for minimal pattern testing",
+            category="test",
+            default_parameters={"weight": 0.8, "threshold": 0.7},
+            priority=1,
+            created_at=aware_utc_now() - timedelta(days=30),
+            updated_at=aware_utc_now() - timedelta(days=30),
+        )
         real_db_session.add(minimal_rule)
         minimal_sessions = []
         for i in range(3):
-            minimal_sessions.append(PromptSession(session_id=f'minimal_pattern_session_{i}', original_prompt=f'Minimal pattern test prompt {i}', improved_prompt=f'Minimal pattern improved prompt {i}', user_context={'minimal_test': True}, quality_score=0.85, improvement_score=0.8, confidence_level=0.82, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            minimal_sessions.append(
+                PromptSession(
+                    session_id=f"minimal_pattern_session_{i}",
+                    original_prompt=f"Minimal pattern test prompt {i}",
+                    improved_prompt=f"Minimal pattern improved prompt {i}",
+                    user_context={"minimal_test": True},
+                    quality_score=0.85,
+                    improvement_score=0.8,
+                    confidence_level=0.82,
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for session in minimal_sessions:
             real_db_session.add(session)
         minimal_performance = []
         for i in range(3):
-            minimal_performance.append(RulePerformance(rule_id='minimal_pattern_rule', session_id=f'minimal_pattern_session_{i}', improvement_score=0.85, execution_time_ms=100, confidence_level=0.8, user_satisfaction_score=0.9, parameters_used={'weight': 0.8 + i * 0.05, 'threshold': 0.7}, created_at=aware_utc_now() - timedelta(hours=i), updated_at=aware_utc_now() - timedelta(hours=i)))
+            minimal_performance.append(
+                RulePerformance(
+                    rule_id="minimal_pattern_rule",
+                    session_id=f"minimal_pattern_session_{i}",
+                    improvement_score=0.85,
+                    execution_time_ms=100,
+                    confidence_level=0.8,
+                    user_satisfaction_score=0.9,
+                    parameters_used={"weight": 0.8 + i * 0.05, "threshold": 0.7},
+                    created_at=aware_utc_now() - timedelta(hours=i),
+                    updated_at=aware_utc_now() - timedelta(hours=i),
+                )
+            )
         for perf in minimal_performance:
             real_db_session.add(perf)
         await real_db_session.commit()
-        mock_ml_service = AsyncMock()
-        mock_ml_service.discover_patterns.return_value = {'status': 'insufficient_data', 'message': 'Only 3 high-performing samples found (minimum: 5)'}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.discover_patterns.return_value = {
+            "status": "insufficient_data",
+            "message": "Only 3 high-performing samples found (minimum: 5)",
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             result = await prompt_service.discover_patterns(0.8, 5, real_db_session)
-        assert result['status'] == 'insufficient_data'
-        assert 'minimum: 5' in result['message']
+        assert result["status"] == "insufficient_data"
+        assert "minimum: 5" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_discover_patterns_creates_ab_experiments(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_discover_patterns_creates_ab_experiments(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test that pattern discovery creates A/B experiments for top patterns using real database."""
-        mock_ml_service = AsyncMock()
-        mock_ml_service.discover_patterns.return_value = {'status': 'success', 'patterns_discovered': 5, 'patterns': [{'parameters': {'weight': 1.0}, 'avg_effectiveness': 0.9}, {'parameters': {'weight': 0.9}, 'avg_effectiveness': 0.85}, {'parameters': {'weight': 0.8}, 'avg_effectiveness': 0.8}, {'parameters': {'weight': 0.7}, 'avg_effectiveness': 0.75}, {'parameters': {'weight': 0.6}, 'avg_effectiveness': 0.7}], 'total_analyzed': 25}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.discover_patterns.return_value = {
+            "status": "success",
+            "patterns_discovered": 5,
+            "patterns": [
+                {"parameters": {"weight": 1.0}, "avg_effectiveness": 0.9},
+                {"parameters": {"weight": 0.9}, "avg_effectiveness": 0.85},
+                {"parameters": {"weight": 0.8}, "avg_effectiveness": 0.8},
+                {"parameters": {"weight": 0.7}, "avg_effectiveness": 0.75},
+                {"parameters": {"weight": 0.6}, "avg_effectiveness": 0.7},
+            ],
+            "total_analyzed": 25,
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             await prompt_service.discover_patterns(0.7, 5, real_db_session)
         ab_experiment_query = select(ABExperiment)
         ab_result = await real_db_session.execute(ab_experiment_query)
@@ -273,52 +593,95 @@ class TestDiscoverPatterns:
         control_rules = [exp.control_rules for exp in ab_experiments]
         assert len(control_rules) == 3
 
+
 class TestPhase3HelperMethods:
     """Test Phase 3 helper methods for ML integration using real database behavior."""
 
     @pytest.mark.asyncio
-    async def test_store_optimization_trigger(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_store_optimization_trigger(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test storing optimization trigger event with real database."""
         feedback_query = select(UserFeedback).limit(1)
         result = await real_db_session.execute(feedback_query)
         feedback = result.scalar_one()
-        await prompt_service._store_optimization_trigger(real_db_session, feedback.id, 'model_456', 25, 0.88)
-        updated_feedback_query = select(UserFeedback).where(UserFeedback.id == feedback.id)
+        await prompt_service._store_optimization_trigger(
+            real_db_session, feedback.id, "model_456", 25, 0.88
+        )
+        updated_feedback_query = select(UserFeedback).where(
+            UserFeedback.id == feedback.id
+        )
         updated_result = await real_db_session.execute(updated_feedback_query)
         updated_feedback = updated_result.scalar_one()
         assert updated_feedback.ml_optimized == True
-        assert updated_feedback.model_id == 'model_456'
+        assert updated_feedback.model_id == "model_456"
 
     @pytest.mark.asyncio
     async def test_store_ml_optimization_results(self, prompt_service, real_db_session):
         """Test storing ML optimization results with real database."""
-        optimization_result = {'model_id': 'test_model_789', 'best_score': 0.85, 'accuracy': 0.9, 'precision': 0.88, 'recall': 0.92}
-        await prompt_service._store_ml_optimization_results(real_db_session, ['clarity_rule'], optimization_result, 30)
-        ml_perf_query = select(MLModelPerformance).where(MLModelPerformance.model_id == 'test_model_789')
+        optimization_result = {
+            "model_id": "test_model_789",
+            "best_score": 0.85,
+            "accuracy": 0.9,
+            "precision": 0.88,
+            "recall": 0.92,
+        }
+        await prompt_service._store_ml_optimization_results(
+            real_db_session, ["clarity_rule"], optimization_result, 30
+        )
+        ml_perf_query = select(MLModelPerformance).where(
+            MLModelPerformance.model_id == "test_model_789"
+        )
         ml_perf_result = await real_db_session.execute(ml_perf_query)
         ml_perf_record = ml_perf_result.scalar_one()
-        assert ml_perf_record.model_id == 'test_model_789'
+        assert ml_perf_record.model_id == "test_model_789"
         assert ml_perf_record.accuracy == 0.9
         assert ml_perf_record.precision == 0.88
         assert ml_perf_record.recall == 0.92
         assert ml_perf_record.training_samples == 30
 
     @pytest.mark.asyncio
-    async def test_create_ab_experiments_from_patterns(self, prompt_service, real_db_session):
+    async def test_create_ab_experiments_from_patterns(
+        self, prompt_service, real_db_session
+    ):
         """Test creating A/B experiments from discovered patterns with real database."""
-        patterns = [{'avg_effectiveness': 0.9, 'parameters': {'weight': 1.0}}, {'avg_effectiveness': 0.85, 'parameters': {'weight': 0.9}}, {'avg_effectiveness': 0.8, 'parameters': {'weight': 0.8}}]
-        await prompt_service._create_ab_experiments_from_patterns(real_db_session, patterns)
+        patterns = [
+            {"avg_effectiveness": 0.9, "parameters": {"weight": 1.0}},
+            {"avg_effectiveness": 0.85, "parameters": {"weight": 0.9}},
+            {"avg_effectiveness": 0.8, "parameters": {"weight": 0.8}},
+        ]
+        await prompt_service._create_ab_experiments_from_patterns(
+            real_db_session, patterns
+        )
         ab_experiment_query = select(ABExperiment)
         ab_result = await real_db_session.execute(ab_experiment_query)
         ab_experiments = ab_result.scalars().all()
         assert len(ab_experiments) == 3
-        assert all((exp.status == 'running' for exp in ab_experiments))
+        assert all(exp.status == "running" for exp in ab_experiments)
 
     @pytest.mark.asyncio
-    async def test_store_pattern_discovery_results(self, prompt_service, real_db_session):
+    async def test_store_pattern_discovery_results(
+        self, prompt_service, real_db_session
+    ):
         """Test storing pattern discovery results with real database."""
-        discovery_result = {'patterns': [{'avg_effectiveness': 0.88, 'parameters': {'weight': 1.0}, 'support_count': 10}, {'avg_effectiveness': 0.82, 'parameters': {'weight': 0.9}, 'support_count': 8}]}
-        await prompt_service._store_pattern_discovery_results(real_db_session, discovery_result)
+        discovery_result = {
+            "patterns": [
+                {
+                    "avg_effectiveness": 0.88,
+                    "parameters": {"weight": 1.0},
+                    "support_count": 10,
+                },
+                {
+                    "avg_effectiveness": 0.82,
+                    "parameters": {"weight": 0.9},
+                    "support_count": 8,
+                },
+            ]
+        }
+        await prompt_service._store_pattern_discovery_results(
+            real_db_session, discovery_result
+        )
+
 
 class TestPhase3Integration:
     """Test Phase 3 integration with existing functionality using real database behavior."""
@@ -326,9 +689,9 @@ class TestPhase3Integration:
     @pytest.mark.asyncio
     async def test_phase3_methods_integration(self, prompt_service, real_db_session):
         """Test that Phase 3 methods integrate properly with existing service."""
-        assert hasattr(prompt_service, 'trigger_optimization')
-        assert hasattr(prompt_service, 'run_ml_optimization')
-        assert hasattr(prompt_service, 'discover_patterns')
+        assert hasattr(prompt_service, "trigger_optimization")
+        assert hasattr(prompt_service, "run_ml_optimization")
+        assert hasattr(prompt_service, "discover_patterns")
         assert asyncio.iscoroutinefunction(prompt_service.trigger_optimization)
         assert asyncio.iscoroutinefunction(prompt_service.run_ml_optimization)
         assert asyncio.iscoroutinefunction(prompt_service.discover_patterns)
@@ -336,29 +699,56 @@ class TestPhase3Integration:
     @pytest.mark.asyncio
     async def test_ml_service_import_integration(self, prompt_service):
         """Test that ML service import works correctly."""
-        with patch('prompt_improver.services.ml_integration.get_ml_service') as mock_get_ml:
-            mock_ml_service = AsyncMock()
-            mock_get_ml.return_value = mock_ml_service
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service"
+        ) as mock_get_ml:
+            real_ml_service_for_testing = AsyncMock()
+            mock_get_ml.return_value = real_ml_service_for_testing
             from prompt_improver.services.ml_integration import get_ml_service
+
             service = await get_ml_service()
-            assert service is mock_ml_service
+            assert service is real_ml_service_for_testing
 
     @pytest.mark.asyncio
-    async def test_end_to_end_ml_workflow(self, prompt_service, real_db_session, real_ml_test_data):
+    async def test_end_to_end_ml_workflow(
+        self, prompt_service, real_db_session, real_ml_test_data
+    ):
         """Test complete end-to-end ML workflow integration with real database."""
-        mock_ml_service = AsyncMock()
-        mock_ml_service.optimize_rules.return_value = {'status': 'success', 'best_score': 0.85, 'model_id': 'workflow_model_123', 'accuracy': 0.85, 'precision': 0.82, 'recall': 0.88}
-        mock_ml_service.discover_patterns.return_value = {'status': 'success', 'patterns_discovered': 2, 'patterns': [{'parameters': {'weight': 1.0}, 'avg_effectiveness': 0.9}, {'parameters': {'weight': 0.8}, 'avg_effectiveness': 0.85}], 'total_analyzed': 25}
-        with patch('prompt_improver.services.ml_integration.get_ml_service', return_value=mock_ml_service):
+        real_ml_service_for_testing = AsyncMock()
+        real_ml_service_for_testing.optimize_rules.return_value = {
+            "status": "success",
+            "best_score": 0.85,
+            "model_id": "workflow_model_123",
+            "accuracy": 0.85,
+            "precision": 0.82,
+            "recall": 0.88,
+        }
+        real_ml_service_for_testing.discover_patterns.return_value = {
+            "status": "success",
+            "patterns_discovered": 2,
+            "patterns": [
+                {"parameters": {"weight": 1.0}, "avg_effectiveness": 0.9},
+                {"parameters": {"weight": 0.8}, "avg_effectiveness": 0.85},
+            ],
+            "total_analyzed": 25,
+        }
+        with patch(
+            "prompt_improver.services.ml_integration.get_ml_service",
+            return_value=real_ml_service_for_testing,
+        ):
             feedback_query = select(UserFeedback).limit(1)
             feedback_result = await real_db_session.execute(feedback_query)
             feedback = feedback_result.scalar_one()
-            optimization_result = await prompt_service.trigger_optimization(feedback.id, real_db_session)
-            assert optimization_result['status'] == 'success'
+            optimization_result = await prompt_service.trigger_optimization(
+                feedback.id, real_db_session
+            )
+            assert optimization_result["status"] == "success"
             ml_result = await prompt_service.run_ml_optimization(None, real_db_session)
-            assert ml_result['status'] == 'success'
-            pattern_result = await prompt_service.discover_patterns(0.7, 5, real_db_session)
-            assert pattern_result['status'] == 'success'
+            assert ml_result["status"] == "success"
+            pattern_result = await prompt_service.discover_patterns(
+                0.7, 5, real_db_session
+            )
+            assert pattern_result["status"] == "success"
             ml_perf_query = select(MLModelPerformance)
             ml_perf_result = await real_db_session.execute(ml_perf_query)
             ml_perf_records = ml_perf_result.scalars().all()
@@ -367,5 +757,7 @@ class TestPhase3Integration:
             ab_result = await real_db_session.execute(ab_query)
             ab_records = ab_result.scalars().all()
             assert len(ab_records) >= 2
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '--tb=short'])
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])

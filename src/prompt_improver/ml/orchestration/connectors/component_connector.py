@@ -28,9 +28,9 @@ class ComponentCapability:
     """Represents a capability that a component provides."""
     name: str
     description: str
-    input_types: List[str]
-    output_types: List[str]
-    dependencies: List[str] = None
+    input_types: list[str]
+    output_types: list[str]
+    dependencies: list[str] = None
 
     def __post_init__(self):
         if self.dependencies is None:
@@ -42,10 +42,10 @@ class ComponentMetadata:
     name: str
     tier: ComponentTier
     version: str
-    capabilities: List[ComponentCapability]
-    health_check_endpoint: Optional[str] = None
-    api_endpoints: List[str] = None
-    resource_requirements: Dict[str, Any] = None
+    capabilities: list[ComponentCapability]
+    health_check_endpoint: str | None = None
+    api_endpoints: list[str] = None
+    resource_requirements: dict[str, Any] = None
 
     def __post_init__(self):
         if self.api_endpoints is None:
@@ -60,7 +60,7 @@ class ComponentInterface(Protocol):
         """Initialize the component."""
         ...
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check component health."""
         ...
 
@@ -68,7 +68,7 @@ class ComponentInterface(Protocol):
         """Get current component status."""
         ...
 
-    async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute component functionality."""
         ...
 
@@ -89,12 +89,12 @@ class ComponentConnector(ABC):
         self.event_bus = event_bus
         self.logger = logging.getLogger(f'{__name__}.{metadata.name}')
         self.status = ComponentStatus.UNKNOWN
-        self.connected_at: Optional[datetime] = None
-        self.last_health_check: Optional[datetime] = None
-        self.health_status: Dict[str, Any] = {}
-        self.component_instance: Optional[ComponentInterface] = None
-        self.active_executions: Dict[str, Dict[str, Any]] = {}
-        self.execution_history: List[Dict[str, Any]] = []
+        self.connected_at: datetime | None = None
+        self.last_health_check: datetime | None = None
+        self.health_status: dict[str, Any] = {}
+        self.component_instance: ComponentInterface | None = None
+        self.active_executions: dict[str, dict[str, Any]] = {}
+        self.execution_history: list[dict[str, Any]] = []
 
     async def connect(self) -> None:
         """Connect the component to the orchestrator."""
@@ -130,7 +130,7 @@ class ComponentConnector(ABC):
             self.status = ComponentStatus.ERROR
             raise
 
-    async def execute_capability(self, capability_name: str, execution_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_capability(self, capability_name: str, execution_id: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute a specific capability of the component."""
         self.logger.info('Executing capability {capability_name} for component %s', self.metadata.name)
         capability = self._get_capability(capability_name)
@@ -176,24 +176,24 @@ class ComponentConnector(ABC):
             self.status = ComponentStatus.ready
         self.logger.info('Execution {execution_id} stopped for component %s', self.metadata.name)
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on the component."""
         await self._perform_health_check()
         return self.health_status.copy()
 
-    def get_capabilities(self) -> List[ComponentCapability]:
+    def get_capabilities(self) -> list[ComponentCapability]:
         """Get list of component capabilities."""
         return self.metadata.capabilities.copy()
 
-    def get_execution_status(self, execution_id: str) -> Optional[Dict[str, Any]]:
+    def get_execution_status(self, execution_id: str) -> dict[str, Any] | None:
         """Get status of a specific execution."""
         return self.active_executions.get(execution_id, {}).copy() if execution_id in self.active_executions else None
 
-    def list_active_executions(self) -> List[str]:
+    def list_active_executions(self) -> list[str]:
         """List all active execution IDs."""
         return list(self.active_executions.keys())
 
-    def get_execution_history(self, limit: int=10) -> List[Dict[str, Any]]:
+    def get_execution_history(self, limit: int=10) -> list[dict[str, Any]]:
         """Get execution history."""
         return self.execution_history[-limit:] if limit > 0 else self.execution_history.copy()
 
@@ -203,7 +203,7 @@ class ComponentConnector(ABC):
         pass
 
     @abstractmethod
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute the specific component. Must be implemented by subclasses."""
         pass
 
@@ -220,14 +220,14 @@ class ComponentConnector(ABC):
             self.health_status = {'status': 'unhealthy', 'timestamp': datetime.now(timezone.utc), 'details': {'error': str(e)}}
             self.logger.warning('Health check failed for component {self.metadata.name}: %s', e)
 
-    def _get_capability(self, capability_name: str) -> Optional[ComponentCapability]:
+    def _get_capability(self, capability_name: str) -> ComponentCapability | None:
         """Get a specific capability by name."""
         for capability in self.metadata.capabilities:
             if capability.name == capability_name:
                 return capability
         return None
 
-    def list_available_components(self) -> List[str]:
+    def list_available_components(self) -> list[str]:
         """
         List available components for this connector.
 
@@ -239,7 +239,7 @@ class ComponentConnector(ABC):
         """
         return [self.metadata.name]
 
-    def get_component_capabilities(self) -> List[ComponentCapability]:
+    def get_component_capabilities(self) -> list[ComponentCapability]:
         """
         Get the capabilities provided by this component.
 

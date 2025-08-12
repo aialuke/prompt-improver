@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 import pandas as pd
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
 from ...core.services.analytics_factory import get_analytics_router
 from ...database.models import ABExperiment, RulePerformance
 from ...performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, TaskPriority, get_background_task_manager
@@ -196,7 +197,7 @@ class ExperimentOrchestrator:
             Comprehensive experiment analysis result
         """
         analysis_start = aware_utc_now()
-        analysis_id = f"analysis_{experiment_id}_{analysis_start.strftime('%Y%m%d_%H%M%S')}"
+        analysis_id = f"analysis_{experiment_id}_{format_compact_timestamp(analysis_start)}"
         try:
             logger.info('Starting experiment analysis: %s', experiment_id)
             config = self.active_experiments.get(experiment_id)
@@ -317,7 +318,7 @@ class ExperimentOrchestrator:
             warnings.append('Effect size threshold is very small, may lead to false positives')
         if config.statistical_power < 0.7:
             warnings.append('Statistical power is low, consider increasing sample size')
-        total_weight = sum((arm.allocation_weight for arm in config.arms))
+        total_weight = sum(arm.allocation_weight for arm in config.arms)
         if abs(total_weight - len(config.arms)) > 0.01:
             warnings.append('Arm allocation weights may not be balanced')
         if not config.stopping_rules:
@@ -701,7 +702,7 @@ class ExperimentOrchestrator:
                 if daily_rate > 0:
                     days_remaining = (target_sample - current_sample) / daily_rate
                     completion_date = aware_utc_now() + timedelta(days=days_remaining)
-                    return completion_date.strftime('%Y-%m-%d')
+                    return format_date_only(completion_date)
             return 'Unable to estimate'
         except Exception as e:
             logger.warning('Error estimating completion date: %s', e)

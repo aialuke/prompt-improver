@@ -14,5 +14,5 @@ from .optimization.algorithms.clustering_optimizer import ClusteringOptimizer
 from .optimization.algorithms.dimensionality_reducer import AdvancedDimensionalityReducer as DimensionalityReducer
 from .optimization.algorithms.multi_armed_bandit import MultiarmedBanditFramework
 from .optimization.algorithms.rule_optimizer import RuleOptimizer
-from .utils.nltk_manager import NLTKResourceManager
-__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelService', 'ModelManager', 'ProductionModelRegistry', 'ContextLearner', 'InsightGenerationEngine', 'RuleAnalyzer', 'RuleOptimizer', 'MultiarmedBanditFramework', 'ClusteringOptimizer', 'DimensionalityReducer', 'AutoMLOrchestrator', 'NLTKResourceManager']
+# NLTK manager removed - use EnglishNLTKManager from ml.learning.features.english_nltk_manager
+__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelService', 'ModelManager', 'ProductionModelRegistry', 'ContextLearner', 'InsightGenerationEngine', 'RuleAnalyzer', 'RuleOptimizer', 'MultiarmedBanditFramework', 'ClusteringOptimizer', 'DimensionalityReducer', 'AutoMLOrchestrator']

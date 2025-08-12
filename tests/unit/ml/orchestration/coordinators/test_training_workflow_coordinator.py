@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock, patch
 import pytest
+from prompt_improver.ml.orchestration.metrics import TrainingMetrics
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.ml.orchestration.coordinators.training_workflow_coordinator import TrainingWorkflowCoordinator
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import PipelineState
@@ -82,9 +83,9 @@ class TestTrainingWorkflowCoordinator:
         """Test model training step execution."""
         workflow_id = 'model-train-test'
         parameters = {'model_architecture': 'transformer', 'epochs': 5, 'learning_rate': 0.001, 'batch_size': 16}
-        mock_ml_service = Mock()
-        mock_ml_service.execute = AsyncMock(return_value={'status': 'success', 'data': {'model_trained': True, 'final_accuracy': 0.94, 'final_loss': 0.12, 'training_time': 120.5, 'epochs_completed': 5}})
-        coordinator.component_registry.get_component.return_value = mock_ml_service
+        real_ml_service_for_testing = Mock()
+        real_ml_service_for_testing.execute = AsyncMock(return_value={'status': 'success', 'data': {'model_trained': True, 'final_accuracy': 0.94, 'final_loss': 0.12, 'training_time': 120.5, 'epochs_completed': 5}})
+        coordinator.component_registry.get_component.return_value = real_ml_service_for_testing
         result = await coordinator._execute_model_training(workflow_id, parameters)
         assert result['status'] == 'success'
         assert result['data']['model_trained'] is True
@@ -153,7 +154,7 @@ class TestTrainingWorkflowCoordinator:
         tasks = [coordinator.start_training_workflow(workflow_id, parameters) for workflow_id in workflow_ids]
         workflows = await asyncio.gather(*tasks)
         assert len(workflows) == 3
-        assert all((w.state == WorkflowState.RUNNING for w in workflows))
+        assert all(w.state == WorkflowState.RUNNING for w in workflows)
         active = await coordinator.list_active_workflows()
         assert len(active) == 3
 
@@ -189,7 +190,7 @@ class TestTrainingMetrics:
     def test_metrics_serialization(self):
         """Test metrics to/from dict conversion."""
         metrics = TrainingMetrics(workflow_id='serialize-test', accuracy=0.88, loss=0.22, training_time=180.0, samples_processed=1000, epochs_completed=5)
-        metrics_dict = metrics.to_dict()
+        metrics_dict = metrics.model_dump()
         restored_metrics = TrainingMetrics.from_dict(metrics_dict)
         assert restored_metrics.workflow_id == metrics.workflow_id
         assert restored_metrics.accuracy == metrics.accuracy

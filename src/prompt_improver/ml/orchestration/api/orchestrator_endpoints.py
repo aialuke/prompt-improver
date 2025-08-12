@@ -9,38 +9,39 @@ import logging
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 from ..events.event_types import EventType, MLEvent
 
-class WorkflowRequest(SQLModel):
+class WorkflowRequest(BaseModel):
     """Request model for workflow creation."""
     workflow_type: str = Field(..., description='Type of workflow (training, evaluation, deployment)')
-    parameters: Dict[str, Any] = Field(default_factory=dict, description='Workflow parameters')
+    parameters: dict[str, Any] = Field(default_factory=dict, description='Workflow parameters')
     priority: str = Field(default='normal', description='Workflow priority (low, normal, high)')
-    timeout: Optional[int] = Field(default=None, description='Workflow timeout in seconds')
+    timeout: int | None = Field(default=None, description='Workflow timeout in seconds')
 
-class WorkflowResponse(SQLModel):
+class WorkflowResponse(BaseModel):
     """Response model for workflow operations."""
     workflow_id: str
     status: str
     created_at: str
-    parameters: Dict[str, Any]
-    current_step: Optional[str] = None
+    parameters: dict[str, Any]
+    current_step: str | None = None
 
-class ComponentRegistrationRequest(SQLModel):
+class ComponentRegistrationRequest(BaseModel):
     """Request model for component registration."""
     component_name: str = Field(..., description='Name of the component')
     component_tier: str = Field(..., description='Component tier (tier_1_core, tier_2_optimization, etc.)')
-    capabilities: List[str] = Field(..., description='List of component capabilities')
-    resource_requirements: Dict[str, Any] = Field(default_factory=dict, description='Resource requirements')
+    capabilities: list[str] = Field(..., description='List of component capabilities')
+    resource_requirements: dict[str, Any] = Field(default_factory=dict, description='Resource requirements')
 
-class HealthStatusResponse(SQLModel):
+class HealthStatusResponse(BaseModel):
     """Response model for health status."""
     overall_health: str
     orchestrator_status: str
     active_workflows: int
     active_components: int
     last_check: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 class OrchestratorEndpoints:
     """
@@ -110,7 +111,7 @@ class OrchestratorEndpoints:
             """Simple health check endpoint."""
             return {'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()}
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get overall orchestrator status."""
         try:
             if not self.orchestrator:
@@ -139,7 +140,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error getting orchestrator status: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def create_workflow(self, request: WorkflowRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+    async def create_workflow(self, request: WorkflowRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
         """Create and start a new workflow."""
         try:
             if not self.orchestrator:
@@ -159,7 +160,7 @@ class OrchestratorEndpoints:
         coordinators = {'training': getattr(self.orchestrator, 'training_coordinator', None), 'evaluation': getattr(self.orchestrator, 'evaluation_coordinator', None), 'deployment': getattr(self.orchestrator, 'deployment_coordinator', None), 'optimization': getattr(self.orchestrator, 'optimization_coordinator', None), 'data_pipeline': getattr(self.orchestrator, 'data_pipeline_coordinator', None)}
         return coordinators.get(workflow_type)
 
-    async def _start_workflow_async(self, coordinator, workflow_id: str, parameters: Dict[str, Any], timeout: Optional[int]):
+    async def _start_workflow_async(self, coordinator, workflow_id: str, parameters: dict[str, Any], timeout: int | None):
         """Start workflow asynchronously."""
         try:
             if hasattr(coordinator, 'start_training_workflow'):
@@ -177,7 +178,7 @@ class OrchestratorEndpoints:
         except Exception as e:
             self.logger.error('Error starting workflow {workflow_id}: %s', e)
 
-    async def list_workflows(self) -> Dict[str, Any]:
+    async def list_workflows(self) -> dict[str, Any]:
         """List all workflows."""
         try:
             if not self.orchestrator:
@@ -208,12 +209,12 @@ class OrchestratorEndpoints:
                     except Exception as e:
                         self.logger.warning('Error getting workflows from {workflow_type} coordinator: %s', e)
                         workflows[workflow_type] = []
-            return {'workflows': workflows, 'total_active': sum((len(wf_list) for wf_list in workflows.values()))}
+            return {'workflows': workflows, 'total_active': sum(len(wf_list) for wf_list in workflows.values())}
         except Exception as e:
             self.logger.error('Error listing workflows: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_workflow_status(self, workflow_id: str) -> dict[str, Any]:
         """Get status of a specific workflow."""
         try:
             if not self.orchestrator:
@@ -240,7 +241,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error getting workflow status: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def stop_workflow(self, workflow_id: str) -> Dict[str, Any]:
+    async def stop_workflow(self, workflow_id: str) -> dict[str, Any]:
         """Stop a running workflow."""
         try:
             if not self.orchestrator:
@@ -266,7 +267,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error stopping workflow: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def list_components(self) -> Dict[str, Any]:
+    async def list_components(self) -> dict[str, Any]:
         """List all registered components."""
         try:
             if not self.orchestrator:
@@ -290,7 +291,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error listing components: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def register_component(self, request: ComponentRegistrationRequest) -> Dict[str, Any]:
+    async def register_component(self, request: ComponentRegistrationRequest) -> dict[str, Any]:
         """Register a new component."""
         try:
             if not self.orchestrator:
@@ -303,7 +304,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error registering component: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def get_component_health(self, component_name: str) -> Dict[str, Any]:
+    async def get_component_health(self, component_name: str) -> dict[str, Any]:
         """Get health status of a specific component."""
         try:
             if not self.orchestrator:
@@ -321,7 +322,7 @@ class OrchestratorEndpoints:
             self.logger.error('Error getting component health: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def get_metrics(self) -> Dict[str, Any]:
+    async def get_metrics(self) -> dict[str, Any]:
         """Get orchestrator performance metrics."""
         try:
             if not self.orchestrator:

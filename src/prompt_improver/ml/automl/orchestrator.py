@@ -21,7 +21,7 @@ from .callbacks import AutoMLCallback
 tracer = trace.get_tracer(__name__)
 if TYPE_CHECKING:
     from ...core.services.analytics_factory import get_analytics_router
-    from ...database import UnifiedConnectionManager
+    from prompt_improver.database import DatabaseServices
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
     from ..optimization.algorithms.rule_optimizer import OptimizationConfig, RuleOptimizer
     from ..utils.model_manager import ModelManager
@@ -38,7 +38,7 @@ class AutoMLMode(Enum):
 class AutoMLConfig:
     """Configuration for AutoML orchestration"""
     study_name: str = 'prompt_improver_automl'
-    storage_url: str = field(default_factory=lambda: os.getenv('AUTOML_DATABASE_URL', f"postgresql+psycopg://{os.getenv('POSTGRES_USERNAME', 'user')}:{os.getenv('POSTGRES_PASSWORD', 'password')}@{os.getenv('POSTGRES_HOST', 'localhost')}/automl_studies"))
+    storage_url: str = field(default_factory=lambda: os.getenv('AUTOML_DATABASE_URL') or f"postgresql+psycopg://{os.getenv('POSTGRES_USERNAME')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}/automl_studies")
     n_trials: int = 100
     timeout: int | None = 3600
     optimization_mode: AutoMLMode = AutoMLMode.HYPERPARAMETER_OPTIMIZATION
@@ -68,7 +68,7 @@ class AutoMLOrchestrator:
     - Continuous optimization and drift detection
     """
 
-    def __init__(self, config: AutoMLConfig, db_manager: 'DatabaseManager', rule_optimizer: Optional['RuleOptimizer']=None, experiment_orchestrator: Optional['ExperimentOrchestrator']=None, analytics_service: Optional[Any]=None, model_manager: Optional['ModelManager']=None):
+    def __init__(self, config: AutoMLConfig, db_manager: 'DatabaseManager', rule_optimizer: Optional['RuleOptimizer']=None, experiment_orchestrator: Optional['ExperimentOrchestrator']=None, analytics_service: Any | None=None, model_manager: Optional['ModelManager']=None):
         """Initialize AutoML orchestrator with existing components
 
         Args:
@@ -226,13 +226,14 @@ class AutoMLOrchestrator:
             if hasattr(self.study, 'optimize_async'):
                 result = await self.study.optimize_async(objective_function, n_trials=self.config.n_trials, timeout=self.config.timeout, callbacks=callbacks)
             else:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(self.study.optimize, objective_function, n_trials=self.config.n_trials, timeout=self.config.timeout, callbacks=callbacks)
-                    while not future.done():
-                        await asyncio.sleep(5)
-                        logger.info('Optimization in progress... Completed trials: %s', len(self.study.trials))
-                    result = future.result()
+                # Use asyncio.to_thread for blocking optimization
+                result = await asyncio.to_thread(
+                    self.study.optimize, 
+                    objective_function, 
+                    n_trials=self.config.n_trials, 
+                    timeout=self.config.timeout, 
+                    callbacks=callbacks
+                )
             return {'status': 'completed', 'best_value': self.study.best_value, 'best_params': self.study.best_params, 'n_trials': len(self.study.trials), 'optimization_time': time.time()}
         except Exception as e:
             logger.error('Optimization execution failed: %s', e)
@@ -314,7 +315,7 @@ class AutoMLOrchestrator:
             return {'status': 'stopped', 'message': 'Optimization stopped successfully'}
         return {'status': 'idle', 'message': 'No optimization running'}
 
-async def create_automl_orchestrator(config: AutoMLConfig | None=None, db_manager: Optional['UnifiedConnectionManager']=None) -> AutoMLOrchestrator:
+async def create_automl_orchestrator(config: AutoMLConfig | None=None, db_manager: Optional['DatabaseServices']=None) -> AutoMLOrchestrator:
     """Factory function to create AutoML orchestrator with proper component initialization
 
     Args:

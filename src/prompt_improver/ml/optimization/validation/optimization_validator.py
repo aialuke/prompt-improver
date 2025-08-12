@@ -69,7 +69,7 @@ class EnhancedValidationConfig:
     bayesian_draws: int = 2000
     bayesian_tune: int = 1000
     enable_multi_metric_validation: bool = True
-    metric_weights: Dict[str, float] = field(default_factory=lambda: {'primary': 0.6, 'secondary': 0.3, 'tertiary': 0.1})
+    metric_weights: dict[str, float] = field(default_factory=lambda: {'primary': 0.6, 'secondary': 0.3, 'tertiary': 0.1})
     outlier_detection_threshold: float = 3.0
     min_consistency_score: float = 0.7
 
@@ -83,19 +83,19 @@ class ValidationResult:
     p_value: float
     effect_size: float
     effect_size_magnitude: EffectSizeMagnitude
-    confidence_interval: Tuple[float, float]
-    bootstrap_result: Optional[Dict[str, Any]] = None
-    permutation_result: Optional[Dict[str, Any]] = None
-    bayesian_result: Optional[Dict[str, Any]] = None
-    model_evidence: Optional[float] = None
-    bayes_factor: Optional[float] = None
-    causal_result: Optional[Dict[str, Any]] = None
-    multi_metric_result: Optional[Dict[str, Any]] = None
-    uncertainty_metrics: Dict[str, float] = field(default_factory=dict)
+    confidence_interval: tuple[float, float]
+    bootstrap_result: dict[str, Any] | None = None
+    permutation_result: dict[str, Any] | None = None
+    bayesian_result: dict[str, Any] | None = None
+    model_evidence: float | None = None
+    bayes_factor: float | None = None
+    causal_result: dict[str, Any] | None = None
+    multi_metric_result: dict[str, Any] | None = None
+    uncertainty_metrics: dict[str, float] = field(default_factory=dict)
     validation_quality_score: float = 0.0
     robustness_score: float = 0.0
-    recommendations: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 class EnhancedOptimizationValidator:
     """Enhanced optimization validator implementing 2025 best practices
@@ -108,7 +108,7 @@ class EnhancedOptimizationValidator:
     - Advanced uncertainty quantification
     """
 
-    def __init__(self, config: Optional[EnhancedValidationConfig]=None):
+    def __init__(self, config: EnhancedValidationConfig | None=None):
         self.config = config or EnhancedValidationConfig()
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
         self.bayesian_validator = None
@@ -121,7 +121,7 @@ class EnhancedOptimizationValidator:
         if self.config.enable_robust_methods and SKLEARN_AVAILABLE:
             self.robust_validator = RobustStatisticalValidator(self.config)
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for optimization validation (2025 pattern)
 
         Args:
@@ -152,7 +152,7 @@ class EnhancedOptimizationValidator:
                 validation_method = ValidationMethod(validation_method_str)
             except ValueError:
                 validation_method = ValidationMethod.comprehensive
-                self.logger.warning("Unknown validation method '%s', using comprehensive", validation_method_str)
+                self.logger.warning(f"Unknown validation method '{validation_method_str}', using comprehensive")
             self.config.validation_method = validation_method
             validation_result = await self.validate_enhanced_optimization(optimization_id=optimization_id, baseline_data=baseline_data, optimized_data=optimized_data, metrics=metrics, causal_features=causal_features)
             result = {'validation_summary': {'optimization_id': optimization_id, 'validation_method': validation_method.value, 'overall_valid': validation_result.valid, 'validation_quality_score': validation_result.validation_quality_score, 'robustness_score': validation_result.robustness_score, 'effect_size_magnitude': validation_result.effect_size_magnitude.value}, 'statistical_analysis': {'p_value': validation_result.p_value, 'effect_size': validation_result.effect_size, 'confidence_interval': validation_result.confidence_interval, 'statistical_significance': validation_result.p_value < self.config.significance_level, 'practical_significance': validation_result.effect_size > self.config.min_effect_size}, 'robust_analysis': validation_result.bootstrap_result or {}, 'bayesian_analysis': validation_result.bayesian_result or {}, 'causal_analysis': validation_result.causal_result or {}, 'multi_metric_analysis': validation_result.multi_metric_result or {}, 'uncertainty_quantification': validation_result.uncertainty_metrics, 'quality_assessment': {'validation_quality': validation_result.validation_quality_score, 'robustness': validation_result.robustness_score, 'recommendations': validation_result.recommendations, 'warnings': validation_result.warnings}}
@@ -165,7 +165,7 @@ class EnhancedOptimizationValidator:
             self.logger.error('Orchestrated optimization validation failed: %s', e)
             return {'orchestrator_compatible': True, 'component_result': {'error': str(e), 'validation_summary': {}}, 'local_metadata': {'execution_time': (datetime.now() - start_time).total_seconds(), 'error': True, 'component_version': '2025.1.0'}}
 
-    async def validate_enhanced_optimization(self, optimization_id: str, baseline_data: Dict[str, Any], optimized_data: Dict[str, Any], metrics: List[str]=None, causal_features: Optional[np.ndarray]=None) -> ValidationResult:
+    async def validate_enhanced_optimization(self, optimization_id: str, baseline_data: dict[str, Any], optimized_data: dict[str, Any], metrics: list[str]=None, causal_features: np.ndarray | None=None) -> ValidationResult:
         """Enhanced optimization validation using 2025 best practices"""
         self.logger.info('Enhanced validation for optimization %s', optimization_id)
         baseline_scores = baseline_data.get('scores', [])
@@ -208,7 +208,7 @@ class EnhancedOptimizationValidator:
             result.warnings.append(f'Validation error: {str(e)}')
             return result
 
-    async def _perform_classical_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> Dict[str, Any]:
+    async def _perform_classical_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
         """Perform classical statistical analysis"""
         statistic, p_value = stats.ttest_ind(optimized, baseline)
         pooled_std = np.sqrt((np.var(baseline, ddof=1) + np.var(optimized, ddof=1)) / 2)
@@ -276,7 +276,7 @@ class EnhancedOptimizationValidator:
             robustness_components.append(bayes_robust)
         return np.mean(robustness_components) if robustness_components else 0.5
 
-    async def _generate_recommendations(self, result: ValidationResult) -> List[str]:
+    async def _generate_recommendations(self, result: ValidationResult) -> list[str]:
         """Generate actionable recommendations"""
         recommendations = []
         if not result.valid:
@@ -293,7 +293,7 @@ class EnhancedOptimizationValidator:
             recommendations.append('Results lack robustness - perform additional validation with different methods')
         return recommendations
 
-    async def _generate_warnings(self, result: ValidationResult) -> List[str]:
+    async def _generate_warnings(self, result: ValidationResult) -> list[str]:
         """Generate validation warnings"""
         warnings = []
         if result.uncertainty_metrics.get('overall_uncertainty', 0) > 0.3:
@@ -304,7 +304,7 @@ class EnhancedOptimizationValidator:
             warnings.append('Only classical statistics used - consider robust methods for better validation')
         return warnings
 
-    async def _multi_metric_validation(self, baseline_data: Dict[str, Any], optimized_data: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
+    async def _multi_metric_validation(self, baseline_data: dict[str, Any], optimized_data: dict[str, Any], metrics: list[str]) -> dict[str, Any]:
         """Validate multiple metrics simultaneously"""
         metric_results = {}
         overall_scores = []
@@ -318,9 +318,9 @@ class EnhancedOptimizationValidator:
                 overall_scores.append(weighted_score)
                 metric_results[metric] = {'analysis': metric_analysis, 'weight': weight, 'weighted_score': weighted_score}
         overall_score = np.mean(overall_scores) if overall_scores else 0.0
-        return {'metric_results': metric_results, 'overall_score': float(overall_score), 'metrics_validated': len(metric_results), 'consistent_improvement': sum((1 for score in overall_scores if score > 0)) / len(overall_scores) if overall_scores else 0}
+        return {'metric_results': metric_results, 'overall_score': float(overall_score), 'metrics_validated': len(metric_results), 'consistent_improvement': sum(1 for score in overall_scores if score > 0) / len(overall_scores) if overall_scores else 0}
 
-    async def _quantify_uncertainty(self, baseline: np.ndarray, optimized: np.ndarray, result: ValidationResult) -> Dict[str, float]:
+    async def _quantify_uncertainty(self, baseline: np.ndarray, optimized: np.ndarray, result: ValidationResult) -> dict[str, float]:
         """Quantify uncertainty in validation results"""
         uncertainty_metrics = {}
         uncertainty_metrics['p_value_uncertainty'] = self._calculate_p_value_uncertainty(baseline, optimized)
@@ -351,7 +351,7 @@ class RobustStatisticalValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def bootstrap_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> Dict[str, Any]:
+    async def bootstrap_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
         """Perform bootstrap analysis"""
         if not SKLEARN_AVAILABLE:
             return {'error': 'scikit-learn not available for bootstrap analysis'}
@@ -373,7 +373,7 @@ class RobustStatisticalValidator:
             self.logger.error('Bootstrap analysis failed: %s', e)
             return {'error': str(e)}
 
-    async def permutation_test(self, baseline: np.ndarray, optimized: np.ndarray) -> Dict[str, Any]:
+    async def permutation_test(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
         """Perform permutation test"""
         try:
             combined = np.concatenate([baseline, optimized])
@@ -400,7 +400,7 @@ class BayesianValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def bayesian_comparison(self, baseline: np.ndarray, optimized: np.ndarray) -> Dict[str, Any]:
+    async def bayesian_comparison(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
         """Perform Bayesian model comparison"""
         if not BAYESIAN_AVAILABLE:
             return {'error': 'PyMC/ArviZ not available for Bayesian analysis'}
@@ -417,7 +417,7 @@ class CausalInferenceValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def causal_validation(self, baseline: np.ndarray, optimized: np.ndarray, features: np.ndarray) -> Dict[str, Any]:
+    async def causal_validation(self, baseline: np.ndarray, optimized: np.ndarray, features: np.ndarray) -> dict[str, Any]:
         """Perform causal inference validation"""
         try:
             treatment = np.concatenate([np.zeros(len(baseline)), np.ones(len(optimized))])

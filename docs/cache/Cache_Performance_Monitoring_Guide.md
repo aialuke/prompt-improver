@@ -1,5 +1,5 @@
 # Cache Performance Monitoring Guide
-**Comprehensive Monitoring and Alerting for UnifiedConnectionManager**
+**Comprehensive Monitoring and Alerting for DatabaseServices**
 
 **Version**: 2025.1  
 **Authority**: Performance Engineering Team  
@@ -9,7 +9,7 @@
 
 ## 🎯 Executive Summary
 
-This guide provides comprehensive monitoring and alerting procedures for the UnifiedConnectionManager cache system, ensuring the **8.4x performance improvement** is maintained and any degradation is quickly detected and resolved.
+This guide provides comprehensive monitoring and alerting procedures for the DatabaseServices cache system, ensuring the **8.4x performance improvement** is maintained and any degradation is quickly detected and resolved.
 
 ### Performance Targets
 - **L1 Cache Hit Rate**: >90% (Target: 93%)
@@ -112,7 +112,7 @@ unified_cache_l1_size:
 #### **Connection Health**
 ```yaml
 # Redis Master Connection Status
-unified_redis_master_connected:
+unifiedcache.redis_client_connected:
   target: 1 (connected)
   critical: 0 (disconnected)
   warning: connection_errors > 5
@@ -172,7 +172,7 @@ cache_response_time_critical:
 ```yaml
 # Critical: Redis Master Down
 redis_master_down:
-  alert: unified_redis_master_connected == 0
+  alert: unifiedcache.redis_client_connected == 0
   for: 30s
   severity: critical
   summary: "Redis master connection lost"
@@ -189,7 +189,7 @@ redis_master_down:
 
 # Critical: Complete Redis Failure
 redis_cluster_down:
-  alert: unified_redis_master_connected == 0 AND unified_redis_replica_connected == 0
+  alert: unifiedcache.redis_client_connected == 0 AND unified_redis_replica_connected == 0
   for: 1m
   severity: critical
   summary: "Complete Redis cluster failure"
@@ -307,7 +307,7 @@ cache_warming_completed:
 
 #### **High-Level KPIs Panel**
 ```yaml
-# Dashboard: UnifiedConnectionManager - Executive Overview
+# Dashboard: DatabaseServices - Executive Overview
 panels:
   - title: "Overall Cache Performance"
     visualization: "stat"
@@ -336,7 +336,7 @@ panels:
   - title: "System Health"
     visualization: "stat"
     targets:
-      - expr: unified_redis_master_connected
+      - expr: unifiedcache.redis_client_connected
         legend: "Redis Status"
         unit: "bool"
         thresholds: [0.5, 1, 1]
@@ -367,7 +367,7 @@ panels:
 
 #### **Detailed Performance Panel**
 ```yaml
-# Dashboard: UnifiedConnectionManager - Operations Detail
+# Dashboard: DatabaseServices - Operations Detail
 panels:
   - title: "Cache Operations by Level"
     visualization: "graph"
@@ -399,7 +399,7 @@ panels:
   - title: "Redis Connection Status"
     visualization: "stat"
     targets:
-      - expr: unified_redis_master_connected
+      - expr: unifiedcache.redis_client_connected
         legend: "Master Connected"
         unit: "bool"
       - expr: unified_redis_replica_connected
@@ -419,7 +419,7 @@ panels:
 
 #### **Cache Warming Analysis**
 ```yaml
-# Dashboard: UnifiedConnectionManager - Engineering Deep Dive
+# Dashboard: DatabaseServices - Engineering Deep Dive
 panels:
   - title: "Cache Warming Effectiveness"
     visualization: "graph"
@@ -486,10 +486,10 @@ echo "Date: $(date)"
 echo -n "Overall Performance: "
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def check_performance():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     stats = await manager.get_cache_stats()
     
@@ -518,10 +518,10 @@ echo "  No critical alerts in last 24h ✅"
 echo "Cache Warming Status:"
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def check_warming():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     stats = await manager.get_cache_stats()
     
@@ -589,11 +589,11 @@ print(f'  Overall Assessment: {'✅ TARGETS MET' if targets_met else '⚠️ PER
 import asyncio
 import time
 import statistics
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def detect_performance_regression():
     """Detect performance regression in cache operations."""
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Performance test parameters
@@ -737,11 +737,11 @@ UCM_ENABLE_STARTUP_WARMING=true
 ```python
 # scripts/dynamic_performance_tuning.py
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def auto_tune_performance():
     """Automatically adjust performance settings based on metrics."""
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Get current performance metrics
@@ -796,7 +796,7 @@ if __name__ == "__main__":
 import asyncio
 import csv
 import datetime
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def export_metrics_to_csv(filename=None):
     """Export current cache metrics to CSV file."""
@@ -804,7 +804,7 @@ async def export_metrics_to_csv(filename=None):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cache_metrics_{timestamp}.csv"
     
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     stats = await manager.get_cache_stats()
@@ -873,9 +873,9 @@ class CacheAlertManager:
             "event_action": "trigger",
             "dedup_key": f"cache_alert_{alert_type}",
             "payload": {
-                "summary": f"UnifiedConnectionManager: {alert_type.replace('_', ' ').title()}",
+                "summary": f"DatabaseServices: {alert_type.replace('_', ' ').title()}",
                 "severity": severity_mapping.get(alert_type, "warning"),
-                "source": "UnifiedConnectionManager",
+                "source": "DatabaseServices",
                 "component": "cache",
                 "group": "database",
                 "class": "performance",
@@ -898,7 +898,7 @@ class CacheAlertManager:
 {
   "dashboard": {
     "id": null,
-    "title": "UnifiedConnectionManager - Cache Performance",
+    "title": "DatabaseServices - Cache Performance",
     "tags": ["cache", "performance", "redis"],
     "timezone": "browser",
     "panels": [

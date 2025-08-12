@@ -22,7 +22,7 @@ class AdvancedABTestingConnector(ComponentConnector):
         self.logger.info('AdvancedABTesting connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute AdvancedABTesting capability."""
         if capability_name == 'enhanced_ab_testing':
             return await self._enhanced_ab_testing(parameters)
@@ -31,12 +31,12 @@ class AdvancedABTestingConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _enhanced_ab_testing(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enhanced_ab_testing(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Enhanced A/B testing."""
         await asyncio.sleep(0.3)
         return {'test_id': 'enhanced_ab_001', 'variant_performance': {'A': 0.83, 'B': 0.87}, 'statistical_power': 0.85, 'sample_size': 2000, 'confidence_level': 0.95}
 
-    async def _multi_variant_testing(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _multi_variant_testing(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Multi-variant testing."""
         await asyncio.sleep(0.4)
         return {'variants_tested': 4, 'best_variant': 'C', 'performance_scores': {'A': 0.8, 'B': 0.83, 'C': 0.89, 'D': 0.85}, 'significance_matrix': 'all_significant'}
@@ -53,7 +53,7 @@ class RealTimeAnalyticsConnector(ComponentConnector):
         self.logger.info('RealTimeAnalytics connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute RealTimeAnalytics capability."""
         if capability_name == 'live_monitoring':
             return await self._live_monitoring(parameters)
@@ -62,12 +62,12 @@ class RealTimeAnalyticsConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _live_monitoring(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _live_monitoring(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Live monitoring."""
         await asyncio.sleep(0.2)
         return {'active_monitors': 12, 'metrics_collected': 150, 'update_frequency': '1s', 'dashboard_status': 'active'}
 
-    async def _real_time_alerts(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _real_time_alerts(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Real-time alerts."""
         await asyncio.sleep(0.1)
         return {'alerts_active': 3, 'alert_types': ['performance', 'error_rate', 'resource'], 'notification_channels': ['email', 'slack', 'webhook'], 'response_time': '500ms'}
@@ -84,7 +84,7 @@ class PerformanceMonitoringConnector(ComponentConnector):
         self.logger.info('PerformanceMonitoring connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute PerformanceMonitoring capability."""
         if capability_name == 'system_monitoring':
             return await self._system_monitoring(parameters)
@@ -93,12 +93,12 @@ class PerformanceMonitoringConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _system_monitoring(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _system_monitoring(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """System monitoring."""
         await asyncio.sleep(0.2)
         return {'cpu_usage': 0.65, 'memory_usage': 0.72, 'disk_usage': 0.45, 'network_latency': '15ms', 'throughput': '1500 req/s'}
 
-    async def _resource_tracking(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _resource_tracking(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Resource tracking."""
         await asyncio.sleep(0.1)
         return {'gpu_utilization': 0.8, 'memory_allocated': '6.2GB', 'storage_used': '125GB', 'bandwidth_usage': '850 Mbps'}
@@ -122,7 +122,7 @@ class DatabasePerformanceMonitorConnector(ComponentConnector):
             self.logger.error('Failed to initialize DatabasePerformanceMonitor: %s', e)
             raise
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute DatabasePerformanceMonitor capability."""
         if capability_name == 'real_time_monitoring':
             return await self._real_time_monitoring(parameters)
@@ -135,14 +135,14 @@ class DatabasePerformanceMonitorConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _real_time_monitoring(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _real_time_monitoring(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Real-time database performance monitoring."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabasePerformanceMonitor component not initialized')
         snapshot = await self.component.take_performance_snapshot()
         return {'status': 'success', 'snapshot': {'timestamp': snapshot.timestamp.isoformat(), 'cache_hit_ratio': snapshot.cache_hit_ratio, 'active_connections': snapshot.active_connections, 'avg_query_time_ms': snapshot.avg_query_time_ms, 'slow_queries_count': snapshot.slow_queries_count, 'index_hit_ratio': snapshot.index_hit_ratio}}
 
-    async def _cache_hit_monitoring(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cache_hit_monitoring(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Monitor database cache hit ratios."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabasePerformanceMonitor component not initialized')
@@ -150,7 +150,7 @@ class DatabasePerformanceMonitorConnector(ComponentConnector):
         index_ratio = await self.component.get_index_hit_ratio()
         return {'status': 'success', 'cache_hit_ratio': cache_ratio, 'index_hit_ratio': index_ratio, 'meets_target': cache_ratio >= 90.0, 'target_threshold': 90.0}
 
-    async def _slow_query_detection(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _slow_query_detection(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Detect and analyze slow queries."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabasePerformanceMonitor component not initialized')
@@ -158,7 +158,7 @@ class DatabasePerformanceMonitorConnector(ComponentConnector):
         slow_queries = await self.component.get_slow_queries(limit=limit)
         return {'status': 'success', 'slow_queries': [{'query_text': q.query_text, 'mean_exec_time': q.mean_exec_time, 'calls': q.calls, 'total_exec_time': q.total_exec_time, 'cache_hit_ratio': q.cache_hit_ratio} for q in slow_queries], 'query_count': len(slow_queries)}
 
-    async def _performance_recommendations(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _performance_recommendations(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Generate performance optimization recommendations."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabasePerformanceMonitor component not initialized')
@@ -184,7 +184,7 @@ class DatabaseConnectionOptimizerConnector(ComponentConnector):
             self.logger.error('Failed to initialize DatabaseConnectionOptimizer: %s', e)
             raise
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute DatabaseConnectionOptimizer capability."""
         if capability_name == 'optimize_connection_settings':
             return await self._optimize_connection_settings(parameters)
@@ -195,21 +195,21 @@ class DatabaseConnectionOptimizerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _optimize_connection_settings(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _optimize_connection_settings(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Optimize database connection settings."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabaseConnectionOptimizer component not initialized')
         await self.component.optimize_connection_settings()
         return {'status': 'success', 'message': 'Database connection settings optimized with dynamic resource detection', 'optimization_applied': True}
 
-    async def _create_performance_indexes(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _create_performance_indexes(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Create performance-critical database indexes."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabaseConnectionOptimizer component not initialized')
         await self.component.create_performance_indexes()
         return {'status': 'success', 'message': 'Performance indexes created successfully', 'indexes_created': True}
 
-    async def _system_resource_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _system_resource_analysis(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze system resources for optimal database configuration."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('DatabaseConnectionOptimizer component not initialized')
@@ -241,7 +241,7 @@ class PreparedStatementCacheConnector(ComponentConnector):
             self.logger.error('Failed to initialize PreparedStatementCache: %s', e)
             raise
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute PreparedStatementCache capability."""
         if capability_name == 'cache_performance_analysis':
             return await self._cache_performance_analysis(parameters)
@@ -252,21 +252,21 @@ class PreparedStatementCacheConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _cache_performance_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cache_performance_analysis(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze cache performance."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('PreparedStatementCache component not initialized')
         analysis_result = await self.component.run_orchestrated_analysis('cache_performance', **parameters)
         return {'status': 'success', 'analysis_result': analysis_result, 'connector': 'PreparedStatementCacheConnector'}
 
-    async def _query_optimization_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _query_optimization_analysis(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze query optimization patterns."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('PreparedStatementCache component not initialized')
         analysis_result = await self.component.run_orchestrated_analysis('query_optimization', **parameters)
         return {'status': 'success', 'analysis_result': analysis_result, 'connector': 'PreparedStatementCacheConnector'}
 
-    async def _cache_efficiency_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cache_efficiency_analysis(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze cache efficiency."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('PreparedStatementCache component not initialized')
@@ -298,7 +298,7 @@ class RetryManagerConnector(ComponentConnector):
             self.logger.error('Failed to initialize RetryManager: %s', e)
             raise
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute RetryManager capability."""
         if capability_name == 'execute_with_retry':
             return await self._execute_with_retry(parameters)
@@ -313,7 +313,7 @@ class RetryManagerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _execute_with_retry(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_with_retry(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute operation with retry logic."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('RetryManager component not initialized')
@@ -330,7 +330,7 @@ class RetryManagerConnector(ComponentConnector):
         except Exception as e:
             return {'status': 'error', 'error': str(e), 'operation_name': operation_name, 'connector': 'RetryManagerConnector'}
 
-    async def _circuit_breaker_status(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _circuit_breaker_status(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Get circuit breaker status."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('RetryManager component not initialized')
@@ -338,14 +338,14 @@ class RetryManagerConnector(ComponentConnector):
         status = await self.component.get_circuit_breaker_status(operation_name)
         return {'status': 'success', 'operation_name': operation_name, 'circuit_breaker_status': status, 'connector': 'RetryManagerConnector'}
 
-    async def _retry_metrics_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _retry_metrics_analysis(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze retry metrics and patterns."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('RetryManager component not initialized')
         analysis = {'total_operations': len(self.component.circuit_breakers), 'circuit_breakers_configured': list(self.component.circuit_breakers.keys()), 'metrics_enabled': self.component.default_config.enable_metrics, 'tracing_enabled': self.component.default_config.enable_tracing}
         return {'status': 'success', 'analysis': analysis, 'connector': 'RetryManagerConnector'}
 
-    async def _reset_circuit_breaker(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _reset_circuit_breaker(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Reset circuit breaker for operation."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('RetryManager component not initialized')
@@ -355,7 +355,7 @@ class RetryManagerConnector(ComponentConnector):
         await self.component.reset_circuit_breaker(operation_name)
         return {'status': 'success', 'message': f'Circuit breaker reset for {operation_name}', 'operation_name': operation_name, 'connector': 'RetryManagerConnector'}
 
-    async def _configure_retry_strategy(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _configure_retry_strategy(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Configure retry strategy."""
         if not hasattr(self, 'component') or not self.component:
             raise RuntimeError('RetryManager component not initialized')
@@ -374,6 +374,6 @@ class Tier4ConnectorFactory:
         return connectors[component_name](event_bus)
 
     @staticmethod
-    def list_available_components() -> List[str]:
+    def list_available_components() -> list[str]:
         """List all available Tier 4 components."""
         return ['advanced_ab_testing', 'canary_testing', 'real_time_analytics', 'analytics', 'performance_monitoring', 'database_performance_monitor', 'database_connection_optimizer', 'prepared_statement_cache', 'type_safe_psycopg_client', 'retry_manager', 'async_optimizer', 'early_stopping', 'background_manager']

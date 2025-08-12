@@ -31,23 +31,23 @@ class ModelHealthMetrics:
     model_type: str
     status: str
     memory_mb: float
-    last_inference_ms: Optional[float]
+    last_inference_ms: float | None
     total_predictions: int
     success_rate: float
     error_rate: float
-    version: Optional[str] = None
-    loaded_at: Optional[datetime] = None
-    last_accessed: Optional[datetime] = None
+    version: str | None = None
+    loaded_at: datetime | None = None
+    last_accessed: datetime | None = None
     
     # Performance metrics
-    latency_p50: Optional[float] = None
-    latency_p95: Optional[float] = None
-    latency_p99: Optional[float] = None
+    latency_p50: float | None = None
+    latency_p95: float | None = None
+    latency_p99: float | None = None
     
     # Resource usage
-    cpu_usage_percent: Optional[float] = None
-    gpu_memory_mb: Optional[float] = None
-    gpu_utilization_percent: Optional[float] = None
+    cpu_usage_percent: float | None = None
+    gpu_memory_mb: float | None = None
+    gpu_utilization_percent: float | None = None
 
 
 @dataclass
@@ -58,7 +58,7 @@ class InferenceMetrics:
     error_count: int = 0
     total_latency_ms: float = 0.0
     latency_samples: deque = field(default_factory=lambda: deque(maxlen=1000))
-    error_types: Dict[str, int] = field(default_factory=dict)
+    error_types: dict[str, int] = field(default_factory=dict)
     
     @property
     def success_rate(self) -> float:
@@ -81,7 +81,7 @@ class InferenceMetrics:
             return 0.0
         return self.total_latency_ms / self.request_count
     
-    def get_latency_percentiles(self) -> Tuple[float, float, float]:
+    def get_latency_percentiles(self) -> tuple[float, float, float]:
         """Get p50, p95, p99 latency percentiles"""
         if not self.latency_samples:
             return 0.0, 0.0, 0.0
@@ -113,8 +113,8 @@ class MLHealthMonitor:
         self.max_history_size = max_history_size
         
         # Model registry and status tracking
-        self._loaded_models: Dict[str, Dict[str, Any]] = {}
-        self._model_metrics: Dict[str, InferenceMetrics] = defaultdict(InferenceMetrics)
+        self._loaded_models: dict[str, dict[str, Any]] = {}
+        self._model_metrics: dict[str, InferenceMetrics] = defaultdict(InferenceMetrics)
         
         # Performance history
         self._performance_history: deque = deque(maxlen=max_history_size)
@@ -122,15 +122,15 @@ class MLHealthMonitor:
         # Resource monitoring
         self._last_resource_check = 0.0
         self._resource_cache_ttl = 5.0  # 5-second cache
-        self._cached_resources: Optional[Dict[str, Any]] = None
+        self._cached_resources: dict[str, Any] | None = None
         
         # GPU availability detection
-        self._gpu_available: Optional[bool] = None
+        self._gpu_available: bool | None = None
         self._gpu_utils = self._initialize_gpu_monitoring()
         
         logger.info("ML Health Monitor initialized")
     
-    def _initialize_gpu_monitoring(self) -> Optional[Any]:
+    def _initialize_gpu_monitoring(self) -> Any | None:
         """Initialize GPU monitoring utilities with graceful fallback"""
         try:
             import pynvml
@@ -139,7 +139,7 @@ class MLHealthMonitor:
             logger.info("GPU monitoring enabled via pynvml")
             return pynvml
         except (ImportError, Exception) as e:
-            logger.info("GPU monitoring not available: %s. Using CPU-only monitoring.", e)
+            logger.info(f"GPU monitoring not available: {e}. Using CPU-only monitoring.")
             self._gpu_available = False
             return None
     
@@ -148,8 +148,8 @@ class MLHealthMonitor:
         model_id: str, 
         model: Any, 
         model_type: str = "unknown",
-        version: Optional[str] = None,
-        memory_mb: Optional[float] = None
+        version: str | None = None,
+        memory_mb: float | None = None
     ) -> bool:
         """Register a model for health monitoring"""
         try:
@@ -175,11 +175,11 @@ class MLHealthMonitor:
                 if model_id not in self._model_metrics:
                     self._model_metrics[model_id] = InferenceMetrics()
                 
-                logger.info("Registered model {model_id} for health monitoring (%sMB)", memory_mb:.1f)
+                logger.info("Registered model {model_id} for health monitoring (%.1fMB)", memory_mb)
                 return True
                 
         except Exception as e:
-            logger.error("Failed to register model {model_id}: %s", e)
+            logger.error(f"Failed to register model {model_id}: {e}")
             return False
     
     async def unregister_model(self, model_id: str) -> bool:
@@ -188,11 +188,11 @@ class MLHealthMonitor:
             with self._lock:
                 if model_id in self._loaded_models:
                     del self._loaded_models[model_id]
-                    logger.info("Unregistered model %s", model_id)
+                    logger.info(f"Unregistered model {model_id}")
                     return True
                 return False
         except Exception as e:
-            logger.error("Failed to unregister model {model_id}: %s", e)
+            logger.error(f"Failed to unregister model {model_id}: {e}")
             return False
     
     async def record_inference(
@@ -200,7 +200,7 @@ class MLHealthMonitor:
         model_id: str,
         latency_ms: float,
         success: bool,
-        error_type: Optional[str] = None
+        error_type: str | None = None
     ) -> None:
         """Record inference metrics for a model"""
         try:
@@ -233,9 +233,9 @@ class MLHealthMonitor:
                 })
                 
         except Exception as e:
-            logger.error("Failed to record inference for {model_id}: %s", e)
+            logger.error(f"Failed to record inference for {model_id}: {e}")
     
-    async def get_model_health(self, model_id: str) -> Optional[ModelHealthMetrics]:
+    async def get_model_health(self, model_id: str) -> ModelHealthMetrics | None:
         """Get comprehensive health metrics for a specific model"""
         try:
             with self._lock:
@@ -272,10 +272,10 @@ class MLHealthMonitor:
                 )
                 
         except Exception as e:
-            logger.error("Failed to get health for model {model_id}: %s", e)
+            logger.error(f"Failed to get health for model {model_id}: {e}")
             return None
     
-    async def get_all_models_health(self) -> List[ModelHealthMetrics]:
+    async def get_all_models_health(self) -> list[ModelHealthMetrics]:
         """Get health metrics for all registered models"""
         health_metrics = []
         
@@ -289,7 +289,7 @@ class MLHealthMonitor:
         
         return health_metrics
     
-    async def get_system_health(self) -> Dict[str, Any]:
+    async def get_system_health(self) -> dict[str, Any]:
         """Get overall ML system health status"""
         try:
             with self._lock:
@@ -328,14 +328,14 @@ class MLHealthMonitor:
             }
             
         except Exception as e:
-            logger.error("Failed to get system health: %s", e)
+            logger.error(f"Failed to get system health: {e}")
             return {
                 "healthy": False,
                 "error": str(e),
                 "timestamp": aware_utc_now().isoformat()
             }
     
-    async def _get_resource_metrics(self) -> Dict[str, Any]:
+    async def _get_resource_metrics(self) -> dict[str, Any]:
         """Get system resource metrics with caching"""
         current_time = time.time()
         
@@ -365,13 +365,13 @@ class MLHealthMonitor:
             return resources
             
         except Exception as e:
-            logger.error("Failed to get resource metrics: %s", e)
+            logger.error(f"Failed to get resource metrics: {e}")
             return {
                 "error": str(e),
                 "timestamp": aware_utc_now().isoformat()
             }
     
-    async def _get_gpu_metrics(self) -> Dict[str, Any]:
+    async def _get_gpu_metrics(self) -> dict[str, Any]:
         """Get GPU utilization metrics"""
         if not self._gpu_available or not self._gpu_utils:
             return {}
@@ -420,7 +420,7 @@ class MLHealthMonitor:
             return gpu_metrics
             
         except Exception as e:
-            logger.error("Failed to get GPU metrics: %s", e)
+            logger.error(f"Failed to get GPU metrics: {e}")
             return {"gpu_error": str(e)}
     
     async def _calculate_system_health_score(self) -> float:
@@ -464,7 +464,7 @@ class MLHealthMonitor:
             return sum(health_factors) / len(health_factors) if health_factors else 0.0
             
         except Exception as e:
-            logger.error("Failed to calculate health score: %s", e)
+            logger.error(f"Failed to calculate health score: {e}")
             return 0.0
     
     def _estimate_model_memory(self, model: Any) -> float:
@@ -506,7 +506,7 @@ class MLHealthMonitor:
             return 5.0
             
         except Exception as e:
-            logger.warning("Could not estimate model memory: %s", e)
+            logger.warning(f"Could not estimate model memory: {e}")
             return 5.0
     
     async def cleanup_stale_models(self, max_age_hours: int = 24) -> int:
@@ -528,15 +528,15 @@ class MLHealthMonitor:
                         del self._model_metrics[model_id]
             
             if stale_models:
-                logger.info("Cleaned up %s stale models", len(stale_models))
+                logger.info(f"Cleaned up {len(stale_models)} stale models")
             
             return len(stale_models)
             
         except Exception as e:
-            logger.error("Failed to cleanup stale models: %s", e)
+            logger.error(f"Failed to cleanup stale models: {e}")
             return 0
     
-    async def get_performance_summary(self, hours: int = 24) -> Dict[str, Any]:
+    async def get_performance_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get performance summary for the specified time period"""
         try:
             cutoff_time = aware_utc_now().timestamp() - (hours * 3600)
@@ -605,7 +605,7 @@ class MLHealthMonitor:
             }
             
         except Exception as e:
-            logger.error("Failed to get performance summary: %s", e)
+            logger.error(f"Failed to get performance summary: {e}")
             return {
                 "error": str(e),
                 "period_hours": hours,
@@ -614,7 +614,7 @@ class MLHealthMonitor:
 
 
 # Global health monitor instance
-_health_monitor: Optional[MLHealthMonitor] = None
+_health_monitor: MLHealthMonitor | None = None
 
 async def get_ml_health_monitor() -> MLHealthMonitor:
     """Get or create global ML health monitor instance"""

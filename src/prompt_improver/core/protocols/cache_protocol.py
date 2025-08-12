@@ -3,8 +3,12 @@
 Provides type-safe interface contracts for caching systems,
 enabling dependency inversion and improved testability.
 """
-from typing import Any, Dict, List, Optional, Protocol
 
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
 class BasicCacheProtocol(Protocol):
     """Protocol for basic cache operations"""
 
@@ -12,7 +16,7 @@ class BasicCacheProtocol(Protocol):
         """Get value from cache"""
         ...
 
-    async def set(self, key: str, value: Any, ttl: int | None=None) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in cache with optional TTL"""
         ...
 
@@ -28,6 +32,8 @@ class BasicCacheProtocol(Protocol):
         """Clear all cache entries"""
         ...
 
+
+@runtime_checkable
 class AdvancedCacheProtocol(Protocol):
     """Protocol for advanced cache operations"""
 
@@ -35,7 +41,7 @@ class AdvancedCacheProtocol(Protocol):
         """Get multiple values from cache"""
         ...
 
-    async def set_many(self, mapping: dict[str, Any], ttl: int | None=None) -> bool:
+    async def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values in cache"""
         ...
 
@@ -43,11 +49,13 @@ class AdvancedCacheProtocol(Protocol):
         """Delete multiple keys from cache"""
         ...
 
-    async def get_or_set(self, key: str, default_func, ttl: int | None=None) -> Any:
+    async def get_or_set(
+        self, key: str, default_func: Callable[[], Any], ttl: int | None = None
+    ) -> Any:
         """Get value or set it using default function"""
         ...
 
-    async def increment(self, key: str, delta: int=1) -> int:
+    async def increment(self, key: str, delta: int = 1) -> int:
         """Increment numeric value in cache"""
         ...
 
@@ -55,6 +63,8 @@ class AdvancedCacheProtocol(Protocol):
         """Set expiration for key"""
         ...
 
+
+@runtime_checkable
 class CacheHealthProtocol(Protocol):
     """Protocol for cache health monitoring"""
 
@@ -74,6 +84,8 @@ class CacheHealthProtocol(Protocol):
         """Get memory usage statistics"""
         ...
 
+
+@runtime_checkable
 class CacheSubscriptionProtocol(Protocol):
     """Protocol for cache pub/sub operations"""
 
@@ -89,10 +101,12 @@ class CacheSubscriptionProtocol(Protocol):
         """Unsubscribe from channels"""
         ...
 
+
+@runtime_checkable
 class CacheLockProtocol(Protocol):
     """Protocol for distributed locking"""
 
-    async def acquire_lock(self, key: str, timeout: int=10) -> str | None:
+    async def acquire_lock(self, key: str, timeout: int = 10) -> str | None:
         """Acquire distributed lock"""
         ...
 
@@ -104,9 +118,20 @@ class CacheLockProtocol(Protocol):
         """Extend lock timeout"""
         ...
 
-class RedisCacheProtocol(BasicCacheProtocol, AdvancedCacheProtocol, CacheHealthProtocol, CacheSubscriptionProtocol, CacheLockProtocol):
+
+@runtime_checkable
+class RedisCacheProtocol(
+    BasicCacheProtocol,
+    AdvancedCacheProtocol,
+    CacheHealthProtocol,
+    CacheSubscriptionProtocol,
+    CacheLockProtocol,
+    Protocol,
+):
     """Combined protocol for Redis cache operations"""
 
+
+@runtime_checkable
 class MultiLevelCacheProtocol(Protocol):
     """Protocol for multi-level cache systems"""
 
@@ -114,7 +139,9 @@ class MultiLevelCacheProtocol(Protocol):
         """Get value from specific cache level"""
         ...
 
-    async def set_to_level(self, key: str, value: Any, level: int, ttl: int | None=None) -> bool:
+    async def set_to_level(
+        self, key: str, value: Any, level: int, ttl: int | None = None
+    ) -> bool:
         """Set value to specific cache level"""
         ...
 

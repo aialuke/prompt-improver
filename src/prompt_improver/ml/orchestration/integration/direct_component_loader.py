@@ -15,10 +15,10 @@ from ..shared.component_types import ComponentTier
 class LoadedComponent:
     """Represents a loaded ML component with its metadata."""
     name: str
-    component_class: Type
-    instance: Optional[Any] = None
+    component_class: type
+    instance: Any | None = None
     module_path: str = ''
-    dependencies: List[str] = None
+    dependencies: list[str] = None
     is_initialized: bool = False
 
 class DirectComponentLoader:
@@ -31,10 +31,10 @@ class DirectComponentLoader:
     def __init__(self):
         """Initialize the direct component loader."""
         self.logger = logging.getLogger(__name__)
-        self.loaded_components: Dict[str, LoadedComponent] = {}
-        self.component_registry: Optional[ComponentRegistryProtocol] = None
-        self.component_factory: Optional[ComponentFactoryProtocol] = None
-        self.component_specs: Dict[str, ComponentSpec] = {}
+        self.loaded_components: dict[str, LoadedComponent] = {}
+        self.component_registry: ComponentRegistryProtocol | None = None
+        self.component_factory: ComponentFactoryProtocol | None = None
+        self.component_specs: dict[str, ComponentSpec] = {}
         self.tier_specifications = {ComponentTier.TIER_1: 'critical_path_components', ComponentTier.TIER_2: 'important_components', ComponentTier.TIER_3: 'optional_components'}
 
     def set_component_registry(self, registry: ComponentRegistryProtocol) -> None:
@@ -45,7 +45,7 @@ class DirectComponentLoader:
         """Set the component factory for instantiation."""
         self.component_factory = factory
 
-    async def discover_components(self, tier: Optional[ComponentTier]=None) -> List[ComponentSpec]:
+    async def discover_components(self, tier: ComponentTier | None=None) -> list[ComponentSpec]:
         """
         Discover available components using registry.
         
@@ -64,7 +64,7 @@ class DirectComponentLoader:
         self.logger.info('Discovered {len(discovered_specs)} components for tier %s', tier)
         return discovered_specs
 
-    async def load_component(self, component_name: str, dependencies: Optional[Dict[str, Any]]=None) -> Optional[LoadedComponent]:
+    async def load_component(self, component_name: str, dependencies: dict[str, Any] | None=None) -> LoadedComponent | None:
         """
         Load component using factory pattern with dependency injection.
         
@@ -96,7 +96,7 @@ class DirectComponentLoader:
             self.logger.error('Failed to load component {component_name}: %s', e)
             return None
 
-    async def load_tier_components(self, tier: ComponentTier, dependencies: Optional[Dict[str, Any]]=None) -> Dict[str, LoadedComponent]:
+    async def load_tier_components(self, tier: ComponentTier, dependencies: dict[str, Any] | None=None) -> dict[str, LoadedComponent]:
         """
         Load all components in a specific tier using modern factory pattern.
         
@@ -120,7 +120,7 @@ class DirectComponentLoader:
             self.logger.error('Failed to load tier {tier} components: %s', e)
             return loaded_tier_components
 
-    async def load_all_components(self) -> Dict[str, LoadedComponent]:
+    async def load_all_components(self) -> dict[str, LoadedComponent]:
         """
         Load all components across all tiers.
         
@@ -134,11 +134,11 @@ class DirectComponentLoader:
         self.logger.info('Loaded %s total components', len(all_loaded))
         return all_loaded
 
-    def get_loaded_component(self, component_name: str) -> Optional[LoadedComponent]:
+    def get_loaded_component(self, component_name: str) -> LoadedComponent | None:
         """Get a loaded component by name."""
         return self.loaded_components.get(component_name)
 
-    def get_all_loaded_components(self) -> Dict[str, LoadedComponent]:
+    def get_all_loaded_components(self) -> dict[str, LoadedComponent]:
         """Get all loaded components."""
         return self.loaded_components.copy()
 

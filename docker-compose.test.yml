@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for E2E testing
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./tests/fixtures/init_test_db.sql:/docker-entrypoint-initdb.d/init_test_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache for E2E testing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Main API server for E2E testing
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/test_db
+      - REDIS_URL=redis://redis:6379
+      - TESTING=true
+      - LOG_LEVEL=INFO
+      - OTEL_SDK_DISABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MCP server for protocol testing
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/test_db
+      - REDIS_URL=redis://redis:6379
+      - TESTING=true
+      - LOG_LEVEL=INFO
+      - MCP_PORT=8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "prompt_improver.mcp_server", "--port", "8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8001)).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Background task processor
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/test_db
+      - REDIS_URL=redis://redis:6379
+      - TESTING=true
+      - LOG_LEVEL=INFO
+      - WORKER_MODE=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "prompt_improver.cli", "worker"]
+
+  # Load testing service (optional)
+  load-tester:
+    image: grafana/k6:latest
+    volumes:
+      - ./scripts/k6_load_test.js:/scripts/load_test.js
+    command: ["run", "--vus", "10", "--duration", "30s", "/scripts/load_test.js"]
+    environment:
+      - K6_BASE_URL=http://api-server:8000
+    depends_on:
+      api-server:
+        condition: service_healthy
+    profiles:
+      - load-testing
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+
+networks:
+  default:
+    name: prompt-improver-test
+    driver: bridge

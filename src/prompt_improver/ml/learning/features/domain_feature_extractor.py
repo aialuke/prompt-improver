@@ -24,6 +24,7 @@ import random
 import time
 from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from ....security import InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
@@ -42,7 +43,7 @@ class CircuitBreakerState(Enum):
     OPEN = 'open'
     HALF_OPEN = 'half_open'
 
-class DomainFeatureConfig(SQLModel):
+class DomainFeatureConfig(BaseModel):
     """Enhanced 2025 configuration model for domain feature extraction."""
     weight: float = Field(default=1.0, ge=0.0, le=10.0, description='Weight for domain features')
     deterministic: bool = Field(default=True, description='Use deterministic random seeds')
@@ -79,7 +80,7 @@ class DomainExtractionMetrics:
     cache_hits: int = 0
     cache_misses: int = 0
     circuit_breaker_trips: int = 0
-    last_extraction_time: Optional[float] = None
+    last_extraction_time: float | None = None
 
     def update_success(self, processing_time: float, used_analyzer: bool=False):
         """Update metrics for successful extraction."""
@@ -111,7 +112,7 @@ class DomainExtractionMetrics:
             return 0.0
         return self.analyzer_extractions / self.successful_extractions * 100.0
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get comprehensive health status."""
         return {'total_extractions': self.total_extractions, 'success_rate': self.get_success_rate(), 'analyzer_usage_rate': self.get_analyzer_usage_rate(), 'average_processing_time': self.average_processing_time, 'cache_hit_rate': self.cache_hits / (self.cache_hits + self.cache_misses) * 100 if self.cache_hits + self.cache_misses > 0 else 0, 'circuit_breaker_trips': self.circuit_breaker_trips, 'last_extraction_time': self.last_extraction_time}
 
@@ -144,7 +145,7 @@ class DomainFeatureExtractor:
     - ML Pipeline Orchestrator integration
     """
 
-    def __init__(self, config: Optional[DomainFeatureConfig]=None):
+    def __init__(self, config: DomainFeatureConfig | None=None):
         """Initialize enhanced domain feature extractor.
         
         Args:
@@ -167,8 +168,8 @@ class DomainFeatureExtractor:
         self.metrics = DomainExtractionMetrics()
         self.circuit_breaker_state = CircuitBreakerState.CLOSED
         self.circuit_breaker_failures = 0
-        self.circuit_breaker_last_failure: Optional[float] = None
-        self._feature_cache: Dict[str, Dict[str, Any]] = {} if self.config.cache_enabled else {}
+        self.circuit_breaker_last_failure: float | None = None
+        self._feature_cache: dict[str, dict[str, Any]] = {} if self.config.cache_enabled else {}
         self._last_cache_cleanup = time.time()
         self._extraction_semaphore = asyncio.Semaphore(1)
         self._technical_domains = {PromptDomain.SOFTWARE_DEVELOPMENT, PromptDomain.DATA_SCIENCE, PromptDomain.AI_ML, PromptDomain.WEB_DEVELOPMENT, PromptDomain.SYSTEM_ADMIN, PromptDomain.API_DOCUMENTATION}
@@ -178,7 +179,7 @@ class DomainFeatureExtractor:
         logger.setLevel(getattr(logging, self.config.log_level))
         logger.info('Enhanced DomainFeatureExtractor initialized with config: weight=%s, cache=%s, analyzer=%s, circuit_breaker=%s, timeout=%ss', self.config.weight, self.config.cache_enabled, self.domain_analyzer is not None, self.config.circuit_breaker_enabled, self.config.timeout_seconds)
 
-    def extract_features(self, text: str, context: Optional[Dict[str, Any]]=None) -> List[float]:
+    def extract_features(self, text: str, context: dict[str, Any] | None=None) -> list[float]:
         """Synchronous wrapper for async feature extraction.
         
         Args:
@@ -194,7 +195,7 @@ class DomainFeatureExtractor:
         except RuntimeError:
             return asyncio.run(self.extract_features_async(text, context))
 
-    async def extract_features_async(self, text: str, context: Optional[Dict[str, Any]]=None) -> List[float]:
+    async def extract_features_async(self, text: str, context: dict[str, Any] | None=None) -> list[float]:
         """Enhanced 2025 async feature extraction with circuit breaker and observability.
         
         Args:
@@ -231,7 +232,7 @@ class DomainFeatureExtractor:
                 self.metrics.update_success(processing_time, used_analyzer)
                 logger.info('Domain feature extraction completed in %ss (analyzer=%s) [correlation_id=%s]', format(processing_time, '.3f'), used_analyzer, correlation_id)
                 return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error('Domain feature extraction timed out after %ss [correlation_id=%s]', self.config.timeout_seconds, correlation_id)
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
@@ -242,7 +243,7 @@ class DomainFeatureExtractor:
             self.metrics.update_failure()
             return self._get_default_features()
 
-    async def _validate_input_async(self, text: str) -> Optional[str]:
+    async def _validate_input_async(self, text: str) -> str | None:
         """Async validation and sanitization of input text."""
         try:
             if not text or not isinstance(text, str):
@@ -270,7 +271,7 @@ class DomainFeatureExtractor:
         """Generate correlation ID for request tracing."""
         return hashlib.md5(f'{time.time()}_{id(self)}'.encode(), usedforsecurity=False).hexdigest()[:8]
 
-    async def _get_cached_features_async(self, cache_key: str) -> Optional[List[float]]:
+    async def _get_cached_features_async(self, cache_key: str) -> list[float] | None:
         """Get cached features if available with TTL check."""
         if not self.config.cache_enabled or cache_key not in self._feature_cache:
             return None
@@ -283,7 +284,7 @@ class DomainFeatureExtractor:
         cache_entry['last_access'] = current_time
         return cache_entry['features']
 
-    async def _cache_features_async(self, cache_key: str, features: List[float]) -> None:
+    async def _cache_features_async(self, cache_key: str, features: list[float]) -> None:
         """Cache extracted features with TTL and size management."""
         if not self.config.cache_enabled:
             return
@@ -309,7 +310,7 @@ class DomainFeatureExtractor:
         self._last_cache_cleanup = current_time
         logger.debug('Domain cache cleanup completed, %s expired entries removed', len(expired_keys))
 
-    async def _perform_extraction_async(self, text: str, correlation_id: Optional[str]) -> tuple[List[float], bool]:
+    async def _perform_extraction_async(self, text: str, correlation_id: str | None) -> tuple[list[float], bool]:
         """Perform the actual domain feature extraction.
         
         Returns:
@@ -336,7 +337,7 @@ class DomainFeatureExtractor:
         logger.debug('Fallback extraction completed with %s features [correlation_id=%s]', len(normalized_features), correlation_id)
         return (normalized_features, used_analyzer)
 
-    def _extract_with_analyzer(self, text: str) -> List[float]:
+    def _extract_with_analyzer(self, text: str) -> list[float]:
         """Extract features using domain analyzer."""
         try:
             domain_features = self.domain_analyzer.extract_domain_features(text)
@@ -346,29 +347,29 @@ class DomainFeatureExtractor:
             logger.error('Domain analysis failed: %s', e)
             return self._extract_fallback_features(text)
 
-    def _extract_fallback_features(self, text: str) -> List[float]:
+    def _extract_fallback_features(self, text: str) -> list[float]:
         """Extract basic features when analyzer is not available."""
         try:
             text_lower = text.lower()
             technical_keywords = ['code', 'function', 'api', 'database', 'algorithm', 'programming']
-            technical_score = sum((1 for keyword in technical_keywords if keyword in text_lower)) / len(technical_keywords)
+            technical_score = sum(1 for keyword in technical_keywords if keyword in text_lower) / len(technical_keywords)
             creative_keywords = ['creative', 'story', 'design', 'artistic', 'imagination', 'narrative']
-            creative_score = sum((1 for keyword in creative_keywords if keyword in text_lower)) / len(creative_keywords)
+            creative_score = sum(1 for keyword in creative_keywords if keyword in text_lower) / len(creative_keywords)
             academic_keywords = ['research', 'study', 'analysis', 'theory', 'academic', 'scholarly']
-            academic_score = sum((1 for keyword in academic_keywords if keyword in text_lower)) / len(academic_keywords)
+            academic_score = sum(1 for keyword in academic_keywords if keyword in text_lower) / len(academic_keywords)
             business_keywords = ['business', 'strategy', 'market', 'customer', 'revenue', 'management']
-            business_score = sum((1 for keyword in business_keywords if keyword in text_lower)) / len(business_keywords)
+            business_score = sum(1 for keyword in business_keywords if keyword in text_lower) / len(business_keywords)
             question_count = text.count('?')
             question_density = min(1.0, question_count / 10.0)
             urgency_keywords = ['urgent', 'asap', 'immediately', 'quickly', 'deadline']
-            has_urgency = any((keyword in text_lower for keyword in urgency_keywords))
+            has_urgency = any(keyword in text_lower for keyword in urgency_keywords)
             features = [0.5, min(1.0, len(text) / 1000.0), 0.5, 1.0 if technical_score > 0.3 else 0.0, 1.0 if creative_score > 0.3 else 0.0, 1.0 if academic_score > 0.3 else 0.0, 1.0 if business_score > 0.3 else 0.0, technical_score, creative_score, academic_score, 0.5, 1.0 if has_urgency else 0.0, question_density, 0.5, 1.0 if sum([technical_score > 0.2, creative_score > 0.2, academic_score > 0.2, business_score > 0.2]) > 1 else 0.0]
             return features
         except Exception as e:
             logger.error('Fallback domain feature extraction failed: %s', e)
             return [self.config.default_feature_value] * 15
 
-    def _normalize_features(self, features: List[float]) -> List[float]:
+    def _normalize_features(self, features: list[float]) -> list[float]:
         """Normalize features to 0-1 range."""
         normalized = []
         for feature in features:
@@ -376,7 +377,7 @@ class DomainFeatureExtractor:
             normalized.append(normalized_feature)
         return normalized
 
-    def _get_default_features(self) -> List[float]:
+    def _get_default_features(self) -> list[float]:
         """Get default feature vector when extraction fails."""
         return [self.config.default_feature_value] * 15
 
@@ -417,11 +418,11 @@ class DomainFeatureExtractor:
             self.circuit_breaker_failures = 0
             logger.info('Domain extractor circuit breaker closed after successful operation')
 
-    def get_feature_names(self) -> List[str]:
+    def get_feature_names(self) -> list[str]:
         """Get names of extracted features with domain prefix."""
         return ['domain_confidence', 'domain_complexity', 'domain_specificity', 'domain_technical_indicator', 'domain_creative_indicator', 'domain_academic_indicator', 'domain_business_indicator', 'domain_technical_density', 'domain_creative_density', 'domain_academic_density', 'domain_conversational_politeness', 'domain_urgency_indicator', 'domain_question_density', 'domain_instruction_clarity', 'domain_hybrid_indicator']
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get comprehensive health status for monitoring."""
         return {'status': 'healthy' if self.circuit_breaker_state == CircuitBreakerState.CLOSED else 'degraded', 'circuit_breaker_state': self.circuit_breaker_state.value, 'metrics': self.metrics.get_health_status(), 'cache_stats': self.get_cache_stats(), 'analyzer_status': {'available': self.domain_analyzer is not None, 'enabled': self.config.use_domain_analyzer, 'fallback_enabled': self.config.fallback_on_analyzer_failure}, 'config': {'weight': self.config.weight, 'timeout_seconds': self.config.timeout_seconds, 'failure_threshold': self.config.failure_threshold, 'cache_enabled': self.config.cache_enabled, 'deterministic': self.config.deterministic}, 'timestamp': datetime.now(timezone.utc).isoformat()}
 
@@ -437,7 +438,7 @@ class DomainFeatureExtractor:
         self.circuit_breaker_last_failure = None
         logger.info('Domain extractor circuit breaker manually reset to closed state')
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for domain feature extraction (2025 pattern).
         
         Args:
@@ -501,7 +502,7 @@ class DomainFeatureExtractor:
             logger.info('Circuit breaker reset due to configuration change')
         logger.info('DomainFeatureExtractor configuration updated')
 
-    def get_config_dict(self) -> Dict[str, Any]:
+    def get_config_dict(self) -> dict[str, Any]:
         """Get current configuration as dictionary."""
         return self.config.model_dump()
 
@@ -513,7 +514,7 @@ class DomainFeatureExtractor:
         logger.info('Cleared %s cached domain features', count)
         return count
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics."""
         if not self.config.cache_enabled:
             return {'cache_enabled': False, 'analyzer_available': self.domain_analyzer is not None}

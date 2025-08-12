@@ -16,7 +16,8 @@ import json
 import logging
 from pathlib import Path
 import time
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from collections.abc import Callable
 from sqlmodel import SQLModel, Field
 import numpy as np
 from scipy.stats import norm
@@ -71,17 +72,17 @@ class ExperimentConfig:
     description: str
     objective_metric: str
     objective_direction: str
-    hyperparameter_space: Dict[str, Any]
-    fixed_parameters: Dict[str, Any] = field(default_factory=dict)
+    hyperparameter_space: dict[str, Any]
+    fixed_parameters: dict[str, Any] = field(default_factory=dict)
     optimization_strategy: OptimizationStrategy = OptimizationStrategy.BAYESIAN
     max_trials: int = 100
-    timeout_seconds: Optional[int] = None
-    early_stopping_rounds: Optional[int] = 10
+    timeout_seconds: int | None = None
+    early_stopping_rounds: int | None = 10
     parallelization_mode: ParallelizationMode = ParallelizationMode.THREAD_PARALLEL
     n_parallel_trials: int = 4
-    max_memory_mb: Optional[int] = None
-    max_cpu_percent: Optional[float] = None
-    track_metrics: List[str] = field(default_factory=list)
+    max_memory_mb: int | None = None
+    max_cpu_percent: float | None = None
+    track_metrics: list[str] = field(default_factory=list)
     save_models: bool = True
     save_frequency: int = 10
 
@@ -93,17 +94,17 @@ class Trial:
     trial_number: int
     hyperparameters: hyper_parameters
     status: ExperimentStatus = ExperimentStatus.created
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    duration_seconds: float | None = None
     metrics: metrics_dict = field(default_factory=dict)
-    model_id: Optional[str] = None
-    peak_memory_mb: Optional[float] = None
-    avg_cpu_percent: Optional[float] = None
-    error_message: Optional[str] = None
-    stack_trace: Optional[str] = None
-    tags: Dict[str, str] = field(default_factory=dict)
-    artifacts: Dict[str, str] = field(default_factory=dict)
+    model_id: str | None = None
+    peak_memory_mb: float | None = None
+    avg_cpu_percent: float | None = None
+    error_message: str | None = None
+    stack_trace: str | None = None
+    tags: dict[str, str] = field(default_factory=dict)
+    artifacts: dict[str, str] = field(default_factory=dict)
 
 @dataclass
 class ExperimentResults:
@@ -121,14 +122,14 @@ class ExperimentResults:
     metric_max: float
     total_duration_seconds: float
     avg_trial_duration_seconds: float
-    parameter_importance: Optional[Dict[str, float]] = None
-    convergence_iteration: Optional[int] = None
+    parameter_importance: dict[str, float] | None = None
+    convergence_iteration: int | None = None
     early_stopped: bool = False
 
 class BayesianOptimizer:
     """Bayesian optimization for hyperparameter tuning."""
 
-    def __init__(self, bounds: Dict[str, Tuple[float, float]], objective_direction: str='maximize'):
+    def __init__(self, bounds: dict[str, tuple[float, float]], objective_direction: str='maximize'):
         """Initialize Bayesian optimizer.
         
         Args:
@@ -143,7 +144,7 @@ class BayesianOptimizer:
         self.X_observed = []
         self.y_observed = []
 
-    def suggest_next(self, n_suggestions: int=1) -> List[Dict[str, float]]:
+    def suggest_next(self, n_suggestions: int=1) -> list[dict[str, float]]:
         """Suggest next hyperparameters to try.
         
         Args:
@@ -161,7 +162,7 @@ class BayesianOptimizer:
             suggestions.append(suggestion)
         return suggestions
 
-    def update(self, params: Dict[str, float], objective_value: float):
+    def update(self, params: dict[str, float], objective_value: float):
         """Update optimizer with observed result.
         
         Args:
@@ -175,14 +176,14 @@ class BayesianOptimizer:
         if len(self.X_observed) >= 2:
             self.gp.fit(np.array(self.X_observed), np.array(self.y_observed))
 
-    def _random_sample(self) -> Dict[str, float]:
+    def _random_sample(self) -> dict[str, float]:
         """Generate random sample within bounds."""
         sample = {}
         for param, (low, high) in self.bounds.items():
             sample[param] = np.random.uniform(low, high)
         return sample
 
-    def _optimize_acquisition(self) -> Dict[str, float]:
+    def _optimize_acquisition(self) -> dict[str, float]:
         """Optimize acquisition function to find next point."""
 
         def acquisition(X):
@@ -219,12 +220,11 @@ class ExperimentTracker:
         self.storage_path = storage_path
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.model_registry = model_registry
-        self._experiments: Dict[str, ExperimentConfig] = {}
-        self._trials: Dict[str, List[Trial]] = {}
-        self._active_experiments: Set[str] = set()
-        self._optimizers: Dict[str, BayesianOptimizer] = {}
-        self._thread_pool = ThreadPoolExecutor(max_workers=8)
-        self._process_pool = ProcessPoolExecutor(max_workers=4)
+        self._experiments: dict[str, ExperimentConfig] = {}
+        self._trials: dict[str, list[Trial]] = {}
+        self._active_experiments: set[str] = set()
+        self._optimizers: dict[str, BayesianOptimizer] = {}
+        # Use asyncio.to_thread instead of thread pools
         logger.info('Experiment tracker initialized at %s', storage_path)
 
     async def create_experiment(self, config: ExperimentConfig) -> str:
@@ -249,7 +249,7 @@ class ExperimentTracker:
         logger.info('Created experiment {experiment_id}: %s', config.experiment_name)
         return experiment_id
 
-    async def run_experiment(self, experiment_id: str, train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]]=None) -> ExperimentResults:
+    async def run_experiment(self, experiment_id: str, train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None=None) -> ExperimentResults:
         """Run a complete experiment with multiple trials.
         
         Args:
@@ -286,7 +286,7 @@ class ExperimentTracker:
         finally:
             self._active_experiments.discard(experiment_id)
 
-    async def run_trial(self, experiment_id: str, hyperparameters: hyper_parameters, train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]]=None) -> Trial:
+    async def run_trial(self, experiment_id: str, hyperparameters: hyper_parameters, train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None=None) -> Trial:
         """Run a single trial within an experiment.
         
         Args:
@@ -341,7 +341,7 @@ class ExperimentTracker:
             json.dump(self._trial_to_dict(trial), f, indent=2)
         return trial
 
-    async def get_experiment_status(self, experiment_id: str) -> Dict[str, Any]:
+    async def get_experiment_status(self, experiment_id: str) -> dict[str, Any]:
         """Get current experiment status.
         
         Args:
@@ -354,7 +354,7 @@ class ExperimentTracker:
         if not config:
             raise ValueError(f'Experiment {experiment_id} not found')
         trials = self._trials.get(experiment_id, [])
-        status = {'experiment_id': experiment_id, 'experiment_name': config.experiment_name, 'is_active': experiment_id in self._active_experiments, 'total_trials': len(trials), 'completed_trials': sum((1 for t in trials if t.status == ExperimentStatus.COMPLETED)), 'failed_trials': sum((1 for t in trials if t.status == ExperimentStatus.FAILED)), 'running_trials': sum((1 for t in trials if t.status == ExperimentStatus.RUNNING)), 'optimization_strategy': config.optimization_strategy.value, 'max_trials': config.max_trials}
+        status = {'experiment_id': experiment_id, 'experiment_name': config.experiment_name, 'is_active': experiment_id in self._active_experiments, 'total_trials': len(trials), 'completed_trials': sum(1 for t in trials if t.status == ExperimentStatus.COMPLETED), 'failed_trials': sum(1 for t in trials if t.status == ExperimentStatus.FAILED), 'running_trials': sum(1 for t in trials if t.status == ExperimentStatus.RUNNING), 'optimization_strategy': config.optimization_strategy.value, 'max_trials': config.max_trials}
         if trials:
             completed_trials = [t for t in trials if t.status == ExperimentStatus.COMPLETED]
             if completed_trials:
@@ -366,7 +366,7 @@ class ExperimentTracker:
                 status['best_trial'] = {'trial_id': best_trial.trial_id, 'hyperparameters': best_trial.hyperparameters, 'metrics': best_trial.metrics, 'objective_value': best_trial.metrics.get(objective_metric)}
         return status
 
-    async def compare_experiments(self, experiment_ids: List[str], metrics: Optional[List[str]]=None) -> Dict[str, Any]:
+    async def compare_experiments(self, experiment_ids: list[str], metrics: list[str] | None=None) -> dict[str, Any]:
         """Compare multiple experiments.
         
         Args:
@@ -405,7 +405,7 @@ class ExperimentTracker:
                     comparison['best_by_metric'][metric] = {'experiment_id': best_exp, 'value': best_value}
         return comparison
 
-    async def _generate_trial_configs(self, config: ExperimentConfig) -> List[hyper_parameters]:
+    async def _generate_trial_configs(self, config: ExperimentConfig) -> list[hyper_parameters]:
         """Generate trial configurations based on optimization strategy."""
         if config.optimization_strategy == OptimizationStrategy.GRID_SEARCH:
             return list(ParameterGrid(config.hyperparameter_space))
@@ -427,7 +427,7 @@ class ExperimentTracker:
         else:
             raise NotImplementedError(f'Strategy {config.optimization_strategy} not implemented')
 
-    async def _run_sequential(self, experiment_id: str, trial_configs: List[hyper_parameters], train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]]) -> List[Trial]:
+    async def _run_sequential(self, experiment_id: str, trial_configs: list[hyper_parameters], train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None) -> list[Trial]:
         """Run trials sequentially."""
         config = self._experiments[experiment_id]
         results = []
@@ -451,7 +451,7 @@ class ExperimentTracker:
                 results.append(trial)
         return results
 
-    async def _run_thread_parallel(self, experiment_id: str, trial_configs: List[hyper_parameters], train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]], n_parallel: int) -> List[Trial]:
+    async def _run_thread_parallel(self, experiment_id: str, trial_configs: list[hyper_parameters], train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None, n_parallel: int) -> list[Trial]:
         """Run trials in parallel using threads."""
         config = self._experiments[experiment_id]
         results = []
@@ -486,18 +486,18 @@ class ExperimentTracker:
                 results.extend(batch_results)
         return results
 
-    async def _run_process_parallel(self, experiment_id: str, trial_configs: List[hyper_parameters], train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]], n_parallel: int) -> List[Trial]:
+    async def _run_process_parallel(self, experiment_id: str, trial_configs: list[hyper_parameters], train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None, n_parallel: int) -> list[Trial]:
         """Run trials in parallel using processes."""
         return await self._run_thread_parallel(experiment_id, trial_configs, train_function, train_data, validation_data, n_parallel)
 
-    async def _run_distributed(self, experiment_id: str, trial_configs: List[hyper_parameters], train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]]) -> List[Trial]:
+    async def _run_distributed(self, experiment_id: str, trial_configs: list[hyper_parameters], train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None) -> list[Trial]:
         """Run trials in distributed mode using Ray."""
         if not RAY_AVAILABLE:
             logger.warning('Ray not available, falling back to thread parallel')
             return await self._run_thread_parallel(experiment_id, trial_configs, train_function, train_data, validation_data, 4)
         return await self._run_thread_parallel(experiment_id, trial_configs, train_function, train_data, validation_data, 4)
 
-    async def _run_training(self, train_function: Callable, train_data: Tuple[features, labels], validation_data: Optional[Tuple[features, labels]], hyperparameters: hyper_parameters) -> Tuple[Any, metrics_dict]:
+    async def _run_training(self, train_function: Callable, train_data: tuple[features, labels], validation_data: tuple[features, labels] | None, hyperparameters: hyper_parameters) -> tuple[Any, metrics_dict]:
         """Execute training function with error handling."""
         try:
             result = await asyncio.get_event_loop().run_in_executor(self._thread_pool, train_function, train_data, validation_data, hyperparameters)
@@ -523,11 +523,11 @@ class ExperimentTracker:
             return False
         if config.objective_direction == 'maximize':
             best_recent = max(objective_values)
-            best_overall = max((t.metrics.get(config.objective_metric, float('-inf')) for t in trials if t.status == ExperimentStatus.COMPLETED))
+            best_overall = max(t.metrics.get(config.objective_metric, float('-inf')) for t in trials if t.status == ExperimentStatus.COMPLETED)
             return best_recent <= best_overall
         else:
             best_recent = min(objective_values)
-            best_overall = min((t.metrics.get(config.objective_metric, float('inf')) for t in trials if t.status == ExperimentStatus.COMPLETED))
+            best_overall = min(t.metrics.get(config.objective_metric, float('inf')) for t in trials if t.status == ExperimentStatus.COMPLETED)
             return best_recent >= best_overall
 
     async def _analyze_experiment(self, experiment_id: str, total_duration: float) -> ExperimentResults:
@@ -550,7 +550,7 @@ class ExperimentTracker:
         results = ExperimentResults(experiment_id=experiment_id, total_trials=len(trials), successful_trials=len(completed_trials), failed_trials=len(failed_trials), best_trial_id=best_trial.trial_id, best_hyperparameters=best_trial.hyperparameters, best_metric_value=best_trial.metrics.get(objective_metric, 0.0), metric_mean=np.mean(objective_values), metric_std=np.std(objective_values), metric_min=np.min(objective_values), metric_max=np.max(objective_values), total_duration_seconds=total_duration, avg_trial_duration_seconds=np.mean([t.duration_seconds for t in completed_trials if t.duration_seconds]), parameter_importance=parameter_importance, early_stopped=len(trials) < config.max_trials)
         return results
 
-    def _calculate_parameter_importance(self, trials: List[Trial], objective_metric: str) -> Dict[str, float]:
+    def _calculate_parameter_importance(self, trials: list[Trial], objective_metric: str) -> dict[str, float]:
         """Calculate relative importance of hyperparameters."""
         importance = {}
         param_names = set()
@@ -575,26 +575,26 @@ class ExperimentTracker:
             importance = {k: v / total for k, v in importance.items()}
         return importance
 
-    def _extract_bounds(self, hyperparameter_space: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:
+    def _extract_bounds(self, hyperparameter_space: dict[str, Any]) -> dict[str, tuple[float, float]]:
         """Extract parameter bounds for Bayesian optimization."""
         bounds = {}
         for param, spec in hyperparameter_space.items():
             if isinstance(spec, tuple) and len(spec) == 2:
                 bounds[param] = spec
-            elif isinstance(spec, list) and all((isinstance(x, (int, float)) for x in spec)):
+            elif isinstance(spec, list) and all(isinstance(x, (int, float)) for x in spec):
                 bounds[param] = (min(spec), max(spec))
             else:
                 pass
         return bounds
 
-    def _config_to_dict(self, config: ExperimentConfig) -> Dict[str, Any]:
+    def _config_to_dict(self, config: ExperimentConfig) -> dict[str, Any]:
         """Convert config to dictionary for serialization."""
         return {'experiment_id': config.experiment_id, 'experiment_name': config.experiment_name, 'description': config.description, 'objective_metric': config.objective_metric, 'objective_direction': config.objective_direction, 'hyperparameter_space': config.hyperparameter_space, 'fixed_parameters': config.fixed_parameters, 'optimization_strategy': config.optimization_strategy.value, 'max_trials': config.max_trials, 'timeout_seconds': config.timeout_seconds, 'early_stopping_rounds': config.early_stopping_rounds, 'parallelization_mode': config.parallelization_mode.value, 'n_parallel_trials': config.n_parallel_trials, 'max_memory_mb': config.max_memory_mb, 'max_cpu_percent': config.max_cpu_percent, 'track_metrics': config.track_metrics, 'save_models': config.save_models, 'save_frequency': config.save_frequency}
 
-    def _trial_to_dict(self, trial: Trial) -> Dict[str, Any]:
+    def _trial_to_dict(self, trial: Trial) -> dict[str, Any]:
         """Convert trial to dictionary for serialization."""
         return {'trial_id': trial.trial_id, 'experiment_id': trial.experiment_id, 'trial_number': trial.trial_number, 'hyperparameters': trial.hyperparameters, 'status': trial.status.value, 'start_time': trial.start_time.isoformat() if trial.start_time else None, 'end_time': trial.end_time.isoformat() if trial.end_time else None, 'duration_seconds': trial.duration_seconds, 'metrics': trial.metrics, 'model_id': trial.model_id, 'peak_memory_mb': trial.peak_memory_mb, 'avg_cpu_percent': trial.avg_cpu_percent, 'error_message': trial.error_message, 'stack_trace': trial.stack_trace, 'tags': trial.tags, 'artifacts': trial.artifacts}
 
-    def _results_to_dict(self, results: ExperimentResults) -> Dict[str, Any]:
+    def _results_to_dict(self, results: ExperimentResults) -> dict[str, Any]:
         """Convert results to dictionary for serialization."""
         return {'experiment_id': results.experiment_id, 'total_trials': results.total_trials, 'successful_trials': results.successful_trials, 'failed_trials': results.failed_trials, 'best_trial_id': results.best_trial_id, 'best_hyperparameters': results.best_hyperparameters, 'best_metric_value': results.best_metric_value, 'metric_mean': results.metric_mean, 'metric_std': results.metric_std, 'metric_min': results.metric_min, 'metric_max': results.metric_max, 'total_duration_seconds': results.total_duration_seconds, 'avg_trial_duration_seconds': results.avg_trial_duration_seconds, 'parameter_importance': results.parameter_importance, 'convergence_iteration': results.convergence_iteration, 'early_stopped': results.early_stopped}

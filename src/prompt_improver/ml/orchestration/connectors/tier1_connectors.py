@@ -22,7 +22,7 @@ class TrainingDataLoaderConnector(ComponentConnector):
         self.logger.info('TrainingDataLoader connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute TrainingDataLoader capability."""
         if capability_name == 'load_training_data':
             return await self._load_training_data(parameters)
@@ -33,17 +33,17 @@ class TrainingDataLoaderConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _load_training_data(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _load_training_data(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Load training data."""
         await asyncio.sleep(0.2)
         return {'dataset_size': parameters.get('expected_size', 10000), 'features_count': 150, 'data_format': 'structured', 'loaded_at': '2025-01-20T10:00:00Z'}
 
-    async def _validate_data_quality(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _validate_data_quality(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Validate data quality."""
         await asyncio.sleep(0.1)
         return {'quality_score': 0.92, 'missing_values': 0.05, 'outliers': 0.02, 'validation_passed': True}
 
-    async def _split_dataset(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _split_dataset(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Split dataset."""
         await asyncio.sleep(0.1)
         return {'train_size': 7000, 'validation_size': 2000, 'test_size': 1000, 'split_ratio': [0.7, 0.2, 0.1]}
@@ -60,7 +60,7 @@ class MLModelServiceConnector(ComponentConnector):
         self.logger.info('MLModelService connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute MLModelService capability."""
         if capability_name == 'train_model':
             return await self._train_model(parameters)
@@ -71,17 +71,17 @@ class MLModelServiceConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _train_model(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _train_model(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Train ML model."""
         await asyncio.sleep(0.5)
         return {'model_id': 'model_v1.0', 'training_accuracy': 0.89, 'training_loss': 0.15, 'epochs': parameters.get('epochs', 10), 'model_size': '50MB'}
 
-    async def _evaluate_model(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _evaluate_model(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Evaluate model."""
         await asyncio.sleep(0.2)
         return {'accuracy': 0.87, 'precision': 0.85, 'recall': 0.89, 'f1_score': 0.87, 'test_loss': 0.18}
 
-    async def _predict(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _predict(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Make predictions."""
         await asyncio.sleep(0.1)
         return {'predictions': [0.9, 0.7, 0.3, 0.8], 'confidence_scores': [0.95, 0.82, 0.65, 0.91], 'prediction_time': '0.05s'}
@@ -98,7 +98,7 @@ class RuleOptimizerConnector(ComponentConnector):
         self.logger.info('RuleOptimizer connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute RuleOptimizer capability."""
         if capability_name == 'optimize_rules':
             return await self._optimize_rules(parameters)
@@ -107,12 +107,12 @@ class RuleOptimizerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _optimize_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _optimize_rules(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Optimize rules."""
         await asyncio.sleep(0.3)
         return {'optimized_rules': 25, 'improvement_score': 0.15, 'optimization_iterations': 50, 'convergence_achieved': True}
 
-    async def _validate_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _validate_rules(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Validate rules."""
         await asyncio.sleep(0.2)
         return {'validation_score': 0.91, 'rules_passed': 23, 'rules_failed': 2, 'coverage': 0.94}
@@ -129,7 +129,7 @@ class MultiArmedBanditConnector(ComponentConnector):
         self.logger.info('MultiArmedBandit connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute MultiArmedBandit capability."""
         if capability_name == 'thompson_sampling':
             return await self._thompson_sampling(parameters)
@@ -138,12 +138,12 @@ class MultiArmedBanditConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _thompson_sampling(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _thompson_sampling(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Thompson Sampling."""
         await asyncio.sleep(0.1)
         return {'selected_action': 2, 'action_probability': 0.75, 'exploration_factor': 0.3, 'expected_reward': 0.82}
 
-    async def _ucb_selection(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _ucb_selection(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """UCB Selection."""
         await asyncio.sleep(0.1)
         return {'selected_action': 1, 'upper_confidence_bound': 0.88, 'confidence_interval': [0.65, 0.88], 'exploration_bonus': 0.12}
@@ -160,7 +160,7 @@ class AprioriAnalyzerConnector(ComponentConnector):
         self.logger.info('AprioriAnalyzer connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute AprioriAnalyzer capability."""
         if capability_name == 'mine_association_rules':
             return await self._mine_association_rules(parameters)
@@ -169,12 +169,12 @@ class AprioriAnalyzerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _mine_association_rules(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _mine_association_rules(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Mine association rules."""
         await asyncio.sleep(0.3)
         return {'rules_discovered': 45, 'min_support': parameters.get('min_support', 0.1), 'min_confidence': parameters.get('min_confidence', 0.8), 'top_rules': [{'rule': 'A -> B', 'support': 0.3, 'confidence': 0.9}, {'rule': 'B -> C', 'support': 0.25, 'confidence': 0.85}]}
 
-    async def _analyze_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_patterns(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze patterns."""
         await asyncio.sleep(0.2)
         return {'frequent_patterns': 120, 'pattern_coverage': 0.87, 'most_frequent': ['pattern_A', 'pattern_B', 'pattern_C'], 'pattern_strength': 0.82}
@@ -191,7 +191,7 @@ class ContextLearnerConnector(ComponentConnector):
         self.logger.info('ContextLearner connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute ContextLearner capability."""
         if capability_name == 'learn_context_patterns':
             return await self._learn_context_patterns(parameters)
@@ -202,17 +202,17 @@ class ContextLearnerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _learn_context_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _learn_context_patterns(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Learn context patterns."""
         await asyncio.sleep(0.3)
         return {'patterns_discovered': 12, 'clusters_formed': 4, 'silhouette_score': 0.75, 'processing_time': '0.3s'}
 
-    async def _extract_features(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _extract_features(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Extract features."""
         await asyncio.sleep(0.2)
         return {'features_extracted': 31, 'feature_dimensions': 128, 'extraction_method': 'composite', 'quality_score': 0.92}
 
-    async def _cluster_contexts(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cluster_contexts(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Cluster contexts."""
         await asyncio.sleep(0.2)
         return {'num_clusters': 5, 'cluster_sizes': [25, 30, 15, 20, 10], 'clustering_method': 'HDBSCAN', 'quality_metrics': {'silhouette_score': 0.68, 'calinski_harabasz_score': 245.7}}
@@ -229,6 +229,6 @@ class Tier1ConnectorFactory:
         return connectors[component_name](event_bus)
 
     @staticmethod
-    def list_available_components() -> List[str]:
+    def list_available_components() -> list[str]:
         """List all available Tier 1 components."""
         return ['training_data_loader', 'ml_model_service', 'rule_optimizer', 'multi_armed_bandit', 'apriori_analyzer', 'batch_processor', 'production_registry', 'context_learner', 'clustering_optimizer', 'failure_analyzer', 'dimensionality_reducer']

@@ -24,7 +24,7 @@ class EvaluationEventHandler:
         self.logger = logging.getLogger(__name__)
         self.events_processed = 0
         self.events_failed = 0
-        self.last_event_time: Optional[datetime] = None
+        self.last_event_time: datetime | None = None
         self.active_evaluations = {}
         self.evaluation_history = []
 
@@ -135,7 +135,7 @@ class EvaluationEventHandler:
                 evaluation['metrics'].update(experiment_results)
         if workflow_id in self.active_evaluations:
             evaluation = self.active_evaluations[workflow_id]
-            all_experiments_complete = all((exp['status'] in ['completed', 'failed'] for exp in evaluation['experiments']))
+            all_experiments_complete = all(exp['status'] in ['completed', 'failed'] for exp in evaluation['experiments'])
             if all_experiments_complete and evaluation['status'] == 'running':
                 if self.event_bus:
                     await self.event_bus.emit(MLEvent(event_type=EventType.EVALUATION_AGGREGATION_REQUESTED, source='evaluation_handler', data={'workflow_id': workflow_id, 'experiments_complete': True}))
@@ -155,11 +155,11 @@ class EvaluationEventHandler:
             if self.event_bus:
                 await self.event_bus.emit(MLEvent(event_type=EventType.EVALUATION_FAILED, source='evaluation_handler', data={'workflow_id': workflow_id, 'error_message': 'Data validation failed', 'validation_results': event.data.get('validation_results', {})}))
 
-    async def get_evaluation_status(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+    async def get_evaluation_status(self, workflow_id: str) -> dict[str, Any] | None:
         """Get status of an evaluation session."""
         return self.active_evaluations.get(workflow_id, {}).copy()
 
-    async def list_active_evaluations(self) -> Dict[str, Dict[str, Any]]:
+    async def list_active_evaluations(self) -> dict[str, dict[str, Any]]:
         """List all active evaluation sessions."""
         active_evaluations = {}
         for workflow_id, evaluation in self.active_evaluations.items():
@@ -167,10 +167,10 @@ class EvaluationEventHandler:
                 active_evaluations[workflow_id] = evaluation.copy()
         return active_evaluations
 
-    async def get_handler_statistics(self) -> Dict[str, Any]:
+    async def get_handler_statistics(self) -> dict[str, Any]:
         """Get event handler statistics."""
         return {'events_processed': self.events_processed, 'events_failed': self.events_failed, 'success_rate': (self.events_processed - self.events_failed) / max(self.events_processed, 1), 'last_event_time': self.last_event_time, 'active_evaluations': len([e for e in self.active_evaluations.values() if e.get('status') == 'running']), 'total_evaluations': len(self.active_evaluations), 'evaluation_history_count': len(self.evaluation_history)}
 
-    def get_supported_events(self) -> List[EventType]:
+    def get_supported_events(self) -> list[EventType]:
         """Get list of supported event types."""
         return [EventType.EVALUATION_STARTED, EventType.EVALUATION_COMPLETED, EventType.EVALUATION_FAILED, EventType.EXPERIMENT_CREATED, EventType.EXPERIMENT_COMPLETED, EventType.DATA_VALIDATION_COMPLETED]

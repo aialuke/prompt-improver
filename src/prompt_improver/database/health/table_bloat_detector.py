@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
-# psycopg_client removed in Phase 1 - using unified_connection_manager instead
-from prompt_improver.database.unified_connection_manager import (
+# psycopg_client removed in Phase 1 - using database_services instead
+from prompt_improver.database import (
     ManagerMode,
-    get_unified_manager,
+    get_database_services,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,7 +155,7 @@ class TableBloatDetector:
     async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return get_unified_manager(ManagerMode.ASYNC_MODERN)
+            return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def detect_table_bloat(self) -> dict[str, Any]:
@@ -208,7 +208,7 @@ class TableBloatDetector:
             report.bloat_health_score = self._calculate_bloat_health_score(report)
 
             detection_time = (time.perf_counter() - start_time) * 1000
-            logger.info("Table bloat detection completed in %sms", detection_time:.2f)
+            logger.info("Table bloat detection completed in %.2fms", detection_time)
 
             return {
                 "timestamp": report.timestamp.isoformat(),
@@ -255,7 +255,7 @@ class TableBloatDetector:
             }
 
         except Exception as e:
-            logger.error("Table bloat detection failed: %s", e)
+            logger.error(f"Table bloat detection failed: {e}")
             return {
                 "error": str(e),
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -456,7 +456,7 @@ class TableBloatDetector:
             return bloat_bytes, round(bloat_ratio, 2)
 
         except Exception as e:
-            logger.debug("Bloat estimation failed for {table_info.table_name}: %s", e)
+            logger.debug(f"Bloat estimation failed for {table_info.table_name}: {e}")
             return 0, 0.0
 
     def _estimate_index_bloat(
@@ -793,7 +793,7 @@ class TableBloatDetector:
             }
 
         except Exception as e:
-            logger.error("Failed to get bloat summary: %s", e)
+            logger.error(f"Failed to get bloat summary: {e}")
             return {
                 "status": "error",
                 "error": str(e),

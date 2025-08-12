@@ -1,16 +1,24 @@
 """Real-time database performance monitoring using pg_stat_statements.
 Comprehensive monitoring for Phase 2 <50ms query time and 90% cache hit ratio requirements.
 """
+
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+
 from sqlalchemy import text
-from prompt_improver.database.unified_connection_manager import ManagerMode, get_unified_manager
+
+from prompt_improver.database import (
+    ManagerMode,
+    get_database_services,
+)
+
 
 @dataclass
 class QueryPerformanceMetric:
     """Individual query performance metric"""
+
     query_text: str
     calls: int
     total_exec_time: float
@@ -20,9 +28,11 @@ class QueryPerformanceMetric:
     rows_affected: int
     cache_hit_ratio: float
 
+
 @dataclass
 class DatabasePerformanceSnapshot:
     """Complete database performance snapshot"""
+
     timestamp: datetime
     cache_hit_ratio: float
     active_connections: int
@@ -32,6 +42,7 @@ class DatabasePerformanceSnapshot:
     top_slow_queries: list[QueryPerformanceMetric]
     database_size_mb: float
     index_hit_ratio: float
+
 
 class DatabasePerformanceMonitor:
     """Real-time database performance monitoring using PostgreSQL statistics.
@@ -55,19 +66,19 @@ class DatabasePerformanceMonitor:
     async def get_client(self):
         """Get database client"""
         if self.client is None:
-            return get_unified_manager(ManagerMode.ASYNC_MODERN)
+            return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def get_client(self):
-        """Get database client - using UnifiedConnectionManager"""
+        """Get database client - using DatabaseServices"""
         if self.client is None:
-            return get_unified_manager(ManagerMode.ASYNC_MODERN)
+            return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def get_cache_hit_ratio(self) -> float:
         """Get current cache hit ratio from pg_stat_database"""
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
-        query = '\n        SELECT\n            CASE\n                WHEN (blks_hit + blks_read) = 0 THEN 0\n                ELSE ROUND(blks_hit::numeric / (blks_hit + blks_read) * 100, 2)\n            END as cache_hit_ratio\n        FROM pg_stat_database\n        WHERE datname = current_database()\n        '
+        manager = await get_database_services(ManagerMode.ASYNC_MODERN)
+        query = "\n        SELECT\n            CASE\n                WHEN (blks_hit + blks_read) = 0 THEN 0\n                ELSE ROUND(blks_hit::numeric / (blks_hit + blks_read) * 100, 2)\n            END as cache_hit_ratio\n        FROM pg_stat_database\n        WHERE datname = current_database()\n        "
         async with manager.get_session() as session:
             result = await session.execute(text(query))
             row = await result.fetchone()
@@ -76,10 +87,10 @@ class DatabasePerformanceMonitor:
     async def get_index_hit_ratio(self) -> float:
         """Get index hit ratio for table access patterns"""
         client = await self.get_client()
-        query = '\n        SELECT\n            CASE\n                WHEN (idx_blks_hit + idx_blks_read) = 0 THEN 0\n                ELSE ROUND(idx_blks_hit::numeric / (idx_blks_hit + idx_blks_read) * 100, 2)\n            END as index_hit_ratio\n        FROM pg_statio_user_indexes\n        '
+        query = "\n        SELECT\n            CASE\n                WHEN (idx_blks_hit + idx_blks_read) = 0 THEN 0\n                ELSE ROUND(idx_blks_hit::numeric / (idx_blks_hit + idx_blks_read) * 100, 2)\n            END as index_hit_ratio\n        FROM pg_statio_user_indexes\n        "
         result = await client.fetch_raw(query)
         if result:
-            return float(result[0]['index_hit_ratio'])
+            return float(result[0]["index_hit_ratio"])
         return 0.0
 
     async def get_active_connections(self) -> int:
@@ -87,39 +98,88 @@ class DatabasePerformanceMonitor:
         client = await self.get_client()
         query = "\n        SELECT count(*) as active_connections\n        FROM pg_stat_activity\n        WHERE state = 'active' AND datname = current_database()\n        "
         result = await client.fetch_raw(query)
-        return int(result[0]['active_connections']) if result else 0
+        return int(result[0]["active_connections"]) if result else 0
 
     async def get_database_size(self) -> float:
         """Get database size in MB"""
         client = await self.get_client()
-        query = '\n        SELECT\n            ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 2) as size_mb\n        '
+        query = "\n        SELECT\n            ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 2) as size_mb\n        "
         result = await client.fetch_raw(query)
-        return float(result[0]['size_mb']) if result else 0.0
+        return float(result[0]["size_mb"]) if result else 0.0
 
-    async def get_slow_queries(self, min_calls: int=10) -> list[QueryPerformanceMetric]:
+    async def get_slow_queries(
+        self, min_calls: int = 10
+    ) -> list[QueryPerformanceMetric]:
         """Get slow queries from pg_stat_statements (if available).
         Fallback to basic query analysis if extension not installed.
         """
         client = await self.get_client()
         extension_check = "\n        SELECT EXISTS (\n            SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'\n        ) as has_extension\n        "
         ext_result = await client.fetch_raw(extension_check)
-        has_extension = ext_result[0]['has_extension'] if ext_result else False
+        has_extension = ext_result[0]["has_extension"] if ext_result else False
         if has_extension:
             query = "\n            SELECT\n                query as query_text,\n                calls,\n                total_exec_time,\n                mean_exec_time,\n                max_exec_time,\n                min_exec_time,\n                rows\n            FROM pg_stat_statements\n            WHERE calls >= %s\n            AND query NOT LIKE '%%pg_stat_statements%%'\n            ORDER BY mean_exec_time DESC\n            LIMIT 10\n            "
-            result = await client.fetch_raw(query, {'calls': min_calls})
+            result = await client.fetch_raw(query, {"calls": min_calls})
             metrics = []
             for row in result:
-                metrics.append(QueryPerformanceMetric(query_text=row['query_text'][:200] + '...' if len(row['query_text']) > 200 else row['query_text'], calls=row['calls'], total_exec_time=row['total_exec_time'], mean_exec_time=row['mean_exec_time'], max_exec_time=row['max_exec_time'], min_exec_time=row['min_exec_time'], rows_affected=row['rows'], cache_hit_ratio=0.0))
+                metrics.append(
+                    QueryPerformanceMetric(
+                        query_text=row["query_text"][:200] + "..."
+                        if len(row["query_text"]) > 200
+                        else row["query_text"],
+                        calls=row["calls"],
+                        total_exec_time=row["total_exec_time"],
+                        mean_exec_time=row["mean_exec_time"],
+                        max_exec_time=row["max_exec_time"],
+                        min_exec_time=row["min_exec_time"],
+                        rows_affected=row["rows"],
+                        cache_hit_ratio=0.0,
+                    )
+                )
             return metrics
         client_stats = await client.get_performance_stats()
-        return [QueryPerformanceMetric(query_text='Client-tracked queries (pg_stat_statements not available)', calls=client_stats['total_queries'], total_exec_time=client_stats['avg_query_time_ms'] * client_stats['total_queries'], mean_exec_time=client_stats['avg_query_time_ms'], max_exec_time=0.0, min_exec_time=0.0, rows_affected=0, cache_hit_ratio=client_stats['cache_hit_ratio'])]
+        return [
+            QueryPerformanceMetric(
+                query_text="Client-tracked queries (pg_stat_statements not available)",
+                calls=client_stats["total_queries"],
+                total_exec_time=client_stats["avg_query_time_ms"]
+                * client_stats["total_queries"],
+                mean_exec_time=client_stats["avg_query_time_ms"],
+                max_exec_time=0.0,
+                min_exec_time=0.0,
+                rows_affected=0,
+                cache_hit_ratio=client_stats["cache_hit_ratio"],
+            )
+        ]
 
     async def take_performance_snapshot(self) -> DatabasePerformanceSnapshot:
         """Take a complete performance snapshot"""
         client = await self.get_client()
-        cache_hit_ratio, index_hit_ratio, active_connections, database_size, slow_queries = await asyncio.gather(self.get_cache_hit_ratio(), self.get_index_hit_ratio(), self.get_active_connections(), self.get_database_size(), self.get_slow_queries())
+        (
+            cache_hit_ratio,
+            index_hit_ratio,
+            active_connections,
+            database_size,
+            slow_queries,
+        ) = await asyncio.gather(
+            self.get_cache_hit_ratio(),
+            self.get_index_hit_ratio(),
+            self.get_active_connections(),
+            self.get_database_size(),
+            self.get_slow_queries(),
+        )
         client_stats = await client.get_performance_stats()
-        snapshot = DatabasePerformanceSnapshot(timestamp=datetime.now(UTC), cache_hit_ratio=cache_hit_ratio, active_connections=active_connections, total_queries=client_stats['total_queries'], avg_query_time_ms=client_stats['avg_query_time_ms'], slow_queries_count=client_stats['slow_query_count'], top_slow_queries=slow_queries[:5], database_size_mb=database_size, index_hit_ratio=index_hit_ratio)
+        snapshot = DatabasePerformanceSnapshot(
+            timestamp=datetime.now(UTC),
+            cache_hit_ratio=cache_hit_ratio,
+            active_connections=active_connections,
+            total_queries=client_stats["total_queries"],
+            avg_query_time_ms=client_stats["avg_query_time_ms"],
+            slow_queries_count=client_stats["slow_query_count"],
+            top_slow_queries=slow_queries[:5],
+            database_size_mb=database_size,
+            index_hit_ratio=index_hit_ratio,
+        )
         self._snapshots.append(snapshot)
         if len(self._snapshots) > 100:
             self._snapshots = self._snapshots[-100:]
@@ -127,97 +187,197 @@ class DatabasePerformanceMonitor:
         await self._check_and_emit_performance_alerts(snapshot)
         return snapshot
 
-    async def start_monitoring(self, interval_seconds: int=30):
+    async def start_monitoring(self, interval_seconds: int = 30):
         """Start continuous monitoring"""
         self._monitoring = True
         while self._monitoring:
             try:
                 snapshot = await self.take_performance_snapshot()
                 if snapshot.cache_hit_ratio < 90:
-                    print(f'⚠️  Cache hit ratio below target: {snapshot.cache_hit_ratio:.1f}% (target: >90%)')
+                    print(
+                        f"⚠️  Cache hit ratio below target: {snapshot.cache_hit_ratio:.1f}% (target: >90%)"
+                    )
                 if snapshot.avg_query_time_ms > 50:
-                    print(f'⚠️  Average query time above target: {snapshot.avg_query_time_ms:.1f}ms (target: <50ms)')
+                    print(
+                        f"⚠️  Average query time above target: {snapshot.avg_query_time_ms:.1f}ms (target: <50ms)"
+                    )
                 await asyncio.sleep(interval_seconds)
             except Exception as e:
-                print(f'Monitoring error: {e}')
+                print(f"Monitoring error: {e}")
                 await asyncio.sleep(interval_seconds)
 
     def stop_monitoring(self):
         """Stop continuous monitoring"""
         self._monitoring = False
 
-    async def get_performance_summary(self, hours: int=24) -> dict[str, Any]:
+    async def get_performance_summary(self, hours: int = 24) -> dict[str, Any]:
         """Get performance summary for the last N hours"""
         cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
         recent_snapshots = [s for s in self._snapshots if s.timestamp >= cutoff_time]
         if not recent_snapshots:
-            return {'error': 'No recent performance data available'}
-        avg_cache_hit = sum((s.cache_hit_ratio for s in recent_snapshots)) / len(recent_snapshots)
-        avg_query_time = sum((s.avg_query_time_ms for s in recent_snapshots)) / len(recent_snapshots)
-        avg_connections = sum((s.active_connections for s in recent_snapshots)) / len(recent_snapshots)
-        return {'period_hours': hours, 'snapshots_analyzed': len(recent_snapshots), 'avg_cache_hit_ratio': round(avg_cache_hit, 2), 'avg_query_time_ms': round(avg_query_time, 2), 'avg_active_connections': round(avg_connections, 1), 'latest_database_size_mb': recent_snapshots[-1].database_size_mb, 'performance_status': 'GOOD' if avg_cache_hit >= 90 and avg_query_time <= 50 else 'NEEDS_ATTENTION', 'target_compliance': {'cache_hit_ratio': avg_cache_hit >= 90, 'query_time': avg_query_time <= 50}}
+            return {"error": "No recent performance data available"}
+        avg_cache_hit = sum(s.cache_hit_ratio for s in recent_snapshots) / len(
+            recent_snapshots
+        )
+        avg_query_time = sum(s.avg_query_time_ms for s in recent_snapshots) / len(
+            recent_snapshots
+        )
+        avg_connections = sum(s.active_connections for s in recent_snapshots) / len(
+            recent_snapshots
+        )
+        return {
+            "period_hours": hours,
+            "snapshots_analyzed": len(recent_snapshots),
+            "avg_cache_hit_ratio": round(avg_cache_hit, 2),
+            "avg_query_time_ms": round(avg_query_time, 2),
+            "avg_active_connections": round(avg_connections, 1),
+            "latest_database_size_mb": recent_snapshots[-1].database_size_mb,
+            "performance_status": "GOOD"
+            if avg_cache_hit >= 90 and avg_query_time <= 50
+            else "NEEDS_ATTENTION",
+            "target_compliance": {
+                "cache_hit_ratio": avg_cache_hit >= 90,
+                "query_time": avg_query_time <= 50,
+            },
+        }
 
     async def get_recommendations(self) -> list[str]:
         """Get performance optimization recommendations"""
         if not self._snapshots:
-            return ['No performance data available. Run monitoring first.']
+            return ["No performance data available. Run monitoring first."]
         latest = self._snapshots[-1]
         recommendations = []
         if latest.cache_hit_ratio < 90:
-            recommendations.append(f'Cache hit ratio is {latest.cache_hit_ratio:.1f}% (target: >90%). Consider increasing shared_buffers.')
+            recommendations.append(
+                f"Cache hit ratio is {latest.cache_hit_ratio:.1f}% (target: >90%). Consider increasing shared_buffers."
+            )
         if latest.avg_query_time_ms > 50:
-            recommendations.append(f'Average query time is {latest.avg_query_time_ms:.1f}ms (target: <50ms). Review slow queries and add indexes.')
+            recommendations.append(
+                f"Average query time is {latest.avg_query_time_ms:.1f}ms (target: <50ms). Review slow queries and add indexes."
+            )
         if latest.index_hit_ratio < 95:
-            recommendations.append(f'Index hit ratio is {latest.index_hit_ratio:.1f}% (target: >95%). Review query plans and index usage.')
+            recommendations.append(
+                f"Index hit ratio is {latest.index_hit_ratio:.1f}% (target: >95%). Review query plans and index usage."
+            )
         if latest.active_connections > 20:
-            recommendations.append(f'High connection count: {latest.active_connections}. Consider connection pooling optimization.')
+            recommendations.append(
+                f"High connection count: {latest.active_connections}. Consider connection pooling optimization."
+            )
         if not recommendations:
-            recommendations.append('✅ Performance targets are being met!')
+            recommendations.append("✅ Performance targets are being met!")
         return recommendations
 
-    async def _emit_performance_snapshot_event(self, snapshot: DatabasePerformanceSnapshot):
+    async def _emit_performance_snapshot_event(
+        self, snapshot: DatabasePerformanceSnapshot
+    ):
         """Emit performance snapshot event for orchestrator coordination."""
         if not self.event_bus:
             return
         try:
-            from prompt_improver.ml.orchestration.events.event_types import EventType, MLEvent
-            await self.event_bus.emit(MLEvent(event_type=EventType.DATABASE_PERFORMANCE_SNAPSHOT_TAKEN, source='database_performance_monitor', data={'snapshot': {'timestamp': snapshot.timestamp.isoformat(), 'cache_hit_ratio': snapshot.cache_hit_ratio, 'active_connections': snapshot.active_connections, 'total_queries': snapshot.total_queries, 'avg_query_time_ms': snapshot.avg_query_time_ms, 'slow_queries_count': snapshot.slow_queries_count, 'database_size_mb': snapshot.database_size_mb, 'index_hit_ratio': snapshot.index_hit_ratio}}))
+            from prompt_improver.ml.orchestration.events.event_types import (
+                EventType,
+                MLEvent,
+            )
+
+            await self.event_bus.emit(
+                MLEvent(
+                    event_type=EventType.DATABASE_PERFORMANCE_SNAPSHOT_TAKEN,
+                    source="database_performance_monitor",
+                    data={
+                        "snapshot": {
+                            "timestamp": snapshot.timestamp.isoformat(),
+                            "cache_hit_ratio": snapshot.cache_hit_ratio,
+                            "active_connections": snapshot.active_connections,
+                            "total_queries": snapshot.total_queries,
+                            "avg_query_time_ms": snapshot.avg_query_time_ms,
+                            "slow_queries_count": snapshot.slow_queries_count,
+                            "database_size_mb": snapshot.database_size_mb,
+                            "index_hit_ratio": snapshot.index_hit_ratio,
+                        }
+                    },
+                )
+            )
         except Exception as e:
             pass
 
-    async def _check_and_emit_performance_alerts(self, snapshot: DatabasePerformanceSnapshot):
+    async def _check_and_emit_performance_alerts(
+        self, snapshot: DatabasePerformanceSnapshot
+    ):
         """Check performance thresholds and emit alerts if needed."""
         if not self.event_bus:
             return
         try:
             from datetime import timedelta
-            from prompt_improver.ml.orchestration.events.event_types import EventType, MLEvent
+
+            from prompt_improver.ml.orchestration.events.event_types import (
+                EventType,
+                MLEvent,
+            )
+
             current_time = datetime.now(UTC)
             if snapshot.cache_hit_ratio < 90.0:
-                last_alert = self._last_alert_times.get('cache_hit_ratio')
+                last_alert = self._last_alert_times.get("cache_hit_ratio")
                 if not last_alert or current_time - last_alert > timedelta(minutes=5):
-                    await self.event_bus.emit(MLEvent(event_type=EventType.DATABASE_CACHE_HIT_RATIO_LOW, source='database_performance_monitor', data={'cache_hit_ratio': snapshot.cache_hit_ratio, 'threshold': 90.0, 'severity': 'warning'}))
-                    self._last_alert_times['cache_hit_ratio'] = current_time
+                    await self.event_bus.emit(
+                        MLEvent(
+                            event_type=EventType.DATABASE_CACHE_HIT_RATIO_LOW,
+                            source="database_performance_monitor",
+                            data={
+                                "cache_hit_ratio": snapshot.cache_hit_ratio,
+                                "threshold": 90.0,
+                                "severity": "warning",
+                            },
+                        )
+                    )
+                    self._last_alert_times["cache_hit_ratio"] = current_time
             if snapshot.avg_query_time_ms > 50.0:
-                last_alert = self._last_alert_times.get('slow_queries')
+                last_alert = self._last_alert_times.get("slow_queries")
                 if not last_alert or current_time - last_alert > timedelta(minutes=5):
-                    await self.event_bus.emit(MLEvent(event_type=EventType.DATABASE_SLOW_QUERY_DETECTED, source='database_performance_monitor', data={'avg_query_time_ms': snapshot.avg_query_time_ms, 'threshold': 50.0, 'slow_queries_count': snapshot.slow_queries_count, 'severity': 'warning'}))
-                    self._last_alert_times['slow_queries'] = current_time
+                    await self.event_bus.emit(
+                        MLEvent(
+                            event_type=EventType.DATABASE_SLOW_QUERY_DETECTED,
+                            source="database_performance_monitor",
+                            data={
+                                "avg_query_time_ms": snapshot.avg_query_time_ms,
+                                "threshold": 50.0,
+                                "slow_queries_count": snapshot.slow_queries_count,
+                                "severity": "warning",
+                            },
+                        )
+                    )
+                    self._last_alert_times["slow_queries"] = current_time
             performance_issues = []
             if snapshot.cache_hit_ratio < 80.0:
-                performance_issues.append('critical_cache_hit_ratio')
+                performance_issues.append("critical_cache_hit_ratio")
             if snapshot.avg_query_time_ms > 100.0:
-                performance_issues.append('critical_query_time')
+                performance_issues.append("critical_query_time")
             if snapshot.active_connections > 25:
-                performance_issues.append('high_connection_count')
+                performance_issues.append("high_connection_count")
             if performance_issues:
-                last_alert = self._last_alert_times.get('performance_degraded')
+                last_alert = self._last_alert_times.get("performance_degraded")
                 if not last_alert or current_time - last_alert > timedelta(minutes=10):
-                    await self.event_bus.emit(MLEvent(event_type=EventType.DATABASE_PERFORMANCE_DEGRADED, source='database_performance_monitor', data={'issues': performance_issues, 'snapshot_data': {'cache_hit_ratio': snapshot.cache_hit_ratio, 'avg_query_time_ms': snapshot.avg_query_time_ms, 'active_connections': snapshot.active_connections}, 'severity': 'critical'}))
-                    self._last_alert_times['performance_degraded'] = current_time
+                    await self.event_bus.emit(
+                        MLEvent(
+                            event_type=EventType.DATABASE_PERFORMANCE_DEGRADED,
+                            source="database_performance_monitor",
+                            data={
+                                "issues": performance_issues,
+                                "snapshot_data": {
+                                    "cache_hit_ratio": snapshot.cache_hit_ratio,
+                                    "avg_query_time_ms": snapshot.avg_query_time_ms,
+                                    "active_connections": snapshot.active_connections,
+                                },
+                                "severity": "critical",
+                            },
+                        )
+                    )
+                    self._last_alert_times["performance_degraded"] = current_time
         except Exception as e:
             pass
+
+
 _monitor: DatabasePerformanceMonitor | None = None
+
 
 async def get_performance_monitor(event_bus=None) -> DatabasePerformanceMonitor:
     """Get or create global performance monitor with optional event bus integration"""

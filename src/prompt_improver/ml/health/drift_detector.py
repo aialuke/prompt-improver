@@ -13,12 +13,13 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from scipy import stats
 from ...utils.datetime_utils import aware_utc_now
 logger = logging.getLogger(__name__)
 
-class DriftMetrics(SQLModel):
+class DriftMetrics(BaseModel):
     """Drift detection metrics for a model"""
     model_id: str = Field(description='Model identifier')
     timestamp: datetime = Field(description='Drift analysis timestamp')
@@ -29,18 +30,18 @@ class DriftMetrics(SQLModel):
     js_divergence: float = Field(ge=0.0, description='Jensen-Shannon divergence')
     drift_detected: bool = Field(description='Whether drift was detected')
     alert_level: str = Field(description='Alert level: none, warning, or critical')
-    alert_message: Optional[str] = Field(default=None, description='Alert message if applicable')
+    alert_message: str | None = Field(default=None, description='Alert message if applicable')
     baseline_samples: int = Field(default=0, ge=0, description='Number of baseline samples')
     current_samples: int = Field(default=0, ge=0, description='Number of current window samples')
 
-class PredictionWindow(SQLModel):
+class PredictionWindow(BaseModel):
     """Rolling window of predictions for drift analysis"""
-    predictions: List[float] = Field(default_factory=list, description='Prediction values in window')
-    confidences: List[float] = Field(default_factory=list, description='Confidence scores in window')
-    timestamps: List[datetime] = Field(default_factory=list, description='Timestamps for each prediction')
+    predictions: list[float] = Field(default_factory=list, description='Prediction values in window')
+    confidences: list[float] = Field(default_factory=list, description='Confidence scores in window')
+    timestamps: list[datetime] = Field(default_factory=list, description='Timestamps for each prediction')
     max_size: int = Field(default=1000, ge=100, description='Maximum window size')
 
-    def _deque_from_list(self, data: List[Any]) -> deque:
+    def _deque_from_list(self, data: list[Any]) -> deque:
         """Convert list to deque with max size for internal use"""
         return deque(data, maxlen=self.max_size)
 
@@ -50,7 +51,7 @@ class PredictionWindow(SQLModel):
         self.confidences.append(confidence)
         self.timestamps.append(timestamp)
 
-    def get_recent_window(self, hours: int=24) -> Tuple[List[float], List[float]]:
+    def get_recent_window(self, hours: int=24) -> tuple[list[float], list[float]]:
         """Get predictions and confidences from the last N hours"""
         cutoff_time = aware_utc_now() - timedelta(hours=hours)
         recent_predictions = []
@@ -74,12 +75,12 @@ class ModelDriftDetector:
         self.detection_window_hours = detection_window_hours
         self.drift_threshold = drift_threshold
         self.confidence_threshold = confidence_threshold
-        self._model_windows: Dict[str, PredictionWindow] = defaultdict(PredictionWindow)
-        self._baseline_distributions: Dict[str, Dict[str, Any]] = {}
-        self._drift_history: Dict[str, List[DriftMetrics]] = defaultdict(list)
+        self._model_windows: dict[str, PredictionWindow] = defaultdict(PredictionWindow)
+        self._baseline_distributions: dict[str, dict[str, Any]] = {}
+        self._drift_history: dict[str, list[DriftMetrics]] = defaultdict(list)
         logger.info('Model Drift Detector initialized')
 
-    async def record_prediction(self, model_id: str, prediction: float, confidence: float, features: Optional[List[float]]=None) -> None:
+    async def record_prediction(self, model_id: str, prediction: float, confidence: float, features: list[float] | None=None) -> None:
         """Record a prediction for drift monitoring"""
         try:
             timestamp = aware_utc_now()
@@ -90,7 +91,7 @@ class ModelDriftDetector:
         except Exception as e:
             logger.error('Failed to record prediction for drift detection: %s', e)
 
-    async def detect_drift(self, model_id: str) -> Optional[DriftMetrics]:
+    async def detect_drift(self, model_id: str) -> DriftMetrics | None:
         """Detect drift for a specific model"""
         try:
             if model_id not in self._model_windows:
@@ -116,7 +117,7 @@ class ModelDriftDetector:
             logger.error('Failed to detect drift for model {model_id}: %s', e)
             return None
 
-    async def get_drift_status(self, model_id: str) -> Dict[str, Any]:
+    async def get_drift_status(self, model_id: str) -> dict[str, Any]:
         """Get comprehensive drift status for a model"""
         try:
             latest_drift = await self.detect_drift(model_id)
@@ -129,7 +130,7 @@ class ModelDriftDetector:
             logger.error('Failed to get drift status for {model_id}: %s', e)
             return {'model_id': model_id, 'error': str(e), 'timestamp': aware_utc_now().isoformat()}
 
-    async def get_all_models_drift_status(self) -> List[Dict[str, Any]]:
+    async def get_all_models_drift_status(self) -> list[dict[str, Any]]:
         """Get drift status for all monitored models"""
         drift_statuses = []
         for model_id in self._model_windows.keys():
@@ -155,7 +156,7 @@ class ModelDriftDetector:
             logger.error('Failed to establish baseline for {model_id}: %s', e)
             return False
 
-    async def _calculate_drift_metrics(self, model_id: str, baseline_predictions: List[float], baseline_confidences: List[float], current_predictions: List[float], current_confidences: List[float]) -> DriftMetrics:
+    async def _calculate_drift_metrics(self, model_id: str, baseline_predictions: list[float], baseline_confidences: list[float], current_predictions: list[float], current_confidences: list[float]) -> DriftMetrics:
         """Calculate comprehensive drift metrics"""
         ks_stat, ks_p_value = stats.ks_2samp(baseline_predictions, current_predictions)
         js_divergence = self._calculate_js_divergence(baseline_predictions, current_predictions)
@@ -173,7 +174,7 @@ class ModelDriftDetector:
                 alert_message = f'Prediction drift warning (score: {prediction_drift_score:.3f})'
         return DriftMetrics(model_id=model_id, timestamp=aware_utc_now(), prediction_drift_score=prediction_drift_score, confidence_drift_score=confidence_drift_score, ks_statistic=ks_stat, ks_p_value=ks_p_value, js_divergence=js_divergence, drift_detected=drift_detected, alert_level=alert_level, alert_message=alert_message, baseline_samples=len(baseline_predictions), current_samples=len(current_predictions))
 
-    def _calculate_distribution_shift(self, baseline: List[float], current: List[float]) -> float:
+    def _calculate_distribution_shift(self, baseline: list[float], current: list[float]) -> float:
         """Calculate distribution shift score between two distributions"""
         try:
             baseline_arr = np.array(baseline)
@@ -191,7 +192,7 @@ class ModelDriftDetector:
             logger.error('Failed to calculate distribution shift: %s', e)
             return 0.0
 
-    def _calculate_js_divergence(self, baseline: List[float], current: List[float]) -> float:
+    def _calculate_js_divergence(self, baseline: list[float], current: list[float]) -> float:
         """Calculate Jensen-Shannon divergence between two distributions"""
         try:
             combined_data = baseline + current
@@ -210,7 +211,7 @@ class ModelDriftDetector:
             logger.error('Failed to calculate JS divergence: %s', e)
             return 0.0
 
-    def _calculate_drift_trend(self, recent_history: List[DriftMetrics]) -> Dict[str, Any]:
+    def _calculate_drift_trend(self, recent_history: list[DriftMetrics]) -> dict[str, Any]:
         """Calculate drift trend from recent history"""
         if len(recent_history) < 2:
             return {'trend': 'insufficient_data', 'slope': 0.0}
@@ -232,7 +233,7 @@ class ModelDriftDetector:
             logger.error('Failed to calculate drift trend: %s', e)
             return {'trend': 'unknown', 'slope': 0.0}
 
-    def _assess_drift_risk(self, latest_drift: Optional[DriftMetrics], recent_history: List[DriftMetrics]) -> str:
+    def _assess_drift_risk(self, latest_drift: DriftMetrics | None, recent_history: list[DriftMetrics]) -> str:
         """Assess overall drift risk level"""
         if not latest_drift:
             return 'unknown'
@@ -252,7 +253,7 @@ class ModelDriftDetector:
                     risk = 'high'
         return risk
 
-    def _generate_drift_recommendations(self, latest_drift: Optional[DriftMetrics], risk_level: str, drift_trend: Dict[str, Any]) -> List[str]:
+    def _generate_drift_recommendations(self, latest_drift: DriftMetrics | None, risk_level: str, drift_trend: dict[str, Any]) -> list[str]:
         """Generate actionable recommendations based on drift analysis"""
         recommendations = []
         if not latest_drift:
@@ -286,7 +287,7 @@ class ModelDriftDetector:
         except Exception as e:
             logger.error('Failed to reset baseline for {model_id}: %s', e)
             return False
-_drift_detector: Optional[ModelDriftDetector] = None
+_drift_detector: ModelDriftDetector | None = None
 
 async def get_drift_detector() -> ModelDriftDetector:
     """Get or create global drift detector instance"""

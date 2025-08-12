@@ -30,7 +30,7 @@ class TrainingDataLoader:
         self.lookback_days = lookback_days
         self.synthetic_ratio = synthetic_ratio
 
-    async def load_training_data(self, db_session: AsyncSession, rule_ids: Optional[List[str]]=None) -> Dict[str, Any]:
+    async def load_training_data(self, db_session: AsyncSession, rule_ids: list[str] | None=None) -> dict[str, Any]:
         """Load training data from both real usage and synthetic sources
         
         Returns a unified dataset ready for ML training with automatic
@@ -52,7 +52,7 @@ class TrainingDataLoader:
         logger.info('Training data ready: %s samples (%s real, %s synthetic)', combined_data['metadata']['total_samples'], real_count, synthetic_count)
         return combined_data
 
-    async def _load_real_performance_data(self, db_session: AsyncSession, rule_ids: Optional[List[str]]=None) -> Dict[str, Any]:
+    async def _load_real_performance_data(self, db_session: AsyncSession, rule_ids: list[str] | None=None) -> dict[str, Any]:
         """Load real training data from rule_performance table"""
         recent_date = aware_utc_now() - timedelta(days=self.lookback_days)
         stmt = select(RulePerformance, RuleMetadata.rule_name, RuleMetadata.default_parameters, RuleMetadata.priority).join(RuleMetadata, RulePerformance.rule_id == RuleMetadata.rule_id).where(and_(RuleMetadata.enabled == True, RulePerformance.created_at >= recent_date, RulePerformance.improvement_score > 0))
@@ -74,7 +74,7 @@ class TrainingDataLoader:
             metadata.append({'rule_id': perf.rule_id, 'rule_name': rule_name, 'prompt_id': perf.prompt_id, 'source': 'real'})
         return {'features': features, 'labels': labels, 'metadata': metadata}
 
-    async def _load_synthetic_training_data(self, db_session: AsyncSession, limit: int=100) -> Dict[str, Any]:
+    async def _load_synthetic_training_data(self, db_session: AsyncSession, limit: int=100) -> dict[str, Any]:
         """Load synthetic training data from training_prompts table"""
         stmt = select(TrainingPrompt).where(and_(TrainingPrompt.data_source == 'synthetic', TrainingPrompt.is_active == True)).order_by(TrainingPrompt.training_priority.desc()).limit(limit)
         result = await db_session.execute(stmt)
@@ -92,7 +92,7 @@ class TrainingDataLoader:
                     metadata.append({'prompt_id': prompt.id, 'domain': prompt.enhancement_result.get('metadata', {}).get('domain', 'unknown'), 'source': 'synthetic', 'session_id': prompt.session_id})
         return {'features': features, 'labels': labels, 'metadata': metadata}
 
-    def _combine_training_data(self, real_data: Dict[str, Any], synthetic_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _combine_training_data(self, real_data: dict[str, Any], synthetic_data: dict[str, Any]) -> dict[str, Any]:
         """Intelligently combine real and synthetic training data"""
         if self.real_data_priority:
             combined_features = real_data['features'] + synthetic_data['features']
@@ -117,7 +117,7 @@ class TrainingDataLoader:
                     synth_idx += 1
         return {'features': combined_features, 'labels': combined_labels, 'metadata': combined_metadata}
 
-    def _validate_training_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_training_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Validate training data quality"""
         features = np.array(data['features']) if data['features'] else np.array([])
         labels = np.array(data['labels']) if data['labels'] else np.array([])
@@ -134,7 +134,7 @@ class TrainingDataLoader:
                     validation['warnings'].append(f'Severe class imbalance detected: {imbalance_ratio:.1f}:1')
         return validation
 
-async def get_training_data_stats(db_session: AsyncSession) -> Dict[str, Any]:
+async def get_training_data_stats(db_session: AsyncSession) -> dict[str, Any]:
     """Get comprehensive training data statistics"""
     real_stats = await db_session.execute(text('\n            SELECT \n                COUNT(*) as total_real,\n                COUNT(DISTINCT rule_id) as unique_rules,\n                AVG(improvement_score) as avg_improvement,\n                MIN(created_at) as oldest_record,\n                MAX(created_at) as newest_record\n            FROM rule_performance\n            WHERE improvement_score > 0\n        '))
     real_row = real_stats.fetchone()

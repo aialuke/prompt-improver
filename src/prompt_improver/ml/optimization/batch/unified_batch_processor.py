@@ -17,12 +17,14 @@ from datetime import datetime
 from enum import Enum
 import logging
 import time
-from typing import Any, AsyncContextManager, AsyncIterator, Callable, Dict, List, Optional, Protocol, Union
+from typing import Any, AsyncContextManager, Dict, List, Optional, Protocol, Union
+from collections.abc import AsyncIterator, Callable
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import psutil
-from typing_extensions import Self
+from typing import Self
 
-class BatchProcessorConfig(SQLModel):
+class BatchProcessorConfig(BaseModel):
     """Configuration for batch processing."""
     batch_size: int = Field(default=10, ge=1, le=100)
     concurrency: int = Field(default=3, ge=1, le=20)
@@ -30,27 +32,27 @@ class BatchProcessorConfig(SQLModel):
     max_attempts: int = Field(default=3, ge=1, le=10)
     dry_run: bool = Field(default=False)
 
-class StreamingBatchConfig(SQLModel):
+class StreamingBatchConfig(BaseModel):
     """Configuration for streaming batch processing."""
     chunk_size: int = Field(default=1000, ge=10, le=100000)
     max_chunk_memory_mb: int = Field(default=100, ge=10, le=1000)
     worker_processes: int = Field(default=0, ge=0, le=32)
     enable_checkpointing: bool = Field(default=True)
 
-class BatchOptimizationConfig(SQLModel):
+class BatchOptimizationConfig(BaseModel):
     """Configuration for batch optimization."""
     min_batch_size: int = Field(default=10, ge=1)
     max_batch_size: int = Field(default=1000, ge=1)
     initial_batch_size: int = Field(default=100, ge=1)
     memory_limit_mb: float = Field(default=1000.0, ge=100.0)
 
-class BatchMetrics(SQLModel):
+class BatchMetrics(BaseModel):
     """Basic batch metrics."""
     processed: int = Field(default=0, ge=0, description='Number of items processed')
     failed: int = Field(default=0, ge=0, description='Number of items failed')
     processing_time_ms: float = Field(default=0.0, ge=0.0, description='Processing time in milliseconds')
 
-class ProcessingMetrics(SQLModel):
+class ProcessingMetrics(BaseModel):
     """Processing metrics for streaming."""
     items_processed: int = Field(default=0, ge=0, description='Number of items processed')
     items_failed: int = Field(default=0, ge=0, description='Number of items failed')
@@ -59,9 +61,9 @@ class ProcessingMetrics(SQLModel):
     memory_peak_mb: float = Field(default=0.0, ge=0.0, description='Peak memory usage in MB')
     chunks_processed: int = Field(default=0, ge=0, description='Number of chunks processed')
     checkpoint_count: int = Field(default=0, ge=0, description='Number of checkpoints created')
-    gc_collections: Dict[str, int] = Field(default_factory=dict, description='Garbage collection statistics')
+    gc_collections: dict[str, int] = Field(default_factory=dict, description='Garbage collection statistics')
 
-class BatchPerformanceMetrics(SQLModel):
+class BatchPerformanceMetrics(BaseModel):
     """Performance metrics for optimization."""
     batch_size: int = Field(default=0, ge=0, description='Batch size used')
     processing_time: float = Field(default=0.0, ge=0.0, description='Processing time in seconds')
@@ -128,7 +130,7 @@ class DynamicBatchOptimizer:
         elif success_rate < 0.7 and batch_size > self.config.min_batch_size:
             self.current_batch_size = max(batch_size - 5, self.config.min_batch_size)
 
-    def get_optimization_stats(self) -> Dict[str, Any]:
+    def get_optimization_stats(self) -> dict[str, Any]:
         """Get optimization statistics."""
         return {'current_batch_size': self.current_batch_size, 'config': self.config.model_dump()}
 logger = logging.getLogger(__name__)
@@ -152,7 +154,7 @@ class DataCharacteristics(Enum):
     CPU_INTENSIVE = 'cpu_intensive'
     IO_INTENSIVE = 'io_intensive'
 
-class ProcessingResult(SQLModel):
+class ProcessingResult(BaseModel):
     """Unified result object for all processing strategies."""
     strategy_used: ProcessingStrategy = Field(description='Processing strategy that was used')
     items_processed: int = Field(ge=0, description='Number of items successfully processed')
@@ -160,20 +162,20 @@ class ProcessingResult(SQLModel):
     processing_time_ms: float = Field(ge=0.0, description='Total processing time in milliseconds')
     throughput_items_per_sec: float = Field(ge=0.0, description='Processing throughput')
     memory_peak_mb: float = Field(ge=0.0, description='Peak memory usage in MB')
-    error_details: List[str] = Field(default_factory=list, description='Detailed error messages')
-    processing_metadata: Dict[str, Any] = Field(default_factory=dict, description='Additional processing metadata')
+    error_details: list[str] = Field(default_factory=list, description='Detailed error messages')
+    processing_metadata: dict[str, Any] = Field(default_factory=dict, description='Additional processing metadata')
 
-class UnifiedMetrics(SQLModel):
+class UnifiedMetrics(BaseModel):
     """Unified metrics combining all processor types."""
-    batch_metrics: Optional[BatchMetrics] = Field(default=None, description='Basic batch processing metrics')
-    processing_metrics: Optional[ProcessingMetrics] = Field(default=None, description='Streaming processing metrics')
-    performance_metrics: Optional[BatchPerformanceMetrics] = Field(default=None, description='Performance optimization metrics')
-    strategy_metrics: Dict[str, Any] = Field(default_factory=dict, description='Strategy-specific metrics')
+    batch_metrics: BatchMetrics | None = Field(default=None, description='Basic batch processing metrics')
+    processing_metrics: ProcessingMetrics | None = Field(default=None, description='Streaming processing metrics')
+    performance_metrics: BatchPerformanceMetrics | None = Field(default=None, description='Performance optimization metrics')
+    strategy_metrics: dict[str, Any] = Field(default_factory=dict, description='Strategy-specific metrics')
 
 class ProcessingProtocol(Protocol):
     """Protocol defining the interface for processing strategies."""
 
-    async def process(self, data: Union[List[Any], AsyncIterator[Any]], **kwargs: Any) -> ProcessingResult:
+    async def process(self, data: list[Any] | AsyncIterator[Any], **kwargs: Any) -> ProcessingResult:
         """Process data and return results."""
         ...
 
@@ -181,11 +183,11 @@ class ProcessingProtocol(Protocol):
         """Clean up resources."""
         ...
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get current metrics."""
         ...
 
-class UnifiedBatchConfig(SQLModel):
+class UnifiedBatchConfig(BaseModel):
     """Unified configuration for all batch processing modes."""
     strategy: ProcessingStrategy = Field(default=ProcessingStrategy.AUTO, description='Processing strategy to use')
     small_batch_threshold: int = Field(default=1000, ge=1)
@@ -202,9 +204,10 @@ class UnifiedBatchConfig(SQLModel):
     max_concurrent_tasks: int = Field(default=10, ge=1, le=100)
     task_timeout_seconds: float = Field(default=300.0, ge=1.0)
 
-    class Config:
-        extra = 'forbid'
-        validate_assignment = True
+    model_config = {
+        'extra': 'forbid',
+        'validate_assignment': True
+    }
 
 class StandardProcessingStrategy:
     """Strategy using simple standard processing logic."""
@@ -215,7 +218,7 @@ class StandardProcessingStrategy:
         self.processed_count = 0
         self.failed_count = 0
 
-    async def process(self, data: Union[List[Any], AsyncIterator[Any]], **kwargs: Any) -> ProcessingResult:
+    async def process(self, data: list[Any] | AsyncIterator[Any], **kwargs: Any) -> ProcessingResult:
         """Process data using standard processing logic."""
         start_time = time.time()
         if hasattr(data, '__aiter__'):
@@ -239,7 +242,7 @@ class StandardProcessingStrategy:
         """Clean up standard processor resources."""
         pass
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get standard processor metrics."""
         return {'strategy': 'standard', 'processed': self.processed_count, 'failed': self.failed_count, 'config': self.config.model_dump()}
 
@@ -250,10 +253,10 @@ class StreamingProcessingStrategy:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.StreamingStrategy')
 
-    async def process(self, data: Union[List[Any], AsyncIterator[Any]], **kwargs: Any) -> ProcessingResult:
+    async def process(self, data: list[Any] | AsyncIterator[Any], **kwargs: Any) -> ProcessingResult:
         """Process data using streaming batch processor."""
 
-        def process_chunk(items: List[Any]) -> List[Any]:
+        def process_chunk(items: list[Any]) -> list[Any]:
             return [{'processed': True, 'original': item} for item in items]
         async with StreamingBatchProcessor(self.config, process_chunk) as processor:
             try:
@@ -267,7 +270,7 @@ class StreamingProcessingStrategy:
         """Clean up streaming processor resources."""
         pass
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get streaming processor metrics."""
         return {'strategy': 'streaming', 'config': self.config.model_dump()}
 
@@ -279,7 +282,7 @@ class OptimizedProcessingStrategy:
         self.standard_config = standard_config
         self.logger = logging.getLogger(f'{__name__}.OptimizedStrategy')
 
-    async def process(self, data: Union[List[Any], AsyncIterator[Any]], **kwargs: Any) -> ProcessingResult:
+    async def process(self, data: list[Any] | AsyncIterator[Any], **kwargs: Any) -> ProcessingResult:
         """Process data with dynamic optimization."""
         start_time = time.time()
         if hasattr(data, '__aiter__'):
@@ -315,7 +318,7 @@ class OptimizedProcessingStrategy:
         """Clean up optimizer resources."""
         pass
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get optimizer metrics."""
         return {'strategy': 'optimized', 'optimizer_stats': self.optimizer.get_optimization_stats()}
 
@@ -337,12 +340,12 @@ class ProcessingStrategyFactory:
 class UnifiedBatchProcessor:
     """Unified batch processor with pluggable strategies and 2025 best practices."""
 
-    def __init__(self, config: Optional[UnifiedBatchConfig]=None):
+    def __init__(self, config: UnifiedBatchConfig | None=None):
         self.config = config or UnifiedBatchConfig()
         self.logger = logging.getLogger(__name__)
         self.strategy_factory = ProcessingStrategyFactory()
-        self.current_strategy: Optional[ProcessingProtocol] = None
-        self._metrics_history: List[ProcessingResult] = []
+        self.current_strategy: ProcessingProtocol | None = None
+        self._metrics_history: list[ProcessingResult] = []
 
     async def __aenter__(self) -> Self:
         """Async context manager entry."""
@@ -352,7 +355,7 @@ class UnifiedBatchProcessor:
         """Async context manager exit."""
         await self.cleanup()
 
-    def _analyze_data_characteristics(self, data: Union[List[Any], AsyncIterator[Any]]) -> DataCharacteristics:
+    def _analyze_data_characteristics(self, data: list[Any] | AsyncIterator[Any]) -> DataCharacteristics:
         """Analyze data to determine characteristics."""
         if isinstance(data, list):
             size = len(data)
@@ -367,7 +370,7 @@ class UnifiedBatchProcessor:
         else:
             return DataCharacteristics.MASSIVE_BATCH
 
-    def _select_optimal_strategy(self, data: Union[List[Any], AsyncIterator[Any]]) -> ProcessingStrategy:
+    def _select_optimal_strategy(self, data: list[Any] | AsyncIterator[Any]) -> ProcessingStrategy:
         """Automatically select optimal processing strategy."""
         if self.config.strategy != ProcessingStrategy.AUTO:
             return self.config.strategy
@@ -391,7 +394,7 @@ class UnifiedBatchProcessor:
         else:
             return ProcessingStrategy.STANDARD
 
-    async def process_batch(self, data: Union[List[Any], AsyncIterator[Any]], strategy: Optional[ProcessingStrategy]=None, **kwargs: Any) -> ProcessingResult:
+    async def process_batch(self, data: list[Any] | AsyncIterator[Any], strategy: ProcessingStrategy | None=None, **kwargs: Any) -> ProcessingResult:
         """Process batch data using the most appropriate strategy.
         
         Args:
@@ -416,7 +419,7 @@ class UnifiedBatchProcessor:
                     self._metrics_history = self._metrics_history[-50:]
             self.logger.info('Batch processing completed: %s processed, %s failed, %sms', result.items_processed, result.items_failed, format(result.processing_time_ms, '.2f'))
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.error('Batch processing timed out after %ss', self.config.task_timeout_seconds)
             return ProcessingResult(strategy_used=selected_strategy, items_processed=0, items_failed=len(data) if isinstance(data, list) else 0, processing_time_ms=self.config.task_timeout_seconds * 1000, throughput_items_per_sec=0, memory_peak_mb=0, error_details=['Processing timeout'])
         except Exception as e:
@@ -426,7 +429,7 @@ class UnifiedBatchProcessor:
             await strategy_impl.cleanup()
             self.current_strategy = None
 
-    async def process_multiple_batches(self, batches: List[Union[List[Any], AsyncIterator[Any]]], max_concurrent: Optional[int]=None) -> List[ProcessingResult]:
+    async def process_multiple_batches(self, batches: list[list[Any] | AsyncIterator[Any]], max_concurrent: int | None=None) -> list[ProcessingResult]:
         """Process multiple batches concurrently.
         
         Args:
@@ -446,15 +449,15 @@ class UnifiedBatchProcessor:
             tasks = [tg.create_task(process_with_semaphore(batch)) for batch in batches]
         return [task.result() for task in tasks]
 
-    def get_metrics_summary(self) -> Dict[str, Any]:
+    def get_metrics_summary(self) -> dict[str, Any]:
         """Get summary of processing metrics."""
         if not self._metrics_history:
             return {'status': 'no_data'}
         recent_results = self._metrics_history[-10:]
-        total_processed = sum((r.items_processed for r in recent_results))
-        total_failed = sum((r.items_failed for r in recent_results))
-        avg_processing_time = sum((r.processing_time_ms for r in recent_results)) / len(recent_results)
-        avg_throughput = sum((r.throughput_items_per_sec for r in recent_results)) / len(recent_results)
+        total_processed = sum(r.items_processed for r in recent_results)
+        total_failed = sum(r.items_failed for r in recent_results)
+        avg_processing_time = sum(r.processing_time_ms for r in recent_results) / len(recent_results)
+        avg_throughput = sum(r.throughput_items_per_sec for r in recent_results) / len(recent_results)
         strategy_usage = {}
         for result in recent_results:
             strategy = result.strategy_used.value

@@ -7,15 +7,25 @@ This module tests the health check functionality including:
 - Database connectivity verification
 - Background task manager integration
 """
+
 import asyncio
 import time
 from typing import Any, Dict
+
 import pytest
 import pytest_asyncio
+
 from prompt_improver.database import get_session
 from prompt_improver.mcp_server.server import APESMCPServer
-from prompt_improver.ml.optimization.batch.unified_batch_processor import BatchProcessorConfig, UnifiedBatchProcessor
-from prompt_improver.performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, get_background_task_manager
+from prompt_improver.ml.optimization.batch.unified_batch_processor import (
+    BatchProcessorConfig,
+    UnifiedBatchProcessor,
+)
+from prompt_improver.performance.monitoring.health.background_manager import (
+    EnhancedBackgroundTaskManager,
+    get_background_task_manager,
+)
+
 
 class TestHealthEndpoints:
     """Test suite for health endpoint functionality using real behavior."""
@@ -31,13 +41,13 @@ class TestHealthEndpoints:
     async def test_health_live_success(self, mcp_server):
         """Test successful health/live endpoint with real behavior - no mocks."""
         result = await mcp_server._health_live_impl()
-        assert result['status'] == 'live'
-        assert 'event_loop_latency_ms' in result
-        assert 'timestamp' in result
-        assert isinstance(result['event_loop_latency_ms'], (int, float))
-        assert result['event_loop_latency_ms'] >= 0
-        if 'background_queue_size' in result:
-            assert result['background_queue_size'] >= 0
+        assert result["status"] == "live"
+        assert "event_loop_latency_ms" in result
+        assert "timestamp" in result
+        assert isinstance(result["event_loop_latency_ms"], (int, float))
+        assert result["event_loop_latency_ms"] >= 0
+        if "background_queue_size" in result:
+            assert result["background_queue_size"] >= 0
 
     @pytest.mark.asyncio
     async def test_health_live_error_resilience(self, mcp_server):
@@ -47,24 +57,24 @@ class TestHealthEndpoints:
             result = await mcp_server._health_live_impl()
             results.append(result)
             await asyncio.sleep(0.01)
-        statuses = [r['status'] for r in results]
+        statuses = [r["status"] for r in results]
         assert len(set(statuses)) <= 2
-        assert 'live' in statuses or 'error' in statuses
+        assert "live" in statuses or "error" in statuses
 
     @pytest.mark.asyncio
     async def test_health_ready_success(self, mcp_server):
         """Test successful health/ready endpoint with real database behavior."""
         result = await mcp_server._health_ready_impl()
-        assert result['status'] in ['ready', 'not_ready', 'error']
-        assert 'timestamp' in result
-        if result['status'] == 'error':
-            assert 'error' in result
-        elif 'database' in result:
-            db_info = result['database']
-            assert 'status' in db_info
-        elif 'rule_application' in result:
-            rule_info = result['rule_application']
-            assert 'ready' in rule_info or 'service_available' in rule_info
+        assert result["status"] in ["ready", "not_ready", "error"]
+        assert "timestamp" in result
+        if result["status"] == "error":
+            assert "error" in result
+        elif "database" in result:
+            db_info = result["database"]
+            assert "status" in db_info
+        elif "rule_application" in result:
+            rule_info = result["rule_application"]
+            assert "ready" in rule_info or "service_available" in rule_info
 
     @pytest.mark.asyncio
     async def test_health_ready_consistency(self, mcp_server):
@@ -74,12 +84,12 @@ class TestHealthEndpoints:
             result = await mcp_server._health_ready_impl()
             results.append(result)
             await asyncio.sleep(0.01)
-        statuses = [r['status'] for r in results]
+        statuses = [r["status"] for r in results]
         unique_statuses = set(statuses)
         assert len(unique_statuses) <= 2
         for result in results:
-            assert 'timestamp' in result
-            assert isinstance(result['timestamp'], (int, float))
+            assert "timestamp" in result
+            assert isinstance(result["timestamp"], (int, float))
 
     @pytest.mark.asyncio
     async def test_health_ready_response_time(self, mcp_server):
@@ -88,35 +98,35 @@ class TestHealthEndpoints:
         result = await mcp_server._health_ready_impl()
         response_time = (time.time() - start_time) * 1000
         assert response_time < 5000
-        assert 'timestamp' in result
-        assert 'status' in result
-        assert result['status'] in ['ready', 'not_ready', 'error']
+        assert "timestamp" in result
+        assert "status" in result
+        assert result["status"] in ["ready", "not_ready", "error"]
 
     @pytest.mark.asyncio
     async def test_health_ready_structure_validation(self, mcp_server):
         """Test health/ready endpoint returns proper structure with real behavior."""
         result = await mcp_server._health_ready_impl()
         assert isinstance(result, dict)
-        assert 'status' in result
-        assert 'timestamp' in result
-        valid_statuses = ['ready', 'not_ready', 'error']
-        assert result['status'] in valid_statuses
+        assert "status" in result
+        assert "timestamp" in result
+        valid_statuses = ["ready", "not_ready", "error"]
+        assert result["status"] in valid_statuses
         current_time = time.time()
-        assert abs(current_time - result['timestamp']) < 10
+        assert abs(current_time - result["timestamp"]) < 10
 
     @pytest.mark.asyncio
     async def test_get_training_queue_size(self, mcp_server):
         """Test training queue size retrieval with real behavior."""
         result = await mcp_server._get_training_queue_size_impl()
         assert isinstance(result, dict)
-        assert 'queue_size' in result
-        assert 'status' in result
-        assert 'timestamp' in result
-        assert result['queue_size'] >= 0
-        assert isinstance(result['queue_size'], int)
-        assert result['status'] in ['idle', 'active', 'error']
-        if 'processor_config' in result:
-            config = result['processor_config']
+        assert "queue_size" in result
+        assert "status" in result
+        assert "timestamp" in result
+        assert result["queue_size"] >= 0
+        assert isinstance(result["queue_size"], int)
+        assert result["status"] in ["idle", "active", "error"]
+        if "processor_config" in result:
+            config = result["processor_config"]
             assert isinstance(config, dict)
 
     @pytest.mark.asyncio
@@ -129,11 +139,11 @@ class TestHealthEndpoints:
             await asyncio.sleep(0.01)
         for result in results:
             assert isinstance(result, dict)
-            assert 'queue_size' in result
-            assert 'status' in result
-            assert result['queue_size'] >= 0
-            assert isinstance(result['queue_size'], int)
-        queue_sizes = [r['queue_size'] for r in results]
+            assert "queue_size" in result
+            assert "status" in result
+            assert result["queue_size"] >= 0
+            assert isinstance(result["queue_size"], int)
+        queue_sizes = [r["queue_size"] for r in results]
         assert max(queue_sizes) - min(queue_sizes) <= 10
 
     @pytest.mark.asyncio
@@ -151,19 +161,20 @@ class TestHealthEndpoints:
         """Test integration with real BatchProcessor - comprehensive validation."""
         result = await mcp_server._get_training_queue_size_impl()
         assert isinstance(result, dict)
-        assert 'queue_size' in result
-        assert 'status' in result
-        assert 'health_status' in result
-        assert 'timestamp' in result
-        assert result['queue_size'] >= 0
-        assert isinstance(result['queue_size'], int)
-        valid_statuses = ['idle', 'active', 'error']
-        assert result['status'] in valid_statuses
-        valid_health = ['healthy', 'degraded', 'unhealthy']
-        assert result['health_status'] in valid_health
-        if 'processing_rate' in result:
-            assert result['processing_rate'] >= 0.0
-            assert isinstance(result['processing_rate'], (int, float))
+        assert "queue_size" in result
+        assert "status" in result
+        assert "health_status" in result
+        assert "timestamp" in result
+        assert result["queue_size"] >= 0
+        assert isinstance(result["queue_size"], int)
+        valid_statuses = ["idle", "active", "error"]
+        assert result["status"] in valid_statuses
+        valid_health = ["healthy", "degraded", "unhealthy"]
+        assert result["health_status"] in valid_health
+        if "processing_rate" in result:
+            assert result["processing_rate"] >= 0.0
+            assert isinstance(result["processing_rate"], (int, float))
+
 
 class TestBackgroundTaskManagerIntegration(TestHealthEndpoints):
     """Test suite for BackgroundTaskManager integration with health checks using real behavior."""
@@ -179,8 +190,9 @@ class TestBackgroundTaskManagerIntegration(TestHealthEndpoints):
 
             async def real_test_task():
                 await asyncio.sleep(0.05)
-                return 'task_complete'
-            await manager.submit_task('test_task', real_test_task)
+                return "task_complete"
+
+            await manager.submit_task("test_task", real_test_task)
             await asyncio.sleep(0.1)
             final_size = manager.get_queue_size()
             assert final_size >= 0
@@ -195,16 +207,17 @@ class TestBackgroundTaskManagerIntegration(TestHealthEndpoints):
         try:
             initial_counts = manager.get_task_count()
             assert isinstance(initial_counts, dict)
-            assert all((count >= 0 for count in initial_counts.values()))
+            assert all(count >= 0 for count in initial_counts.values())
 
             async def quick_task(task_id: str):
                 await asyncio.sleep(0.02)
-                return f'task_{task_id}_complete'
-            await manager.submit_task('task1', lambda: quick_task('1'))
-            await manager.submit_task('task2', lambda: quick_task('2'))
+                return f"task_{task_id}_complete"
+
+            await manager.submit_task("task1", lambda: quick_task("1"))
+            await manager.submit_task("task2", lambda: quick_task("2"))
             await asyncio.sleep(0.1)
             final_counts = manager.get_task_count()
-            assert all((count >= 0 for count in final_counts.values()))
+            assert all(count >= 0 for count in final_counts.values())
         finally:
             await manager.stop(timeout=2.0)
 
@@ -212,16 +225,18 @@ class TestBackgroundTaskManagerIntegration(TestHealthEndpoints):
     async def test_health_live_background_integration(self, mcp_server):
         """Test health/live endpoint integration with real system behavior."""
         result = await mcp_server._health_live_impl()
-        assert result['status'] == 'live'
-        assert 'event_loop_latency_ms' in result
-        assert 'timestamp' in result
-        assert result['event_loop_latency_ms'] >= 0
-        assert result['event_loop_latency_ms'] < 1000
-        if 'background_queue_size' in result:
-            assert result['background_queue_size'] >= 0
-        if 'phase' in result:
-            assert result['phase'] == '0'
-        if 'mcp_server_mode' in result:
-            assert result['mcp_server_mode'] == 'rule_application_only'
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+        assert result["status"] == "live"
+        assert "event_loop_latency_ms" in result
+        assert "timestamp" in result
+        assert result["event_loop_latency_ms"] >= 0
+        assert result["event_loop_latency_ms"] < 1000
+        if "background_queue_size" in result:
+            assert result["background_queue_size"] >= 0
+        if "phase" in result:
+            assert result["phase"] == "0"
+        if "mcp_server_mode" in result:
+            assert result["mcp_server_mode"] == "rule_application_only"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

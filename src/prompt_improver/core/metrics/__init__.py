@@ -9,5 +9,7 @@ Features:
 - Unified API across different metrics backends
 - Clean separation of concerns for DI containers
 """
+
 from prompt_improver.core.metrics.unified_metrics_adapter import UnifiedMetricsAdapter
-__all__ = ['UnifiedMetricsAdapter']
+
+__all__ = ["UnifiedMetricsAdapter"]

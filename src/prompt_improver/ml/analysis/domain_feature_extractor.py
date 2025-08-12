@@ -97,7 +97,7 @@ class TechnicalDomainExtractor(BaseDomainExtractor):
         technical_density = len(technical_terms) / max(word_count, 1)
         unique_technical_terms = len(set(technical_terms))
         technical_diversity = unique_technical_terms / max(len(technical_terms), 1)
-        return {'technical_term_count': len(technical_terms), 'unique_technical_terms': unique_technical_terms, 'technical_density': technical_density, 'technical_diversity': technical_diversity, 'avg_technical_term_length': sum((len(term) for term in technical_terms)) / max(len(technical_terms), 1)}
+        return {'technical_term_count': len(technical_terms), 'unique_technical_terms': unique_technical_terms, 'technical_density': technical_density, 'technical_diversity': technical_diversity, 'avg_technical_term_length': sum(len(term) for term in technical_terms) / max(len(technical_terms), 1)}
 
     def _analyze_code_quality_indicators(self, text: str) -> dict[str, Any]:
         """Analyze indicators of code quality discussion."""
@@ -303,11 +303,11 @@ class DomainFeatureExtractor:
         domain_result = self.domain_detector.detect_domain(text)
         features = DomainFeatures(domain=domain_result.primary_domain, confidence=domain_result.confidence, complexity_score=domain_result.technical_complexity, specificity_score=domain_result.domain_specificity, secondary_domains=domain_result.secondary_domains, hybrid_domain=domain_result.hybrid_domain)
         all_domains = [domain_result.primary_domain] + [d[0] for d in domain_result.secondary_domains]
-        if any((self._is_technical_domain(d) for d in all_domains)):
+        if any(self._is_technical_domain(d) for d in all_domains):
             features.technical_features = self.extractors['technical'].extract_features(text, domain_result)
-        if any((self._is_creative_domain(d) for d in all_domains)):
+        if any(self._is_creative_domain(d) for d in all_domains):
             features.creative_features = self.extractors['creative'].extract_features(text, domain_result)
-        if any((self._is_academic_domain(d) for d in all_domains)):
+        if any(self._is_academic_domain(d) for d in all_domains):
             features.academic_features = self.extractors['academic'].extract_features(text, domain_result)
         features.conversational_features = self._extract_conversational_features(text)
         features.feature_vector, features.feature_names = self._create_feature_vector(features)
@@ -348,8 +348,8 @@ class DomainFeatureExtractor:
         features['has_urgency'] = urgency_count > 0
         positive_words = ['great', 'excellent', 'amazing', 'wonderful', 'fantastic']
         negative_words = ['bad', 'terrible', 'awful', 'horrible', 'disappointing']
-        positive_count = sum((text.lower().count(word) for word in positive_words))
-        negative_count = sum((text.lower().count(word) for word in negative_words))
+        positive_count = sum(text.lower().count(word) for word in positive_words)
+        negative_count = sum(text.lower().count(word) for word in negative_words)
         features['positive_sentiment_count'] = positive_count
         features['negative_sentiment_count'] = negative_count
         features['sentiment_polarity'] = (positive_count - negative_count) / max(positive_count + negative_count, 1)
@@ -404,7 +404,7 @@ class DomainFeatureExtractor:
         primary_match = features.domain == target_domain
         secondary_match = any((domain == target_domain for domain, _ in features.secondary_domains))
         target_keywords = self.domain_detector.get_domain_keywords(target_domain)
-        found_keywords = sum((1 for keyword in target_keywords if keyword.lower() in text.lower()))
+        found_keywords = sum(1 for keyword in target_keywords if keyword.lower() in text.lower())
         keyword_coverage = found_keywords / max(len(target_keywords), 1)
         if primary_match:
             suitability_score = features.confidence

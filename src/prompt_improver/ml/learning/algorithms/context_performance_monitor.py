@@ -25,9 +25,9 @@ class ContextPerformanceMonitor:
     
     def get_performance_metrics(
         self,
-        cache_stats: Dict[str, Any],
+        cache_stats: dict[str, Any],
         context_clusters_count: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get comprehensive performance metrics."""
         memory_stats = self.memory_guard.check_memory_usage()
         
@@ -80,9 +80,9 @@ class ContextPerformanceMonitor:
         """Reset privacy budget tracking."""
         old_budget = self.privacy_budget_used
         self.privacy_budget_used = 0.0
-        self.logger.info("Reset privacy budget from %s to 0.0", old_budget:.2f)
+        self.logger.info("Reset privacy budget from %.2f to 0.0", old_budget)
     
-    def get_privacy_budget_status(self) -> Dict[str, float]:
+    def get_privacy_budget_status(self) -> dict[str, float]:
         """Get current privacy budget status."""
         return {
             "budget_used": self.privacy_budget_used,

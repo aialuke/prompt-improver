@@ -57,7 +57,7 @@ def real_components():
 class TestRealPerformanceGapAnalysis:
     """Test real behavior of performance gap analysis with actual database data."""
 
-    async def test_real_gap_analysis_with_database(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_real_gap_analysis_with_database(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test gap analysis using real database data."""
         gap_analyzer = real_components['gap_analyzer']
         gap_result = await gap_analyzer.analyze_performance_gaps(session=real_database_session, rule_ids=None, baseline_window=10)
@@ -73,7 +73,7 @@ class TestRealPerformanceGapAnalysis:
         assert gap_result.metadata['analysis_duration_ms'] > 0
         print(f'Real gap analysis completed: {gap_result.total_gaps_detected} gaps detected')
 
-    async def test_enhanced_gap_analysis_for_generation(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_enhanced_gap_analysis_for_generation(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test enhanced gap analysis specifically for data generation."""
         gap_analyzer = real_components['gap_analyzer']
         enhanced_result = await gap_analyzer.analyze_gaps_for_targeted_generation(session=real_database_session, rule_ids=None, focus_areas=['clarity', 'specificity'])
@@ -93,7 +93,7 @@ class TestRealPerformanceGapAnalysis:
 class TestRealStrategyDetermination:
     """Test real behavior of generation strategy determination."""
 
-    async def test_real_strategy_analysis(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_real_strategy_analysis(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test strategy analysis with real gap data."""
         gap_analyzer = real_components['gap_analyzer']
         strategy_analyzer = real_components['strategy_analyzer']
@@ -115,7 +115,7 @@ class TestRealStrategyDetermination:
 class TestRealDataGeneration:
     """Test real behavior of adaptive data generation."""
 
-    async def test_real_targeted_data_generation(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_real_targeted_data_generation(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test targeted data generation with real performance gaps."""
         gap_analyzer = real_components['gap_analyzer']
         data_generator = real_components['data_generator']
@@ -133,9 +133,9 @@ class TestRealDataGeneration:
         assert len(features) > 0
         assert len(effectiveness) == len(features)
         assert len(prompts) == len(features)
-        assert all((isinstance(f, list) for f in features))
-        assert all((0.0 <= e <= 1.0 for e in effectiveness))
-        assert all((isinstance(p, tuple) and len(p) == 2 for p in prompts))
+        assert all(isinstance(f, list) for f in features)
+        assert all(0.0 <= e <= 1.0 for e in effectiveness)
+        assert all(isinstance(p, tuple) and len(p) == 2 for p in prompts)
         targeting_info = generated_data['metadata'].get('targeting_info', {})
         assert 'performance_gaps' in targeting_info
         assert 'strategy_used' in targeting_info
@@ -145,7 +145,7 @@ class TestRealDataGeneration:
 class TestRealAdaptiveTrainingIntegration:
     """Test real behavior of adaptive training integration."""
 
-    async def test_real_adaptive_training_session_creation(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_real_adaptive_training_session_creation(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test creation of real adaptive training session."""
         orchestrator = MLPipelineOrchestrator()
         data_generator = real_components['data_generator']
@@ -172,7 +172,7 @@ class TestRealAdaptiveTrainingIntegration:
 class TestRealEndToEndWorkflow:
     """Test complete end-to-end adaptive generation workflow."""
 
-    async def test_complete_adaptive_workflow(self, real_database_session: AsyncSession, sample_performance_data: Dict[str, Any], real_components: Dict[str, Any]):
+    async def test_complete_adaptive_workflow(self, real_database_session: AsyncSession, sample_performance_data: dict[str, Any], real_components: dict[str, Any]):
         """Test complete workflow from gap analysis to data generation."""
         gap_analyzer = real_components['gap_analyzer']
         strategy_analyzer = real_components['strategy_analyzer']
@@ -202,7 +202,7 @@ class TestRealEndToEndWorkflow:
         effectiveness_scores = generated_data['effectiveness']
         difficulty_dist = difficulty_profile.distribution_weights
         expected_hard_ratio = difficulty_dist.get('hard', 0.33)
-        hard_examples = sum((1 for score in effectiveness_scores if score < 0.5))
+        hard_examples = sum(1 for score in effectiveness_scores if score < 0.5)
         actual_hard_ratio = hard_examples / len(effectiveness_scores)
         assert abs(actual_hard_ratio - expected_hard_ratio) < 0.2
         print(f'Difficulty distribution verification: Expected {expected_hard_ratio:.2f}, Actual {actual_hard_ratio:.2f} hard examples ratio')

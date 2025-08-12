@@ -7,6 +7,7 @@ Implements 2025 OWASP security best practices including:
 - ML-specific threat detection
 - Event-driven security alerts
 """
+
 import html
 import logging
 import math
@@ -16,14 +17,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
+
 logger = logging.getLogger(__name__)
+
 
 class SecurityError(Exception):
     """Exception raised for critical security threats."""
 
+
 class SecurityThreatLevel(Enum):
     """Security threat levels for validation results."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3
@@ -49,10 +55,18 @@ class SecurityThreatLevel(Enum):
             return self.value >= other.value
         return NotImplemented
 
+
 class ValidationResult:
     """Result of input validation with security context."""
 
-    def __init__(self, is_valid: bool, sanitized_value: Any=None, threat_level: SecurityThreatLevel=SecurityThreatLevel.LOW, threats_detected: list[str]=None, message: str=''):
+    def __init__(
+        self,
+        is_valid: bool,
+        sanitized_value: Any = None,
+        threat_level: SecurityThreatLevel = SecurityThreatLevel.LOW,
+        threats_detected: list[str] = None,
+        message: str = "",
+    ):
         self.is_valid = is_valid
         self.sanitized_value = sanitized_value
         self.threat_level = threat_level
@@ -60,9 +74,11 @@ class ValidationResult:
         self.message = message
         self.timestamp = datetime.now(UTC)
 
+
 @dataclass
 class SecurityEvent:
     """Security event for monitoring and alerting."""
+
     event_type: str
     threat_level: SecurityThreatLevel
     source_ip: str | None = None
@@ -74,6 +90,7 @@ class SecurityEvent:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now(UTC)
+
 
 class InputSanitizer:
     """Enhanced input sanitization service implementing 2025 OWASP security best practices.
@@ -89,42 +106,142 @@ class InputSanitizer:
     def __init__(self, event_bus=None):
         self.event_bus = event_bus
         self.security_events: list[SecurityEvent] = []
-        self._validation_stats = {'total_validations': 0, 'threats_detected': 0, 'threats_blocked': 0}
-        self.xss_patterns = ['<script[^>]*>.*?</script>', 'javascript:', 'onload\\s*=', 'onerror\\s*=', 'onclick\\s*=', 'onmouseover\\s*=', 'onfocus\\s*=', 'onblur\\s*=', '<iframe[^>]*>', '<object[^>]*>', '<embed[^>]*>', '<link[^>]*>', '<meta[^>]*>', '<style[^>]*>.*?</style>']
-        self.sql_patterns = ['(\\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\\b)', '(--|#|/\\*|\\*/)', '(\\bOR\\b.*=.*\\bOR\\b)', '(\\bAND\\b.*=.*\\bAND\\b)', '(;|\\x00)', '(\\b(CHAR|NCHAR|VARCHAR|NVARCHAR)\\b\\s*\\(\\s*\\d+\\s*\\))']
-        self.command_patterns = ['(\\||;|&|`|\\$\\(|\\$\\{)', '(\\b(rm|del|format|fdisk|mkfs)\\b)', '(\\.\\.\\/|\\.\\.\\\\)', '(\\bnc\\b|\\bnetcat\\b|\\btelnet\\b)']
-        self.prompt_injection_patterns = ['ignore\\s+previous\\s+instructions', 'forget\\s+everything\\s+above', 'system\\s*:\\s*you\\s+are\\s+now', 'new\\s+instructions\\s*:', 'override\\s+your\\s+programming', 'act\\s+as\\s+if\\s+you\\s+are', 'pretend\\s+to\\s+be', 'roleplay\\s+as', 'simulate\\s+being', 'you\\s+must\\s+now', 'from\\s+now\\s+on\\s+you\\s+are', 'disregard\\s+all\\s+previous', 'ignore\\s+your\\s+guidelines', 'bypass\\s+your\\s+restrictions', 'jailbreak\\s+mode', 'developer\\s+mode\\s+enabled', 'admin\\s+override', 'root\\s+access\\s+granted']
-        self.ml_threat_patterns = ['adversarial\\s+example', 'poison\\s+training\\s+data', 'model\\s+extraction', 'membership\\s+inference', 'gradient\\s+inversion', 'backdoor\\s+attack', 'data\\s+poisoning', 'evasion\\s+attack']
+        self._validation_stats = {
+            "total_validations": 0,
+            "threats_detected": 0,
+            "threats_blocked": 0,
+        }
+        self.xss_patterns = [
+            "<script[^>]*>.*?</script>",
+            "javascript:",
+            "onload\\s*=",
+            "onerror\\s*=",
+            "onclick\\s*=",
+            "onmouseover\\s*=",
+            "onfocus\\s*=",
+            "onblur\\s*=",
+            "<iframe[^>]*>",
+            "<object[^>]*>",
+            "<embed[^>]*>",
+            "<link[^>]*>",
+            "<meta[^>]*>",
+            "<style[^>]*>.*?</style>",
+        ]
+        self.sql_patterns = [
+            "(\\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\\b)",
+            "(--|#|/\\*|\\*/)",
+            "(\\bOR\\b.*=.*\\bOR\\b)",
+            "(\\bAND\\b.*=.*\\bAND\\b)",
+            "(;|\\x00)",
+            "(\\b(CHAR|NCHAR|VARCHAR|NVARCHAR)\\b\\s*\\(\\s*\\d+\\s*\\))",
+        ]
+        self.command_patterns = [
+            "(\\||;|&|`|\\$\\(|\\$\\{)",
+            "(\\b(rm|del|format|fdisk|mkfs)\\b)",
+            "(\\.\\.\\/|\\.\\.\\\\)",
+            "(\\bnc\\b|\\bnetcat\\b|\\btelnet\\b)",
+        ]
+        self.prompt_injection_patterns = [
+            "ignore\\s+previous\\s+instructions",
+            "forget\\s+everything\\s+above",
+            "system\\s*:\\s*you\\s+are\\s+now",
+            "new\\s+instructions\\s*:",
+            "override\\s+your\\s+programming",
+            "act\\s+as\\s+if\\s+you\\s+are",
+            "pretend\\s+to\\s+be",
+            "roleplay\\s+as",
+            "simulate\\s+being",
+            "you\\s+must\\s+now",
+            "from\\s+now\\s+on\\s+you\\s+are",
+            "disregard\\s+all\\s+previous",
+            "ignore\\s+your\\s+guidelines",
+            "bypass\\s+your\\s+restrictions",
+            "jailbreak\\s+mode",
+            "developer\\s+mode\\s+enabled",
+            "admin\\s+override",
+            "root\\s+access\\s+granted",
+        ]
+        self.ml_threat_patterns = [
+            "adversarial\\s+example",
+            "poison\\s+training\\s+data",
+            "model\\s+extraction",
+            "membership\\s+inference",
+            "gradient\\s+inversion",
+            "backdoor\\s+attack",
+            "data\\s+poisoning",
+            "evasion\\s+attack",
+        ]
 
     def set_event_bus(self, event_bus):
         """Set event bus for security event emission."""
         self.event_bus = event_bus
-        logger.info('Event bus integrated with InputSanitizer for security monitoring')
+        logger.info("Event bus integrated with InputSanitizer for security monitoring")
 
     async def _emit_security_event(self, event: SecurityEvent):
         """Emit security event for monitoring and alerting."""
         self.security_events.append(event)
         if self.event_bus:
             try:
-                from prompt_improver.ml.orchestration.events.event_types import EventType, MLEvent
-                if 'prompt_injection' in event.threats_detected:
+                from prompt_improver.ml.orchestration.events.event_types import (
+                    EventType,
+                    MLEvent,
+                )
+
+                if "prompt_injection" in event.threats_detected:
                     event_type = EventType.PROMPT_INJECTION_DETECTED
-                elif event.threat_level in [SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL]:
+                elif event.threat_level in [
+                    SecurityThreatLevel.HIGH,
+                    SecurityThreatLevel.CRITICAL,
+                ]:
                     event_type = EventType.INPUT_VALIDATION_FAILED
                 else:
                     event_type = EventType.SECURITY_ALERT
-                ml_event = MLEvent(event_type=event_type, source='input_sanitizer', data={'event_type': event.event_type, 'threat_level': event.threat_level.name.lower(), 'threats_detected': event.threats_detected, 'timestamp': event.timestamp.isoformat(), 'user_id': event.user_id, 'source_ip': event.source_ip, 'input_data_sample': event.input_data[:100] if event.input_data else None})
+                ml_event = MLEvent(
+                    event_type=event_type,
+                    source="input_sanitizer",
+                    data={
+                        "event_type": event.event_type,
+                        "threat_level": event.threat_level.name.lower(),
+                        "threats_detected": event.threats_detected,
+                        "timestamp": event.timestamp.isoformat(),
+                        "user_id": event.user_id,
+                        "source_ip": event.source_ip,
+                        "input_data_sample": event.input_data[:100]
+                        if event.input_data
+                        else None,
+                    },
+                )
                 await self.event_bus.emit(ml_event)
             except Exception as e:
-                logger.error('Failed to emit security event: %s', e)
-        if event.threat_level in [SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL]:
-            logger.error('SECURITY ALERT: %s - %s - Threats: %s', event.event_type, event.threat_level.name.lower(), event.threats_detected)
+                logger.error(f"Failed to emit security event: {e}")
+        if event.threat_level in [
+            SecurityThreatLevel.HIGH,
+            SecurityThreatLevel.CRITICAL,
+        ]:
+            logger.error(
+                f"SECURITY ALERT: {event.event_type} - {event.threat_level.name.lower()} - Threats: {event.threats_detected}"
+            )
         else:
-            logger.warning('Security event: %s - %s', event.event_type, event.threat_level.name.lower())
+            logger.warning(
+                f"Security event: {event.event_type} - {event.threat_level.name.lower()}"
+            )
 
     def get_security_stats(self) -> dict[str, Any]:
         """Get security validation statistics."""
-        return {**self._validation_stats, 'recent_events': len([e for e in self.security_events if (datetime.now(UTC) - e.timestamp).seconds < 3600]), 'high_threat_events': len([e for e in self.security_events if e.threat_level in [SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL]])}
+        return {
+            **self._validation_stats,
+            "recent_events": len([
+                e
+                for e in self.security_events
+                if (datetime.now(UTC) - e.timestamp).seconds < 3600
+            ]),
+            "high_threat_events": len([
+                e
+                for e in self.security_events
+                if e.threat_level
+                in [SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL]
+            ]),
+        }
 
     def sanitize_html_input(self, input_text: str) -> str:
         """Sanitize HTML input to prevent XSS attacks."""
@@ -132,10 +249,12 @@ class InputSanitizer:
             return str(input_text)
         sanitized = html.escape(input_text, quote=True)
         for pattern in self.xss_patterns:
-            sanitized = re.sub(pattern, '', sanitized, flags=re.IGNORECASE | re.DOTALL)
+            sanitized = re.sub(pattern, "", sanitized, flags=re.IGNORECASE | re.DOTALL)
         return sanitized.strip()
 
-    async def validate_input_async(self, input_data: Any, context: dict[str, Any]=None) -> ValidationResult:
+    async def validate_input_async(
+        self, input_data: Any, context: dict[str, Any] = None
+    ) -> ValidationResult:
         """Comprehensive async input validation with 2025 security best practices.
 
         Args:
@@ -149,7 +268,7 @@ class InputSanitizer:
         context = context or {}
         threats_detected = []
         threat_level = SecurityThreatLevel.LOW
-        self._validation_stats['total_validations'] += 1
+        self._validation_stats["total_validations"] += 1
         try:
             if isinstance(input_data, str):
                 result = await self._validate_string_input(input_data, threats_detected)
@@ -168,51 +287,79 @@ class InputSanitizer:
                 if not result.is_valid:
                     threat_level = result.threat_level
             else:
-                result = ValidationResult(is_valid=True, sanitized_value=input_data, message='Input type validation passed')
+                result = ValidationResult(
+                    is_valid=True,
+                    sanitized_value=input_data,
+                    message="Input type validation passed",
+                )
             if threats_detected:
-                self._validation_stats['threats_detected'] += len(threats_detected)
+                self._validation_stats["threats_detected"] += len(threats_detected)
                 if not result.is_valid:
-                    self._validation_stats['threats_blocked'] += 1
+                    self._validation_stats["threats_blocked"] += 1
             if threats_detected:
-                await self._emit_security_event(SecurityEvent(event_type='input_validation', threat_level=threat_level, source_ip=context.get('source_ip'), user_id=context.get('user_id'), input_data=str(input_data)[:500], threats_detected=threats_detected))
+                await self._emit_security_event(
+                    SecurityEvent(
+                        event_type="input_validation",
+                        threat_level=threat_level,
+                        source_ip=context.get("source_ip"),
+                        user_id=context.get("user_id"),
+                        input_data=str(input_data)[:500],
+                        threats_detected=threats_detected,
+                    )
+                )
             validation_time = time.time() - start_time
             if validation_time > 0.1:
-                logger.warning('Slow input validation: %ss for %s', format(validation_time, '.3f'), type(input_data).__name__)
+                logger.warning(
+                    f"Slow input validation: {validation_time:.3f}s for {type(input_data).__name__}"
+                )
             return result
         except Exception as e:
-            logger.error('Input validation error: %s', e)
-            return ValidationResult(is_valid=False, threat_level=SecurityThreatLevel.HIGH, threats_detected=['validation_error'], message=f'Validation failed: {e!s}')
+            logger.error(f"Input validation error: {e}")
+            return ValidationResult(
+                is_valid=False,
+                threat_level=SecurityThreatLevel.HIGH,
+                threats_detected=["validation_error"],
+                message=f"Validation failed: {e!s}",
+            )
 
-    async def _validate_string_input(self, text: str, threats_detected: list[str]) -> ValidationResult:
+    async def _validate_string_input(
+        self, text: str, threats_detected: list[str]
+    ) -> ValidationResult:
         """Validate string input for various security threats."""
         if not isinstance(text, str):
-            return ValidationResult(is_valid=False, message='Input must be string')
+            return ValidationResult(is_valid=False, message="Input must be string")
         sanitized_text = text
         threat_level = SecurityThreatLevel.LOW
         for pattern in self.prompt_injection_patterns:
             if re.search(pattern, text, re.IGNORECASE):
-                threats_detected.append('prompt_injection')
+                threats_detected.append("prompt_injection")
                 threat_level = SecurityThreatLevel.CRITICAL
                 break
         for pattern in self.xss_patterns:
             if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
-                threats_detected.append('xss_attack')
+                threats_detected.append("xss_attack")
                 threat_level = max(threat_level, SecurityThreatLevel.HIGH)
                 sanitized_text = self.sanitize_html_input(text)
                 break
         if not self.validate_sql_input(text):
-            threats_detected.append('sql_injection')
+            threats_detected.append("sql_injection")
             threat_level = max(threat_level, SecurityThreatLevel.HIGH)
         if not self.validate_command_input(text):
-            threats_detected.append('command_injection')
+            threats_detected.append("command_injection")
             threat_level = max(threat_level, SecurityThreatLevel.HIGH)
         for pattern in self.ml_threat_patterns:
             if re.search(pattern, text, re.IGNORECASE):
-                threats_detected.append('ml_threat')
+                threats_detected.append("ml_threat")
                 threat_level = max(threat_level, SecurityThreatLevel.MEDIUM)
                 break
         is_valid = threat_level < SecurityThreatLevel.HIGH
-        return ValidationResult(is_valid=is_valid, sanitized_value=sanitized_text if is_valid else None, threat_level=threat_level, threats_detected=threats_detected, message='String validation completed')
+        return ValidationResult(
+            is_valid=is_valid,
+            sanitized_value=sanitized_text if is_valid else None,
+            threat_level=threat_level,
+            threats_detected=threats_detected,
+            message="String validation completed",
+        )
 
     def validate_sql_input(self, input_text: str) -> bool:
         """Validate input for SQL injection patterns."""
@@ -232,7 +379,9 @@ class InputSanitizer:
                 return False
         return True
 
-    async def _validate_dict_input(self, data: dict, threats_detected: list[str]) -> ValidationResult:
+    async def _validate_dict_input(
+        self, data: dict, threats_detected: list[str]
+    ) -> ValidationResult:
         """Validate dictionary input recursively."""
         sanitized_dict = {}
         threat_level = SecurityThreatLevel.LOW
@@ -242,29 +391,45 @@ class InputSanitizer:
                 threat_level = max(threat_level, key_result.threat_level)
                 continue
             if isinstance(value, str):
-                value_result = await self._validate_string_input(value, threats_detected)
+                value_result = await self._validate_string_input(
+                    value, threats_detected
+                )
                 if value_result.is_valid:
-                    sanitized_dict[key_result.sanitized_value] = value_result.sanitized_value
+                    sanitized_dict[key_result.sanitized_value] = (
+                        value_result.sanitized_value
+                    )
                 else:
                     threat_level = max(threat_level, value_result.threat_level)
             elif isinstance(value, dict):
                 value_result = await self._validate_dict_input(value, threats_detected)
                 if value_result.is_valid:
-                    sanitized_dict[key_result.sanitized_value] = value_result.sanitized_value
+                    sanitized_dict[key_result.sanitized_value] = (
+                        value_result.sanitized_value
+                    )
                 else:
                     threat_level = max(threat_level, value_result.threat_level)
             elif isinstance(value, (list, tuple)):
                 value_result = await self._validate_list_input(value, threats_detected)
                 if value_result.is_valid:
-                    sanitized_dict[key_result.sanitized_value] = value_result.sanitized_value
+                    sanitized_dict[key_result.sanitized_value] = (
+                        value_result.sanitized_value
+                    )
                 else:
                     threat_level = max(threat_level, value_result.threat_level)
             else:
                 sanitized_dict[key_result.sanitized_value] = value
         is_valid = threat_level != SecurityThreatLevel.CRITICAL
-        return ValidationResult(is_valid=is_valid, sanitized_value=sanitized_dict if is_valid else None, threat_level=threat_level, threats_detected=threats_detected, message='Dictionary validation completed')
+        return ValidationResult(
+            is_valid=is_valid,
+            sanitized_value=sanitized_dict if is_valid else None,
+            threat_level=threat_level,
+            threats_detected=threats_detected,
+            message="Dictionary validation completed",
+        )
 
-    async def _validate_list_input(self, data: list | tuple, threats_detected: list[str]) -> ValidationResult:
+    async def _validate_list_input(
+        self, data: list | tuple, threats_detected: list[str]
+    ) -> ValidationResult:
         """Validate list/tuple input recursively."""
         sanitized_list = []
         threat_level = SecurityThreatLevel.LOW
@@ -290,25 +455,39 @@ class InputSanitizer:
             else:
                 sanitized_list.append(item)
         is_valid = threat_level != SecurityThreatLevel.CRITICAL
-        return ValidationResult(is_valid=is_valid, sanitized_value=sanitized_list if is_valid else None, threat_level=threat_level, threats_detected=threats_detected, message='List validation completed')
+        return ValidationResult(
+            is_valid=is_valid,
+            sanitized_value=sanitized_list if is_valid else None,
+            threat_level=threat_level,
+            threats_detected=threats_detected,
+            message="List validation completed",
+        )
 
-    async def _validate_numpy_input(self, data: np.ndarray, threats_detected: list[str]) -> ValidationResult:
+    async def _validate_numpy_input(
+        self, data: np.ndarray, threats_detected: list[str]
+    ) -> ValidationResult:
         """Validate numpy array input for ML safety."""
         threat_level = SecurityThreatLevel.LOW
         if np.any(np.isnan(data)) or np.any(np.isinf(data)):
-            threats_detected.append('invalid_numeric_data')
+            threats_detected.append("invalid_numeric_data")
             threat_level = SecurityThreatLevel.MEDIUM
         if np.any(np.abs(data) > 10000000000.0):
-            threats_detected.append('extreme_values')
+            threats_detected.append("extreme_values")
             threat_level = SecurityThreatLevel.MEDIUM
         if data.size > 0:
             data_std = np.std(data)
             data_mean = np.mean(data)
             if data_std > 1000 or abs(data_mean) > 1000:
-                threats_detected.append('suspicious_data_distribution')
+                threats_detected.append("suspicious_data_distribution")
                 threat_level = SecurityThreatLevel.MEDIUM
         is_valid = threat_level != SecurityThreatLevel.CRITICAL
-        return ValidationResult(is_valid=is_valid, sanitized_value=data if is_valid else None, threat_level=threat_level, threats_detected=threats_detected, message='NumPy array validation completed')
+        return ValidationResult(
+            is_valid=is_valid,
+            sanitized_value=data if is_valid else None,
+            threat_level=threat_level,
+            threats_detected=threats_detected,
+            message="NumPy array validation completed",
+        )
 
     def validate_ml_input_data(self, data: Any) -> bool:
         """Validate ML input data for safety and consistency."""
@@ -334,14 +513,16 @@ class InputSanitizer:
                 return True
             if isinstance(data, dict):
                 for key, value in data.items():
-                    if not isinstance(key, str) or not self.validate_ml_input_data(value):
+                    if not isinstance(key, str) or not self.validate_ml_input_data(
+                        value
+                    ):
                         return False
                 return True
             return False
         except Exception:
             return False
 
-    def validate_privacy_parameters(self, epsilon: float, delta: float=None) -> bool:
+    def validate_privacy_parameters(self, epsilon: float, delta: float = None) -> bool:
         """Validate differential privacy parameters."""
         if not isinstance(epsilon, (int, float)) or epsilon <= 0 or epsilon > 10:
             return False
@@ -353,18 +534,18 @@ class InputSanitizer:
     def sanitize_file_path(self, file_path: str) -> str:
         """Sanitize file path to prevent directory traversal attacks."""
         if not isinstance(file_path, str):
-            return ''
-        sanitized = re.sub('\\.\\.\\/|\\.\\.\\\\', '', file_path)
-        sanitized = sanitized.replace('\x00', '')
+            return ""
+        sanitized = re.sub("\\.\\.\\/|\\.\\.\\\\", "", file_path)
+        sanitized = sanitized.replace("\x00", "")
         sanitized = sanitized.strip()
-        sanitized = re.sub('[^a-zA-Z0-9._/-]', '', sanitized)
+        sanitized = re.sub(r"[^a-zA-Z0-9._/-]", "", sanitized)
         return sanitized
 
     def validate_email(self, email: str) -> bool:
         """Validate email format."""
         if not isinstance(email, str):
             return False
-        email_pattern = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
+        email_pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
         if not re.match(email_pattern, email):
             return False
         if len(email) > 254:
@@ -375,32 +556,36 @@ class InputSanitizer:
         """Validate username format."""
         if not isinstance(username, str):
             return False
-        if not re.match('^[a-zA-Z0-9_-]{3,50}$', username):
+        if not re.match(r"^[a-zA-Z0-9_-]{3,50}$", username):
             return False
         return True
 
     def validate_password_strength(self, password: str) -> dict[str, bool | list[str]]:
         """Validate password strength and return detailed feedback."""
         if not isinstance(password, str):
-            return {'valid': False, 'errors': ['Password must be a string']}
+            return {"valid": False, "errors": ["Password must be a string"]}
         errors = []
         if len(password) < 8:
-            errors.append('Password must be at least 8 characters long')
+            errors.append("Password must be at least 8 characters long")
         if len(password) > 128:
-            errors.append('Password must be no more than 128 characters long')
-        if not re.search('[a-z]', password):
-            errors.append('Password must contain at least one lowercase letter')
-        if not re.search('[A-Z]', password):
-            errors.append('Password must contain at least one uppercase letter')
-        if not re.search('\\d', password):
-            errors.append('Password must contain at least one digit')
-        if not re.search('[!@#$%^&*(),.?":{}|<>]', password):
-            errors.append('Password must contain at least one special character')
-        if re.search('(.)\\1{3,}', password):
-            errors.append('Password must not contain 4 or more repeated characters')
-        if re.search('(123|abc|qwe|asd|zxc)', password, re.IGNORECASE):
-            errors.append('Password must not contain common patterns')
-        return {'valid': len(errors) == 0, 'errors': errors, 'strength_score': max(0, 100 - len(errors) * 15)}
+            errors.append("Password must be no more than 128 characters long")
+        if not re.search(r"[a-z]", password):
+            errors.append("Password must contain at least one lowercase letter")
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must contain at least one uppercase letter")
+        if not re.search("\\d", password):
+            errors.append("Password must contain at least one digit")
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            errors.append("Password must contain at least one special character")
+        if re.search("(.)\\1{3,}", password):
+            errors.append("Password must not contain 4 or more repeated characters")
+        if re.search(r"(123|abc|qwe|asd|zxc)", password, re.IGNORECASE):
+            errors.append("Password must not contain common patterns")
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "strength_score": max(0, 100 - len(errors) * 15),
+        }
 
     def sanitize_json_input(self, json_data: dict[str, Any]) -> dict[str, Any]:
         """Sanitize JSON input data."""
@@ -414,7 +599,12 @@ class InputSanitizer:
             elif isinstance(value, dict):
                 clean_value = self.sanitize_json_input(value)
             elif isinstance(value, list):
-                clean_value = [self.sanitize_html_input(str(item)) if isinstance(item, str) else item for item in value]
+                clean_value = [
+                    self.sanitize_html_input(str(item))
+                    if isinstance(item, str)
+                    else item
+                    for item in value
+                ]
             else:
                 clean_value = value
             sanitized[clean_key] = clean_value

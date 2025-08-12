@@ -21,7 +21,7 @@ class AdversarialDefenseConnector(ComponentConnector):
         self.logger.info('AdversarialDefense connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute AdversarialDefense capability."""
         if capability_name == 'detect_adversarial_attacks':
             return await self._detect_adversarial_attacks(parameters)
@@ -32,17 +32,17 @@ class AdversarialDefenseConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _detect_adversarial_attacks(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _detect_adversarial_attacks(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Detect adversarial attacks."""
         await asyncio.sleep(0.3)
         return {'attacks_detected': 3, 'attack_types': ['fgsm', 'pgd', 'c&w'], 'detection_confidence': 0.92, 'false_positive_rate': 0.05, 'response_time': '100ms'}
 
-    async def _defensive_mechanisms(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _defensive_mechanisms(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Apply defensive mechanisms."""
         await asyncio.sleep(0.4)
         return {'defenses_applied': ['adversarial_training', 'input_transformation', 'ensemble'], 'robustness_improvement': 0.35, 'accuracy_preservation': 0.96, 'defense_effectiveness': 0.88}
 
-    async def _security_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _security_validation(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Security validation."""
         await asyncio.sleep(0.2)
         return {'security_score': 0.89, 'vulnerabilities_found': 2, 'security_level': 'high', 'compliance_status': 'passed', 'recommendations': ['update_defense_params', 'enhance_monitoring']}
@@ -59,7 +59,7 @@ class DifferentialPrivacyConnector(ComponentConnector):
         self.logger.info('DifferentialPrivacy connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute DifferentialPrivacy capability."""
         if capability_name == 'privacy_preserving_ml':
             return await self._privacy_preserving_ml(parameters)
@@ -70,17 +70,17 @@ class DifferentialPrivacyConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _privacy_preserving_ml(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _privacy_preserving_ml(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Privacy-preserving ML."""
         await asyncio.sleep(0.4)
         return {'privacy_epsilon': 1.0, 'privacy_delta': 1e-05, 'model_accuracy': 0.84, 'privacy_mechanism': 'gaussian_mechanism', 'utility_loss': 0.06}
 
-    async def _privacy_accounting(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _privacy_accounting(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Privacy accounting."""
         await asyncio.sleep(0.2)
         return {'total_epsilon': 2.5, 'epsilon_used': 1.8, 'remaining_budget': 0.7, 'composition_method': 'rdp', 'budget_utilization': 0.72}
 
-    async def _noise_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _noise_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Noise optimization."""
         await asyncio.sleep(0.3)
         return {'optimal_sigma': 0.1, 'noise_variance': 0.01, 'privacy_utility_tradeoff': 0.85, 'convergence_achieved': True}
@@ -97,7 +97,7 @@ class FederatedLearningConnector(ComponentConnector):
         self.logger.info('FederatedLearning connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute FederatedLearning capability."""
         if capability_name == 'distributed_training':
             return await self._distributed_training(parameters)
@@ -108,17 +108,17 @@ class FederatedLearningConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _distributed_training(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _distributed_training(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Distributed training."""
         await asyncio.sleep(0.5)
         return {'participating_clients': 25, 'training_rounds': 10, 'global_model_accuracy': 0.87, 'convergence_achieved': True, 'communication_rounds': 50}
 
-    async def _aggregation_protocols(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _aggregation_protocols(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Aggregation protocols."""
         await asyncio.sleep(0.3)
         return {'aggregation_method': 'fedavg', 'secure_aggregation': True, 'client_weights': 'data_proportional', 'aggregation_accuracy': 0.95, 'privacy_preserved': True}
 
-    async def _client_management(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _client_management(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Client management."""
         await asyncio.sleep(0.2)
         return {'active_clients': 20, 'client_selection_rate': 0.8, 'dropout_rate': 0.1, 'client_health': 'good', 'data_distribution': 'non_iid'}
@@ -135,6 +135,6 @@ class Tier6ConnectorFactory:
         return connectors[component_name](event_bus)
 
     @staticmethod
-    def list_available_components() -> List[str]:
+    def list_available_components() -> list[str]:
         """List all available Tier 6 components."""
         return ['adversarial_defense', 'differential_privacy', 'federated_learning', 'performance_benchmark', 'response_optimizer', 'automl_status', 'security_validator']

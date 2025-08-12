@@ -15,15 +15,15 @@ class TestSessionSummaryReporter:
     """Test suite for session summary reporter with real behavior testing"""
 
     @pytest.fixture
-    async def mock_db_session(self):
-        """Create mock database session"""
-        session = AsyncMock()
-        return session
+    async def db_session(self, postgres_container):
+        """Create real database session with PostgreSQL testcontainer"""
+        async with postgres_container.get_session() as session:
+            yield session
 
     @pytest.fixture
-    def reporter(self, mock_db_session):
-        """Create reporter instance"""
-        return SessionSummaryReporter(mock_db_session)
+    def reporter(self, db_session):
+        """Create reporter instance with real database session"""
+        return SessionSummaryReporter(db_session)
 
     @pytest.fixture
     def sample_training_session(self):
@@ -175,7 +175,7 @@ class TestSessionSummaryReporter:
         result_path = await reporter.export_session_report('test_session_1', ReportFormat.JSON, str(output_path))
         assert result_path == str(output_path)
         assert output_path.exists()
-        with open(output_path, 'r') as f:
+        with open(output_path) as f:
             data = json.load(f)
         assert 'session_summary' in data
         assert 'iterations' in data

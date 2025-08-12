@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from enum import Enum
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from collections.abc import Callable
 from ....core.protocols.ml_protocols import ComponentInvokerProtocol, ComponentLoaderProtocol, ComponentRegistryProtocol, EventBusProtocol, ExternalServicesConfigProtocol, HealthMonitorProtocol, ResourceManagerProtocol, WorkflowEngineProtocol
 
 class PipelineState(Enum):
@@ -29,10 +30,10 @@ class WorkflowInstance:
     workflow_type: str
     state: PipelineState
     created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
+    metadata: dict[str, Any] | None = None
 
 class MLPipelineOrchestratorRefactored:
     """
@@ -53,7 +54,7 @@ class MLPipelineOrchestratorRefactored:
     5. Health monitoring integration
     """
 
-    def __init__(self, config: ExternalServicesConfigProtocol, event_bus: EventBusProtocol, workflow_engine: WorkflowEngineProtocol, resource_manager: ResourceManagerProtocol, component_registry: ComponentRegistryProtocol, component_loader: ComponentLoaderProtocol, component_invoker: ComponentInvokerProtocol, health_monitor: Optional[HealthMonitorProtocol]=None, logger: Optional[logging.Logger]=None):
+    def __init__(self, config: ExternalServicesConfigProtocol, event_bus: EventBusProtocol, workflow_engine: WorkflowEngineProtocol, resource_manager: ResourceManagerProtocol, component_registry: ComponentRegistryProtocol, component_loader: ComponentLoaderProtocol, component_invoker: ComponentInvokerProtocol, health_monitor: HealthMonitorProtocol | None=None, logger: logging.Logger | None=None):
         """
         Initialize ML Pipeline Orchestrator with injected dependencies.
         
@@ -78,8 +79,8 @@ class MLPipelineOrchestratorRefactored:
         self.health_monitor = health_monitor
         self.logger = logger or logging.getLogger(__name__)
         self.state = PipelineState.idle
-        self.active_workflows: Dict[str, WorkflowInstance] = {}
-        self.component_health: Dict[str, bool] = {}
+        self.active_workflows: dict[str, WorkflowInstance] = {}
+        self.component_health: dict[str, bool] = {}
         self._is_initialized = False
         self._setup_component_references()
 
@@ -146,7 +147,7 @@ class MLPipelineOrchestratorRefactored:
             self.logger.error('Error during orchestrator shutdown: %s', e)
             raise
 
-    async def start_workflow(self, workflow_type: str, parameters: Dict[str, Any]) -> str:
+    async def start_workflow(self, workflow_type: str, parameters: dict[str, Any]) -> str:
         """Start a new ML workflow."""
         if not self._is_initialized:
             raise RuntimeError('Orchestrator not initialized')
@@ -185,7 +186,7 @@ class MLPipelineOrchestratorRefactored:
             self.logger.error('Failed to stop workflow {workflow_id}: %s', e)
             raise
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Comprehensive health check of the orchestrator and all components."""
         try:
             health_results = {'healthy': True, 'status': 'healthy', 'orchestrator_version': '2025.1-refactored', 'timestamp': datetime.now(timezone.utc).isoformat(), 'components': {}, 'external_services': {}, 'active_workflows': len(self.active_workflows)}
@@ -219,7 +220,7 @@ class MLPipelineOrchestratorRefactored:
             self.logger.error('Health check failed: %s', e)
             return {'healthy': False, 'status': 'error', 'error': str(e), 'timestamp': datetime.now(timezone.utc).isoformat()}
 
-    async def get_component_health(self) -> Dict[str, bool]:
+    async def get_component_health(self) -> dict[str, bool]:
         """Get health status of all registered components."""
         components = await self.component_registry.list_components()
         health_status = {}
@@ -237,45 +238,45 @@ class MLPipelineOrchestratorRefactored:
             raise RuntimeError(f'Component {component_name}.{method_name} failed: {result.error}')
         return result.result
 
-    async def run_training_workflow(self, training_data: Any) -> Dict[str, Any]:
+    async def run_training_workflow(self, training_data: Any) -> dict[str, Any]:
         """Run a complete training workflow using the injected component invoker."""
         self.logger.info('Running training workflow (Refactored)')
         try:
             results = await self.component_invoker.invoke_training_workflow(training_data)
             for step, result in results.items():
                 if result.success:
-                    self.logger.info("Training step '%s' completed successfully", step)
+                    self.logger.info(f"Training step '{step}' completed successfully")
                 else:
-                    self.logger.error("Training step '{step}' failed: %s", result.error)
+                    self.logger.error(f"Training step '{step}' failed: {result.error}")
             return {step: result.result for step, result in results.items() if result.success}
         except Exception as e:
             self.logger.error('Training workflow failed: %s', e)
             raise
 
-    async def run_evaluation_workflow(self, evaluation_data: Any) -> Dict[str, Any]:
+    async def run_evaluation_workflow(self, evaluation_data: Any) -> dict[str, Any]:
         """Run a complete evaluation workflow using the injected component invoker."""
         self.logger.info('Running evaluation workflow (Refactored)')
         try:
             results = await self.component_invoker.invoke_evaluation_workflow(evaluation_data)
             for step, result in results.items():
                 if result.success:
-                    self.logger.info("Evaluation step '%s' completed successfully", step)
+                    self.logger.info(f"Evaluation step '{step}' completed successfully")
                 else:
-                    self.logger.error("Evaluation step '{step}' failed: %s", result.error)
+                    self.logger.error(f"Evaluation step '{step}' failed: {result.error}")
             return {step: result.result for step, result in results.items() if result.success}
         except Exception as e:
             self.logger.error('Evaluation workflow failed: %s', e)
             raise
 
-    def get_loaded_components(self) -> List[str]:
+    def get_loaded_components(self) -> list[str]:
         """Get list of loaded component names."""
         return list(self.component_loader.get_all_loaded_components().keys())
 
-    def get_component_methods(self, component_name: str) -> List[str]:
+    def get_component_methods(self, component_name: str) -> list[str]:
         """Get available methods for a component."""
         return self.component_invoker.get_available_methods(component_name)
 
-    def get_invocation_history(self, component_name: Optional[str]=None) -> List[Dict[str, Any]]:
+    def get_invocation_history(self, component_name: str | None=None) -> list[dict[str, Any]]:
         """Get component invocation history."""
         history = self.component_invoker.get_invocation_history(component_name)
         return [{'component_name': result.component_name, 'method_name': result.method_name, 'success': result.success, 'execution_time': result.execution_time, 'timestamp': result.timestamp.isoformat(), 'error': result.error} for result in history]
@@ -287,7 +288,7 @@ class MLPipelineOrchestratorRefactored:
         self.event_bus.subscribe('WORKFLOW_FAILED', self._handle_workflow_failed)
         self.event_bus.subscribe('RESOURCE_EXHAUSTED', self._handle_resource_exhausted)
 
-    async def _emit_orchestrator_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _emit_orchestrator_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit an orchestrator event through the injected event bus."""
         await self.event_bus.publish(event_type=event_type, data={'source': 'ml_pipeline_orchestrator_refactored', **data})
 

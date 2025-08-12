@@ -1,12 +1,16 @@
-"""
-Debug script for ML components validation issues.
-"""
+"""Debug script for ML components validation issues."""
+
 import asyncio
-from pathlib import Path
 import sys
-from prompt_improver.ml.learning.algorithms.analysis_orchestrator import AnalysisOrchestrator
+from pathlib import Path
+
+from prompt_improver.ml.learning.algorithms.analysis_orchestrator import (
+    AnalysisOrchestrator,
+)
 from prompt_improver.ml.learning.algorithms.failure_classifier import FailureClassifier
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 
 class MinimalFailureConfig:
     """Minimal configuration for ML components validation."""
@@ -43,62 +47,85 @@ class MinimalFailureConfig:
         self.max_analysis_iterations = 5
         self.convergence_threshold = 0.01
 
+
 async def test_analysis_orchestrator():
     """Test AnalysisOrchestrator initialization and basic functionality."""
-    print('🧪 Testing AnalysisOrchestrator...')
+    print("🧪 Testing AnalysisOrchestrator...")
     try:
         config = MinimalFailureConfig()
-        print(f'✅ Config created: {config}')
+        print(f"✅ Config created: {config}")
         analyzer = AnalysisOrchestrator(config)
-        print(f'✅ AnalysisOrchestrator created: {analyzer}')
-        test_results = [{'overallImprovement': 0.2, 'error': 'Test validation error', 'prompt': 'Test prompt', 'response': 'Test response', 'metadata': {'test': True}}]
-        print(f'📊 Test data: {test_results}')
+        print(f"✅ AnalysisOrchestrator created: {analyzer}")
+        test_results = [
+            {
+                "overallImprovement": 0.2,
+                "error": "Test validation error",
+                "prompt": "Test prompt",
+                "response": "Test response",
+                "metadata": {"test": True},
+            }
+        ]
+        print(f"📊 Test data: {test_results}")
         analysis_result = await analyzer.analyze_failures(test_results)
-        print(f'✅ Analysis result: {analysis_result}')
+        print(f"✅ Analysis result: {analysis_result}")
         return True
     except Exception as e:
-        print(f'❌ AnalysisOrchestrator test failed: {e}')
+        print(f"❌ AnalysisOrchestrator test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 async def test_failure_classifier():
     """Test FailureClassifier initialization and basic functionality."""
-    print('\n🧪 Testing FailureClassifier...')
+    print("\n🧪 Testing FailureClassifier...")
     try:
         config = MinimalFailureConfig()
-        print(f'✅ Config created: {config}')
+        print(f"✅ Config created: {config}")
         classifier = FailureClassifier(config)
-        print(f'✅ FailureClassifier created: {classifier}')
-        test_failures = [{'error': 'timeout_error', 'type': 'timeout', 'severity': 'high'}]
-        test_results = [{'overallImprovement': 0.2, 'error': 'timeout_error', 'prompt': 'test'}]
-        print(f'📊 Test failures: {test_failures}')
-        print(f'📊 Test results: {test_results}')
-        fmea_result = await classifier.perform_ml_fmea_analysis(test_failures, test_results)
-        print(f'✅ FMEA result: {fmea_result}')
-        anomaly_result = await classifier.perform_ensemble_anomaly_detection(test_failures)
-        print(f'✅ Anomaly result: {anomaly_result}')
+        print(f"✅ FailureClassifier created: {classifier}")
+        test_failures = [
+            {"error": "timeout_error", "type": "timeout", "severity": "high"}
+        ]
+        test_results = [
+            {"overallImprovement": 0.2, "error": "timeout_error", "prompt": "test"}
+        ]
+        print(f"📊 Test failures: {test_failures}")
+        print(f"📊 Test results: {test_results}")
+        fmea_result = await classifier.perform_ml_fmea_analysis(
+            test_failures, test_results
+        )
+        print(f"✅ FMEA result: {fmea_result}")
+        anomaly_result = await classifier.perform_ensemble_anomaly_detection(
+            test_failures
+        )
+        print(f"✅ Anomaly result: {anomaly_result}")
         return True
     except Exception as e:
-        print(f'❌ FailureClassifier test failed: {e}')
+        print(f"❌ FailureClassifier test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
+
 async def main():
     """Main test function."""
-    print('🚀 Starting ML Components Debug Test')
-    print('=' * 50)
+    print("🚀 Starting ML Components Debug Test")
+    print("=" * 50)
     orchestrator_success = await test_analysis_orchestrator()
     classifier_success = await test_failure_classifier()
-    print('\n' + '=' * 50)
-    print('📊 DEBUG TEST RESULTS')
-    print('=' * 50)
+    print("\n" + "=" * 50)
+    print("📊 DEBUG TEST RESULTS")
+    print("=" * 50)
     print(f"AnalysisOrchestrator: {('✅ PASS' if orchestrator_success else '❌ FAIL')}")
     print(f"FailureClassifier: {('✅ PASS' if classifier_success else '❌ FAIL')}")
     overall_success = orchestrator_success and classifier_success
     print(f"\nOverall: {('✅ PASS' if overall_success else '❌ FAIL')}")
     return overall_success
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     success = asyncio.run(main())
     sys.exit(0 if success else 1)

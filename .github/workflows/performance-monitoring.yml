@@ -1,0 +1,419 @@
+name: Performance Monitoring and Validation
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+  schedule:
+    # Run performance monitoring daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'CI Stage to run'
+        required: true
+        default: 'integration_tests'
+        type: choice
+        options:
+          - pre_commit
+          - unit_tests
+          - integration_tests
+          - performance_tests
+          - pre_deployment
+      quick_check:
+        description: 'Run quick check (reduced operations)'
+        required: false
+        default: false
+        type: boolean
+      operations_limit:
+        description: 'Limit number of operations'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  performance-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: prompt_improver_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+        stage: 
+          - ${{ github.event.inputs.stage || (github.event_name == 'pull_request' && 'integration_tests') || (github.event_name == 'push' && 'pre_deployment') || 'performance_tests' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for performance regression detection
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client redis-tools
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements-dev.txt
+        # Install additional performance monitoring dependencies
+        pip install psutil scipy numpy aiofiles
+    
+    - name: Set up environment variables
+      run: |
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/prompt_improver_test" >> $GITHUB_ENV
+        echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+        echo "ENVIRONMENT=testing" >> $GITHUB_ENV
+    
+    - name: Initialize database
+      run: |
+        python -c "
+        import asyncio
+        from prompt_improver.database import create_tables
+        asyncio.run(create_tables())
+        " || echo "Database initialization may have failed - continuing"
+    
+    - name: Cache performance baseline
+      uses: actions/cache@v3
+      with:
+        path: |
+          .performance/
+          benchmark_results/
+          performance_data/
+        key: performance-baseline-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('src/prompt_improver/performance/**/*.py') }}
+        restore-keys: |
+          performance-baseline-${{ runner.os }}-${{ matrix.python-version }}-
+          performance-baseline-${{ runner.os }}-
+    
+    - name: Run Performance Gate - Quick Check (PR)
+      if: github.event_name == 'pull_request'
+      run: |
+        python scripts/run_performance_baseline.py \
+          --ci-stage integration_tests \
+          --quick \
+          --verbose
+      continue-on-error: true
+      id: quick-check
+    
+    - name: Run Performance Gate - Full Check (Push/Schedule)
+      if: github.event_name != 'pull_request'
+      run: |
+        operations_limit=""
+        if [[ "${{ github.event.inputs.operations_limit }}" != "" ]]; then
+          operations_limit="--operations ${{ github.event.inputs.operations_limit }}"
+        fi
+        
+        quick_flag=""
+        if [[ "${{ github.event.inputs.quick_check }}" == "true" ]]; then
+          quick_flag="--quick"
+        fi
+        
+        python scripts/run_performance_baseline.py \
+          --ci-stage ${{ matrix.stage }} \
+          $quick_flag \
+          $operations_limit \
+          --verbose
+      id: full-check
+    
+    - name: Run Memory Leak Detection
+      if: github.event_name == 'schedule' || matrix.stage == 'performance_tests'
+      run: |
+        python scripts/run_performance_baseline.py \
+          --memory-test \
+          --operations 50000 \
+          --output-dir memory_analysis_${{ matrix.python-version }} \
+          --verbose
+      continue-on-error: true
+      id: memory-check
+    
+    - name: Upload Performance Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-reports-${{ matrix.python-version }}-${{ matrix.stage }}
+        path: |
+          .performance/
+          performance_results/
+          memory_analysis_*/
+          benchmark_results/
+        retention-days: 30
+    
+    - name: Generate Performance Summary
+      if: always()
+      run: |
+        echo "## Performance Monitoring Results" > performance_summary.md
+        echo "" >> performance_summary.md
+        echo "**Stage:** ${{ matrix.stage }}" >> performance_summary.md
+        echo "**Python:** ${{ matrix.python-version }}" >> performance_summary.md
+        echo "**Timestamp:** $(date -u)" >> performance_summary.md
+        echo "" >> performance_summary.md
+        
+        # Find latest performance report
+        if [ -f ".performance/performance_gate_summary_${{ matrix.stage }}_*.txt" ]; then
+          echo "### Performance Gate Results" >> performance_summary.md
+          echo '```' >> performance_summary.md
+          cat $(ls -t .performance/performance_gate_summary_${{ matrix.stage }}_*.txt | head -1) >> performance_summary.md
+          echo '```' >> performance_summary.md
+        fi
+        
+        # Add baseline comparison if available
+        if [ -f "performance_results/performance_baseline_summary.json" ]; then
+          echo "" >> performance_summary.md
+          echo "### Baseline Comparison" >> performance_summary.md
+          python -c "
+        import json
+        try:
+            with open('performance_results/performance_baseline_summary.json') as f:
+                data = json.load(f)
+            assessment = data.get('overall_assessment', {})
+            print(f'- **Compliance Rate:** {assessment.get(\"target_compliance_rate\", 0) * 100:.1f}%')
+            print(f'- **Operations Meeting Targets:** {assessment.get(\"operations_meeting_targets\", 0)}/{assessment.get(\"total_operations_tested\", 0)}')
+            print(f'- **Memory Leaks:** {assessment.get(\"memory_leaks_detected\", 0)}')
+        except:
+            print('- Baseline data not available')
+          " >> performance_summary.md
+        fi
+    
+    - name: Comment Performance Results on PR
+      if: github.event_name == 'pull_request' && steps.quick-check.outcome != 'skipped'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('performance_summary.md')) {
+            const summary = fs.readFileSync('performance_summary.md', 'utf8');
+            
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.data.find(comment => 
+              comment.body.includes('## Performance Monitoring Results')
+            );
+            
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: summary
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary
+              });
+            }
+          }
+    
+    - name: Check Performance Gate Exit Code
+      if: always()
+      run: |
+        if [[ "${{ steps.quick-check.outcome }}" == "failure" || "${{ steps.full-check.outcome }}" == "failure" ]]; then
+          echo "Performance gate failed - check reports for details"
+          exit 1
+        fi
+    
+    - name: Performance Regression Alert
+      if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = `Performance Regression Detected - ${context.ref}`;
+          const body = `
+          ## Performance Regression Alert
+          
+          A performance regression has been detected in the validation system.
+          
+          **Details:**
+          - **Branch:** ${context.ref}
+          - **Commit:** ${context.sha}
+          - **Stage:** ${{ matrix.stage }}
+          - **Python Version:** ${{ matrix.python-version }}
+          - **Workflow:** ${context.workflow}
+          
+          Please check the performance reports in the workflow artifacts and address any critical violations.
+          
+          **Action Required:**
+          - Review performance regression details
+          - Identify root cause of performance degradation
+          - Apply fixes or consider rollback if critical
+          
+          **Reports:** See workflow artifacts for detailed analysis.
+          `;
+          
+          // Create issue for performance regression
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['performance', 'regression', 'bug', 'priority-high']
+          });
+
+  baseline-establishment:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.stage == 'performance_tests')
+    timeout-minutes: 60
+    needs: []  # Run independently
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: prompt_improver_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client redis-tools
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements-dev.txt
+        pip install psutil scipy numpy aiofiles
+    
+    - name: Set up environment
+      run: |
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/prompt_improver_test" >> $GITHUB_ENV
+        echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+        echo "ENVIRONMENT=testing" >> $GITHUB_ENV
+    
+    - name: Initialize database
+      run: |
+        python -c "
+        import asyncio
+        from prompt_improver.database import create_tables
+        asyncio.run(create_tables())
+        " || echo "Database initialization may have failed - continuing"
+    
+    - name: Run Comprehensive Performance Baseline
+      run: |
+        python scripts/run_performance_baseline.py \
+          --operations 25000 \
+          --memory-operations 100000 \
+          --concurrent-sessions 200 \
+          --output-dir comprehensive_baseline \
+          --verbose
+    
+    - name: Upload Comprehensive Baseline
+      uses: actions/upload-artifact@v3
+      with:
+        name: comprehensive-performance-baseline
+        path: |
+          comprehensive_baseline/
+          .performance/
+        retention-days: 90
+    
+    - name: Update Performance Budgets
+      run: |
+        # Check if budgets need updating based on actual measurements
+        python -c "
+        import json
+        from pathlib import Path
+        
+        baseline_file = Path('comprehensive_baseline/performance_baseline_summary.json')
+        if baseline_file.exists():
+            with open(baseline_file) as f:
+                data = json.load(f)
+            
+            compliance_rate = data.get('overall_assessment', {}).get('target_compliance_rate', 0)
+            if compliance_rate < 0.8:
+                print('Performance targets may need adjustment - see baseline report')
+                exit(1)
+            else:
+                print('Performance baseline successfully established')
+                exit(0)
+        else:
+            print('Baseline file not found')
+            exit(1)
+        "
+    
+    - name: Performance Baseline Summary
+      if: always()
+      run: |
+        echo "## Comprehensive Performance Baseline" > baseline_summary.md
+        echo "" >> baseline_summary.md
+        echo "**Timestamp:** $(date -u)" >> baseline_summary.md
+        echo "**Operations:** 25,000 per test" >> baseline_summary.md
+        echo "**Memory Operations:** 100,000" >> baseline_summary.md
+        echo "**Concurrent Sessions:** 200" >> baseline_summary.md
+        echo "" >> baseline_summary.md
+        
+        if [ -f "comprehensive_baseline/performance_baseline_report.txt" ]; then
+          echo "### Baseline Results" >> baseline_summary.md
+          echo '```' >> baseline_summary.md
+          cat comprehensive_baseline/performance_baseline_report.txt >> baseline_summary.md
+          echo '```' >> baseline_summary.md
+        fi

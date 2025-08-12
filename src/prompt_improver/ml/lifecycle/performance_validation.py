@@ -19,7 +19,8 @@ import logging
 from pathlib import Path
 import statistics
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+from collections.abc import Callable
 import uuid
 
 from sqlmodel import SQLModel
@@ -87,9 +88,9 @@ class BenchmarkConfig:
     target_experiment_throughput_factor: float = 10.0
     
     # Test data configuration
-    model_sizes: List[str] = field(default_factory=lambda: ["small", "medium", "large"])
-    experiment_complexities: List[str] = field(default_factory=lambda: ["simple", "complex"])
-    data_volumes: List[str] = field(default_factory=lambda: ["1k", "10k", "100k"])
+    model_sizes: list[str] = field(default_factory=lambda: ["small", "medium", "large"])
+    experiment_complexities: list[str] = field(default_factory=lambda: ["simple", "complex"])
+    data_volumes: list[str] = field(default_factory=lambda: ["1k", "10k", "100k"])
     
     # Environment settings
     enable_distributed: bool = True
@@ -111,7 +112,7 @@ class BenchmarkResult:
     iterations_failed: int
     
     # Performance metrics
-    measurements: List[float] = field(default_factory=list)
+    measurements: list[float] = field(default_factory=list)
     avg_time_seconds: float = 0.0
     min_time_seconds: float = 0.0
     max_time_seconds: float = 0.0
@@ -121,7 +122,7 @@ class BenchmarkResult:
     std_dev_seconds: float = 0.0
     
     # Improvement calculations
-    baseline_avg_seconds: Optional[float] = None
+    baseline_avg_seconds: float | None = None
     improvement_percent: float = 0.0
     throughput_factor: float = 1.0
     
@@ -132,7 +133,7 @@ class BenchmarkResult:
     
     # Success metrics
     success_rate: float = 100.0
-    error_details: List[str] = field(default_factory=list)
+    error_details: list[str] = field(default_factory=list)
     
     # Validation results
     meets_target: bool = False
@@ -152,18 +153,18 @@ class ValidationReport:
     overall_success_rate: float = 0.0
     
     # Key performance validations
-    deployment_speed_validation: Dict[str, Any] = field(default_factory=dict)
-    experiment_throughput_validation: Dict[str, Any] = field(default_factory=dict)
+    deployment_speed_validation: dict[str, Any] = field(default_factory=dict)
+    experiment_throughput_validation: dict[str, Any] = field(default_factory=dict)
     
     # Detailed results
-    benchmark_results: List[BenchmarkResult] = field(default_factory=list)
+    benchmark_results: list[BenchmarkResult] = field(default_factory=list)
     
     # Performance summary
-    performance_summary: Dict[str, Any] = field(default_factory=dict)
+    performance_summary: dict[str, Any] = field(default_factory=dict)
     
     # Recommendations
-    recommendations: List[str] = field(default_factory=list)
-    issues_found: List[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
+    issues_found: list[str] = field(default_factory=list)
 
 class PerformanceValidator:
     """ML Platform Performance Validation System.
@@ -179,7 +180,7 @@ class PerformanceValidator:
     
     def __init__(self,
                  storage_path: Path = Path("./validation_results"),
-                 baseline_data_path: Optional[Path] = None):
+                 baseline_data_path: Path | None = None):
         """Initialize performance validator.
         
         Args:
@@ -190,14 +191,14 @@ class PerformanceValidator:
         self.storage_path.mkdir(parents=True, exist_ok=True)
         
         self.baseline_data_path = baseline_data_path
-        self.baseline_metrics: Dict[str, float] = {}
+        self.baseline_metrics: dict[str, float] = {}
         
         # Test platform instance
-        self.test_platform: Optional[MLPlatformIntegration] = None
+        self.test_platform: MLPlatformIntegration | None = None
         
         # Results storage
-        self.benchmark_results: List[BenchmarkResult] = []
-        self.validation_reports: List[ValidationReport] = []
+        self.benchmark_results: list[BenchmarkResult] = []
+        self.validation_reports: list[ValidationReport] = []
         
         # Performance tracking
         self.executor = ThreadPoolExecutor(max_workers=8)
@@ -210,11 +211,14 @@ class PerformanceValidator:
         
         if self.baseline_data_path and self.baseline_data_path.exists():
             try:
-                with open(self.baseline_data_path, 'r') as f:
-                    self.baseline_metrics = json.load(f)
-                logger.info("Loaded baseline metrics from %s", self.baseline_data_path)
+                def load_baseline_sync():
+                    with open(self.baseline_data_path) as f:
+                        return json.load(f)
+                
+                self.baseline_metrics = await asyncio.to_thread(load_baseline_sync)
+                logger.info(f"Loaded baseline metrics from {self.baseline_data_path}")
             except Exception as e:
-                logger.warning("Failed to load baseline metrics: %s", e)
+                logger.warning(f"Failed to load baseline metrics: {e}")
         
         # Set default baseline metrics if not loaded
         if not self.baseline_metrics:
@@ -241,7 +245,7 @@ class PerformanceValidator:
             return True
             
         except Exception as e:
-            logger.error("Failed to initialize test platform: %s", e)
+            logger.error(f"Failed to initialize test platform: {e}")
             return False
     
     async def run_comprehensive_validation(self) -> ValidationReport:
@@ -266,7 +270,7 @@ class PerformanceValidator:
             
             # Execute benchmarks
             for config in benchmark_configs:
-                logger.info("Running benchmark: {config.benchmark_type.value} - %s", config.scenario.value)
+                logger.info(f"Running benchmark: {config.benchmark_type.value} - {config.scenario.value}")
                 
                 result = await self._execute_benchmark(config)
                 self.benchmark_results.append(result)
@@ -285,10 +289,10 @@ class PerformanceValidator:
             # Save report
             await self._save_validation_report(report)
             
-            logger.info("✅ Validation completed: {report.passed_benchmarks}/%s benchmarks passed", report.total_benchmarks)
+            logger.info(f"✅ Validation completed: {report.passed_benchmarks}/{report.total_benchmarks} benchmarks passed")
             
         except Exception as e:
-            logger.error("Validation failed: %s", e)
+            logger.error(f"Validation failed: {e}")
             report.issues_found.append(f"Validation execution failed: {str(e)}")
         
         finally:
@@ -298,7 +302,7 @@ class PerformanceValidator:
         
         return report
     
-    def _create_benchmark_configs(self) -> List[BenchmarkConfig]:
+    def _create_benchmark_configs(self) -> list[BenchmarkConfig]:
         """Create comprehensive benchmark configurations."""
         
         configs = []
@@ -371,7 +375,7 @@ class PerformanceValidator:
         
         try:
             # Warmup iterations
-            logger.info("Running %s warmup iterations...", config.warmup_iterations)
+            logger.info(f"Running {config.warmup_iterations} warmup iterations...")
             for _ in range(config.warmup_iterations):
                 await self._execute_single_iteration(config, warmup=True)
             
@@ -380,7 +384,7 @@ class PerformanceValidator:
             resource_usage = []
             
             for i in range(config.iterations):
-                logger.info("Iteration {i+1}/%s", config.iterations)
+                logger.info(f"Iteration {i+1}/{config.iterations}")
                 
                 try:
                     measurement, resources = await self._execute_single_iteration(config)
@@ -391,7 +395,7 @@ class PerformanceValidator:
                 except Exception as e:
                     result.iterations_failed += 1
                     result.error_details.append(f"Iteration {i+1}: {str(e)}")
-                    logger.warning("Iteration {i+1} failed: %s", e)
+                    logger.warning(f"Iteration {i+1} failed: {e}")
             
             # Calculate statistics
             if measurements:
@@ -417,15 +421,15 @@ class PerformanceValidator:
             result.end_time = aware_utc_now()
             result.duration_seconds = (result.end_time - result.start_time).total_seconds()
             
-            logger.info("Benchmark completed: {result.avg_time_seconds:.2f}s avg, %s% improvement", result.improvement_percent:.1f)
+            logger.info("Benchmark completed: {result.avg_time_seconds:.2f}s avg, %.1f%% improvement", result.improvement_percent)
             
         except Exception as e:
             result.error_details.append(f"Benchmark execution failed: {str(e)}")
-            logger.error("Benchmark {config.benchmark_id} failed: %s", e)
+            logger.error(f"Benchmark {config.benchmark_id} failed: {e}")
         
         return result
     
-    async def _execute_single_iteration(self, config: BenchmarkConfig, warmup: bool = False) -> Tuple[float, Dict[str, float]]:
+    async def _execute_single_iteration(self, config: BenchmarkConfig, warmup: bool = False) -> tuple[float, dict[str, float]]:
         """Execute a single benchmark iteration."""
         
         start_time = time.time()
@@ -461,7 +465,7 @@ class PerformanceValidator:
             
         except Exception as e:
             if not warmup:  # Only log errors for actual iterations
-                logger.error("Iteration failed: %s", e)
+                logger.error(f"Iteration failed: {e}")
             raise
     
     async def _benchmark_deployment_speed(self, config: BenchmarkConfig):
@@ -621,13 +625,15 @@ class PerformanceValidator:
             await self._benchmark_resource_efficiency(scaled_config)
             await asyncio.sleep(1)  # Brief pause between load levels
     
-    def _mock_training_function(self, train_data, validation_data, params):
+    async def _mock_training_function(self, train_data, validation_data, params):
         """Mock training function for benchmarking."""
         
         # Simulate training time based on scenario
         import random
         training_time = random.uniform(0.1, 0.5)  # 100-500ms
-        time.sleep(training_time)
+        # Use async sleep for proper async compliance
+        import asyncio
+        await asyncio.sleep(training_time)
         
         # Return mock model and metrics
         return None, {
@@ -818,13 +824,13 @@ class PerformanceValidator:
         with open(report_path, 'w') as f:
             json.dump(report_data, f, indent=2)
         
-        logger.info("Validation report saved: %s", report_path)
+        logger.info(f"Validation report saved: {report_path}")
 
 # Factory Functions
 
 async def create_performance_validator(
     storage_path: Path = Path("./validation_results"),
-    baseline_data_path: Optional[Path] = None
+    baseline_data_path: Path | None = None
 ) -> PerformanceValidator:
     """Create performance validator for ML platform validation.
     
@@ -845,7 +851,7 @@ async def create_performance_validator(
 
 async def run_performance_validation(
     storage_path: Path = Path("./validation_results"),
-    baseline_data_path: Optional[Path] = None
+    baseline_data_path: Path | None = None
 ) -> ValidationReport:
     """Run complete performance validation suite.
     

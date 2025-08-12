@@ -21,7 +21,7 @@ class ModelManagerConnector(ComponentConnector):
         self.logger.info('ModelManager connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute ModelManager capability."""
         if capability_name == 'manage_transformer_models':
             return await self._manage_transformer_models(parameters)
@@ -32,17 +32,17 @@ class ModelManagerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _manage_transformer_models(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _manage_transformer_models(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Manage transformer models."""
         await asyncio.sleep(0.3)
         return {'models_managed': 8, 'active_models': 3, 'model_types': ['bert', 'gpt', 't5'], 'total_model_size': '2.5GB', 'load_balancing': 'enabled'}
 
-    async def _model_versioning(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _model_versioning(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Model versioning."""
         await asyncio.sleep(0.2)
         return {'current_version': 'v2.1.0', 'previous_versions': ['v2.0.0', 'v1.9.5', 'v1.9.0'], 'version_metadata': {'accuracy': 0.89, 'size': '500MB'}, 'rollback_available': True}
 
-    async def _model_deployment(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _model_deployment(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Model deployment."""
         await asyncio.sleep(0.4)
         return {'deployment_id': 'deploy_001', 'deployment_status': 'success', 'endpoint_url': 'https://api.example.com/v1/model', 'health_check': 'passing'}
@@ -59,7 +59,7 @@ class RedisCacheConnector(ComponentConnector):
         self.logger.info('RedisCache connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute RedisCache capability."""
         if capability_name == 'multi_level_caching':
             return await self._multi_level_caching(parameters)
@@ -70,17 +70,17 @@ class RedisCacheConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _multi_level_caching(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _multi_level_caching(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Multi-level caching."""
         await asyncio.sleep(0.2)
         return {'cache_levels': 3, 'hit_rate_l1': 0.85, 'hit_rate_l2': 0.7, 'hit_rate_l3': 0.45, 'overall_hit_rate': 0.78, 'cache_size': '1.2GB'}
 
-    async def _cache_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cache_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Cache optimization."""
         await asyncio.sleep(0.2)
         return {'optimization_applied': True, 'performance_improvement': 0.25, 'memory_reduction': 0.15, 'eviction_policy': 'lru_optimized', 'compression_enabled': True}
 
-    async def _cache_invalidation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _cache_invalidation(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Cache invalidation."""
         await asyncio.sleep(0.1)
         return {'keys_invalidated': 150, 'invalidation_strategy': 'pattern_based', 'cache_consistency': 'maintained', 'invalidation_time': '50ms'}
@@ -97,7 +97,7 @@ class PerformanceOptimizerConnector(ComponentConnector):
         self.logger.info('PerformanceOptimizer connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute PerformanceOptimizer capability."""
         if capability_name == 'system_optimization':
             return await self._system_optimization(parameters)
@@ -106,12 +106,12 @@ class PerformanceOptimizerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _system_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _system_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """System optimization."""
         await asyncio.sleep(0.3)
         return {'optimization_score': 0.88, 'performance_improvement': 0.22, 'bottlenecks_resolved': 5, 'optimization_techniques': ['caching', 'batching', 'parallelization'], 'throughput_increase': 0.3}
 
-    async def _resource_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _resource_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Resource optimization."""
         await asyncio.sleep(0.2)
         return {'cpu_optimization': 0.18, 'memory_optimization': 0.25, 'storage_optimization': 0.12, 'network_optimization': 0.15, 'cost_reduction': 0.2}
@@ -128,6 +128,6 @@ class Tier5ConnectorFactory:
         return connectors[component_name](event_bus)
 
     @staticmethod
-    def list_available_components() -> List[str]:
+    def list_available_components() -> list[str]:
         """List all available Tier 5 components."""
         return ['model_manager', 'enhanced_scorer', 'prompt_enhancement', 'redis_cache', 'performance_validation', 'performance_optimizer']

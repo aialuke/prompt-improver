@@ -199,7 +199,8 @@ class TestEventSubscription:
     def test_subscription_serialization(self):
         """Test subscription to/from dict conversion."""
         subscription = EventSubscription(subscription_id='sub-456', event_type=EventType.EVALUATION_COMPLETED, handler=lambda x: None, subscriber_info='test_subscriber')
-        subscription_dict = subscription.to_dict()
+        from dataclasses import asdict
+        subscription_dict = asdict(subscription)
         assert subscription_dict['subscription_id'] == 'sub-456'
         assert subscription_dict['event_type'] == EventType.EVALUATION_COMPLETED.value
         assert subscription_dict['subscriber_info'] == 'test_subscriber'
@@ -230,7 +231,7 @@ class TestMLEvent:
         """Test event creation with tags."""
         event = MLEvent(event_type=EventType.TRAINING_FAILED, source='training_coordinator', data={'error': 'Out of memory'}, tags=['error', 'memory', 'training'])
         assert event.tags == ['error', 'memory', 'training']
-        event_dict = event.to_dict()
+        event_dict = event.model_dump()
         assert event_dict['tags'] == ['error', 'memory', 'training']
 if __name__ == '__main__':
 

@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List, Optional
 import warnings
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from scipy import stats
 try:
@@ -28,7 +29,7 @@ except ImportError:
     warnings.warn('Gaussian process libraries not available. Install with: pip install scikit-learn pandas')
 logger = logging.getLogger(__name__)
 
-class OptimizationConfig(SQLModel):
+class OptimizationConfig(BaseModel):
     """Configuration for rule optimization"""
     min_sample_size: int = Field(default=20, ge=1, description='Minimum sample size for optimization')
     improvement_threshold: float = Field(default=0.1, ge=0.0, le=1.0, description='Minimum improvement threshold')
@@ -45,31 +46,31 @@ class OptimizationConfig(SQLModel):
     gp_kernel_length_scale: float = Field(default=1.0, gt=0.0, description='GP kernel length scale')
     gp_noise_level: float = Field(default=1e-05, gt=0.0, description='GP noise level')
 
-class ParetoSolution(SQLModel):
+class ParetoSolution(BaseModel):
     """A solution on the Pareto frontier"""
-    rule_parameters: Dict[str, float] = Field(description='Rule parameter values')
-    objectives: Dict[str, float] = Field(description='Objective function values')
+    rule_parameters: dict[str, float] = Field(description='Rule parameter values')
+    objectives: dict[str, float] = Field(description='Objective function values')
     dominance_rank: int = Field(ge=0, description='Pareto dominance rank')
     crowding_distance: float = Field(ge=0.0, description='Crowding distance for diversity')
     feasible: bool = Field(default=True, description='Whether solution is feasible')
 
-class MultiObjectiveResult(SQLModel):
+class MultiObjectiveResult(BaseModel):
     """Results from multi-objective optimization"""
     rule_id: str = Field(description='Rule identifier')
-    pareto_frontier: List[ParetoSolution] = Field(description='Pareto frontier solutions')
+    pareto_frontier: list[ParetoSolution] = Field(description='Pareto frontier solutions')
     hypervolume: float = Field(ge=0.0, description='Hypervolume indicator')
     convergence_metric: float = Field(ge=0.0, le=1.0, description='Convergence quality metric')
     total_evaluations: int = Field(ge=0, description='Total function evaluations')
-    best_compromise_solution: Optional[ParetoSolution] = Field(default=None, description='Best compromise solution')
-    trade_off_analysis: Dict[str, Any] = Field(default_factory=dict, description='Trade-off analysis results')
+    best_compromise_solution: ParetoSolution | None = Field(default=None, description='Best compromise solution')
+    trade_off_analysis: dict[str, Any] = Field(default_factory=dict, description='Trade-off analysis results')
 
-class GaussianProcessResult(SQLModel):
+class GaussianProcessResult(BaseModel):
     """Results from Gaussian process optimization"""
     rule_id: str = Field(description='Rule identifier')
-    optimal_parameters: Dict[str, float] = Field(description='Optimal parameter values')
+    optimal_parameters: dict[str, float] = Field(description='Optimal parameter values')
     predicted_performance: float = Field(description='Predicted performance at optimum')
     uncertainty_estimate: float = Field(ge=0.0, description='Uncertainty in prediction')
-    acquisition_history: List[Dict[str, Any]] = Field(default_factory=list, description='Acquisition function history')
+    acquisition_history: list[dict[str, Any]] = Field(default_factory=list, description='Acquisition function history')
     model_confidence: float = Field(ge=0.0, le=1.0, description='Model confidence score')
     expected_improvement: float = Field(ge=0.0, description='Expected improvement value')
 
@@ -134,7 +135,7 @@ class RuleOptimizer:
         """Prepare historical data for optimization"""
         optimization_data = []
         for data_point in historical_data:
-            if all((key in data_point for key in ['score', 'context', 'timestamp'])):
+            if all(key in data_point for key in ['score', 'context', 'timestamp']):
                 parameters = {'threshold': np.random.uniform(0.1, 0.9), 'weight': np.random.uniform(0.5, 1.0), 'complexity_factor': np.random.uniform(0.1, 1.0), 'context_sensitivity': np.random.uniform(0.0, 1.0)}
                 objectives = {'performance': data_point['score'], 'consistency': 1.0 - abs(data_point['score'] - 0.7), 'efficiency': 1.0 / (data_point.get('execution_time_ms', 100) / 100.0), 'robustness': np.random.uniform(0.5, 1.0)}
                 optimization_data.append({'parameters': parameters, 'objectives': objectives, 'feasible': objectives['performance'] > 0.3})
@@ -214,7 +215,7 @@ class RuleOptimizer:
         for i, individual in enumerate(pareto_frontier):
             params = {'threshold': individual[0], 'weight': individual[1], 'complexity_factor': individual[2], 'context_sensitivity': individual[3]}
             objectives = {'performance': individual.fitness.values[0], 'consistency': individual.fitness.values[1], 'efficiency': individual.fitness.values[2], 'robustness': individual.fitness.values[3]}
-            solution = ParetoSolution(rule_parameters=params, objectives=objectives, dominance_rank=0, crowding_distance=self._calculate_crowding_distance(individual, pareto_frontier), feasible=all((obj > 0.3 for obj in objectives.values())))
+            solution = ParetoSolution(rule_parameters=params, objectives=objectives, dominance_rank=0, crowding_distance=self._calculate_crowding_distance(individual, pareto_frontier), feasible=all(obj > 0.3 for obj in objectives.values()))
             pareto_solutions.append(solution)
         return (pareto_solutions, logbook)
 

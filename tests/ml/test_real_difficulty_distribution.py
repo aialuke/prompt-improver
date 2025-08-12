@@ -36,7 +36,7 @@ def real_hardness_analysis():
 class TestRealDifficultyDistributionAnalysis:
     """Test real behavior of difficulty distribution analysis."""
 
-    async def test_real_difficulty_distribution_analysis(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: List[PerformanceGap], real_hardness_analysis: Dict[str, Any]):
+    async def test_real_difficulty_distribution_analysis(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: list[PerformanceGap], real_hardness_analysis: dict[str, Any]):
         """Test difficulty distribution analysis with real performance gaps."""
         difficulty_profile = await real_difficulty_analyzer.analyze_optimal_difficulty_distribution(performance_gaps=real_performance_gaps, hardness_analysis=real_hardness_analysis, focus_areas=['clarity', 'specificity', 'effectiveness'])
         assert isinstance(difficulty_profile, DifficultyProfile)
@@ -51,7 +51,7 @@ class TestRealDifficultyDistributionAnalysis:
         assert 'hard' in weights
         total_weight = sum(weights.values())
         assert abs(total_weight - 1.0) < 0.01
-        assert all((w >= 0.0 for w in weights.values()))
+        assert all(w >= 0.0 for w in weights.values())
         assert 0.0 <= difficulty_profile.hardness_threshold <= 1.0
         assert set(difficulty_profile.focus_areas) == {'clarity', 'specificity', 'effectiveness'}
         adaptive_params = difficulty_profile.adaptive_parameters
@@ -63,19 +63,19 @@ class TestRealDifficultyDistributionAnalysis:
         critical_ratio = 3 / 9
         assert weights['hard'] > 0.3
 
-    async def test_real_focus_area_targeting(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: List[PerformanceGap]):
+    async def test_real_focus_area_targeting(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: list[PerformanceGap]):
         """Test focus area targeting with real performance data."""
         focus_areas = ['clarity', 'specificity', 'effectiveness', 'consistency']
         current_performance = {'clarity_effectiveness': 0.6, 'specificity_effectiveness': 0.5, 'effectiveness_effectiveness': 0.4, 'consistency_effectiveness': 0.7}
         focus_targets = await real_difficulty_analyzer.generate_focus_area_targets(performance_gaps=real_performance_gaps, focus_areas=focus_areas, current_performance=current_performance, target_samples=1000)
         assert len(focus_targets) == len(focus_areas)
-        assert all((isinstance(target, FocusAreaTarget) for target in focus_targets))
+        assert all(isinstance(target, FocusAreaTarget) for target in focus_targets)
         priorities = [target.priority for target in focus_targets]
         assert priorities == sorted(priorities, reverse=True)
-        total_allocation = sum((target.sample_allocation for target in focus_targets))
+        total_allocation = sum(target.sample_allocation for target in focus_targets)
         assert abs(total_allocation - 1.0) < 0.01
-        effectiveness_target = next((target for target in focus_targets if target.area_name == 'effectiveness'))
-        assert effectiveness_target.priority == max((target.priority for target in focus_targets))
+        effectiveness_target = next(target for target in focus_targets if target.area_name == 'effectiveness')
+        assert effectiveness_target.priority == max(target.priority for target in focus_targets)
         for target in focus_targets:
             assert 0.0 <= target.target_improvement <= 0.5
             assert 0.0 <= target.current_performance <= 1.0
@@ -84,7 +84,7 @@ class TestRealDifficultyDistributionAnalysis:
         for target in focus_targets:
             print(f"  {target.area_name}: priority={target.priority:.3f}, allocation={target.sample_allocation:.3f}, samples={target.metadata['estimated_samples']}")
 
-    async def test_real_adaptive_distribution_calculation(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: List[PerformanceGap], real_hardness_analysis: Dict[str, Any]):
+    async def test_real_adaptive_distribution_calculation(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: list[PerformanceGap], real_hardness_analysis: dict[str, Any]):
         """Test adaptive distribution calculation with varying gap profiles."""
         high_severity_gaps = [gap for gap in real_performance_gaps if gap.severity >= 0.7]
         high_severity_profile = await real_difficulty_analyzer.analyze_optimal_difficulty_distribution(performance_gaps=high_severity_gaps, hardness_analysis=real_hardness_analysis, focus_areas=['effectiveness'])
@@ -98,7 +98,7 @@ class TestRealDifficultyDistributionAnalysis:
         print(f'High severity distribution: {high_severity_profile.distribution_weights}')
         print(f'Low severity distribution: {low_severity_profile.distribution_weights}')
 
-    async def test_real_complexity_factor_application(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: List[PerformanceGap], real_hardness_analysis: Dict[str, Any]):
+    async def test_real_complexity_factor_application(self, real_difficulty_analyzer: DifficultyDistributionAnalyzer, real_performance_gaps: list[PerformanceGap], real_hardness_analysis: dict[str, Any]):
         """Test complexity factor application in difficulty distribution."""
         complex_gaps = []
         for i, gap in enumerate(real_performance_gaps[:3]):
@@ -119,7 +119,7 @@ class TestRealDifficultyDistributionAnalysis:
         minimal_profile = await real_difficulty_analyzer.analyze_optimal_difficulty_distribution(performance_gaps=minimal_gaps, hardness_analysis={'optimal_threshold': 0.7, 'distribution': {'hard_examples_ratio': 0.1, 'std': 0.1, 'median': 0.6}}, focus_areas=['effectiveness'])
         weights = minimal_profile.distribution_weights
         assert abs(sum(weights.values()) - 1.0) < 0.01
-        assert all((w >= 0.0 for w in weights.values()))
+        assert all(w >= 0.0 for w in weights.values())
         empty_profile = await real_difficulty_analyzer.analyze_optimal_difficulty_distribution(performance_gaps=[], hardness_analysis={'optimal_threshold': 0.7, 'distribution': {'hard_examples_ratio': 0.3}}, focus_areas=[])
         empty_weights = empty_profile.distribution_weights
         assert abs(sum(empty_weights.values()) - 1.0) < 0.01

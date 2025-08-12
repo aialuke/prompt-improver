@@ -86,7 +86,7 @@ class CausalInferenceAnalyzer:
     analysis of rule effectiveness and optimization insights.
     """
 
-    def __init__(self, significance_level: float=0.05, minimum_effect_size: float=0.1, bootstrap_samples: int=1000, enable_sensitivity_analysis: bool=True, training_loader: Optional[TrainingDataLoader]=None):
+    def __init__(self, significance_level: float=0.05, minimum_effect_size: float=0.1, bootstrap_samples: int=1000, enable_sensitivity_analysis: bool=True, training_loader: TrainingDataLoader | None=None):
         """Initialize causal inference analyzer
 
         Args:
@@ -102,7 +102,7 @@ class CausalInferenceAnalyzer:
         self.training_loader = training_loader or TrainingDataLoader(real_data_priority=True, min_samples=10, lookback_days=30, synthetic_ratio=0.2)
         logger.info('CausalInferenceAnalyzer initialized with training data integration')
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for causal inference analysis (2025 pattern)
 
         Args:
@@ -133,12 +133,12 @@ class CausalInferenceAnalyzer:
                 method = CausalMethod(method_str)
             except ValueError:
                 method = CausalMethod.DIFFERENCE_IN_DIFFERENCES
-                logger.warning("Unknown method '%s', using difference_in_differences", method_str)
+                logger.warning(f"Unknown method '{method_str}', using difference_in_differences")
             try:
                 assignment = TreatmentAssignment(assignment_str)
             except ValueError:
                 assignment = TreatmentAssignment.randomized
-                logger.warning("Unknown assignment '%s', using randomized", assignment_str)
+                logger.warning(f"Unknown assignment '{assignment_str}', using randomized")
             outcome_array = np.array(outcome_data, dtype=float)
             treatment_array = np.array(treatment_data, dtype=int)
             covariates_array = np.array(covariates, dtype=float) if covariates else None
@@ -168,7 +168,8 @@ class CausalInferenceAnalyzer:
         Returns:
             Comprehensive causal inference result
         """
-        analysis_id = f"causal_analysis_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        from prompt_improver.common.datetime_utils import format_compact_timestamp
+        analysis_id = f"causal_analysis_{format_compact_timestamp(datetime.utcnow())}"
         try:
             logger.info('Starting causal inference analysis: %s', analysis_id)
             validated_data = self._validate_causal_data(outcome_data, treatment_data, covariates, time_periods, instruments)
@@ -189,7 +190,7 @@ class CausalInferenceAnalyzer:
             interpretation = self._generate_causal_interpretation(primary_effect, assumptions)
             business_recs = self._generate_business_recommendations(primary_effect, assumptions, robustness_score)
             warnings = self._generate_statistical_warnings(assumptions, confounding_assessment)
-            result = CausalInferenceResult(analysis_id=analysis_id, timestamp=datetime.utcnow(), treatment_assignment=assignment_mechanism, average_treatment_effect=primary_effect, conditional_average_treatment_effect=conditional_effect, assumptions_tested=assumptions, overall_assumptions_satisfied=all((not a.violated for a in assumptions)), sensitivity_analysis=sensitivity_results, placebo_tests=placebo_results, robustness_score=robustness_score, confounding_assessment=confounding_assessment, covariate_balance=covariate_balance, causal_interpretation=interpretation, business_recommendations=business_recs, statistical_warnings=warnings, internal_validity_score=internal_validity, external_validity_score=external_validity, overall_quality_score=overall_quality)
+            result = CausalInferenceResult(analysis_id=analysis_id, timestamp=datetime.utcnow(), treatment_assignment=assignment_mechanism, average_treatment_effect=primary_effect, conditional_average_treatment_effect=conditional_effect, assumptions_tested=assumptions, overall_assumptions_satisfied=all(not a.violated for a in assumptions), sensitivity_analysis=sensitivity_results, placebo_tests=placebo_results, robustness_score=robustness_score, confounding_assessment=confounding_assessment, covariate_balance=covariate_balance, causal_interpretation=interpretation, business_recommendations=business_recs, statistical_warnings=warnings, internal_validity_score=internal_validity, external_validity_score=external_validity, overall_quality_score=overall_quality)
             logger.info('Causal inference analysis completed: %s', analysis_id)
             logger.info('ATE: %s ± %s', format(primary_effect.point_estimate, '.4f'), format(primary_effect.standard_error, '.4f'))
             return result
@@ -709,7 +710,7 @@ class CausalInferenceAnalyzer:
             placebo_tests.append({'test_name': 'random_permutation', 'p_value': float(p_value_permutation), 'passes': p_value_permutation < 0.05, 'description': 'Treatment permutation test'})
             if 'time_periods' in data:
                 placebo_tests.append({'test_name': 'pre_treatment_placebo', 'p_value': 0.5, 'passes': True, 'description': 'Pre-treatment placebo test'})
-            return {'placebo_tests': placebo_tests, 'overall_passes': all((test['passes'] for test in placebo_tests)), 'permutation_distribution': permutation_effects[:20], 'original_effect': float(original_effect)}
+            return {'placebo_tests': placebo_tests, 'overall_passes': all(test['passes'] for test in placebo_tests), 'permutation_distribution': permutation_effects[:20], 'original_effect': float(original_effect)}
         except Exception as e:
             logger.warning('Error in placebo tests: %s', e)
             return {'error': str(e)}
@@ -752,7 +753,7 @@ class CausalInferenceAnalyzer:
                 smd = (np.mean(treated_cov) - np.mean(control_cov)) / pooled_std if pooled_std > 0 else 0
                 statistic, p_value = stats.ttest_ind(treated_cov, control_cov)
                 balance_results.append({'covariate_index': i, 'standardized_mean_difference': float(smd), 'p_value': float(p_value), 'balanced': abs(smd) < 0.1})
-            n_imbalanced = sum((1 for r in balance_results if not r['balanced']))
+            n_imbalanced = sum(1 for r in balance_results if not r['balanced'])
             overall_balanced = n_imbalanced / len(balance_results) <= 0.05
             return {'balance_results': balance_results, 'n_covariates': len(balance_results), 'n_imbalanced': n_imbalanced, 'proportion_imbalanced': n_imbalanced / len(balance_results), 'overall_balanced': overall_balanced}
         except Exception as e:
@@ -784,8 +785,8 @@ class CausalInferenceAnalyzer:
         """Calculate internal validity score"""
         if not assumptions:
             return 0.5
-        critical_violations = sum((1 for a in assumptions if a.violated and a.severity == 'high'))
-        moderate_violations = sum((1 for a in assumptions if a.violated and a.severity == 'medium'))
+        critical_violations = sum(1 for a in assumptions if a.violated and a.severity == 'high')
+        moderate_violations = sum(1 for a in assumptions if a.violated and a.severity == 'medium')
         assumption_score = max(0, 1.0 - 0.4 * critical_violations - 0.2 * moderate_violations)
         confounding_risk = confounding_assessment.get('confounding_risk', 'medium')
         if confounding_risk == 'low':
@@ -866,7 +867,7 @@ class CausalInferenceAnalyzer:
             warnings.append('⚠️ SMALL TREATMENT GROUP: Limited power for detecting effects')
         return warnings
 
-    async def analyze_training_data_causality(self, db_session: AsyncSession, rule_id: Optional[str]=None, outcome_metric: str='improvement_score', treatment_variable: str='rule_application') -> CausalInferenceResult:
+    async def analyze_training_data_causality(self, db_session: AsyncSession, rule_id: str | None=None, outcome_metric: str='improvement_score', treatment_variable: str='rule_application') -> CausalInferenceResult:
         """Analyze causal relationships in training data
         
         Phase 2 Integration: Analyzes causal effects of rule applications
@@ -892,7 +893,7 @@ class CausalInferenceAnalyzer:
                 logger.warning('No causal data found in training set')
                 return self._create_no_data_result('training_data_causality')
             result = self.analyze_causal_effect(outcome_data=causal_data['outcomes'], treatment_data=causal_data['treatments'], covariates=causal_data.get('covariates'), assignment_mechanism=TreatmentAssignment.QUASI_EXPERIMENTAL, method=CausalMethod.DOUBLY_ROBUST)
-            result.analysis_id = f"training_data_causality_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            result.analysis_id = f"training_data_causality_{format_compact_timestamp(datetime.utcnow())}"
             result = self._enhance_result_with_training_insights(result, training_data, causal_data)
             logger.info('Training data causal analysis completed: %s', result.analysis_id)
             return result
@@ -926,7 +927,7 @@ class CausalInferenceAnalyzer:
                 return self._create_no_data_result('rule_effectiveness_causality')
             method = CausalMethod.DIFFERENCE_IN_DIFFERENCES if 'time_periods' in effectiveness_data else CausalMethod.PROPENSITY_SCORE_MATCHING
             result = self.analyze_causal_effect(outcome_data=effectiveness_data['outcomes'], treatment_data=effectiveness_data['treatments'], covariates=effectiveness_data.get('covariates'), time_periods=effectiveness_data.get('time_periods'), assignment_mechanism=TreatmentAssignment.QUASI_EXPERIMENTAL, method=method)
-            result.analysis_id = f"rule_effectiveness_causality_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            result.analysis_id = f"rule_effectiveness_causality_{format_compact_timestamp(datetime.utcnow())}"
             result = self._enhance_result_with_rule_insights(result, intervention_rules, control_rules, effectiveness_data)
             logger.info('Rule effectiveness causal analysis completed: %s', result.analysis_id)
             return result
@@ -958,7 +959,7 @@ class CausalInferenceAnalyzer:
                 return self._create_no_data_result('parameter_optimization_causality')
             method = CausalMethod.REGRESSION_DISCONTINUITY if param_data.get('discontinuity_detected', False) else CausalMethod.PROPENSITY_SCORE_MATCHING
             result = self.analyze_causal_effect(outcome_data=param_data['outcomes'], treatment_data=param_data['treatments'], covariates=param_data.get('covariates'), assignment_mechanism=TreatmentAssignment.QUASI_EXPERIMENTAL, method=method)
-            result.analysis_id = f"parameter_optimization_causality_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            result.analysis_id = f"parameter_optimization_causality_{format_compact_timestamp(datetime.utcnow())}"
             result = self._enhance_result_with_parameter_insights(result, parameter_name, threshold_value, param_data)
             logger.info('Parameter optimization causal analysis completed: %s', result.analysis_id)
             return result
@@ -966,7 +967,7 @@ class CausalInferenceAnalyzer:
             logger.error('Error in parameter optimization causal analysis: %s', e)
             return self._create_error_result('parameter_optimization_causality', str(e))
 
-    async def _extract_causal_data_from_training(self, training_data: dict[str, Any], rule_id: Optional[str], outcome_metric: str, treatment_variable: str) -> Optional[dict[str, np.ndarray]]:
+    async def _extract_causal_data_from_training(self, training_data: dict[str, Any], rule_id: str | None, outcome_metric: str, treatment_variable: str) -> dict[str, np.ndarray] | None:
         """Extract causal analysis data from training features"""
         try:
             features = np.array(training_data['features'])
@@ -983,7 +984,7 @@ class CausalInferenceAnalyzer:
             logger.error('Error extracting causal data from training: %s', e)
             return None
 
-    async def _extract_rule_effectiveness_data(self, training_data: dict[str, Any], intervention_rules: list[str], control_rules: list[str]) -> Optional[dict[str, np.ndarray]]:
+    async def _extract_rule_effectiveness_data(self, training_data: dict[str, Any], intervention_rules: list[str], control_rules: list[str]) -> dict[str, np.ndarray] | None:
         """Extract rule effectiveness comparison data"""
         try:
             features = np.array(training_data['features'])
@@ -997,7 +998,7 @@ class CausalInferenceAnalyzer:
             logger.error('Error extracting rule effectiveness data: %s', e)
             return None
 
-    async def _extract_parameter_optimization_data(self, training_data: dict[str, Any], parameter_name: str, threshold_value: float) -> Optional[dict[str, np.ndarray]]:
+    async def _extract_parameter_optimization_data(self, training_data: dict[str, Any], parameter_name: str, threshold_value: float) -> dict[str, np.ndarray] | None:
         """Extract parameter optimization data"""
         try:
             features = np.array(training_data['features'])
@@ -1065,15 +1066,15 @@ class CausalInferenceAnalyzer:
 
     def _create_insufficient_data_result(self, analysis_type: str, sample_count: int) -> CausalInferenceResult:
         """Create result for insufficient data cases"""
-        return CausalInferenceResult(analysis_id=f"{analysis_type}_insufficient_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='Insufficient Data', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=sample_count, effect_size_interpretation='insufficient data', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': 'insufficient_training_data', 'samples': sample_count}), causal_interpretation='Insufficient training data for reliable causal inference', business_recommendations=['Collect more training data before conducting causal analysis'], statistical_warnings=['Sample size too small for causal inference'], overall_assumptions_satisfied=False, robustness_score=0.0)
+        return CausalInferenceResult(analysis_id=f"{analysis_type}_insufficient_data_{format_compact_timestamp(datetime.utcnow())}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='Insufficient Data', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=sample_count, effect_size_interpretation='insufficient data', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': 'insufficient_training_data', 'samples': sample_count}), causal_interpretation='Insufficient training data for reliable causal inference', business_recommendations=['Collect more training data before conducting causal analysis'], statistical_warnings=['Sample size too small for causal inference'], overall_assumptions_satisfied=False, robustness_score=0.0)
 
     def _create_no_data_result(self, analysis_type: str) -> CausalInferenceResult:
         """Create result for no data cases"""
-        return CausalInferenceResult(analysis_id=f"{analysis_type}_no_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='No Data Available', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=0, effect_size_interpretation='no data', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': 'no_training_data_available'}), causal_interpretation='No training data available for causal analysis', business_recommendations=['Ensure training data collection is working properly'], statistical_warnings=['No data available for analysis'])
+        return CausalInferenceResult(analysis_id=f"{analysis_type}_no_data_{format_compact_timestamp(datetime.utcnow())}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='No Data Available', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=0, effect_size_interpretation='no data', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': 'no_training_data_available'}), causal_interpretation='No training data available for causal analysis', business_recommendations=['Ensure training data collection is working properly'], statistical_warnings=['No data available for analysis'])
 
     def _create_error_result(self, analysis_type: str, error_message: str) -> CausalInferenceResult:
         """Create result for error cases"""
-        return CausalInferenceResult(analysis_id=f"{analysis_type}_error_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='Analysis Error', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=0, effect_size_interpretation='error', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': error_message}), causal_interpretation=f'Error in causal analysis: {error_message}', business_recommendations=['Review error logs and retry analysis'], statistical_warnings=[f'Analysis failed: {error_message}'], overall_assumptions_satisfied=False, robustness_score=0.0)
+        return CausalInferenceResult(analysis_id=f"{analysis_type}_error_{format_compact_timestamp(datetime.utcnow())}", timestamp=datetime.utcnow(), treatment_assignment=TreatmentAssignment.observational, average_treatment_effect=CausalEffect(effect_name='Analysis Error', point_estimate=0.0, confidence_interval=(0.0, 0.0), standard_error=0.0, p_value=1.0, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=0, effect_size_interpretation='error', statistical_significance=False, practical_significance=False, robustness_score=0.0, assumptions_satisfied=False, metadata={'error': error_message}), causal_interpretation=f'Error in causal analysis: {error_message}', business_recommendations=['Review error logs and retry analysis'], statistical_warnings=[f'Analysis failed: {error_message}'], overall_assumptions_satisfied=False, robustness_score=0.0)
 
 def quick_causal_analysis(outcome_data: list[float], treatment_data: list[int], covariates: list[list[float]] | None=None, method: str='simple_difference') -> dict[str, Any]:
     """Quick causal analysis for immediate use"""

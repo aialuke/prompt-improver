@@ -26,7 +26,7 @@ class OptimizationConfig:
     max_iterations: int = 100
     convergence_threshold: float = 0.001
     parallel_evaluations: int = 4
-    optimization_metrics: List[str] = None
+    optimization_metrics: list[str] = None
 
     def __post_init__(self):
         if self.optimization_metrics is None:
@@ -49,7 +49,7 @@ class OptimizationController:
         self.event_bus = event_bus
         self.component_registry = component_registry
         self.logger = logging.getLogger(__name__)
-        self.active_optimizations: Dict[str, Dict[str, Any]] = {}
+        self.active_optimizations: dict[str, dict[str, Any]] = {}
         self.automl_orchestrator = None
         self.rule_optimizer = None
         self.multi_armed_bandit = None
@@ -65,7 +65,7 @@ class OptimizationController:
                 self.logger.info('Found registered RuleOptimizer component')
         self.logger.info('Optimization controller initialized')
 
-    async def start_optimization_workflow(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def start_optimization_workflow(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Start a new optimization workflow."""
         self.logger.info('Starting optimization workflow %s', workflow_id)
         optimization_type = OptimizationType(parameters.get('type', OptimizationType.hyperparameter.value))
@@ -83,7 +83,7 @@ class OptimizationController:
             await self._handle_optimization_failure(workflow_id, e)
             raise
 
-    async def _initialize_optimization(self, workflow_id: str, optimization_type: OptimizationType, parameters: Dict[str, Any]) -> None:
+    async def _initialize_optimization(self, workflow_id: str, optimization_type: OptimizationType, parameters: dict[str, Any]) -> None:
         """Initialize the optimization workflow."""
         self.logger.info('Initializing {optimization_type.value} optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'initialization'
@@ -93,7 +93,7 @@ class OptimizationController:
         self.active_optimizations[workflow_id]['optimization_space'] = {'parameter_bounds': parameters.get('parameter_bounds', {}), 'constraints': parameters.get('constraints', []), 'objectives': parameters.get('objectives', ['maximize_accuracy'])}
         self.logger.info('Optimization initialization completed for %s', workflow_id)
 
-    async def _execute_optimization_strategy(self, workflow_id: str, optimization_type: OptimizationType, parameters: Dict[str, Any]) -> None:
+    async def _execute_optimization_strategy(self, workflow_id: str, optimization_type: OptimizationType, parameters: dict[str, Any]) -> None:
         """Execute the specific optimization strategy."""
         self.logger.info('Executing {optimization_type.value} optimization strategy for %s', workflow_id)
         if optimization_type == OptimizationType.automl:
@@ -107,7 +107,7 @@ class OptimizationController:
         elif optimization_type == OptimizationType.EVOLUTIONARY:
             await self._execute_evolutionary_optimization(workflow_id, parameters)
 
-    async def _coordinate_automl_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _coordinate_automl_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Coordinate optimization through registered AutoMLOrchestrator."""
         self.logger.info('Coordinating AutoML optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'automl_coordination'
@@ -122,7 +122,7 @@ class OptimizationController:
                 self.active_optimizations[workflow_id]['best_result'] = result.copy()
         self.logger.info('AutoML optimization coordination completed for %s', workflow_id)
 
-    async def _execute_hyperparameter_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_hyperparameter_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute hyperparameter optimization."""
         self.logger.info('Executing hyperparameter optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'hyperparameter_optimization'
@@ -134,7 +134,7 @@ class OptimizationController:
             if self.active_optimizations[workflow_id]['best_result'] is None or result['score'] > self.active_optimizations[workflow_id]['best_result']['score']:
                 self.active_optimizations[workflow_id]['best_result'] = result.copy()
 
-    async def _execute_multi_objective_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_multi_objective_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute multi-objective optimization."""
         self.logger.info('Executing multi-objective optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'multi_objective_optimization'
@@ -144,7 +144,7 @@ class OptimizationController:
         self.active_optimizations[workflow_id]['best_result'] = result
         self.active_optimizations[workflow_id]['iterations'] = 1
 
-    async def _execute_bayesian_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_bayesian_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute real Bayesian optimization using integrated RuleOptimizer."""
         self.logger.info('Executing Bayesian optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'bayesian_optimization'
@@ -181,7 +181,7 @@ class OptimizationController:
             self.logger.error('Failed to import RuleOptimizer: %s', e)
             return None
 
-    async def _enhanced_simulation_fallback(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enhanced_simulation_fallback(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Enhanced simulation fallback with realistic Bayesian characteristics."""
         import random
         import numpy as np
@@ -202,7 +202,7 @@ class OptimizationController:
                 suggested_params[param] = np.random.uniform(0.0, 1.0)
         return {'iteration': 1, 'score': float(score), 'acquisition_value': float(acquisition_value), 'parameters': suggested_params, 'uncertainty': float(np.random.uniform(0.02, 0.1)), 'method': 'enhanced_simulation', 'timestamp': datetime.now(timezone.utc)}
 
-    async def _execute_evolutionary_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_evolutionary_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute evolutionary optimization."""
         self.logger.info('Executing evolutionary optimization for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'evolutionary_optimization'
@@ -212,7 +212,7 @@ class OptimizationController:
         self.active_optimizations[workflow_id]['best_result'] = result
         self.active_optimizations[workflow_id]['iterations'] = 1
 
-    async def _validate_optimization_results(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _validate_optimization_results(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Validate optimization results."""
         self.logger.info('Validating optimization results for %s', workflow_id)
         self.active_optimizations[workflow_id]['current_step'] = 'result_validation'
@@ -242,17 +242,17 @@ class OptimizationController:
         self.active_optimizations[workflow_id]['completed_at'] = datetime.now(timezone.utc)
         self.logger.info('Optimization workflow %s stopped', workflow_id)
 
-    async def get_optimization_status(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_optimization_status(self, workflow_id: str) -> dict[str, Any]:
         """Get the status of an optimization workflow."""
         if workflow_id not in self.active_optimizations:
             raise ValueError(f'Optimization workflow {workflow_id} not found')
         return self.active_optimizations[workflow_id].copy()
 
-    async def list_active_optimizations(self) -> List[str]:
+    async def list_active_optimizations(self) -> list[str]:
         """List all active optimization workflows."""
         return [opt_id for opt_id, opt_data in self.active_optimizations.items() if opt_data['status'] == 'running']
 
-    async def get_best_parameters(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+    async def get_best_parameters(self, workflow_id: str) -> dict[str, Any] | None:
         """Get the best parameters found by optimization."""
         if workflow_id not in self.active_optimizations:
             raise ValueError(f'Optimization workflow {workflow_id} not found')

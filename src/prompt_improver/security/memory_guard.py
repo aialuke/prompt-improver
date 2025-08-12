@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from sqlmodel import Field, SQLModel
+from pydantic import BaseModel, Field
 
 try:
     import psutil
@@ -59,7 +59,7 @@ class MemoryThreatLevel(Enum):
         return NotImplemented
 
 
-class MemoryEvent(SQLModel):
+class MemoryEvent(BaseModel):
     """Memory event for monitoring and alerting."""
 
     event_type: str
@@ -71,7 +71,7 @@ class MemoryEvent(SQLModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class ResourceStats(SQLModel):
+class ResourceStats(BaseModel):
     """Comprehensive resource statistics."""
 
     current_memory_mb: float
@@ -163,7 +163,7 @@ class MemoryGuard:
                 )
                 await self.event_bus.emit(ml_event)
             except Exception as e:
-                logger.error("Failed to emit memory event: %s", e)
+                logger.error(f"Failed to emit memory event: {e}")
 
         # Log memory events
         if event.threat_level in [MemoryThreatLevel.HIGH, MemoryThreatLevel.CRITICAL]:
@@ -339,7 +339,7 @@ class MemoryGuard:
                 buffer[: actual_count * dtype_size], dtype=dtype, count=actual_count
             )
         except Exception as e:
-            self.logger.error("Failed to create array from buffer: %s", e)
+            self.logger.error(f"Failed to create array from buffer: {e}")
             raise
 
     def safe_tobytes(self, array: np.ndarray) -> bytes:
@@ -359,7 +359,7 @@ class MemoryGuard:
         try:
             return array.tobytes()
         except Exception as e:
-            self.logger.error("Failed to convert array to bytes: %s", e)
+            self.logger.error(f"Failed to convert array to bytes: {e}")
             raise
 
     def monitor_operation(self, operation_name: str):

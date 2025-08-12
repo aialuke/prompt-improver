@@ -136,20 +136,65 @@ async def mock_input_sanitizer():
     return sanitizer
 
 @pytest_asyncio.fixture
-async def mock_redis_cache():
-    """Mock Redis cache for testing."""
-    cache = Mock()
-    cache.get_async = AsyncMock(return_value=None)
-    cache.set_async = AsyncMock()
-    cache.clear_pattern_async = AsyncMock(return_value=5)
-    cache.close_async = AsyncMock()
-    return cache
+async def real_redis_cache(redis_client):
+    """Real Redis cache for testing ML components."""
+    # Clear Redis for test isolation
+    await redis_client.flushdb()
+    
+    from prompt_improver.utils.redis_cache import RedisCache
+    
+    # Create a real Redis cache adapter
+    class RealRedisCacheAdapter:
+        def __init__(self, redis_client):
+            self._redis_client = redis_client
+        
+        async def get_async(self, key: str):
+            """Get value from Redis."""
+            try:
+                value = await self._redis_client.get(key)
+                if value:
+                    import json
+                    return json.loads(value)
+                return None
+            except Exception:
+                return None
+        
+        async def set_async(self, key: str, value, ttl: int = None):
+            """Set value in Redis."""
+            try:
+                import json
+                serialized = json.dumps(value)
+                if ttl:
+                    await self._redis_client.set(key, serialized, ex=ttl)
+                else:
+                    await self._redis_client.set(key, serialized)
+            except Exception:
+                pass
+        
+        async def clear_pattern_async(self, pattern: str):
+            """Clear keys matching pattern."""
+            try:
+                keys = []
+                async for key in self._redis_client.scan_iter(match=pattern):
+                    keys.append(key)
+                if keys:
+                    await self._redis_client.delete(*keys)
+                return len(keys)
+            except Exception:
+                return 0
+        
+        async def close_async(self):
+            """Close Redis connection."""
+            # Connection managed by fixture
+            pass
+    
+    return RealRedisCacheAdapter(redis_client)
 
 @pytest_asyncio.fixture
-async def extractor(mock_input_sanitizer, mock_redis_cache):
-    """Create linguistic feature extractor for testing."""
+async def extractor(mock_input_sanitizer, real_redis_cache):
+    """Create linguistic feature extractor with real Redis cache."""
     config = FeatureExtractionConfig(cache_enabled=True, deterministic=True, async_batch_size=5)
-    return LinguisticFeatureExtractor(config=config, input_sanitizer=mock_input_sanitizer, redis_cache=mock_redis_cache)
+    return LinguisticFeatureExtractor(config=config, input_sanitizer=mock_input_sanitizer, redis_cache=real_redis_cache)
 
 class TestLinguisticFeatureExtractor:
     """Test modern async linguistic feature extractor."""
@@ -171,7 +216,7 @@ class TestLinguisticFeatureExtractor:
         assert isinstance(response, FeatureExtractionResponse)
         assert len(response.features) == 10
         assert len(response.feature_names) == 10
-        assert all((0.0 <= f <= 1.0 for f in response.features))
+        assert all(0.0 <= f <= 1.0 for f in response.features)
         assert response.correlation_id == request.correlation_id
         assert response.extraction_time_ms >= 0
         assert 0.0 <= response.confidence_score <= 1.0
@@ -183,7 +228,7 @@ class TestLinguisticFeatureExtractor:
         response = await extractor.extract_features(text)
         assert isinstance(response, FeatureExtractionResponse)
         assert len(response.features) == 10
-        assert all((0.0 <= f <= 1.0 for f in response.features))
+        assert all(0.0 <= f <= 1.0 for f in response.features)
         assert response.correlation_id is not None
 
     @pytest.mark.asyncio
@@ -197,18 +242,18 @@ class TestLinguisticFeatureExtractor:
         assert response.confidence_score == 0.0
 
     @pytest.mark.asyncio
-    async def test_cache_functionality(self, extractor, mock_redis_cache):
+    async def test_cache_functionality(self, extractor, real_redis_cache):
         """Test caching functionality."""
         request = FeatureExtractionRequest(text='Test caching functionality')
         response1 = await extractor.extract_features(request)
         assert not response1.cache_hit
-        mock_redis_cache.set_async.assert_called_once()
+        real_redis_cache.set_async.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_cache_hit_scenario(self, extractor, mock_redis_cache):
+    async def test_cache_hit_scenario(self, extractor, real_redis_cache):
         """Test cache hit scenario."""
         cached_data = {'features': [0.1] * 10, 'feature_names': ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10'], 'extraction_time_ms': 50.0, 'cache_hit': False, 'correlation_id': 'cached-id', 'timestamp': datetime.now(timezone.utc).isoformat(), 'confidence_score': 0.8}
-        mock_redis_cache.get_async.return_value = cached_data
+        real_redis_cache.get_async.return_value = cached_data
         request = FeatureExtractionRequest(text='Cached text')
         response = await extractor.extract_features(request)
         assert response.cache_hit is True
@@ -224,7 +269,7 @@ class TestLinguisticFeatureExtractor:
         for i, response in enumerate(responses):
             assert response.correlation_id == f'test-{i}'
             assert len(response.features) == 10
-            assert all((0.0 <= f <= 1.0 for f in response.features))
+            assert all(0.0 <= f <= 1.0 for f in response.features)
 
     @pytest.mark.asyncio
     async def test_health_check(self, extractor):
@@ -249,18 +294,18 @@ class TestLinguisticFeatureExtractor:
         assert 'configuration' in metrics
 
     @pytest.mark.asyncio
-    async def test_cache_clearing(self, extractor, mock_redis_cache):
+    async def test_cache_clearing(self, extractor, real_redis_cache):
         """Test cache clearing functionality."""
         result = await extractor.clear_cache()
         assert result['status'] == 'success'
         assert result['cleared_entries'] == 5
-        mock_redis_cache.clear_pattern_async.assert_called_once()
+        real_redis_cache.clear_pattern_async.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_graceful_shutdown(self, extractor, mock_redis_cache):
+    async def test_graceful_shutdown(self, extractor, real_redis_cache):
         """Test graceful shutdown."""
         await extractor.shutdown()
-        mock_redis_cache.close_async.assert_called_once()
+        real_redis_cache.close_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_extraction_context_manager(self, extractor):

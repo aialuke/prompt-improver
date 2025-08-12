@@ -12,14 +12,18 @@ Key consolidations:
 
 Following CLAUDE.md MINIMAL COMPLEXITY PRINCIPLE - uses existing proven patterns.
 """
+
 import asyncio
 import functools
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any, Optional, TypeVar, Union
+
 import pytest
-T = TypeVar('T')
+
+T = TypeVar("T")
+
 
 def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
     """Get existing event loop or create new one using proven pattern.
@@ -34,12 +38,13 @@ def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_closed():
-                raise RuntimeError('Event loop is closed')
+                raise RuntimeError("Event loop is closed")
             return loop
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             return loop
+
 
 def ensure_event_loop() -> asyncio.AbstractEventLoop:
     """Ensure event loop exists using standardized approach.
@@ -54,6 +59,7 @@ def ensure_event_loop() -> asyncio.AbstractEventLoop:
         asyncio.set_event_loop(loop)
     return loop
 
+
 def run_async_test(coro: Awaitable[T]) -> T:
     """Run async test with standardized event loop handling.
 
@@ -64,7 +70,8 @@ def run_async_test(coro: Awaitable[T]) -> T:
     try:
         return loop.run_until_complete(coro)
     except Exception as e:
-        raise RuntimeError(f'Async test execution failed: {e}') from e
+        raise RuntimeError(f"Async test execution failed: {e}") from e
+
 
 def async_test_wrapper(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
     """Decorator for async test functions using unified pattern.
@@ -76,10 +83,14 @@ def async_test_wrapper(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return run_async_test(func(*args, **kwargs))
+
     return wrapper
 
+
 @asynccontextmanager
-async def async_test_context(setup_func: Callable | None=None, teardown_func: Callable | None=None):
+async def async_test_context(
+    setup_func: Callable | None = None, teardown_func: Callable | None = None
+):
     """Unified async context manager for test setup/teardown.
 
     Consolidates duplicate async setup/teardown patterns from:
@@ -99,6 +110,7 @@ async def async_test_context(setup_func: Callable | None=None, teardown_func: Ca
                 await teardown_func()
             else:
                 teardown_func()
+
 
 class UnifiedPerformanceTimer:
     """Unified performance timing for async tests.
@@ -126,10 +138,13 @@ class UnifiedPerformanceTimer:
     def elapsed_ms(self) -> float:
         """Get elapsed time in milliseconds."""
         if self.start_time is None or self.end_time is None:
-            raise RuntimeError('Timer not properly started/stopped')
+            raise RuntimeError("Timer not properly started/stopped")
         return (self.end_time - self.start_time) * 1000
 
-async def measure_async_performance(func: Callable[..., Awaitable[T]], *args, **kwargs) -> tuple[T, float]:
+
+async def measure_async_performance(
+    func: Callable[..., Awaitable[T]], *args, **kwargs
+) -> tuple[T, float]:
     """Measure async function performance with unified timing.
 
     Consolidates duplicate performance measurement patterns across benchmarking frameworks.
@@ -138,6 +153,7 @@ async def measure_async_performance(func: Callable[..., Awaitable[T]], *args, **
     async with UnifiedPerformanceTimer() as timer:
         result = await func(*args, **kwargs)
     return (result, timer.elapsed_ms)
+
 
 class UnifiedValidationResult:
     """Unified validation result structure.
@@ -150,7 +166,14 @@ class UnifiedValidationResult:
     - Week8PerformanceValidator
     """
 
-    def __init__(self, test_name: str, passed: bool, message: str='', duration_ms: float=0.0, metadata: dict | None=None):
+    def __init__(
+        self,
+        test_name: str,
+        passed: bool,
+        message: str = "",
+        duration_ms: float = 0.0,
+        metadata: dict | None = None,
+    ):
         self.test_name = test_name
         self.passed = passed
         self.message = message
@@ -158,8 +181,9 @@ class UnifiedValidationResult:
         self.metadata = metadata or {}
 
     def __str__(self) -> str:
-        status = 'PASSED' if self.passed else 'FAILED'
-        return f'{self.test_name}: {status} ({self.duration_ms:.2f}ms)'
+        status = "PASSED" if self.passed else "FAILED"
+        return f"{self.test_name}: {status} ({self.duration_ms:.2f}ms)"
+
 
 class UnifiedAsyncValidator:
     """Unified async validation framework.
@@ -174,31 +198,65 @@ class UnifiedAsyncValidator:
         self.name = name
         self.results: list[UnifiedValidationResult] = []
 
-    async def validate_async(self, test_name: str, test_func: Callable[[], Awaitable[bool]], timeout_ms: float=30000) -> UnifiedValidationResult:
+    async def validate_async(
+        self,
+        test_name: str,
+        test_func: Callable[[], Awaitable[bool]],
+        timeout_ms: float = 30000,
+    ) -> UnifiedValidationResult:
         """Run async validation with unified error handling and timing."""
         start_time = time.perf_counter()
         try:
             passed = await asyncio.wait_for(test_func(), timeout=timeout_ms / 1000)
             duration_ms = (time.perf_counter() - start_time) * 1000
-            result = UnifiedValidationResult(test_name=test_name, passed=passed, message='Validation completed successfully' if passed else 'Validation failed', duration_ms=duration_ms)
+            result = UnifiedValidationResult(
+                test_name=test_name,
+                passed=passed,
+                message="Validation completed successfully"
+                if passed
+                else "Validation failed",
+                duration_ms=duration_ms,
+            )
         except TimeoutError:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            result = UnifiedValidationResult(test_name=test_name, passed=False, message=f'Validation timed out after {timeout_ms}ms', duration_ms=duration_ms)
+            result = UnifiedValidationResult(
+                test_name=test_name,
+                passed=False,
+                message=f"Validation timed out after {timeout_ms}ms",
+                duration_ms=duration_ms,
+            )
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            result = UnifiedValidationResult(test_name=test_name, passed=False, message=f'Validation error: {e!s}', duration_ms=duration_ms)
+            result = UnifiedValidationResult(
+                test_name=test_name,
+                passed=False,
+                message=f"Validation error: {e!s}",
+                duration_ms=duration_ms,
+            )
         self.results.append(result)
         return result
 
     def get_summary(self) -> dict:
         """Get validation summary statistics."""
         total = len(self.results)
-        passed = sum((1 for r in self.results if r.passed))
+        passed = sum(1 for r in self.results if r.passed)
         failed = total - passed
-        avg_duration = sum((r.duration_ms for r in self.results)) / total if total > 0 else 0
-        return {'validator_name': self.name, 'total_tests': total, 'passed': passed, 'failed': failed, 'success_rate': passed / total if total > 0 else 0, 'average_duration_ms': avg_duration}
+        avg_duration = (
+            sum(r.duration_ms for r in self.results) / total if total > 0 else 0
+        )
+        return {
+            "validator_name": self.name,
+            "total_tests": total,
+            "passed": passed,
+            "failed": failed,
+            "success_rate": passed / total if total > 0 else 0,
+            "average_duration_ms": avg_duration,
+        }
 
-async def test_async_database_connection(database_url: str, timeout_ms: float=5000) -> bool:
+
+async def test_async_database_connection(
+    database_url: str, timeout_ms: float = 5000
+) -> bool:
     """Test async database connection with unified pattern.
 
     Consolidates 12+ duplicate async debugging connection patterns from tools directory:
@@ -210,32 +268,43 @@ async def test_async_database_connection(database_url: str, timeout_ms: float=50
     try:
         try:
             from sqlalchemy import text
-            from prompt_improver.database.unified_connection_manager import ManagerMode, get_unified_manager
-            manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+
+            from prompt_improver.database import (
+                ManagerMode,
+                create_database_services,
+                get_database_services,
+            )
+
+            manager = await get_database_services(ManagerMode.ASYNC_MODERN)
+            if manager is None:
+                manager = await create_database_services(ManagerMode.ASYNC_MODERN)
             health_info = await manager.get_health_info()
-            if health_info.get('status') == 'healthy':
+            if health_info.get("status") == "healthy":
                 async with manager.get_async_session() as session:
-                    result = await session.execute(text('SELECT 1'))
+                    result = await session.execute(text("SELECT 1"))
                     return result.scalar() == 1
-            else:
-                pass
         except Exception:
             pass
         import asyncpg
-        conn = await asyncio.wait_for(asyncpg.connect(database_url), timeout=timeout_ms / 1000)
-        result = await conn.fetchval('SELECT 1')
+
+        conn = await asyncio.wait_for(
+            asyncpg.connect(database_url), timeout=timeout_ms / 1000
+        )
+        result = await conn.fetchval("SELECT 1")
         await conn.close()
         return result == 1
     except Exception:
         return False
 
-async def test_async_redis_connection(redis_url: str, timeout_ms: float=5000) -> bool:
+
+async def test_async_redis_connection(redis_url: str, timeout_ms: float = 5000) -> bool:
     """Test async Redis connection with unified pattern.
 
     Consolidates duplicate Redis connection testing patterns.
     """
     try:
         import coredis
+
         redis = coredis.from_url(redis_url)
         result = await asyncio.wait_for(redis.ping(), timeout=timeout_ms / 1000)
         await redis.close()
@@ -243,13 +312,17 @@ async def test_async_redis_connection(redis_url: str, timeout_ms: float=5000) ->
     except Exception:
         return False
 
+
 @pytest.fixture
 def unified_async_validator():
     """Pytest fixture for unified async validation."""
-    return UnifiedAsyncValidator('pytest_validation')
+    return UnifiedAsyncValidator("pytest_validation")
+
 
 @pytest.fixture
 def performance_timer():
     """Pytest fixture for unified performance timing."""
     return UnifiedPerformanceTimer()
+
+
 pytest_asyncio_auto_mode = True

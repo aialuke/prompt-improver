@@ -1,7 +1,10 @@
 """Repository interfaces following clean architecture patterns"""
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, List, Optional, TypeVar
-T = TypeVar('T')
+
+T = TypeVar("T")
+
 
 class IRepository(Generic[T], ABC):
     """Generic repository interface following repository pattern
@@ -47,7 +50,7 @@ class IRepository(Generic[T], ABC):
         ...
 
     @abstractmethod
-    async def list_all(self, limit: int | None=None, offset: int=0) -> list[T]:
+    async def list_all(self, limit: int | None = None, offset: int = 0) -> list[T]:
         """List all entities with pagination
 
         Args:
@@ -58,6 +61,7 @@ class IRepository(Generic[T], ABC):
             List of entities
         """
         ...
+
 
 class IPromptRepository(IRepository, ABC):
     """Repository interface specifically for prompts
@@ -90,7 +94,7 @@ class IPromptRepository(IRepository, ABC):
         ...
 
     @abstractmethod
-    async def search_by_content(self, search_term: str, limit: int=10) -> list[Any]:
+    async def search_by_content(self, search_term: str, limit: int = 10) -> list[Any]:
         """Search prompts by content
 
         Args:
@@ -101,6 +105,7 @@ class IPromptRepository(IRepository, ABC):
             List of matching prompts
         """
         ...
+
 
 class ISessionRepository(IRepository, ABC):
     """Repository interface for improvement sessions"""
@@ -126,11 +131,14 @@ class ISessionRepository(IRepository, ABC):
         """
         ...
 
+
 class IMetricsRepository(IRepository, ABC):
     """Repository interface for metrics and analytics data"""
 
     @abstractmethod
-    async def save_metric(self, metric_name: str, value: float, tags: dict[str, str]) -> None:
+    async def save_metric(
+        self, metric_name: str, value: float, tags: dict[str, str]
+    ) -> None:
         """Save a metric value
 
         Args:
@@ -141,7 +149,12 @@ class IMetricsRepository(IRepository, ABC):
         ...
 
     @abstractmethod
-    async def get_metrics_by_name(self, metric_name: str, start_time: str | None=None, end_time: str | None=None) -> list[dict[str, Any]]:
+    async def get_metrics_by_name(
+        self,
+        metric_name: str,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Get metrics by name within time range
 
         Args:

@@ -27,9 +27,9 @@ class ComponentHealthCheck:
     """Component health check result."""
     component_name: str
     health_status: ComponentHealthStatus
-    response_time: Optional[float]
-    error_message: Optional[str]
-    details: Dict[str, Any]
+    response_time: float | None
+    error_message: str | None
+    details: dict[str, Any]
     timestamp: datetime
 
 class ComponentHealthMonitor:
@@ -48,14 +48,14 @@ class ComponentHealthMonitor:
         self.logger = logging.getLogger(__name__)
         self.is_monitoring = False
         self.monitor_task = None
-        self.health_history: Dict[str, List[ComponentHealthCheck]] = {}
-        self.current_health: Dict[str, ComponentHealthStatus] = {}
+        self.health_history: dict[str, list[ComponentHealthCheck]] = {}
+        self.current_health: dict[str, ComponentHealthStatus] = {}
         self.health_check_interval = self.config.get('health_check_interval', 60)
         self.health_check_timeout = self.config.get('health_check_timeout', 10)
         self.unhealthy_threshold = self.config.get('unhealthy_threshold', 3)
         self.history_limit = self.config.get('history_limit', 100)
-        self.monitored_components: Set[str] = set()
-        self.failed_checks: Dict[str, int] = {}
+        self.monitored_components: set[str] = set()
+        self.failed_checks: dict[str, int] = {}
 
     async def start_monitoring(self) -> None:
         """Start component health monitoring."""
@@ -141,14 +141,14 @@ class ComponentHealthMonitor:
                 response_time = asyncio.get_event_loop().time() - start_time
                 health_status = self._interpret_health_result(health_result)
                 await self._record_health_check(component_name, health_status, response_time, None, health_result)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 response_time = asyncio.get_event_loop().time() - start_time
                 await self._record_health_check(component_name, ComponentHealthStatus.UNHEALTHY, response_time, f'Health check timeout after {self.health_check_timeout}s', {})
         except Exception as e:
             response_time = asyncio.get_event_loop().time() - start_time
             await self._record_health_check(component_name, ComponentHealthStatus.UNHEALTHY, response_time, str(e), {})
 
-    def _interpret_health_result(self, health_result: Dict[str, Any]) -> ComponentHealthStatus:
+    def _interpret_health_result(self, health_result: dict[str, Any]) -> ComponentHealthStatus:
         """Interpret health check result to determine status."""
         if not health_result:
             return ComponentHealthStatus.UNKNOWN
@@ -162,7 +162,7 @@ class ComponentHealthMonitor:
         else:
             return ComponentHealthStatus.UNKNOWN
 
-    async def _record_health_check(self, component_name: str, health_status: ComponentHealthStatus, response_time: Optional[float], error_message: Optional[str], details: Dict[str, Any]) -> None:
+    async def _record_health_check(self, component_name: str, health_status: ComponentHealthStatus, response_time: float | None, error_message: str | None, details: dict[str, Any]) -> None:
         """Record the result of a health check."""
         try:
             health_check = ComponentHealthCheck(component_name=component_name, health_status=health_status, response_time=response_time, error_message=error_message, details=details, timestamp=datetime.now(timezone.utc))
@@ -203,14 +203,14 @@ class ComponentHealthMonitor:
         if self.event_bus:
             await self.event_bus.emit(MLEvent(event_type=EventType.COMPONENT_RECOVERED, source='component_health_monitor', data={'component_name': component_name, 'health_status': health_check.health_status.value, 'response_time': health_check.response_time, 'timestamp': health_check.timestamp.isoformat()}))
 
-    async def get_component_health(self, component_name: str) -> Optional[Dict[str, Any]]:
+    async def get_component_health(self, component_name: str) -> dict[str, Any] | None:
         """Get current health status of a component."""
         if component_name not in self.current_health:
             return None
         recent_checks = self.health_history.get(component_name, [])[-10:]
-        return {'component_name': component_name, 'current_health': self.current_health[component_name].value, 'consecutive_failures': self.failed_checks.get(component_name, 0), 'last_check': recent_checks[-1].timestamp.isoformat() if recent_checks else None, 'recent_checks_count': len(recent_checks), 'average_response_time': sum((check.response_time for check in recent_checks if check.response_time is not None)) / len([check for check in recent_checks if check.response_time is not None]) if recent_checks else None}
+        return {'component_name': component_name, 'current_health': self.current_health[component_name].value, 'consecutive_failures': self.failed_checks.get(component_name, 0), 'last_check': recent_checks[-1].timestamp.isoformat() if recent_checks else None, 'recent_checks_count': len(recent_checks), 'average_response_time': sum(check.response_time for check in recent_checks if check.response_time is not None) / len([check for check in recent_checks if check.response_time is not None]) if recent_checks else None}
 
-    async def get_all_component_health(self) -> Dict[str, Dict[str, Any]]:
+    async def get_all_component_health(self) -> dict[str, dict[str, Any]]:
         """Get health status of all monitored components."""
         result = {}
         for component_name in self.monitored_components:
@@ -219,13 +219,13 @@ class ComponentHealthMonitor:
                 result[component_name] = health_info
         return result
 
-    async def get_unhealthy_components(self) -> List[str]:
+    async def get_unhealthy_components(self) -> list[str]:
         """Get list of currently unhealthy components."""
         return [component_name for component_name, health_status in self.current_health.items() if health_status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]]
 
-    async def get_health_summary(self) -> Dict[str, Any]:
+    async def get_health_summary(self) -> dict[str, Any]:
         """Get overall health summary."""
         total_components = len(self.monitored_components)
-        healthy_count = sum((1 for status in self.current_health.values() if status == ComponentHealthStatus.HEALTHY))
-        unhealthy_count = sum((1 for status in self.current_health.values() if status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected]))
-        return {'total_components': total_components, 'healthy_components': healthy_count, 'unhealthy_components': unhealthy_count, 'health_percentage': healthy_count / total_components * 100 if total_components > 0 else 0, 'monitoring_active': self.is_monitoring, 'health_check_interval': self.health_check_interval, 'components_requiring_intervention': sum((1 for failures in self.failed_checks.values() if failures >= self.unhealthy_threshold))}
+        healthy_count = sum(1 for status in self.current_health.values() if status == ComponentHealthStatus.HEALTHY)
+        unhealthy_count = sum(1 for status in self.current_health.values() if status in [ComponentHealthStatus.UNHEALTHY, ComponentHealthStatus.disconnected])
+        return {'total_components': total_components, 'healthy_components': healthy_count, 'unhealthy_components': unhealthy_count, 'health_percentage': healthy_count / total_components * 100 if total_components > 0 else 0, 'monitoring_active': self.is_monitoring, 'health_check_interval': self.health_check_interval, 'components_requiring_intervention': sum(1 for failures in self.failed_checks.values() if failures >= self.unhealthy_threshold)}

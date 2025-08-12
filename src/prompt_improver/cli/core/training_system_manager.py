@@ -29,10 +29,10 @@ from prompt_improver.core.protocols.ml_protocols import (
     ServiceContainerProtocol,
 )
 from prompt_improver.core.services.analytics_factory import get_analytics_interface
-from prompt_improver.database import get_sessionmanager
-from prompt_improver.database.unified_connection_manager import (
+from prompt_improver.database import (
     ManagerMode,
-    get_unified_manager,
+    get_database_services,
+    get_sessionmanager,
 )
 from prompt_improver.ml.orchestration.config.external_services_config import (
     ExternalServicesConfig,
@@ -122,13 +122,13 @@ class TrainingSystemManager:
             self._register_signal_handlers()
 
         except ImportError as e:
-            self.logger.warning("Signal handling integration not available: %s", e)
+            self.logger.warning(f"Signal handling integration not available: {e}")
             # Continue without signal handling
 
-    async def _ensure_unified_connection_manager(self):
-        """Ensure unified connection manager is available."""
+    async def _ensure_database_services(self):
+        """Ensure database services are available."""
         if self._unified_session_manager is None:
-            self._unified_session_manager = await get_unified_manager(
+            self._unified_session_manager = await get_database_services(
                 ManagerMode.MCP_SERVER
             )
 
@@ -142,7 +142,7 @@ class TrainingSystemManager:
             Created training session ID
         """
         try:
-            await self._ensure_unified_connection_manager()
+            await self._ensure_database_services()
 
             # Generate session ID
             import uuid
@@ -173,11 +173,11 @@ class TrainingSystemManager:
 
             self._training_session_id = session_id
             self._training_status = "running"
-            self.logger.info("Created training session: %s", session_id)
+            self.logger.info(f"Created training session: {session_id}")
             return session_id
 
         except Exception as e:
-            self.logger.error("Failed to create training session: %s", e)
+            self.logger.error(f"Failed to create training session: {e}")
             raise
 
     async def update_training_progress(
@@ -201,7 +201,7 @@ class TrainingSystemManager:
             return False
 
         try:
-            await self._ensure_unified_connection_manager()
+            await self._ensure_database_services()
 
             # Update training session progress in database
             async with self._unified_session_manager.get_async_session() as db_session:
@@ -230,11 +230,11 @@ class TrainingSystemManager:
                 )
                 await db_session.commit()
 
-            self.logger.debug("Updated training progress: iteration %s", iteration)
+            self.logger.debug(f"Updated training progress: iteration {iteration}")
             return True
 
         except Exception as e:
-            self.logger.error("Failed to update training progress: %s", e)
+            self.logger.error(f"Failed to update training progress: {e}")
             return False
 
     async def get_training_session_context(self) -> dict[str, Any] | None:
@@ -247,7 +247,7 @@ class TrainingSystemManager:
             return None
 
         try:
-            await self._ensure_unified_connection_manager()
+            await self._ensure_database_services()
 
             # Get session data from database
             async with self._unified_session_manager.get_async_session() as db_session:
@@ -281,7 +281,7 @@ class TrainingSystemManager:
                 return None
 
         except Exception as e:
-            self.logger.error("Failed to get training session context: %s", e)
+            self.logger.error(f"Failed to get training session context: {e}")
             return None
 
     def _register_signal_handlers(self):
@@ -343,7 +343,7 @@ class TrainingSystemManager:
                 "progress_preserved": self._training_session_id is not None,
             }
         except Exception as e:
-            self.logger.error("TrainingSystemManager shutdown error: %s", e)
+            self.logger.error(f"TrainingSystemManager shutdown error: {e}")
             return {
                 "status": "error",
                 "component": "TrainingSystemManager",
@@ -385,7 +385,7 @@ class TrainingSystemManager:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error("Emergency checkpoint creation failed: %s", e)
+            self.logger.error(f"Emergency checkpoint creation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def generate_training_status_report(self, signal_context):
@@ -407,12 +407,12 @@ class TrainingSystemManager:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error("Status report generation failed: %s", e)
+            self.logger.error(f"Status report generation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def prepare_training_shutdown(self, signum, signal_name):
         """Prepare training system for coordinated shutdown."""
-        self.logger.info("Preparing training system for shutdown (%s)", signal_name)
+        self.logger.info(f"Preparing training system for shutdown ({signal_name})")
 
         try:
             # Set training status to indicate shutdown preparation
@@ -430,7 +430,7 @@ class TrainingSystemManager:
 
             return preparation_status
         except Exception as e:
-            self.logger.error("Training shutdown preparation failed: %s", e)
+            self.logger.error(f"Training shutdown preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "TrainingSystemManager",
@@ -439,7 +439,7 @@ class TrainingSystemManager:
 
     def prepare_training_interruption(self, signum, signal_name):
         """Prepare training system for user interruption (Ctrl+C)."""
-        self.logger.info("Preparing training system for interruption (%s)", signal_name)
+        self.logger.info(f"Preparing training system for interruption ({signal_name})")
 
         try:
             # For user interruption, prioritize progress preservation
@@ -454,7 +454,7 @@ class TrainingSystemManager:
 
             return preparation_status
         except Exception as e:
-            self.logger.error("Training interruption preparation failed: %s", e)
+            self.logger.error(f"Training interruption preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "TrainingSystemManager",
@@ -469,24 +469,24 @@ class TrainingSystemManager:
                 try:
                     await self._orchestrator.shutdown()
                 except Exception as e:
-                    self.logger.warning("Orchestrator emergency shutdown failed: %s", e)
+                    self.logger.warning(f"Orchestrator emergency shutdown failed: {e}")
 
             # Emergency save of any remaining training data
             if self._training_session_id:
                 try:
                     await self._save_training_progress()
                 except Exception as e:
-                    self.logger.warning("Emergency progress save failed: %s", e)
+                    self.logger.warning(f"Emergency progress save failed: {e}")
 
             # Release any background tasks
             try:
                 await self.background_manager.stop(timeout=5.0)
             except Exception as e:
-                self.logger.warning("Background task cleanup failed: %s", e)
+                self.logger.warning(f"Background task cleanup failed: {e}")
 
             self.logger.info("Emergency training cleanup completed")
         except Exception as e:
-            self.logger.error("Emergency cleanup failed: %s", e)
+            self.logger.error(f"Emergency cleanup failed: {e}")
 
     async def _get_current_performance_metrics(self) -> dict[str, Any]:
         """Get current training performance metrics for checkpoints."""
@@ -592,7 +592,7 @@ class TrainingSystemManager:
 
         except Exception as e:
             self._training_status = "failed"
-            self.logger.error("Failed to start training system: %s", e)
+            self.logger.error(f"Failed to start training system: {e}")
             return {
                 "status": "failed",
                 "error": str(e),
@@ -608,7 +608,7 @@ class TrainingSystemManager:
         Returns:
             True if shutdown successful, False otherwise
         """
-        self.logger.info("Stopping training system (graceful=%s)", graceful)
+        self.logger.info(f"Stopping training system (graceful={graceful})")
 
         try:
             self._training_status = "stopping"
@@ -635,7 +635,7 @@ class TrainingSystemManager:
             return True
 
         except Exception as e:
-            self.logger.error("Error stopping training system: %s", e)
+            self.logger.error(f"Error stopping training system: {e}")
             return False
 
     async def get_training_status(self) -> dict[str, Any]:
@@ -746,7 +746,8 @@ class TrainingSystemManager:
             if self._orchestrator:
                 # Check if orchestrator is initialized and in a good state
                 health_status["orchestrator_status"] = (
-                    self._orchestrator._is_initialized
+                    hasattr(self._orchestrator, "_is_initialized")
+                    and self._orchestrator._is_initialized
                     and self._orchestrator.state.name in ["IDLE", "RUNNING"]
                 )
 
@@ -767,7 +768,7 @@ class TrainingSystemManager:
             health_status["response_time_ms"] = (time.time() - health_start) * 1000
 
         except Exception as e:
-            self.logger.error("Health check failed: %s", e)
+            self.logger.error(f"Health check failed: {e}")
             health_status["error"] = str(e)
 
         return health_status
@@ -875,7 +876,7 @@ class TrainingSystemManager:
             }
 
         except Exception as e:
-            self.logger.error("Enhanced smart initialization failed: %s", e)
+            self.logger.error(f"Enhanced smart initialization failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -1181,7 +1182,7 @@ class TrainingSystemManager:
                 }
 
         except Exception as e:
-            self.logger.error("Data availability assessment failed: %s", e)
+            self.logger.error(f"Data availability assessment failed: {e}")
             data_status.update({
                 "training_data": {
                     "status": "error",
@@ -1570,14 +1571,14 @@ class TrainingSystemManager:
                 elif action["action"].startswith("initialize_"):
                     component_name = action["action"].replace("initialize_", "")
                     # Component initialization handled by start_training_system
-                    self.logger.debug("Initializing component: %s", component_name)
+                    self.logger.debug(f"Initializing component: {component_name}")
                     results["actions_completed"].append(action["action"])
 
                 action_time = time.time() - action_start
-                self.logger.info("Completed %s in %.2fs", action["action"], action_time)
+                self.logger.info(f"Completed {action['action']} in %.2fs")
 
             except Exception as e:
-                self.logger.error("Failed to execute {action['action']}: %s", e)
+                self.logger.error(f"Failed to execute {action['action']}: {e}")
                 results["actions_failed"].append(action["action"])
                 results["success"] = False
 
@@ -1663,7 +1664,7 @@ class TrainingSystemManager:
             return True
 
         except Exception as e:
-            self.logger.error("Training readiness validation failed: %s", e)
+            self.logger.error(f"Training readiness validation failed: {e}")
             return False
 
     async def create_training_session(self, config: dict[str, Any]) -> Any:
@@ -1707,11 +1708,11 @@ class TrainingSystemManager:
                 # Set as current training session
                 self._training_session_id = session_id
 
-                self.logger.info("Created training session: %s", session_id)
+                self.logger.info(f"Created training session: {session_id}")
                 return db_session
 
         except Exception as e:
-            self.logger.error("Failed to create training session: %s", e)
+            self.logger.error(f"Failed to create training session: {e}")
             raise
 
     async def get_system_status(self) -> dict[str, Any]:
@@ -1792,7 +1793,7 @@ class TrainingSystemManager:
             }
 
         except Exception as e:
-            self.logger.error("Failed to get system status: %s", e)
+            self.logger.error(f"Failed to get system status: {e}")
             return {
                 "healthy": False,
                 "status": "error",
@@ -1822,7 +1823,7 @@ class TrainingSystemManager:
                 return list(active_sessions)
 
         except Exception as e:
-            self.logger.error("Failed to get active sessions: %s", e)
+            self.logger.error(f"Failed to get active sessions: {e}")
             return []
 
     async def _needs_synthetic_data(self) -> bool:
@@ -1913,7 +1914,7 @@ class TrainingSystemManager:
             generation_results["generation_time_seconds"] = (
                 time.time() - generation_start
             )
-            self.logger.error("Enhanced data generation failed: %s", e)
+            self.logger.error(f"Enhanced data generation failed: {e}")
 
         return generation_results
 
@@ -2087,7 +2088,7 @@ class TrainingSystemManager:
                     )
 
         except Exception as e:
-            self.logger.warning("Quality validation failed: %s", e)
+            self.logger.warning(f"Quality validation failed: {e}")
 
         return quality_assessment
 

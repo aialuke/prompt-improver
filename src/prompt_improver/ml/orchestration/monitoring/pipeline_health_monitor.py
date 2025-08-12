@@ -26,11 +26,28 @@ class PipelineHealthStatus(Enum):
 class PipelineHealthSnapshot:
     """Complete pipeline health snapshot."""
     overall_health: PipelineHealthStatus
-    component_health_summary: Dict[str, Any]
-    orchestrator_health: Dict[str, Any]
-    active_alerts: List[Dict[str, Any]]
-    performance_metrics: Dict[str, Any]
+    component_health_summary: dict[str, Any]
+    orchestrator_health: dict[str, Any]
+    active_alerts: list[dict[str, Any]]
+    performance_metrics: dict[str, Any]
     timestamp: datetime
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        from dataclasses import asdict
+        data = asdict(self)
+        data['overall_health'] = self.overall_health.value
+        data['timestamp'] = self.timestamp.isoformat()
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> 'PipelineHealthSnapshot':
+        """Create instance from dictionary."""
+        if isinstance(data.get('overall_health'), str):
+            data['overall_health'] = PipelineHealthStatus(data['overall_health'])
+        if isinstance(data.get('timestamp'), str):
+            data['timestamp'] = datetime.fromisoformat(data['timestamp'])
+        return cls(**data)
 
 @dataclass
 class HealthTrend:
@@ -49,7 +66,7 @@ class PipelineHealthMonitor:
     Provides unified view of pipeline health, trends, and alerting.
     """
 
-    def __init__(self, orchestrator_monitor: Optional[OrchestratorMonitor]=None, component_health_monitor: Optional[ComponentHealthMonitor]=None, event_bus=None, config=None):
+    def __init__(self, orchestrator_monitor: OrchestratorMonitor | None=None, component_health_monitor: ComponentHealthMonitor | None=None, event_bus=None, config=None):
         """Initialize pipeline health monitor."""
         self.orchestrator_monitor = orchestrator_monitor
         self.component_health_monitor = component_health_monitor
@@ -58,13 +75,13 @@ class PipelineHealthMonitor:
         self.logger = logging.getLogger(__name__)
         self.current_pipeline_health = PipelineHealthStatus.UNKNOWN
         self.last_health_check = None
-        self.health_snapshots: List[PipelineHealthSnapshot] = []
+        self.health_snapshots: list[PipelineHealthSnapshot] = []
         self.health_check_interval = self.config.get('pipeline_health_check_interval', 30)
         self.snapshot_retention = self.config.get('snapshot_retention_hours', 24)
         self.trend_analysis_window = self.config.get('trend_analysis_window_minutes', 60)
         self.critical_component_threshold = self.config.get('critical_component_threshold', 0.3)
         self.degraded_component_threshold = self.config.get('degraded_component_threshold', 0.1)
-        self.active_alerts: List[Dict[str, Any]] = []
+        self.active_alerts: list[dict[str, Any]] = []
         self.is_monitoring = False
         self.monitor_task = None
 
@@ -132,7 +149,7 @@ class PipelineHealthMonitor:
         except Exception as e:
             self.logger.error('Error collecting pipeline health: %s', e)
 
-    async def _collect_performance_metrics(self) -> Dict[str, Any]:
+    async def _collect_performance_metrics(self) -> dict[str, Any]:
         """Collect performance metrics from various sources."""
         metrics = {'workflow_metrics': {}, 'resource_metrics': {}, 'response_times': {}, 'throughput': {}}
         try:
@@ -162,7 +179,7 @@ class PipelineHealthMonitor:
             self.logger.error('Error collecting performance metrics: %s', e)
         return metrics
 
-    async def _collect_active_alerts(self) -> List[Dict[str, Any]]:
+    async def _collect_active_alerts(self) -> list[dict[str, Any]]:
         """Collect all active alerts from monitoring systems."""
         alerts = []
         try:
@@ -180,7 +197,7 @@ class PipelineHealthMonitor:
             self.logger.error('Error collecting active alerts: %s', e)
         return alerts
 
-    async def _determine_overall_health(self, component_health: Dict[str, Any], orchestrator_health: Dict[str, Any], performance_metrics: Dict[str, Any]) -> PipelineHealthStatus:
+    async def _determine_overall_health(self, component_health: dict[str, Any], orchestrator_health: dict[str, Any], performance_metrics: dict[str, Any]) -> PipelineHealthStatus:
         """Determine overall pipeline health status."""
         try:
             health_factors = []
@@ -243,7 +260,7 @@ class PipelineHealthMonitor:
         except Exception as e:
             self.logger.error('Error analyzing health trends: %s', e)
 
-    async def _calculate_component_trends(self) -> List[HealthTrend]:
+    async def _calculate_component_trends(self) -> list[HealthTrend]:
         """Calculate health trends for components."""
         trends = []
         try:
@@ -262,7 +279,7 @@ class PipelineHealthMonitor:
             self.logger.error('Error calculating component trends: %s', e)
         return trends
 
-    async def _calculate_single_component_trend(self, component_name: str, snapshots: List[PipelineHealthSnapshot]) -> Optional[HealthTrend]:
+    async def _calculate_single_component_trend(self, component_name: str, snapshots: list[PipelineHealthSnapshot]) -> HealthTrend | None:
         """Calculate trend for a single component."""
         try:
             health_scores = []
@@ -327,18 +344,18 @@ class PipelineHealthMonitor:
         except Exception as e:
             self.logger.error('Error cleaning up old snapshots: %s', e)
 
-    async def get_current_pipeline_health(self) -> Dict[str, Any]:
+    async def get_current_pipeline_health(self) -> dict[str, Any]:
         """Get current pipeline health status."""
         latest_snapshot = self.health_snapshots[-1] if self.health_snapshots else None
         return {'overall_health': self.current_pipeline_health.value, 'last_check': self.last_health_check.isoformat() if self.last_health_check else None, 'monitoring_active': self.is_monitoring, 'active_alerts_count': len(latest_snapshot.active_alerts) if latest_snapshot else 0, 'component_health_summary': latest_snapshot.component_health_summary if latest_snapshot else {}, 'orchestrator_health': latest_snapshot.orchestrator_health if latest_snapshot else {}, 'performance_metrics': latest_snapshot.performance_metrics if latest_snapshot else {}}
 
-    async def get_health_history(self, hours: int=24) -> List[Dict[str, Any]]:
+    async def get_health_history(self, hours: int=24) -> list[dict[str, Any]]:
         """Get pipeline health history."""
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_snapshots = [snapshot for snapshot in self.health_snapshots if snapshot.timestamp > cutoff_time]
         return [asdict(snapshot) for snapshot in recent_snapshots]
 
-    async def get_health_trends(self) -> List[Dict[str, Any]]:
+    async def get_health_trends(self) -> list[dict[str, Any]]:
         """Get current health trends."""
         trends = await self._calculate_component_trends()
         return [asdict(trend) for trend in trends]

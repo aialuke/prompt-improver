@@ -4,27 +4,40 @@ Provides a simplified, unified protocol for health monitoring that
 focuses on plugin registration and core health checking functionality
 needed for component integration.
 """
+
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+
 
 class HealthStatus(Enum):
     """Health check status"""
-    HEALTHY = 'healthy'
-    DEGRADED = 'degraded'
-    UNHEALTHY = 'unhealthy'
-    UNKNOWN = 'unknown'
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
+
 
 class HealthCheckResult:
     """Standardized health check result"""
 
-    def __init__(self, status: HealthStatus, message: str='', details: dict[str, Any] | None=None, check_name: str='', duration_ms: float=0.0):
+    def __init__(
+        self,
+        status: HealthStatus,
+        message: str = "",
+        details: dict[str, Any] | None = None,
+        check_name: str = "",
+        duration_ms: float = 0.0,
+    ):
         self.status = status
         self.message = message
         self.details = details or {}
         self.check_name = check_name
         self.duration_ms = duration_ms
 
+
+@runtime_checkable
 class HealthMonitorProtocol(Protocol):
     """Unified protocol for health monitoring operations.
 
@@ -33,7 +46,9 @@ class HealthMonitorProtocol(Protocol):
     unified health reporting across system components.
     """
 
-    async def check_health(self, component_name: str | None=None, include_details: bool=True) -> dict[str, HealthCheckResult]:
+    async def check_health(
+        self, component_name: str | None = None, include_details: bool = True
+    ) -> dict[str, HealthCheckResult]:
         """Perform health checks on registered components.
 
         Args:
@@ -45,7 +60,13 @@ class HealthMonitorProtocol(Protocol):
         """
         ...
 
-    def register_checker(self, name: str, checker: Callable[[], Any], timeout: float=30.0, critical: bool=False) -> None:
+    def register_checker(
+        self,
+        name: str,
+        checker: Callable[[], Any],
+        timeout: float = 30.0,
+        critical: bool = False,
+    ) -> None:
         """Register a health checker function.
 
         Args:

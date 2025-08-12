@@ -3,10 +3,20 @@
 This rule integrates the LinguisticAnalyzer to assess prompts based on
 readability, syntactic complexity, entity richness, and structural clarity.
 """
+
 import logging
 from typing import Any
-from prompt_improver.ml.analysis.linguistic_analyzer import LinguisticAnalyzer, LinguisticConfig
-from prompt_improver.rule_engine.base import BasePromptRule, RuleCheckResult, TransformationResult
+
+from prompt_improver.ml.analysis.linguistic_analyzer import (
+    LinguisticAnalyzer,
+    LinguisticConfig,
+)
+from prompt_improver.rule_engine.base import (
+    BasePromptRule,
+    RuleCheckResult,
+    TransformationResult,
+)
+
 
 class LinguisticQualityRule(BasePromptRule):
     """Rule that evaluates prompts using advanced linguistic analysis.
@@ -22,16 +32,37 @@ class LinguisticQualityRule(BasePromptRule):
     def __init__(self):
         """Initialize the linguistic quality rule."""
         self.logger = logging.getLogger(__name__)
-        config = LinguisticConfig(enable_ner=True, enable_dependency_parsing=True, enable_readability=True, enable_complexity_metrics=True, enable_prompt_segmentation=True, use_transformers_ner=False, enable_caching=True)
+        config = LinguisticConfig(
+            enable_ner=True,
+            enable_dependency_parsing=True,
+            enable_readability=True,
+            enable_complexity_metrics=True,
+            enable_prompt_segmentation=True,
+            use_transformers_ner=False,
+            enable_caching=True,
+        )
         self.linguistic_analyzer = LinguisticAnalyzer(config)
-        self.thresholds = {'min_readability': 0.4, 'max_complexity': 0.8, 'min_instruction_clarity': 0.3, 'min_entity_diversity': 0.1, 'optimal_sentence_length': 20, 'max_sentence_length': 40}
+        self.thresholds = {
+            "min_readability": 0.4,
+            "max_complexity": 0.8,
+            "min_instruction_clarity": 0.3,
+            "min_entity_diversity": 0.1,
+            "optimal_sentence_length": 20,
+            "max_sentence_length": 40,
+        }
 
     @property
     def metadata(self):
         """Rule metadata."""
-        return {'name': 'Linguistic Quality Rule', 'description': 'Evaluates prompts using advanced linguistic analysis including NER, dependency parsing, and readability metrics', 'category': 'quality', 'priority': 7, 'version': '1.0.0'}
+        return {
+            "name": "Linguistic Quality Rule",
+            "description": "Evaluates prompts using advanced linguistic analysis including NER, dependency parsing, and readability metrics",
+            "category": "quality",
+            "priority": 7,
+            "version": "1.0.0",
+        }
 
-    def check(self, prompt: str, context: dict[str, Any]=None) -> RuleCheckResult:
+    def check(self, prompt: str, context: dict[str, Any] = None) -> RuleCheckResult:
         """Check if linguistic analysis should be applied to this prompt.
 
         Args:
@@ -43,9 +74,15 @@ class LinguisticQualityRule(BasePromptRule):
         """
         if not prompt.strip():
             return RuleCheckResult(applies=False, confidence=0.0, metadata={})
-        return RuleCheckResult(applies=True, confidence=0.9, metadata={'analysis_type': 'linguistic_quality'})
+        return RuleCheckResult(
+            applies=True,
+            confidence=0.9,
+            metadata={"analysis_type": "linguistic_quality"},
+        )
 
-    def apply(self, prompt: str, context: dict[str, Any]=None) -> TransformationResult:
+    def apply(
+        self, prompt: str, context: dict[str, Any] = None
+    ) -> TransformationResult:
         """Apply linguistic analysis and generate improvement suggestions.
 
         Args:
@@ -56,7 +93,12 @@ class LinguisticQualityRule(BasePromptRule):
             TransformationResult containing analysis and suggestions
         """
         if not prompt.strip():
-            return TransformationResult(success=False, improved_prompt=prompt, confidence=0.0, transformations=[])
+            return TransformationResult(
+                success=False,
+                improved_prompt=prompt,
+                confidence=0.0,
+                transformations=[],
+            )
         try:
             features = self.linguistic_analyzer.analyze(prompt)
             readability_score = self._assess_readability(features)
@@ -64,16 +106,45 @@ class LinguisticQualityRule(BasePromptRule):
             structure_score = self._assess_structure(features)
             entity_score = self._assess_entity_richness(features)
             clarity_score = self._assess_clarity(features)
-            overall_score = self._calculate_overall_score({'readability': readability_score, 'complexity': complexity_score, 'structure': structure_score, 'entity_richness': entity_score, 'clarity': clarity_score})
-            suggestions = self._generate_suggestions(features, {'readability': readability_score, 'complexity': complexity_score, 'structure': structure_score, 'entity_richness': entity_score, 'clarity': clarity_score})
+            overall_score = self._calculate_overall_score({
+                "readability": readability_score,
+                "complexity": complexity_score,
+                "structure": structure_score,
+                "entity_richness": entity_score,
+                "clarity": clarity_score,
+            })
+            suggestions = self._generate_suggestions(
+                features,
+                {
+                    "readability": readability_score,
+                    "complexity": complexity_score,
+                    "structure": structure_score,
+                    "entity_richness": entity_score,
+                    "clarity": clarity_score,
+                },
+            )
             improved_prompt = self._create_improved_prompt(prompt, suggestions)
             transformations = []
             for suggestion in suggestions:
-                transformations.append({'type': 'linguistic_improvement', 'description': suggestion, 'confidence': 0.8})
-            return TransformationResult(success=True, improved_prompt=improved_prompt, confidence=features.confidence, transformations=transformations)
+                transformations.append({
+                    "type": "linguistic_improvement",
+                    "description": suggestion,
+                    "confidence": 0.8,
+                })
+            return TransformationResult(
+                success=True,
+                improved_prompt=improved_prompt,
+                confidence=features.confidence,
+                transformations=transformations,
+            )
         except Exception as e:
-            self.logger.error('Linguistic quality analysis failed: %s', e)
-            return TransformationResult(success=False, improved_prompt=prompt, confidence=0.0, transformations=[])
+            self.logger.error(f"Linguistic quality analysis failed: {e}")
+            return TransformationResult(
+                success=False,
+                improved_prompt=prompt,
+                confidence=0.0,
+                transformations=[],
+            )
 
     def to_llm_instruction(self) -> str:
         """Generate LLM instruction for applying linguistic improvements.
@@ -81,14 +152,14 @@ class LinguisticQualityRule(BasePromptRule):
         Returns:
             String instruction for LLM to apply linguistic improvements
         """
-        return 'Analyze this prompt for linguistic quality and improve it by:\n1. Enhancing readability and clarity\n2. Improving sentence structure and flow\n3. Adding specific technical terms where appropriate\n4. Ensuring clear instructions and examples\n5. Maintaining appropriate complexity level\n\nFocus on making the prompt more precise, readable, and effective while preserving its original intent.'
+        return "Analyze this prompt for linguistic quality and improve it by:\n1. Enhancing readability and clarity\n2. Improving sentence structure and flow\n3. Adding specific technical terms where appropriate\n4. Ensuring clear instructions and examples\n5. Maintaining appropriate complexity level\n\nFocus on making the prompt more precise, readable, and effective while preserving its original intent."
 
     def _assess_readability(self, features) -> float:
         """Assess readability quality."""
         if features.readability_score == 0:
             return 0.5
         readability_score = features.readability_score
-        if readability_score < self.thresholds['min_readability']:
+        if readability_score < self.thresholds["min_readability"]:
             return readability_score * 2
         if readability_score > 0.9:
             return 0.9
@@ -101,7 +172,7 @@ class LinguisticQualityRule(BasePromptRule):
         complexity = features.syntactic_complexity
         if complexity < 0.3:
             return 0.6
-        if complexity > self.thresholds['max_complexity']:
+        if complexity > self.thresholds["max_complexity"]:
             return 1.0 - complexity
         return 0.8 + 0.2 * (1 - abs(complexity - 0.5) * 2)
 
@@ -110,7 +181,7 @@ class LinguisticQualityRule(BasePromptRule):
         structure_score = features.sentence_structure_quality
         if features.avg_sentence_length > 0:
             length_penalty = 0
-            if features.avg_sentence_length > self.thresholds['max_sentence_length']:
+            if features.avg_sentence_length > self.thresholds["max_sentence_length"]:
                 length_penalty = 0.2
             elif features.avg_sentence_length < 5:
                 length_penalty = 0.1
@@ -123,7 +194,7 @@ class LinguisticQualityRule(BasePromptRule):
         entity_density = features.entity_density
         technical_term_count = len(features.technical_terms)
         richness_score = 0.0
-        if entity_density >= self.thresholds['min_entity_diversity']:
+        if entity_density >= self.thresholds["min_entity_diversity"]:
             richness_score += 0.4
         if technical_term_count > 0:
             richness_score += min(technical_term_count * 0.1, 0.3)
@@ -145,48 +216,81 @@ class LinguisticQualityRule(BasePromptRule):
 
     def _calculate_overall_score(self, component_scores: dict[str, float]) -> float:
         """Calculate weighted overall score."""
-        weights = {'readability': 0.25, 'syntactic_complexity': 0.2, 'structure_quality': 0.2, 'entity_richness': 0.15, 'instruction_clarity': 0.2}
-        total_score = sum((component_scores.get(component, 0.0) * weight for component, weight in weights.items()))
+        weights = {
+            "readability": 0.25,
+            "syntactic_complexity": 0.2,
+            "structure_quality": 0.2,
+            "entity_richness": 0.15,
+            "instruction_clarity": 0.2,
+        }
+        total_score = sum(
+            (
+                component_scores.get(component, 0.0) * weight
+                for component, weight in weights.items()
+            )
+        )
         return round(total_score, 3)
 
-    def _generate_suggestions(self, features, component_scores: dict[str, float]) -> list[str]:
+    def _generate_suggestions(
+        self, features, component_scores: dict[str, float]
+    ) -> list[str]:
         """Generate improvement suggestions based on analysis."""
         suggestions = []
-        if component_scores['readability'] < 0.6:
+        if component_scores["readability"] < 0.6:
             if features.flesch_reading_ease < 30:
-                suggestions.append('Consider simplifying sentence structure and using shorter sentences for better readability.')
-            if features.avg_sentence_length > self.thresholds['max_sentence_length']:
-                suggestions.append('Break down long sentences into shorter, clearer statements.')
-        if component_scores.get('syntactic_complexity', 0) < 0.6:
-            if features.syntactic_complexity > self.thresholds['max_complexity']:
-                suggestions.append('Reduce syntactic complexity by using simpler grammatical structures.')
+                suggestions.append(
+                    "Consider simplifying sentence structure and using shorter sentences for better readability."
+                )
+            if features.avg_sentence_length > self.thresholds["max_sentence_length"]:
+                suggestions.append(
+                    "Break down long sentences into shorter, clearer statements."
+                )
+        if component_scores.get("syntactic_complexity", 0) < 0.6:
+            if features.syntactic_complexity > self.thresholds["max_complexity"]:
+                suggestions.append(
+                    "Reduce syntactic complexity by using simpler grammatical structures."
+                )
             elif features.syntactic_complexity < 0.2:
-                suggestions.append('Add more detail and structure to make the prompt more informative.')
-        if component_scores.get('structure_quality', 0) < 0.6:
-            suggestions.append('Improve sentence structure with clearer subject-verb-object relationships.')
-        if component_scores.get('entity_richness', 0) < 0.5:
-            suggestions.append('Include more specific terms, examples, or domain-relevant concepts.')
-        if component_scores.get('instruction_clarity', 0) < 0.6:
+                suggestions.append(
+                    "Add more detail and structure to make the prompt more informative."
+                )
+        if component_scores.get("structure_quality", 0) < 0.6:
+            suggestions.append(
+                "Improve sentence structure with clearer subject-verb-object relationships."
+            )
+        if component_scores.get("entity_richness", 0) < 0.5:
+            suggestions.append(
+                "Include more specific terms, examples, or domain-relevant concepts."
+            )
+        if component_scores.get("instruction_clarity", 0) < 0.6:
             if not features.has_clear_instructions:
-                suggestions.append('Add clear action words (write, create, analyze, etc.) to specify the task.')
+                suggestions.append(
+                    "Add clear action words (write, create, analyze, etc.) to specify the task."
+                )
             if not features.has_examples:
-                suggestions.append('Include examples to illustrate the desired output or approach.')
+                suggestions.append(
+                    "Include examples to illustrate the desired output or approach."
+                )
             if not features.has_context:
-                suggestions.append('Provide context or background information to clarify the task scope.')
+                suggestions.append(
+                    "Provide context or background information to clarify the task scope."
+                )
         return suggestions
 
-    def _create_improved_prompt(self, original_prompt: str, suggestions: list[str]) -> str:
+    def _create_improved_prompt(
+        self, original_prompt: str, suggestions: list[str]
+    ) -> str:
         """Create an improved version of the prompt with suggestions."""
         if not suggestions:
             return original_prompt
         improved_prompt = original_prompt
         if suggestions:
-            improved_prompt += '\n\n# Linguistic Quality Suggestions:\n'
+            improved_prompt += "\n\n# Linguistic Quality Suggestions:\n"
             for i, suggestion in enumerate(suggestions, 1):
-                improved_prompt += f'# {i}. {suggestion}\n'
+                improved_prompt += f"# {i}. {suggestion}\n"
         return improved_prompt
 
-    def evaluate(self, prompt: str, context: dict[str, Any]=None) -> dict[str, Any]:
+    def evaluate(self, prompt: str, context: dict[str, Any] = None) -> dict[str, Any]:
         """Evaluate prompt using real linguistic analysis (for testing compatibility).
 
         Args:
@@ -197,7 +301,16 @@ class LinguisticQualityRule(BasePromptRule):
             Dictionary containing evaluation results matching test expectations
         """
         if not prompt.strip():
-            return {'score': 0.0, 'confidence': 0.0, 'passed': False, 'component_scores': {}, 'linguistic_features': {}, 'suggestions': [], 'explanation': 'Empty prompt cannot be evaluated', 'metadata': {'rule_name': 'Linguistic Quality Rule', 'error': False}}
+            return {
+                "score": 0.0,
+                "confidence": 0.0,
+                "passed": False,
+                "component_scores": {},
+                "linguistic_features": {},
+                "suggestions": [],
+                "explanation": "Empty prompt cannot be evaluated",
+                "metadata": {"rule_name": "Linguistic Quality Rule", "error": False},
+            }
         try:
             features = self.linguistic_analyzer.analyze(prompt)
             readability_score = self._assess_readability(features)
@@ -205,23 +318,63 @@ class LinguisticQualityRule(BasePromptRule):
             structure_score = self._assess_structure(features)
             entity_score = self._assess_entity_richness(features)
             clarity_score = self._assess_clarity(features)
-            component_scores = {'readability': readability_score, 'syntactic_complexity': complexity_score, 'structure_quality': structure_score, 'entity_richness': entity_score, 'instruction_clarity': clarity_score}
+            component_scores = {
+                "readability": readability_score,
+                "syntactic_complexity": complexity_score,
+                "structure_quality": structure_score,
+                "entity_richness": entity_score,
+                "instruction_clarity": clarity_score,
+            }
             overall_score = self._calculate_overall_score(component_scores)
             suggestions = self._generate_suggestions(features, component_scores)
-            linguistic_features = {'flesch_reading_ease': features.flesch_reading_ease, 'avg_sentence_length': features.avg_sentence_length, 'lexical_diversity': features.lexical_diversity, 'entity_count': len(features.entities), 'technical_terms': features.technical_terms, 'has_clear_instructions': features.has_clear_instructions, 'has_examples': features.has_examples, 'has_context': features.has_context}
+            linguistic_features = {
+                "flesch_reading_ease": features.flesch_reading_ease,
+                "avg_sentence_length": features.avg_sentence_length,
+                "lexical_diversity": features.lexical_diversity,
+                "entity_count": len(features.entities),
+                "technical_terms": features.technical_terms,
+                "has_clear_instructions": features.has_clear_instructions,
+                "has_examples": features.has_examples,
+                "has_context": features.has_context,
+            }
             explanation = self._generate_explanation(overall_score, suggestions)
             passed = overall_score >= 0.5 and len(suggestions) <= 3
-            return {'score': overall_score, 'confidence': features.confidence, 'passed': passed, 'component_scores': component_scores, 'linguistic_features': linguistic_features, 'suggestions': suggestions, 'explanation': explanation, 'metadata': {'rule_name': 'Linguistic Quality Rule', 'analysis_method': 'advanced_linguistic', 'features_analyzed': list(linguistic_features.keys()), 'error': False}}
+            return {
+                "score": overall_score,
+                "confidence": features.confidence,
+                "passed": passed,
+                "component_scores": component_scores,
+                "linguistic_features": linguistic_features,
+                "suggestions": suggestions,
+                "explanation": explanation,
+                "metadata": {
+                    "rule_name": "Linguistic Quality Rule",
+                    "analysis_method": "advanced_linguistic",
+                    "features_analyzed": list(linguistic_features.keys()),
+                    "error": False,
+                },
+            }
         except Exception as e:
-            self.logger.error('Linguistic quality evaluation failed: %s', e)
-            return {'score': 0.0, 'confidence': 0.0, 'passed': False, 'component_scores': {}, 'linguistic_features': {}, 'suggestions': [], 'explanation': f'Error during linguistic analysis: {e!s}', 'metadata': {'rule_name': 'Linguistic Quality Rule', 'error': True}}
+            self.logger.error(f"Linguistic quality evaluation failed: {e}")
+            return {
+                "score": 0.0,
+                "confidence": 0.0,
+                "passed": False,
+                "component_scores": {},
+                "linguistic_features": {},
+                "suggestions": [],
+                "explanation": f"Error during linguistic analysis: {e!s}",
+                "metadata": {"rule_name": "Linguistic Quality Rule", "error": True},
+            }
 
     def _generate_explanation(self, score: float, suggestions: list[str]) -> str:
         """Generate explanation based on score and suggestions."""
         if score >= 0.8:
-            return 'Excellent linguistic quality with clear structure and good readability.'
+            return "Excellent linguistic quality with clear structure and good readability."
         if score >= 0.6:
-            return 'Good linguistic quality with minor areas for improvement.'
+            return "Good linguistic quality with minor areas for improvement."
         if score >= 0.4:
-            return 'Moderate linguistic quality that needs improvement in several areas.'
-        return 'Poor linguistic quality requiring significant improvement in clarity, structure, and readability.'
+            return (
+                "Moderate linguistic quality that needs improvement in several areas."
+            )
+        return "Poor linguistic quality requiring significant improvement in clarity, structure, and readability."

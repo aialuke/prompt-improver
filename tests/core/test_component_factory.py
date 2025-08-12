@@ -4,12 +4,23 @@ Tests for ComponentFactory with dependency injection and Protocol compliance.
 Tests the ComponentFactory implementation for proper dependency injection,
 component creation, and Protocol interface compliance.
 """
+
 import asyncio
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock
+
 import pytest
-from src.prompt_improver.core.factories.component_factory import ComponentFactory, DependencyValidator, create_component_factory
-from src.prompt_improver.core.protocols.ml_protocols import ComponentFactoryProtocol, ComponentSpec, ServiceContainerProtocol
+from src.prompt_improver.core.factories.component_factory import (
+    ComponentFactory,
+    DependencyValidator,
+    create_component_factory,
+)
+from src.prompt_improver.core.protocols.ml_protocols import (
+    ComponentFactoryProtocol,
+    ComponentSpec,
+    ServiceContainerProtocol,
+)
+
 
 class MockServiceContainer:
     """Mock service container for testing."""
@@ -19,11 +30,12 @@ class MockServiceContainer:
 
     async def get_service(self, service_name: str) -> Any:
         if service_name not in self.services:
-            raise KeyError(f'Service not found: {service_name}')
+            raise KeyError(f"Service not found: {service_name}")
         return self.services[service_name]
 
     def add_service(self, name: str, service: Any):
         self.services[name] = service
+
 
 class MockComponent:
     """Mock component for testing."""
@@ -40,23 +52,36 @@ class MockComponent:
     async def shutdown(self):
         self.shutdown_called = True
 
+
 @pytest.fixture
 def mock_container():
     """Create mock service container."""
     container = MockServiceContainer()
-    container.add_service('database_service', Mock(name='database_service'))
-    container.add_service('cache_service', Mock(name='cache_service'))
+    container.add_service("database_service", Mock(name="database_service"))
+    container.add_service("cache_service", Mock(name="cache_service"))
     return container
+
 
 @pytest.fixture
 def component_factory(mock_container):
     """Create ComponentFactory with mock container."""
     return ComponentFactory(mock_container)
 
+
 @pytest.fixture
 def sample_spec():
     """Create sample component specification."""
-    return ComponentSpec(name='test_component', module_path='tests.core.test_component_factory', class_name='MockComponent', tier='TIER_1', dependencies={'db_service': 'database_service', 'cache_service': 'cache_service'})
+    return ComponentSpec(
+        name="test_component",
+        module_path="tests.core.test_component_factory",
+        class_name="MockComponent",
+        tier="TIER_1",
+        dependencies={
+            "db_service": "database_service",
+            "cache_service": "cache_service",
+        },
+    )
+
 
 class TestComponentFactory:
     """Test ComponentFactory implementation."""
@@ -80,11 +105,26 @@ class TestComponentFactory:
 
     async def test_register_multiple_specs(self, component_factory):
         """Test multiple specification registration."""
-        specs = [ComponentSpec(name='comp1', module_path='test.module1', class_name='Comp1', tier='TIER_1', dependencies={}), ComponentSpec(name='comp2', module_path='test.module2', class_name='Comp2', tier='TIER_1', dependencies={})]
+        specs = [
+            ComponentSpec(
+                name="comp1",
+                module_path="test.module1",
+                class_name="Comp1",
+                tier="TIER_1",
+                dependencies={},
+            ),
+            ComponentSpec(
+                name="comp2",
+                module_path="test.module2",
+                class_name="Comp2",
+                tier="TIER_1",
+                dependencies={},
+            ),
+        ]
         await component_factory.register_multiple_specs(specs)
         assert len(component_factory.component_specs) == 2
-        assert 'comp1' in component_factory.component_specs
-        assert 'comp2' in component_factory.component_specs
+        assert "comp1" in component_factory.component_specs
+        assert "comp2" in component_factory.component_specs
 
     async def test_get_component_class(self, component_factory, sample_spec):
         """Test component class retrieval via dynamic import."""
@@ -93,14 +133,26 @@ class TestComponentFactory:
 
     async def test_get_component_class_missing_module(self, component_factory):
         """Test error handling for missing module."""
-        bad_spec = ComponentSpec(name='bad_component', module_path='non.existent.module', class_name='BadComponent', tier='TIER_1', dependencies={})
-        with pytest.raises(ImportError, match='Module import failed'):
+        bad_spec = ComponentSpec(
+            name="bad_component",
+            module_path="non.existent.module",
+            class_name="BadComponent",
+            tier="TIER_1",
+            dependencies={},
+        )
+        with pytest.raises(ImportError, match="Module import failed"):
             await component_factory.get_component_class(bad_spec)
 
     async def test_get_component_class_missing_class(self, component_factory):
         """Test error handling for missing class."""
-        bad_spec = ComponentSpec(name='bad_component', module_path='tests.core.test_component_factory', class_name='NonExistentClass', tier='TIER_1', dependencies={})
-        with pytest.raises(ImportError, match='Class.*resolution failed'):
+        bad_spec = ComponentSpec(
+            name="bad_component",
+            module_path="tests.core.test_component_factory",
+            class_name="NonExistentClass",
+            tier="TIER_1",
+            dependencies={},
+        )
+        with pytest.raises(ImportError, match="Class.*resolution failed"):
             await component_factory.get_component_class(bad_spec)
 
     async def test_validate_dependencies_success(self, component_factory, sample_spec):
@@ -110,8 +162,14 @@ class TestComponentFactory:
 
     async def test_validate_dependencies_missing_service(self, component_factory):
         """Test dependency validation with missing service."""
-        bad_spec = ComponentSpec(name='bad_component', module_path='test.module', class_name='BadComponent', tier='TIER_1', dependencies={'missing_service': 'non_existent_service'})
-        with pytest.raises(ValueError, match='Missing dependencies'):
+        bad_spec = ComponentSpec(
+            name="bad_component",
+            module_path="test.module",
+            class_name="BadComponent",
+            tier="TIER_1",
+            dependencies={"missing_service": "non_existent_service"},
+        )
+        with pytest.raises(ValueError, match="Missing dependencies"):
             await component_factory.validate_dependencies(bad_spec, {})
 
     async def test_create_component_success(self, component_factory, sample_spec):
@@ -122,9 +180,18 @@ class TestComponentFactory:
         assert component.cache_service is not None
         assert sample_spec.name in component_factory.created_components
 
-    async def test_create_component_with_async_init(self, component_factory, sample_spec):
+    async def test_create_component_with_async_init(
+        self, component_factory, sample_spec
+    ):
         """Test component creation with async initialization."""
-        spec_with_init = ComponentSpec(name=sample_spec.name, module_path=sample_spec.module_path, class_name=sample_spec.class_name, tier=sample_spec.tier, dependencies=sample_spec.dependencies, config={'requires_async_init': True})
+        spec_with_init = ComponentSpec(
+            name=sample_spec.name,
+            module_path=sample_spec.module_path,
+            class_name=sample_spec.class_name,
+            tier=sample_spec.tier,
+            dependencies=sample_spec.dependencies,
+            config={"requires_async_init": True},
+        )
         component = await component_factory.create_component(spec_with_init)
         assert isinstance(component, MockComponent)
         assert component.initialized is True
@@ -138,8 +205,8 @@ class TestComponentFactory:
 
     async def test_create_component_by_name_not_found(self, component_factory):
         """Test error handling for unknown component name."""
-        with pytest.raises(KeyError, match='Component specification not found'):
-            await component_factory.create_component_by_name('unknown_component')
+        with pytest.raises(KeyError, match="Component specification not found"):
+            await component_factory.create_component_by_name("unknown_component")
 
     async def test_get_or_create_component_cached(self, component_factory, sample_spec):
         """Test getting cached component."""
@@ -163,40 +230,67 @@ class TestComponentFactory:
             assert not component.shutdown_called
         assert component.shutdown_called is True
 
+
 class TestDependencyValidator:
     """Test DependencyValidator implementation."""
 
     def test_validator_creation(self):
         """Test validator creation."""
-        specs = {'comp1': Mock()}
+        specs = {"comp1": Mock()}
         validator = DependencyValidator(specs)
         assert validator.specs is specs
 
     def test_validate_all_dependencies_success(self):
         """Test successful validation of all dependencies."""
-        spec = ComponentSpec(name='test_comp', module_path='test.module', class_name='TestComp', tier='TIER_1', dependencies={'service1': 'database_service'})
-        validator = DependencyValidator({'test_comp': spec})
-        available_services = ['database_service', 'cache_service']
+        spec = ComponentSpec(
+            name="test_comp",
+            module_path="test.module",
+            class_name="TestComp",
+            tier="TIER_1",
+            dependencies={"service1": "database_service"},
+        )
+        validator = DependencyValidator({"test_comp": spec})
+        available_services = ["database_service", "cache_service"]
         errors = validator.validate_all_dependencies(available_services)
         assert len(errors) == 0
 
     def test_validate_all_dependencies_missing(self):
         """Test validation with missing dependencies."""
-        spec = ComponentSpec(name='test_comp', module_path='test.module', class_name='TestComp', tier='TIER_1', dependencies={'service1': 'missing_service'})
-        validator = DependencyValidator({'test_comp': spec})
-        available_services = ['database_service']
+        spec = ComponentSpec(
+            name="test_comp",
+            module_path="test.module",
+            class_name="TestComp",
+            tier="TIER_1",
+            dependencies={"service1": "missing_service"},
+        )
+        validator = DependencyValidator({"test_comp": spec})
+        available_services = ["database_service"]
         errors = validator.validate_all_dependencies(available_services)
         assert len(errors) == 1
-        assert 'missing_service' in errors[0]
+        assert "missing_service" in errors[0]
 
     def test_get_initialization_order(self):
         """Test initialization order determination."""
-        spec1 = ComponentSpec(name='comp1', module_path='test.module1', class_name='Comp1', tier='TIER_1', dependencies={})
-        spec2 = ComponentSpec(name='comp2', module_path='test.module2', class_name='Comp2', tier='TIER_1', dependencies={'service1': 'database_service'})
-        validator = DependencyValidator({'comp1': spec1, 'comp2': spec2})
+        spec1 = ComponentSpec(
+            name="comp1",
+            module_path="test.module1",
+            class_name="Comp1",
+            tier="TIER_1",
+            dependencies={},
+        )
+        spec2 = ComponentSpec(
+            name="comp2",
+            module_path="test.module2",
+            class_name="Comp2",
+            tier="TIER_1",
+            dependencies={"service1": "database_service"},
+        )
+        validator = DependencyValidator({"comp1": spec1, "comp2": spec2})
         levels = validator.get_initialization_order()
         assert len(levels) >= 1
-        assert 'comp1' in levels[0] or 'comp1' in levels[1] if len(levels) > 1 else True
-        assert 'comp2' in levels[0] or 'comp2' in levels[1] if len(levels) > 1 else True
-if __name__ == '__main__':
+        assert "comp1" in levels[0] or "comp1" in levels[1] if len(levels) > 1 else True
+        assert "comp2" in levels[0] or "comp2" in levels[1] if len(levels) > 1 else True
+
+
+if __name__ == "__main__":
     pytest.main([__file__])

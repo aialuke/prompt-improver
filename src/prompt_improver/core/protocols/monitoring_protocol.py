@@ -3,29 +3,42 @@
 Provides type-safe interface contracts for monitoring systems,
 enabling dependency inversion and improved testability.
 """
+
 from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, ParamSpec, Protocol, TypeVar
-P = ParamSpec('P')
-T = TypeVar('T')
+from typing import Any, Dict, Optional, ParamSpec, Protocol, TypeVar, runtime_checkable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 class HealthStatus(Enum):
     """Health check status enumeration"""
-    HEALTHY = 'healthy'
-    DEGRADED = 'degraded'
-    UNHEALTHY = 'unhealthy'
-    UNKNOWN = 'unknown'
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
+
 
 class HealthCheckResult:
     """Standardized health check result"""
 
-    def __init__(self, status: HealthStatus, message: str='', details: dict[str, Any] | None=None, timestamp: datetime | None=None):
+    def __init__(
+        self,
+        status: HealthStatus,
+        message: str = "",
+        details: dict[str, Any] | None = None,
+        timestamp: datetime | None = None,
+    ):
         self.status = status
         self.message = message
         self.details = details or {}
         self.timestamp = timestamp
 
+
+@runtime_checkable
 class BasicHealthCheckProtocol(Protocol):
     """Protocol for basic health check operations"""
 
@@ -41,6 +54,8 @@ class BasicHealthCheckProtocol(Protocol):
         """Get health check timeout in seconds"""
         ...
 
+
+@runtime_checkable
 class AdvancedHealthCheckProtocol(Protocol):
     """Protocol for advanced health check operations"""
 
@@ -56,18 +71,26 @@ class AdvancedHealthCheckProtocol(Protocol):
         """Perform comprehensive health check"""
         ...
 
+
+@runtime_checkable
 class PerformanceMonitorProtocol(Protocol):
     """Protocol for performance monitoring"""
 
-    async def record_metric(self, name: str, value: float, tags: dict[str, str] | None=None) -> None:
+    async def record_metric(
+        self, name: str, value: float, tags: dict[str, str] | None = None
+    ) -> None:
         """Record a performance metric"""
         ...
 
-    async def record_timer(self, name: str, duration_ms: float, tags: dict[str, str] | None=None) -> None:
+    async def record_timer(
+        self, name: str, duration_ms: float, tags: dict[str, str] | None = None
+    ) -> None:
         """Record timing metric"""
         ...
 
-    async def record_counter(self, name: str, count: int=1, tags: dict[str, str] | None=None) -> None:
+    async def record_counter(
+        self, name: str, count: int = 1, tags: dict[str, str] | None = None
+    ) -> None:
         """Record counter metric"""
         ...
 
@@ -75,6 +98,8 @@ class PerformanceMonitorProtocol(Protocol):
         """Get performance metrics summary"""
         ...
 
+
+@runtime_checkable
 class CircuitBreakerProtocol(Protocol):
     """Protocol for circuit breaker operations"""
 
@@ -94,14 +119,20 @@ class CircuitBreakerProtocol(Protocol):
         """Reset circuit breaker"""
         ...
 
+
+@runtime_checkable
 class AlertingProtocol(Protocol):
     """Protocol for alerting operations"""
 
-    async def send_alert(self, level: str, message: str, context: dict[str, Any] | None=None) -> bool:
+    async def send_alert(
+        self, level: str, message: str, context: dict[str, Any] | None = None
+    ) -> bool:
         """Send alert notification"""
         ...
 
-    async def send_health_alert(self, check_name: str, result: HealthCheckResult) -> bool:
+    async def send_health_alert(
+        self, check_name: str, result: HealthCheckResult
+    ) -> bool:
         """Send health check alert"""
         ...
 
@@ -109,10 +140,14 @@ class AlertingProtocol(Protocol):
         """Configure alerting rules"""
         ...
 
+
+@runtime_checkable
 class SLAMonitorProtocol(Protocol):
     """Protocol for SLA monitoring"""
 
-    async def record_sla_event(self, service: str, success: bool, response_time: float) -> None:
+    async def record_sla_event(
+        self, service: str, success: bool, response_time: float
+    ) -> None:
         """Record SLA event"""
         ...
 
@@ -124,6 +159,8 @@ class SLAMonitorProtocol(Protocol):
         """Check if service meets SLA requirements"""
         ...
 
+
+@runtime_checkable
 class MetricsCollectorProtocol(Protocol):
     """Protocol for metrics collection"""
 
@@ -139,11 +176,20 @@ class MetricsCollectorProtocol(Protocol):
         """Collect business-level metrics"""
         ...
 
-    async def export_metrics(self, format: str='opentelemetry') -> str:
+    async def export_metrics(self, format: str = "opentelemetry") -> str:
         """Export metrics in specified format"""
         ...
 
-class HealthServiceProtocol(BasicHealthCheckProtocol, AdvancedHealthCheckProtocol, PerformanceMonitorProtocol, CircuitBreakerProtocol, AlertingProtocol, SLAMonitorProtocol, MetricsCollectorProtocol):
+
+class HealthServiceProtocol(
+    BasicHealthCheckProtocol,
+    AdvancedHealthCheckProtocol,
+    PerformanceMonitorProtocol,
+    CircuitBreakerProtocol,
+    AlertingProtocol,
+    SLAMonitorProtocol,
+    MetricsCollectorProtocol,
+):
     """Combined protocol for comprehensive health monitoring"""
 
     async def get_overall_health(self) -> HealthCheckResult:

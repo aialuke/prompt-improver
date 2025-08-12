@@ -287,12 +287,12 @@ print(f"Critical checkers: {summary['critical_checkers']}")
 
 ## Unified Implementation Classes
 
-### UnifiedConnectionManagerV2
+### DatabaseServices
 
 The consolidated connection manager implementation.
 
 ```python
-from prompt_improver.database import UnifiedConnectionManagerV2
+from prompt_improver.database import DatabaseServicesV2
 from prompt_improver.database.config import UnifiedDatabaseConfig
 ```
 
@@ -342,7 +342,7 @@ config = UnifiedDatabaseConfig(
     password=os.getenv("DATABASE_PASSWORD")
 )
 
-connection_manager = UnifiedConnectionManagerV2(config)
+connection_manager = DatabaseServices(config)
 
 # High availability setup
 ha_config = UnifiedDatabaseConfig(
@@ -355,7 +355,7 @@ ha_config = UnifiedDatabaseConfig(
     failover_timeout=3.0
 )
 
-ha_manager = UnifiedConnectionManagerV2(ha_config)
+ha_manager = DatabaseServices(ha_config)
 
 # Performance-optimized setup
 perf_config = UnifiedDatabaseConfig(
@@ -369,12 +369,12 @@ perf_config = UnifiedDatabaseConfig(
     connection_timeout=5.0
 )
 
-perf_manager = UnifiedConnectionManagerV2(perf_config)
+perf_manager = DatabaseServices(perf_config)
 ```
 
 #### Methods
 ```python
-class UnifiedConnectionManagerV2:
+class DatabaseServices:
     """Consolidated connection manager implementation"""
     
     def __init__(self, config: UnifiedDatabaseConfig):

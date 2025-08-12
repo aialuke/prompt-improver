@@ -20,12 +20,12 @@ class DifficultyLevel(Enum):
 @dataclass
 class DifficultyProfile:
     """Profile for difficulty distribution."""
-    distribution_weights: Dict[str, float]
+    distribution_weights: dict[str, float]
     hardness_threshold: float
-    focus_areas: List[str]
-    complexity_factors: Dict[str, float]
-    adaptive_parameters: Dict[str, Any]
-    metadata: Dict[str, Any]
+    focus_areas: list[str]
+    complexity_factors: dict[str, float]
+    adaptive_parameters: dict[str, Any]
+    metadata: dict[str, Any]
 
 @dataclass
 class FocusAreaTarget:
@@ -36,7 +36,7 @@ class FocusAreaTarget:
     current_performance: float
     difficulty_emphasis: str
     sample_allocation: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 class DifficultyDistributionAnalyzer:
     """
@@ -53,7 +53,7 @@ class DifficultyDistributionAnalyzer:
         self.logger = logging.getLogger('apes.difficulty_distribution_analyzer')
         self.config = {'default_distribution': {'easy': 0.33, 'medium': 0.34, 'hard': 0.33}, 'adaptive_learning_rate': 0.1, 'hardness_percentiles': {'easy': 30, 'medium': 70, 'hard': 90}, 'focus_area_weights': {'clarity': 1.0, 'specificity': 1.0, 'effectiveness': 1.2, 'consistency': 1.1, 'coverage': 0.9}, 'complexity_factors': {'semantic_complexity': 0.3, 'syntactic_complexity': 0.2, 'domain_complexity': 0.25, 'rule_complexity': 0.25}, 'min_samples_per_level': 20, 'max_extreme_ratio': 0.1}
 
-    async def analyze_optimal_difficulty_distribution(self, performance_gaps: List[PerformanceGap], hardness_analysis: Dict[str, Any], focus_areas: Optional[List[str]]=None, current_performance: Optional[Dict[str, float]]=None) -> DifficultyProfile:
+    async def analyze_optimal_difficulty_distribution(self, performance_gaps: list[PerformanceGap], hardness_analysis: dict[str, Any], focus_areas: list[str] | None=None, current_performance: dict[str, float] | None=None) -> DifficultyProfile:
         """
         Analyze optimal difficulty distribution for targeted generation (2025 best practice).
 
@@ -83,7 +83,7 @@ class DifficultyDistributionAnalyzer:
             self.logger.error('Error in difficulty distribution analysis: %s', e)
             raise
 
-    async def generate_focus_area_targets(self, performance_gaps: List[PerformanceGap], focus_areas: List[str], current_performance: Dict[str, float], target_samples: int) -> List[FocusAreaTarget]:
+    async def generate_focus_area_targets(self, performance_gaps: list[PerformanceGap], focus_areas: list[str], current_performance: dict[str, float], target_samples: int) -> list[FocusAreaTarget]:
         """
         Generate detailed focus area targets for adaptive generation.
 
@@ -120,13 +120,13 @@ class DifficultyDistributionAnalyzer:
             self.logger.error('Error generating focus area targets: %s', e)
             raise
 
-    def _analyze_gap_difficulty_requirements(self, performance_gaps: List[PerformanceGap]) -> Dict[str, float]:
+    def _analyze_gap_difficulty_requirements(self, performance_gaps: list[PerformanceGap]) -> dict[str, float]:
         """Analyze difficulty requirements based on performance gaps."""
         if not performance_gaps:
             return self.config['default_distribution'].copy()
         severities = [gap.severity for gap in performance_gaps]
-        critical_ratio = sum((1 for s in severities if s >= 0.7)) / len(severities)
-        moderate_ratio = sum((1 for s in severities if 0.3 <= s < 0.7)) / len(severities)
+        critical_ratio = sum(1 for s in severities if s >= 0.7) / len(severities)
+        moderate_ratio = sum(1 for s in severities if 0.3 <= s < 0.7) / len(severities)
         minor_ratio = 1.0 - critical_ratio - moderate_ratio
         if critical_ratio > 0.5:
             return {'easy': 0.15, 'medium': 0.25, 'hard': 0.6}
@@ -137,13 +137,13 @@ class DifficultyDistributionAnalyzer:
         else:
             return {'easy': 0.33, 'medium': 0.34, 'hard': 0.33}
 
-    def _extract_hardness_insights(self, hardness_analysis: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_hardness_insights(self, hardness_analysis: dict[str, Any]) -> dict[str, Any]:
         """Extract actionable insights from hardness analysis."""
         distribution = hardness_analysis.get('distribution', {})
         insights = {'hard_examples_ratio': distribution.get('hard_examples_ratio', 0.3), 'hardness_variance': distribution.get('std', 0.2), 'median_hardness': distribution.get('median', 0.5), 'hardness_skew': self._calculate_hardness_skew(distribution), 'requires_extreme_examples': distribution.get('hard_examples_ratio', 0.3) > 0.6}
         return insights
 
-    def _calculate_hardness_skew(self, distribution: Dict[str, float]) -> str:
+    def _calculate_hardness_skew(self, distribution: dict[str, float]) -> str:
         """Calculate hardness distribution skew."""
         mean = distribution.get('mean', 0.5)
         median = distribution.get('median', 0.5)
@@ -154,7 +154,7 @@ class DifficultyDistributionAnalyzer:
         else:
             return 'symmetric'
 
-    async def _calculate_focus_area_priorities(self, performance_gaps: List[PerformanceGap], focus_areas: Optional[List[str]], current_performance: Optional[Dict[str, float]]) -> Dict[str, float]:
+    async def _calculate_focus_area_priorities(self, performance_gaps: list[PerformanceGap], focus_areas: list[str] | None, current_performance: dict[str, float] | None) -> dict[str, float]:
         """Calculate priority scores for focus areas."""
         if not focus_areas:
             return {}
@@ -170,7 +170,7 @@ class DifficultyDistributionAnalyzer:
             priorities[area] = final_priority
         return priorities
 
-    def _calculate_gap_adjustment(self, area: str, performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_gap_adjustment(self, area: str, performance_gaps: list[PerformanceGap]) -> float:
         """Calculate priority adjustment based on relevant gaps."""
         relevant_gaps = []
         for gap in performance_gaps:
@@ -178,12 +178,12 @@ class DifficultyDistributionAnalyzer:
                 relevant_gaps.append(gap)
         if not relevant_gaps:
             return 1.0
-        total_impact = sum((gap.severity * gap.improvement_potential for gap in relevant_gaps))
+        total_impact = sum(gap.severity * gap.improvement_potential for gap in relevant_gaps)
         average_impact = total_impact / len(relevant_gaps)
         adjustment = 0.5 + average_impact * 1.5
         return min(2.0, max(0.5, adjustment))
 
-    def _calculate_adaptive_distribution(self, gap_requirements: Dict[str, float], hardness_insights: Dict[str, Any], focus_priorities: Dict[str, float]) -> Dict[str, float]:
+    def _calculate_adaptive_distribution(self, gap_requirements: dict[str, float], hardness_insights: dict[str, Any], focus_priorities: dict[str, float]) -> dict[str, float]:
         """Calculate adaptive difficulty distribution."""
         distribution = gap_requirements.copy()
         hard_ratio = hardness_insights['hard_examples_ratio']
@@ -202,7 +202,7 @@ class DifficultyDistributionAnalyzer:
             distribution = {k: v / total for k, v in distribution.items()}
         return distribution
 
-    def _apply_complexity_factors(self, distribution: Dict[str, float], performance_gaps: List[PerformanceGap]) -> Dict[str, float]:
+    def _apply_complexity_factors(self, distribution: dict[str, float], performance_gaps: list[PerformanceGap]) -> dict[str, float]:
         """Apply complexity factors to difficulty distribution."""
         complexity_score = self._calculate_overall_complexity(performance_gaps)
         adjusted_distribution = distribution.copy()
@@ -217,23 +217,23 @@ class DifficultyDistributionAnalyzer:
             adjusted_distribution['hard'] = max(0.1, adjusted_distribution['hard'] - shift_amount)
         return adjusted_distribution
 
-    def _calculate_overall_complexity(self, performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_overall_complexity(self, performance_gaps: list[PerformanceGap]) -> float:
         """Calculate overall complexity score from performance gaps."""
         if not performance_gaps:
             return 0.5
         severity_complexity = np.mean([gap.severity for gap in performance_gaps])
         confidence_complexity = 1.0 - np.mean([gap.confidence for gap in performance_gaps])
-        type_complexity = len(set((gap.gap_type for gap in performance_gaps))) / 3.0
+        type_complexity = len({gap.gap_type for gap in performance_gaps}) / 3.0
         overall_complexity = severity_complexity * 0.4 + confidence_complexity * 0.3 + type_complexity * 0.3
         return min(1.0, max(0.0, overall_complexity))
 
-    def _validate_and_normalize_distribution(self, distribution: Dict[str, float]) -> Dict[str, float]:
+    def _validate_and_normalize_distribution(self, distribution: dict[str, float]) -> dict[str, float]:
         """Validate and normalize difficulty distribution."""
         min_ratio = self.config['min_samples_per_level'] / 1000.0
         validated_distribution = {}
         for level in ['easy', 'medium', 'hard']:
             validated_distribution[level] = max(min_ratio, distribution.get(level, 0.33))
-        if any((gap.severity > 0.9 for gap in [] if hasattr(self, '_current_gaps'))):
+        if any(gap.severity > 0.9 for gap in [] if hasattr(self, '_current_gaps')):
             extreme_ratio = min(self.config['max_extreme_ratio'], 0.05)
             validated_distribution['extreme'] = extreme_ratio
         total = sum(validated_distribution.values())
@@ -241,7 +241,7 @@ class DifficultyDistributionAnalyzer:
             validated_distribution = {k: v / total for k, v in validated_distribution.items()}
         return validated_distribution
 
-    def _calculate_optimal_hardness_threshold(self, hardness_analysis: Dict[str, Any], performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_optimal_hardness_threshold(self, hardness_analysis: dict[str, Any], performance_gaps: list[PerformanceGap]) -> float:
         """Calculate optimal hardness threshold for example classification."""
         base_threshold = hardness_analysis.get('optimal_threshold', 0.7)
         if performance_gaps:
@@ -252,11 +252,11 @@ class DifficultyDistributionAnalyzer:
                 base_threshold = min(0.8, base_threshold + 0.1)
         return base_threshold
 
-    def _generate_adaptive_parameters(self, performance_gaps: List[PerformanceGap], hardness_insights: Dict[str, Any], focus_priorities: Dict[str, float]) -> Dict[str, Any]:
+    def _generate_adaptive_parameters(self, performance_gaps: list[PerformanceGap], hardness_insights: dict[str, Any], focus_priorities: dict[str, float]) -> dict[str, Any]:
         """Generate adaptive parameters for dynamic difficulty adjustment."""
         return {'learning_rate': self.config['adaptive_learning_rate'], 'adjustment_frequency': 100, 'performance_window': 50, 'min_improvement_threshold': 0.02, 'max_difficulty_shift': 0.1, 'focus_area_boost': 1.2 if focus_priorities else 1.0, 'hardness_sensitivity': hardness_insights.get('hardness_variance', 0.2), 'plateau_detection': {'window_size': 20, 'threshold': 0.01}}
 
-    def _generate_distribution_reasoning(self, distribution: Dict[str, float], gap_requirements: Dict[str, float], hardness_insights: Dict[str, Any]) -> str:
+    def _generate_distribution_reasoning(self, distribution: dict[str, float], gap_requirements: dict[str, float], hardness_insights: dict[str, Any]) -> str:
         """Generate human-readable reasoning for distribution choice."""
         hard_ratio = distribution.get('hard', 0.33)
         easy_ratio = distribution.get('easy', 0.33)
@@ -267,7 +267,7 @@ class DifficultyDistributionAnalyzer:
         else:
             return f'Balanced distribution ({hard_ratio:.1%} hard, {easy_ratio:.1%} easy) appropriate for moderate gap severity and complexity'
 
-    def _calculate_area_priority(self, area: str, performance_gaps: List[PerformanceGap], current_performance: Dict[str, float]) -> float:
+    def _calculate_area_priority(self, area: str, performance_gaps: list[PerformanceGap], current_performance: dict[str, float]) -> float:
         """Calculate priority score for a focus area."""
         base_priority = self.config['focus_area_weights'].get(area, 1.0)
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower() or area.lower() in str(gap.metadata).lower()]
@@ -280,7 +280,7 @@ class DifficultyDistributionAnalyzer:
         performance_adjustment = 2.0 - current_perf
         return base_priority * gap_adjustment * performance_adjustment
 
-    def _determine_area_difficulty_emphasis(self, area: str, performance_gaps: List[PerformanceGap]) -> str:
+    def _determine_area_difficulty_emphasis(self, area: str, performance_gaps: list[PerformanceGap]) -> str:
         """Determine difficulty emphasis for a focus area."""
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower()]
         if not relevant_gaps:
@@ -293,16 +293,16 @@ class DifficultyDistributionAnalyzer:
         else:
             return 'easy'
 
-    def _calculate_target_improvement(self, area: str, current_performance: float, performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_target_improvement(self, area: str, current_performance: float, performance_gaps: list[PerformanceGap]) -> float:
         """Calculate target improvement for a focus area."""
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower()]
         if relevant_gaps:
-            max_improvement = max((gap.improvement_potential for gap in relevant_gaps))
+            max_improvement = max(gap.improvement_potential for gap in relevant_gaps)
             return min(0.3, max_improvement)
         else:
             return min(0.2, 1.0 - current_performance)
 
-    def _calculate_gap_relevance(self, area: str, performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_gap_relevance(self, area: str, performance_gaps: list[PerformanceGap]) -> float:
         """Calculate how relevant performance gaps are to this area."""
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower() or area.lower() in str(gap.metadata).lower()]
         if not relevant_gaps:
@@ -311,7 +311,7 @@ class DifficultyDistributionAnalyzer:
         severity_weight = np.mean([gap.severity for gap in relevant_gaps])
         return min(1.0, relevance_score * severity_weight * 2.0)
 
-    def _calculate_area_complexity(self, area: str, performance_gaps: List[PerformanceGap]) -> float:
+    def _calculate_area_complexity(self, area: str, performance_gaps: list[PerformanceGap]) -> float:
         """Calculate complexity score for a focus area."""
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower()]
         if not relevant_gaps:

@@ -32,9 +32,9 @@ class TrainingWorkflowCoordinator:
         self.event_bus = event_bus
         self.resource_manager = resource_manager
         self.logger = logging.getLogger(__name__)
-        self.active_workflows: Dict[str, Dict[str, Any]] = {}
+        self.active_workflows: dict[str, dict[str, Any]] = {}
 
-    async def start_training_workflow(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def start_training_workflow(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Start a new training workflow."""
         self.logger.info('Starting training workflow %s', workflow_id)
         self.active_workflows[workflow_id] = {'status': 'running', 'started_at': datetime.now(timezone.utc), 'parameters': parameters, 'current_step': None, 'steps_completed': []}
@@ -56,7 +56,7 @@ class TrainingWorkflowCoordinator:
             self.logger.error('Training workflow {workflow_id} failed: %s', e)
             raise
 
-    async def _execute_data_loading(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_loading(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute data loading step."""
         self.logger.info('Executing data loading for workflow %s', workflow_id)
         self.active_workflows[workflow_id]['current_step'] = 'data_loading'
@@ -66,7 +66,7 @@ class TrainingWorkflowCoordinator:
         self.active_workflows[workflow_id]['steps_completed'].append('data_loading')
         self.logger.info('Data loading completed for workflow %s', workflow_id)
 
-    async def _execute_model_training(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_model_training(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute model training step."""
         self.logger.info('Executing model training for workflow %s', workflow_id)
         self.active_workflows[workflow_id]['current_step'] = 'model_training'
@@ -76,7 +76,7 @@ class TrainingWorkflowCoordinator:
         self.active_workflows[workflow_id]['steps_completed'].append('model_training')
         self.logger.info('Model training completed for workflow %s', workflow_id)
 
-    async def _execute_rule_optimization(self, workflow_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_rule_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute rule optimization step."""
         self.logger.info('Executing rule optimization for workflow %s', workflow_id)
         self.active_workflows[workflow_id]['current_step'] = 'rule_optimization'
@@ -94,12 +94,12 @@ class TrainingWorkflowCoordinator:
         self.active_workflows[workflow_id]['completed_at'] = datetime.now(timezone.utc)
         self.logger.info('Training workflow %s stopped', workflow_id)
 
-    async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_workflow_status(self, workflow_id: str) -> dict[str, Any]:
         """Get the status of a training workflow."""
         if workflow_id not in self.active_workflows:
             raise ValueError(f'Training workflow {workflow_id} not found')
         return self.active_workflows[workflow_id].copy()
 
-    async def list_active_workflows(self) -> List[str]:
+    async def list_active_workflows(self) -> list[str]:
         """List all active training workflows."""
         return [wf_id for wf_id, wf_data in self.active_workflows.items() if wf_data['status'] == 'running']

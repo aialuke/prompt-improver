@@ -67,9 +67,9 @@ class TestWorkflowMetricsCollector:
             await metrics_collector.record_metric(workflow_id, MetricType.ERROR_RATE, 'workflow_error_rate', rate, {'unit': 'percentage', 'threshold': 0.05})
         error_metrics = await metrics_collector.get_metrics_by_type(workflow_id, MetricType.ERROR_RATE)
         assert len(error_metrics) == 5
-        max_error_rate = max((m.value for m in error_metrics))
+        max_error_rate = max(m.value for m in error_metrics)
         assert max_error_rate == 0.05
-        assert all((m.metadata['threshold'] == 0.05 for m in error_metrics))
+        assert all(m.metadata['threshold'] == 0.05 for m in error_metrics)
 
     @pytest.mark.asyncio
     async def test_record_resource_utilization_metric(self, metrics_collector):
@@ -93,7 +93,7 @@ class TestWorkflowMetricsCollector:
             await metrics_collector.record_metric(workflow_id, MetricType.WORKFLOW_DURATION, f'{step_name}_duration', duration, {'unit': 'seconds', 'step': step_name})
         duration_metrics = await metrics_collector.get_metrics_by_type(workflow_id, MetricType.WORKFLOW_DURATION)
         assert len(duration_metrics) == 5
-        total_duration = sum((m.value for m in duration_metrics))
+        total_duration = sum(m.value for m in duration_metrics)
         assert total_duration == sum((duration for _, duration in step_durations))
         longest_step = max(duration_metrics, key=lambda x: x.value)
         assert longest_step.metadata['step'] == 'model_training'
@@ -108,7 +108,7 @@ class TestWorkflowMetricsCollector:
             await metrics_collector.record_metric(workflow_id, MetricType.COMPONENT_LATENCY, f'{component_name}_latency', latency, {'unit': 'milliseconds', 'component': component_name})
         latency_metrics = await metrics_collector.get_metrics_by_type(workflow_id, MetricType.COMPONENT_LATENCY)
         assert len(latency_metrics) == 4
-        avg_latency = sum((m.value for m in latency_metrics)) / len(latency_metrics)
+        avg_latency = sum(m.value for m in latency_metrics) / len(latency_metrics)
         assert avg_latency > 0
         fastest_component = min(latency_metrics, key=lambda x: x.value)
         assert fastest_component.metadata['component'] == 'training_data_loader'
@@ -162,7 +162,7 @@ class TestWorkflowMetricsCollector:
         assert len(prometheus_metrics) > 0
         for metric_line in prometheus_metrics:
             assert isinstance(metric_line, str)
-            assert any((name in metric_line for name in ['cpu_usage', 'requests_per_second', 'error_percentage']))
+            assert any(name in metric_line for name in ['cpu_usage', 'requests_per_second', 'error_percentage'])
 
     @pytest.mark.asyncio
     async def test_metrics_retention_and_cleanup(self, metrics_collector):
@@ -249,13 +249,23 @@ class TestMetricAggregation:
 
     def test_aggregation_serialization(self):
         """Test aggregation to/from dict conversion."""
-        aggregation = MetricAggregation(metric_name='serialize_metric', metric_type=MetricType.ERROR_RATE, count=50, average=0.05, minimum=0.01, maximum=0.15, percentile_50=0.04, percentile_95=0.12, percentile_99=0.14)
+        aggregation = MetricAggregation(
+            metric_name='serialize_metric', 
+            count=50, 
+            sum_value=2.5, 
+            avg_value=0.05, 
+            min_value=0.01, 
+            max_value=0.15, 
+            percentile_95=0.12, 
+            percentile_99=0.14,
+            window_start=datetime.now(timezone.utc),
+            window_end=datetime.now(timezone.utc) + timedelta(minutes=1)
+        )
         agg_dict = aggregation.to_dict()
         restored_agg = MetricAggregation.from_dict(agg_dict)
         assert restored_agg.metric_name == aggregation.metric_name
-        assert restored_agg.metric_type == aggregation.metric_type
         assert restored_agg.count == aggregation.count
-        assert restored_agg.average == aggregation.average
+        assert restored_agg.avg_value == aggregation.avg_value
 if __name__ == '__main__':
 
     async def smoke_test():

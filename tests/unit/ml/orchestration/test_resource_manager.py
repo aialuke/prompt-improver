@@ -110,7 +110,7 @@ class TestResourceManager:
         tasks = [resource_manager.allocate_resources(workflow_id, requirements) for workflow_id in workflows]
         allocations = await asyncio.gather(*tasks)
         assert len(allocations) == 5
-        assert all((allocation is not None for allocation in allocations))
+        assert all(allocation is not None for allocation in allocations)
         allocation_ids = [alloc.allocation_id for alloc in allocations]
         assert len(set(allocation_ids)) == 5
 

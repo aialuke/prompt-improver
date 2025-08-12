@@ -32,14 +32,14 @@ class ComponentInfo:
     """Information about a component in the orchestration system."""
     name: str
     tier: ComponentTier
-    capabilities: List[ComponentCapability]
-    dependencies: List[str] = None
-    config: Dict[str, Any] = None
+    capabilities: list[ComponentCapability]
+    dependencies: list[str] = None
+    config: dict[str, Any] = None
     enabled: bool = True
-    status: Optional[str] = None
+    status: str | None = None
     last_health_check: Optional['datetime'] = None
-    error_message: Optional[str] = None
-    health_check_endpoint: Optional[str] = None
+    error_message: str | None = None
+    health_check_endpoint: str | None = None
     registered_at: Optional['datetime'] = None
 
     def __post_init__(self):
@@ -57,9 +57,9 @@ class ComponentStatus:
     name: str
     is_running: bool = False
     is_healthy: bool = True
-    last_check: Optional[str] = None
-    error_message: Optional[str] = None
-    metrics: Dict[str, Any] = None
+    last_check: str | None = None
+    error_message: str | None = None
+    metrics: dict[str, Any] = None
 
     def __post_init__(self):
         if self.metrics is None:
@@ -73,4 +73,4 @@ class ComponentMetrics:
     cpu_usage_percent: float = 0.0
     success_rate: float = 100.0
     error_count: int = 0
-    last_execution: Optional[str] = None
+    last_execution: str | None = None

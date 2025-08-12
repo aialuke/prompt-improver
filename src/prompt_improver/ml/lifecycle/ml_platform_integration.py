@@ -17,7 +17,8 @@ import json
 import logging
 from pathlib import Path
 import time
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from collections.abc import Callable
 import uuid
 from sqlmodel import SQLModel, Field
 import numpy as np
@@ -86,14 +87,14 @@ class WorkflowRequest:
     """Request for ML platform workflow execution."""
     workflow_id: str
     workflow_type: WorkflowType
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     priority: ExperimentPriority = ExperimentPriority.NORMAL
     requester: str = 'system'
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    model_id: Optional[str] = None
-    experiment_config: Optional[EnhancedExperimentConfig] = None
-    deployment_config: Optional[DeploymentConfig] = None
-    serving_config: Optional[ServingConfig] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    model_id: str | None = None
+    experiment_config: EnhancedExperimentConfig | None = None
+    deployment_config: DeploymentConfig | None = None
+    serving_config: ServingConfig | None = None
 
 @dataclass
 class WorkflowResult:
@@ -102,15 +103,15 @@ class WorkflowResult:
     workflow_type: WorkflowType
     status: str
     start_time: datetime
-    end_time: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
-    model_id: Optional[str] = None
-    deployment_id: Optional[str] = None
-    experiment_id: Optional[str] = None
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    artifacts: Dict[str, str] = field(default_factory=dict)
-    error_message: Optional[str] = None
-    warnings: List[str] = field(default_factory=list)
+    end_time: datetime | None = None
+    duration_seconds: float | None = None
+    model_id: str | None = None
+    deployment_id: str | None = None
+    experiment_id: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
+    artifacts: dict[str, str] = field(default_factory=dict)
+    error_message: str | None = None
+    warnings: list[str] = field(default_factory=list)
 
 class MLPlatformIntegration:
     """Unified ML Platform Integration for Complete Model Lifecycle Management.
@@ -134,24 +135,24 @@ class MLPlatformIntegration:
         """
         self.storage_path = storage_path
         self.storage_path.mkdir(parents=True, exist_ok=True)
-        self.model_registry: Optional[EnhancedModelRegistry] = None
-        self.deployment_pipeline: Optional[AutomatedDeploymentPipeline] = None
-        self.experiment_orchestrator: Optional[EnhancedExperimentOrchestrator] = None
-        self.model_server: Optional[ProductionModelServer] = None
-        self.batch_processor: Optional[UnifiedBatchProcessor] = None
-        self.ab_testing_service: Optional[ModernABTestingService] = None
-        self.database_manager: Optional[DatabaseOptimizationManager] = None
-        self.performance_monitor: Optional[PerformanceMonitor] = None
+        self.model_registry: EnhancedModelRegistry | None = None
+        self.deployment_pipeline: AutomatedDeploymentPipeline | None = None
+        self.experiment_orchestrator: EnhancedExperimentOrchestrator | None = None
+        self.model_server: ProductionModelServer | None = None
+        self.batch_processor: UnifiedBatchProcessor | None = None
+        self.ab_testing_service: ModernABTestingService | None = None
+        self.database_manager: DatabaseOptimizationManager | None = None
+        self.performance_monitor: PerformanceMonitor | None = None
         self.task_manager = task_manager or get_background_task_manager()
         self.platform_status = PlatformStatus.INITIALIZING
         self.start_time = time.time()
         self.metrics = PlatformMetrics()
-        self.active_workflows: Dict[str, WorkflowResult] = {}
-        self.workflow_history: List[WorkflowResult] = []
+        self.active_workflows: dict[str, WorkflowResult] = {}
+        self.workflow_history: list[WorkflowResult] = []
         self.workflow_executor = ThreadPoolExecutor(max_workers=16)
         self.enable_distributed = enable_distributed
         self.enable_monitoring = enable_monitoring
-        self._background_task_ids: List[str] = []
+        self._background_task_ids: list[str] = []
         self._is_running = False
         logger.info('ML Platform Integration initialized')
         logger.info('Target improvements: 40%% deployment speed, 10x experiment throughput')
@@ -283,7 +284,7 @@ class MLPlatformIntegration:
             del self.active_workflows[request.workflow_id]
         return request.workflow_id
 
-    async def _execute_experiment_to_production_workflow(self, request: WorkflowRequest) -> Dict[str, Any]:
+    async def _execute_experiment_to_production_workflow(self, request: WorkflowRequest) -> dict[str, Any]:
         """Execute end-to-end experiment to production workflow."""
         results = {'metrics': {}, 'artifacts': {}}
         if request.experiment_config and self.experiment_orchestrator:
@@ -309,7 +310,7 @@ class MLPlatformIntegration:
             results['serving_id'] = serving_id
         return results
 
-    async def _execute_ab_test_workflow(self, request: WorkflowRequest) -> Dict[str, Any]:
+    async def _execute_ab_test_workflow(self, request: WorkflowRequest) -> dict[str, Any]:
         """Execute A/B test deployment workflow with Phase 1 integration."""
         results = {'metrics': {}, 'artifacts': {}}
         if self.ab_testing_service and self.deployment_pipeline:
@@ -322,7 +323,7 @@ class MLPlatformIntegration:
             results['metrics']['ab_testing_optimized'] = True
         return results
 
-    async def _execute_batch_inference_workflow(self, request: WorkflowRequest) -> Dict[str, Any]:
+    async def _execute_batch_inference_workflow(self, request: WorkflowRequest) -> dict[str, Any]:
         """Execute batch inference workflow with Phase 1 batch processing."""
         results = {'metrics': {}, 'artifacts': {}}
         if self.batch_processor:
@@ -348,7 +349,7 @@ class MLPlatformIntegration:
             self.metrics.experiments_per_hour = throughput_metrics.get('experiments_per_hour', 0.0)
         if self.model_server:
             serving_stats = await self.model_server.get_serving_statistics()
-            self.metrics.total_requests = sum((model['total_requests'] for model in serving_stats.get('models', {}).values()))
+            self.metrics.total_requests = sum(model['total_requests'] for model in serving_stats.get('models', {}).values())
         completed_workflows = [w for w in self.workflow_history if w.status == 'completed']
         deployment_workflows = [w for w in completed_workflows if w.workflow_type == WorkflowType.EXPERIMENT_TO_PRODUCTION]
         if deployment_workflows:
@@ -361,7 +362,7 @@ class MLPlatformIntegration:
         self.metrics.last_updated = aware_utc_now()
         return self.metrics
 
-    async def get_platform_status(self) -> Dict[str, Any]:
+    async def get_platform_status(self) -> dict[str, Any]:
         """Get comprehensive platform status and health information."""
         metrics = await self.get_platform_metrics()
         return {'platform_status': self.platform_status.value, 'uptime_hours': metrics.platform_uptime_hours, 'performance_targets': {'deployment_speed_improvement': {'target_percent': 40.0, 'current_percent': metrics.deployment_speed_improvement_percent, 'achieved': metrics.deployment_speed_improvement_percent >= 40.0}, 'experiment_throughput_improvement': {'target_factor': 10.0, 'current_factor': metrics.experiment_throughput_improvement_factor, 'achieved': metrics.experiment_throughput_improvement_factor >= 10.0}}, 'component_health': {'model_registry': 'healthy' if self.model_registry else 'unavailable', 'deployment_pipeline': 'healthy' if self.deployment_pipeline else 'unavailable', 'experiment_orchestrator': 'healthy' if self.experiment_orchestrator else 'unavailable', 'model_server': 'healthy' if self.model_server else 'unavailable', 'batch_processor': metrics.batch_processing_health, 'ab_testing': metrics.ab_testing_health, 'database': metrics.database_health, 'monitoring': metrics.monitoring_health}, 'active_workflows': len(self.active_workflows), 'completed_workflows': len(self.workflow_history), 'metrics': {'total_models': metrics.total_models, 'experiments_per_hour': metrics.experiments_per_hour, 'total_requests': metrics.total_requests, 'avg_response_time_ms': metrics.avg_response_time_ms}}
@@ -476,14 +477,14 @@ async def create_ml_platform(storage_path: Path=Path('./ml_platform'), enable_di
         raise RuntimeError('Failed to initialize ML Platform')
     return platform
 
-def create_experiment_to_production_request(experiment_config: EnhancedExperimentConfig, deployment_config: DeploymentConfig, serving_config: ServingConfig, train_function: Callable, train_data: Any, validation_data: Optional[Any]=None, priority: ExperimentPriority=ExperimentPriority.NORMAL) -> WorkflowRequest:
+def create_experiment_to_production_request(experiment_config: EnhancedExperimentConfig, deployment_config: DeploymentConfig, serving_config: ServingConfig, train_function: Callable, train_data: Any, validation_data: Any | None=None, priority: ExperimentPriority=ExperimentPriority.NORMAL) -> WorkflowRequest:
     """Create experiment-to-production workflow request."""
     return WorkflowRequest(workflow_id=f'exp2prod_{int(time.time())}', workflow_type=WorkflowType.EXPERIMENT_TO_PRODUCTION, parameters={'train_function': train_function, 'train_data': train_data, 'validation_data': validation_data, 'model_name': experiment_config.experiment_name}, priority=priority, experiment_config=experiment_config, deployment_config=deployment_config, serving_config=serving_config)
 
-def create_ab_test_deployment_request(model_a_id: str, model_b_id: str, deployment_config: DeploymentConfig, traffic_split: Dict[str, float]=None, priority: ExperimentPriority=ExperimentPriority.HIGH) -> WorkflowRequest:
+def create_ab_test_deployment_request(model_a_id: str, model_b_id: str, deployment_config: DeploymentConfig, traffic_split: dict[str, float]=None, priority: ExperimentPriority=ExperimentPriority.HIGH) -> WorkflowRequest:
     """Create A/B test deployment workflow request."""
     return WorkflowRequest(workflow_id=f'abtest_{int(time.time())}', workflow_type=WorkflowType.A_B_TEST_DEPLOYMENT, parameters={'model_a_id': model_a_id, 'model_b_id': model_b_id, 'ab_test_config': {'traffic_split': traffic_split or {'A': 0.5, 'B': 0.5}}}, priority=priority, deployment_config=deployment_config)
 
-def create_batch_inference_request(model_id: str, input_data: Any, batch_config: Dict[str, Any]=None, priority: ExperimentPriority=ExperimentPriority.NORMAL) -> WorkflowRequest:
+def create_batch_inference_request(model_id: str, input_data: Any, batch_config: dict[str, Any]=None, priority: ExperimentPriority=ExperimentPriority.NORMAL) -> WorkflowRequest:
     """Create batch inference workflow request."""
     return WorkflowRequest(workflow_id=f'batch_{int(time.time())}', workflow_type=WorkflowType.BATCH_INFERENCE, parameters={'input_data': input_data, 'batch_config': batch_config or {'batch_size': 1000}}, priority=priority, model_id=model_id)

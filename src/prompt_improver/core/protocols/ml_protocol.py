@@ -3,10 +3,13 @@
 Provides type-safe interface contracts for machine learning components,
 enabling dependency inversion and improved testability.
 """
+
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
+
+@runtime_checkable
 class ModelProtocol(Protocol):
     """Protocol for ML model operations"""
 
@@ -26,14 +29,18 @@ class ModelProtocol(Protocol):
         """Get model version"""
         ...
 
+
+@runtime_checkable
 class ModelRegistryProtocol(Protocol):
     """Protocol for model registry operations"""
 
-    async def register_model(self, name: str, model: Any, metadata: dict[str, Any]) -> str:
+    async def register_model(
+        self, name: str, model: Any, metadata: dict[str, Any]
+    ) -> str:
         """Register a new model"""
         ...
 
-    async def get_model(self, name: str, version: str | None=None) -> ModelProtocol:
+    async def get_model(self, name: str, version: str | None = None) -> ModelProtocol:
         """Get model by name and version"""
         ...
 
@@ -49,10 +56,12 @@ class ModelRegistryProtocol(Protocol):
         """Promote model to a stage (staging, production, etc.)"""
         ...
 
+
+@runtime_checkable
 class ExperimentTrackingProtocol(Protocol):
     """Protocol for experiment tracking"""
 
-    async def start_experiment(self, name: str, description: str='') -> str:
+    async def start_experiment(self, name: str, description: str = "") -> str:
         """Start a new experiment"""
         ...
 
@@ -64,7 +73,9 @@ class ExperimentTrackingProtocol(Protocol):
         """Log experiment metrics"""
         ...
 
-    async def log_artifacts(self, experiment_id: str, artifacts: dict[str, Path]) -> None:
+    async def log_artifacts(
+        self, experiment_id: str, artifacts: dict[str, Path]
+    ) -> None:
         """Log experiment artifacts"""
         ...
 
@@ -72,14 +83,23 @@ class ExperimentTrackingProtocol(Protocol):
         """End experiment with status"""
         ...
 
+
+@runtime_checkable
 class FeatureStoreProtocol(Protocol):
     """Protocol for feature store operations"""
 
-    async def get_features(self, feature_names: list[str], entity_ids: list[str]) -> dict[str, Any]:
+    async def get_features(
+        self, feature_names: list[str], entity_ids: list[str]
+    ) -> dict[str, Any]:
         """Get features for entities"""
         ...
 
-    async def get_historical_features(self, feature_names: list[str], entity_ids: list[str], timestamp_range: tuple[datetime, datetime]) -> dict[str, Any]:
+    async def get_historical_features(
+        self,
+        feature_names: list[str],
+        entity_ids: list[str],
+        timestamp_range: tuple[datetime, datetime],
+    ) -> dict[str, Any]:
         """Get historical features"""
         ...
 
@@ -87,6 +107,8 @@ class FeatureStoreProtocol(Protocol):
         """Register a new feature group"""
         ...
 
+
+@runtime_checkable
 class DataPipelineProtocol(Protocol):
     """Protocol for data pipeline operations"""
 
@@ -106,25 +128,37 @@ class DataPipelineProtocol(Protocol):
         """Save data to destination"""
         ...
 
+
+@runtime_checkable
 class ModelTrainingProtocol(Protocol):
     """Protocol for model training operations"""
 
-    async def train_model(self, algorithm: str, training_data: Any, hyperparameters: dict[str, Any]) -> tuple[ModelProtocol, dict[str, Any]]:
+    async def train_model(
+        self, algorithm: str, training_data: Any, hyperparameters: dict[str, Any]
+    ) -> tuple[ModelProtocol, dict[str, Any]]:
         """Train a model and return model + metrics"""
         ...
 
-    async def validate_model(self, model: ModelProtocol, validation_data: Any) -> dict[str, float]:
+    async def validate_model(
+        self, model: ModelProtocol, validation_data: Any
+    ) -> dict[str, float]:
         """Validate model performance"""
         ...
 
-    async def tune_hyperparameters(self, algorithm: str, training_data: Any, param_space: dict[str, Any]) -> dict[str, Any]:
+    async def tune_hyperparameters(
+        self, algorithm: str, training_data: Any, param_space: dict[str, Any]
+    ) -> dict[str, Any]:
         """Tune hyperparameters"""
         ...
 
+
+@runtime_checkable
 class ModelServingProtocol(Protocol):
     """Protocol for model serving operations"""
 
-    async def deploy_model(self, model_name: str, version: str, config: dict[str, Any]) -> str:
+    async def deploy_model(
+        self, model_name: str, version: str, config: dict[str, Any]
+    ) -> str:
         """Deploy model for serving"""
         ...
 
@@ -140,10 +174,14 @@ class ModelServingProtocol(Protocol):
         """Get serving performance metrics"""
         ...
 
+
+@runtime_checkable
 class AutoMLProtocol(Protocol):
     """Protocol for AutoML operations"""
 
-    async def auto_train(self, dataset: Any, target_column: str, task_type: str, time_budget: int) -> tuple[ModelProtocol, dict[str, Any]]:
+    async def auto_train(
+        self, dataset: Any, target_column: str, task_type: str, time_budget: int
+    ) -> tuple[ModelProtocol, dict[str, Any]]:
         """Automatically train best model"""
         ...
 
@@ -155,22 +193,42 @@ class AutoMLProtocol(Protocol):
         """Suggest appropriate algorithms"""
         ...
 
+
+@runtime_checkable
 class MLMonitoringProtocol(Protocol):
     """Protocol for ML monitoring operations"""
 
-    async def monitor_model_drift(self, model_name: str, new_data: Any) -> dict[str, Any]:
+    async def monitor_model_drift(
+        self, model_name: str, new_data: Any
+    ) -> dict[str, Any]:
         """Monitor for model drift"""
         ...
 
-    async def monitor_data_quality(self, data: Any, schema: dict[str, Any]) -> dict[str, Any]:
+    async def monitor_data_quality(
+        self, data: Any, schema: dict[str, Any]
+    ) -> dict[str, Any]:
         """Monitor data quality"""
         ...
 
-    async def get_model_performance(self, model_name: str, timeframe: str) -> dict[str, Any]:
+    async def get_model_performance(
+        self, model_name: str, timeframe: str
+    ) -> dict[str, Any]:
         """Get model performance metrics"""
         ...
 
-class MLPlatformProtocol(ModelRegistryProtocol, ExperimentTrackingProtocol, FeatureStoreProtocol, DataPipelineProtocol, ModelTrainingProtocol, ModelServingProtocol, AutoMLProtocol, MLMonitoringProtocol):
+
+@runtime_checkable
+class MLPlatformProtocol(
+    ModelRegistryProtocol,
+    ExperimentTrackingProtocol,
+    FeatureStoreProtocol,
+    DataPipelineProtocol,
+    ModelTrainingProtocol,
+    ModelServingProtocol,
+    AutoMLProtocol,
+    MLMonitoringProtocol,
+    Protocol,
+):
     """Combined protocol for complete ML platform"""
 
     async def get_platform_health(self) -> dict[str, Any]:

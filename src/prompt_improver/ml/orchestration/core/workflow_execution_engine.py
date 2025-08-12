@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from collections.abc import Callable
 import uuid
 from ....performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, TaskPriority, get_background_task_manager
 from ..config.orchestrator_config import OrchestratorConfig
@@ -28,10 +29,10 @@ class WorkflowExecutor:
         self.task_manager = task_manager or get_background_task_manager()
         self.is_running = False
         self.is_cancelled = False
-        self.step_results: Dict[str, Any] = {}
-        self.execution_task_id: Optional[str] = None
+        self.step_results: dict[str, Any] = {}
+        self.execution_task_id: str | None = None
 
-    async def start(self, parameters: Dict[str, Any]) -> None:
+    async def start(self, parameters: dict[str, Any]) -> None:
         """Start workflow execution."""
         if self.is_running:
             raise RuntimeError(f'Workflow {self.workflow_id} is already running')
@@ -52,7 +53,7 @@ class WorkflowExecutor:
         self.is_running = False
         await self.event_bus.emit(MLEvent(event_type=EventType.WORKFLOW_STOPPED, source='workflow_executor', data={'workflow_id': self.workflow_id}))
 
-    async def _execute_workflow(self, parameters: Dict[str, Any]) -> None:
+    async def _execute_workflow(self, parameters: dict[str, Any]) -> None:
         """Execute the workflow steps."""
         try:
             if self.definition.parallel_execution:
@@ -70,21 +71,21 @@ class WorkflowExecutor:
         finally:
             self.is_running = False
 
-    async def _execute_sequential(self, parameters: Dict[str, Any]) -> None:
+    async def _execute_sequential(self, parameters: dict[str, Any]) -> None:
         """Execute workflow steps sequentially."""
         for step in self.definition.steps:
             if self.is_cancelled:
                 break
             await self._execute_step(step, parameters)
 
-    async def _execute_parallel(self, parameters: Dict[str, Any]) -> None:
+    async def _execute_parallel(self, parameters: dict[str, Any]) -> None:
         """Execute workflow steps in parallel where possible."""
         dependency_graph = self._build_dependency_graph()
         completed_steps = set()
         while len(completed_steps) < len(self.definition.steps) and (not self.is_cancelled):
             ready_steps = []
             for step in self.definition.steps:
-                if step.step_id not in completed_steps and all((dep in completed_steps for dep in step.dependencies)):
+                if step.step_id not in completed_steps and all(dep in completed_steps for dep in step.dependencies):
                     ready_steps.append(step)
             if not ready_steps:
                 break
@@ -94,7 +95,7 @@ class WorkflowExecutor:
                 if step.status == WorkflowStepStatus.COMPLETED:
                     completed_steps.add(step.step_id)
 
-    async def _execute_step(self, step: WorkflowStep, parameters: Dict[str, Any]) -> None:
+    async def _execute_step(self, step: WorkflowStep, parameters: dict[str, Any]) -> None:
         """Execute a single workflow step."""
         step.status = WorkflowStepStatus.RUNNING
         step.started_at = datetime.now(timezone.utc)
@@ -103,7 +104,7 @@ class WorkflowExecutor:
         else:
             await self._execute_step_direct(step, parameters)
 
-    async def _execute_step_direct(self, step: WorkflowStep, parameters: Dict[str, Any]) -> None:
+    async def _execute_step_direct(self, step: WorkflowStep, parameters: dict[str, Any]) -> None:
         """Execute a workflow step directly without retry logic."""
         try:
             step_params = {**parameters, **step.parameters}
@@ -121,7 +122,7 @@ class WorkflowExecutor:
             if self.definition.on_failure == 'stop':
                 raise
 
-    async def _execute_step_with_retry(self, step: WorkflowStep, parameters: Dict[str, Any]) -> None:
+    async def _execute_step_with_retry(self, step: WorkflowStep, parameters: dict[str, Any]) -> None:
         """Execute a workflow step with unified retry manager."""
         from ....core.retry_manager import RetryConfig, RetryStrategy
         retry_config = RetryConfig(max_attempts=step.max_retries + 1, strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=self.config.workflow_retry_delay, operation_name=f'workflow_step_{step.name}', enable_circuit_breaker=True)
@@ -145,7 +146,7 @@ class WorkflowExecutor:
             if self.definition.on_failure == 'stop':
                 raise
 
-    async def _call_component(self, component_name: str, parameters: Dict[str, Any]) -> Any:
+    async def _call_component(self, component_name: str, parameters: dict[str, Any]) -> Any:
         """
         Call a component to execute a step.
         
@@ -167,7 +168,7 @@ class WorkflowExecutor:
         known_components = {'training_data_loader': {'file_path': 'ml/core/training_data_loader.py', 'class_name': 'TrainingDataLoader'}, 'ml_integration': {'file_path': 'ml/core/ml_integration.py', 'class_name': 'MLModelService'}, 'rule_optimizer': {'file_path': 'ml/optimization/algorithms/rule_optimizer.py', 'class_name': 'RuleOptimizer'}}
         return known_components.get(component_name)
 
-    async def _execute_component(self, component_info: Dict[str, Any], parameters: Dict[str, Any]) -> Any:
+    async def _execute_component(self, component_info: dict[str, Any], parameters: dict[str, Any]) -> Any:
         """Execute the actual component with parameters."""
         file_path = component_info.get('file_path', '')
         class_name = component_info.get('class_name', '')
@@ -182,7 +183,7 @@ class WorkflowExecutor:
         else:
             return {'executed': True, 'processing_time': processing_time}
 
-    def _build_dependency_graph(self) -> Dict[str, List[str]]:
+    def _build_dependency_graph(self) -> dict[str, list[str]]:
         """Build dependency graph for parallel execution."""
         graph = {}
         for step in self.definition.steps:
@@ -200,8 +201,8 @@ class WorkflowExecutionEngine:
         """Initialize the workflow execution engine."""
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self.workflow_definitions: Dict[str, WorkflowDefinition] = {}
-        self.active_executors: Dict[str, WorkflowExecutor] = {}
+        self.workflow_definitions: dict[str, WorkflowDefinition] = {}
+        self.active_executors: dict[str, WorkflowExecutor] = {}
         self.event_bus = None
         self.retry_manager = None
         self.input_sanitizer = None
@@ -245,7 +246,7 @@ class WorkflowExecutionEngine:
         self.workflow_definitions[definition.workflow_type] = definition
         self.logger.info('Registered workflow definition: %s', definition.workflow_type)
 
-    async def start_workflow(self, workflow_id: str, workflow_type: str, parameters: Dict[str, Any]) -> None:
+    async def start_workflow(self, workflow_id: str, workflow_type: str, parameters: dict[str, Any]) -> None:
         """Start a new workflow instance."""
         if workflow_type not in self.workflow_definitions:
             raise ValueError(f'Unknown workflow type: {workflow_type}')
@@ -266,7 +267,7 @@ class WorkflowExecutionEngine:
         del self.active_executors[workflow_id]
         self.logger.info('Stopped workflow %s', workflow_id)
 
-    async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_workflow_status(self, workflow_id: str) -> dict[str, Any]:
         """Get the status of a workflow with enhanced task management information."""
         if workflow_id not in self.active_executors:
             raise ValueError(f'Workflow {workflow_id} not found')
@@ -276,11 +277,11 @@ class WorkflowExecutionEngine:
             task_status = executor.task_manager.get_enhanced_task_status(executor.execution_task_id)
         return {'workflow_id': workflow_id, 'workflow_type': executor.definition.workflow_type, 'is_running': executor.is_running, 'is_cancelled': executor.is_cancelled, 'steps': [{'step_id': step.step_id, 'name': step.name, 'status': step.status.value, 'started_at': step.started_at.isoformat() if step.started_at else None, 'completed_at': step.completed_at.isoformat() if step.completed_at else None, 'error_message': step.error_message} for step in executor.definition.steps], 'results': executor.step_results, 'task_management': {'task_manager_integration': True, 'execution_task_id': executor.execution_task_id, 'task_status': task_status['status'] if task_status else 'unknown', 'execution_time': task_status.get('metrics', {}).get('total_duration', 0) if task_status else 0, 'retry_count': task_status.get('retry_count', 0) if task_status else 0, 'task_manager_type': type(executor.task_manager).__name__}}
 
-    async def list_workflow_definitions(self) -> List[str]:
+    async def list_workflow_definitions(self) -> list[str]:
         """List available workflow types."""
         return list(self.workflow_definitions.keys())
 
-    async def list_active_workflows(self) -> List[Dict[str, Any]]:
+    async def list_active_workflows(self) -> list[dict[str, Any]]:
         """List all active workflows."""
         active_workflows = []
         for workflow_id, executor in self.active_executors.items():

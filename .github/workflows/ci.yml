@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11']  # Standardized on 3.11 to prevent unnecessary image pulls
+        python-version: ['3.12']  # Standardized on 3.12 for modernization
 
     services:
       postgres:
@@ -76,7 +76,6 @@ jobs:
     - name: Ruff check with preview features
       run: |
         ruff check --preview --output-format=github --statistics
-        echo "RUFF_ERROR_COUNT=$(ruff check --preview --statistics --quiet | grep -E 'Found [0-9]+ error' | grep -o '[0-9]*' || echo '0')" >> $GITHUB_ENV
 
     - name: Ruff format check
       run: ruff format --check --diff
@@ -234,43 +233,6 @@ jobs:
         name: codecov-umbrella
         fail_ci_if_error: false
 
-    - name: Export JSONB-compatible metrics for ruff errors
-      run: |
-        python -c "
-        import os
-        import json
-        from datetime import datetime
-
-        # Create JSONB-compatible metrics export for PostgreSQL storage
-        ruff_error_count = int(os.environ.get('RUFF_ERROR_COUNT', '0'))
-
-        metrics_data = {
-            'timestamp': datetime.now().isoformat(),
-            'service_name': 'apes-ci-pipeline',
-            'metrics': {
-                'ruff_errors_total': {
-                    'value': ruff_error_count,
-                    'type': 'gauge',
-                    'description': 'Total number of ruff linting errors',
-                    'labels': {'pipeline': 'ci', 'tool': 'ruff'}
-                }
-            }
-        }
-
-        # Export as JSONB-compatible JSON for PostgreSQL storage
-        with open('ruff_metrics.json', 'w') as f:
-            json.dump(metrics_data, f, indent=2, ensure_ascii=False)
-
-        print(f'Ruff errors: {ruff_error_count}')
-        print(f'JSONB-compatible metrics exported to ruff_metrics.json')
-        "
-
-    - name: Upload ruff metrics artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: ruff-metrics-${{ matrix.python-version }}
-        path: ruff_metrics.json
-        retention-days: 30
 
     - name: Upload Pyright metrics artifact
       uses: actions/upload-artifact@v3
@@ -293,7 +255,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -707,7 +669,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install JSONB-compatible dependencies
       run: |
@@ -953,12 +915,6 @@ jobs:
           ci_alerting_rules.json
         retention-days: 30
 
-    - name: Alert on threshold breach
-      if: env.RUFF_ERROR_COUNT != '0'
-      run: |
-        echo "::error::Ruff error threshold exceeded! Found ${{ env.RUFF_ERROR_COUNT }} errors (threshold: 0)"
-        echo "Review the code quality report and fix all linting issues before merging."
-        exit 1
 
   notify-completion:
     name: Notify CI Completion

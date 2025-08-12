@@ -253,7 +253,7 @@ class EnhancedQualityScorer:
         sub_metrics = {}
         total_samples = sum(domain_counts.values())
         domain_proportions = [count / total_samples for count in domain_counts.values()]
-        shannon_entropy = -sum((p * np.log(p) for p in domain_proportions if p > 0))
+        shannon_entropy = -sum(p * np.log(p) for p in domain_proportions if p > 0)
         max_entropy = np.log(len(domain_counts))
         sub_metrics['domain_diversity'] = shannon_entropy / max_entropy if max_entropy > 0 else 0
         if len(features) >= 5:
@@ -271,7 +271,7 @@ class EnhancedQualityScorer:
         effectiveness_range = np.max(features) - np.min(features) if len(features) > 1 else 0
         sub_metrics['effectiveness_diversity'] = min(1.0, effectiveness_range / 1.0)
         min_samples_per_domain = 10
-        adequate_samples = all((count >= min_samples_per_domain for count in domain_counts.values()))
+        adequate_samples = all(count >= min_samples_per_domain for count in domain_counts.values())
         sub_metrics['sample_adequacy'] = float(adequate_samples)
         diversity_score = np.mean(list(sub_metrics.values()))
         confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
@@ -321,8 +321,8 @@ class EnhancedQualityScorer:
 
     def _calculate_weighted_score(self, dimensions: list[QualityDimension]) -> float:
         """Calculate weighted overall quality score"""
-        weighted_sum = sum((dim.score * dim.weight for dim in dimensions))
-        total_weight = sum((dim.weight for dim in dimensions))
+        weighted_sum = sum(dim.score * dim.weight for dim in dimensions)
+        total_weight = sum(dim.weight for dim in dimensions)
         return weighted_sum / total_weight if total_weight > 0 else 0.0
 
     def _calculate_confidence_score(self, dimensions: list[QualityDimension]) -> float:

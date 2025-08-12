@@ -3,10 +3,14 @@
 Consolidates the pattern: self.metrics_registry = get_metrics_registry()
 Found in 15+ files across the codebase.
 """
+
 from functools import lru_cache
 from typing import Any, Dict, Optional
+
 from prompt_improver.core.common.logging_utils import LoggerMixin, get_logger
+
 logger = get_logger(__name__)
+
 
 @lru_cache(maxsize=1)
 def get_metrics_safely():
@@ -22,11 +26,15 @@ def get_metrics_safely():
         Metrics registry instance or None on failure
     """
     try:
-        from prompt_improver.performance.monitoring.metrics_registry import get_metrics_registry
+        from prompt_improver.performance.monitoring.metrics_registry import (
+            get_metrics_registry,
+        )
+
         return get_metrics_registry()
     except Exception as e:
-        logger.warning('Failed to load metrics registry: %s', e)
+        logger.warning(f"Failed to load metrics registry: {e}")
         return None
+
 
 class MetricsMixin(LoggerMixin):
     """Mixin class to provide consistent metrics registry access pattern.
@@ -47,7 +55,9 @@ class MetricsMixin(LoggerMixin):
             self._metrics_registry = get_metrics_safely()
             self._metrics_available = self._metrics_registry is not None
             if not self._metrics_available:
-                self.logger.warning('Metrics registry not available, metrics will be disabled')
+                self.logger.warning(
+                    "Metrics registry not available, metrics will be disabled"
+                )
         return self._metrics_registry
 
     @property
@@ -57,7 +67,9 @@ class MetricsMixin(LoggerMixin):
             _ = self.metrics_registry
         return self._metrics_available
 
-    def record_metric(self, metric_name: str, value: Any, labels: dict[str, str] | None=None) -> bool:
+    def record_metric(
+        self, metric_name: str, value: Any, labels: dict[str, str] | None = None
+    ) -> bool:
         """Record a metric value safely.
 
         Args:
@@ -72,34 +84,41 @@ class MetricsMixin(LoggerMixin):
             return False
         try:
             registry = self.metrics_registry
-            if hasattr(registry, 'record_metric'):
+            if hasattr(registry, "record_metric"):
                 registry.record_metric(metric_name, value, labels or {})
                 return True
             if hasattr(registry, metric_name):
                 metric = getattr(registry, metric_name)
                 if labels:
-                    if hasattr(metric, 'labels'):
-                        metric.labels(**labels).set(value) if hasattr(metric, 'set') else metric.labels(**labels).observe(value)
-                    elif hasattr(metric, 'set'):
+                    if hasattr(metric, "labels"):
+                        metric.labels(**labels).set(value) if hasattr(
+                            metric, "set"
+                        ) else metric.labels(**labels).observe(value)
+                    elif hasattr(metric, "set"):
                         metric.set(value)
-                    elif hasattr(metric, 'observe'):
+                    elif hasattr(metric, "observe"):
                         metric.observe(value)
-                    elif hasattr(metric, 'inc'):
+                    elif hasattr(metric, "inc"):
                         metric.inc(value)
-                elif hasattr(metric, 'set'):
+                elif hasattr(metric, "set"):
                     metric.set(value)
-                elif hasattr(metric, 'observe'):
+                elif hasattr(metric, "observe"):
                     metric.observe(value)
-                elif hasattr(metric, 'inc'):
+                elif hasattr(metric, "inc"):
                     metric.inc(value)
                 return True
-            self.logger.debug('Metric %s not found in registry', metric_name)
+            self.logger.debug(f"Metric {metric_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error('Failed to record metric {metric_name}: %s', e)
+            self.logger.error(f"Failed to record metric {metric_name}: {e}")
             return False
 
-    def increment_counter(self, counter_name: str, labels: dict[str, str] | None=None, amount: float=1.0) -> bool:
+    def increment_counter(
+        self,
+        counter_name: str,
+        labels: dict[str, str] | None = None,
+        amount: float = 1.0,
+    ) -> bool:
         """Increment a counter metric safely.
 
         Args:
@@ -116,18 +135,20 @@ class MetricsMixin(LoggerMixin):
             registry = self.metrics_registry
             if hasattr(registry, counter_name):
                 counter = getattr(registry, counter_name)
-                if labels and hasattr(counter, 'labels'):
+                if labels and hasattr(counter, "labels"):
                     counter.labels(**labels).inc(amount)
                 else:
                     counter.inc(amount)
                 return True
-            self.logger.debug('Counter %s not found in registry', counter_name)
+            self.logger.debug(f"Counter {counter_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error('Failed to increment counter {counter_name}: %s', e)
+            self.logger.error(f"Failed to increment counter {counter_name}: {e}")
             return False
 
-    def observe_histogram(self, histogram_name: str, value: float, labels: dict[str, str] | None=None) -> bool:
+    def observe_histogram(
+        self, histogram_name: str, value: float, labels: dict[str, str] | None = None
+    ) -> bool:
         """Observe a histogram metric safely.
 
         Args:
@@ -144,18 +165,20 @@ class MetricsMixin(LoggerMixin):
             registry = self.metrics_registry
             if hasattr(registry, histogram_name):
                 histogram = getattr(registry, histogram_name)
-                if labels and hasattr(histogram, 'labels'):
+                if labels and hasattr(histogram, "labels"):
                     histogram.labels(**labels).observe(value)
                 else:
                     histogram.observe(value)
                 return True
-            self.logger.debug('Histogram %s not found in registry', histogram_name)
+            self.logger.debug(f"Histogram {histogram_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error('Failed to observe histogram {histogram_name}: %s', e)
+            self.logger.error(f"Failed to observe histogram {histogram_name}: {e}")
             return False
 
-    def set_gauge(self, gauge_name: str, value: float, labels: dict[str, str] | None=None) -> bool:
+    def set_gauge(
+        self, gauge_name: str, value: float, labels: dict[str, str] | None = None
+    ) -> bool:
         """Set a gauge metric value safely.
 
         Args:
@@ -172,18 +195,19 @@ class MetricsMixin(LoggerMixin):
             registry = self.metrics_registry
             if hasattr(registry, gauge_name):
                 gauge = getattr(registry, gauge_name)
-                if labels and hasattr(gauge, 'labels'):
+                if labels and hasattr(gauge, "labels"):
                     gauge.labels(**labels).set(value)
                 else:
                     gauge.set(value)
                 return True
-            self.logger.debug('Gauge %s not found in registry', gauge_name)
+            self.logger.debug(f"Gauge {gauge_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error('Failed to set gauge {gauge_name}: %s', e)
+            self.logger.error(f"Failed to set gauge {gauge_name}: {e}")
             return False
 
-def create_metrics_context(prefix: str=''):
+
+def create_metrics_context(prefix: str = ""):
     """Create a metrics recording context with optional prefix.
 
     Args:
@@ -194,7 +218,6 @@ def create_metrics_context(prefix: str=''):
     """
 
     class MetricsContext:
-
         def __init__(self, prefix: str):
             self.prefix = prefix
             self.registry = get_metrics_safely()
@@ -206,31 +229,32 @@ def create_metrics_context(prefix: str=''):
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
 
-        def record(self, name: str, value: Any, labels: dict[str, str] | None=None):
+        def record(self, name: str, value: Any, labels: dict[str, str] | None = None):
             """Record a metric with optional prefix."""
             if not self.available:
                 return False
-            full_name = f'{self.prefix}_{name}' if self.prefix else name
+            full_name = f"{self.prefix}_{name}" if self.prefix else name
             try:
                 if hasattr(self.registry, full_name):
                     metric = getattr(self.registry, full_name)
-                    if labels and hasattr(metric, 'labels'):
+                    if labels and hasattr(metric, "labels"):
                         labeled_metric = metric.labels(**labels)
-                        if hasattr(labeled_metric, 'set'):
+                        if hasattr(labeled_metric, "set"):
                             labeled_metric.set(value)
-                        elif hasattr(labeled_metric, 'observe'):
+                        elif hasattr(labeled_metric, "observe"):
                             labeled_metric.observe(value)
-                        elif hasattr(labeled_metric, 'inc'):
+                        elif hasattr(labeled_metric, "inc"):
                             labeled_metric.inc(value)
-                    elif hasattr(metric, 'set'):
+                    elif hasattr(metric, "set"):
                         metric.set(value)
-                    elif hasattr(metric, 'observe'):
+                    elif hasattr(metric, "observe"):
                         metric.observe(value)
-                    elif hasattr(metric, 'inc'):
+                    elif hasattr(metric, "inc"):
                         metric.inc(value)
                     return True
                 return False
             except Exception as e:
-                logger.error('Failed to record metric {full_name}: %s', e)
+                logger.error(f"Failed to record metric {full_name}: {e}")
                 return False
+
     return MetricsContext(prefix)

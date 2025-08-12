@@ -3,9 +3,13 @@
 Provides type-safe interface contracts for database access,
 enabling dependency inversion and improved testability.
 """
-from typing import Any, AsyncContextManager, Dict, Optional, Protocol
+
+from typing import Any, AsyncContextManager, Dict, Optional, Protocol, runtime_checkable
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+@runtime_checkable
 class DatabaseSessionProtocol(Protocol):
     """Protocol for database session management"""
 
@@ -21,6 +25,8 @@ class DatabaseSessionProtocol(Protocol):
         """Check database health"""
         ...
 
+
+@runtime_checkable
 class DatabaseConfigProtocol(Protocol):
     """Protocol for database configuration"""
 
@@ -36,10 +42,12 @@ class DatabaseConfigProtocol(Protocol):
         """Get retry configuration"""
         ...
 
+
+@runtime_checkable
 class QueryOptimizerProtocol(Protocol):
     """Protocol for query optimization services"""
 
-    async def optimize_query(self, query: str, params: dict | None=None) -> str:
+    async def optimize_query(self, query: str, params: dict | None = None) -> str:
         """Optimize SQL query"""
         ...
 
@@ -51,6 +59,8 @@ class QueryOptimizerProtocol(Protocol):
         """Get query execution plan"""
         ...
 
+
+@runtime_checkable
 class DatabaseHealthProtocol(Protocol):
     """Protocol for database health monitoring"""
 
@@ -66,5 +76,13 @@ class DatabaseHealthProtocol(Protocol):
         """Check table health metrics"""
         ...
 
-class DatabaseProtocol(DatabaseSessionProtocol, DatabaseConfigProtocol, QueryOptimizerProtocol, DatabaseHealthProtocol):
+
+@runtime_checkable
+class DatabaseProtocol(
+    DatabaseSessionProtocol,
+    DatabaseConfigProtocol,
+    QueryOptimizerProtocol,
+    DatabaseHealthProtocol,
+    Protocol,
+):
     """Combined protocol for all database operations"""

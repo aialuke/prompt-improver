@@ -10,11 +10,11 @@ from typing import Any, Dict, List, Optional, Protocol
 class AutoMLOrchestratorProtocol(Protocol):
     """Protocol for AutoML orchestrator to avoid circular imports."""
 
-    def get_current_trial_info(self) -> Dict[str, Any]:
+    def get_current_trial_info(self) -> dict[str, Any]:
         """Get information about the current trial."""
         ...
 
-    def update_trial_metrics(self, metrics: Dict[str, float]) -> None:
+    def update_trial_metrics(self, metrics: dict[str, float]) -> None:
         """Update metrics for the current trial."""
         ...
 
@@ -25,11 +25,11 @@ class AutoMLOrchestratorProtocol(Protocol):
 class CallbackProtocol(Protocol):
     """Protocol for AutoML callbacks to avoid circular imports."""
 
-    def on_trial_start(self, trial_info: Dict[str, Any]) -> None:
+    def on_trial_start(self, trial_info: dict[str, Any]) -> None:
         """Called when a trial starts."""
         ...
 
-    def on_trial_end(self, trial_info: Dict[str, Any], result: Dict[str, Any]) -> None:
+    def on_trial_end(self, trial_info: dict[str, Any], result: dict[str, Any]) -> None:
         """Called when a trial ends."""
         ...
 
@@ -44,18 +44,18 @@ class CallbackProtocol(Protocol):
 class AnalyticsServiceProtocol(Protocol):
     """Protocol for analytics service to avoid circular imports."""
 
-    def log_trial_metrics(self, trial_id: str, metrics: Dict[str, float]) -> None:
+    def log_trial_metrics(self, trial_id: str, metrics: dict[str, float]) -> None:
         """Log metrics for a trial."""
         ...
 
-    def get_trial_history(self, limit: Optional[int]=None) -> List[Dict[str, Any]]:
+    def get_trial_history(self, limit: int | None=None) -> list[dict[str, Any]]:
         """Get trial history."""
         ...
 
 class TrialInfo:
     """Information about an AutoML trial."""
 
-    def __init__(self, trial_id: str, parameters: Dict[str, Any], state: str='running', metrics: Optional[Dict[str, float]]=None):
+    def __init__(self, trial_id: str, parameters: dict[str, Any], state: str='running', metrics: dict[str, float] | None=None):
         self.trial_id = trial_id
         self.parameters = parameters
         self.state = state
@@ -64,7 +64,7 @@ class TrialInfo:
 class OptimizationResult:
     """Result of an AutoML optimization."""
 
-    def __init__(self, best_trial_id: str, best_parameters: Dict[str, Any], best_score: float, total_trials: int, optimization_time: float):
+    def __init__(self, best_trial_id: str, best_parameters: dict[str, Any], best_score: float, total_trials: int, optimization_time: float):
         self.best_trial_id = best_trial_id
         self.best_parameters = best_parameters
         self.best_score = best_score

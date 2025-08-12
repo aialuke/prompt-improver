@@ -182,7 +182,7 @@ class DependencyParser:
                 verb_count = sum((1 for _, pos in pos_tags if pos.startswith('VB')))
                 features.clause_count += max(1, verb_count)
                 chunks = self.chunk_parser.parse(pos_tags)
-                phrase_count = sum((1 for subtree in chunks if isinstance(subtree, Tree)))
+                phrase_count = sum(1 for subtree in chunks if isinstance(subtree, Tree))
                 features.phrase_count += phrase_count
                 coord_count = sum((1 for token, _ in pos_tags if token.lower() in self.complexity_indicators['coordinating_conjunctions']))
                 features.coordination_count += coord_count
@@ -254,7 +254,7 @@ class DependencyParser:
             return 'interrogative'
         if sentence.endswith('!'):
             return 'exclamatory'
-        if any((word in sentence.lower() for word in ['please', 'let', 'make', 'do', "don't"])):
+        if any(word in sentence.lower() for word in ['please', 'let', 'make', 'do', "don't"]):
             return 'imperative'
         return 'declarative'
 
@@ -279,13 +279,13 @@ class DependencyParser:
             quality_score += 0.2
             total_weights += 0.2
         modifier_relations = ['amod', 'advmod', 'det']
-        modifier_count = sum((1 for rel in relations if rel in modifier_relations))
+        modifier_count = sum(1 for rel in relations if rel in modifier_relations)
         if modifier_count > 0:
             modifier_score = min(modifier_count / len(dependencies), 0.3)
             quality_score += modifier_score
             total_weights += 0.3
         complex_relations = ['prep', 'conj', 'comp']
-        complex_count = sum((1 for rel in relations if rel in complex_relations))
+        complex_count = sum(1 for rel in relations if rel in complex_relations)
         if 0 < complex_count <= len(dependencies) * 0.3:
             quality_score += 0.2
             total_weights += 0.2

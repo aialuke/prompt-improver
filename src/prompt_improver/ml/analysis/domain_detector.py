@@ -173,11 +173,11 @@ class DomainDetector:
             keywords_found[attr_name] = found_keywords
             if found_keywords:
                 keyword_score = len(found_keywords) / len(domain_keywords)
-                specificity_boost = sum((len(kw.split()) for kw in found_keywords)) / len(found_keywords)
+                specificity_boost = sum(len(kw.split()) for kw in found_keywords) / len(found_keywords)
                 domain_scores[attr_name] = keyword_score * (1 + specificity_boost * 0.1)
         pattern_scores = {}
         for domain, patterns in self.compiled_patterns.items():
-            pattern_matches = sum((1 for pattern in patterns if pattern.search(text)))
+            pattern_matches = sum(1 for pattern in patterns if pattern.search(text))
             if pattern_matches > 0:
                 pattern_scores[domain] = pattern_matches / len(patterns)
         final_scores = {}
@@ -208,7 +208,7 @@ class DomainDetector:
     def _calculate_technical_complexity(self, text: str, keywords_found: dict) -> float:
         """Calculate technical complexity score."""
         technical_domains = ['software_development', 'data_science', 'ai_ml', 'web_development']
-        total_technical_keywords = sum((len(keywords_found.get(domain, [])) for domain in technical_domains))
+        total_technical_keywords = sum(len(keywords_found.get(domain, [])) for domain in technical_domains)
         word_count = len(text.split())
         if word_count == 0:
             return 0.0
@@ -219,7 +219,7 @@ class DomainDetector:
         if not domain_scores:
             return 0.0
         max_score = max(domain_scores.values())
-        score_variance = sum(((score - max_score) ** 2 for score in domain_scores.values()))
+        score_variance = sum((score - max_score) ** 2 for score in domain_scores.values())
         return max_score * (1 - score_variance / len(domain_scores))
 
     async def detect_domain_async(self, text: str) -> DomainClassificationResult:

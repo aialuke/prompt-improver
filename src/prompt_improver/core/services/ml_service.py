@@ -3,15 +3,30 @@
 This service provides a unified ML interface through composition of specialized services,
 maintaining strict architectural separation between MCP and ML components.
 """
+
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from prompt_improver.core.interfaces.ml_interface import MLAnalysisResult, MLHealthReport, MLModelType, MLServiceInterface, MLTrainingRequest, MLTrainingResult
-from prompt_improver.core.services.ml_analysis_service import EventBasedMLAnalysisService
+
+from prompt_improver.core.interfaces.ml_interface import (
+    MLAnalysisResult,
+    MLHealthReport,
+    MLModelType,
+    MLServiceInterface,
+    MLTrainingRequest,
+    MLTrainingResult,
+)
+from prompt_improver.core.services.ml_analysis_service import (
+    EventBasedMLAnalysisService,
+)
 from prompt_improver.core.services.ml_health_service import EventBasedMLHealthService
 from prompt_improver.core.services.ml_model_service import EventBasedMLModelService
-from prompt_improver.core.services.ml_training_service import EventBasedMLTrainingService
+from prompt_improver.core.services.ml_training_service import (
+    EventBasedMLTrainingService,
+)
+
 logger = logging.getLogger(__name__)
+
 
 class EventBasedMLService(MLServiceInterface):
     """Event-based unified ML service using composition pattern.
@@ -28,7 +43,9 @@ class EventBasedMLService(MLServiceInterface):
         self.health_service = EventBasedMLHealthService()
         self.model_service = EventBasedMLModelService()
 
-    async def process_prompt_improvement_request(self, prompt: str, context: dict[str, Any], improvement_type: str='general') -> dict[str, Any]:
+    async def process_prompt_improvement_request(
+        self, prompt: str, context: dict[str, Any], improvement_type: str = "general"
+    ) -> dict[str, Any]:
         """Process a prompt improvement request by coordinating multiple services.
 
         Args:
@@ -40,13 +57,24 @@ class EventBasedMLService(MLServiceInterface):
             Improvement results
         """
         try:
-            analysis_result = await self.analysis_service.analyze_prompt_effectiveness(prompt=prompt, context=context)
-            return {'request_id': analysis_result.get('request_id'), 'original_prompt': prompt, 'improved_prompt': f'Enhanced: {prompt}', 'analysis_results': analysis_result, 'improvement_type': improvement_type, 'timestamp': datetime.now().isoformat()}
+            analysis_result = await self.analysis_service.analyze_prompt_effectiveness(
+                prompt=prompt, context=context
+            )
+            return {
+                "request_id": analysis_result.get("request_id"),
+                "original_prompt": prompt,
+                "improved_prompt": f"Enhanced: {prompt}",
+                "analysis_results": analysis_result,
+                "improvement_type": improvement_type,
+                "timestamp": datetime.now().isoformat(),
+            }
         except Exception as e:
-            self.logger.error('Failed to process prompt improvement request: %s', e)
-            return {'error': str(e), 'timestamp': datetime.now().isoformat()}
+            self.logger.error(f"Failed to process prompt improvement request: {e}")
+            return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
-    async def analyze_rule_effectiveness(self, rule_ids: list[str], time_period_days: int=30) -> dict[str, Any]:
+    async def analyze_rule_effectiveness(
+        self, rule_ids: list[str], time_period_days: int = 30
+    ) -> dict[str, Any]:
         """Analyze effectiveness of rules by delegating to analysis service.
 
         Args:
@@ -56,9 +84,17 @@ class EventBasedMLService(MLServiceInterface):
         Returns:
             Rule effectiveness analysis
         """
-        return await self.analysis_service.analyze_rule_performance(rule_id=','.join(rule_ids), performance_data=[{'rule_id': rule_id, 'time_period_days': time_period_days} for rule_id in rule_ids])
+        return await self.analysis_service.analyze_rule_performance(
+            rule_id=",".join(rule_ids),
+            performance_data=[
+                {"rule_id": rule_id, "time_period_days": time_period_days}
+                for rule_id in rule_ids
+            ],
+        )
 
-    async def trigger_model_retraining(self, model_type: str, trigger_reason: str, config: dict[str, Any] | None=None) -> str:
+    async def trigger_model_retraining(
+        self, model_type: str, trigger_reason: str, config: dict[str, Any] | None = None
+    ) -> str:
         """Trigger model retraining by delegating to training service.
 
         Args:
@@ -69,7 +105,11 @@ class EventBasedMLService(MLServiceInterface):
         Returns:
             Retraining job ID
         """
-        return await self.training_service.retrain_model(model_id=f'{model_type}_model', new_data={'trigger_reason': trigger_reason}, retrain_config=config)
+        return await self.training_service.retrain_model(
+            model_id=f"{model_type}_model",
+            new_data={"trigger_reason": trigger_reason},
+            retrain_config=config,
+        )
 
     async def get_ml_pipeline_status(self) -> dict[str, Any]:
         """Get overall ML pipeline status by aggregating from all services.
@@ -79,14 +119,29 @@ class EventBasedMLService(MLServiceInterface):
         """
         try:
             system_health = await self.health_service.check_system_health()
-            training_status = await self.training_service.get_training_status('latest')
+            training_status = await self.training_service.get_training_status("latest")
             model_list = await self.model_service.list_models()
-            return {'pipeline_status': system_health.get('overall_status', 'unknown'), 'components': system_health.get('components', {}), 'training_status': training_status, 'active_models': len(model_list), 'model_list': model_list, 'timestamp': datetime.now().isoformat()}
+            return {
+                "pipeline_status": system_health.get("overall_status", "unknown"),
+                "components": system_health.get("components", {}),
+                "training_status": training_status,
+                "active_models": len(model_list),
+                "model_list": model_list,
+                "timestamp": datetime.now().isoformat(),
+            }
         except Exception as e:
-            self.logger.error('Failed to get ML pipeline status: %s', e)
-            return {'pipeline_status': 'error', 'error': str(e), 'timestamp': datetime.now().isoformat()}
+            self.logger.error(f"Failed to get ML pipeline status: {e}")
+            return {
+                "pipeline_status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+            }
 
-    async def optimize_prompt_rules(self, optimization_target: str='effectiveness', constraints: dict[str, Any] | None=None) -> dict[str, Any]:
+    async def optimize_prompt_rules(
+        self,
+        optimization_target: str = "effectiveness",
+        constraints: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Optimize prompt improvement rules by coordinating training and analysis services.
 
         Args:
@@ -97,12 +152,24 @@ class EventBasedMLService(MLServiceInterface):
             Optimization results
         """
         try:
-            optimization_job = await self.training_service.optimize_hyperparameters(model_type='rule_optimizer', training_data={'target': optimization_target, 'constraints': constraints or {}}, optimization_config={'optimization_target': optimization_target})
+            optimization_job = await self.training_service.optimize_hyperparameters(
+                model_type="rule_optimizer",
+                training_data={
+                    "target": optimization_target,
+                    "constraints": constraints or {},
+                },
+                optimization_config={"optimization_target": optimization_target},
+            )
             results = await self.training_service.get_training_results(optimization_job)
-            return {'optimization_id': optimization_job, 'target': optimization_target, 'results': results, 'timestamp': datetime.now().isoformat()}
+            return {
+                "optimization_id": optimization_job,
+                "target": optimization_target,
+                "results": results,
+                "timestamp": datetime.now().isoformat(),
+            }
         except Exception as e:
-            self.logger.error('Failed to optimize prompt rules: %s', e)
-            return {'error': str(e), 'timestamp': datetime.now().isoformat()}
+            self.logger.error(f"Failed to optimize prompt rules: {e}")
+            return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
     async def get_operation_status(self, operation_id: str) -> dict[str, Any]:
         """Get status of a specific ML operation.
@@ -116,63 +183,163 @@ class EventBasedMLService(MLServiceInterface):
         try:
             return await self.training_service.get_training_status(operation_id)
         except:
-            return {'operation_id': operation_id, 'status': 'completed', 'progress': 100, 'started_at': datetime.now().isoformat(), 'completed_at': datetime.now().isoformat(), 'duration_seconds': 45.2, 'result_available': True}
+            return {
+                "operation_id": operation_id,
+                "status": "completed",
+                "progress": 100,
+                "started_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),
+                "duration_seconds": 45.2,
+                "result_available": True,
+            }
 
-    async def analyze_prompt_patterns(self, prompts: list[str], analysis_parameters: dict[str, Any] | None=None) -> MLAnalysisResult:
+    async def analyze_prompt_patterns(
+        self, prompts: list[str], analysis_parameters: dict[str, Any] | None = None
+    ) -> MLAnalysisResult:
         """Delegate to analysis service."""
-        result = await self.analysis_service.analyze_prompt_effectiveness(prompt='\n'.join(prompts), context=analysis_parameters or {})
-        return MLAnalysisResult(analysis_id=result.get('request_id', 'unknown'), analysis_type='pattern_analysis', results=result, confidence_score=result.get('effectiveness_score', 0.0), processing_time_ms=result.get('processing_time_ms', 0), timestamp=datetime.now())
+        result = await self.analysis_service.analyze_prompt_effectiveness(
+            prompt="\n".join(prompts), context=analysis_parameters or {}
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("request_id", "unknown"),
+            analysis_type="pattern_analysis",
+            results=result,
+            confidence_score=result.get("effectiveness_score", 0.0),
+            processing_time_ms=result.get("processing_time_ms", 0),
+            timestamp=datetime.now(),
+        )
 
-    async def analyze_performance_trends(self, performance_data: list[dict[str, Any]], time_window_hours: int=24) -> MLAnalysisResult:
+    async def analyze_performance_trends(
+        self, performance_data: list[dict[str, Any]], time_window_hours: int = 24
+    ) -> MLAnalysisResult:
         """Delegate to analysis service."""
-        result = await self.analysis_service.discover_patterns(data=performance_data, pattern_types=['trends', 'performance'])
-        return MLAnalysisResult(analysis_id=result.get('request_id', 'unknown'), analysis_type='performance_trends', results=result, confidence_score=0.85, processing_time_ms=100, timestamp=datetime.now())
+        result = await self.analysis_service.discover_patterns(
+            data=performance_data, pattern_types=["trends", "performance"]
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("request_id", "unknown"),
+            analysis_type="performance_trends",
+            results=result,
+            confidence_score=0.85,
+            processing_time_ms=100,
+            timestamp=datetime.now(),
+        )
 
-    async def detect_anomalies(self, data: dict[str, Any], sensitivity: float=0.8) -> MLAnalysisResult:
+    async def detect_anomalies(
+        self, data: dict[str, Any], sensitivity: float = 0.8
+    ) -> MLAnalysisResult:
         """Delegate to analysis service."""
-        result = await self.analysis_service.discover_patterns(data=[data], pattern_types=['anomalies'])
-        return MLAnalysisResult(analysis_id=result.get('request_id', 'unknown'), analysis_type='anomaly_detection', results={**result, 'sensitivity': sensitivity}, confidence_score=0.9, processing_time_ms=75, timestamp=datetime.now())
+        result = await self.analysis_service.discover_patterns(
+            data=[data], pattern_types=["anomalies"]
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("request_id", "unknown"),
+            analysis_type="anomaly_detection",
+            results={**result, "sensitivity": sensitivity},
+            confidence_score=0.9,
+            processing_time_ms=75,
+            timestamp=datetime.now(),
+        )
 
-    async def predict_failure_risk(self, system_metrics: dict[str, Any], prediction_horizon_hours: int=1) -> MLAnalysisResult:
+    async def predict_failure_risk(
+        self, system_metrics: dict[str, Any], prediction_horizon_hours: int = 1
+    ) -> MLAnalysisResult:
         """Delegate to analysis service."""
-        result = await self.analysis_service.analyze_prompt_effectiveness(prompt='system_health_prediction', context=system_metrics)
-        return MLAnalysisResult(analysis_id=result.get('request_id', 'unknown'), analysis_type='failure_risk_prediction', results={**result, 'prediction_horizon_hours': prediction_horizon_hours}, confidence_score=0.88, processing_time_ms=120, timestamp=datetime.now())
+        result = await self.analysis_service.analyze_prompt_effectiveness(
+            prompt="system_health_prediction", context=system_metrics
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("request_id", "unknown"),
+            analysis_type="failure_risk_prediction",
+            results={**result, "prediction_horizon_hours": prediction_horizon_hours},
+            confidence_score=0.88,
+            processing_time_ms=120,
+            timestamp=datetime.now(),
+        )
 
     async def train_model(self, request: MLTrainingRequest) -> MLTrainingResult:
         """Delegate to training service."""
-        job_id = await self.training_service.train_model(model_type=request.model_type.value, training_data=request.training_data, hyperparameters=request.hyperparameters)
-        return MLTrainingResult(job_id=job_id, model_id=f'{request.model_type.value}_{job_id}', status='started', metrics={}, artifacts={}, timestamp=datetime.now())
+        job_id = await self.training_service.train_model(
+            model_type=request.model_type.value,
+            training_data=request.training_data,
+            hyperparameters=request.hyperparameters,
+        )
+        return MLTrainingResult(
+            job_id=job_id,
+            model_id=f"{request.model_type.value}_{job_id}",
+            status="started",
+            metrics={},
+            artifacts={},
+            timestamp=datetime.now(),
+        )
 
-    async def optimize_hyperparameters(self, model_type: MLModelType, training_data: dict[str, Any], optimization_budget_minutes: int=60) -> dict[str, Any]:
+    async def optimize_hyperparameters(
+        self,
+        model_type: MLModelType,
+        training_data: dict[str, Any],
+        optimization_budget_minutes: int = 60,
+    ) -> dict[str, Any]:
         """Delegate to training service."""
-        return await self.training_service.optimize_hyperparameters(model_type=model_type.value, training_data=training_data, optimization_config={'budget_minutes': optimization_budget_minutes})
+        return await self.training_service.optimize_hyperparameters(
+            model_type=model_type.value,
+            training_data=training_data,
+            optimization_config={"budget_minutes": optimization_budget_minutes},
+        )
 
-    async def evaluate_model(self, model_id: str, test_data: dict[str, Any]) -> dict[str, float]:
+    async def evaluate_model(
+        self, model_id: str, test_data: dict[str, Any]
+    ) -> dict[str, float]:
         """Delegate to training service."""
         results = await self.training_service.get_training_results(model_id)
-        return results.get('validation_metrics', {})
+        return results.get("validation_metrics", {})
 
     async def get_training_status(self, training_job_id: str) -> dict[str, Any]:
         """Delegate to training service."""
         return await self.training_service.get_training_status(training_job_id)
 
-    async def check_ml_health(self, components: list[str] | None=None) -> list[MLHealthReport]:
+    async def check_ml_health(
+        self, components: list[str] | None = None
+    ) -> list[MLHealthReport]:
         """Delegate to health service."""
         system_health = await self.health_service.check_system_health()
         reports = []
-        for component, status in system_health.get('components', {}).items():
+        for component, status in system_health.get("components", {}).items():
             if components is None or component in components:
-                reports.append(MLHealthReport(component_name=component, status=status.get('status', 'unknown'), metrics=status, timestamp=datetime.now(), issues=[], recommendations=[]))
+                reports.append(
+                    MLHealthReport(
+                        component_name=component,
+                        status=status.get("status", "unknown"),
+                        metrics=status,
+                        timestamp=datetime.now(),
+                        issues=[],
+                        recommendations=[],
+                    )
+                )
         return reports
 
-    async def get_ml_metrics(self, time_window_minutes: int=15) -> dict[str, Any]:
+    async def get_ml_metrics(self, time_window_minutes: int = 15) -> dict[str, Any]:
         """Delegate to health service."""
-        return await self.health_service.get_performance_metrics(time_range_hours=time_window_minutes / 60)
+        return await self.health_service.get_performance_metrics(
+            time_range_hours=time_window_minutes / 60
+        )
 
     async def diagnose_ml_issues(self, symptoms: list[str]) -> dict[str, Any]:
         """Delegate to health service."""
         health_reports = await self.check_ml_health()
-        return {'symptoms': symptoms, 'diagnosis': 'System appears healthy', 'health_reports': [{'component': report.component_name, 'status': report.status, 'issues': report.issues} for report in health_reports], 'recommendations': ['Monitor system performance'], 'timestamp': datetime.now().isoformat()}
+        return {
+            "symptoms": symptoms,
+            "diagnosis": "System appears healthy",
+            "health_reports": [
+                {
+                    "component": report.component_name,
+                    "status": report.status,
+                    "issues": report.issues,
+                }
+                for report in health_reports
+            ],
+            "recommendations": ["Monitor system performance"],
+            "timestamp": datetime.now().isoformat(),
+        }
 
     async def get_resource_usage(self) -> dict[str, Any]:
         """Get current resource usage for ML components."""
@@ -181,17 +348,29 @@ class EventBasedMLService(MLServiceInterface):
     async def load_model(self, model_id: str, model_type: MLModelType) -> bool:
         """Delegate to model service."""
         try:
-            deployment_id = await self.model_service.deploy_model(model_id=model_id, model_config={'model_type': model_type.value})
+            deployment_id = await self.model_service.deploy_model(
+                model_id=model_id, model_config={"model_type": model_type.value}
+            )
             return deployment_id is not None
         except Exception as e:
-            self.logger.error('Failed to load model {model_id}: %s', e)
+            self.logger.error(f"Failed to load model {model_id}: {e}")
             return False
 
-    async def predict(self, model_id: str, input_data: dict[str, Any]) -> dict[str, Any]:
+    async def predict(
+        self, model_id: str, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Delegate to model service."""
-        return {'model_id': model_id, 'prediction': 'placeholder_prediction', 'confidence': 0.85, 'input_data': input_data, 'timestamp': datetime.now().isoformat()}
+        return {
+            "model_id": model_id,
+            "prediction": "placeholder_prediction",
+            "confidence": 0.85,
+            "input_data": input_data,
+            "timestamp": datetime.now().isoformat(),
+        }
 
-    async def batch_predict(self, model_id: str, batch_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    async def batch_predict(
+        self, model_id: str, batch_data: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Delegate to model service."""
         results = []
         for data in batch_data:
@@ -207,24 +386,81 @@ class EventBasedMLService(MLServiceInterface):
         """Delegate to model service."""
         return await self.model_service.list_models()
 
-    async def analyze_prompt_patterns(self, prompts: list[str], analysis_parameters: dict[str, Any] | None=None) -> MLAnalysisResult:
+    async def analyze_prompt_patterns(
+        self, prompts: list[str], analysis_parameters: dict[str, Any] | None = None
+    ) -> MLAnalysisResult:
         """Analyze patterns in prompts using ML algorithms."""
-        result = await self.process_prompt_improvement_request(prompt='\n'.join(prompts), context=analysis_parameters or {}, improvement_type='pattern_analysis')
-        return MLAnalysisResult(analysis_id=result.get('request_id', 'unknown'), analysis_type='pattern_analysis', results=result, confidence_score=result.get('effectiveness_score', 0.0), processing_time_ms=result.get('processing_time_ms', 0), timestamp=datetime.now())
+        result = await self.process_prompt_improvement_request(
+            prompt="\n".join(prompts),
+            context=analysis_parameters or {},
+            improvement_type="pattern_analysis",
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("request_id", "unknown"),
+            analysis_type="pattern_analysis",
+            results=result,
+            confidence_score=result.get("effectiveness_score", 0.0),
+            processing_time_ms=result.get("processing_time_ms", 0),
+            timestamp=datetime.now(),
+        )
 
-    async def analyze_performance_trends(self, performance_data: list[dict[str, Any]], time_window_hours: int=24) -> MLAnalysisResult:
+    async def analyze_performance_trends(
+        self, performance_data: list[dict[str, Any]], time_window_hours: int = 24
+    ) -> MLAnalysisResult:
         """Analyze performance trends using ML models."""
-        result = await self.analyze_rule_effectiveness(rule_ids=[str(i) for i in range(len(performance_data))], time_period_days=time_window_hours // 24 or 1)
-        return MLAnalysisResult(analysis_id=result.get('analysis_id', 'unknown'), analysis_type='performance_trends', results=result, confidence_score=result.get('overall_metrics', {}).get('avg_effectiveness', 0.0), processing_time_ms=100, timestamp=datetime.now())
+        result = await self.analyze_rule_effectiveness(
+            rule_ids=[str(i) for i in range(len(performance_data))],
+            time_period_days=time_window_hours // 24 or 1,
+        )
+        return MLAnalysisResult(
+            analysis_id=result.get("analysis_id", "unknown"),
+            analysis_type="performance_trends",
+            results=result,
+            confidence_score=result.get("overall_metrics", {}).get(
+                "avg_effectiveness", 0.0
+            ),
+            processing_time_ms=100,
+            timestamp=datetime.now(),
+        )
 
-    async def detect_anomalies(self, data: dict[str, Any], sensitivity: float=0.8) -> MLAnalysisResult:
+    async def detect_anomalies(
+        self, data: dict[str, Any], sensitivity: float = 0.8
+    ) -> MLAnalysisResult:
         """Detect anomalies in system behavior."""
         self._operation_counter += 1
         analysis_id = f"anomaly_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._operation_counter}"
-        return MLAnalysisResult(analysis_id=analysis_id, analysis_type='anomaly_detection', results={'anomalies_detected': 0, 'anomaly_score': 0.1, 'sensitivity': sensitivity, 'data_points_analyzed': len(data)}, confidence_score=0.95, processing_time_ms=50, timestamp=datetime.now())
+        return MLAnalysisResult(
+            analysis_id=analysis_id,
+            analysis_type="anomaly_detection",
+            results={
+                "anomalies_detected": 0,
+                "anomaly_score": 0.1,
+                "sensitivity": sensitivity,
+                "data_points_analyzed": len(data),
+            },
+            confidence_score=0.95,
+            processing_time_ms=50,
+            timestamp=datetime.now(),
+        )
 
-    async def predict_failure_risk(self, system_metrics: dict[str, Any], prediction_horizon_hours: int=1) -> MLAnalysisResult:
+    async def predict_failure_risk(
+        self, system_metrics: dict[str, Any], prediction_horizon_hours: int = 1
+    ) -> MLAnalysisResult:
         """Predict system failure risk using ML models."""
         self._operation_counter += 1
-        analysis_id = f"risk_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._operation_counter}"
-        return MLAnalysisResult(analysis_id=analysis_id, analysis_type='failure_risk_prediction', results={'failure_risk_score': 0.05, 'risk_level': 'low', 'prediction_horizon_hours': prediction_horizon_hours, 'contributing_factors': []}, confidence_score=0.88, processing_time_ms=75, timestamp=datetime.now())
+        analysis_id = (
+            f"risk_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._operation_counter}"
+        )
+        return MLAnalysisResult(
+            analysis_id=analysis_id,
+            analysis_type="failure_risk_prediction",
+            results={
+                "failure_risk_score": 0.05,
+                "risk_level": "low",
+                "prediction_horizon_hours": prediction_horizon_hours,
+                "contributing_factors": [],
+            },
+            confidence_score=0.88,
+            processing_time_ms=75,
+            timestamp=datetime.now(),
+        )

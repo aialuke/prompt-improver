@@ -1,18 +1,44 @@
-# APES - Universal Prompt Testing Framework
+# APES - Adaptive Prompt Enhancement System
 
-A comprehensive, autonomous testing framework that improves prompt engineering by analyzing any codebase, generating relevant tests, and optimizing based on results.
+A high-performance, intelligent prompt improvement system built with clean architecture principles and comprehensive ML optimization capabilities.
 
 ## 🎯 Overview
 
-Transform any prompt improvement tool into an intelligent system that continuously learns and improves across any project type, tech stack, or domain.
+APES transforms prompt engineering through systematic analysis, intelligent rule application, and continuous learning. Built with 2025 architectural best practices for exceptional performance and maintainability.
 
 ### Core Value Proposition
 
-- **Universal Context Analysis** - Understands any codebase/tech stack
-- **Adaptive Test Generation** - Creates relevant prompts for detected context
-- **Multi-Dimensional Evaluation** - Measures improvement quality comprehensively
-- **Pattern Learning Engine** - Extracts insights and optimizes rules
-- **Autonomous Orchestration** - Manages entire workflow without human intervention
+- **Clean Architecture** - Strict layer separation with dependency inversion
+- **High Performance** - 96%+ improvements, <2ms response times
+- **Intelligent Analytics** - Advanced ML-driven pattern discovery  
+- **Comprehensive Testing** - Real behavior validation with testcontainers
+- **Service Consolidation** - Unified facades for complex operations
+
+## 🏗️ Architecture (2025 Refactoring)
+
+### Clean Architecture Implementation
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Presentation Layer (API/CLI/MCP)                   │  
+├─────────────────────────────────────────────────────┤
+│  Application Services (Workflow Orchestration)     │
+├─────────────────────────────────────────────────────┤
+│  Domain Services (Business Logic)                  │
+├─────────────────────────────────────────────────────┤
+│  Repository Interfaces (Data Contracts)            │
+├─────────────────────────────────────────────────────┤
+│  Infrastructure (Database/Cache/Monitoring)        │
+└─────────────────────────────────────────────────────┘
+```
+
+### Service Architecture Patterns
+
+- **Repository Pattern**: All data access through protocol-based interfaces
+- **Service Facades**: Unified entry points (Analytics, Security, ML)  
+- **Application Services**: Business workflow orchestration
+- **Multi-Level Caching**: L1 (Memory) + L2 (Redis) + L3 (Database)
+- **Protocol-Based DI**: Type-safe dependency injection without frameworks
 
 ## 🧪 Integration Testing Standards (2025)
 
@@ -118,22 +144,67 @@ pytest -m performance -v
 
 ## 🏗️ Architecture
 
-The framework consists of 6 core phases:
+### Modern Clean Architecture (2025)
 
-1. **Context Analysis** - Universal codebase understanding
-2. **Test Generation** - Adaptive prompt creation
-3. **Test Execution** - Automated improvement testing
-4. **Multi-Dimensional Evaluation** - Comprehensive quality assessment
-5. **Pattern Analysis & Learning** - Insight extraction
-6. **Rule Optimization** - Automated rule improvements
+The system follows **Clean Architecture principles** with clear separation of concerns:
 
-### Key Components
+```
+┌─────────────────┐  ┌─────────────────┐
+│   API Layer    │  │  CLI Interface  │
+│   (FastAPI)    │  │  (Clean CLI)    │
+└─────────┬───────┘  └─────┬───────────┘
+          │                │
+          v                v
+┌─────────────────────────────────────┐
+│        Application Services         │
+│  • Prompt Improvement Service       │
+│  • Rule Selection Service           │
+│  • ML Training Service              │
+└─────────┬───────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────┐
+│         Domain Layer                │
+│  • Repository Protocols             │
+│  • Business Logic                   │
+│  • Clean DI Container               │
+└─────────┬───────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────┐
+│      Infrastructure Layer           │
+│  • Database Services (AsyncPG)      │
+│  • Cache Services (CoreDIS)         │
+│  • Security Services (Unified)      │
+│  • ML Orchestration                 │
+└─────────────────────────────────────┘
+```
 
-- **AutoML Orchestrator** - Manages optimization experiments
-- **Real-Time Analytics** - WebSocket-based monitoring
-- **A/B Testing Service** - Experiment management
-- **Database Layer** - PostgreSQL with async support
-- **MCP Integration** - Model Context Protocol support
+### Service Architecture Patterns
+
+#### 1. **Repository Pattern**
+- Clean separation between domain and infrastructure
+- Protocol-based dependency injection
+- Testable through interface contracts
+
+#### 2. **Unified Service Consolidation**
+- **Database Services**: Single AsyncPG-based service layer
+- **Security Services**: Consolidated facade pattern
+- **Cache Services**: Unified Redis/memory abstraction
+- **Analytics Services**: Clean repository-based analytics
+
+#### 3. **Event-Driven ML Processing**
+- Background intelligence processing
+- Event bus communication for ML operations
+- Graceful degradation and circuit breaker patterns
+
+### Core Components
+
+- **Clean DI Container** - Dependency injection without infrastructure coupling
+- **Repository Services** - Database abstraction layer
+- **Security Service Facade** - Unified security operations
+- **ML Event Bus** - Asynchronous ML communication
+- **Background Task Manager** - Persistent service orchestration
 
 ## 🔧 External Tools
 

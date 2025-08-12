@@ -19,9 +19,9 @@ class ResourceSnapshot:
     timestamp: datetime
     cpu_percent: float
     cpu_count: int
-    load_avg_1m: Optional[float] = None
-    load_avg_5m: Optional[float] = None
-    load_avg_15m: Optional[float] = None
+    load_avg_1m: float | None = None
+    load_avg_5m: float | None = None
+    load_avg_15m: float | None = None
     memory_total_gb: float
     memory_available_gb: float
     memory_used_gb: float
@@ -49,7 +49,7 @@ class ResourceMonitor:
         self.monitoring_interval_seconds = monitoring_interval_seconds
         self._gpu_available = False
         self._gpu_utils = self._initialize_gpu_monitoring()
-        self._resource_history: List[ResourceSnapshot] = []
+        self._resource_history: list[ResourceSnapshot] = []
         self._max_history_size = 1000
         self.cpu_alert_threshold = 85.0
         self.memory_alert_threshold = 90.0
@@ -57,7 +57,7 @@ class ResourceMonitor:
         self.disk_alert_threshold = 85.0
         logger.info('Resource Monitor initialized')
 
-    def _initialize_gpu_monitoring(self) -> Optional[Any]:
+    def _initialize_gpu_monitoring(self) -> Any | None:
         """Initialize GPU monitoring with graceful fallback"""
         try:
             import pynvml
@@ -103,7 +103,7 @@ class ResourceMonitor:
             logger.error('Failed to get current resources: %s', e)
             return ResourceSnapshot(timestamp=aware_utc_now(), cpu_percent=0.0, cpu_count=0, memory_total_gb=0.0, memory_available_gb=0.0, memory_used_gb=0.0, memory_percent=0.0, disk_total_gb=0.0, disk_used_gb=0.0, disk_free_gb=0.0, disk_percent=0.0)
 
-    async def _get_gpu_metrics(self) -> Dict[str, Any]:
+    async def _get_gpu_metrics(self) -> dict[str, Any]:
         """Get GPU utilization metrics"""
         if not self._gpu_available or not self._gpu_utils:
             return {}
@@ -133,7 +133,7 @@ class ResourceMonitor:
         if len(self._resource_history) > self._max_history_size:
             self._resource_history = self._resource_history[-self._max_history_size:]
 
-    async def get_resource_summary(self, hours: int=24) -> Dict[str, Any]:
+    async def get_resource_summary(self, hours: int=24) -> dict[str, Any]:
         """Get resource utilization summary for the specified period"""
         try:
             cutoff_time = aware_utc_now() - timedelta(hours=hours)
@@ -152,7 +152,7 @@ class ResourceMonitor:
             logger.error('Failed to get resource summary: %s', e)
             return {'error': str(e), 'timestamp': aware_utc_now().isoformat()}
 
-    def _generate_resource_alerts(self, current_snapshot: Optional[ResourceSnapshot]) -> List[Dict[str, Any]]:
+    def _generate_resource_alerts(self, current_snapshot: ResourceSnapshot | None) -> list[dict[str, Any]]:
         """Generate resource utilization alerts"""
         alerts = []
         if not current_snapshot:
@@ -171,7 +171,7 @@ class ResourceMonitor:
             alerts.append({'type': 'disk_high', 'severity': 'warning' if current_snapshot.disk_percent < 95 else 'critical', 'message': f'High disk utilization: {current_snapshot.disk_percent:.1f}%', 'current_value': current_snapshot.disk_percent, 'threshold': self.disk_alert_threshold})
         return alerts
 
-    def _assess_resource_health(self, current_snapshot: Optional[ResourceSnapshot]) -> Dict[str, Any]:
+    def _assess_resource_health(self, current_snapshot: ResourceSnapshot | None) -> dict[str, Any]:
         """Assess overall resource health"""
         if not current_snapshot:
             return {'status': 'unknown', 'score': 0.0}
@@ -198,7 +198,7 @@ class ResourceMonitor:
             status = 'critical'
         return {'status': status, 'score': float(overall_score), 'component_scores': {'cpu': float(cpu_health), 'memory': float(memory_health), 'disk': float(disk_health), 'gpu': float(gpu_health)}, 'recommendations': self._generate_health_recommendations(current_snapshot, overall_score)}
 
-    def _generate_health_recommendations(self, snapshot: ResourceSnapshot, health_score: float) -> List[str]:
+    def _generate_health_recommendations(self, snapshot: ResourceSnapshot, health_score: float) -> list[str]:
         """Generate recommendations based on resource health"""
         recommendations = []
         if health_score < 0.3:
@@ -238,7 +238,7 @@ class ResourceMonitor:
         except Exception as e:
             logger.error('Failed to cleanup old history: %s', e)
             return 0
-_resource_monitor: Optional[ResourceMonitor] = None
+_resource_monitor: ResourceMonitor | None = None
 
 async def get_resource_monitor() -> ResourceMonitor:
     """Get or create global resource monitor instance"""

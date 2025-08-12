@@ -18,6 +18,7 @@ import time
 from typing import Any, Dict, List, Optional, Set, Union
 import uuid
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from ....security.input_sanitization import InputSanitizer
 from .english_nltk_manager import get_english_nltk_manager
@@ -35,7 +36,7 @@ except ImportError:
     LINGUISTIC_ANALYSIS_AVAILABLE = False
 logger = logging.getLogger(__name__)
 
-class FeatureExtractionConfig(SQLModel):
+class FeatureExtractionConfig(BaseModel):
     """Configuration model with validation and type safety."""
     weight: float = Field(default=1.0, ge=0.0, le=10.0)
     cache_enabled: bool = Field(default=True)
@@ -45,17 +46,17 @@ class FeatureExtractionConfig(SQLModel):
     enable_metrics: bool = Field(default=True)
     async_batch_size: int = Field(default=10, ge=1, le=100)
 
-class FeatureExtractionRequest(SQLModel):
+class FeatureExtractionRequest(BaseModel):
     """Request model for feature extraction with validation."""
     text: str = Field(min_length=1, max_length=100000)
-    context: Optional[Dict[str, Any]] = Field(default=None)
+    context: dict[str, Any] | None = Field(default=None)
     correlation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     priority: int = Field(default=1, ge=1, le=3)
 
-class FeatureExtractionResponse(SQLModel):
+class FeatureExtractionResponse(BaseModel):
     """Response model with comprehensive metadata."""
-    features: List[float] = Field(min_items=10, max_items=10)
-    feature_names: List[str] = Field(min_items=10, max_items=10)
+    features: list[float] = Field(min_items=10, max_items=10)
+    feature_names: list[str] = Field(min_items=10, max_items=10)
     extraction_time_ms: float = Field(ge=0)
     cache_hit: bool = Field(default=False)
     correlation_id: str
@@ -70,7 +71,7 @@ class ExtractionMetrics:
     cache_misses: int = 0
     total_extraction_time_ms: float = 0.0
     errors: int = 0
-    last_extraction: Optional[datetime] = None
+    last_extraction: datetime | None = None
     average_response_time_ms: float = 0.0
 
     def update_timing(self, extraction_time_ms: float, cache_hit: bool=False):
@@ -115,7 +116,7 @@ class LinguisticFeatureExtractor:
     - Performance metrics collection
     """
 
-    def __init__(self, config: Optional[FeatureExtractionConfig]=None, input_sanitizer: Optional[InputSanitizer]=None, redis_cache=None):
+    def __init__(self, config: FeatureExtractionConfig | None=None, input_sanitizer: InputSanitizer | None=None, redis_cache=None):
         """Initialize with dependency injection and configuration."""
         self.config = config or FeatureExtractionConfig()
         self.input_sanitizer = input_sanitizer or InputSanitizer()
@@ -135,7 +136,7 @@ class LinguisticFeatureExtractor:
         self._feature_names = ['readability_score', 'lexical_diversity', 'entity_density', 'syntactic_complexity', 'sentence_structure_quality', 'technical_term_ratio', 'avg_sentence_length_norm', 'instruction_clarity', 'has_examples', 'overall_linguistic_quality']
         logger.info('LinguisticFeatureExtractor initialized', extra={'component': 'linguistic_feature_extractor', 'config': self.config.model_dump(), 'correlation_id': self._correlation_id})
 
-    async def extract_features(self, request: Union[FeatureExtractionRequest, str], context: Optional[Dict[str, Any]]=None) -> FeatureExtractionResponse:
+    async def extract_features(self, request: FeatureExtractionRequest | str, context: dict[str, Any] | None=None) -> FeatureExtractionResponse:
         """Extract linguistic features asynchronously with full validation and monitoring.
         
         Args:
@@ -188,7 +189,7 @@ class LinguisticFeatureExtractor:
             logger.error('Feature extraction failed: %s', e, extra={'component': 'linguistic_feature_extractor', 'error': str(e), 'correlation_id': request.correlation_id, 'extraction_time_ms': extraction_time}, exc_info=True)
             return self._create_default_response(request.correlation_id, extraction_time, cache_hit)
 
-    async def batch_extract_features(self, requests: List[FeatureExtractionRequest]) -> List[FeatureExtractionResponse]:
+    async def batch_extract_features(self, requests: list[FeatureExtractionRequest]) -> list[FeatureExtractionResponse]:
         """Extract features for multiple texts concurrently."""
         batch_size = self.config.async_batch_size
         results = []
@@ -203,7 +204,7 @@ class LinguisticFeatureExtractor:
                     results.append(result)
         return results
 
-    async def _validate_and_sanitize_input(self, text: str) -> Optional[str]:
+    async def _validate_and_sanitize_input(self, text: str) -> str | None:
         """Async input validation and sanitization."""
         try:
             if not text or not isinstance(text, str):
@@ -219,7 +220,7 @@ class LinguisticFeatureExtractor:
             logger.error('Input validation failed: %s', e)
             return None
 
-    async def _get_cached_features(self, text: str, correlation_id: str) -> Optional[FeatureExtractionResponse]:
+    async def _get_cached_features(self, text: str, correlation_id: str) -> FeatureExtractionResponse | None:
         """Retrieve cached features asynchronously."""
         if not self.redis_cache:
             return None
@@ -247,7 +248,7 @@ class LinguisticFeatureExtractor:
         except Exception as e:
             logger.warning('Failed to cache features: %s', e)
 
-    async def _compute_linguistic_features_async(self, text: str, correlation_id: str) -> List[float]:
+    async def _compute_linguistic_features_async(self, text: str, correlation_id: str) -> list[float]:
         """Compute linguistic features asynchronously."""
         if self.config.deterministic:
             np.random.seed(42)
@@ -256,7 +257,7 @@ class LinguisticFeatureExtractor:
         else:
             return await self._extract_fallback_features_async(text, correlation_id)
 
-    async def _extract_with_analyzer_async(self, text: str, correlation_id: str) -> List[float]:
+    async def _extract_with_analyzer_async(self, text: str, correlation_id: str) -> list[float]:
         """Extract features using linguistic analyzer asynchronously."""
         try:
             linguistic_features = await asyncio.to_thread(self.linguistic_analyzer.analyze, text)
@@ -266,7 +267,7 @@ class LinguisticFeatureExtractor:
             logger.error('Linguistic analysis failed: %s', e, extra={'correlation_id': correlation_id})
             return await self._extract_fallback_features_async(text, correlation_id)
 
-    async def _extract_fallback_features_async(self, text: str, correlation_id: str) -> List[float]:
+    async def _extract_fallback_features_async(self, text: str, correlation_id: str) -> list[float]:
         """Extract features using NLTK fallback asynchronously."""
         try:
             features = await asyncio.to_thread(self._compute_nltk_features, text)
@@ -275,7 +276,7 @@ class LinguisticFeatureExtractor:
             logger.error('Fallback feature extraction failed: %s', e, extra={'correlation_id': correlation_id})
             return [0.5] * 10
 
-    def _compute_nltk_features(self, text: str) -> List[float]:
+    def _compute_nltk_features(self, text: str) -> list[float]:
         """Compute features using NLTK (synchronous)."""
         try:
             sentence_tokenizer = self.nltk_manager.get_sentence_tokenizer()
@@ -284,13 +285,13 @@ class LinguisticFeatureExtractor:
             sentences = sentence_tokenizer(text)
             words = word_tokenizer(text)
             content_words = [word for word in words if word.lower() not in stopwords]
-            features = [min(1.0, 1.0 - sum((len(s.split()) for s in sentences)) / len(sentences) / 30.0) if sentences else 0.5, min(1.0, len(set(words)) / len(words)) if words else 0.0, self._estimate_entity_density(text, sentences), min(1.0, sum((len(s.split()) for s in sentences)) / len(sentences) / 25.0) if sentences else 0.0, self._calculate_sentence_variety(sentences), self._calculate_technical_ratio(content_words), min(1.0, sum((len(s.split()) for s in sentences)) / len(sentences) / 20.0) if sentences else 0.0, self._calculate_instruction_clarity(words), 1.0 if any((word in text.lower() for word in ['example', 'for instance', 'such as', 'e.g.', 'i.e.'])) else 0.0, self._calculate_overall_quality(text, words, sentences)]
+            features = [min(1.0, 1.0 - sum(len(s.split()) for s in sentences) / len(sentences) / 30.0) if sentences else 0.5, min(1.0, len(set(words)) / len(words)) if words else 0.0, self._estimate_entity_density(text, sentences), min(1.0, sum(len(s.split()) for s in sentences) / len(sentences) / 25.0) if sentences else 0.0, self._calculate_sentence_variety(sentences), self._calculate_technical_ratio(content_words), min(1.0, sum(len(s.split()) for s in sentences) / len(sentences) / 20.0) if sentences else 0.0, self._calculate_instruction_clarity(words), 1.0 if any(word in text.lower() for word in ['example', 'for instance', 'such as', 'e.g.', 'i.e.']) else 0.0, self._calculate_overall_quality(text, words, sentences)]
             return features
         except Exception as e:
             logger.error('NLTK feature computation failed: %s', e)
             return [0.5] * 10
 
-    def _estimate_entity_density(self, text: str, sentences: List[str]) -> float:
+    def _estimate_entity_density(self, text: str, sentences: list[str]) -> float:
         """Estimate entity density based on capitalization patterns."""
         try:
             import re
@@ -308,7 +309,7 @@ class LinguisticFeatureExtractor:
         except Exception:
             return 0.5
 
-    def _calculate_sentence_variety(self, sentences: List[str]) -> float:
+    def _calculate_sentence_variety(self, sentences: list[str]) -> float:
         """Calculate sentence length variety as quality indicator."""
         try:
             if len(sentences) < 2:
@@ -319,37 +320,37 @@ class LinguisticFeatureExtractor:
             mean_length = sum(lengths) / len(lengths)
             if mean_length == 0:
                 return 0.5
-            variance = sum(((l - mean_length) ** 2 for l in lengths)) / len(lengths)
+            variance = sum((l - mean_length) ** 2 for l in lengths) / len(lengths)
             std_dev = variance ** 0.5
             cv = std_dev / mean_length
             return min(1.0, cv / 0.5)
         except Exception:
             return 0.5
 
-    def _calculate_technical_ratio(self, words: List[str]) -> float:
+    def _calculate_technical_ratio(self, words: list[str]) -> float:
         """Calculate ratio of technical/specialized terms."""
         try:
             if not words:
                 return 0.0
             technical_indicators = {'function', 'method', 'class', 'variable', 'algorithm', 'data', 'model', 'system', 'process', 'analysis', 'implementation', 'framework', 'library', 'api', 'database', 'server', 'client', 'interface', 'protocol', 'network'}
-            technical_count = sum((1 for word in words if word.lower() in technical_indicators))
+            technical_count = sum(1 for word in words if word.lower() in technical_indicators)
             return min(1.0, technical_count / len(words))
         except Exception:
             return 0.5
 
-    def _calculate_instruction_clarity(self, words: List[str]) -> float:
+    def _calculate_instruction_clarity(self, words: list[str]) -> float:
         """Calculate instruction clarity based on action words."""
         try:
             if not words:
                 return 0.0
             action_words = {'create', 'make', 'build', 'develop', 'implement', 'design', 'write', 'generate', 'produce', 'construct', 'establish', 'form', 'execute', 'perform', 'run', 'process', 'analyze', 'evaluate', 'assess', 'review'}
-            action_count = sum((1 for word in words if word.lower() in action_words))
+            action_count = sum(1 for word in words if word.lower() in action_words)
             clarity_score = min(1.0, action_count / max(1, len(words) / 10))
             return clarity_score
         except Exception:
             return 0.5
 
-    def _calculate_overall_quality(self, text: str, words: List[str], sentences: List[str]) -> float:
+    def _calculate_overall_quality(self, text: str, words: list[str], sentences: list[str]) -> float:
         """Calculate overall linguistic quality composite score."""
         try:
             quality_factors = []
@@ -364,7 +365,7 @@ class LinguisticFeatureExtractor:
                 word_variety = len(set(words)) / len(words)
                 quality_factors.append(word_variety)
             if sentences:
-                avg_sentence_length = sum((len(s.split()) for s in sentences)) / len(sentences)
+                avg_sentence_length = sum(len(s.split()) for s in sentences) / len(sentences)
                 if 10 <= avg_sentence_length <= 25:
                     quality_factors.append(1.0)
                 else:
@@ -373,7 +374,7 @@ class LinguisticFeatureExtractor:
         except Exception:
             return 0.5
 
-    def _normalize_features(self, features: List[float]) -> List[float]:
+    def _normalize_features(self, features: list[float]) -> list[float]:
         """Normalize features to [0, 1] range with validation."""
         normalized = []
         for i, feature in enumerate(features):
@@ -385,7 +386,7 @@ class LinguisticFeatureExtractor:
                 normalized.append(0.5)
         return normalized
 
-    def _calculate_confidence_score(self, features: List[float]) -> float:
+    def _calculate_confidence_score(self, features: list[float]) -> float:
         """Calculate confidence score based on feature consistency."""
         if not features:
             return 0.0
@@ -393,7 +394,7 @@ class LinguisticFeatureExtractor:
         if not non_default_features:
             return 0.5
         mean_feature = sum(non_default_features) / len(non_default_features)
-        variance = sum(((f - mean_feature) ** 2 for f in non_default_features)) / len(non_default_features)
+        variance = sum((f - mean_feature) ** 2 for f in non_default_features) / len(non_default_features)
         confidence = min(1.0, 0.5 + variance * 2)
         return confidence
 
@@ -408,7 +409,7 @@ class LinguisticFeatureExtractor:
         """Create default response for error cases."""
         return FeatureExtractionResponse(features=[0.5] * 10, feature_names=self._feature_names, extraction_time_ms=extraction_time, cache_hit=cache_hit, correlation_id=correlation_id, confidence_score=0.0)
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Health check endpoint for orchestrator monitoring."""
         try:
             test_request = FeatureExtractionRequest(text='Health check test text for feature extraction.', correlation_id='health-check')
@@ -419,15 +420,15 @@ class LinguisticFeatureExtractor:
         except Exception as e:
             return {'status': 'unhealthy', 'component': 'linguistic_feature_extractor', 'error': str(e), 'timestamp': datetime.now(timezone.utc).isoformat()}
 
-    async def get_metrics(self) -> Dict[str, Any]:
+    async def get_metrics(self) -> dict[str, Any]:
         """Get comprehensive metrics for monitoring."""
         return {'component': 'linguistic_feature_extractor', 'timestamp': datetime.now(timezone.utc).isoformat(), 'metrics': {'total_extractions': self.metrics.total_extractions, 'cache_hits': self.metrics.cache_hits, 'cache_misses': self.metrics.cache_misses, 'cache_hit_rate': self.metrics.cache_hit_rate, 'total_extraction_time_ms': self.metrics.total_extraction_time_ms, 'average_response_time_ms': self.metrics.average_response_time_ms, 'errors': self.metrics.errors, 'error_rate': self.metrics.error_rate, 'last_extraction': self.metrics.last_extraction.isoformat() if self.metrics.last_extraction else None}, 'configuration': self.config.model_dump()}
 
-    def get_feature_names(self) -> List[str]:
+    def get_feature_names(self) -> list[str]:
         """Get feature names for model compatibility."""
         return self._feature_names.copy()
 
-    def extract_features_sync(self, text: str, context: Optional[Dict[str, Any]]=None) -> List[float]:
+    def extract_features_sync(self, text: str, context: dict[str, Any] | None=None) -> list[float]:
         """Synchronous wrapper for async feature extraction.
         
         Args:
@@ -447,7 +448,7 @@ class LinguisticFeatureExtractor:
             result = asyncio.run(self.extract_features(request, context))
             return result.features if hasattr(result, 'features') else result
 
-    async def clear_cache(self) -> Dict[str, Any]:
+    async def clear_cache(self) -> dict[str, Any]:
         """Clear cache and return operation result."""
         if not self.redis_cache:
             return {'status': 'no_cache', 'message': 'Redis cache not configured'}

@@ -176,7 +176,7 @@ class BaseBandit(ABC):
         if self.total_trials == 0:
             return 0.0
         total_optimal_reward = optimal_reward * self.total_trials
-        total_actual_reward = sum((state.total_reward for state in self.arm_states.values()))
+        total_actual_reward = sum(state.total_reward for state in self.arm_states.values())
         return max(0.0, total_optimal_reward - total_actual_reward)
 
 class EpsilonGreedyBandit(BaseBandit):
@@ -291,7 +291,7 @@ class MultiarmedBanditFramework:
         self.bandits: dict[str, BaseBandit] = {}
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for multi-armed bandit optimization (2025 pattern)
 
         Args:
@@ -322,7 +322,7 @@ class MultiarmedBanditFramework:
                 algorithm = BanditAlgorithm(algorithm_str)
             except ValueError:
                 algorithm = BanditAlgorithm.THOMPSON_SAMPLING
-                self.logger.warning("Unknown algorithm '%s', using thompson_sampling", algorithm_str)
+                self.logger.warning(f"Unknown algorithm '{algorithm_str}', using thompson_sampling")
             experiment_id = await self.create_experiment(experiment_name=experiment_name, arms=arms, algorithm=algorithm)
             if reward_data:
                 await self._initialize_with_historical_data(experiment_id, reward_data)
@@ -413,7 +413,7 @@ class MultiarmedBanditFramework:
         experiment.total_reward += normalized_reward
         experiment.arm_states[arm_result.arm_id] = bandit.arm_states[arm_result.arm_id]
         if self.config.enable_regret_tracking:
-            best_possible_reward = max((state.mean_reward for state in bandit.arm_states.values()))
+            best_possible_reward = max(state.mean_reward for state in bandit.arm_states.values())
             current_regret = bandit.calculate_regret(best_possible_reward)
             experiment.regret_history.append(current_regret)
         self.logger.debug('Updated experiment %s: total_trials=%s, total_reward=%s', experiment_id, experiment.total_trials, format(experiment.total_reward, '.3f'))
@@ -477,7 +477,7 @@ class MultiarmedBanditFramework:
         self.logger.info('Cleaned up %s old experiments', len(to_remove))
         return len(to_remove)
 
-    async def _initialize_with_historical_data(self, experiment_id: str, reward_data: Dict[str, List[float]]) -> None:
+    async def _initialize_with_historical_data(self, experiment_id: str, reward_data: dict[str, list[float]]) -> None:
         """Initialize bandit with historical reward data"""
         if experiment_id not in self.bandits:
             return
@@ -487,7 +487,7 @@ class MultiarmedBanditFramework:
                 for reward in rewards:
                     await bandit.update(arm_id, reward)
 
-    async def _run_bandit_simulation(self, experiment_id: str, num_trials: int, context_data: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    async def _run_bandit_simulation(self, experiment_id: str, num_trials: int, context_data: list[dict[str, Any]] | None) -> dict[str, Any]:
         """Run bandit optimization simulation"""
         if experiment_id not in self.bandits:
             raise ValueError(f'Experiment {experiment_id} not found')
@@ -507,7 +507,7 @@ class MultiarmedBanditFramework:
             simulated_reward = self._simulate_reward(selected_arm, context)
             rewards_received.append(simulated_reward)
             await bandit.update(selected_arm, simulated_reward, context)
-            optimal_reward = max((self._simulate_reward(arm, context) for arm in bandit.arms))
+            optimal_reward = max(self._simulate_reward(arm, context) for arm in bandit.arms)
             regret = optimal_reward - simulated_reward
             total_regret += regret
             cumulative_regret.append(total_regret)
@@ -517,7 +517,7 @@ class MultiarmedBanditFramework:
         convergence_achieved = convergence_trial < num_trials * 0.8
         return {'best_arm': best_arm, 'best_arm_reward': best_arm_stats.mean_reward, 'total_regret': total_regret, 'cumulative_regret': cumulative_regret, 'convergence_trial': convergence_trial, 'convergence_achieved': convergence_achieved, 'exploration_rate': self._calculate_exploration_rate(arm_selections), 'algorithm_efficiency': 1.0 - total_regret / (num_trials * 1.0), 'confidence_level': self._calculate_confidence_level(bandit, best_arm), 'continue_exploration': not convergence_achieved, 'suggested_next_trials': max(0, int(num_trials * 0.2)) if not convergence_achieved else 0}
 
-    def _simulate_reward(self, arm_id: str, context: Optional[np.ndarray]=None) -> float:
+    def _simulate_reward(self, arm_id: str, context: np.ndarray | None=None) -> float:
         """Simulate reward for an arm (for testing/simulation purposes)"""
         arm_rewards = {'arm_0': 0.3, 'arm_1': 0.5, 'arm_2': 0.7, 'arm_3': 0.4, 'rule_1': 0.6, 'rule_2': 0.8, 'rule_3': 0.4, 'rule_4': 0.7, 'strategy_a': 0.5, 'strategy_b': 0.7, 'strategy_c': 0.6}
         base_reward = arm_rewards.get(arm_id, 0.5)
@@ -528,7 +528,7 @@ class MultiarmedBanditFramework:
         reward = np.clip(base_reward + noise, 0, 1)
         return float(reward)
 
-    def _calculate_convergence_trial(self, arm_selections: List[str], best_arm: str) -> int:
+    def _calculate_convergence_trial(self, arm_selections: list[str], best_arm: str) -> int:
         """Calculate when the algorithm converged to the best arm"""
         if not arm_selections:
             return 0
@@ -537,7 +537,7 @@ class MultiarmedBanditFramework:
                 return i + 1
         return 0
 
-    def _calculate_exploration_rate(self, arm_selections: List[str]) -> float:
+    def _calculate_exploration_rate(self, arm_selections: list[str]) -> float:
         """Calculate the exploration rate (diversity of arm selections)"""
         if not arm_selections:
             return 0.0
@@ -558,7 +558,7 @@ class MultiarmedBanditFramework:
             confidence = (confidence + consistency_bonus) / 2
         return confidence
 
-    def _get_experiment_statistics(self, experiment_id: str) -> Dict[str, Dict[str, Any]]:
+    def _get_experiment_statistics(self, experiment_id: str) -> dict[str, dict[str, Any]]:
         """Get experiment statistics for all arms"""
         if experiment_id not in self.bandits:
             return {}
@@ -567,7 +567,7 @@ class MultiarmedBanditFramework:
         for arm_id in bandit.arms:
             arm_state = bandit.arm_states[arm_id]
             stats[arm_id] = {'pulls': arm_state.pulls, 'mean_reward': arm_state.mean_reward, 'total_reward': arm_state.total_reward, 'confidence_interval': [max(0, arm_state.mean_reward - 1.96 * np.sqrt(arm_state.variance / max(1, arm_state.pulls))), min(1, arm_state.mean_reward + 1.96 * np.sqrt(arm_state.variance / max(1, arm_state.pulls)))] if hasattr(arm_state, 'variance') and arm_state.variance is not None else [0, 0], 'regret': 0.0}
-        best_mean = max((stats[arm]['mean_reward'] for arm in stats.keys())) if stats else 0
+        best_mean = max(stats[arm]['mean_reward'] for arm in stats.keys()) if stats else 0
         for arm_id in stats:
             stats[arm_id]['regret'] = best_mean - stats[arm_id]['mean_reward']
         return stats

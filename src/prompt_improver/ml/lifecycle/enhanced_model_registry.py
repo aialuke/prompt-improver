@@ -9,7 +9,6 @@ Comprehensive model registry incorporating 2025 MLflow best practices with:
 - 40% faster model registration through parallel processing
 """
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -21,6 +20,7 @@ import time
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import uuid
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import mlflow
@@ -28,6 +28,7 @@ import numpy as np
 from prompt_improver.ml.types import features, hyper_parameters, labels, model_config
 from prompt_improver.performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
 logger = logging.getLogger(__name__)
 
 class ModelStatus(Enum):
@@ -41,7 +42,6 @@ class ModelStatus(Enum):
     CHAMPION = 'champion'
     CHALLENGER = 'challenger'
     SHADOW = 'shadow'
-    DEPRECATED = 'deprecated'
     ARCHIVED = 'archived'
 
 class ModelTier(Enum):
@@ -75,8 +75,8 @@ class SemanticVersion:
     major: int
     minor: int
     patch: int
-    pre_release: Optional[str] = None
-    build_metadata: Optional[str] = None
+    pre_release: str | None = None
+    build_metadata: str | None = None
 
     @classmethod
     def from_string(cls, version_str: str) -> 'SemanticVersion':
@@ -114,44 +114,44 @@ class ModelMetadata:
     created_at: datetime
     created_by: str
     status: ModelStatus
-    tier: Optional[ModelTier] = None
+    tier: ModelTier | None = None
     model_format: ModelFormat = ModelFormat.SKLEARN
-    training_dataset_id: Optional[str] = None
-    training_dataset_version: Optional[str] = None
-    training_duration_seconds: Optional[float] = None
-    training_framework: Optional[str] = None
-    training_hyperparameters: Dict[str, Any] = field(default_factory=dict)
-    training_code_version: Optional[str] = None
-    training_git_commit: Optional[str] = None
-    validation_metrics: Dict[str, float] = field(default_factory=dict)
-    test_metrics: Dict[str, float] = field(default_factory=dict)
-    production_metrics: Dict[str, float] = field(default_factory=dict)
-    benchmark_metrics: Dict[str, float] = field(default_factory=dict)
-    model_size_mb: Optional[float] = None
-    inference_latency_ms: Optional[float] = None
-    memory_usage_mb: Optional[float] = None
-    fairness_metrics: Dict[str, float] = field(default_factory=dict)
-    explainability_score: Optional[float] = None
-    privacy_compliance: Dict[str, bool] = field(default_factory=dict)
-    parent_model_id: Optional[str] = None
-    experiment_id: Optional[str] = None
-    dependencies: List[Dict[str, str]] = field(default_factory=list)
-    data_lineage: List[Dict[str, str]] = field(default_factory=list)
-    deployment_timestamp: Optional[datetime] = None
-    deployment_endpoint: Optional[str] = None
-    serving_container: Optional[str] = None
-    deployment_environment: Optional[str] = None
-    health_check_url: Optional[str] = None
-    business_use_case: Optional[str] = None
-    model_owner: Optional[str] = None
-    model_stakeholders: List[str] = field(default_factory=list)
-    compliance_requirements: List[str] = field(default_factory=list)
-    tags: Dict[str, str] = field(default_factory=dict)
-    description: Optional[str] = None
-    changelog: List[str] = field(default_factory=list)
-    notes: List[str] = field(default_factory=list)
-    aliases: List[str] = field(default_factory=list)
-    mlflow_version: Optional[int] = None
+    training_dataset_id: str | None = None
+    training_dataset_version: str | None = None
+    training_duration_seconds: float | None = None
+    training_framework: str | None = None
+    training_hyperparameters: dict[str, Any] = field(default_factory=dict)
+    training_code_version: str | None = None
+    training_git_commit: str | None = None
+    validation_metrics: dict[str, float] = field(default_factory=dict)
+    test_metrics: dict[str, float] = field(default_factory=dict)
+    production_metrics: dict[str, float] = field(default_factory=dict)
+    benchmark_metrics: dict[str, float] = field(default_factory=dict)
+    model_size_mb: float | None = None
+    inference_latency_ms: float | None = None
+    memory_usage_mb: float | None = None
+    fairness_metrics: dict[str, float] = field(default_factory=dict)
+    explainability_score: float | None = None
+    privacy_compliance: dict[str, bool] = field(default_factory=dict)
+    parent_model_id: str | None = None
+    experiment_id: str | None = None
+    dependencies: list[dict[str, str]] = field(default_factory=list)
+    data_lineage: list[dict[str, str]] = field(default_factory=list)
+    deployment_timestamp: datetime | None = None
+    deployment_endpoint: str | None = None
+    serving_container: str | None = None
+    deployment_environment: str | None = None
+    health_check_url: str | None = None
+    business_use_case: str | None = None
+    model_owner: str | None = None
+    model_stakeholders: list[str] = field(default_factory=list)
+    compliance_requirements: list[str] = field(default_factory=list)
+    tags: dict[str, str] = field(default_factory=dict)
+    description: str | None = None
+    changelog: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    mlflow_version: int | None = None
 
     @property
     def mlflow_compatible_version(self) -> int:
@@ -164,14 +164,14 @@ class ModelMetadata:
 class ModelLineage:
     """Enhanced model lineage with dependency graphs."""
     model_id: str
-    parent_models: List[Dict[str, str]]
-    derived_models: List[Dict[str, str]]
-    training_data_sources: List[Dict[str, str]]
-    feature_transformations: List[Dict[str, str]]
-    experiment_history: List[str]
-    deployment_history: List[Dict[str, Any]]
+    parent_models: list[dict[str, str]]
+    derived_models: list[dict[str, str]]
+    training_data_sources: list[dict[str, str]]
+    feature_transformations: list[dict[str, str]]
+    experiment_history: list[str]
+    deployment_history: list[dict[str, Any]]
     creation_timestamp: datetime
-    dependency_graph: Dict[str, Any] = field(default_factory=dict)
+    dependency_graph: dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class ModelValidation:
@@ -179,11 +179,11 @@ class ModelValidation:
     model_id: str
     validation_timestamp: datetime
     is_valid: bool
-    validation_checks: Dict[str, bool]
-    performance_benchmarks: Dict[str, float]
-    data_drift_score: Optional[float] = None
-    concept_drift_score: Optional[float] = None
-    statistical_significance: Dict[str, float] = field(default_factory=dict)
+    validation_checks: dict[str, bool]
+    performance_benchmarks: dict[str, float]
+    data_drift_score: float | None = None
+    concept_drift_score: float | None = None
+    statistical_significance: dict[str, float] = field(default_factory=dict)
     accuracy_threshold_met: bool = False
     latency_threshold_met: bool = False
     memory_threshold_met: bool = False
@@ -191,28 +191,28 @@ class ModelValidation:
     privacy_compliance_passed: bool = False
     security_scan_passed: bool = False
     model_card_complete: bool = False
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
 
-class ModelApprovalRequest(SQLModel):
+class ModelApprovalRequest(BaseModel):
     """Enhanced model approval with multi-stage workflow."""
     model_id: str
     requester: str
     reason: str
     target_tier: ModelTier
-    validation_results: Optional[ModelValidation] = None
+    validation_results: ModelValidation | None = None
     approval_stage: str = 'initial'
-    technical_reviewer: Optional[str] = None
-    business_reviewer: Optional[str] = None
-    final_approver: Optional[str] = None
-    technical_approved: Optional[bool] = None
-    business_approved: Optional[bool] = None
-    final_approved: Optional[bool] = None
-    reviewer_notes: Optional[str] = None
-    approval_timestamp: Optional[datetime] = None
+    technical_reviewer: str | None = None
+    business_reviewer: str | None = None
+    final_approver: str | None = None
+    technical_approved: bool | None = None
+    business_approved: bool | None = None
+    final_approved: bool | None = None
+    reviewer_notes: str | None = None
+    approval_timestamp: datetime | None = None
     risk_level: str = 'medium'
-    risk_mitigation_plan: Optional[str] = None
+    risk_mitigation_plan: str | None = None
 
 class EnhancedModelRegistry:
     """Enhanced Model Registry with 2025 MLflow best practices.
@@ -225,7 +225,7 @@ class EnhancedModelRegistry:
     - 40% faster registration through parallel processing
     """
 
-    def __init__(self, mlflow_tracking_uri: Optional[str]=None, storage_path: Path=Path('./enhanced_model_registry'), enable_parallel_processing: bool=True):
+    def __init__(self, mlflow_tracking_uri: str | None=None, storage_path: Path=Path('./enhanced_model_registry'), enable_parallel_processing: bool=True):
         """Initialize enhanced model registry.
         
         Args:
@@ -237,21 +237,20 @@ class EnhancedModelRegistry:
         self.storage_path = storage_path
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.enable_parallel_processing = enable_parallel_processing
-        self._executor = ThreadPoolExecutor(max_workers=8) if enable_parallel_processing else None
-        self._model_metadata: Dict[str, ModelMetadata] = {}
-        self._model_lineage: Dict[str, ModelLineage] = {}
-        self._approval_requests: Dict[str, ModelApprovalRequest] = {}
-        self._active_experiments: Dict[str, Set[str]] = {}
-        self._model_aliases: Dict[str, str] = {}
+        self._model_metadata: dict[str, ModelMetadata] = {}
+        self._model_lineage: dict[str, ModelLineage] = {}
+        self._approval_requests: dict[str, ModelApprovalRequest] = {}
+        self._active_experiments: dict[str, set[str]] = {}
+        self._model_aliases: dict[str, str] = {}
         if mlflow_tracking_uri:
             mlflow.set_tracking_uri(mlflow_tracking_uri)
         self.mlflow_client = mlflow.MlflowClient(tracking_uri=mlflow_tracking_uri)
-        self._registration_times: List[float] = []
-        self._validation_cache: Dict[str, ModelValidation] = {}
+        self._registration_times: list[float] = []
+        self._validation_cache: dict[str, ModelValidation] = {}
         logger.info('Enhanced Model Registry (2025) initialized at %s', storage_path)
         logger.info('Parallel processing: %s', 'enabled' if enable_parallel_processing else 'disabled')
 
-    async def register_model(self, model: Any, model_name: str, version: Optional[SemanticVersion]=None, metadata: Optional[ModelMetadata]=None, experiment_id: Optional[str]=None, parent_model_id: Optional[str]=None, auto_validate: bool=True) -> str:
+    async def register_model(self, model: Any, model_name: str, version: SemanticVersion | None=None, metadata: ModelMetadata | None=None, experiment_id: str | None=None, parent_model_id: str | None=None, auto_validate: bool=True) -> str:
         """Register a new model with enhanced metadata and parallel processing.
         
         Args:
@@ -315,7 +314,7 @@ class EnhancedModelRegistry:
         logger.info('Registered model %s v%s with ID %s in %ss (avg: %ss, speedup: %s%%)', model_name, version, model_id, format(registration_time, '.2f'), format(avg_time, '.2f'), format(speedup, '.1f'))
         return model_id
 
-    async def create_model_alias(self, model_id: str, alias: str, description: Optional[str]=None) -> bool:
+    async def create_model_alias(self, model_id: str, alias: str, description: str | None=None) -> bool:
         """Create an alias for a model (2025 MLflow pattern).
         
         Args:
@@ -338,17 +337,17 @@ class EnhancedModelRegistry:
                 self.mlflow_client.set_registered_model_alias(metadata.model_name, alias, str(metadata.mlflow_compatible_version))
             except Exception as e:
                 logger.error('Failed to set MLflow alias: %s', e)
-        logger.info("Created alias '{alias}' for model %s", model_id)
+        logger.info(f"Created alias '{alias}' for model {model_id}")
         return True
 
-    async def get_model_by_alias(self, alias: str) -> Optional[ModelMetadata]:
+    async def get_model_by_alias(self, alias: str) -> ModelMetadata | None:
         """Get model by alias (2025 MLflow pattern)."""
         model_id = self._model_aliases.get(alias)
         if model_id:
             return self._model_metadata.get(model_id)
         return None
 
-    async def promote_model(self, model_id: str, target_tier: ModelTier, approval_request: Optional[ModelApprovalRequest]=None) -> bool:
+    async def promote_model(self, model_id: str, target_tier: ModelTier, approval_request: ModelApprovalRequest | None=None) -> bool:
         """Promote model through tiers with approval workflow.
         
         Args:
@@ -414,7 +413,7 @@ class EnhancedModelRegistry:
         logger.info('Started A/B test {ab_test_id} between {champion_model_id} and %s', challenger_model_id)
         return ab_test_id
 
-    async def get_model_performance_comparison(self, model_ids: List[str], metrics: Optional[List[str]]=None) -> Dict[str, Any]:
+    async def get_model_performance_comparison(self, model_ids: list[str], metrics: list[str] | None=None) -> dict[str, Any]:
         """Compare performance across multiple models."""
         comparison = {'models': {}, 'best_by_metric': {}, 'statistical_significance': {}}
         metrics = metrics or ['accuracy', 'precision', 'recall', 'f1_score', 'auc']
@@ -437,7 +436,7 @@ class EnhancedModelRegistry:
                 comparison['best_by_metric'][metric] = {'model_id': best_model, 'value': best_value, 'model_name': comparison['models'][best_model]['name'], 'model_version': comparison['models'][best_model]['version']}
         return comparison
 
-    async def get_registry_statistics(self) -> Dict[str, Any]:
+    async def get_registry_statistics(self) -> dict[str, Any]:
         """Get comprehensive registry statistics."""
         models_by_status = {}
         models_by_tier = {}
@@ -474,19 +473,18 @@ class EnhancedModelRegistry:
         model_path.mkdir(parents=True, exist_ok=True)
         metadata_path = model_path / 'metadata.json'
         metadata_dict = self._metadata_to_dict(metadata)
-        if self._executor:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(self._executor, self._save_metadata_sync, metadata_path, metadata_dict)
+        if self.enable_parallel_processing:
+            await asyncio.to_thread(self._save_metadata_sync, metadata_path, metadata_dict)
         else:
             with open(metadata_path, 'w') as f:
                 json.dump(metadata_dict, f, indent=2)
 
-    def _save_metadata_sync(self, metadata_path: Path, metadata_dict: Dict[str, Any]):
+    def _save_metadata_sync(self, metadata_path: Path, metadata_dict: dict[str, Any]):
         """Synchronous metadata saving for thread pool."""
         with open(metadata_path, 'w') as f:
             json.dump(metadata_dict, f, indent=2)
 
-    async def _register_with_mlflow_async(self, model: Any, model_name: str, metadata: ModelMetadata, experiment_id: Optional[str]):
+    async def _register_with_mlflow_async(self, model: Any, model_name: str, metadata: ModelMetadata, experiment_id: str | None):
         """Register with MLflow asynchronously."""
         try:
             with mlflow.start_run(experiment_id=experiment_id) as run:
@@ -517,7 +515,7 @@ class EnhancedModelRegistry:
         except Exception as e:
             logger.error('Failed to register model with MLflow: %s', e)
 
-    async def _update_lineage_async(self, model_id: str, parent_model_id: str, experiment_id: Optional[str]):
+    async def _update_lineage_async(self, model_id: str, parent_model_id: str, experiment_id: str | None):
         """Update model lineage asynchronously."""
         if model_id not in self._model_lineage:
             self._model_lineage[model_id] = ModelLineage(model_id=model_id, parent_models=[{'model_id': parent_model_id, 'version': 'latest', 'relationship_type': 'derived_from'}] if parent_model_id else [], derived_models=[], training_data_sources=[], feature_transformations=[], experiment_history=[experiment_id] if experiment_id else [], deployment_history=[], creation_timestamp=aware_utc_now())
@@ -527,7 +525,7 @@ class EnhancedModelRegistry:
             if parent_entry not in parent_lineage.derived_models:
                 parent_lineage.derived_models.append(parent_entry)
 
-    async def _validate_model_async(self, model_id: str, model: Any) -> Optional[ModelValidation]:
+    async def _validate_model_async(self, model_id: str, model: Any) -> ModelValidation | None:
         """Validate model asynchronously."""
         if model_id in self._validation_cache:
             return self._validation_cache[model_id]
@@ -580,9 +578,9 @@ class EnhancedModelRegistry:
         allowed_promotions = {ModelTier.DEVELOPMENT: [ModelTier.STAGING], ModelTier.STAGING: [ModelTier.PRODUCTION, ModelTier.CANARY], ModelTier.CANARY: [ModelTier.PRODUCTION], ModelTier.PRODUCTION: [ModelTier.GLOBAL]}
         return target_tier in allowed_promotions.get(current_tier, [])
 
-    def _generate_changelog_entry(self, metadata: ModelMetadata, parent_model_id: Optional[str]) -> str:
+    def _generate_changelog_entry(self, metadata: ModelMetadata, parent_model_id: str | None) -> str:
         """Generate changelog entry for model registration."""
-        entry_parts = [f"v{metadata.version} - {metadata.created_at.strftime('%Y-%m-%d %H:%M:%S')}"]
+        entry_parts = [f"v{metadata.version} - {metadata.format_display_date(created_at)}"]
         if parent_model_id:
             entry_parts.append(f'Derived from model {parent_model_id}')
         if metadata.training_hyperparameters:
@@ -594,10 +592,10 @@ class EnhancedModelRegistry:
             entry_parts.append(f'Metrics: {metrics_str}')
         return ' | '.join(entry_parts)
 
-    def _metadata_to_dict(self, metadata: ModelMetadata) -> Dict[str, Any]:
+    def _metadata_to_dict(self, metadata: ModelMetadata) -> dict[str, Any]:
         """Convert metadata to dictionary for serialization."""
         return {'model_id': metadata.model_id, 'model_name': metadata.model_name, 'version': str(metadata.version), 'created_at': metadata.created_at.isoformat(), 'created_by': metadata.created_by, 'status': metadata.status.value, 'tier': metadata.tier.value if metadata.tier else None, 'model_format': metadata.model_format.value, 'training_dataset_id': metadata.training_dataset_id, 'training_dataset_version': metadata.training_dataset_version, 'training_duration_seconds': metadata.training_duration_seconds, 'training_framework': metadata.training_framework, 'training_hyperparameters': metadata.training_hyperparameters, 'training_code_version': metadata.training_code_version, 'training_git_commit': metadata.training_git_commit, 'validation_metrics': metadata.validation_metrics, 'test_metrics': metadata.test_metrics, 'production_metrics': metadata.production_metrics, 'benchmark_metrics': metadata.benchmark_metrics, 'model_size_mb': metadata.model_size_mb, 'inference_latency_ms': metadata.inference_latency_ms, 'memory_usage_mb': metadata.memory_usage_mb, 'fairness_metrics': metadata.fairness_metrics, 'explainability_score': metadata.explainability_score, 'privacy_compliance': metadata.privacy_compliance, 'parent_model_id': metadata.parent_model_id, 'experiment_id': metadata.experiment_id, 'dependencies': metadata.dependencies, 'data_lineage': metadata.data_lineage, 'deployment_timestamp': metadata.deployment_timestamp.isoformat() if metadata.deployment_timestamp else None, 'deployment_endpoint': metadata.deployment_endpoint, 'serving_container': metadata.serving_container, 'deployment_environment': metadata.deployment_environment, 'health_check_url': metadata.health_check_url, 'business_use_case': metadata.business_use_case, 'model_owner': metadata.model_owner, 'model_stakeholders': metadata.model_stakeholders, 'compliance_requirements': metadata.compliance_requirements, 'tags': metadata.tags, 'description': metadata.description, 'changelog': metadata.changelog, 'notes': metadata.notes, 'aliases': metadata.aliases}
 
-def create_enhanced_model_registry(mlflow_tracking_uri: Optional[str]=None, storage_path: Optional[Path]=None, enable_parallel_processing: bool=True) -> EnhancedModelRegistry:
+def create_enhanced_model_registry(mlflow_tracking_uri: str | None=None, storage_path: Path | None=None, enable_parallel_processing: bool=True) -> EnhancedModelRegistry:
     """Create enhanced model registry with 2025 optimizations."""
     return EnhancedModelRegistry(mlflow_tracking_uri=mlflow_tracking_uri, storage_path=storage_path or Path('./enhanced_model_registry'), enable_parallel_processing=enable_parallel_processing)

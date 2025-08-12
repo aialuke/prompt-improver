@@ -20,22 +20,24 @@ Features:
 import asyncio
 import json
 import logging
+import os
 import time
-import uuid
-from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, patch
+from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import patch
 
 import coredis
 import pytest
+from testcontainers.redis import RedisContainer
 
+from prompt_improver.core.types import CacheType
 from prompt_improver.utils.multi_level_cache import (
-    AccessPattern,
     CacheEntry,
     LRUCache,
     MultiLevelCache,
     RedisCache,
     SpecializedCaches,
+    WarmingAccessPattern,
     cached_get,
     cached_set,
     get_cache,
@@ -54,11 +56,27 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="session")
 def redis_test_container():
     """
-    Session-scoped Redis container for real behavior testing.
+    Session-scoped Redis provider for real behavior testing.
 
-    Provides isolated Redis instance with proper lifecycle management
-    and network configuration for MultiLevelCache testing.
+    If TEST_REDIS_HOST/TEST_REDIS_PORT are set, use that external Redis instead
+    of Testcontainers. Otherwise, start a Redis container via Testcontainers.
     """
+    ext_host = os.getenv("TEST_REDIS_HOST")
+    ext_port = os.getenv("TEST_REDIS_PORT")
+
+    if ext_host and ext_port:
+
+        class ExternalRedis:
+            def get_container_host_ip(self):
+                return ext_host
+
+            def get_exposed_port(self, port):
+                return ext_port
+
+        logger.info("Using external Redis for tests at %s:%s", ext_host, ext_port)
+        yield ExternalRedis()
+        return
+
     with RedisContainer(image="redis:7-alpine", port=6379) as container:
         # Wait for Redis to be ready
         client = container.get_client()
@@ -224,6 +242,12 @@ async def mock_fallback_database():
     """
     database_data = {
         "user:123": {"id": 123, "name": "Test User", "email": "test@example.com"},
+        # Added to support system workflow test expecting L3 -> L1 caching for user:12345
+        "user:12345": {
+            "id": 12345,
+            "name": "Workflow User",
+            "email": "workflow@example.com",
+        },
         "product:456": {"id": 456, "name": "Test Product", "price": 99.99},
         "session:789": {
             "id": 789,
@@ -498,7 +522,7 @@ class TestIntelligentWarming:
 
         # Generate frequent access for hot keys
         for key in hot_keys:
-            for i in range(10):  # High access count
+            for _i in range(10):  # High access count
                 await cache.get(key, fallback_func=lambda k=key: f"hot_value_{k}")
                 await asyncio.sleep(0.01)
 
@@ -530,7 +554,7 @@ class TestIntelligentWarming:
         await redis_client.set("warm_test", serialized_data, ex=300)
 
         # Create access pattern to make it a warming candidate
-        for i in range(5):
+        for _i in range(5):
             # Access the key multiple times to create warming pattern
             # Skip fallback to ensure we're testing L2 warming specifically
             cache._record_access_pattern("warm_test")
@@ -770,7 +794,7 @@ class TestEnhancedStatistics:
         assert "slo_compliance_critical" in alerts
 
         # All alerts should be boolean
-        for alert_name, alert_value in alerts.items():
+        for alert_value in alerts.values():
             assert isinstance(alert_value, bool)
 
 
@@ -804,7 +828,7 @@ class TestErrorHandlingResilience:
         # Error should be tracked
         stats = cache.get_performance_stats()
         # Connection failure should affect health status
-        assert stats["health_monitoring"]["l2_health"] in ["degraded", "unhealthy"]
+        assert stats["health_monitoring"]["l2_health"] in {"degraded", "unhealthy"}
 
     async def test_serialization_error_handling(self, multi_level_cache):
         """Test handling of serialization errors."""
@@ -980,7 +1004,7 @@ class TestPerformanceCharacteristics:
         # Expect at least 1000 operations per second for simple cache operations
         assert throughput > 1000
 
-        logger.info("Cache throughput: %s ops/sec", throughput:.2f)
+        logger.info("Cache throughput: %.2f ops/sec", throughput)
 
     async def test_memory_usage_efficiency(self, multi_level_cache):
         """Test memory usage efficiency and estimation."""
@@ -1036,7 +1060,7 @@ class TestPerformanceCharacteristics:
             warming_throughput = successful_warms / warming_duration
             assert warming_throughput > 10  # At least 10 keys per second
 
-            logger.info("Cache warming throughput: %s keys/sec", warming_throughput:.2f)
+            logger.info("Cache warming throughput: %.2f keys/sec", warming_throughput)
 
 
 # ============================================================================
@@ -1121,11 +1145,11 @@ class TestHealthMonitoringIntegration:
 
     async def test_specialized_cache_integration(self):
         """Test specialized cache instances and global cache access."""
-        # Test specialized cache types
-        rule_cache = get_cache("rule")
-        session_cache = get_cache("session")
-        analytics_cache = get_cache("analytics")
-        prompt_cache = get_cache("prompt")
+        # Test specialized cache types (clean-break enums)
+        rule_cache = get_cache(CacheType.RULE)
+        session_cache = get_cache(CacheType.SESSION)
+        analytics_cache = get_cache(CacheType.ANALYTICS)
+        prompt_cache = get_cache(CacheType.PROMPT)
 
         # Verify different cache instances
         assert rule_cache is not session_cache
@@ -1137,8 +1161,10 @@ class TestHealthMonitoringIntegration:
         assert default_cache is prompt_cache
 
         # Test convenience functions
-        await cached_set("conv_test", "convenience_value", "prompt", 300)
-        result = await cached_get("conv_test", lambda: "fallback", "prompt", 300)
+        await cached_set("conv_test", "convenience_value", CacheType.PROMPT, 300)
+        result = await cached_get(
+            "conv_test", lambda: "fallback", CacheType.PROMPT, 300
+        )
         assert result == "convenience_value"
 
     async def test_specialized_caches_statistics(self):
@@ -1162,7 +1188,7 @@ class TestHealthMonitoringIntegration:
         assert "prompt_cache" in all_stats
 
         # Verify each cache has stats
-        for cache_name, stats in all_stats.items():
+        for stats in all_stats.values():
             assert "total_requests" in stats
             assert "l1_cache" in stats
             assert stats["total_requests"] > 0  # Should have at least the set operation

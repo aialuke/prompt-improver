@@ -20,14 +20,14 @@
     ".archive",
     "tests/deprecated"
   ],
-  "pythonVersion": "3.13",
+  "pythonVersion": "3.12",
   "pythonPlatform": "Darwin",
   "venvPath": ".",
   "venv": ".venv",
   "executionEnvironments": [
     {
       "root": "src",
-      "pythonVersion": "3.13",
+      "pythonVersion": "3.12",
       "pythonPlatform": "Darwin",
       "extraPaths": [
         "src"

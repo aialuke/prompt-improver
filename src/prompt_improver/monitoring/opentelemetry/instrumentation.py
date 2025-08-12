@@ -4,15 +4,21 @@
 Provides automatic instrumentation for HTTP, database, Redis, and ML operations
 with minimal performance overhead and comprehensive observability.
 """
+
 import asyncio
 import functools
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, Dict, Optional, TypeVar, ParamSpec
-from prompt_improver.monitoring.opentelemetry.metrics import get_database_metrics, get_ml_metrics
+from typing import Any, Dict, Optional, ParamSpec, TypeVar
+
+from prompt_improver.monitoring.opentelemetry.metrics import (
+    get_database_metrics,
+    get_ml_metrics,
+)
 from prompt_improver.monitoring.opentelemetry.setup import get_tracer
 from prompt_improver.monitoring.opentelemetry.tracing import SpanAttributes
+
 try:
     from opentelemetry import trace
     from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
@@ -21,13 +27,14 @@ try:
     from opentelemetry.instrumentation.redis import RedisInstrumentor
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
     from opentelemetry.trace import SpanKind, Status, StatusCode
+
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
     trace = SpanKind = Status = StatusCode = None
 logger = logging.getLogger(__name__)
-T = TypeVar('T')
-P = ParamSpec('P')
+T = TypeVar("T")
+P = ParamSpec("P")
 
 
 class InstrumentationManager:
@@ -40,46 +47,46 @@ class InstrumentationManager:
     def instrument_all(self) -> None:
         """Enable all available auto-instrumentation."""
         if not OTEL_AVAILABLE:
-            logger.warning('OpenTelemetry not available, skipping instrumentation')
+            logger.warning("OpenTelemetry not available, skipping instrumentation")
             return
         self.instrument_http()
         self.instrument_database()
         self.instrument_redis()
-        logger.info('OpenTelemetry auto-instrumentation enabled for all components')
+        logger.info("OpenTelemetry auto-instrumentation enabled for all components")
 
     def instrument_http(self) -> None:
         """Instrument HTTP client and server operations."""
-        if not OTEL_AVAILABLE or self._instrumented.get('http', False):
+        if not OTEL_AVAILABLE or self._instrumented.get("http", False):
             return
         try:
             AioHttpClientInstrumentor().instrument()
             RequestsInstrumentor().instrument()
-            self._instrumented['http'] = True
-            logger.info('HTTP instrumentation enabled')
+            self._instrumented["http"] = True
+            logger.info("HTTP instrumentation enabled")
         except Exception as e:
-            logger.error('Failed to instrument HTTP: %s', e)
+            logger.error(f"Failed to instrument HTTP: {e}")
 
     def instrument_database(self) -> None:
         """Instrument database operations."""
-        if not OTEL_AVAILABLE or self._instrumented.get('database', False):
+        if not OTEL_AVAILABLE or self._instrumented.get("database", False):
             return
         try:
             AsyncPGInstrumentor().instrument()
-            self._instrumented['database'] = True
-            logger.info('Database instrumentation enabled')
+            self._instrumented["database"] = True
+            logger.info("Database instrumentation enabled")
         except Exception as e:
-            logger.error('Failed to instrument database: %s', e)
+            logger.error(f"Failed to instrument database: {e}")
 
     def instrument_redis(self) -> None:
         """Instrument Redis operations."""
-        if not OTEL_AVAILABLE or self._instrumented.get('redis', False):
+        if not OTEL_AVAILABLE or self._instrumented.get("redis", False):
             return
         try:
             RedisInstrumentor().instrument()
-            self._instrumented['redis'] = True
-            logger.info('Redis instrumentation enabled')
+            self._instrumented["redis"] = True
+            logger.info("Redis instrumentation enabled")
         except Exception as e:
-            logger.error('Failed to instrument Redis: %s', e)
+            logger.error(f"Failed to instrument Redis: {e}")
 
     def uninstrument_all(self) -> None:
         """Disable all instrumentation."""
@@ -91,10 +98,13 @@ class InstrumentationManager:
             AsyncPGInstrumentor().uninstrument()
             RedisInstrumentor().uninstrument()
             self._instrumented.clear()
-            logger.info('All instrumentation disabled')
+            logger.info("All instrumentation disabled")
         except Exception as e:
-            logger.error('Failed to uninstrument: %s', e)
+            logger.error(f"Failed to uninstrument: {e}")
+
+
 _instrumentation_manager: InstrumentationManager | None = None
+
 
 def get_instrumentation_manager() -> InstrumentationManager:
     """Get global instrumentation manager."""
@@ -103,27 +113,37 @@ def get_instrumentation_manager() -> InstrumentationManager:
         _instrumentation_manager = InstrumentationManager()
     return _instrumentation_manager
 
+
 def instrument_http() -> None:
     """Enable HTTP instrumentation."""
     get_instrumentation_manager().instrument_http()
+
 
 def instrument_database() -> None:
     """Enable database instrumentation."""
     get_instrumentation_manager().instrument_database()
 
+
 def instrument_redis() -> None:
     """Enable Redis instrumentation."""
     get_instrumentation_manager().instrument_redis()
 
+
 def instrument_ml_pipeline() -> None:
     """Enable ML pipeline instrumentation (custom implementation)."""
-    logger.info('ML pipeline instrumentation available via @trace_ml_operation decorator')
+    logger.info(
+        "ML pipeline instrumentation available via @trace_ml_operation decorator"
+    )
+
 
 def instrument_external_apis() -> None:
     """Enable external API instrumentation."""
     instrument_http()
 
-def trace_ml_operation(operation_type: str, model_name: str | None=None, capture_io: bool=False):
+
+def trace_ml_operation(
+    operation_type: str, model_name: str | None = None, capture_io: bool = False
+):
     """Decorator to trace ML operations with custom metrics."""
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -134,10 +154,12 @@ def trace_ml_operation(operation_type: str, model_name: str | None=None, capture
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            span_name = f'ml.{operation_type}'
+            span_name = f"ml.{operation_type}"
             if model_name:
-                span_name += f'.{model_name}'
-            with tracer.start_as_current_span(span_name, kind=SpanKind.INTERNAL) as span:
+                span_name += f".{model_name}"
+            with tracer.start_as_current_span(
+                span_name, kind=SpanKind.INTERNAL
+            ) as span:
                 span.set_attribute(SpanAttributes.ML_OPERATION, operation_type)
                 if model_name:
                     span.set_attribute(SpanAttributes.ML_MODEL_NAME, model_name)
@@ -147,24 +169,30 @@ def trace_ml_operation(operation_type: str, model_name: str | None=None, capture
                 try:
                     result = await func(*args, **kwargs)
                     duration_ms = (time.time() - start_time) * 1000
-                    ml_metrics.record_inference(model_name or 'unknown', 'unknown', duration_ms, success=True)
+                    ml_metrics.record_inference(
+                        model_name or "unknown", "unknown", duration_ms, success=True
+                    )
                     if capture_io:
                         _capture_ml_output_metadata(span, result)
                     span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
                     duration_ms = (time.time() - start_time) * 1000
-                    ml_metrics.record_inference(model_name or 'unknown', 'unknown', duration_ms, success=False)
+                    ml_metrics.record_inference(
+                        model_name or "unknown", "unknown", duration_ms, success=False
+                    )
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
 
         @functools.wraps(func)
         def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            span_name = f'ml.{operation_type}'
+            span_name = f"ml.{operation_type}"
             if model_name:
-                span_name += f'.{model_name}'
-            with tracer.start_as_current_span(span_name, kind=SpanKind.INTERNAL) as span:
+                span_name += f".{model_name}"
+            with tracer.start_as_current_span(
+                span_name, kind=SpanKind.INTERNAL
+            ) as span:
                 span.set_attribute(SpanAttributes.ML_OPERATION, operation_type)
                 if model_name:
                     span.set_attribute(SpanAttributes.ML_MODEL_NAME, model_name)
@@ -174,23 +202,30 @@ def trace_ml_operation(operation_type: str, model_name: str | None=None, capture
                 try:
                     result = func(*args, **kwargs)
                     duration_ms = (time.time() - start_time) * 1000
-                    ml_metrics.record_inference(model_name or 'unknown', 'unknown', duration_ms, success=True)
+                    ml_metrics.record_inference(
+                        model_name or "unknown", "unknown", duration_ms, success=True
+                    )
                     if capture_io:
                         _capture_ml_output_metadata(span, result)
                     span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
                     duration_ms = (time.time() - start_time) * 1000
-                    ml_metrics.record_inference(model_name or 'unknown', 'unknown', duration_ms, success=False)
+                    ml_metrics.record_inference(
+                        model_name or "unknown", "unknown", duration_ms, success=False
+                    )
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
+
     return decorator
 
-def trace_database_operation(operation: str, table: str | None=None):
+
+def trace_database_operation(operation: str, table: str | None = None):
     """Decorator to trace database operations with enhanced metrics."""
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -201,55 +236,66 @@ def trace_database_operation(operation: str, table: str | None=None):
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            span_name = f'db.{operation}'
+            span_name = f"db.{operation}"
             if table:
-                span_name += f'.{table}'
+                span_name += f".{table}"
             with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
                 span.set_attribute(SpanAttributes.DB_OPERATION, operation)
                 if table:
-                    span.set_attribute('db.table', table)
+                    span.set_attribute("db.table", table)
                 start_time = time.time()
                 try:
                     result = await func(*args, **kwargs)
                     duration_ms = (time.time() - start_time) * 1000
-                    db_metrics.record_query(operation, table or 'unknown', duration_ms, success=True)
+                    db_metrics.record_query(
+                        operation, table or "unknown", duration_ms, success=True
+                    )
                     span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
                     duration_ms = (time.time() - start_time) * 1000
-                    db_metrics.record_query(operation, table or 'unknown', duration_ms, success=False)
+                    db_metrics.record_query(
+                        operation, table or "unknown", duration_ms, success=False
+                    )
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
 
         @functools.wraps(func)
         def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            span_name = f'db.{operation}'
+            span_name = f"db.{operation}"
             if table:
-                span_name += f'.{table}'
+                span_name += f".{table}"
             with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
                 span.set_attribute(SpanAttributes.DB_OPERATION, operation)
                 if table:
-                    span.set_attribute('db.table', table)
+                    span.set_attribute("db.table", table)
                 start_time = time.time()
                 try:
                     result = func(*args, **kwargs)
                     duration_ms = (time.time() - start_time) * 1000
-                    db_metrics.record_query(operation, table or 'unknown', duration_ms, success=True)
+                    db_metrics.record_query(
+                        operation, table or "unknown", duration_ms, success=True
+                    )
                     span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
                     duration_ms = (time.time() - start_time) * 1000
-                    db_metrics.record_query(operation, table or 'unknown', duration_ms, success=False)
+                    db_metrics.record_query(
+                        operation, table or "unknown", duration_ms, success=False
+                    )
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
+
     return decorator
 
-def trace_cache_operation(operation: str, cache_name: str='default'):
+
+def trace_cache_operation(operation: str, cache_name: str = "default"):
     """Decorator to trace cache operations."""
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -259,12 +305,14 @@ def trace_cache_operation(operation: str, cache_name: str='default'):
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            with tracer.start_as_current_span(f'cache.{operation}', kind=SpanKind.CLIENT) as span:
-                span.set_attribute('cache.operation', operation)
-                span.set_attribute('cache.name', cache_name)
+            with tracer.start_as_current_span(
+                f"cache.{operation}", kind=SpanKind.CLIENT
+            ) as span:
+                span.set_attribute("cache.operation", operation)
+                span.set_attribute("cache.name", cache_name)
                 try:
                     result = await func(*args, **kwargs)
-                    if operation == 'get':
+                    if operation == "get":
                         hit = result is not None
                         span.set_attribute(SpanAttributes.CACHE_HIT, hit)
                     span.set_status(Status(StatusCode.OK))
@@ -276,12 +324,14 @@ def trace_cache_operation(operation: str, cache_name: str='default'):
 
         @functools.wraps(func)
         def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            with tracer.start_as_current_span(f'cache.{operation}', kind=SpanKind.CLIENT) as span:
-                span.set_attribute('cache.operation', operation)
-                span.set_attribute('cache.name', cache_name)
+            with tracer.start_as_current_span(
+                f"cache.{operation}", kind=SpanKind.CLIENT
+            ) as span:
+                span.set_attribute("cache.operation", operation)
+                span.set_attribute("cache.name", cache_name)
                 try:
                     result = func(*args, **kwargs)
-                    if operation == 'get':
+                    if operation == "get":
                         hit = result is not None
                         span.set_attribute(SpanAttributes.CACHE_HIT, hit)
                     span.set_status(Status(StatusCode.OK))
@@ -290,12 +340,15 @@ def trace_cache_operation(operation: str, cache_name: str='default'):
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
+
     return decorator
 
-def trace_business_operation(operation_name: str, component: str='business'):
+
+def trace_business_operation(operation_name: str, component: str = "business"):
     """Decorator to trace business logic operations."""
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -305,7 +358,9 @@ def trace_business_operation(operation_name: str, component: str='business'):
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            with tracer.start_as_current_span(f'{component}.{operation_name}', kind=SpanKind.INTERNAL) as span:
+            with tracer.start_as_current_span(
+                f"{component}.{operation_name}", kind=SpanKind.INTERNAL
+            ) as span:
                 span.set_attribute(SpanAttributes.COMPONENT, component)
                 span.set_attribute(SpanAttributes.OPERATION, operation_name)
                 try:
@@ -319,7 +374,9 @@ def trace_business_operation(operation_name: str, component: str='business'):
 
         @functools.wraps(func)
         def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            with tracer.start_as_current_span(f'{component}.{operation_name}', kind=SpanKind.INTERNAL) as span:
+            with tracer.start_as_current_span(
+                f"{component}.{operation_name}", kind=SpanKind.INTERNAL
+            ) as span:
                 span.set_attribute(SpanAttributes.COMPONENT, component)
                 span.set_attribute(SpanAttributes.OPERATION, operation_name)
                 try:
@@ -330,10 +387,13 @@ def trace_business_operation(operation_name: str, component: str='business'):
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
+
     return decorator
+
 
 def _capture_ml_input_metadata(span, args: tuple, kwargs: dict) -> None:
     """Capture ML operation input metadata."""
@@ -344,16 +404,17 @@ def _capture_ml_input_metadata(span, args: tuple, kwargs: dict) -> None:
                 span.set_attribute(SpanAttributes.ML_INPUT_SIZE, len(first_arg))
                 estimated_tokens = len(first_arg.split())
                 span.set_attribute(SpanAttributes.ML_PROMPT_TOKENS, estimated_tokens)
-            elif hasattr(first_arg, '__len__'):
+            elif hasattr(first_arg, "__len__"):
                 span.set_attribute(SpanAttributes.ML_INPUT_SIZE, len(first_arg))
-        if 'max_tokens' in kwargs:
-            span.set_attribute('ml.max_tokens', kwargs['max_tokens'])
-        if 'temperature' in kwargs:
-            span.set_attribute('ml.temperature', kwargs['temperature'])
-        if 'model' in kwargs:
-            span.set_attribute(SpanAttributes.ML_MODEL_NAME, kwargs['model'])
+        if "max_tokens" in kwargs:
+            span.set_attribute("ml.max_tokens", kwargs["max_tokens"])
+        if "temperature" in kwargs:
+            span.set_attribute("ml.temperature", kwargs["temperature"])
+        if "model" in kwargs:
+            span.set_attribute(SpanAttributes.ML_MODEL_NAME, kwargs["model"])
     except Exception as e:
-        logger.debug('Failed to capture ML input metadata: %s', e)
+        logger.debug(f"Failed to capture ML input metadata: {e}")
+
 
 def _capture_ml_output_metadata(span, result: Any) -> None:
     """Capture ML operation output metadata."""
@@ -362,31 +423,36 @@ def _capture_ml_output_metadata(span, result: Any) -> None:
             span.set_attribute(SpanAttributes.ML_OUTPUT_SIZE, len(result))
             estimated_tokens = len(result.split())
             span.set_attribute(SpanAttributes.ML_COMPLETION_TOKENS, estimated_tokens)
-        elif hasattr(result, '__len__'):
+        elif hasattr(result, "__len__"):
             span.set_attribute(SpanAttributes.ML_OUTPUT_SIZE, len(result))
-        elif hasattr(result, 'choices'):
+        elif hasattr(result, "choices"):
             if result.choices:
                 choice = result.choices[0]
-                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                if hasattr(choice, "message") and hasattr(choice.message, "content"):
                     content = choice.message.content
                     span.set_attribute(SpanAttributes.ML_OUTPUT_SIZE, len(content))
-            if hasattr(result, 'usage'):
+            if hasattr(result, "usage"):
                 usage = result.usage
-                if hasattr(usage, 'prompt_tokens'):
-                    span.set_attribute(SpanAttributes.ML_PROMPT_TOKENS, usage.prompt_tokens)
-                if hasattr(usage, 'completion_tokens'):
-                    span.set_attribute(SpanAttributes.ML_COMPLETION_TOKENS, usage.completion_tokens)
+                if hasattr(usage, "prompt_tokens"):
+                    span.set_attribute(
+                        SpanAttributes.ML_PROMPT_TOKENS, usage.prompt_tokens
+                    )
+                if hasattr(usage, "completion_tokens"):
+                    span.set_attribute(
+                        SpanAttributes.ML_COMPLETION_TOKENS, usage.completion_tokens
+                    )
     except Exception as e:
-        logger.debug('Failed to capture ML output metadata: %s', e)
+        logger.debug(f"Failed to capture ML output metadata: {e}")
+
 
 def instrument_fastapi_app(app):
     """Instrument a FastAPI application."""
     if not OTEL_AVAILABLE:
-        logger.warning('OpenTelemetry not available, skipping FastAPI instrumentation')
+        logger.warning("OpenTelemetry not available, skipping FastAPI instrumentation")
         return app
     try:
         FastAPIInstrumentor.instrument_app(app)
-        logger.info('FastAPI application instrumented')
+        logger.info("FastAPI application instrumented")
     except Exception as e:
-        logger.error('Failed to instrument FastAPI app: %s', e)
+        logger.error(f"Failed to instrument FastAPI app: {e}")
     return app

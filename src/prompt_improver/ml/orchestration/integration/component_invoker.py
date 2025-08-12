@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+from collections.abc import Callable
 
 from .direct_component_loader import DirectComponentLoader, LoadedComponent
 
@@ -21,7 +22,7 @@ class InvocationResult:
     method_name: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time: float = 0.0
     timestamp: datetime = None
     
@@ -41,7 +42,7 @@ class ComponentInvoker:
         """Initialize the component invoker."""
         self.component_loader = component_loader
         self.logger = logging.getLogger(__name__)
-        self.invocation_history: List[InvocationResult] = []
+        self.invocation_history: list[InvocationResult] = []
         self.retry_manager = retry_manager
         self.input_sanitizer = input_sanitizer
         self.memory_guard = memory_guard
@@ -151,7 +152,7 @@ class ComponentInvoker:
                 timestamp=start_time
             )
             
-            self.logger.info("Successfully invoked %s.%s in %.3fs", component_name, method_name, execution_time)
+            self.logger.info(f"Successfully invoked {component_name}.{method_name} in %.3fs")
             self.invocation_history.append(invocation_result)
             
             return invocation_result
@@ -200,7 +201,7 @@ class ComponentInvoker:
         """
         if not self.retry_manager:
             # Fallback to regular invocation if retry manager not available
-            self.logger.warning("Retry manager not available for {component_name}.%s, using direct invocation", method_name)
+            self.logger.warning(f"Retry manager not available for {component_name}.{method_name}, using direct invocation")
             return await self.invoke_component_method(component_name, method_name, *args, **kwargs)
 
         operation_name = f"{component_name}.{method_name}"
@@ -228,7 +229,7 @@ class ComponentInvoker:
             # Execute with retry
             result = await self.retry_manager.retry_async(component_operation, config=retry_config)
 
-            self.logger.info("Successfully invoked %s with retry support", operation_name)
+            self.logger.info(f"Successfully invoked {operation_name} with retry support")
             return result
 
         except Exception as e:
@@ -236,7 +237,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Resilient invocation failed after retries: {str(e)}"
-            self.logger.error("Failed to invoke {operation_name} with retry: %s", e)
+            self.logger.error(f"Failed to invoke {operation_name} with retry: {e}")
 
             invocation_result = InvocationResult(
                 component_name=component_name,
@@ -255,7 +256,7 @@ class ComponentInvoker:
         component_name: str,
         method_name: str,
         *args,
-        context: Dict[str, Any] = None,
+        context: dict[str, Any] = None,
         **kwargs
     ) -> InvocationResult:
         """
@@ -321,7 +322,7 @@ class ComponentInvoker:
                 args = tuple(validated_args)
                 kwargs = validated_kwargs
 
-                self.logger.info("Security validation passed for {component_name}.%s", method_name)
+                self.logger.info(f"Security validation passed for {component_name}.{method_name}")
 
             # Invoke the component method with validated arguments
             if self.retry_manager:
@@ -338,7 +339,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Secure component invocation failed: {str(e)}"
-            self.logger.error("Failed to securely invoke {component_name}.{method_name}: %s", e)
+            self.logger.error(f"Failed to securely invoke {component_name}.{method_name}: {e}")
 
             invocation_result = InvocationResult(
                 component_name=component_name,
@@ -352,7 +353,7 @@ class ComponentInvoker:
             self.invocation_history.append(invocation_result)
             return invocation_result
     
-    async def invoke_training_workflow(self, training_data: Any) -> Dict[str, InvocationResult]:
+    async def invoke_training_workflow(self, training_data: Any) -> dict[str, InvocationResult]:
         """
         Invoke a complete training workflow using core components.
         
@@ -433,7 +434,7 @@ class ComponentInvoker:
         
         return results
     
-    async def invoke_evaluation_workflow(self, evaluation_data: Any) -> Dict[str, InvocationResult]:
+    async def invoke_evaluation_workflow(self, evaluation_data: Any) -> dict[str, InvocationResult]:
         """
         Invoke a complete evaluation workflow using evaluation components.
         
@@ -479,8 +480,8 @@ class ComponentInvoker:
     
     async def batch_invoke_components(
         self,
-        invocations: List[Dict[str, Any]]
-    ) -> List[InvocationResult]:
+        invocations: list[dict[str, Any]]
+    ) -> list[InvocationResult]:
         """
         Invoke multiple component methods in parallel.
         
@@ -523,7 +524,7 @@ class ComponentInvoker:
         
         return processed_results
     
-    def get_available_methods(self, component_name: str) -> List[str]:
+    def get_available_methods(self, component_name: str) -> list[str]:
         """
         Get list of available methods for a component.
         
@@ -544,7 +545,7 @@ class ComponentInvoker:
         
         return methods
     
-    def get_method_signature(self, component_name: str, method_name: str) -> Optional[str]:
+    def get_method_signature(self, component_name: str, method_name: str) -> str | None:
         """
         Get method signature for a component method.
         
@@ -568,9 +569,9 @@ class ComponentInvoker:
     
     def get_invocation_history(
         self, 
-        component_name: Optional[str] = None,
-        limit: Optional[int] = None
-    ) -> List[InvocationResult]:
+        component_name: str | None = None,
+        limit: int | None = None
+    ) -> list[InvocationResult]:
         """
         Get invocation history, optionally filtered by component.
         
@@ -591,7 +592,7 @@ class ComponentInvoker:
         
         return history
     
-    def get_success_rate(self, component_name: Optional[str] = None) -> float:
+    def get_success_rate(self, component_name: str | None = None) -> float:
         """
         Get success rate for invocations.
         
@@ -619,7 +620,7 @@ class ComponentInvoker:
         component_name: str,
         method_name: str,
         *args,
-        context: Dict[str, Any] = None,
+        context: dict[str, Any] = None,
         **kwargs
     ) -> InvocationResult:
         """
@@ -669,7 +670,7 @@ class ComponentInvoker:
                         )
             else:
                 # Fallback to other invocation methods if memory guard not available
-                self.logger.warning("Memory guard not available for %s, using fallback invocation", operation_name)
+                self.logger.warning(f"Memory guard not available for {operation_name}, using fallback invocation")
 
                 if self.input_sanitizer:
                     return await self.invoke_component_method_secure(
@@ -689,7 +690,7 @@ class ComponentInvoker:
             execution_time = (end_time - start_time).total_seconds()
 
             error_msg = f"Memory-monitored component invocation failed: {str(e)}"
-            self.logger.error("Failed to invoke {operation_name} with memory monitoring: %s", e)
+            self.logger.error(f"Failed to invoke {operation_name} with memory monitoring: {e}")
 
             invocation_result = InvocationResult(
                 component_name=component_name,

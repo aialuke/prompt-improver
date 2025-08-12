@@ -14,15 +14,15 @@ class TestPerformanceImprovementCalculator:
     """Test suite for performance improvement calculator with real behavior testing"""
 
     @pytest.fixture
-    async def mock_db_session(self):
-        """Create mock database session"""
-        session = AsyncMock()
-        return session
+    async def db_session(self, postgres_container):
+        """Create real database session with PostgreSQL testcontainer"""
+        async with postgres_container.get_session() as session:
+            yield session
 
     @pytest.fixture
-    def calculator(self, mock_db_session):
-        """Create calculator instance"""
-        return PerformanceImprovementCalculator(mock_db_session)
+    def calculator(self, db_session):
+        """Create calculator instance with real database session"""
+        return PerformanceImprovementCalculator(db_session)
 
     @pytest.fixture
     def sample_metrics_current(self):

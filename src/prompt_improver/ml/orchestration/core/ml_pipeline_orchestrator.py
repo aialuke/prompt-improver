@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from enum import Enum
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol
+from collections.abc import Callable
 
 # Import Protocol interfaces for dependency injection
 from ....core.protocols.ml_protocols import (
@@ -59,10 +60,10 @@ class WorkflowInstance:
     workflow_type: str
     state: PipelineState
     created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
+    metadata: dict[str, Any] | None = None
 
 class MLPipelineOrchestrator:
     """
@@ -96,10 +97,10 @@ class MLPipelineOrchestrator:
         external_services_config: ExternalServicesConfig,
         
         # Optional services
-        health_monitor: Optional[HealthMonitorProtocol] = None,
-        retry_manager: Optional[RetryManagerProtocol] = None,
-        input_sanitizer: Optional[InputSanitizer] = None,
-        memory_guard: Optional[MemoryGuard] = None
+        health_monitor: HealthMonitorProtocol | None = None,
+        retry_manager: RetryManagerProtocol | None = None,
+        input_sanitizer: InputSanitizer | None = None,
+        memory_guard: MemoryGuard | None = None
     ):
         """Initialize ML Pipeline Orchestrator with pure dependency injection.
         
@@ -152,8 +153,8 @@ class MLPipelineOrchestrator:
 
         # State management
         self.state = PipelineState.idle
-        self.active_workflows: Dict[str, WorkflowInstance] = {}
-        self.component_health: Dict[str, bool] = {}
+        self.active_workflows: dict[str, WorkflowInstance] = {}
+        self.component_health: dict[str, bool] = {}
 
         # Event handlers setup
         self._setup_event_handlers()
@@ -201,7 +202,7 @@ class MLPipelineOrchestrator:
 
         except Exception as e:
             self.state = PipelineState.ERROR
-            self.logger.error("Failed to initialize orchestrator: %s", e)
+            self.logger.error(f"Failed to initialize orchestrator: {e}")
             raise
 
     async def shutdown(self) -> None:
@@ -225,10 +226,10 @@ class MLPipelineOrchestrator:
             self.logger.info("ML Pipeline Orchestrator shutdown complete")
 
         except Exception as e:
-            self.logger.error("Error during orchestrator shutdown: %s", e)
+            self.logger.error(f"Error during orchestrator shutdown: {e}")
             raise
 
-    async def start_workflow(self, workflow_type: str, parameters: Dict[str, Any]) -> str:
+    async def start_workflow(self, workflow_type: str, parameters: dict[str, Any]) -> str:
         """Start a new ML workflow."""
         if not self._is_initialized:
             raise RuntimeError("Orchestrator not initialized")
@@ -268,13 +269,13 @@ class MLPipelineOrchestrator:
                 }
             ))
 
-            self.logger.info("Started workflow {workflow_id} of type %s", workflow_type)
+            self.logger.info(f"Started workflow {workflow_id} of type {workflow_type}")
             return workflow_id
 
         except Exception as e:
             workflow_instance.state = PipelineState.ERROR
             workflow_instance.error_message = str(e)
-            self.logger.error("Failed to start workflow {workflow_id}: %s", e)
+            self.logger.error(f"Failed to start workflow {workflow_id}: {e}")
             raise
 
     async def stop_workflow(self, workflow_id: str) -> None:
@@ -297,12 +298,12 @@ class MLPipelineOrchestrator:
                 data={"workflow_id": workflow_id}
             ))
 
-            self.logger.info("Stopped workflow %s", workflow_id)
+            self.logger.info(f"Stopped workflow {workflow_id}")
 
         except Exception as e:
             workflow_instance.state = PipelineState.ERROR
             workflow_instance.error_message = str(e)
-            self.logger.error("Failed to stop workflow {workflow_id}: %s", e)
+            self.logger.error(f"Failed to stop workflow {workflow_id}: {e}")
             raise
 
     async def get_workflow_status(self, workflow_id: str) -> WorkflowInstance:
@@ -312,11 +313,11 @@ class MLPipelineOrchestrator:
 
         return self.active_workflows[workflow_id]
 
-    async def list_workflows(self) -> List[WorkflowInstance]:
+    async def list_workflows(self) -> list[WorkflowInstance]:
         """List all workflows."""
         return list(self.active_workflows.values())
 
-    async def get_component_health(self) -> Dict[str, bool]:
+    async def get_component_health(self) -> dict[str, bool]:
         """Get health status of all registered components."""
         # Get current health from component registry
         components = await self.component_registry.list_components()
@@ -328,7 +329,7 @@ class MLPipelineOrchestrator:
 
         return health_status
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         Comprehensive health check of the orchestrator and all components.
 
@@ -394,7 +395,7 @@ class MLPipelineOrchestrator:
             return health_result
 
         except Exception as e:
-            self.logger.error("Health check failed: %s", e)
+            self.logger.error(f"Health check failed: {e}")
             return {
                 "healthy": False,
                 "status": "error",
@@ -402,7 +403,7 @@ class MLPipelineOrchestrator:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-    async def get_resource_usage(self) -> Dict[str, Any]:
+    async def get_resource_usage(self) -> dict[str, Any]:
         """Get current resource usage statistics."""
         return await self.resource_manager.get_usage_stats()
 
@@ -425,7 +426,7 @@ class MLPipelineOrchestrator:
 
         if component_name:
             self.component_health[component_name] = is_healthy
-            self.logger.info("Component {component_name} health: %s", is_healthy)
+            self.logger.info(f"Component {component_name} health: {is_healthy}")
 
     async def _handle_workflow_completed(self, event: MLEvent) -> None:
         """Handle workflow completion events."""
@@ -435,7 +436,7 @@ class MLPipelineOrchestrator:
             workflow_instance.state = PipelineState.COMPLETED
             workflow_instance.completed_at = datetime.now(timezone.utc)
 
-            self.logger.info("Workflow %s completed successfully", workflow_id)
+            self.logger.info(f"Workflow {workflow_id} completed successfully")
 
     async def _handle_workflow_failed(self, event: MLEvent) -> None:
         """Handle workflow failure events."""
@@ -448,12 +449,12 @@ class MLPipelineOrchestrator:
             workflow_instance.error_message = error_message
             workflow_instance.completed_at = datetime.now(timezone.utc)
 
-            self.logger.error("Workflow {workflow_id} failed: %s", error_message)
+            self.logger.error(f"Workflow {workflow_id} failed: {error_message}")
 
     async def _handle_resource_exhausted(self, event: MLEvent) -> None:
         """Handle resource exhaustion events."""
         resource_type = event.data.get("resource_type")
-        self.logger.warning("Resource exhausted: %s", resource_type)
+        self.logger.warning(f"Resource exhausted: {resource_type}")
 
         # Implement resource management strategies
         await self.resource_manager.handle_resource_exhaustion(resource_type)
@@ -469,7 +470,7 @@ class MLPipelineOrchestrator:
         for component in components:
             self.component_health[component.name] = False  # Initially unhealthy until verified
 
-        self.logger.info("Discovered %s ML components", len(components))
+        self.logger.info(f"Discovered {len(components)} ML components")
 
     async def _setup_monitoring(self) -> None:
         """Setup monitoring for the orchestrator."""
@@ -482,7 +483,7 @@ class MLPipelineOrchestrator:
             try:
                 await self.stop_workflow(workflow_id)
             except Exception as e:
-                self.logger.error("Error stopping workflow {workflow_id}: %s", e)
+                self.logger.error(f"Error stopping workflow {workflow_id}: {e}")
 
     async def _load_direct_components(self) -> None:
         """Load ML components directly for Phase 6 integration."""
@@ -492,7 +493,7 @@ class MLPipelineOrchestrator:
             # Load all components across all tiers
             loaded_components = await self.component_loader.load_all_components()
 
-            self.logger.info("Successfully loaded %s ML components", len(loaded_components))
+            self.logger.info(f"Successfully loaded {len(loaded_components)} ML components")
 
             # Initialize core components for immediate use
             core_components = [
@@ -521,7 +522,7 @@ class MLPipelineOrchestrator:
                         success = await self.component_loader.initialize_component(component_name)
 
                     if success:
-                        self.logger.info("Initialized core component: %s", component_name)
+                        self.logger.info(f"Initialized core component: {component_name}")
 
                         # Set retry manager reference for orchestrator use
                         if component_name == "unified_retry_manager":
@@ -557,16 +558,16 @@ class MLPipelineOrchestrator:
                                 self.workflow_engine.set_memory_guard(self.memory_guard)
                                 self.logger.info("MemoryGuard integrated with orchestrator, event bus, component invoker, and workflow engine")
                     else:
-                        self.logger.warning("Failed to initialize core component: %s", component_name)
+                        self.logger.warning(f"Failed to initialize core component: {component_name}")
 
             # Initialize evaluation components for workflows
             for component_name in evaluation_components:
                 if component_name in loaded_components:
                     success = await self.component_loader.initialize_component(component_name)
                     if success:
-                        self.logger.info("Initialized evaluation component: %s", component_name)
+                        self.logger.info(f"Initialized evaluation component: {component_name}")
                     else:
-                        self.logger.warning("Failed to initialize evaluation component: %s", component_name)
+                        self.logger.warning(f"Failed to initialize evaluation component: {component_name}")
 
             # Emit component loading complete event
             await self.event_bus.emit(MLEvent(
@@ -580,7 +581,7 @@ class MLPipelineOrchestrator:
             ))
 
         except Exception as e:
-            self.logger.error("Failed to load direct components: %s", e)
+            self.logger.error(f"Failed to load direct components: {e}")
             raise
 
     async def invoke_component(self, component_name: str, method_name: str, *args, **kwargs) -> Any:
@@ -604,12 +605,12 @@ class MLPipelineOrchestrator:
         )
 
         if not result.success:
-            self.logger.error("Component invocation failed: %s", result.error)
+            self.logger.error(f"Component invocation failed: {result.error}")
             raise RuntimeError(f"Component {component_name}.{method_name} failed: {result.error}")
 
         return result.result
 
-    async def run_training_workflow(self, training_data: Any) -> Dict[str, Any]:
+    async def run_training_workflow(self, training_data: Any) -> dict[str, Any]:
         """
         Run a complete training workflow using direct component integration.
 
@@ -627,14 +628,14 @@ class MLPipelineOrchestrator:
             # Log results
             for step, result in results.items():
                 if result.success:
-                    self.logger.info("Training step '%s' completed successfully", step)
+                    self.logger.info(f"Training step '{step}' completed successfully")
                 else:
-                    self.logger.error("Training step '{step}' failed: %s", result.error)
+                    self.logger.error(f"Training step '{step}' failed: {result.error}")
 
             return {step: result.result for step, result in results.items() if result.success}
 
         except Exception as e:
-            self.logger.error("Training workflow failed: %s", e)
+            self.logger.error(f"Training workflow failed: {e}")
             raise
 
     async def execute_with_retry(self, operation, operation_name: str, **retry_config_kwargs):
@@ -654,7 +655,7 @@ class MLPipelineOrchestrator:
             Exception: Last exception if all retries failed
         """
         if not self.retry_manager:
-            self.logger.warning("Retry manager not available for operation: %s", operation_name)
+            self.logger.warning(f"Retry manager not available for operation: {operation_name}")
             # Fallback to direct execution
             return await operation()
 
@@ -668,7 +669,7 @@ class MLPipelineOrchestrator:
 
         return await self.retry_manager.retry_async(operation, config=config)
 
-    async def validate_input_secure(self, input_data: Any, context: Dict[str, Any] = None):
+    async def validate_input_secure(self, input_data: Any, context: dict[str, Any] = None):
         """
         Validate input data using integrated security sanitizer.
 
@@ -702,7 +703,7 @@ class MLPipelineOrchestrator:
 
         # Log security validation results
         if result.threats_detected:
-            self.logger.warning("Security threats detected in input: %s", result.threats_detected)
+            self.logger.warning(f"Security threats detected in input: {result.threats_detected}")
 
         # Raise exception for critical threats
         from prompt_improver.security.input_sanitization import (
@@ -714,7 +715,7 @@ class MLPipelineOrchestrator:
 
         return result
 
-    async def run_training_workflow_secure(self, training_data: Any, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def run_training_workflow_secure(self, training_data: Any, context: dict[str, Any] = None) -> dict[str, Any]:
         """
         Run a complete training workflow with security validation.
 
@@ -743,14 +744,14 @@ class MLPipelineOrchestrator:
             # Log results
             for step, result in results.items():
                 if result.success:
-                    self.logger.info("Secure training step '%s' completed successfully", step)
+                    self.logger.info(f"Secure training step '{step}' completed successfully")
                 else:
-                    self.logger.error("Secure training step '{step}' failed: %s", result.error)
+                    self.logger.error(f"Secure training step '{step}' failed: {result.error}")
 
             return {step: result.result for step, result in results.items() if result.success}
 
         except Exception as e:
-            self.logger.error("Secure training workflow failed: %s", e)
+            self.logger.error(f"Secure training workflow failed: {e}")
             raise
 
     async def monitor_memory_usage(self, operation_name: str = "orchestrator_operation", component_name: str = None):
@@ -815,7 +816,7 @@ class MLPipelineOrchestrator:
 
         return await self.memory_guard.validate_ml_operation_memory(data, operation_name, component_name)
 
-    async def run_training_workflow_with_memory_monitoring(self, training_data: Any, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def run_training_workflow_with_memory_monitoring(self, training_data: Any, context: dict[str, Any] = None) -> dict[str, Any]:
         """
         Run a complete training workflow with comprehensive memory monitoring.
 
@@ -840,10 +841,10 @@ class MLPipelineOrchestrator:
                     return await self.run_training_workflow(training_data)
 
             except Exception as e:
-                self.logger.error("Memory-monitored training workflow failed: %s", e)
+                self.logger.error(f"Memory-monitored training workflow failed: {e}")
                 raise
 
-    async def run_evaluation_workflow(self, evaluation_data: Any) -> Dict[str, Any]:
+    async def run_evaluation_workflow(self, evaluation_data: Any) -> dict[str, Any]:
         """
         Run a complete evaluation workflow using direct component integration.
 
@@ -861,19 +862,19 @@ class MLPipelineOrchestrator:
             # Log results
             for step, result in results.items():
                 if result.success:
-                    self.logger.info("Evaluation step '%s' completed successfully", step)
+                    self.logger.info(f"Evaluation step '{step}' completed successfully")
                 else:
-                    self.logger.error("Evaluation step '{step}' failed: %s", result.error)
+                    self.logger.error(f"Evaluation step '{step}' failed: {result.error}")
 
             return {step: result.result for step, result in results.items() if result.success}
 
         except Exception as e:
-            self.logger.error("Evaluation workflow failed: %s", e)
+            self.logger.error(f"Evaluation workflow failed: {e}")
             raise
 
     async def run_native_deployment_workflow(self, 
                                            model_id: str,
-                                           deployment_config: Dict[str, Any]) -> Dict[str, Any]:
+                                           deployment_config: dict[str, Any]) -> dict[str, Any]:
         """
         Run native ML model deployment workflow without Docker containers.
 
@@ -884,7 +885,7 @@ class MLPipelineOrchestrator:
         Returns:
             Dictionary of deployment workflow results
         """
-        self.logger.info("Running native deployment workflow for model %s", model_id)
+        self.logger.info(f"Running native deployment workflow for model {model_id}")
 
         try:
             # Import native deployment pipeline
@@ -945,17 +946,17 @@ class MLPipelineOrchestrator:
             if result.error_message:
                 deployment_results['error'] = result.error_message
 
-            self.logger.info("Native deployment workflow completed for %s", model_id)
+            self.logger.info(f"Native deployment workflow completed for {model_id}")
             return deployment_results
 
         except Exception as e:
-            self.logger.error("Native deployment workflow failed: %s", e)
+            self.logger.error(f"Native deployment workflow failed: {e}")
             raise
 
     async def run_complete_ml_pipeline(self, 
                                      training_data: Any,
-                                     model_config: Dict[str, Any],
-                                     deployment_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                     model_config: dict[str, Any],
+                                     deployment_config: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Run complete ML pipeline: training, evaluation, and native deployment.
 
@@ -1015,18 +1016,18 @@ class MLPipelineOrchestrator:
             return results
 
         except Exception as e:
-            self.logger.error("Complete ML pipeline failed: %s", e)
+            self.logger.error(f"Complete ML pipeline failed: {e}")
             raise
 
-    def get_loaded_components(self) -> List[str]:
+    def get_loaded_components(self) -> list[str]:
         """Get list of loaded component names."""
         return list(self.component_loader.get_all_loaded_components().keys())
 
-    def get_component_methods(self, component_name: str) -> List[str]:
+    def get_component_methods(self, component_name: str) -> list[str]:
         """Get available methods for a component."""
         return self.component_invoker.get_available_methods(component_name)
 
-    def get_invocation_history(self, component_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_invocation_history(self, component_name: str | None = None) -> list[dict[str, Any]]:
         """Get component invocation history."""
         history = self.component_invoker.get_invocation_history(component_name)
         return [

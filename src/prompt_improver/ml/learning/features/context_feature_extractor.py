@@ -23,6 +23,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 import numpy as np
 from ....security import InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
@@ -35,7 +36,7 @@ class CircuitBreakerState(Enum):
     OPEN = 'open'
     HALF_OPEN = 'half_open'
 
-class ContextFeatureConfig(SQLModel):
+class ContextFeatureConfig(BaseModel):
     """Enhanced 2025 configuration model for context feature extraction."""
     weight: float = Field(default=1.0, ge=0.0, le=10.0, description='Weight for context features')
     cache_enabled: bool = Field(default=True, description='Enable result caching')
@@ -67,7 +68,7 @@ class ContextExtractionMetrics:
     cache_hits: int = 0
     cache_misses: int = 0
     circuit_breaker_trips: int = 0
-    last_extraction_time: Optional[float] = None
+    last_extraction_time: float | None = None
 
     def update_success(self, processing_time: float):
         """Update metrics for successful extraction."""
@@ -89,7 +90,7 @@ class ContextExtractionMetrics:
             return 100.0
         return self.successful_extractions / self.total_extractions * 100.0
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get comprehensive health status."""
         return {'total_extractions': self.total_extractions, 'success_rate': self.get_success_rate(), 'average_processing_time': self.average_processing_time, 'cache_hit_rate': self.cache_hits / (self.cache_hits + self.cache_misses) * 100 if self.cache_hits + self.cache_misses > 0 else 0, 'circuit_breaker_trips': self.circuit_breaker_trips, 'last_extraction_time': self.last_extraction_time}
 
@@ -111,7 +112,7 @@ class ContextFeatureExtractor:
     - ML Pipeline Orchestrator integration
     """
 
-    def __init__(self, config: Optional[ContextFeatureConfig]=None):
+    def __init__(self, config: ContextFeatureConfig | None=None):
         """Initialize enhanced context feature extractor.
         
         Args:
@@ -123,14 +124,14 @@ class ContextFeatureExtractor:
         self.metrics = ContextExtractionMetrics()
         self.circuit_breaker_state = CircuitBreakerState.CLOSED
         self.circuit_breaker_failures = 0
-        self.circuit_breaker_last_failure: Optional[float] = None
-        self._feature_cache: Dict[str, Dict[str, Any]] = {} if self.config.cache_enabled else {}
+        self.circuit_breaker_last_failure: float | None = None
+        self._feature_cache: dict[str, dict[str, Any]] = {} if self.config.cache_enabled else {}
         self._last_cache_cleanup = time.time()
         self._extraction_semaphore = asyncio.Semaphore(1)
         logger.setLevel(getattr(logging, self.config.log_level))
         logger.info('Enhanced ContextFeatureExtractor initialized with config: weight=%s, cache=%s, circuit_breaker=%s, timeout=%ss', self.config.weight, self.config.cache_enabled, self.config.circuit_breaker_enabled, self.config.timeout_seconds)
 
-    def extract_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def extract_features(self, context_data: dict[str, Any]) -> list[float]:
         """Synchronous wrapper for async feature extraction.
         
         Args:
@@ -146,7 +147,7 @@ class ContextFeatureExtractor:
         except RuntimeError:
             return asyncio.run(self.extract_features_async(context_data))
 
-    async def extract_features_async(self, context_data: Dict[str, Any]) -> List[float]:
+    async def extract_features_async(self, context_data: dict[str, Any]) -> list[float]:
         """Enhanced 2025 async feature extraction with circuit breaker and observability.
         
         Args:
@@ -183,7 +184,7 @@ class ContextFeatureExtractor:
                 self.metrics.update_success(processing_time)
                 logger.info('Context feature extraction completed in %ss [correlation_id=%s]', format(processing_time, '.3f'), correlation_id)
                 return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error('Context feature extraction timed out after %ss [correlation_id=%s]', self.config.timeout_seconds, correlation_id)
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
@@ -194,7 +195,7 @@ class ContextFeatureExtractor:
             self.metrics.update_failure()
             return self._get_default_features()
 
-    async def _perform_extraction_async(self, context_data: Dict[str, Any], correlation_id: Optional[str]) -> List[float]:
+    async def _perform_extraction_async(self, context_data: dict[str, Any], correlation_id: str | None) -> list[float]:
         """Perform the actual feature extraction."""
         logger.debug('Starting feature extraction [correlation_id=%s]', correlation_id)
         features = self._compute_context_features(context_data)
@@ -202,7 +203,7 @@ class ContextFeatureExtractor:
         logger.debug('Extracted %s features [correlation_id=%s]', len(normalized_features), correlation_id)
         return normalized_features
 
-    async def _validate_input_async(self, context_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _validate_input_async(self, context_data: dict[str, Any]) -> dict[str, Any] | None:
         """Async validation and sanitization of input context data."""
         try:
             if not context_data or not isinstance(context_data, dict):
@@ -221,7 +222,7 @@ class ContextFeatureExtractor:
             logger.error('Async context validation failed: %s', e)
             return {}
 
-    def _generate_cache_key(self, context_data: Dict[str, Any]) -> str:
+    def _generate_cache_key(self, context_data: dict[str, Any]) -> str:
         """Generate cache key for context data using secure hashing."""
         key_elements = [str(context_data.get('user_id', 'unknown')), str(context_data.get('session_id', 'unknown')), str(context_data.get('project_type', 'unknown')), str(self.config.weight), str(len(context_data)), str(sorted(context_data.keys()))]
         key_string = '|'.join(key_elements)
@@ -231,7 +232,7 @@ class ContextFeatureExtractor:
         """Generate correlation ID for request tracing."""
         return hashlib.md5(f'{time.time()}_{id(self)}'.encode(), usedforsecurity=False).hexdigest()[:8]
 
-    async def _get_cached_features_async(self, cache_key: str) -> Optional[List[float]]:
+    async def _get_cached_features_async(self, cache_key: str) -> list[float] | None:
         """Get cached features if available with TTL check."""
         if not self.config.cache_enabled or cache_key not in self._feature_cache:
             return None
@@ -244,7 +245,7 @@ class ContextFeatureExtractor:
         cache_entry['last_access'] = current_time
         return cache_entry['features']
 
-    async def _cache_features_async(self, cache_key: str, features: List[float]) -> None:
+    async def _cache_features_async(self, cache_key: str, features: list[float]) -> None:
         """Cache extracted features with TTL and size management."""
         if not self.config.cache_enabled:
             return
@@ -270,7 +271,7 @@ class ContextFeatureExtractor:
         self._last_cache_cleanup = current_time
         logger.debug('Cache cleanup completed, %s expired entries removed', len(expired_keys))
 
-    def _compute_context_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def _compute_context_features(self, context_data: dict[str, Any]) -> list[float]:
         """Compute raw context features."""
         features = []
         features.extend(self._extract_performance_features(context_data))
@@ -279,7 +280,7 @@ class ContextFeatureExtractor:
         features.extend(self._extract_temporal_features(context_data))
         return features
 
-    def _extract_performance_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def _extract_performance_features(self, context_data: dict[str, Any]) -> list[float]:
         """Extract performance-related features."""
         try:
             performance = context_data.get('performance', {})
@@ -289,7 +290,7 @@ class ContextFeatureExtractor:
             logger.error('Performance feature extraction failed: %s', e)
             return [0.5] * 5
 
-    def _extract_metadata_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def _extract_metadata_features(self, context_data: dict[str, Any]) -> list[float]:
         """Extract metadata features."""
         try:
             features = []
@@ -311,7 +312,7 @@ class ContextFeatureExtractor:
             logger.error('Metadata feature extraction failed: %s', e)
             return [0.5] * 5
 
-    def _extract_interaction_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def _extract_interaction_features(self, context_data: dict[str, Any]) -> list[float]:
         """Extract user interaction pattern features."""
         try:
             interaction = context_data.get('interaction', {})
@@ -321,7 +322,7 @@ class ContextFeatureExtractor:
             logger.error('Interaction feature extraction failed: %s', e)
             return [0.5] * 5
 
-    def _extract_temporal_features(self, context_data: Dict[str, Any]) -> List[float]:
+    def _extract_temporal_features(self, context_data: dict[str, Any]) -> list[float]:
         """Extract temporal pattern features."""
         try:
             temporal = context_data.get('temporal', {})
@@ -331,7 +332,7 @@ class ContextFeatureExtractor:
             logger.error('Temporal feature extraction failed: %s', e)
             return [0.5] * 5
 
-    def _normalize_features(self, features: List[float]) -> List[float]:
+    def _normalize_features(self, features: list[float]) -> list[float]:
         """Normalize features to 0-1 range."""
         normalized = []
         for feature in features:
@@ -339,7 +340,7 @@ class ContextFeatureExtractor:
             normalized.append(normalized_feature)
         return normalized
 
-    def _get_default_features(self) -> List[float]:
+    def _get_default_features(self) -> list[float]:
         """Get default feature vector when extraction fails."""
         return [self.config.default_feature_value] * 20
 
@@ -380,7 +381,7 @@ class ContextFeatureExtractor:
             self.circuit_breaker_failures = 0
             logger.info('Context extractor circuit breaker closed after successful operation')
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get comprehensive health status for monitoring."""
         return {'status': 'healthy' if self.circuit_breaker_state == CircuitBreakerState.CLOSED else 'degraded', 'circuit_breaker_state': self.circuit_breaker_state.value, 'metrics': self.metrics.get_health_status(), 'cache_stats': self.get_cache_stats(), 'config': {'weight': self.config.weight, 'timeout_seconds': self.config.timeout_seconds, 'failure_threshold': self.config.failure_threshold, 'cache_enabled': self.config.cache_enabled}, 'timestamp': datetime.now(timezone.utc).isoformat()}
 
@@ -396,7 +397,7 @@ class ContextFeatureExtractor:
         self.circuit_breaker_last_failure = None
         logger.info('Context extractor circuit breaker manually reset to closed state')
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for context feature extraction (2025 pattern).
         
         Args:
@@ -451,11 +452,11 @@ class ContextFeatureExtractor:
             logger.info('Circuit breaker reset due to configuration change')
         logger.info('ContextFeatureExtractor configuration updated')
 
-    def get_config_dict(self) -> Dict[str, Any]:
+    def get_config_dict(self) -> dict[str, Any]:
         """Get current configuration as dictionary."""
         return self.config.model_dump()
 
-    def get_feature_names(self) -> List[str]:
+    def get_feature_names(self) -> list[str]:
         """Get names of extracted features with context prefix."""
         return ['context_improvement_score', 'context_user_satisfaction', 'context_rule_effectiveness', 'context_response_time_score', 'context_quality_score', 'context_project_type_encoding', 'context_complexity_score', 'context_technical_level', 'context_richness', 'context_data_quality', 'context_session_length_norm', 'context_iteration_count_norm', 'context_feedback_frequency', 'context_user_engagement_score', 'context_success_rate', 'context_time_of_day_norm', 'context_day_of_week_norm', 'context_session_recency_norm', 'context_usage_frequency_norm', 'context_trend_indicator']
 
@@ -467,7 +468,7 @@ class ContextFeatureExtractor:
         logger.info('Cleared %s cached context features', count)
         return count
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics."""
         if not self.config.cache_enabled:
             return {'cache_enabled': False}

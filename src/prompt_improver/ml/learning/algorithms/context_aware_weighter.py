@@ -142,13 +142,13 @@ class ContextAwareFeatureWeighter:
     def _categorize_feature(self, feature_name: str) -> str:
         """Categorize a feature by name to determine appropriate weight category."""
         feature_name_lower = feature_name.lower()
-        if any((prefix in feature_name_lower for prefix in ['tech_', 'technical_', 'code_', 'api_', 'algorithm'])):
+        if any(prefix in feature_name_lower for prefix in ['tech_', 'technical_', 'code_', 'api_', 'algorithm']):
             return 'technical'
-        if any((prefix in feature_name_lower for prefix in ['creative_', 'narrative_', 'emotional_', 'sensory_'])):
+        if any(prefix in feature_name_lower for prefix in ['creative_', 'narrative_', 'emotional_', 'sensory_']):
             return 'creative'
-        if any((prefix in feature_name_lower for prefix in ['academic_', 'research_', 'citation_', 'formal_'])):
+        if any(prefix in feature_name_lower for prefix in ['academic_', 'research_', 'citation_', 'formal_']):
             return 'academic'
-        if any((prefix in feature_name_lower for prefix in ['conv_', 'conversational_', 'question_', 'polite_'])):
+        if any(prefix in feature_name_lower for prefix in ['conv_', 'conversational_', 'question_', 'polite_']):
             return 'conversational'
         return 'general'
 

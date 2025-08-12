@@ -83,7 +83,7 @@ class PatternSignificanceAnalyzer:
         self.effect_size_threshold = effect_size_threshold
         self.apply_multiple_testing_correction = apply_multiple_testing_correction
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for pattern significance analysis (2025 pattern)
 
         Args:
@@ -116,7 +116,7 @@ class PatternSignificanceAnalyzer:
                     try:
                         converted_pattern_types[pattern_id] = PatternType(pattern_type_str)
                     except ValueError:
-                        logger.warning("Unknown pattern type '{pattern_type_str}' for pattern '%s', using behavioral", pattern_id)
+                        logger.warning(f"Unknown pattern type '{pattern_type_str}' for pattern '{pattern_id}', using behavioral")
                         converted_pattern_types[pattern_id] = PatternType.behavioral
                 pattern_types = converted_pattern_types
             analysis_result = self.analyze_pattern_significance(patterns_data=patterns_data, control_data=control_data, treatment_data=treatment_data, pattern_types=pattern_types)
@@ -191,13 +191,13 @@ class PatternSignificanceAnalyzer:
                 if isinstance(control_pattern, (list, np.ndarray)):
                     control_size = len(control_pattern)
                 elif isinstance(control_pattern, dict):
-                    control_size = sum(control_pattern.values()) if all((isinstance(v, (int, float)) for v in control_pattern.values())) else control_pattern.get('count', 0)
+                    control_size = sum(control_pattern.values()) if all(isinstance(v, (int, float)) for v in control_pattern.values()) else control_pattern.get('count', 0)
                 else:
                     control_size = 0
                 if isinstance(treatment_pattern, (list, np.ndarray)):
                     treatment_size = len(treatment_pattern)
                 elif isinstance(treatment_pattern, dict):
-                    treatment_size = sum(treatment_pattern.values()) if all((isinstance(v, (int, float)) for v in treatment_pattern.values())) else treatment_pattern.get('count', 0)
+                    treatment_size = sum(treatment_pattern.values()) if all(isinstance(v, (int, float)) for v in treatment_pattern.values()) else treatment_pattern.get('count', 0)
                 else:
                     treatment_size = 0
                 if control_size < self.min_sample_size or treatment_size < self.min_sample_size:
@@ -438,10 +438,10 @@ class PatternSignificanceAnalyzer:
         if not test_results:
             return 0.0
         score_components = []
-        adequate_samples = sum((1 for r in test_results if r.sample_size >= self.min_sample_size))
+        adequate_samples = sum(1 for r in test_results if r.sample_size >= self.min_sample_size)
         sample_score = adequate_samples / len(test_results)
         score_components.append(('sample_size', sample_score, 0.3))
-        meaningful_effects = sum((1 for r in test_results if r.effect_size >= self.effect_size_threshold))
+        meaningful_effects = sum(1 for r in test_results if r.effect_size >= self.effect_size_threshold)
         effect_score = meaningful_effects / len(test_results)
         score_components.append(('effect_size', effect_score, 0.25))
         if multiple_testing_correction:
@@ -449,10 +449,10 @@ class PatternSignificanceAnalyzer:
         else:
             correction_score = 0.5 if len(test_results) > 1 else 1.0
         score_components.append(('multiple_testing', correction_score, 0.2))
-        pattern_types = set((r.pattern_type for r in test_results))
+        pattern_types = {r.pattern_type for r in test_results}
         diversity_score = min(len(pattern_types) / 3, 1.0)
         score_components.append(('diversity', diversity_score, 0.15))
-        significant_results = sum((1 for r in test_results if r.p_value < self.alpha))
+        significant_results = sum(1 for r in test_results if r.p_value < self.alpha)
         rigor_score = min(significant_results / max(len(test_results) * 0.3, 1), 1.0)
         score_components.append(('rigor', rigor_score, 0.1))
         total_score = sum((score * weight for _, score, weight in score_components))

@@ -3,6 +3,7 @@
 This module provides secure subprocess execution with comprehensive validation,
 logging, and error handling based on the best patterns from cli.py.
 """
+
 import logging
 import os
 import shutil
@@ -11,29 +12,86 @@ from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
-from typing import TypedDict, NotRequired
 
-class SubprocessRunOptions(TypedDict, total=False):
-    shell: bool
-    cwd: str
-    env: dict[str, str]
-    timeout: int
-    check: bool
-    capture_output: bool
-    text: bool
+from pydantic import BaseModel, Field, field_validator
 
-class SubprocessPopenOptions(TypedDict, total=False):
-    shell: bool
-    cwd: str
-    env: dict[str, str]
-    bufsize: int
-    stdin: Any
-    stdout: Any
-    stderr: Any
-    start_new_session: bool
-    close_fds: bool
+
+class SubprocessRunOptions(BaseModel):
+    """Validated subprocess.run options with security constraints."""
+
+    shell: bool = Field(
+        default=False, description="Shell execution (security risk if True)"
+    )
+    cwd: str | None = Field(default=None, description="Working directory path")
+    env: dict[str, str] | None = Field(
+        default=None, description="Environment variables"
+    )
+    timeout: int = Field(default=300, ge=1, le=3600, description="Timeout in seconds")
+    check: bool = Field(default=False, description="Raise on non-zero return code")
+    capture_output: bool = Field(default=True, description="Capture stdout/stderr")
+    text: bool = Field(default=True, description="Return string instead of bytes")
+
+    @field_validator("shell")
+    @classmethod
+    def validate_shell_usage(cls, v: bool) -> bool:
+        """Warn about shell=True security implications."""
+        if v:
+            logger.warning("shell=True detected - ensure input is sanitized")
+        return v
+
+    @field_validator("cwd")
+    @classmethod
+    def validate_cwd_path(cls, v: str | None) -> str | None:
+        """Validate working directory exists and is accessible."""
+        if v is not None:
+            path = Path(v)
+            if not path.exists():
+                raise ValueError(f"Working directory does not exist: {v}")
+            if not path.is_dir():
+                raise ValueError(f"Working directory path is not a directory: {v}")
+        return v
+
+
+class SubprocessPopenOptions(BaseModel):
+    """Validated subprocess.Popen options with security constraints."""
+
+    shell: bool = Field(
+        default=False, description="Shell execution (security risk if True)"
+    )
+    cwd: str | None = Field(default=None, description="Working directory path")
+    env: dict[str, str] | None = Field(
+        default=None, description="Environment variables"
+    )
+    bufsize: int = Field(default=-1, description="Buffer size")
+    stdin: Any = Field(default=None, description="Standard input")
+    stdout: Any = Field(default=None, description="Standard output")
+    stderr: Any = Field(default=None, description="Standard error")
+    start_new_session: bool = Field(default=False, description="Start new session")
+    close_fds: bool = Field(default=True, description="Close file descriptors")
+
+    @field_validator("shell")
+    @classmethod
+    def validate_shell_usage(cls, v: bool) -> bool:
+        """Warn about shell=True security implications."""
+        if v:
+            logger.warning("shell=True detected - ensure input is sanitized")
+        return v
+
+    @field_validator("cwd")
+    @classmethod
+    def validate_cwd_path(cls, v: str | None) -> str | None:
+        """Validate working directory exists and is accessible."""
+        if v is not None:
+            path = Path(v)
+            if not path.exists():
+                raise ValueError(f"Working directory does not exist: {v}")
+            if not path.is_dir():
+                raise ValueError(f"Working directory path is not a directory: {v}")
+        return v
+
 
 logger = logging.getLogger(__name__)
+
 
 class SecureSubprocessManager:
     """Secure subprocess execution manager with comprehensive security patterns.
@@ -47,7 +105,7 @@ class SecureSubprocessManager:
     - Audit logging
     """
 
-    def __init__(self, default_timeout: int=300, enable_audit_logging: bool=True):
+    def __init__(self, default_timeout: int = 300, enable_audit_logging: bool = True):
         """Initialize the secure subprocess manager.
 
         Args:
@@ -77,9 +135,11 @@ class SecureSubprocessManager:
             return resolved_path
         executable_path = Path(executable)
         if not executable_path.exists():
-            raise FileNotFoundError(f'Executable path does not exist: {executable_path}')
+            raise FileNotFoundError(
+                f"Executable path does not exist: {executable_path}"
+            )
         if not executable_path.is_file():
-            raise ValueError(f'Path is not a regular file: {executable_path}')
+            raise ValueError(f"Path is not a regular file: {executable_path}")
         return str(executable_path.resolve())
 
     def _validate_arguments(self, args: list[str]) -> list[str]:
@@ -95,11 +155,11 @@ class SecureSubprocessManager:
             ValueError: If arguments contain security risks
         """
         if not args:
-            raise ValueError('Arguments list cannot be empty')
-        dangerous_chars = [';', '&&', '||', '|', '>', '<', '`', '$']
+            raise ValueError("Arguments list cannot be empty")
+        dangerous_chars = [";", "&&", "||", "|", ">", "<", "`", "$"]
         for arg in args:
-            if any((char in str(arg) for char in dangerous_chars)):
-                logger.warning('Potentially dangerous character in argument: %s', arg)
+            if any(char in str(arg) for char in dangerous_chars):
+                logger.warning(f"Potentially dangerous character in argument: {arg}")
         return [str(arg) for arg in args]
 
     def _log_subprocess_call(self, args: list[str], operation: str) -> None:
@@ -110,10 +170,27 @@ class SecureSubprocessManager:
             operation: Description of the operation
         """
         if self.enable_audit_logging:
-            safe_args = [args[0]] + ['<arg>' for _ in args[1:]]
-            logger.info('Secure subprocess call: %s', operation, extra={'operation': operation, 'executable': args[0], 'arg_count': len(args) - 1, 'security_validated': True})
+            safe_args = [args[0]] + ["<arg>" for _ in args[1:]]
+            logger.info(
+                "Secure subprocess call",
+                extra={
+                    "operation": operation,
+                    "arg_count": max(len(args) - 1, 0),
+                    "security_validated": True,
+                },
+            )
 
-    def run_secure(self, args: list[str | Path], operation: str, timeout: int | None=None, check: bool=True, capture_output: bool=False, text: bool=True, cwd: str | Path | None=None, **kwargs: SubprocessRunOptions) -> subprocess.CompletedProcess:
+    def run_secure(
+        self,
+        args: list[str | Path],
+        operation: str,
+        timeout: int | None = None,
+        check: bool = True,
+        capture_output: bool = False,
+        text: bool = True,
+        cwd: str | Path | None = None,
+        **kwargs: SubprocessRunOptions,
+    ) -> subprocess.CompletedProcess:
         """Execute subprocess with comprehensive security validation.
 
         Args:
@@ -136,35 +213,50 @@ class SecureSubprocessManager:
             subprocess.TimeoutExpired: If timeout exceeded
         """
         if not args:
-            raise ValueError('Command arguments cannot be empty')
+            raise ValueError("Command arguments cannot be empty")
         validated_executable = self._validate_executable_path(args[0])
         validated_args = [validated_executable] + self._validate_arguments(args[1:])
-        secure_kwargs = {'shell': False, 'timeout': timeout or self.default_timeout, 'check': check, 'capture_output': capture_output, 'text': text, **kwargs}
+        secure_kwargs = {
+            "shell": False,
+            "timeout": timeout or self.default_timeout,
+            "check": check,
+            "capture_output": capture_output,
+            "text": text,
+            **kwargs,
+        }
         if cwd is not None:
             cwd_path = Path(cwd)
             if not cwd_path.exists() or not cwd_path.is_dir():
-                raise ValueError(f'Invalid working directory: {cwd}')
-            secure_kwargs['cwd'] = str(cwd_path.resolve())
+                raise ValueError(f"Invalid working directory: {cwd}")
+            secure_kwargs["cwd"] = str(cwd_path.resolve())
         self._log_subprocess_call(validated_args, operation)
         try:
             result = subprocess.run(validated_args, **secure_kwargs)
             if self.enable_audit_logging:
-                logger.info('Subprocess completed successfully: %s', operation, extra={'operation': operation, 'return_code': result.returncode, 'execution_time': 'tracked_externally'})
+                logger.info(f"Subprocess completed successfully: {operation}")
             return result
         except subprocess.TimeoutExpired as e:
-            logger.error('Subprocess timeout in {operation}: %s', e)
+            logger.error(f"Subprocess timeout in {operation}: {e}")
             raise
         except subprocess.CalledProcessError as e:
-            logger.error('Subprocess failed in {operation}: %s', e)
+            logger.error(f"Subprocess failed in {operation}: {e}")
             raise
         except (FileNotFoundError, PermissionError, OSError) as e:
-            logger.error('System error in {operation}: %s', e)
+            logger.error(f"System error in {operation}: {e}")
             raise
         except Exception as e:
-            logger.error('Unexpected error in {operation}: %s', e)
+            logger.error(f"Unexpected error in {operation}: {e}")
             raise
 
-    def popen_secure(self, args: list[str | Path], operation: str, stdout: Any=None, stderr: Any=None, start_new_session: bool=True, **kwargs: SubprocessPopenOptions) -> subprocess.Popen:
+    def popen_secure(
+        self,
+        args: list[str | Path],
+        operation: str,
+        stdout: Any = None,
+        stderr: Any = None,
+        start_new_session: bool = True,
+        **kwargs: SubprocessPopenOptions,
+    ) -> subprocess.Popen:
         """Execute subprocess.Popen with security validation.
 
         Args:
@@ -184,25 +276,39 @@ class SecureSubprocessManager:
             subprocess.SubprocessError: If subprocess fails
         """
         if not args:
-            raise ValueError('Command arguments cannot be empty')
+            raise ValueError("Command arguments cannot be empty")
         validated_executable = self._validate_executable_path(args[0])
         validated_args = [validated_executable] + self._validate_arguments(args[1:])
-        secure_kwargs = {'shell': False, 'stdout': stdout, 'stderr': stderr, 'start_new_session': start_new_session, **kwargs}
+        secure_kwargs = {
+            "shell": False,
+            "stdout": stdout,
+            "stderr": stderr,
+            "start_new_session": start_new_session,
+            **kwargs,
+        }
         self._log_subprocess_call(validated_args, operation)
         try:
             process = subprocess.Popen(validated_args, **secure_kwargs)
             if self.enable_audit_logging:
-                logger.info('Subprocess Popen started: %s', operation, extra={'operation': operation, 'pid': process.pid, 'process_started': True})
+                logger.info(f"Subprocess Popen started: {operation}")
             return process
         except (FileNotFoundError, PermissionError, OSError) as e:
-            logger.error('System error starting {operation}: %s', e)
+            logger.error(f"System error starting {operation}: {e}")
             raise
         except Exception as e:
-            logger.error('Unexpected error starting {operation}: %s', e)
+            logger.error(f"Unexpected error starting {operation}: {e}")
             raise
+
+
 _default_manager = SecureSubprocessManager()
 
-def secure_subprocess(operation: str, timeout: int | None=None, capture_output: bool=False, check: bool=True):
+
+def secure_subprocess(
+    operation: str,
+    timeout: int | None = None,
+    capture_output: bool = False,
+    check: bool = True,
+):
     """Decorator for secure subprocess execution.
 
     This decorator wraps functions that execute subprocess calls with
@@ -222,17 +328,25 @@ def secure_subprocess(operation: str, timeout: int | None=None, capture_output: 
         def launch_mlflow_ui(mlflow_path: str, port: str) -> subprocess.CompletedProcess:
             return [mlflow_path, "ui", "--port", port]
     """
-    P = ParamSpec('P')
-    R = TypeVar('R')
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
     def decorator(func: Callable[P, list[str]]) -> Callable[P, Any]:
-
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             command_args = func(*args, **kwargs)
-            return _default_manager.run_secure(command_args, operation=operation, timeout=timeout, capture_output=capture_output, check=check)
+            return _default_manager.run_secure(
+                command_args,
+                operation=operation,
+                timeout=timeout,
+                capture_output=capture_output,
+                check=check,
+            )
+
         return wrapper
+
     return decorator
+
 
 def ensure_running(pid: int) -> bool:
     """Centralized function to validate if a background process is running.
@@ -249,6 +363,7 @@ def ensure_running(pid: int) -> bool:
     try:
         try:
             import psutil
+
             return psutil.pid_exists(pid)
         except ImportError:
             os.kill(pid, 0)

@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
-from sqlmodel import SQLModel, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -27,7 +27,12 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from ...database.models import GenerationSession, TrainingIteration, TrainingSession
 from ...utils.datetime_utils import naive_utc_now
-from .performance_improvement_calculator import PerformanceImprovementCalculator
+# MIGRATION NOTE: PerformanceImprovementCalculator is now part of unified analytics service
+# Use: analytics = await create_analytics_service(db_session); await analytics.analyze_performance(...)
+try:
+    from .performance_improvement_calculator import PerformanceImprovementCalculator
+except ImportError:
+    from ...analytics.legacy.performance_improvement_calculator import PerformanceImprovementCalculator
 from .session_summary_reporter import SessionSummary, SessionSummaryReporter
 logger = logging.getLogger(__name__)
 
@@ -47,7 +52,7 @@ class ComparisonMethod(Enum):
     CORRELATION = 'correlation'
     EFFECT_SIZE = 'effect_size'
 
-class SessionComparisonResult(SQLModel):
+class SessionComparisonResult(BaseModel):
     """Result of comparing two training sessions"""
     session_a_id: str = Field(description='ID of first session in comparison')
     session_b_id: str = Field(description='ID of second session in comparison')
@@ -55,47 +60,47 @@ class SessionComparisonResult(SQLModel):
     statistical_significance: bool = Field(description='Whether difference is statistically significant')
     p_value: float = Field(ge=0.0, le=1.0, description='P-value from statistical test')
     effect_size: float = Field(ge=0.0, description='Effect size magnitude')
-    confidence_interval: Tuple[float, float] = Field(description='95% confidence interval for difference')
+    confidence_interval: tuple[float, float] = Field(description='95% confidence interval for difference')
     session_a_score: float = Field(description='Performance score for session A')
     session_b_score: float = Field(description='Performance score for session B')
     performance_difference: float = Field(description='Absolute performance difference')
     relative_improvement: float = Field(description='Relative improvement percentage')
     winner: str = Field(description="Winning session or 'no_significant_difference'")
-    insights: List[str] = Field(default_factory=list, description='Analysis insights')
-    recommendations: List[str] = Field(default_factory=list, description='Improvement recommendations')
+    insights: list[str] = Field(default_factory=list, description='Analysis insights')
+    recommendations: list[str] = Field(default_factory=list, description='Improvement recommendations')
 
-class MultiSessionAnalysis(SQLModel):
+class MultiSessionAnalysis(BaseModel):
     """Analysis of multiple training sessions"""
-    session_ids: List[str] = Field(description='Session IDs included in analysis')
-    analysis_period: Tuple[datetime, datetime] = Field(description='Time period covered by analysis')
-    performance_ranking: List[Tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by performance')
-    efficiency_ranking: List[Tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by efficiency')
-    stability_ranking: List[Tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by stability')
-    high_performers: List[str] = Field(default_factory=list, description='Top performing session IDs')
-    low_performers: List[str] = Field(default_factory=list, description='Poor performing session IDs')
-    outliers: List[str] = Field(default_factory=list, description='Outlier session IDs')
-    common_success_patterns: List[Dict[str, Any]] = Field(default_factory=list, description='Patterns found in successful sessions')
-    common_failure_patterns: List[Dict[str, Any]] = Field(default_factory=list, description='Patterns found in failed sessions')
-    optimization_recommendations: List[str] = Field(default_factory=list, description='Optimization suggestions')
-    performance_distribution: Dict[str, float] = Field(default_factory=dict, description='Performance distribution statistics')
-    correlation_matrix: Dict[str, Dict[str, float]] = Field(default_factory=dict, description='Feature correlation matrix')
-    cluster_analysis: Dict[str, List[str]] = Field(default_factory=dict, description='Clustering results')
+    session_ids: list[str] = Field(description='Session IDs included in analysis')
+    analysis_period: tuple[datetime, datetime] = Field(description='Time period covered by analysis')
+    performance_ranking: list[tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by performance')
+    efficiency_ranking: list[tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by efficiency')
+    stability_ranking: list[tuple[str, float]] = Field(default_factory=list, description='Sessions ranked by stability')
+    high_performers: list[str] = Field(default_factory=list, description='Top performing session IDs')
+    low_performers: list[str] = Field(default_factory=list, description='Poor performing session IDs')
+    outliers: list[str] = Field(default_factory=list, description='Outlier session IDs')
+    common_success_patterns: list[dict[str, Any]] = Field(default_factory=list, description='Patterns found in successful sessions')
+    common_failure_patterns: list[dict[str, Any]] = Field(default_factory=list, description='Patterns found in failed sessions')
+    optimization_recommendations: list[str] = Field(default_factory=list, description='Optimization suggestions')
+    performance_distribution: dict[str, float] = Field(default_factory=dict, description='Performance distribution statistics')
+    correlation_matrix: dict[str, dict[str, float]] = Field(default_factory=dict, description='Feature correlation matrix')
+    cluster_analysis: dict[str, list[str]] = Field(default_factory=dict, description='Clustering results')
 
-class BenchmarkResult(SQLModel):
+class BenchmarkResult(BaseModel):
     """Benchmarking result against historical data"""
     session_id: str = Field(description='Session ID being benchmarked')
-    benchmark_period: Tuple[datetime, datetime] = Field(description='Historical comparison period')
+    benchmark_period: tuple[datetime, datetime] = Field(description='Historical comparison period')
     performance_percentile: float = Field(ge=0.0, le=100.0, description='Performance percentile ranking')
     efficiency_percentile: float = Field(ge=0.0, le=100.0, description='Efficiency percentile ranking')
     speed_percentile: float = Field(ge=0.0, le=100.0, description='Speed percentile ranking')
-    vs_average: Dict[str, float] = Field(default_factory=dict, description='Comparison vs historical average')
-    vs_best: Dict[str, float] = Field(default_factory=dict, description='Comparison vs historical best')
-    vs_recent: Dict[str, float] = Field(default_factory=dict, description='Comparison vs recent sessions')
+    vs_average: dict[str, float] = Field(default_factory=dict, description='Comparison vs historical average')
+    vs_best: dict[str, float] = Field(default_factory=dict, description='Comparison vs historical best')
+    vs_recent: dict[str, float] = Field(default_factory=dict, description='Comparison vs recent sessions')
     performance_tier: str = Field(description='Performance tier classification')
     improvement_potential: float = Field(ge=0.0, le=1.0, description='Potential for improvement')
-    strengths: List[str] = Field(default_factory=list, description='Identified strengths')
-    weaknesses: List[str] = Field(default_factory=list, description='Identified weaknesses')
-    recommendations: List[str] = Field(default_factory=list, description='Improvement recommendations')
+    strengths: list[str] = Field(default_factory=list, description='Identified strengths')
+    weaknesses: list[str] = Field(default_factory=list, description='Identified weaknesses')
+    recommendations: list[str] = Field(default_factory=list, description='Improvement recommendations')
 
 class SessionComparisonAnalyzer:
     """
@@ -155,7 +160,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error comparing sessions {session_a_id} and {session_b_id}: %s', e)
             raise
 
-    async def analyze_multiple_sessions(self, session_ids: Optional[List[str]]=None, start_date: Optional[datetime]=None, end_date: Optional[datetime]=None, limit: int=50) -> MultiSessionAnalysis:
+    async def analyze_multiple_sessions(self, session_ids: list[str] | None=None, start_date: datetime | None=None, end_date: datetime | None=None, limit: int=50) -> MultiSessionAnalysis:
         """
         Analyze multiple training sessions for patterns and optimization opportunities.
 
@@ -227,7 +232,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error benchmarking session {session_id}: %s', e)
             raise
 
-    async def _get_session_with_iterations(self, session_id: str) -> Optional[Tuple[TrainingSession, List[TrainingIteration]]]:
+    async def _get_session_with_iterations(self, session_id: str) -> tuple[TrainingSession, list[TrainingIteration]] | None:
         """Get session with its iterations"""
         try:
             session_query = select(TrainingSession).where(TrainingSession.session_id == session_id)
@@ -243,7 +248,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error getting session with iterations: %s', e)
             return None
 
-    async def _get_multiple_sessions_by_ids(self, session_ids: List[str]) -> List[Tuple[TrainingSession, List[TrainingIteration]]]:
+    async def _get_multiple_sessions_by_ids(self, session_ids: list[str]) -> list[tuple[TrainingSession, list[TrainingIteration]]]:
         """Get multiple sessions by their IDs"""
         try:
             sessions_data = []
@@ -256,7 +261,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error getting multiple sessions by IDs: %s', e)
             return []
 
-    async def _get_sessions_by_date_range(self, start_date: Optional[datetime], end_date: Optional[datetime], limit: int) -> List[Tuple[TrainingSession, List[TrainingIteration]]]:
+    async def _get_sessions_by_date_range(self, start_date: datetime | None, end_date: datetime | None, limit: int) -> list[tuple[TrainingSession, list[TrainingIteration]]]:
         """Get sessions within date range"""
         try:
             query = select(TrainingSession)
@@ -278,7 +283,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error getting sessions by date range: %s', e)
             return []
 
-    async def _extract_comparison_metrics(self, session: TrainingSession, iterations: List[TrainingIteration], dimension: ComparisonDimension) -> List[float]:
+    async def _extract_comparison_metrics(self, session: TrainingSession, iterations: list[TrainingIteration], dimension: ComparisonDimension) -> list[float]:
         """Extract metrics for comparison based on dimension"""
         try:
             metrics = []
@@ -326,7 +331,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error extracting comparison metrics: %s', e)
             return []
 
-    async def _perform_statistical_comparison(self, metrics_a: List[float], metrics_b: List[float], method: ComparisonMethod) -> Dict[str, Any]:
+    async def _perform_statistical_comparison(self, metrics_a: list[float], metrics_b: list[float], method: ComparisonMethod) -> dict[str, Any]:
         """Perform statistical comparison between two metric sets"""
         try:
             if not metrics_a or not metrics_b:
@@ -358,7 +363,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error performing statistical comparison: %s', e)
             return {'significant': False, 'p_value': 1.0, 'effect_size': 0.0, 'confidence_interval': (0.0, 0.0)}
 
-    async def _extract_session_features(self, session: TrainingSession, iterations: List[TrainingIteration]) -> Dict[str, float]:
+    async def _extract_session_features(self, session: TrainingSession, iterations: list[TrainingIteration]) -> dict[str, float]:
         """Extract comprehensive features for session analysis"""
         try:
             features = {}
@@ -380,7 +385,7 @@ class SessionComparisonAnalyzer:
                 features['std_iteration_duration'] = np.std(durations) if len(durations) > 1 else 0.0
                 features['avg_improvement_per_iteration'] = np.mean(improvements) if improvements else 0.0
                 features['std_improvement_per_iteration'] = np.std(improvements) if len(improvements) > 1 else 0.0
-                successful = sum((1 for it in iterations if it.status == 'completed'))
+                successful = sum(1 for it in iterations if it.status == 'completed')
                 features['success_rate'] = successful / len(iterations)
                 if durations and improvements:
                     efficiency_scores = [imp / (dur / 3600) for imp, dur in zip(improvements, durations) if dur > 0]
@@ -415,7 +420,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error extracting session features: %s', e)
             return {}
 
-    async def _generate_comparison_insights(self, session_a: TrainingSession, session_b: TrainingSession, iterations_a: List[TrainingIteration], iterations_b: List[TrainingIteration], dimension: ComparisonDimension, statistical_result: Dict[str, Any]) -> List[str]:
+    async def _generate_comparison_insights(self, session_a: TrainingSession, session_b: TrainingSession, iterations_a: list[TrainingIteration], iterations_b: list[TrainingIteration], dimension: ComparisonDimension, statistical_result: dict[str, Any]) -> list[str]:
         """Generate insights from session comparison"""
         try:
             insights = []
@@ -444,7 +449,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error generating comparison insights: %s', e)
             return []
 
-    async def _generate_comparison_recommendations(self, session_a: TrainingSession, session_b: TrainingSession, winner: str, dimension: ComparisonDimension, statistical_result: Dict[str, Any]) -> List[str]:
+    async def _generate_comparison_recommendations(self, session_a: TrainingSession, session_b: TrainingSession, winner: str, dimension: ComparisonDimension, statistical_result: dict[str, Any]) -> list[str]:
         """Generate recommendations from session comparison"""
         try:
             recommendations = []
@@ -466,7 +471,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error generating comparison recommendations: %s', e)
             return []
 
-    async def _calculate_performance_ranking(self, session_features: Dict[str, Dict[str, float]]) -> List[Tuple[str, float]]:
+    async def _calculate_performance_ranking(self, session_features: dict[str, dict[str, float]]) -> list[tuple[str, float]]:
         """Calculate performance ranking for sessions"""
         try:
             rankings = []
@@ -478,7 +483,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating performance ranking: %s', e)
             return []
 
-    async def _calculate_efficiency_ranking(self, session_features: Dict[str, Dict[str, float]]) -> List[Tuple[str, float]]:
+    async def _calculate_efficiency_ranking(self, session_features: dict[str, dict[str, float]]) -> list[tuple[str, float]]:
         """Calculate efficiency ranking for sessions"""
         try:
             rankings = []
@@ -490,7 +495,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating efficiency ranking: %s', e)
             return []
 
-    async def _calculate_stability_ranking(self, session_features: Dict[str, Dict[str, float]]) -> List[Tuple[str, float]]:
+    async def _calculate_stability_ranking(self, session_features: dict[str, dict[str, float]]) -> list[tuple[str, float]]:
         """Calculate stability ranking for sessions"""
         try:
             rankings = []
@@ -502,7 +507,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating stability ranking: %s', e)
             return []
 
-    async def _identify_patterns(self, session_features: Dict[str, Dict[str, float]]) -> Dict[str, List[str]]:
+    async def _identify_patterns(self, session_features: dict[str, dict[str, float]]) -> dict[str, list[str]]:
         """Identify patterns in session performance"""
         try:
             all_scores = [features.get('final_performance', 0.0) for features in session_features.values()]
@@ -544,7 +549,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error identifying patterns: %s', e)
             return {'high_performers': [], 'low_performers': [], 'outliers': [], 'success_patterns': [], 'failure_patterns': []}
 
-    async def _perform_clustering_analysis(self, session_features: Dict[str, Dict[str, float]]) -> Dict[str, List[str]]:
+    async def _perform_clustering_analysis(self, session_features: dict[str, dict[str, float]]) -> dict[str, list[str]]:
         """Perform clustering analysis on sessions"""
         try:
             if len(session_features) < 3:
@@ -572,7 +577,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error performing clustering analysis: %s', e)
             return {'cluster_0': list(session_features.keys())}
 
-    async def _calculate_correlation_matrix(self, session_features: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    async def _calculate_correlation_matrix(self, session_features: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]:
         """Calculate correlation matrix between features"""
         try:
             if len(session_features) < 3:
@@ -594,7 +599,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating correlation matrix: %s', e)
             return {}
 
-    async def _calculate_performance_distribution(self, session_features: Dict[str, Dict[str, float]]) -> Dict[str, float]:
+    async def _calculate_performance_distribution(self, session_features: dict[str, dict[str, float]]) -> dict[str, float]:
         """Calculate performance distribution statistics"""
         try:
             performance_scores = [features.get('final_performance', 0.0) for features in session_features.values()]
@@ -605,7 +610,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating performance distribution: %s', e)
             return {}
 
-    async def _generate_optimization_recommendations(self, session_features: Dict[str, Dict[str, float]], patterns: Dict[str, Any], clusters: Dict[str, List[str]]) -> List[str]:
+    async def _generate_optimization_recommendations(self, session_features: dict[str, dict[str, float]], patterns: dict[str, Any], clusters: dict[str, list[str]]) -> list[str]:
         """Generate optimization recommendations based on analysis"""
         try:
             recommendations = []
@@ -633,7 +638,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error generating optimization recommendations: %s', e)
             return []
 
-    async def _calculate_percentile_rankings(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]]) -> Dict[str, float]:
+    async def _calculate_percentile_rankings(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]]) -> dict[str, float]:
         """Calculate percentile rankings for target session"""
         try:
             if not historical_features:
@@ -652,7 +657,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating percentile rankings: %s', e)
             return {'performance': 50.0, 'efficiency': 50.0, 'speed': 50.0}
 
-    async def _calculate_benchmark_comparisons(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    async def _calculate_benchmark_comparisons(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]:
         """Calculate benchmark comparisons (vs average, best, recent)"""
         try:
             if not historical_features:
@@ -676,7 +681,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating benchmark comparisons: %s', e)
             return {'vs_average': {}, 'vs_best': {}, 'vs_recent': {}}
 
-    async def _classify_performance_tier(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]]) -> str:
+    async def _classify_performance_tier(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]]) -> str:
         """Classify session into performance tier"""
         try:
             if not historical_features:
@@ -701,7 +706,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error classifying performance tier: %s', e)
             return 'average'
 
-    async def _calculate_improvement_potential(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]]) -> float:
+    async def _calculate_improvement_potential(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]]) -> float:
         """Calculate improvement potential for target session"""
         try:
             if not historical_features:
@@ -717,7 +722,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error calculating improvement potential: %s', e)
             return 0.5
 
-    async def _identify_strengths_weaknesses(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]]) -> Tuple[List[str], List[str]]:
+    async def _identify_strengths_weaknesses(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]]) -> tuple[list[str], list[str]]:
         """Identify strengths and weaknesses of target session"""
         try:
             strengths = []
@@ -739,7 +744,7 @@ class SessionComparisonAnalyzer:
             self.logger.error('Error identifying strengths and weaknesses: %s', e)
             return ([], [])
 
-    async def _generate_benchmark_recommendations(self, target_features: Dict[str, float], historical_features: Dict[str, Dict[str, float]], performance_tier: str) -> List[str]:
+    async def _generate_benchmark_recommendations(self, target_features: dict[str, float], historical_features: dict[str, dict[str, float]], performance_tier: str) -> list[str]:
         """Generate benchmark-based recommendations"""
         try:
             recommendations = []

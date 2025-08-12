@@ -32,10 +32,10 @@ class DataPipelineCoordinator:
         self.event_bus = event_bus
         self.resource_manager = resource_manager
         self.logger = logging.getLogger(__name__)
-        self.active_pipelines: Dict[str, Dict[str, Any]] = {}
-        self.data_flows: Dict[str, List[str]] = {}
+        self.active_pipelines: dict[str, dict[str, Any]] = {}
+        self.data_flows: dict[str, list[str]] = {}
 
-    async def start_data_pipeline(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def start_data_pipeline(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Start a new data pipeline workflow."""
         self.logger.info('Starting data pipeline %s', pipeline_id)
         await self._validate_pipeline_parameters(parameters)
@@ -56,7 +56,7 @@ class DataPipelineCoordinator:
             await self._handle_pipeline_failure(pipeline_id, e)
             raise
 
-    async def _validate_pipeline_parameters(self, parameters: Dict[str, Any]) -> None:
+    async def _validate_pipeline_parameters(self, parameters: dict[str, Any]) -> None:
         """Validate data pipeline parameters."""
         required_params = ['data_source', 'target_components']
         missing_params = [param for param in required_params if param not in parameters]
@@ -69,7 +69,7 @@ class DataPipelineCoordinator:
         if not isinstance(target_components, list) or not target_components:
             raise ValueError('target_components must be a non-empty list')
 
-    async def _execute_data_ingestion(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_ingestion(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Execute data ingestion step."""
         self.logger.info('Executing data ingestion for pipeline %s', pipeline_id)
         self.active_pipelines[pipeline_id]['current_step'] = 'data_ingestion'
@@ -80,7 +80,7 @@ class DataPipelineCoordinator:
         self.active_pipelines[pipeline_id]['data_processed'] = simulated_data_size
         self.logger.info('Data ingestion completed for pipeline %s', pipeline_id)
 
-    async def _execute_data_validation(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_validation(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Execute data validation step."""
         self.logger.info('Executing data validation for pipeline %s', pipeline_id)
         self.active_pipelines[pipeline_id]['current_step'] = 'data_validation'
@@ -93,7 +93,7 @@ class DataPipelineCoordinator:
             await self.event_bus.emit(MLEvent(event_type=EventType.DATA_VALIDATION_COMPLETED, source='data_pipeline_coordinator', data={'pipeline_id': pipeline_id, 'validation_results': validation_results}))
         self.logger.info('Data validation completed for pipeline %s', pipeline_id)
 
-    async def _execute_data_preprocessing(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_preprocessing(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Execute data preprocessing step."""
         self.logger.info('Executing data preprocessing for pipeline %s', pipeline_id)
         self.active_pipelines[pipeline_id]['current_step'] = 'data_preprocessing'
@@ -104,7 +104,7 @@ class DataPipelineCoordinator:
             self.active_pipelines[pipeline_id]['transformation_history'].append(step_result)
         self.logger.info('Data preprocessing completed for pipeline %s', pipeline_id)
 
-    async def _execute_data_transformation(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_transformation(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Execute data transformation step."""
         self.logger.info('Executing data transformation for pipeline %s', pipeline_id)
         self.active_pipelines[pipeline_id]['current_step'] = 'data_transformation'
@@ -115,7 +115,7 @@ class DataPipelineCoordinator:
             self.active_pipelines[pipeline_id]['transformation_history'].append(transformation_result)
         self.logger.info('Data transformation completed for pipeline %s', pipeline_id)
 
-    async def _execute_data_distribution(self, pipeline_id: str, parameters: Dict[str, Any]) -> None:
+    async def _execute_data_distribution(self, pipeline_id: str, parameters: dict[str, Any]) -> None:
         """Execute data distribution to target components."""
         self.logger.info('Executing data distribution for pipeline %s', pipeline_id)
         self.active_pipelines[pipeline_id]['current_step'] = 'data_distribution'
@@ -144,21 +144,21 @@ class DataPipelineCoordinator:
         self.active_pipelines[pipeline_id]['completed_at'] = datetime.now(timezone.utc)
         self.logger.info('Data pipeline %s stopped', pipeline_id)
 
-    async def get_pipeline_status(self, pipeline_id: str) -> Dict[str, Any]:
+    async def get_pipeline_status(self, pipeline_id: str) -> dict[str, Any]:
         """Get the status of a data pipeline."""
         if pipeline_id not in self.active_pipelines:
             raise ValueError(f'Data pipeline {pipeline_id} not found')
         return self.active_pipelines[pipeline_id].copy()
 
-    async def list_active_pipelines(self) -> List[str]:
+    async def list_active_pipelines(self) -> list[str]:
         """List all active data pipelines."""
         return [pipe_id for pipe_id, pipe_data in self.active_pipelines.items() if pipe_data['status'] == 'running']
 
-    async def get_data_flow_map(self) -> Dict[str, List[str]]:
+    async def get_data_flow_map(self) -> dict[str, list[str]]:
         """Get the data flow mapping for all pipelines."""
         return self.data_flows.copy()
 
-    async def get_pipeline_metrics(self, pipeline_id: str) -> Optional[Dict[str, Any]]:
+    async def get_pipeline_metrics(self, pipeline_id: str) -> dict[str, Any] | None:
         """Get metrics for a specific pipeline."""
         if pipeline_id not in self.active_pipelines:
             return None

@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-08-09T10:30:00Z",
+  "results": [
+    {
+      "library": "Pydantic V2",
+      "time_per_op_us": 1.0161834012251347,
+      "ops_per_sec": 984074.3302777592,
+      "memory_per_1k_kb": 1412.6640625,
+      "improvement_factor": 1.9792481315863348
+    },
+    {
+      "library": "SQLModel",
+      "time_per_op_us": 2.011279098223895,
+      "ops_per_sec": 497196.03852248675,
+      "memory_per_1k_kb": 1400.75,
+      "improvement_factor": 1.0
+    },
+    {
+      "library": "msgspec",
+      "time_per_op_us": 0.3272375004598871,
+      "ops_per_sec": 3055884.4832717464,
+      "memory_per_1k_kb": 455.125,
+      "improvement_factor": 6.146236587791192
+    },
+    {
+      "library": "dataclass",
+      "time_per_op_us": 0.2309625007910654,
+      "ops_per_sec": 4329707.18872076,
+      "memory_per_1k_kb": 157.0625,
+      "improvement_factor": 8.708249570103805
+    }
+  ]
+}

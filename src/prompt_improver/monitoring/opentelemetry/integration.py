@@ -4,20 +4,35 @@
 Provides integration adapters to connect OpenTelemetry with existing
 OpenTelemetry metrics, health checks, and monitoring systems.
 """
+
 import logging
 from contextlib import contextmanager
 from typing import Dict, Optional
-from prompt_improver.monitoring.opentelemetry.metrics import get_business_metrics, get_database_metrics, get_http_metrics
+
+from prompt_improver.monitoring.opentelemetry.metrics import (
+    get_business_metrics,
+    get_database_metrics,
+    get_http_metrics,
+)
 from prompt_improver.monitoring.opentelemetry.setup import get_meter, get_tracer
-from prompt_improver.monitoring.opentelemetry.tracing import add_span_attributes, trace_async
+from prompt_improver.monitoring.opentelemetry.tracing import (
+    add_span_attributes,
+    trace_async,
+)
+
 try:
-    from opentelemetry import metrics as otel_metrics, trace
+    from opentelemetry import (
+        metrics as otel_metrics,
+        trace,
+    )
     from opentelemetry.trace import Status, StatusCode
+
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
     trace = otel_metrics = Status = StatusCode = None
 logger = logging.getLogger(__name__)
+
 
 class MetricsIntegration:
     """Integrates OpenTelemetry metrics with existing monitoring systems."""
@@ -29,4 +44,4 @@ class MetricsIntegration:
         self.business_metrics = get_business_metrics()
         self.meter = get_meter(__name__)
         self.tracer = get_tracer(__name__)
-        logger.info('OpenTelemetry metrics integration initialized')
+        logger.info("OpenTelemetry metrics integration initialized")

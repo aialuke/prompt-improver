@@ -9,7 +9,7 @@
 
 ## Summary
 
-This ADR documents the unified cache architecture implemented through the UnifiedConnectionManager consolidation, establishing the L1/L2/L3 cache hierarchy as the architectural standard for all caching operations.
+This ADR documents the unified cache architecture implemented through the DatabaseServices consolidation, establishing the L1/L2/L3 cache hierarchy as the architectural standard for all caching operations.
 
 ## Context
 
@@ -19,7 +19,7 @@ The prompt-improver application previously had **34 separate cache implementatio
 - Operational complexity and maintenance overhead
 - Lack of unified monitoring and observability
 
-The consolidation into UnifiedConnectionManager achieved:
+The consolidation into DatabaseServices achieved:
 - **8.4x performance improvement** (24 → 201 req/s throughput)
 - **93% cache hit rate** through intelligent multi-level caching
 - **Zero security vulnerabilities** with comprehensive security controls
@@ -99,7 +99,7 @@ We adopt the **Unified Cache Architecture** with three distinct cache levels, ea
 ### 1. L1 Memory Cache
 
 **Implementation**: Custom LRUCache with OrderedDict  
-**Location**: `UnifiedConnectionManager._l1_cache`
+**Location**: `DatabaseServices._l1_cache`
 
 ```python
 class CacheEntry:
@@ -126,7 +126,7 @@ ADMIN:           500 entries, 120min TTL, warming disabled
 ### 2. L2 Redis Cache
 
 **Implementation**: coredis with master/replica support  
-**Location**: `UnifiedConnectionManager._redis_master/_redis_replica`
+**Location**: `DatabaseServices.cache.redis_client/_redis_replica`
 
 **Features**:
 - High availability with automatic failover
@@ -153,7 +153,7 @@ ADMIN:           500 entries, 120min TTL, warming disabled
 ### 3. L3 Database/Compute Fallback
 
 **Implementation**: AsyncPG connection pooling + computational operations  
-**Location**: `UnifiedConnectionManager.get_session()` + fallback handlers
+**Location**: `DatabaseServices.get_session()` + fallback handlers
 
 **Fallback Sources**:
 - PostgreSQL database queries
@@ -230,7 +230,7 @@ ADMIN (Resource Conservative):
 
 **Key Metrics**:
 ```python
-# Prometheus metrics exported by UnifiedConnectionManager
+# Prometheus metrics exported by DatabaseServices
 unified_cache_operations_total{operation_type, cache_level, status}
 unified_cache_hit_ratio{cache_level}
 unified_cache_operation_duration_seconds{operation_type, cache_level}
@@ -391,7 +391,7 @@ Monitoring:
 1. **Complexity**: More sophisticated than simple direct Redis connections
 2. **Memory Usage**: L1 cache consumes application memory (managed through sizing)
 3. **Learning Curve**: Developers must understand the multi-level architecture
-4. **Dependencies**: Increased coupling to the UnifiedConnectionManager
+4. **Dependencies**: Increased coupling to the DatabaseServices
 
 ### Risk Mitigation
 

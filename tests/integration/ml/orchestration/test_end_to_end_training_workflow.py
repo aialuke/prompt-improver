@@ -18,7 +18,8 @@ class TestEndToEndTrainingWorkflow:
         """Create full orchestrator for integration testing with Protocol-based DI."""
         config = OrchestratorConfig(max_concurrent_workflows=3, component_health_check_interval=2, training_timeout=300, event_bus_buffer_size=50)
         factory = MLPipelineFactory()
-        orchestrator = await factory.create_from_container(ml_service_container, config.to_dict())
+        from dataclasses import asdict
+        orchestrator = await factory.create_from_container(ml_service_container, asdict(config))
         await orchestrator.initialize()
         yield orchestrator
         await orchestrator.shutdown()
@@ -60,7 +61,7 @@ class TestEndToEndTrainingWorkflow:
         if status.state == PipelineState.COMPLETED:
             component_health = await orchestrator.get_component_health()
             assert len(component_health) > 0
-            healthy_components = sum((1 for is_healthy in component_health.values() if is_healthy))
+            healthy_components = sum(1 for is_healthy in component_health.values() if is_healthy)
             assert healthy_components > 0
 
     @pytest.mark.asyncio

@@ -24,7 +24,7 @@ class OptimizationEventHandler:
         self.logger = logging.getLogger(__name__)
         self.events_processed = 0
         self.events_failed = 0
-        self.last_event_time: Optional[datetime] = None
+        self.last_event_time: datetime | None = None
         self.active_optimizations = {}
         self.optimization_history = []
 
@@ -126,13 +126,13 @@ class OptimizationEventHandler:
             optimization['iterations'] += 1
             optimization['last_iteration'] = datetime.now(timezone.utc)
             if optimization['iterations'] % 10 == 0:
-                self.logger.info("Optimization {workflow_id} progress: {optimization['iterations']} iterations, best score: %s", optimization.get('best_score', 'N/A'))
+                self.logger.info(f"Optimization {workflow_id} progress: {optimization['iterations']} iterations, best score: {optimization.get('best_score')}")
 
-    async def get_optimization_status(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+    async def get_optimization_status(self, workflow_id: str) -> dict[str, Any] | None:
         """Get status of an optimization session."""
         return self.active_optimizations.get(workflow_id, {}).copy()
 
-    async def list_active_optimizations(self) -> Dict[str, Dict[str, Any]]:
+    async def list_active_optimizations(self) -> dict[str, dict[str, Any]]:
         """List all active optimization sessions."""
         active_optimizations = {}
         for workflow_id, optimization in self.active_optimizations.items():
@@ -140,10 +140,10 @@ class OptimizationEventHandler:
                 active_optimizations[workflow_id] = optimization.copy()
         return active_optimizations
 
-    async def get_handler_statistics(self) -> Dict[str, Any]:
+    async def get_handler_statistics(self) -> dict[str, Any]:
         """Get event handler statistics."""
         return {'events_processed': self.events_processed, 'events_failed': self.events_failed, 'success_rate': (self.events_processed - self.events_failed) / max(self.events_processed, 1), 'last_event_time': self.last_event_time, 'active_optimizations': len([o for o in self.active_optimizations.values() if o.get('status') == 'running']), 'total_optimizations': len(self.active_optimizations), 'optimization_history_count': len(self.optimization_history)}
 
-    def get_supported_events(self) -> List[EventType]:
+    def get_supported_events(self) -> list[EventType]:
         """Get list of supported event types."""
         return [EventType.OPTIMIZATION_STARTED, EventType.OPTIMIZATION_COMPLETED, EventType.OPTIMIZATION_FAILED, EventType.HYPERPARAMETER_UPDATE, EventType.OPTIMIZATION_ITERATION]

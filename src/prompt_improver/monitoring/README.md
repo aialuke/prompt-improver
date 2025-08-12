@@ -217,17 +217,17 @@ print(f"Health Score: {snapshot.overall_health_score}/100")
 
 ### Get Health Dashboard
 ```bash
-curl http://localhost:8000/health/dashboard
+curl http://${API_HOST:-localhost}:${API_PORT:-8000}/health/dashboard
 ```
 
 ### Reset Circuit Breakers (Emergency)
 ```bash
-curl -X POST http://localhost:8000/health/circuit-breakers/reset
+curl -X POST http://${API_HOST:-localhost}:${API_PORT:-8000}/health/circuit-breakers/reset
 ```
 
 ### Get Prometheus Metrics
 ```bash
-curl http://localhost:8000/health/metrics/prometheus
+curl http://${API_HOST:-localhost}:${API_PORT:-8000}/health/metrics/prometheus
 ```
 
 ## Configuration

@@ -3,12 +3,13 @@
 This module provides comprehensive type definitions for machine learning components,
 including proper numpy array typing and model interfaces.
 """
-from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Tuple, TypeVar, Union, runtime_checkable
+from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple, TypeVar, Union, runtime_checkable
+from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 float_array = NDArray[np.float64]
 int_array = NDArray[np.int64]
-bool_array = NDArray[np.bool]
+bool_array = NDArray[np.bool_]
 feature_array = NDArray[np.float64]
 label_array = NDArray[np.int64]
 T = TypeVar('T', bound=np.generic)
@@ -24,19 +25,19 @@ cluster_centers = float_array
 distance_matrix = float_array
 reduced_features = float_array
 transform_matrix = float_array
-model_config = Dict[str, Any]
-hyper_parameters = Dict[str, Union[int, float, str, bool]]
-metrics_dict = Dict[str, float]
+model_config = dict[str, Any]
+hyper_parameters = dict[str, Union[int, float, str, bool]]
+metrics_dict = dict[str, float]
 progress_callback = Callable[[int, int], None]
 metrics_callback = Callable[[metrics_dict], None]
-pipeline_step = Tuple[str, Any]
-pipeline_config = List[pipeline_step]
+pipeline_step = tuple[str, Any]
+pipeline_config = list[pipeline_step]
 
 @runtime_checkable
 class Transformer(Protocol):
     """Protocol for feature transformers."""
 
-    def fit(self, X: features, y: Optional[labels]=None) -> 'Transformer':
+    def fit(self, X: features, y: labels | None=None) -> 'Transformer':
         """Fit the transformer to data."""
         ...
 
@@ -44,7 +45,7 @@ class Transformer(Protocol):
         """Transform the features."""
         ...
 
-    def fit_transform(self, X: features, y: Optional[labels]=None) -> features:
+    def fit_transform(self, X: features, y: labels | None=None) -> features:
         """Fit and transform in one step."""
         ...
 
@@ -68,7 +69,7 @@ class Clusterer(Protocol):
 class Optimizer(Protocol):
     """Protocol for optimization algorithms."""
 
-    def optimize(self, features: features, labels: Optional[labels]=None, **kwargs: Any) -> Dict[str, Any]:
+    def optimize(self, features: features, labels: labels | None=None, **kwargs: Any) -> dict[str, Any]:
         """Optimize the given features."""
         ...
 
@@ -92,14 +93,14 @@ class ModelManager(Protocol):
         """Save a model with ID."""
         ...
 
-    def get_pipeline(self) -> Optional[Any]:
+    def get_pipeline(self) -> Any | None:
         """Get the model pipeline."""
         ...
 
 class TrainingBatch:
     """Type-safe container for training data batches."""
 
-    def __init__(self, features: features, labels: labels, sample_weights: Optional[weights]=None, metadata: Optional[Dict[str, Any]]=None):
+    def __init__(self, features: features, labels: labels, sample_weights: weights | None=None, metadata: dict[str, Any] | None=None):
         self.features = features
         self.labels = labels
         self.sample_weights = sample_weights
@@ -108,7 +109,7 @@ class TrainingBatch:
 class OptimizationResult:
     """Type-safe container for optimization results."""
 
-    def __init__(self, optimized_features: features, metrics: metrics_dict, model_params: Optional[hyper_parameters]=None, execution_time: Optional[float]=None):
+    def __init__(self, optimized_features: features, metrics: metrics_dict, model_params: hyper_parameters | None=None, execution_time: float | None=None):
         self.optimized_features = optimized_features
         self.metrics = metrics
         self.model_params = model_params
@@ -117,7 +118,7 @@ class OptimizationResult:
 class ClusteringResult:
     """Type-safe container for clustering results."""
 
-    def __init__(self, labels: cluster_labels, centers: Optional[cluster_centers]=None, metrics: Optional[metrics_dict]=None, n_clusters: Optional[int]=None):
+    def __init__(self, labels: cluster_labels, centers: cluster_centers | None=None, metrics: metrics_dict | None=None, n_clusters: int | None=None):
         self.labels = labels
         self.centers = centers
         self.metrics = metrics or {}
@@ -126,8 +127,8 @@ SilhouetteScore = float
 CalinskiHarabaszScore = float
 DaviesBouldinScore = float
 InertiaScore = float
-ValidationSplit = Tuple[int_array, int_array]
-CrossValidationFolds = List[ValidationSplit]
+ValidationSplit = tuple[int_array, int_array]
+CrossValidationFolds = list[ValidationSplit]
 
 class MLError(Exception):
     """Base exception for ML module."""
@@ -153,13 +154,13 @@ def is_valid_labels(arr: Any) -> bool:
     """Check if array is valid labels array."""
     return isinstance(arr, np.ndarray) and arr.ndim == 1 and np.issubdtype(arr.dtype, np.integer)
 
-def ensure_features(arr: Union[List, np.ndarray]) -> features:
+def ensure_features(arr: list | np.ndarray) -> features:
     """Ensure input is proper features array."""
     arr = np.asarray(arr, dtype=np.float64)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
     return arr
 
-def ensure_labels(arr: Union[List, np.ndarray]) -> labels:
+def ensure_labels(arr: list | np.ndarray) -> labels:
     """Ensure input is proper labels array."""
     return np.asarray(arr, dtype=np.int64).ravel()

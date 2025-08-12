@@ -3,16 +3,21 @@
 Provides a simplified, unified protocol for connection management across
 different backends (PostgreSQL, Redis, etc.) following 2025 best practices.
 """
+
 from enum import Enum
-from typing import Any, AsyncContextManager, Dict, Optional, Protocol
+from typing import Any, AsyncContextManager, Protocol, runtime_checkable
+
 
 class ConnectionMode(Enum):
     """Connection operation modes"""
-    READ_ONLY = 'read_only'
-    READ_WRITE = 'read_write'
-    BATCH = 'batch'
-    TRANSACTIONAL = 'transactional'
 
+    READ_ONLY = "read_only"
+    READ_WRITE = "read_write"
+    BATCH = "batch"
+    TRANSACTIONAL = "transactional"
+
+
+@runtime_checkable
 class ConnectionManagerProtocol(Protocol):
     """Unified protocol for connection management.
 
@@ -21,7 +26,9 @@ class ConnectionManagerProtocol(Protocol):
     and eliminating circular imports.
     """
 
-    async def get_connection(self, mode: ConnectionMode=ConnectionMode.READ_WRITE, **kwargs) -> AsyncContextManager[Any]:
+    async def get_connection(
+        self, mode: ConnectionMode = ConnectionMode.READ_WRITE, **kwargs: Any
+    ) -> AsyncContextManager[Any]:
         """Get a connection with specified mode.
 
         Args:

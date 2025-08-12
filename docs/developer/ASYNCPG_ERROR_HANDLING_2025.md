@@ -81,7 +81,7 @@ from prompt_improver.database.error_handling import DatabaseErrorClassifier
 
 async def safe_database_operation():
     """Example of safe database operation with error handling."""
-    manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+    manager = get_database_services(ManagerMode.ASYNC_MODERN)
     
     try:
         async with manager.get_session() as session:
@@ -107,16 +107,16 @@ async def safe_database_operation():
             raise
 ```
 
-### Integration with UnifiedConnectionManager
+### Integration with DatabaseServices
 
 ```python
 from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def robust_query_execution():
     """Execute queries with built-in error handling and retry logic."""
-    manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+    manager = get_database_services(ManagerMode.ASYNC_MODERN)
     
-    # The UnifiedConnectionManager automatically handles:
+    # The DatabaseServices automatically handles:
     # - Connection pooling
     # - Retry logic for transient errors
     # - Circuit breaker patterns
@@ -134,7 +134,7 @@ async def robust_query_execution():
 ## Best Practices
 
 ### ✅ **Do:**
-- Use the UnifiedConnectionManager for all database operations
+- Use the DatabaseServices for all database operations
 - Classify errors appropriately for retry decisions
 - Log errors with sufficient context for debugging
 - Monitor error rates and patterns
@@ -216,5 +216,5 @@ The asyncpg-based error handling system provides robust, observable, and maintai
 
 For more information, see:
 - [AsyncPG Documentation](https://magicstack.github.io/asyncpg/)
-- [UnifiedConnectionManager Documentation](../database/UNIFIED_CONNECTION_MANAGER.md)
+- [DatabaseServices Documentation](../database/UNIFIED_CONNECTION_MANAGER.md)
 - [OpenTelemetry Integration](../monitoring/OPENTELEMETRY_SETUP.md)

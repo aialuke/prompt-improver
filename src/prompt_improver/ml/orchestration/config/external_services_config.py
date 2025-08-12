@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 @dataclass
 class PostgreSQLConfig:
     """PostgreSQL configuration for MLflow model registry and tracking."""
-    host: str = field(default_factory=lambda: os.getenv('POSTGRES_HOST', 'localhost'))
+    host: str = field(default_factory=lambda: os.getenv('POSTGRES_HOST') or os.getenv('DATABASE_HOST'))
     port: int = 5432
     database: str = 'mlflow'
     username: str = 'mlflow'
@@ -22,9 +22,9 @@ class PostgreSQLConfig:
     pool_timeout: int = 30
     pool_recycle: int = 3600
     ssl_mode: str = 'prefer'
-    ssl_cert_path: Optional[str] = None
-    ssl_key_path: Optional[str] = None
-    ssl_ca_path: Optional[str] = None
+    ssl_cert_path: str | None = None
+    ssl_key_path: str | None = None
+    ssl_ca_path: str | None = None
 
     def connection_string(self) -> str:
         """Generate PostgreSQL connection string."""
@@ -52,21 +52,21 @@ class RedisConfig:
     host: str = field(default_factory=lambda: os.getenv('REDIS_HOST', 'redis.external.service'))
     port: int = 6379
     database: int = 0
-    password: Optional[str] = None
+    password: str | None = None
     connection_timeout: int = 5
     socket_timeout: int = 5
     max_connections: int = 50
     retry_on_timeout: bool = True
     ssl: bool = False
-    ssl_cert_reqs: Optional[str] = None
-    ssl_ca_certs: Optional[str] = None
-    ssl_cert_file: Optional[str] = None
-    ssl_key_file: Optional[str] = None
+    ssl_cert_reqs: str | None = None
+    ssl_ca_certs: str | None = None
+    ssl_cert_file: str | None = None
+    ssl_key_file: str | None = None
     default_ttl: int = 3600
     model_cache_ttl: int = 86400
     prediction_cache_ttl: int = 300
 
-    def connection_params(self) -> Dict[str, Any]:
+    def connection_params(self) -> dict[str, Any]:
         """Generate Redis connection parameters."""
         params = {'host': self.host, 'port': self.port, 'db': self.database, 'socket_timeout': self.socket_timeout, 'socket_connect_timeout': self.connection_timeout, 'retry_on_timeout': self.retry_on_timeout, 'max_connections': self.max_connections}
         if self.password:
@@ -86,12 +86,12 @@ class RedisConfig:
 @dataclass
 class MLflowConfig:
     """MLflow configuration for model registry and tracking."""
-    tracking_uri: Optional[str] = None
+    tracking_uri: str | None = None
     artifact_root: str = '/var/mlflow/artifacts'
     default_artifact_root: str = '/var/mlflow/artifacts'
-    registry_store_uri: Optional[str] = None
+    registry_store_uri: str | None = None
     auth_enabled: bool = False
-    auth_config_path: Optional[str] = None
+    auth_config_path: str | None = None
     serve_artifacts: bool = True
     artifacts_only: bool = False
     host: str = '0.0.0.0'
@@ -196,6 +196,6 @@ class ExternalServicesConfig:
             raise ValueError(f"Configuration validation failed: {'; '.join(errors)}")
         return True
 
-    def get_service_urls(self) -> Dict[str, str]:
+    def get_service_urls(self) -> dict[str, str]:
         """Get service URLs for health checks and monitoring."""
         return {'postgresql': f'postgresql://{self.postgresql.host}:{self.postgresql.port}/{self.postgresql.database}', 'redis': f'redis://{self.redis.host}:{self.redis.port}/{self.redis.database}', 'mlflow': f'http://{self.mlflow.host}:{self.mlflow.port}'}

@@ -45,7 +45,8 @@ class TestRealBehaviorEndToEndWorkflow:
         """Create real orchestrator with Protocol-based DI from service container."""
         config = OrchestratorConfig(max_concurrent_workflows=3, component_health_check_interval=1, training_timeout=300, event_bus_buffer_size=50, debug_mode=True, verbose_logging=True, enable_performance_profiling=True)
         factory = MLPipelineFactory()
-        orchestrator = await factory.create_from_container(ml_service_container, config.to_dict())
+        from dataclasses import asdict
+        orchestrator = await factory.create_from_container(ml_service_container, asdict(config))
         await orchestrator.initialize()
         assert orchestrator._is_initialized, 'Orchestrator failed to initialize'
         assert orchestrator.component_registry is not None, 'Component registry not initialized'
@@ -144,7 +145,7 @@ class TestRealBehaviorEndToEndWorkflow:
             component_health = await orchestrator.get_component_health()
             assert isinstance(component_health, dict), 'Invalid health data format'
             assert len(component_health) > 0, 'No components found in health check'
-            healthy_count = sum((1 for is_healthy in component_health.values() if is_healthy))
+            healthy_count = sum(1 for is_healthy in component_health.values() if is_healthy)
             total_count = len(component_health)
             health_percentage = healthy_count / total_count * 100 if total_count > 0 else 0
             print(f'✅ Health check completed for {total_count} components')
@@ -314,17 +315,17 @@ class TestRealBehaviorEndToEndWorkflow:
             print('🔄 Verifying tier-based component organization...')
             tier_components = {}
             for component_name in component_health.keys():
-                if any((keyword in component_name.lower() for keyword in ['training', 'ml_integration', 'rule_optimizer', 'batch_processor'])):
+                if any(keyword in component_name.lower() for keyword in ['training', 'ml_integration', 'rule_optimizer', 'batch_processor']):
                     tier_components.setdefault('tier1_core', []).append(component_name)
-                elif any((keyword in component_name.lower() for keyword in ['optimization', 'learning', 'insight', 'pattern'])):
+                elif any(keyword in component_name.lower() for keyword in ['optimization', 'learning', 'insight', 'pattern']):
                     tier_components.setdefault('tier2_optimization', []).append(component_name)
-                elif any((keyword in component_name.lower() for keyword in ['evaluation', 'analysis', 'statistical', 'causal'])):
+                elif any(keyword in component_name.lower() for keyword in ['evaluation', 'analysis', 'statistical', 'causal']):
                     tier_components.setdefault('tier3_evaluation', []).append(component_name)
-                elif any((keyword in component_name.lower() for keyword in ['performance', 'monitoring', 'analytics', 'testing'])):
+                elif any(keyword in component_name.lower() for keyword in ['performance', 'monitoring', 'analytics', 'testing']):
                     tier_components.setdefault('tier4_performance', []).append(component_name)
-                elif any((keyword in component_name.lower() for keyword in ['model', 'registry', 'cache', 'validation'])):
+                elif any(keyword in component_name.lower() for keyword in ['model', 'registry', 'cache', 'validation']):
                     tier_components.setdefault('tier5_infrastructure', []).append(component_name)
-                elif any((keyword in component_name.lower() for keyword in ['security', 'sanitizer', 'guard', 'defense'])):
+                elif any(keyword in component_name.lower() for keyword in ['security', 'sanitizer', 'guard', 'defense']):
                     tier_components.setdefault('tier6_security', []).append(component_name)
                 else:
                     tier_components.setdefault('other', []).append(component_name)

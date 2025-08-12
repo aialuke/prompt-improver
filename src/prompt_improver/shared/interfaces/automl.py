@@ -1,28 +1,34 @@
 """Shared AutoML interfaces to break circular dependencies
 Following 2025 dependency injection patterns
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol
 
+
 class AutoMLMode(Enum):
     """AutoML operation modes"""
-    HYPERPARAMETER_OPTIMIZATION = 'hpo'
-    AUTOMATED_EXPERIMENT_DESIGN = 'aed'
-    CONTINUOUS_OPTIMIZATION = 'continuous'
-    MULTI_OBJECTIVE_PARETO = 'pareto'
+
+    HYPERPARAMETER_OPTIMIZATION = "hpo"
+    AUTOMATED_EXPERIMENT_DESIGN = "aed"
+    CONTINUOUS_OPTIMIZATION = "continuous"
+    MULTI_OBJECTIVE_PARETO = "pareto"
+
 
 @dataclass
 class TrialResult:
     """Result from an AutoML trial"""
+
     trial_id: str
     parameters: dict[str, Any]
     metrics: dict[str, float]
     duration: float
     status: str
     timestamp: datetime
+
 
 class IAutoMLCallback(Protocol):
     """Interface for AutoML callbacks
@@ -64,6 +70,7 @@ class IAutoMLCallback(Protocol):
         """
         ...
 
+
 class IAutoMLOrchestrator(Protocol):
     """Interface for AutoML orchestrator
 
@@ -71,7 +78,12 @@ class IAutoMLOrchestrator(Protocol):
     and multiple AutoML framework support.
     """
 
-    async def optimize(self, objective_function: Callable[[dict[str, Any]], float], parameter_space: dict[str, Any], n_trials: int=100) -> list[TrialResult]:
+    async def optimize(
+        self,
+        objective_function: Callable[[dict[str, Any]], float],
+        parameter_space: dict[str, Any],
+        n_trials: int = 100,
+    ) -> list[TrialResult]:
         """Run optimization with given configuration
 
         Args:
@@ -112,10 +124,13 @@ class IAutoMLOrchestrator(Protocol):
         """Stop ongoing optimization"""
         ...
 
+
 class IAutoMLMetrics(Protocol):
     """Interface for AutoML metrics collection"""
 
-    async def record_trial_metric(self, trial_id: str, metric_name: str, value: float) -> None:
+    async def record_trial_metric(
+        self, trial_id: str, metric_name: str, value: float
+    ) -> None:
         """Record a metric for a trial
 
         Args:

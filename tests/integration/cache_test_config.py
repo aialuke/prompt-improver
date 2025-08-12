@@ -5,12 +5,15 @@ Provides centralized configuration management, test scenarios,
 performance thresholds, and validation criteria for comprehensive
 cache testing with TestContainers and real behavior validation.
 """
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
 
 @dataclass
 class CacheTestConfig:
     """Configuration for cache testing scenarios."""
+
     l1_max_size: int = 100
     l2_default_ttl: int = 300
     enable_l2: bool = True
@@ -18,12 +21,14 @@ class CacheTestConfig:
     warming_threshold: float = 2.0
     warming_interval: int = 60
     max_warming_keys: int = 10
-    redis_image: str = 'redis:7-alpine'
+    redis_image: str = "redis:7-alpine"
     redis_port: int = 6379
+
 
 @dataclass
 class PerformanceThresholds:
     """Performance requirements and SLA thresholds."""
+
     l1_max_avg_time: float = 0.001
     l1_max_p95_time: float = 0.002
     full_cache_max_avg_time: float = 0.01
@@ -41,9 +46,11 @@ class PerformanceThresholds:
     max_memory_overhead_ratio: float = 5.0
     max_memory_per_item_kb: float = 50.0
 
+
 @dataclass
 class LoadTestConfig:
     """Configuration for load testing scenarios."""
+
     concurrent_users: int = 10
     operations_per_user: int = 100
     sustained_duration_seconds: int = 60
@@ -52,7 +59,8 @@ class LoadTestConfig:
 
     def __post_init__(self):
         if self.operation_mix is None:
-            self.operation_mix = {'get': 0.7, 'set': 0.25, 'delete': 0.05}
+            self.operation_mix = {"get": 0.7, "set": 0.25, "delete": 0.05}
+
 
 class TestScenarios:
     """Predefined test scenario configurations."""
@@ -65,7 +73,12 @@ class TestScenarios:
     @staticmethod
     def get_performance_config() -> CacheTestConfig:
         """Configuration optimized for performance testing."""
-        return CacheTestConfig(l1_max_size=1000, l2_default_ttl=600, warming_interval=30, max_warming_keys=50)
+        return CacheTestConfig(
+            l1_max_size=1000,
+            l2_default_ttl=600,
+            warming_interval=30,
+            max_warming_keys=50,
+        )
 
     @staticmethod
     def get_memory_constrained_config() -> CacheTestConfig:
@@ -75,7 +88,12 @@ class TestScenarios:
     @staticmethod
     def get_high_throughput_config() -> CacheTestConfig:
         """Configuration for high-throughput testing."""
-        return CacheTestConfig(l1_max_size=5000, l2_default_ttl=600, warming_interval=10, max_warming_keys=100)
+        return CacheTestConfig(
+            l1_max_size=5000,
+            l2_default_ttl=600,
+            warming_interval=10,
+            max_warming_keys=100,
+        )
 
     @staticmethod
     def get_warming_disabled_config() -> CacheTestConfig:
@@ -90,54 +108,88 @@ class TestScenarios:
     @staticmethod
     def get_resilience_test_config() -> CacheTestConfig:
         """Configuration for resilience testing."""
-        return CacheTestConfig(l1_max_size=50, l2_default_ttl=120, warming_interval=300, max_warming_keys=20)
+        return CacheTestConfig(
+            l1_max_size=50,
+            l2_default_ttl=120,
+            warming_interval=300,
+            max_warming_keys=20,
+        )
+
 
 class ValidationCriteria:
     """Validation criteria for different test aspects."""
-    BASIC_OPERATIONS = {'data_consistency': True, 'cache_isolation': True, 'ttl_behavior': True}
-    MULTI_LEVEL_BEHAVIOR = {'l1_hit_priority': True, 'l2_fallback': True, 'l3_population': True, 'cache_level_isolation': True}
-    WARMING_VALIDATION = {'access_pattern_tracking': True, 'warming_candidate_identification': True, 'background_warming_cycles': True, 'manual_warming': True, 'warming_error_handling': True}
-    HEALTH_MONITORING = {'comprehensive_health_check': True, 'degradation_detection': True, 'opentelemetry_integration': True, 'specialized_cache_integration': True}
+
+    BASIC_OPERATIONS = {
+        "data_consistency": True,
+        "cache_isolation": True,
+        "ttl_behavior": True,
+    }
+    MULTI_LEVEL_BEHAVIOR = {
+        "l1_hit_priority": True,
+        "l2_fallback": True,
+        "l3_population": True,
+        "cache_level_isolation": True,
+    }
+    WARMING_VALIDATION = {
+        "access_pattern_tracking": True,
+        "warming_candidate_identification": True,
+        "background_warming_cycles": True,
+        "manual_warming": True,
+        "warming_error_handling": True,
+    }
+    HEALTH_MONITORING = {
+        "comprehensive_health_check": True,
+        "degradation_detection": True,
+        "opentelemetry_integration": True,
+        "specialized_cache_integration": True,
+    }
+
 
 class TestDataPatterns:
     """Test data patterns and sizes."""
+
     SMALL_DATA_SIZE = 100
     MEDIUM_DATA_SIZE = 10000
     LARGE_DATA_SIZE = 100000
     SMALL_DATASET = 10
     MEDIUM_DATASET = 100
     LARGE_DATASET = 1000
-    SIMPLE_DATA_TYPES = ['string', 'integer', 'float', 'boolean', 'null']
-    COMPLEX_DATA_TYPES = ['nested_dict', 'mixed_array', 'unicode_text', 'date_strings']
-    REALISTIC_DATA_TYPES = ['users', 'products', 'sessions']
-    HOT_ACCESS_PATTERN = {'frequency': 10, 'interval': 0.1}
-    WARM_ACCESS_PATTERN = {'frequency': 5, 'interval': 1.0}
-    COLD_ACCESS_PATTERN = {'frequency': 1, 'interval': 10.0}
+    SIMPLE_DATA_TYPES = ["string", "integer", "float", "boolean", "null"]
+    COMPLEX_DATA_TYPES = ["nested_dict", "mixed_array", "unicode_text", "date_strings"]
+    REALISTIC_DATA_TYPES = ["users", "products", "sessions"]
+    HOT_ACCESS_PATTERN = {"frequency": 10, "interval": 0.1}
+    WARM_ACCESS_PATTERN = {"frequency": 5, "interval": 1.0}
+    COLD_ACCESS_PATTERN = {"frequency": 1, "interval": 10.0}
+
 
 class ContainerSettings:
     """Container configuration and settings."""
-    REDIS_IMAGE = 'redis:7-alpine'
+
+    REDIS_IMAGE = "redis:7-alpine"
     REDIS_PORT = 6379
     REDIS_STARTUP_TIMEOUT = 30
     REDIS_HEALTH_CHECK_INTERVAL = 1.0
-    MEMORY_LIMIT = '512m'
-    CPU_LIMIT = '1.0'
+    MEMORY_LIMIT = "512m"
+    CPU_LIMIT = "1.0"
     NETWORK_TIMEOUT = 10.0
     CONNECTION_POOL_SIZE = 20
     HEALTH_CHECK_RETRIES = 30
     HEALTH_CHECK_DELAY = 1.0
 
+
 class TestExecutionSettings:
     """Test execution configuration."""
+
     TEST_TIMEOUT_SECONDS = 30
     LONG_TEST_TIMEOUT_SECONDS = 300
     MAX_RETRIES = 3
     RETRY_DELAY = 1.0
     MAX_CONCURRENT_TESTS = 4
     CONCURRENT_OPERATIONS_LIMIT = 100
-    LOG_LEVEL = 'INFO'
+    LOG_LEVEL = "INFO"
     ENABLE_PERFORMANCE_LOGGING = True
     ENABLE_CONTAINER_LOGGING = False
+
 
 class EnvironmentConfigs:
     """Environment-specific configurations."""
@@ -145,24 +197,90 @@ class EnvironmentConfigs:
     @staticmethod
     def get_ci_config() -> dict[str, Any]:
         """Configuration for CI/CD environments."""
-        return {'cache_config': CacheTestConfig(l1_max_size=50, l2_default_ttl=180, warming_interval=120), 'performance_thresholds': PerformanceThresholds(full_cache_max_avg_time=0.02, full_cache_max_p95_time=0.1, min_ops_per_second=500.0), 'load_test_config': LoadTestConfig(concurrent_users=5, operations_per_user=50, sustained_duration_seconds=30), 'container_settings': {'startup_timeout': 60, 'memory_limit': '256m'}}
+        return {
+            "cache_config": CacheTestConfig(
+                l1_max_size=50, l2_default_ttl=180, warming_interval=120
+            ),
+            "performance_thresholds": PerformanceThresholds(
+                full_cache_max_avg_time=0.02,
+                full_cache_max_p95_time=0.1,
+                min_ops_per_second=500.0,
+            ),
+            "load_test_config": LoadTestConfig(
+                concurrent_users=5,
+                operations_per_user=50,
+                sustained_duration_seconds=30,
+            ),
+            "container_settings": {"startup_timeout": 60, "memory_limit": "256m"},
+        }
 
     @staticmethod
     def get_development_config() -> dict[str, Any]:
         """Configuration for development environments."""
-        return {'cache_config': TestScenarios.get_default_config(), 'performance_thresholds': PerformanceThresholds(), 'load_test_config': LoadTestConfig(), 'container_settings': ContainerSettings(), 'enable_detailed_logging': True}
+        return {
+            "cache_config": TestScenarios.get_default_config(),
+            "performance_thresholds": PerformanceThresholds(),
+            "load_test_config": LoadTestConfig(),
+            "container_settings": ContainerSettings(),
+            "enable_detailed_logging": True,
+        }
 
     @staticmethod
     def get_performance_test_config() -> dict[str, Any]:
         """Configuration for dedicated performance testing."""
-        return {'cache_config': TestScenarios.get_performance_config(), 'performance_thresholds': PerformanceThresholds(l1_max_avg_time=0.0005, full_cache_max_avg_time=0.005, min_ops_per_second=2000.0), 'load_test_config': LoadTestConfig(concurrent_users=20, operations_per_user=200, sustained_duration_seconds=120, target_ops_per_second=500), 'container_settings': {'memory_limit': '1g', 'cpu_limit': '2.0'}}
+        return {
+            "cache_config": TestScenarios.get_performance_config(),
+            "performance_thresholds": PerformanceThresholds(
+                l1_max_avg_time=0.0005,
+                full_cache_max_avg_time=0.005,
+                min_ops_per_second=2000.0,
+            ),
+            "load_test_config": LoadTestConfig(
+                concurrent_users=20,
+                operations_per_user=200,
+                sustained_duration_seconds=120,
+                target_ops_per_second=500,
+            ),
+            "container_settings": {"memory_limit": "1g", "cpu_limit": "2.0"},
+        }
+
 
 class TestMatrix:
     """Test matrix configurations for comprehensive coverage."""
-    CACHE_CONFIGURATIONS = [('default', TestScenarios.get_default_config()), ('performance', TestScenarios.get_performance_config()), ('memory_constrained', TestScenarios.get_memory_constrained_config()), ('warming_disabled', TestScenarios.get_warming_disabled_config()), ('l2_disabled', TestScenarios.get_l2_disabled_config())]
-    DATA_SCENARIOS = [('simple_data', TestDataPatterns.SMALL_DATASET, 'simple'), ('complex_data', TestDataPatterns.SMALL_DATASET, 'complex'), ('user_data', TestDataPatterns.MEDIUM_DATASET, 'users'), ('product_data', TestDataPatterns.MEDIUM_DATASET, 'products'), ('session_data', TestDataPatterns.SMALL_DATASET, 'sessions'), ('mixed_data', TestDataPatterns.MEDIUM_DATASET, 'mixed')]
-    LOAD_TEST_SCENARIOS = [('light_load', LoadTestConfig(concurrent_users=5, operations_per_user=50)), ('medium_load', LoadTestConfig(concurrent_users=10, operations_per_user=100)), ('heavy_load', LoadTestConfig(concurrent_users=20, operations_per_user=200)), ('sustained_load', LoadTestConfig(sustained_duration_seconds=60)), ('burst_load', LoadTestConfig(concurrent_users=50, operations_per_user=20))]
-    ERROR_SCENARIOS = [('redis_disconnection', {'simulate': 'redis_failure', 'duration': 5}), ('high_latency', {'simulate': 'network_latency', 'latency_ms': 200}), ('memory_pressure', {'simulate': 'memory_pressure', 'fill_ratio': 1.5}), ('serialization_errors', {'simulate': 'serialization_failure', 'error_rate': 0.1}), ('concurrent_access', {'simulate': 'race_conditions', 'threads': 20})]
+
+    CACHE_CONFIGURATIONS = [
+        ("default", TestScenarios.get_default_config()),
+        ("performance", TestScenarios.get_performance_config()),
+        ("memory_constrained", TestScenarios.get_memory_constrained_config()),
+        ("warming_disabled", TestScenarios.get_warming_disabled_config()),
+        ("l2_disabled", TestScenarios.get_l2_disabled_config()),
+    ]
+    DATA_SCENARIOS = [
+        ("simple_data", TestDataPatterns.SMALL_DATASET, "simple"),
+        ("complex_data", TestDataPatterns.SMALL_DATASET, "complex"),
+        ("user_data", TestDataPatterns.MEDIUM_DATASET, "users"),
+        ("product_data", TestDataPatterns.MEDIUM_DATASET, "products"),
+        ("session_data", TestDataPatterns.SMALL_DATASET, "sessions"),
+        ("mixed_data", TestDataPatterns.MEDIUM_DATASET, "mixed"),
+    ]
+    LOAD_TEST_SCENARIOS = [
+        ("light_load", LoadTestConfig(concurrent_users=5, operations_per_user=50)),
+        ("medium_load", LoadTestConfig(concurrent_users=10, operations_per_user=100)),
+        ("heavy_load", LoadTestConfig(concurrent_users=20, operations_per_user=200)),
+        ("sustained_load", LoadTestConfig(sustained_duration_seconds=60)),
+        ("burst_load", LoadTestConfig(concurrent_users=50, operations_per_user=20)),
+    ]
+    ERROR_SCENARIOS = [
+        ("redis_disconnection", {"simulate": "redis_failure", "duration": 5}),
+        ("high_latency", {"simulate": "network_latency", "latency_ms": 200}),
+        ("memory_pressure", {"simulate": "memory_pressure", "fill_ratio": 1.5}),
+        (
+            "serialization_errors",
+            {"simulate": "serialization_failure", "error_rate": 0.1},
+        ),
+        ("concurrent_access", {"simulate": "race_conditions", "threads": 20}),
+    ]
+
 
 def get_config_for_test_type(test_type: str) -> dict[str, Any]:
     """
@@ -174,10 +292,47 @@ def get_config_for_test_type(test_type: str) -> dict[str, Any]:
     Returns:
         Complete configuration dictionary
     """
-    configs = {'unit': {'cache_config': TestScenarios.get_default_config(), 'performance_thresholds': PerformanceThresholds(), 'enable_containers': False, 'enable_performance_monitoring': False}, 'integration': {'cache_config': TestScenarios.get_default_config(), 'performance_thresholds': PerformanceThresholds(), 'load_test_config': LoadTestConfig(), 'enable_containers': True, 'enable_performance_monitoring': True}, 'performance': EnvironmentConfigs.get_performance_test_config(), 'load': {'cache_config': TestScenarios.get_high_throughput_config(), 'performance_thresholds': PerformanceThresholds(), 'load_test_config': LoadTestConfig(concurrent_users=50, operations_per_user=500, sustained_duration_seconds=300), 'enable_containers': True, 'enable_performance_monitoring': True}, 'resilience': {'cache_config': TestScenarios.get_resilience_test_config(), 'performance_thresholds': PerformanceThresholds(max_error_rate=0.05, min_slo_compliance_rate=0.9), 'enable_containers': True, 'enable_error_simulation': True}}
-    return configs.get(test_type, configs['integration'])
+    configs = {
+        "unit": {
+            "cache_config": TestScenarios.get_default_config(),
+            "performance_thresholds": PerformanceThresholds(),
+            "enable_containers": False,
+            "enable_performance_monitoring": False,
+        },
+        "integration": {
+            "cache_config": TestScenarios.get_default_config(),
+            "performance_thresholds": PerformanceThresholds(),
+            "load_test_config": LoadTestConfig(),
+            "enable_containers": True,
+            "enable_performance_monitoring": True,
+        },
+        "performance": EnvironmentConfigs.get_performance_test_config(),
+        "load": {
+            "cache_config": TestScenarios.get_high_throughput_config(),
+            "performance_thresholds": PerformanceThresholds(),
+            "load_test_config": LoadTestConfig(
+                concurrent_users=50,
+                operations_per_user=500,
+                sustained_duration_seconds=300,
+            ),
+            "enable_containers": True,
+            "enable_performance_monitoring": True,
+        },
+        "resilience": {
+            "cache_config": TestScenarios.get_resilience_test_config(),
+            "performance_thresholds": PerformanceThresholds(
+                max_error_rate=0.05, min_slo_compliance_rate=0.9
+            ),
+            "enable_containers": True,
+            "enable_error_simulation": True,
+        },
+    }
+    return configs.get(test_type, configs["integration"])
 
-def get_thresholds_for_environment(environment: str='development') -> PerformanceThresholds:
+
+def get_thresholds_for_environment(
+    environment: str = "development",
+) -> PerformanceThresholds:
     """
     Get performance thresholds for specific environment.
 
@@ -187,11 +342,14 @@ def get_thresholds_for_environment(environment: str='development') -> Performanc
     Returns:
         Performance thresholds configuration
     """
-    if environment == 'ci':
-        return EnvironmentConfigs.get_ci_config()['performance_thresholds']
-    if environment == 'performance':
-        return EnvironmentConfigs.get_performance_test_config()['performance_thresholds']
+    if environment == "ci":
+        return EnvironmentConfigs.get_ci_config()["performance_thresholds"]
+    if environment == "performance":
+        return EnvironmentConfigs.get_performance_test_config()[
+            "performance_thresholds"
+        ]
     return PerformanceThresholds()
+
 
 def validate_config(config: dict[str, Any]) -> bool:
     """
@@ -203,29 +361,36 @@ def validate_config(config: dict[str, Any]) -> bool:
     Returns:
         True if configuration is valid
     """
-    required_keys = ['cache_config', 'performance_thresholds']
+    required_keys = ["cache_config", "performance_thresholds"]
     for key in required_keys:
         if key not in config:
-            raise ValueError(f'Missing required configuration key: {key}')
-    cache_config = config['cache_config']
+            raise ValueError(f"Missing required configuration key: {key}")
+    cache_config = config["cache_config"]
     if cache_config.enable_warming and (not cache_config.enable_l2):
-        raise ValueError('Cache warming requires L2 cache to be enabled')
+        raise ValueError("Cache warming requires L2 cache to be enabled")
     if cache_config.l1_max_size <= 0:
-        raise ValueError('L1 max size must be positive')
+        raise ValueError("L1 max size must be positive")
     if cache_config.l2_default_ttl <= 0:
-        raise ValueError('L2 default TTL must be positive')
-    thresholds = config['performance_thresholds']
+        raise ValueError("L2 default TTL must be positive")
+    thresholds = config["performance_thresholds"]
     if thresholds.min_overall_hit_rate < 0 or thresholds.min_overall_hit_rate > 1:
-        raise ValueError('Hit rate thresholds must be between 0 and 1')
+        raise ValueError("Hit rate thresholds must be between 0 and 1")
     if thresholds.max_error_rate < 0 or thresholds.max_error_rate > 1:
-        raise ValueError('Error rate thresholds must be between 0 and 1')
+        raise ValueError("Error rate thresholds must be between 0 and 1")
     return True
-DEFAULT_INTEGRATION_CONFIG = get_config_for_test_type('integration')
-DEFAULT_PERFORMANCE_CONFIG = get_config_for_test_type('performance')
-DEFAULT_LOAD_TEST_CONFIG = get_config_for_test_type('load')
-DEFAULT_RESILIENCE_CONFIG = get_config_for_test_type('resilience')
-for config_name, config in [('integration', DEFAULT_INTEGRATION_CONFIG), ('performance', DEFAULT_PERFORMANCE_CONFIG), ('load', DEFAULT_LOAD_TEST_CONFIG), ('resilience', DEFAULT_RESILIENCE_CONFIG)]:
+
+
+DEFAULT_INTEGRATION_CONFIG = get_config_for_test_type("integration")
+DEFAULT_PERFORMANCE_CONFIG = get_config_for_test_type("performance")
+DEFAULT_LOAD_TEST_CONFIG = get_config_for_test_type("load")
+DEFAULT_RESILIENCE_CONFIG = get_config_for_test_type("resilience")
+for config_name, config in [
+    ("integration", DEFAULT_INTEGRATION_CONFIG),
+    ("performance", DEFAULT_PERFORMANCE_CONFIG),
+    ("load", DEFAULT_LOAD_TEST_CONFIG),
+    ("resilience", DEFAULT_RESILIENCE_CONFIG),
+]:
     try:
         validate_config(config)
     except ValueError as e:
-        raise ValueError(f'Invalid default {config_name} configuration: {e}')
+        raise ValueError(f"Invalid default {config_name} configuration: {e}")

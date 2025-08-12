@@ -20,7 +20,8 @@ import json
 import logging
 import statistics
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from collections.abc import Callable
 import uuid
 from ....performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 
@@ -50,7 +51,7 @@ class PerformanceMetric:
     timestamp: datetime
     metric_type: MetricType
     component: str
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 @dataclass
 class PerformanceThresholds:
@@ -108,16 +109,16 @@ class PerformanceTelemetrySystem:
     def __init__(self):
         """Initialize performance telemetry system."""
         self.logger = logging.getLogger(__name__)
-        self.metrics: Dict[str, deque] = defaultdict(lambda: deque(maxlen=10000))
-        self.current_metrics: Dict[str, PerformanceMetric] = {}
-        self.thresholds: Dict[str, PerformanceThresholds] = {}
+        self.metrics: dict[str, deque] = defaultdict(lambda: deque(maxlen=10000))
+        self.current_metrics: dict[str, PerformanceMetric] = {}
+        self.thresholds: dict[str, PerformanceThresholds] = {}
         self._initialize_default_thresholds()
         self.anomalies: deque = deque(maxlen=1000)
-        self.anomaly_callbacks: List[Callable[[PerformanceAnomaly], None]] = []
+        self.anomaly_callbacks: list[Callable[[PerformanceAnomaly], None]] = []
         self.trend_window = 300
         self.baseline_window = 3600
         self.is_monitoring = False
-        self.monitoring_task: Optional[asyncio.Task] = None
+        self.monitoring_task: asyncio.Task | None = None
         self.collection_interval = 10
         self.event_bus = None
         self._unified_manager = None
@@ -133,13 +134,13 @@ class PerformanceTelemetrySystem:
         self.logger.info('Event bus registered for telemetry')
 
     def register_unified_manager(self, unified_manager) -> None:
-        """Register UnifiedConnectionManager for consolidated pool monitoring.
+        """Register DatabaseServices for consolidated pool monitoring.
         
         This replaces independent connection pool registration with unified
         pool monitoring, eliminating duplication across ML orchestration.
         """
         self._unified_manager = unified_manager
-        self.logger.info('UnifiedConnectionManager registered for consolidated telemetry')
+        self.logger.info('DatabaseServices registered for consolidated telemetry')
 
     async def start_monitoring(self) -> None:
         """Start performance monitoring."""
@@ -200,7 +201,7 @@ class PerformanceTelemetrySystem:
     async def _collect_unified_pool_metrics(self, timestamp: datetime) -> None:
         """Collect unified connection pool performance metrics.
         
-        Uses UnifiedConnectionManager's consolidated pool monitoring,
+        Uses DatabaseServices's consolidated pool monitoring,
         eliminating the need for independent pool registration patterns.
         """
         try:
@@ -317,7 +318,7 @@ class PerformanceTelemetrySystem:
         """Add callback for anomaly notifications."""
         self.anomaly_callbacks.append(callback)
 
-    def get_performance_report(self, hours: int=1) -> Dict[str, Any]:
+    def get_performance_report(self, hours: int=1) -> dict[str, Any]:
         """Generate comprehensive performance report."""
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         report = {'timestamp': datetime.now(timezone.utc).isoformat(), 'period_hours': hours, 'metrics': {}, 'anomalies': [], 'recommendations': []}
@@ -331,7 +332,7 @@ class PerformanceTelemetrySystem:
         report['recommendations'] = self._generate_recommendations(report['metrics'])
         return report
 
-    def _generate_recommendations(self, metrics: Dict[str, Any]) -> List[str]:
+    def _generate_recommendations(self, metrics: dict[str, Any]) -> list[str]:
         """Generate performance optimization recommendations."""
         recommendations = []
         if 'event_throughput' in metrics:

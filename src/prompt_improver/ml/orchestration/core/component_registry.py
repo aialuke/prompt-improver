@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from collections.abc import Callable
 import uuid
 from ....core.protocols.ml_protocols import ComponentRegistryProtocol, ComponentSpec, ServiceStatus
 from ....performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
@@ -46,11 +47,11 @@ class ComponentRegistry(ComponentRegistryProtocol):
         """Initialize the component registry with Protocol compliance."""
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self.components: Dict[str, ComponentInfo] = {}
-        self.components_by_tier: Dict[ComponentTier, List[str]] = {tier: [] for tier in ComponentTier}
-        self.component_specs: Dict[str, ComponentSpec] = {}
-        self.specs_by_tier: Dict[str, List[str]] = {'TIER_1': [], 'TIER_2': [], 'TIER_3': []}
-        self.health_check_task: Optional[asyncio.Task] = None
+        self.components: dict[str, ComponentInfo] = {}
+        self.components_by_tier: dict[ComponentTier, list[str]] = {tier: [] for tier in ComponentTier}
+        self.component_specs: dict[str, ComponentSpec] = {}
+        self.specs_by_tier: dict[str, list[str]] = {'TIER_1': [], 'TIER_2': [], 'TIER_3': []}
+        self.health_check_task: asyncio.Task | None = None
         self.is_monitoring = False
 
     async def initialize(self) -> None:
@@ -67,7 +68,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
         await self._stop_health_monitoring()
         self.logger.info('Component registry shutdown complete')
 
-    async def discover_components(self, tier: Optional[str]=None) -> List[ComponentSpec]:
+    async def discover_components(self, tier: str | None=None) -> list[ComponentSpec]:
         """
         Discover available components, optionally filtered by tier.
         
@@ -113,7 +114,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
             self.logger.error('Failed to register component spec {spec.name}: %s', e)
             raise
 
-    async def get_component_spec(self, component_name: str) -> Optional[ComponentSpec]:
+    async def get_component_spec(self, component_name: str) -> ComponentSpec | None:
         """
         Get component specification by name (Protocol method).
         
@@ -125,7 +126,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
         """
         return self.component_specs.get(component_name)
 
-    async def list_components_by_tier(self, tier: str) -> List[ComponentSpec]:
+    async def list_components_by_tier(self, tier: str) -> list[ComponentSpec]:
         """
         List all components for a specific tier (Protocol method).
         
@@ -188,11 +189,11 @@ class ComponentRegistry(ComponentRegistryProtocol):
             self.logger.info('Unregistered component %s', component_name)
         return removed
 
-    async def get_component(self, component_name: str) -> Optional[ComponentInfo]:
+    async def get_component(self, component_name: str) -> ComponentInfo | None:
         """Get component information by name."""
         return self.components.get(component_name)
 
-    async def list_components(self, tier: Optional[ComponentTier]=None) -> List[ComponentInfo]:
+    async def list_components(self, tier: ComponentTier | None=None) -> list[ComponentInfo]:
         """
         List registered components.
 
@@ -207,7 +208,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
             return [self.components[name] for name in component_names]
         return list(self.components.values())
 
-    async def get_components_by_capability(self, capability_name: str) -> List[ComponentInfo]:
+    async def get_components_by_capability(self, capability_name: str) -> list[ComponentInfo]:
         """
         Find components that provide a specific capability.
 
@@ -251,7 +252,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
             self.logger.error('Health check failed for {component_name}: %s', e)
             return ComponentStatus.ERROR
 
-    async def get_health_summary(self) -> Dict[str, Any]:
+    async def get_health_summary(self) -> dict[str, Any]:
         """
         Get overall health summary of all components.
 
@@ -270,7 +271,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
                 tier_health[component.tier.value]['healthy'] += 1
         return {'total_components': total_components, 'status_distribution': status_counts, 'tier_health': tier_health, 'overall_health_percentage': status_counts['healthy'] / total_components * 100 if total_components > 0 else 0}
 
-    async def discover_components(self) -> List[ComponentInfo]:
+    async def discover_components(self) -> list[ComponentInfo]:
         """
         Discover ComponentInfo objects from the codebase.
 
@@ -312,7 +313,7 @@ class ComponentRegistry(ComponentRegistryProtocol):
             self.logger.error('Legacy component discovery failed: %s', e)
         return discovered_components
 
-    def _get_predefined_components(self) -> Dict[str, Dict[str, Any]]:
+    def _get_predefined_components(self) -> dict[str, dict[str, Any]]:
         """Get predefined components following modern 3-tier system."""
 
         class SimpleCapability:
@@ -376,14 +377,14 @@ class ComponentRegistry(ComponentRegistryProtocol):
         module_path = file_path.replace('/', '.').replace('.py', '')
         return f'prompt_improver.{module_path}'
 
-    def _get_class_name(self, component_name: str, definition: Dict[str, Any]) -> str:
+    def _get_class_name(self, component_name: str, definition: dict[str, Any]) -> str:
         """Get class name from component name or definition."""
         if 'class_name' in definition:
             return definition['class_name']
         words = component_name.split('_')
-        return ''.join((word.capitalize() for word in words))
+        return ''.join(word.capitalize() for word in words)
 
-    def _convert_dependencies(self, dependencies: List[str]) -> Optional[Dict[str, str]]:
+    def _convert_dependencies(self, dependencies: list[str]) -> dict[str, str] | None:
         """Convert dependency list to dependency mapping."""
         if not dependencies:
             return None

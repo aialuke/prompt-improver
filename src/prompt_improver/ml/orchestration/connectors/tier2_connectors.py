@@ -16,7 +16,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
         metadata = ComponentMetadata(name='automl_orchestrator', tier=ComponentTier.TIER_2, version='1.0.0', capabilities=[ComponentCapability(name='coordinate_automl_workflow', description='Coordinate AutoML workflows with Optuna integration', input_types=['automl_config', 'training_data'], output_types=['automl_results']), ComponentCapability(name='hyperparameter_optimization', description='Optimize hyperparameters using Optuna', input_types=['model_config', 'search_space'], output_types=['optimal_hyperparameters']), ComponentCapability(name='manage_callbacks', description='Manage ML optimization callbacks', input_types=['callback_config'], output_types=['callback_results'])], resource_requirements={'memory': '4GB', 'cpu': '4 cores', 'gpu': '1'})
         super().__init__(metadata, event_bus)
 
-    def list_available_components(self) -> List[str]:
+    def list_available_components(self) -> list[str]:
         """List available components for this connector instance."""
         return ['automl_orchestrator']
 
@@ -25,7 +25,7 @@ class AutoMLOrchestratorConnector(ComponentConnector):
         self.logger.info('AutoMLOrchestrator connector initialized (specialized component)')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute AutoMLOrchestrator capability through component interface."""
         if capability_name == 'coordinate_automl_workflow':
             return await self._coordinate_automl_workflow(parameters)
@@ -36,17 +36,17 @@ class AutoMLOrchestratorConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _coordinate_automl_workflow(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _coordinate_automl_workflow(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Coordinate AutoML workflow through existing orchestrator."""
         await asyncio.sleep(0.5)
         return {'workflow_id': 'automl_workflow_001', 'experiments_run': 25, 'best_model_score': 0.92, 'optimization_time': '45min', 'models_evaluated': ['RandomForest', 'XGBoost', 'LightGBM']}
 
-    async def _hyperparameter_optimization(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _hyperparameter_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute hyperparameter optimization."""
         await asyncio.sleep(0.3)
         return {'best_params': {'learning_rate': 0.01, 'n_estimators': 100, 'max_depth': 6}, 'best_score': 0.89, 'trials_completed': 50, 'optimization_method': 'optuna_tpe'}
 
-    async def _manage_callbacks(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _manage_callbacks(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Manage ML optimization callbacks."""
         await asyncio.sleep(0.1)
         return {'callbacks_registered': 5, 'early_stopping_triggered': False, 'best_score_callback': True, 'logging_enabled': True}
@@ -63,7 +63,7 @@ class InsightEngineConnector(ComponentConnector):
         self.logger.info('InsightEngine connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute InsightEngine capability."""
         if capability_name == 'causal_discovery':
             return await self._causal_discovery(parameters)
@@ -72,12 +72,12 @@ class InsightEngineConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _causal_discovery(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _causal_discovery(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Discover causal relationships."""
         await asyncio.sleep(0.4)
         return {'causal_edges': 15, 'confounders_detected': 3, 'causal_strength': 0.78, 'discovery_method': 'pc_algorithm'}
 
-    async def _generate_insights(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _generate_insights(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Generate insights."""
         await asyncio.sleep(0.3)
         return {'insights_count': 8, 'confidence_score': 0.85, 'actionable_insights': 6, 'insight_categories': ['performance', 'efficiency', 'quality']}
@@ -94,7 +94,7 @@ class RuleAnalyzerConnector(ComponentConnector):
         self.logger.info('RuleAnalyzer connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute RuleAnalyzer capability."""
         if capability_name == 'bayesian_modeling':
             return await self._bayesian_modeling(parameters)
@@ -103,12 +103,12 @@ class RuleAnalyzerConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _bayesian_modeling(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _bayesian_modeling(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Bayesian modeling."""
         await asyncio.sleep(0.3)
         return {'model_convergence': True, 'posterior_samples': 1000, 'credible_intervals': {'param1': [0.2, 0.8], 'param2': [0.1, 0.6]}, 'model_fit': 0.87}
 
-    async def _analyze_rule_effectiveness(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_rule_effectiveness(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Analyze rule effectiveness."""
         await asyncio.sleep(0.2)
         return {'effective_rules': 18, 'ineffective_rules': 3, 'average_effectiveness': 0.83, 'top_performing_rules': ['rule_A', 'rule_B', 'rule_C']}
@@ -125,7 +125,7 @@ class ContextAwareWeighterConnector(ComponentConnector):
         self.logger.info('ContextAwareWeighter connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute ContextAwareWeighter capability."""
         if capability_name == 'weight_features':
             return await self._weight_features(parameters)
@@ -134,12 +134,12 @@ class ContextAwareWeighterConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _weight_features(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _weight_features(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Weight features."""
         await asyncio.sleep(0.2)
         return {'weighted_features': 45, 'weight_distribution': 'gaussian', 'context_influence': 0.72, 'feature_importance': [0.8, 0.6, 0.9, 0.4, 0.7]}
 
-    async def _adaptive_weighting(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _adaptive_weighting(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Adaptive weighting."""
         await asyncio.sleep(0.2)
         return {'weights_updated': 32, 'performance_improvement': 0.08, 'adaptation_rate': 0.1, 'convergence_status': 'stable'}
@@ -156,7 +156,7 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
         self.logger.info('AdvancedPatternDiscovery connector initialized')
         await asyncio.sleep(0.1)
 
-    async def _execute_component(self, capability_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_component(self, capability_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
         """Execute AdvancedPatternDiscovery capability."""
         if capability_name == 'discover_patterns':
             return await self._discover_patterns(parameters)
@@ -165,12 +165,12 @@ class AdvancedPatternDiscoveryConnector(ComponentConnector):
         else:
             raise ValueError(f'Unknown capability: {capability_name}')
 
-    async def _discover_patterns(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _discover_patterns(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Discover patterns."""
         await asyncio.sleep(0.4)
         return {'patterns_discovered': 28, 'pattern_types': ['sequential', 'temporal', 'structural'], 'pattern_confidence': 0.84, 'novel_patterns': 7}
 
-    async def _pattern_validation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def _pattern_validation(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Validate patterns."""
         await asyncio.sleep(0.2)
         return {'validated_patterns': 25, 'validation_accuracy': 0.91, 'false_positives': 3, 'pattern_stability': 0.88}
@@ -187,6 +187,6 @@ class Tier2ConnectorFactory:
         return connectors[component_name](event_bus)
 
     @staticmethod
-    def list_available_components() -> List[str]:
+    def list_available_components() -> list[str]:
         """List all available Tier 2 components."""
         return ['automl_orchestrator', 'insight_engine', 'rule_analyzer', 'context_aware_weighter', 'optimization_validator', 'advanced_pattern_discovery', 'llm_transformer', 'automl_callbacks']

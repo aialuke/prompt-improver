@@ -1,5 +1,5 @@
 # Troubleshooting and Emergency Response Guide
-**Comprehensive Issue Resolution for UnifiedConnectionManager**
+**Comprehensive Issue Resolution for DatabaseServices**
 
 **Version**: 2025.1  
 **Authority**: Site Reliability Engineering Team  
@@ -76,7 +76,7 @@ echo "Responder: $(whoami)"
 echo "1. Declaring P0 incident..."
 # curl -X POST https://incident.company.com/api/incidents \
 #   -H "Authorization: Bearer $INCIDENT_API_KEY" \
-#   -d '{"severity": "P0", "title": "UnifiedConnectionManager Complete Failure"}'
+#   -d '{"severity": "P0", "title": "DatabaseServices Complete Failure"}'
 
 # 2. Quick system status check
 echo "2. System status check..."
@@ -123,12 +123,12 @@ sleep 10
 echo "2. Basic functionality test..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def emergency_test():
     try:
-        print('   Testing UnifiedConnectionManager initialization...')
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        print('   Testing DatabaseServices initialization...')
+        manager = get_database_services(ManagerMode.ASYNC_MODERN)
         await manager.initialize()
         
         print('   Testing cache operations...')
@@ -171,10 +171,10 @@ if [ $? -ne 0 ]; then
     # Test emergency mode
     python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_emergency_mode():
-    manager = get_unified_manager(ManagerMode.ADMIN)  # Minimal mode
+    manager = get_database_services(ManagerMode.ADMIN)  # Minimal mode
     await manager.initialize()
     
     # Test basic L1 cache only
@@ -220,18 +220,18 @@ echo "1. Emergency write lockdown..."
 echo "2. Emergency cache flush..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def emergency_cache_flush():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     print('   Clearing L1 cache...')
     await manager.clear_cache()
     
     print('   Clearing Redis cache...')
-    if manager._redis_master:
-        await manager._redis_master.flushdb()
+    if manager.cache.redis_client:
+        await manager.cache.redis_client.flushdb()
     
     print('   ✅ All caches cleared')
     await manager.close()
@@ -243,10 +243,10 @@ asyncio.run(emergency_cache_flush())
 echo "3. Database integrity check..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def integrity_check():
-    manager = get_unified_manager(ManagerMode.ADMIN)
+    manager = get_database_services(ManagerMode.ADMIN)
     await manager.initialize()
     
     async with manager.get_session() as session:
@@ -291,10 +291,10 @@ echo "1. Performance metrics snapshot..."
 python3 -c "
 import asyncio
 import time
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def performance_snapshot():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Get cache statistics
@@ -338,10 +338,10 @@ echo "3. Database performance..."
 python3 -c "
 import asyncio
 import time
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def db_performance_check():
-    manager = get_unified_manager(ManagerMode.ADMIN)
+    manager = get_database_services(ManagerMode.ADMIN)
     await manager.initialize()
     
     async with manager.get_session() as session:
@@ -383,10 +383,10 @@ echo "🔧 P1 RESOLUTION: PERFORMANCE OPTIMIZATION 🔧"
 echo "1. Cache optimization..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def optimize_cache():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     stats = await manager.get_cache_stats()
@@ -484,16 +484,16 @@ fi
 echo "3. Application connection test..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_redis_connection():
     try:
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        manager = get_database_services(ManagerMode.ASYNC_MODERN)
         await manager.initialize()
         
         # Test Redis directly
-        if manager._redis_master:
-            await manager._redis_master.ping()
+        if manager.cache.redis_client:
+            await manager.cache.redis_client.ping()
             print('   ✅ Redis master connection working from application')
         else:
             print('   ❌ Redis master not available in connection manager')
@@ -520,7 +520,7 @@ async def test_redis_connection():
                 decode_responses=True
             )
             await redis_client.ping()
-            print('   ✅ Direct Redis connection working - issue is in UnifiedConnectionManager')
+            print('   ✅ Direct Redis connection working - issue is in DatabaseServices')
             await redis_client.close()
         except Exception as direct_e:
             print(f'   ❌ Direct Redis connection also failed: {direct_e}')
@@ -540,10 +540,10 @@ sleep 15
 echo "   Testing after restart..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def post_restart_test():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     await manager.set_cached('restart_test', 'success', ttl=60)
@@ -578,10 +578,10 @@ echo "🔍 INVESTIGATING: CACHE HIT RATE DROP 🔍"
 # 1. Get detailed cache statistics
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def detailed_cache_analysis():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     stats = await manager.get_cache_stats()
@@ -636,14 +636,14 @@ echo "🔍 CACHE HIT RATE INVESTIGATION COMPLETE 🔍"
 ```python
 # cache_hit_rate_fixes.py
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def apply_cache_hit_rate_fixes():
     """Apply common fixes for cache hit rate issues."""
     
     print("🔧 Applying Cache Hit Rate Fixes...")
     
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     stats = await manager.get_cache_stats()
@@ -688,7 +688,7 @@ import asyncio
 import time
 import psutil
 import os
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def detect_and_fix_memory_leak():
     """Detect and resolve memory leaks in L1 cache."""
@@ -700,7 +700,7 @@ async def detect_and_fix_memory_leak():
     initial_memory = process.memory_info().rss / 1024 / 1024  # MB
     print(f"Initial memory usage: {initial_memory:.2f} MB")
     
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Check L1 cache state
@@ -774,11 +774,11 @@ log_message() {
 # 1. Basic connectivity check
 if python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def quick_health():
     try:
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        manager = get_database_services(ManagerMode.ASYNC_MODERN)
         await manager.initialize()
         await manager.set_cached('health_check', 'ok', ttl=30)
         result = await manager.get_cached('health_check') 
@@ -796,16 +796,16 @@ else
     # Trigger alert
     curl -X POST https://alerts.company.com/webhook \
         -H "Content-Type: application/json" \
-        -d '{"alert": "UnifiedConnectionManager health check failed", "severity": "warning"}'
+        -d '{"alert": "DatabaseServices health check failed", "severity": "warning"}'
 fi
 
 # 2. Performance monitoring
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def performance_check():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     stats = await manager.get_cache_stats()
     
@@ -846,10 +846,10 @@ sleep 30
 # 2. Test recovery
 if python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_recovery():
-    manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+    manager = get_database_services(ManagerMode.ASYNC_MODERN)
     await manager.initialize()
     
     await manager.set_cached('recovery_test', 'success', ttl=60)
@@ -865,14 +865,14 @@ asyncio.run(test_recovery())
     # Send success notification
     curl -X POST https://alerts.company.com/webhook \
         -H "Content-Type: application/json" \
-        -d '{"alert": "UnifiedConnectionManager auto-recovery successful", "severity": "info"}'
+        -d '{"alert": "DatabaseServices auto-recovery successful", "severity": "info"}'
 else
     recovery_log "RECOVERY: FAILED - Manual intervention required"
     
     # Escalate to on-call
     curl -X POST https://alerts.company.com/webhook \
         -H "Content-Type: application/json" \
-        -d '{"alert": "UnifiedConnectionManager auto-recovery failed - manual intervention required", "severity": "critical"}'
+        -d '{"alert": "DatabaseServices auto-recovery failed - manual intervention required", "severity": "critical"}'
 fi
 ```
 
@@ -887,20 +887,20 @@ import asyncio
 import json
 import statistics
 from datetime import datetime
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 class CacheAnalyzer:
     def __init__(self):
         self.manager = None
     
     async def initialize(self):
-        self.manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+        self.manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
         await self.manager.initialize()
     
     async def comprehensive_analysis(self):
         """Perform comprehensive cache analysis."""
         
-        print("🔍 UnifiedConnectionManager Comprehensive Analysis")
+        print("🔍 DatabaseServices Comprehensive Analysis")
         print("=" * 60)
         
         # Basic statistics
@@ -1126,11 +1126,11 @@ echo "3. Collecting configuration..."
 echo "4. Running cache analysis..."
 python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def emergency_analysis():
     try:
-        manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+        manager = get_database_services(ManagerMode.ASYNC_MODERN)
         await manager.initialize()
         
         stats = await manager.get_cache_stats()
@@ -1227,10 +1227,10 @@ fi
 echo -n "2. Cache operations: "
 if python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_cache():
-    manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+    manager = get_database_services(ManagerMode.ASYNC_MODERN)
     await manager.initialize()
     await manager.set_cached('validation_test', 'success', ttl=60)
     result = await manager.get_cached('validation_test')
@@ -1250,10 +1250,10 @@ fi
 echo -n "3. Database operations: "
 if python3 -c "
 import asyncio
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_database():
-    manager = get_unified_manager(ManagerMode.ASYNC_MODERN)
+    manager = get_database_services(ManagerMode.ASYNC_MODERN)
     await manager.initialize()
     async with manager.get_session() as session:
         result = await session.execute('SELECT NOW()')
@@ -1274,10 +1274,10 @@ echo -n "4. Performance validation: "
 if python3 -c "
 import asyncio
 import time
-from prompt_improver.database.unified_connection_manager import get_unified_manager, ManagerMode
+from prompt_improver.database import get_unified_manager, ManagerMode
 
 async def test_performance():
-    manager = get_unified_manager(ManagerMode.HIGH_AVAILABILITY)
+    manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
     await manager.initialize()
     
     # Performance test
@@ -1353,4 +1353,4 @@ fi
 **Document Owner**: Site Reliability Engineering Team  
 **Emergency Contact**: +1-555-URGENT-OPS
 
-**Remember**: In emergency situations, focus on rapid diagnosis and resolution. The UnifiedConnectionManager has proven 99.9% reliability - most issues have simple solutions if approached systematically.
+**Remember**: In emergency situations, focus on rapid diagnosis and resolution. The DatabaseServices has proven 99.9% reliability - most issues have simple solutions if approached systematically.

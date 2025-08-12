@@ -23,6 +23,7 @@ import time
 from typing import Any, Dict, List, Optional, Union
 
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 
 import numpy as np
 
@@ -44,7 +45,7 @@ class CircuitBreakerState(Enum):
     OPEN = "open"
     HALF_OPEN = "half_open"
 
-class FeatureExtractionConfig(SQLModel):
+class FeatureExtractionConfig(BaseModel):
     """Enhanced 2025 configuration for composite feature extraction."""
 
     # Feature extractor enablement
@@ -84,7 +85,7 @@ class FeatureExtractionConfig(SQLModel):
     enable_tracing: bool = Field(default=True, description="Enable distributed tracing")
     log_level: str = Field(default="INFO", description="Logging level")
 
-class ExtractionMetrics(SQLModel):
+class ExtractionMetrics(BaseModel):
     """Metrics for feature extraction operations."""
     total_extractions: int = Field(default=0, ge=0, description="Total number of extractions")
     successful_extractions: int = Field(default=0, ge=0, description="Number of successful extractions")
@@ -124,7 +125,7 @@ class CompositeFeatureExtractor:
     - Event-driven integration capabilities
     """
 
-    def __init__(self, config: Optional[FeatureExtractionConfig] = None):
+    def __init__(self, config: FeatureExtractionConfig | None = None):
         """Initialize enhanced composite feature extractor.
 
         Args:
@@ -187,7 +188,7 @@ class CompositeFeatureExtractor:
     
     def extract_features(self, 
                         text: str, 
-                        context_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                        context_data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Extract comprehensive features from text and context.
         
         Args:
@@ -270,10 +271,10 @@ class CompositeFeatureExtractor:
             return result
             
         except Exception as e:
-            logger.error("Composite feature extraction failed: %s", e)
+            logger.error(f"Composite feature extraction failed: {e}")
             return self._get_default_result()
     
-    def _validate_inputs(self, text: str, context_data: Optional[Dict[str, Any]]) -> bool:
+    def _validate_inputs(self, text: str, context_data: dict[str, Any] | None) -> bool:
         """Validate input parameters."""
         try:
             # Validate text
@@ -282,11 +283,11 @@ class CompositeFeatureExtractor:
                 return False
             
             if len(text.strip()) < self.config.min_text_length:
-                logger.warning("Text too short: {len(text)} < %s", self.config.min_text_length)
+                logger.warning(f"Text too short: {len(text)} < {self.config.min_text_length}")
                 return False
             
             if len(text) > self.config.max_text_length:
-                logger.warning("Text too long: {len(text)} > %s", self.config.max_text_length)
+                logger.warning(f"Text too long: {len(text)} > {self.config.max_text_length}")
                 return False
             
             # Validate context data if provided
@@ -297,10 +298,10 @@ class CompositeFeatureExtractor:
             return True
             
         except Exception as e:
-            logger.error("Input validation failed: %s", e)
+            logger.error(f"Input validation failed: {e}")
             return False
     
-    def _get_default_result(self) -> Dict[str, Any]:
+    def _get_default_result(self) -> dict[str, Any]:
         """Get default result when extraction fails."""
         # Calculate expected feature count
         feature_count = 0
@@ -343,7 +344,7 @@ class CompositeFeatureExtractor:
             count += 20
         return count
     
-    def get_extractor_info(self) -> Dict[str, Any]:
+    def get_extractor_info(self) -> dict[str, Any]:
         """Get information about configured extractors."""
         info = {}
         for name, extractor in self.extractors.items():
@@ -353,7 +354,7 @@ class CompositeFeatureExtractor:
                 info[name] = {'available': True}
         return info
     
-    def clear_all_caches(self) -> Dict[str, int]:
+    def clear_all_caches(self) -> dict[str, int]:
         """Clear caches for all extractors."""
         cleared_counts = {}
         for name, extractor in self.extractors.items():
@@ -363,7 +364,7 @@ class CompositeFeatureExtractor:
                 cleared_counts[name] = 0
         
         total_cleared = sum(cleared_counts.values())
-        logger.info("Cleared {total_cleared} total cached features across %s extractors", len(cleared_counts))
+        logger.info(f"Cleared {total_cleared} total cached features across {len(cleared_counts)} extractors")
         
         return cleared_counts
     
@@ -392,7 +393,7 @@ class CompositeFeatureExtractor:
 
     async def extract_features_async(self,
                                     text: str,
-                                    context_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                    context_data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Enhanced 2025 async feature extraction with circuit breaker and observability.
 
         Args:
@@ -442,19 +443,19 @@ class CompositeFeatureExtractor:
                 logger.info("Feature extraction completed in %.3fs", processing_time)
                 return result
 
-        except asyncio.TimeoutError:
-            logger.error("Feature extraction timed out after %ss", self.config.timeout_seconds)
+        except TimeoutError:
+            logger.error(f"Feature extraction timed out after {self.config.timeout_seconds}s")
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
             return self._get_default_result()
 
         except Exception as e:
-            logger.error("Async feature extraction failed: %s", e)
+            logger.error(f"Async feature extraction failed: {e}")
             self._handle_circuit_breaker_failure()
             self.metrics.update_failure()
             return self._get_default_result()
 
-    async def _perform_extraction_async(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _perform_extraction_async(self, text: str, context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Perform the actual feature extraction based on execution mode."""
         if self.config.execution_mode == ExtractionMode.parallel:
             return await self._extract_parallel(text, context_data)
@@ -463,7 +464,7 @@ class CompositeFeatureExtractor:
         else:
             return await self._extract_sequential_async(text, context_data)
 
-    async def _extract_sequential_async(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _extract_sequential_async(self, text: str, context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Sequential async feature extraction."""
         extractor_results = {}
         all_features = []
@@ -491,15 +492,15 @@ class CompositeFeatureExtractor:
                         feature_names = [f"{extractor_name}_feature_{i}" for i in range(len(features))]
                     all_feature_names.extend(feature_names)
 
-                    logger.debug("Extracted {len(features)} features from %s", extractor_name)
+                    logger.debug(f"Extracted {len(features)} features from {extractor_name}")
 
             except Exception as e:
-                logger.error("Feature extraction failed for {extractor_name}: %s", e)
+                logger.error(f"Feature extraction failed for {extractor_name}: {e}")
                 continue
 
         return self._create_result(all_features, all_feature_names, extractor_results, text, context_data)
 
-    async def _extract_parallel(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _extract_parallel(self, text: str, context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Parallel feature extraction using asyncio.gather."""
         tasks = []
         extractor_names = []
@@ -527,7 +528,7 @@ class CompositeFeatureExtractor:
                 extractor_name = extractor_names[i]
 
                 if isinstance(result, Exception):
-                    logger.error("Parallel extraction failed for {extractor_name}: %s", result)
+                    logger.error(f"Parallel extraction failed for {extractor_name}: {result}")
                     continue
 
                 if result and 'features' in result:
@@ -543,10 +544,10 @@ class CompositeFeatureExtractor:
             return self._create_result(all_features, all_feature_names, extractor_results, text, context_data)
 
         except Exception as e:
-            logger.error("Parallel feature extraction failed: %s", e)
+            logger.error(f"Parallel feature extraction failed: {e}")
             raise
 
-    async def _extract_adaptive(self, text: str, context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _extract_adaptive(self, text: str, context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Adaptive feature extraction based on resource availability."""
         # For now, use parallel if we have multiple extractors, sequential otherwise
         if len(self.extractors) > 1:
@@ -584,9 +585,9 @@ class CompositeFeatureExtractor:
 
         if self.circuit_breaker_failures >= self.config.failure_threshold:
             self.circuit_breaker_state = CircuitBreakerState.OPEN
-            logger.warning("Circuit breaker opened after %s failures", self.circuit_breaker_failures)
+            logger.warning(f"Circuit breaker opened after {self.circuit_breaker_failures} failures")
 
-    def _generate_cache_key(self, text: str, context_data: Optional[Dict[str, Any]]) -> str:
+    def _generate_cache_key(self, text: str, context_data: dict[str, Any] | None) -> str:
         """Generate cache key for text and context."""
         import hashlib
 
@@ -608,24 +609,24 @@ class CompositeFeatureExtractor:
         for key in keys_to_remove:
             del self._cache[key]
 
-    def _validate_inputs(self, text: str, context_data: Optional[Dict[str, Any]]) -> bool:
+    def _validate_inputs(self, text: str, context_data: dict[str, Any] | None) -> bool:
         """Validate input parameters."""
         if not text or not isinstance(text, str):
             logger.warning("Invalid text input")
             return False
 
         if len(text) < self.config.min_text_length:
-            logger.warning("Text too short: {len(text)} < %s", self.config.min_text_length)
+            logger.warning(f"Text too short: {len(text)} < {self.config.min_text_length}")
             return False
 
         if len(text) > self.config.max_text_length:
-            logger.warning("Text too long: {len(text)} > %s", self.config.max_text_length)
+            logger.warning(f"Text too long: {len(text)} > {self.config.max_text_length}")
             # Truncate but continue processing
             return True
 
         return True
 
-    def _normalize_features(self, features: Any) -> List[float]:
+    def _normalize_features(self, features: Any) -> list[float]:
         """Normalize features to list of floats."""
         if isinstance(features, np.ndarray):
             return features.tolist()
@@ -636,9 +637,9 @@ class CompositeFeatureExtractor:
         else:
             return [0.0]
 
-    def _create_result(self, all_features: List[float], all_feature_names: List[str],
-                      extractor_results: Dict[str, Any], text: str,
-                      context_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _create_result(self, all_features: list[float], all_feature_names: list[str],
+                      extractor_results: dict[str, Any], text: str,
+                      context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Create standardized result dictionary."""
         return {
             'features': np.array(all_features),
@@ -664,7 +665,7 @@ class CompositeFeatureExtractor:
 
     # 2025: Orchestrator-compatible interface
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Orchestrator-compatible interface for feature extraction (2025 pattern).
 
         Args:
@@ -720,7 +721,7 @@ class CompositeFeatureExtractor:
                 }
 
         except Exception as e:
-            logger.error("Orchestrated analysis failed: %s", e)
+            logger.error(f"Orchestrated analysis failed: {e}")
             return {
                 "status": "error",
                 "error": str(e),

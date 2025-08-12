@@ -19,7 +19,8 @@ from enum import Enum
 import logging
 import statistics
 import time
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
+from collections.abc import Callable
 from ....performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, TaskPriority, get_background_task_manager
 from ..config.orchestrator_config import OrchestratorConfig
 from .event_types import EventType, MLEvent
@@ -45,7 +46,7 @@ class EventProcessingMetrics:
     throughput_per_second: float = 0.0
     backpressure_events: int = 0
     circuit_breaker_trips: int = 0
-    last_scale_event: Optional[datetime] = None
+    last_scale_event: datetime | None = None
     processing_times: deque = field(default_factory=lambda: deque(maxlen=1000))
 
 @dataclass
@@ -80,10 +81,10 @@ class AdaptiveEventBus:
         self.min_workers = 2
         self.max_workers = 20
         self.current_workers = 2
-        self.worker_task_ids: List[str] = []
+        self.worker_task_ids: list[str] = []
         self.event_queue: asyncio.Queue = asyncio.Queue(maxsize=self.current_queue_size)
         self.priority_queue: asyncio.PriorityQueue = asyncio.PriorityQueue(maxsize=1000)
-        self.subscriptions: Dict[EventType, List[EventSubscription]] = defaultdict(list)
+        self.subscriptions: dict[EventType, list[EventSubscription]] = defaultdict(list)
         self.metrics = EventProcessingMetrics()
         self.performance_window = deque(maxlen=100)
         self.last_metrics_update = time.time()
@@ -189,13 +190,13 @@ class AdaptiveEventBus:
             else:
                 await asyncio.wait_for(self.event_queue.put(event), timeout=0.1)
             self.logger.debug('Emitted event {event.event_type.value} with priority %s', priority)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self._handle_backpressure(event)
         except Exception as e:
             self.logger.error('Error emitting event: %s', e)
             await self._handle_circuit_breaker_failure()
 
-    async def emit_and_wait(self, event: MLEvent, timeout: float=5.0) -> List[Any]:
+    async def emit_and_wait(self, event: MLEvent, timeout: float=5.0) -> list[Any]:
         """Emit event and wait for all handlers to complete."""
         if not self.is_running:
             return []
@@ -215,7 +216,7 @@ class AdaptiveEventBus:
                     handler_time = (time.time() - handler_start) * 1000
                     await self._update_subscription_metrics(subscription, handler_time, True)
                     results.append(result)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     self.logger.warning('Handler %s timed out', subscription.subscription_id)
                     await self._update_subscription_metrics(subscription, subscription.max_processing_time_ms, False)
                 except Exception as e:
@@ -235,10 +236,10 @@ class AdaptiveEventBus:
                 event = None
                 try:
                     _, event = await asyncio.wait_for(self.priority_queue.get(), timeout=0.1)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     try:
                         event = await asyncio.wait_for(self.event_queue.get(), timeout=1.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         continue
                 if event:
                     await self._process_event(event, worker_id)
@@ -263,7 +264,7 @@ class AdaptiveEventBus:
                         subscription.handler(event)
                     handler_time = (time.time() - handler_start) * 1000
                     await self._update_subscription_metrics(subscription, handler_time, True)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     self.logger.warning('Handler %s timed out', subscription.subscription_id)
                     await self._update_subscription_metrics(subscription, subscription.max_processing_time_ms, False)
                 except Exception as e:
@@ -351,7 +352,7 @@ class AdaptiveEventBus:
             try:
                 await asyncio.wait_for(self.event_queue.put(event), timeout=0.1)
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
         self.metrics.events_dropped += 1
         self.logger.warning('Dropped event %s due to backpressure', event.event_type.value)
@@ -390,9 +391,9 @@ class AdaptiveEventBus:
         else:
             subscription.failure_count += 1
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
+    def get_performance_metrics(self) -> dict[str, Any]:
         """Get comprehensive performance metrics."""
-        return {'state': self.state.value, 'events_processed': self.metrics.events_processed, 'events_failed': self.metrics.events_failed, 'events_dropped': self.metrics.events_dropped, 'throughput_per_second': self.metrics.throughput_per_second, 'avg_processing_time_ms': self.metrics.avg_processing_time_ms, 'queue_size': self.metrics.queue_size, 'queue_capacity': self.current_queue_size, 'queue_utilization': self.metrics.queue_size / self.current_queue_size if self.current_queue_size > 0 else 0, 'worker_count': self.current_workers, 'backpressure_events': self.metrics.backpressure_events, 'circuit_breaker_trips': self.metrics.circuit_breaker_trips, 'circuit_breaker_open': self.circuit_breaker_open, 'subscription_count': sum((len(subs) for subs in self.subscriptions.values())), 'last_scale_event': self.metrics.last_scale_event.isoformat() if self.metrics.last_scale_event else None, 'performance_window': list(self.performance_window)}
+        return {'state': self.state.value, 'events_processed': self.metrics.events_processed, 'events_failed': self.metrics.events_failed, 'events_dropped': self.metrics.events_dropped, 'throughput_per_second': self.metrics.throughput_per_second, 'avg_processing_time_ms': self.metrics.avg_processing_time_ms, 'queue_size': self.metrics.queue_size, 'queue_capacity': self.current_queue_size, 'queue_utilization': self.metrics.queue_size / self.current_queue_size if self.current_queue_size > 0 else 0, 'worker_count': self.current_workers, 'backpressure_events': self.metrics.backpressure_events, 'circuit_breaker_trips': self.metrics.circuit_breaker_trips, 'circuit_breaker_open': self.circuit_breaker_open, 'subscription_count': sum(len(subs) for subs in self.subscriptions.values()), 'last_scale_event': self.metrics.last_scale_event.isoformat() if self.metrics.last_scale_event else None, 'performance_window': list(self.performance_window)}
 
     async def initialize(self) -> None:
         """Initialize the event bus (alias for start() for compatibility)."""
@@ -402,7 +403,7 @@ class AdaptiveEventBus:
         """Shutdown the event bus (alias for stop() for compatibility)."""
         await self.stop()
 
-    def get_event_history(self, event_type: Optional[EventType]=None, limit: int=100) -> List[MLEvent]:
+    def get_event_history(self, event_type: EventType | None=None, limit: int=100) -> list[MLEvent]:
         """
         Get recent event history for compatibility with Basic EventBus.
         
@@ -416,7 +417,7 @@ class AdaptiveEventBus:
         self.logger.debug('Event history not available in AdaptiveEventBus - optimized for performance')
         return []
 
-    def get_subscription_count(self, event_type: Optional[EventType]=None) -> int:
+    def get_subscription_count(self, event_type: EventType | None=None) -> int:
         """
         Get number of active subscriptions.
         
@@ -428,8 +429,8 @@ class AdaptiveEventBus:
         """
         if event_type:
             return len(self.subscriptions.get(event_type, []))
-        return sum((len(subs) for subs in self.subscriptions.values()))
+        return sum(len(subs) for subs in self.subscriptions.values())
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get event bus statistics for compatibility with Basic EventBus."""
         return {'total_events': self.metrics.events_processed, 'failed_events': self.metrics.events_failed, 'active_handlers': self.get_subscription_count(), 'queue_size': self.metrics.queue_size, 'is_running': self.is_running}

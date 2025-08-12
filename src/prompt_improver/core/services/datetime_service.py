@@ -10,11 +10,14 @@ Features:
 - Comprehensive error handling
 - Logging for debugging and monitoring
 """
+
 import logging
 from datetime import UTC, datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
+
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
+
 
 class DateTimeService(DateTimeServiceProtocol):
     """Production datetime service with timezone awareness.
@@ -23,7 +26,7 @@ class DateTimeService(DateTimeServiceProtocol):
     robust datetime operations for the ML Pipeline Orchestrator.
     """
 
-    def __init__(self, logger: logging.Logger | None=None):
+    def __init__(self, logger: logging.Logger | None = None):
         """Initialize the datetime service.
 
         Args:
@@ -32,7 +35,7 @@ class DateTimeService(DateTimeServiceProtocol):
         self.logger = logger or logging.getLogger(__name__)
         self._call_count = 0
         self._utc_tz = UTC
-        self.logger.debug('DateTimeService initialized')
+        self.logger.debug("DateTimeService initialized")
 
     async def utc_now(self) -> datetime:
         """Get current UTC time as timezone-aware datetime.
@@ -54,7 +57,7 @@ class DateTimeService(DateTimeServiceProtocol):
         self._call_count += 1
         return datetime.now(self._utc_tz).replace(tzinfo=None)
 
-    async def from_timestamp(self, timestamp: float, aware: bool=True) -> datetime:
+    async def from_timestamp(self, timestamp: float, aware: bool = True) -> datetime:
         """Convert Unix timestamp to datetime.
 
         Args:
@@ -72,8 +75,8 @@ class DateTimeService(DateTimeServiceProtocol):
             dt = datetime.fromtimestamp(timestamp, self._utc_tz)
             return dt if aware else dt.replace(tzinfo=None)
         except (ValueError, OSError) as e:
-            self.logger.error('Invalid timestamp {timestamp}: %s', e)
-            raise ValueError(f'Invalid timestamp: {timestamp}') from e
+            self.logger.error(f"Invalid timestamp {timestamp}: {e}")
+            raise ValueError(f"Invalid timestamp: {timestamp}") from e
 
     async def to_timezone(self, dt: datetime, tz: ZoneInfo) -> datetime:
         """Convert datetime to specified timezone.
@@ -94,8 +97,8 @@ class DateTimeService(DateTimeServiceProtocol):
                 dt = dt.replace(tzinfo=self._utc_tz)
             return dt.astimezone(tz)
         except Exception as e:
-            self.logger.error('Timezone conversion failed for {dt} to {tz}: %s', e)
-            raise ValueError(f'Timezone conversion failed: {e}') from e
+            self.logger.error(f"Timezone conversion failed for {dt} to {tz}: {e}")
+            raise ValueError(f"Timezone conversion failed: {e}") from e
 
     async def format_iso(self, dt: datetime) -> str:
         """Format datetime as ISO 8601 string.
@@ -110,8 +113,8 @@ class DateTimeService(DateTimeServiceProtocol):
         try:
             return dt.isoformat()
         except Exception as e:
-            self.logger.error('ISO formatting failed for {dt}: %s', e)
-            raise ValueError(f'ISO formatting failed: {e}') from e
+            self.logger.error(f"ISO formatting failed for {dt}: {e}")
+            raise ValueError(f"ISO formatting failed: {e}") from e
 
     async def ensure_aware_utc(self, dt: datetime) -> datetime:
         """Ensure datetime is timezone-aware UTC.
@@ -158,6 +161,7 @@ class DateTimeService(DateTimeServiceProtocol):
             datetime: Modified datetime
         """
         from datetime import timedelta
+
         return dt + timedelta(seconds=seconds)
 
     async def get_age_seconds(self, dt: datetime) -> float:
@@ -175,7 +179,7 @@ class DateTimeService(DateTimeServiceProtocol):
         delta = now - dt
         return delta.total_seconds()
 
-    async def is_recent(self, dt: datetime, max_age_seconds: int=300) -> bool:
+    async def is_recent(self, dt: datetime, max_age_seconds: int = 300) -> bool:
         """Check if datetime is recent (within max_age_seconds).
 
         Args:
@@ -199,7 +203,7 @@ class DateTimeService(DateTimeServiceProtocol):
     def reset_call_count(self) -> None:
         """Reset call counter for testing/monitoring."""
         self._call_count = 0
-        self.logger.debug('DateTimeService call count reset')
+        self.logger.debug("DateTimeService call count reset")
 
     async def health_check(self) -> dict:
         """Perform health check of the datetime service.
@@ -211,7 +215,16 @@ class DateTimeService(DateTimeServiceProtocol):
             now = await self.utc_now()
             naive_now = await self.naive_utc_now()
             iso_format = await self.format_iso(now)
-            return {'status': 'healthy', 'call_count': self._call_count, 'current_utc': iso_format, 'service_type': 'DateTimeService'}
+            return {
+                "status": "healthy",
+                "call_count": self._call_count,
+                "current_utc": iso_format,
+                "service_type": "DateTimeService",
+            }
         except Exception as e:
-            self.logger.error('DateTimeService health check failed: %s', e)
-            return {'status': 'unhealthy', 'error': str(e), 'service_type': 'DateTimeService'}
+            self.logger.error(f"DateTimeService health check failed: {e}")
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "service_type": "DateTimeService",
+            }

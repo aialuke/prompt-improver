@@ -11,6 +11,7 @@ Features:
 - Double-count protection to avoid duplicate emission
 - Cardinality controls for journey labels: 'none' | 'hashed' | 'full'
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -18,22 +19,20 @@ import os
 import time
 from typing import Any, Dict, Literal, Optional
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
-
-from prompt_improver.monitoring.opentelemetry.metrics import (
-    get_business_metrics,
-    get_http_metrics,
-)
 from src.prompt_improver.metrics.api_metrics import (
     AuthenticationMethod,
     EndpointCategory,
     HTTPMethod,
-    record_api_request,
     UserJourneyStage,
+    record_api_request,
 )
-
+from src.prompt_improver.monitoring.opentelemetry.metrics import (
+    get_business_metrics,
+    get_http_metrics,
+)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 JourneyLabelsMode = Literal["none", "hashed", "full"]
 
@@ -77,7 +76,9 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
         # Extract request/response data safely
         method = getattr(request, "method", "UNKNOWN")
         endpoint = getattr(getattr(request, "url", None), "path", "/unknown")
-        status_code = getattr(response, "status_code", 200) if 'response' in locals() else 500
+        status_code = (
+            getattr(response, "status_code", 200) if "response" in locals() else 500
+        )
         response_size = self._get_response_size(response)
 
         # OTEL RED metrics
@@ -95,6 +96,9 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
         if labels_mode == "hashed":
             user_id_h = self._hash_label(user_id) if user_id else None
             session_id_h = self._hash_label(session_id) if session_id else None
+        elif labels_mode == "none":
+            user_id_h = None
+            session_id_h = None
         else:
             user_id_h = user_id
             session_id_h = session_id
@@ -102,8 +106,7 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
         # Default journey heuristics
         stage = UserJourneyStage.REGULAR_USE
         event_type = "api_request"
-        from prompt_improver.monitoring.opentelemetry.metrics import get_business_metrics as _gbm
-        _gbm(self.service_name).record_journey_event(
+        get_business_metrics(self.service_name).record_journey_event(
             user_id=user_id_h or "anonymous",
             session_id=session_id_h or f"session_{user_id_h or 'anon'}",
             stage=stage.value,
@@ -116,7 +119,9 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
             try:
                 await record_api_request(
                     endpoint=endpoint,
-                    method=HTTPMethod(method) if method in HTTPMethod.__members__ else HTTPMethod.GET,
+                    method=HTTPMethod(method)
+                    if method in HTTPMethod.__members__
+                    else HTTPMethod.GET,
                     category=EndpointCategory.OTHER,
                     status_code=int(status_code),
                     response_time_ms=float(duration_ms),
@@ -132,7 +137,7 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def _get_response_size(self, response: Optional[Response]) -> int:
+    def _get_response_size(self, response: Response | None) -> int:
         if response is None:
             return 0
         try:
@@ -141,21 +146,63 @@ class UnifiedHTTPMetricsMiddleware(BaseHTTPMiddleware):
         except Exception:
             return 0
 
-    def _hash_label(self, value: Optional[str]) -> Optional[str]:
+    def _hash_label(self, value: str | None) -> str | None:
         if not value:
             return value
         h = hashlib.sha256(value.encode("utf-8")).hexdigest()
         return h[:16]
 
-    def _extract_user_and_session(self, request: Request) -> tuple[Optional[str], Optional[str]]:
+    def _extract_user_and_session(
+        self, request: Request
+    ) -> tuple[str | None, str | None]:
         # Minimal safe extraction; extend if needed
         user_id = None
         session_id = None
         try:
             # Common header/cookie sources; replace with real auth/session extractor if available
-            user_id = request.headers.get("x-user-id") or request.headers.get("x-api-key")
+            user_id = request.headers.get("x-user-id") or request.headers.get(
+                "x-api-key"
+            )
             session_id = request.cookies.get("session_id")
         except Exception:
             pass
         return user_id, session_id
 
+
+# Configuration-based registration helper
+_DEF_ENV_FLAG = "APES_HTTP_METRICS_ENABLED"
+_DEF_STATE_FLAG = "_apes_unified_http_metrics_registered"
+
+
+def register_unified_http_middleware(
+    app,
+    *,
+    journey_labels: JourneyLabelsMode = "hashed",
+    enable_in_memory_analytics: bool = True,
+    service_name: str = "prompt-improver",
+    env_flag: str = _DEF_ENV_FLAG,
+) -> bool:
+    """Register UnifiedHTTPMetricsMiddleware based on a single env flag.
+
+    Returns True if middleware was added, False otherwise. Ensures single registration per app.
+    """
+    try:
+        if getattr(app.state, _DEF_STATE_FLAG, False):
+            return False
+    except Exception:
+        pass
+    enabled_val = os.getenv(env_flag, "true").strip().lower()
+    enabled = enabled_val in ("1", "true", "yes", "on")
+    if not enabled:
+        return False
+    try:
+        app.add_middleware(
+            UnifiedHTTPMetricsMiddleware,
+            enable_in_memory_analytics=enable_in_memory_analytics,
+            journey_labels=journey_labels,
+            service_name=service_name,
+        )
+        setattr(app.state, _DEF_STATE_FLAG, True)
+        return True
+    except Exception:
+        return False
