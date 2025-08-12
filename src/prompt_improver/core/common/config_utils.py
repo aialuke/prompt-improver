@@ -16,6 +16,23 @@ logger = get_logger(__name__)
 T = TypeVar("T")
 
 
+class ConfigMixin:
+    """Mixin class providing configuration utilities."""
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize ConfigMixin."""
+        super().__init__(*args, **kwargs)
+        self._config = None
+    
+    @property
+    def config(self) -> Any:
+        """Get configuration, loading it if necessary."""
+        if self._config is None:
+            config_result = get_config_safely()
+            self._config = config_result.config
+        return self._config
+
+
 @dataclass
 class ConfigLoadResult:
     """Result of configuration loading operation."""
