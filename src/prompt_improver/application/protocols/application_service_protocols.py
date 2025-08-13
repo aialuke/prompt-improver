@@ -8,11 +8,15 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Protocol
 
-from prompt_improver.database.models import (
-    AprioriAnalysisRequest,
-    AprioriAnalysisResponse,
-    PatternDiscoveryRequest,
-    PatternDiscoveryResponse,
+from prompt_improver.core.domain.types import (
+    AprioriAnalysisRequestData,
+    AprioriAnalysisResponseData,
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
+)
+from prompt_improver.core.domain.types import (
+    AssociationRuleFilterData,
+    PatternDiscoveryFilterData,
 )
 
 
@@ -229,4 +233,63 @@ class HealthApplicationServiceProtocol(Protocol):
         benchmark_config: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Execute performance benchmark workflow."""
+        ...
+
+
+class AprioriApplicationServiceProtocol(Protocol):
+    """Protocol for Apriori analysis application service."""
+
+    async def execute_apriori_analysis(
+        self,
+        request: AprioriAnalysisRequest,
+        session_id: str | None = None,
+    ) -> AprioriAnalysisResponse:
+        """Execute complete Apriori analysis workflow."""
+        ...
+
+    async def get_association_rules(
+        self,
+        filters: AssociationRuleFilter | None = None,
+        sort_by: str = "lift",
+        sort_desc: bool = True,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve association rules with filtering and sorting."""
+        ...
+
+    async def get_contextualized_patterns(
+        self,
+        context_items: List[str],
+        min_confidence: float = 0.6,
+    ) -> Dict[str, Any]:
+        """Get patterns relevant to specific context items."""
+        ...
+
+
+class PatternApplicationServiceProtocol(Protocol):
+    """Protocol for pattern discovery application service."""
+
+    async def execute_comprehensive_pattern_discovery(
+        self,
+        request: PatternDiscoveryRequest,
+        session_id: str | None = None,
+    ) -> PatternDiscoveryResponse:
+        """Execute comprehensive pattern discovery workflow."""
+        ...
+
+    async def get_pattern_discoveries(
+        self,
+        filters: PatternDiscoveryFilter | None = None,
+        sort_by: str = "created_at",
+        sort_desc: bool = True,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve historical pattern discovery runs."""
+        ...
+
+    async def get_discovery_insights(
+        self,
+        discovery_run_id: str,
+    ) -> Dict[str, Any]:
+        """Get detailed insights for a specific discovery run."""
         ...
