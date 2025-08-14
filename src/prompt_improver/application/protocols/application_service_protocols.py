@@ -13,10 +13,14 @@ from prompt_improver.core.domain.types import (
     AprioriAnalysisResponseData,
     PatternDiscoveryRequestData,
     PatternDiscoveryResponseData,
-)
-from prompt_improver.core.domain.types import (
     AssociationRuleFilterData,
     PatternDiscoveryFilterData,
+)
+from prompt_improver.database.models import (
+    PatternDiscoveryRequest,
+    AprioriAnalysisRequest,
+    PatternDiscoveryResponse,
+    AprioriAnalysisResponse,
 )
 
 
@@ -249,7 +253,7 @@ class AprioriApplicationServiceProtocol(Protocol):
 
     async def get_association_rules(
         self,
-        filters: AssociationRuleFilter | None = None,
+        filters: AssociationRuleFilterData | None = None,
         sort_by: str = "lift",
         sort_desc: bool = True,
         limit: int = 50,

@@ -548,7 +548,7 @@ class SLOPerformanceBenchmark:
                     "l1_cache_available": hasattr(self.unified_manager, "_l1_cache"),
                     "l2_redis_cache_available": self.unified_manager._redis_master
                     is not None,
-                    "multi_level_cache_effective": unified_metrics.cache_hit_rate
+                    "unified_cache_effective": unified_metrics.cache_hit_rate
                     > (legacy_metrics.cache_hit_rate if legacy_metrics else 0) + 0.1,
                     "cache_warming_benefits": unified_metrics.cache_hit_rate > 0.7,
                 }

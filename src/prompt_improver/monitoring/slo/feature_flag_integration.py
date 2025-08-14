@@ -4,7 +4,7 @@
 Implements automated feature flag rollback and deployment blocking
 when error budgets are exhausted, following Google SRE practices.
 
-This module integrates with the core FeatureFlagManager to provide
+This module integrates with the core FeatureFlagService to provide
 SLO-specific policy enforcement capabilities.
 """
 
@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from prompt_improver.core.feature_flags import (
     EvaluationContext,
-    FeatureFlagManager as CoreFeatureFlagManager,
+    FeatureFlagService as CoreFeatureFlagService,
     get_feature_flag_manager,
 )
 from prompt_improver.monitoring.slo.framework import ErrorBudget, SLODefinition
@@ -60,7 +60,7 @@ class DeploymentBlock:
 
 
 class SLOFeatureFlagIntegration:
-    """SLO-specific feature flag integration using the core FeatureFlagManager.
+    """SLO-specific feature flag integration using the core FeatureFlagService.
 
     This class provides error budget policy enforcement capabilities
     by integrating with the core feature flag system.
@@ -68,7 +68,7 @@ class SLOFeatureFlagIntegration:
 
     def __init__(
         self,
-        core_flag_manager: CoreFeatureFlagManager | None = None,
+        core_flag_manager: CoreFeatureFlagService | None = None,
         redis_url: str | None = None,
         default_rollback_timeout: int = 3600,
     ):
@@ -180,9 +180,9 @@ class SLOFeatureFlagIntegration:
     async def _rollback_features(
         self, service_name: str, error_budget: ErrorBudget
     ) -> dict[str, Any]:
-        """Rollback feature flags for the service using core FeatureFlagManager"""
+        """Rollback feature flags for the service using core FeatureFlagService"""
         if not self.core_flag_manager:
-            logger.warning("Core FeatureFlagManager not available for rollback")
+            logger.warning("Core FeatureFlagService not available for rollback")
             return {
                 "action": "rollback_features",
                 "status": "no_flag_manager",
@@ -210,7 +210,7 @@ class SLOFeatureFlagIntegration:
             "action": "rollback_features",
             "status": "completed",
             "flags_rolled_back": rolled_back_flags,
-            "note": "Integration with core FeatureFlagManager - extend for full functionality",
+            "note": "Integration with core FeatureFlagService - extend for full functionality",
         }
 
     async def _block_deployments(
@@ -250,7 +250,7 @@ class SLOFeatureFlagIntegration:
         self, service_name: str, error_budget: ErrorBudget
     ) -> dict[str, Any]:
         """Activate circuit breaker for the service"""
-        from prompt_improver.core.retry_manager import get_retry_manager
+        from prompt_improver.core.services.resilience.retry_service_facade import get_retry_service as get_retry_manager
 
         retry_manager = get_retry_manager()
         logger.critical(f"Circuit breaker activated for service: {service_name}")
@@ -430,4 +430,4 @@ class ErrorBudgetPolicyEnforcer:
         }
 
 
-FeatureFlagManager = SLOFeatureFlagIntegration
+FeatureFlagService = SLOFeatureFlagIntegration

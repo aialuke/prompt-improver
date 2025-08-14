@@ -159,6 +159,140 @@ class OrchestrationConfig(BaseModel):
     auto_scaling_enabled: bool = Field(
         default=True, description="Enable auto-scaling for ML resources"
     )
+    
+    # Advanced orchestration settings (consolidated from ml/orchestration/config)
+    max_concurrent_workflows: int = Field(
+        default=10, ge=1, le=100, description="Maximum concurrent workflows"
+    )
+    gpu_allocation_timeout: int = Field(
+        default=300, gt=0, description="GPU allocation timeout in seconds"
+    )
+    memory_limit_gb: float = Field(
+        default=16.0, gt=0, description="Memory limit in GB"
+    )
+    cpu_limit_cores: int = Field(
+        default=8, gt=0, description="CPU cores limit"
+    )
+    training_timeout: int = Field(
+        default=3600, gt=0, description="Training timeout in seconds"
+    )
+    evaluation_timeout: int = Field(
+        default=1800, gt=0, description="Evaluation timeout in seconds"
+    )
+    deployment_timeout: int = Field(
+        default=600, gt=0, description="Deployment timeout in seconds"
+    )
+    optimization_timeout: int = Field(
+        default=7200, gt=0, description="Optimization timeout in seconds"
+    )
+    component_health_check_interval: int = Field(
+        default=30, gt=0, description="Component health check interval in seconds"
+    )
+    pipeline_status_update_interval: int = Field(
+        default=10, gt=0, description="Pipeline status update interval in seconds"
+    )
+    orchestrator_health_check_interval: int = Field(
+        default=60, gt=0, description="Orchestrator health check interval in seconds"
+    )
+    event_bus_buffer_size: int = Field(
+        default=1000, gt=0, description="Event bus buffer size"
+    )
+    event_handler_timeout: int = Field(
+        default=30, gt=0, description="Event handler timeout in seconds"
+    )
+    event_history_size: int = Field(
+        default=1000, gt=0, description="Event history size"
+    )
+    workflow_retry_attempts: int = Field(
+        default=3, ge=1, description="Workflow retry attempts"
+    )
+    workflow_retry_delay: int = Field(
+        default=5, gt=0, description="Workflow retry delay in seconds"
+    )
+    parallel_execution_limit: int = Field(
+        default=5, ge=1, description="Parallel execution limit"
+    )
+    metrics_collection_interval: int = Field(
+        default=30, gt=0, description="Metrics collection interval in seconds"
+    )
+    alert_threshold_cpu: float = Field(
+        default=0.8, gt=0, le=1, description="CPU alert threshold"
+    )
+    alert_threshold_memory: float = Field(
+        default=0.9, gt=0, le=1, description="Memory alert threshold"
+    )
+    alert_threshold_error_rate: float = Field(
+        default=0.05, ge=0, le=1, description="Error rate alert threshold"
+    )
+    db_connection_pool_size: int = Field(
+        default=20, ge=1, description="Database connection pool size"
+    )
+    db_connection_timeout: int = Field(
+        default=30, gt=0, description="Database connection timeout in seconds"
+    )
+    db_query_timeout: int = Field(
+        default=60, gt=0, description="Database query timeout in seconds"
+    )
+    redis_connection_pool_size: int = Field(
+        default=10, ge=1, description="Redis connection pool size"
+    )
+    cache_default_ttl: int = Field(
+        default=3600, gt=0, description="Cache default TTL in seconds"
+    )
+    cache_max_memory: str = Field(
+        default="2gb", description="Cache maximum memory"
+    )
+    api_timeout: int = Field(
+        default=30, gt=0, description="API timeout in seconds"
+    )
+    api_max_concurrent_requests: int = Field(
+        default=100, ge=1, description="API max concurrent requests"
+    )
+    api_rate_limit_per_minute: int = Field(
+        default=1000, ge=1, description="API rate limit per minute"
+    )
+    enable_authentication: bool = Field(
+        default=True, description="Enable authentication"
+    )
+    enable_authorization: bool = Field(
+        default=True, description="Enable authorization"
+    )
+    enable_audit_logging: bool = Field(
+        default=True, description="Enable audit logging"
+    )
+    enable_input_validation: bool = Field(
+        default=True, description="Enable input validation"
+    )
+    debug_mode: bool = Field(
+        default=False, description="Enable debug mode"
+    )
+    verbose_logging: bool = Field(
+        default=False, description="Enable verbose logging"
+    )
+    enable_performance_profiling: bool = Field(
+        default=False, description="Enable performance profiling"
+    )
+    component_startup_timeout: int = Field(
+        default=120, gt=0, description="Component startup timeout in seconds"
+    )
+    component_shutdown_timeout: int = Field(
+        default=60, gt=0, description="Component shutdown timeout in seconds"
+    )
+    component_discovery_interval: int = Field(
+        default=300, gt=0, description="Component discovery interval in seconds"
+    )
+    enable_auto_scaling: bool = Field(
+        default=True, description="Enable auto scaling"
+    )
+    enable_resource_optimization: bool = Field(
+        default=True, description="Enable resource optimization"
+    )
+    enable_predictive_scheduling: bool = Field(
+        default=False, description="Enable predictive scheduling"
+    )
+    enable_cross_tier_coordination: bool = Field(
+        default=True, description="Enable cross tier coordination"
+    )
 
 
 class MLConfig(BaseSettings):

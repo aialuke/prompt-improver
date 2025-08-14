@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 import nltk
-from prompt_improver.core.textstat_config import get_textstat_wrapper
+from prompt_improver.core.config.textstat import get_textstat_wrapper
 from ..models.model_manager import ModelManager, get_lightweight_ner_pipeline, get_memory_optimized_config, get_ultra_lightweight_ner_pipeline, model_config
 from ..learning.features.english_nltk_manager import get_english_nltk_manager
 from .dependency_parser import DependencyParser

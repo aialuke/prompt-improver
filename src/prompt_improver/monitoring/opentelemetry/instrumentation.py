@@ -37,7 +37,7 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 
-class InstrumentationManager:
+class InstrumentationServiceFacade:
     """Manages automatic instrumentation for various components."""
 
     def __init__(self):
@@ -103,14 +103,14 @@ class InstrumentationManager:
             logger.error(f"Failed to uninstrument: {e}")
 
 
-_instrumentation_manager: InstrumentationManager | None = None
+_instrumentation_manager: InstrumentationServiceFacade | None = None
 
 
-def get_instrumentation_manager() -> InstrumentationManager:
+def get_instrumentation_manager() -> InstrumentationServiceFacade:
     """Get global instrumentation manager."""
     global _instrumentation_manager
     if _instrumentation_manager is None:
-        _instrumentation_manager = InstrumentationManager()
+        _instrumentation_manager = InstrumentationServiceFacade()
     return _instrumentation_manager
 
 

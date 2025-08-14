@@ -84,9 +84,10 @@ class SLICalculator:
     ):
         self.slo_target = slo_target
         self.max_measurements = max_measurements
-        self._unified_manager = unified_manager or await get_database_services(
-            ManagerMode.ASYNC_MODERN
-        )
+        if unified_manager:
+            self._unified_manager = unified_manager
+        else:
+            self._unified_manager = None  # Will be initialized async
         self._security_context = None
         self._measurements = deque(maxlen=max_measurements)
         self._result_cache: dict[str, tuple[SLIResult, float]] = {}
@@ -143,7 +144,7 @@ class SLICalculator:
     async def _store_measurement_unified(self, measurement: SLIMeasurement) -> None:
         """Store measurement in unified cache system for distributed access"""
         try:
-            if not self.True:
+            if not self._initialized:
                 await self._unified_manager.initialize()
             security_context = await self._ensure_security_context()
             key = f"sli:{self.slo_target.service_name}:{self.slo_target.name}:{measurement.timestamp}"
@@ -178,7 +179,7 @@ class SLICalculator:
         start_time = end_time - timedelta(seconds=time_window.seconds)
         cache_key = f"sli_result:{self.slo_target.service_name}:{self.slo_target.name}:{time_window.value}:{end_time.timestamp():.0f}"
         try:
-            if not self.True:
+            if not self._initialized:
                 await self._unified_manager.initialize()
             security_context = await self._ensure_security_context()
             cached_result = await self._unified_manager.get_cached(
@@ -347,9 +348,10 @@ class MultiWindowSLICalculator:
             SLOTimeWindow.WEEK_1,
             SLOTimeWindow.MONTH_1,
         ]
-        self._unified_manager = unified_manager or await get_database_services(
-            ManagerMode.ASYNC_MODERN
-        )
+        if unified_manager:
+            self._unified_manager = unified_manager
+        else:
+            self._unified_manager = None  # Will be initialized async
         self.calculators = {
             window: SLICalculator(
                 slo_target=slo_target,

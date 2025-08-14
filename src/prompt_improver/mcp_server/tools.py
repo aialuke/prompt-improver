@@ -14,7 +14,10 @@ import msgspec.json
 from mcp.server.fastmcp import Context
 from sqlmodel import Field
 
-from prompt_improver.database import ManagerMode, get_database_services
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.core.di import get_container
 from prompt_improver.mcp_server.middleware import MiddlewareContext
 from prompt_improver.security.structured_prompts import create_rule_application_prompt
 

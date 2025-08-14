@@ -8,11 +8,14 @@ from typing import Any, Dict, List, Optional
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 import numpy as np
-from ....security.input_validator import InputValidator, ValidationError
+from ....security.owasp_input_validator import OWASP2025InputValidator
+from ....security.input_validator import ValidationError
 from ....security.memory_guard import MemoryGuard, get_memory_guard
 from ....utils.datetime_utils import aware_utc_now
-from ...optimization.algorithms.clustering_optimizer import ClusteringConfig, ClusteringOptimizer, ClusteringResult
-from ..clustering import ClusteringConfig as OriginalClusteringConfig
+from ...clustering.services.clustering_optimizer_facade import ClusteringOptimizerFacade as ClusteringOptimizer
+from ...clustering.services import ClusteringResult
+# Import config from clustering services
+from ..clustering import ClusteringConfig
 from ..features import CompositeFeatureExtractor, FeatureExtractionConfig, FeatureExtractorFactory
 logger = logging.getLogger(__name__)
 
@@ -59,7 +62,7 @@ class ContextLearner:
             training_loader: Training data loader for ML pipeline integration
         """
         self.config = config or ContextConfig()
-        self.input_validator = InputValidator()
+        self.input_validator = OWASP2025InputValidator()
         self.memory_guard = get_memory_guard()
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
         self._initialize_feature_extractor()

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select, text
 
 from prompt_improver.cli.core.signal_handler import SignalOperation
-from prompt_improver.database import get_session_context
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import (
     DiscoveredPattern,
     RuleMetadata,
@@ -45,8 +45,8 @@ class ProgressSnapshot:
         return cls(**data)
 
 
-class ProgressPreservationManager:
-    """Manages training progress preservation with database integration and file backup.
+class ProgressService:
+    """Progress service implementing Clean Architecture patterns for training progress preservation with database integration and file backup.
 
     Features:
     - Real-time progress saving to PostgreSQL
@@ -56,7 +56,8 @@ class ProgressPreservationManager:
     - Performance metrics preservation
     """
 
-    def __init__(self, backup_dir: Path | None = None):
+    def __init__(self, session_manager: SessionManagerProtocol, backup_dir: Path | None = None):
+        self.session_manager = session_manager
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./training_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -390,7 +391,7 @@ class ProgressPreservationManager:
     async def _save_to_database(self, snapshot: ProgressSnapshot) -> None:
         """Save progress snapshot to PostgreSQL database using existing TrainingSession model."""
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 session_query = select(TrainingSession).where(
                     text(f"session_id = '{snapshot.session_id}'")
                 )
@@ -446,7 +447,7 @@ class ProgressPreservationManager:
             True if optimizations saved successfully
         """
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 for rule_id, optimization_data in rule_optimizations.items():
                     performance_data = {
                         "rule_id": rule_id,
@@ -505,7 +506,7 @@ class ProgressPreservationManager:
             True if patterns saved successfully
         """
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 for pattern_name, pattern_data in discovered_patterns.items():
                     pattern_data_dict = {
                         "pattern_id": f"{session_id}_{pattern_name}_{int(datetime.now(UTC).timestamp())}",
@@ -556,7 +557,7 @@ class ProgressPreservationManager:
             Checkpoint identifier if successful
         """
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 session_result = await db_session.execute(
                     select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
@@ -625,7 +626,7 @@ class ProgressPreservationManager:
             Latest progress snapshot if found
         """
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 latest_iteration = await db_session.execute(
                     select(TrainingIteration)
                     .where(text(f"session_id = '{session_id}'"))
@@ -870,7 +871,7 @@ class ProgressPreservationManager:
             Path to exported file if successful
         """
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 session_result = await db_session.execute(
                     select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )

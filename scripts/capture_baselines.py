@@ -30,16 +30,17 @@ os.environ["PYTHONPATH"] = str(project_root / "src")
 database_available = True
 redis_available = True
 try:
-    from prompt_improver.database.session_manager import get_session_context
-    from prompt_improver.database.unified_connection_manager import (
-        UnifiedConnectionManager,
-    )
+    # Clean architecture: Use repository pattern instead of direct database access
+    from prompt_improver.repositories.factory import get_ml_repository
+    from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
+    from prompt_improver.database.services.connection.postgres_pool_manager_facade import PostgreSQLPoolManager
 
+    ml_repository = None
     connection_manager = None
 except ImportError:
     database_available = False
     connection_manager = None
-    get_session_context = None
+    ml_repository = None
 try:
     from prompt_improver.cache.redis_client import get_redis_client
 except ImportError:

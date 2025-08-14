@@ -34,7 +34,7 @@ def setup_test_containers():
     
     # Set environment variables
     os.environ["TEST_DATABASE_URL"] = postgres.get_connection_url().replace("psycopg2", "asyncpg")
-    os.environ["TEST_REDIS_URL"] = redis.get_connection_url()
+    os.environ["TEST_REDIS_URL"] = f"redis://localhost:{redis.get_exposed_port(6379)}"
     
     yield {
         "postgres": postgres,
@@ -138,7 +138,8 @@ async def setup_test_database_schema(test_db_session):
     );
     """
     
-    await test_db_session.execute(schema_sql)
+    from sqlalchemy import text
+    await test_db_session.execute(text(schema_sql))
     await test_db_session.commit()
 
 # Performance monitoring for integration tests
@@ -182,7 +183,7 @@ def mock_external_services():
 @pytest.fixture
 async def prompt_improvement_service(test_db_session, test_redis_client):
     """Create real prompt improvement service for integration testing."""
-    from src.prompt_improver.core.services.prompt_improvement import PromptImprovementService
+    from src.prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
     
     service = PromptImprovementService(
         db_session=test_db_session,

@@ -31,7 +31,7 @@ from prompt_improver.database.services.cache.database_cache import (
     DatabaseMetrics,
     create_database_cache,
 )
-from prompt_improver.common.types import SecurityContext
+from prompt_improver.core.types import SecurityContext
 
 
 class TestDatabaseCacheConfig:

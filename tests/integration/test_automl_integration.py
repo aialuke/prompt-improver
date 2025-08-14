@@ -10,27 +10,25 @@ from typing import Any, Dict
 
 import pytest
 
-from prompt_improver.automl.callbacks import create_standard_callbacks
-from prompt_improver.automl.orchestrator import (
+from prompt_improver.ml.automl.callbacks import create_standard_callbacks
+from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
     AutoMLOrchestrator,
 )
-from prompt_improver.database.connection import DatabaseManager
-from prompt_improver.optimization.rule_optimizer import RuleOptimizer
-from prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+# from prompt_improver.optimization.rule_optimizer import RuleOptimizer  # Module doesn't exist
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-async def db_manager():
-    """Create database manager for testing"""
-    try:
-        db_manager = DatabaseManager()
-        yield db_manager
-    finally:
-        pass
+async def database_services():
+    """Create database services for testing using testcontainers"""
+    services = await create_database_services(ManagerMode.ASYNC_MODERN)
+    yield services
+    await services.cleanup()
 
 
 @pytest.fixture
@@ -48,11 +46,12 @@ async def automl_config():
 
 
 @pytest.fixture
-async def automl_orchestrator(automl_config, db_manager):
+async def automl_orchestrator(automl_config, database_services):
     """Create AutoML orchestrator for testing"""
-    rule_optimizer = RuleOptimizer()
+    # rule_optimizer = RuleOptimizer()  # Module doesn't exist
+    rule_optimizer = None
     orchestrator = AutoMLOrchestrator(
-        config=automl_config, db_manager=db_manager, rule_optimizer=rule_optimizer
+        config=automl_config, session_manager=database_services, rule_optimizer=rule_optimizer
     )
     yield orchestrator
 
@@ -88,10 +87,10 @@ class TestAutoMLIntegration:
         logger.info("✓ Optimization status tracking test passed")
 
     @pytest.mark.asyncio
-    async def test_prompt_improvement_service_automl_integration(self, db_manager):
+    async def test_prompt_improvement_service_automl_integration(self, database_services):
         """Test PromptImprovementService AutoML integration"""
         service = PromptImprovementService(enable_automl=True)
-        await service.initialize_automl(db_manager)
+        await service.initialize_automl(database_services)
         assert service.automl_orchestrator is not None
         assert service.enable_automl is True
         status = await service.get_automl_status()
@@ -137,7 +136,7 @@ class TestAutoMLIntegration:
         logger.info("✓ AutoML configuration validation test passed")
 
     @pytest.mark.asyncio
-    async def test_automl_error_handling(self, db_manager):
+    async def test_automl_error_handling(self, database_services):
         """Test AutoML error handling and graceful degradation"""
         service = PromptImprovementService(enable_automl=False)
         status = await service.get_automl_status()
@@ -152,9 +151,9 @@ class TestAutoMLIntegration:
 async def test_automl_integration_comprehensive():
     """Comprehensive AutoML integration test"""
     try:
-        db_manager = DatabaseManager()
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
         service = PromptImprovementService(enable_automl=True)
-        await service.initialize_automl(db_manager)
+        await service.initialize_automl(services)
         assert service.automl_orchestrator is not None
         status = await service.get_automl_status()
         assert status["status"] == "not_started"

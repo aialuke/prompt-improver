@@ -12,8 +12,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.database import DatabaseServices
-from prompt_improver.database.models import ImprovementSessionCreate, UserFeedbackCreate
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.repositories.protocols.ml_repository_protocol import (
+    ImprovementSessionCreate,
+    UserFeedbackCreate,
+)
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,

@@ -192,14 +192,14 @@ def _get_ml_performance_health_checker():
     return MLPerformanceHealthChecker
 
 
-def _get_database_health_monitor():
-    """Lazy import DatabaseHealthMonitor"""
+def _get_database_health_service():
+    """Lazy import DatabaseHealthService using new decomposed architecture"""
     try:
-        from prompt_improver.database.health.database_health_monitor import (
-            get_database_health_monitor,
+        from prompt_improver.database.health.services import (
+            get_database_health_service,
         )
-
-        return get_database_health_monitor()
+        # Requires session manager - return factory function instead
+        return get_database_health_service
     except ImportError:
         return None
 
@@ -680,7 +680,7 @@ class DatabaseConnectionPoolPlugin(HealthCheckPlugin):
             return _create_health_check_result(
                 status=HealthStatus.UNHEALTHY,
                 message=f"Connection pool check failed: {e!s}",
-                details={"error": str(e), "source": "DatabaseHealthMonitor"},
+                details={"error": str(e), "source": "DatabaseHealthService"},
                 check_name=self.name,
             )
 

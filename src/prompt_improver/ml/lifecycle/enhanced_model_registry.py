@@ -28,7 +28,7 @@ import numpy as np
 from prompt_improver.ml.types import features, hyper_parameters, labels, model_config
 from prompt_improver.performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 from prompt_improver.utils.datetime_utils import aware_utc_now
-from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
+from prompt_improver.utils.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
 logger = logging.getLogger(__name__)
 
 class ModelStatus(Enum):

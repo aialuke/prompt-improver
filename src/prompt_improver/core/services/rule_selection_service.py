@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def _get_database_session():
     """Lazy import of database session to avoid circular imports."""
-    from prompt_improver.database import get_session_context
+    # Database session will be injected via constructor
 
     return get_session_context
 
@@ -57,7 +57,7 @@ class RuleSelectionService:
             rules = await self._load_rules_from_database(db_session)
         else:
             get_session_context = _get_database_session()
-            async with get_session_context() as session:
+            async with self.session_manager.session_context() as session:
                 rules = await self._load_rules_from_database(session)
 
         self.rule_cache[cache_key] = (rules, time.time())

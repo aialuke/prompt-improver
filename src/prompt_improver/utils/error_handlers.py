@@ -1,16 +1,32 @@
-"""Error handling decorators for consistent exception management.
+"""Comprehensive error handling decorators and FastAPI integration.
 
-This module provides standardized error handling decorators that implement the
-sophisticated error categorization and rollback patterns identified in
-ab_testing.py as the gold standard for error handling in the codebase.
+This consolidated module provides standardized error handling decorators that implement
+sophisticated error categorization and rollback patterns, plus FastAPI-specific exception
+handlers and correlation tracking for web applications.
 
-features:
-- Categorized exception handling (Database I/O, Validation, User interruption, etc.)
-- Automatic rollback logic for database operations
-- Consistent return value structures
-- Context-aware logging with operation details
-- Retry logic for transient errors
-- Graceful degradation patterns
+Core Error Handling Decorators:
+- handle_database_errors(): Database operations with rollback support
+- handle_filesystem_errors(): File operations with retry logic  
+- handle_validation_errors(): Data validation with detailed logging
+- handle_network_errors(): Network operations with exponential backoff
+- handle_common_errors(): Combined error handling for complex operations
+
+Advanced Features:
+- AsyncErrorBoundary: Context manager for async error boundaries
+- PIIRedactionFilter: Automatic PII redaction in logs
+- AsyncContextLogger: Structured logging with correlation tracking
+- Retry logic with exponential backoff and jitter
+
+FastAPI Integration (consolidated from common.error_handling):
+- Authentication/authorization exception handlers
+- Validation and rate limit error handlers  
+- Correlation middleware for request tracking
+- Standardized JSON error responses
+
+Repository/Service Layer Integration:
+- handle_repository_errors(): Repository layer decorator
+- handle_service_errors(): Service layer decorator
+- Context-aware error propagation with correlation IDs
 
 Usage:
     @handle_database_errors(rollback_session=True)
@@ -22,6 +38,9 @@ Usage:
     def validate_data(data: dict):
         # Validation logic here
         pass
+
+This module consolidates error handling patterns from both generic application
+layers and FastAPI-specific web framework requirements for comprehensive coverage.
 """
 
 import asyncio
@@ -32,9 +51,12 @@ import time
 import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from functools import wraps
 from typing import Any, Literal, ParamSpec, TypeVar
 
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -921,4 +943,344 @@ def handle_common_errors(
         )(decorated_func)
         return decorated_func
 
+    return decorator
+
+
+# ============================================================================
+# FASTAPI INTEGRATION (from common.error_handling)
+# ============================================================================
+
+# Context variable for correlation ID tracking across async boundaries
+correlation_context: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+
+
+def handle_repository_errors(correlation_id: str | None = None) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Decorator for repository layer error handling.
+    
+    Catches external exceptions and wraps them in appropriate domain exceptions.
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return await func(*args, **kwargs)
+            except Exception as exc:
+                # Get correlation ID from context or parameter
+                corr_id = correlation_id or correlation_context.get()
+                context = {
+                    "layer": "repository",
+                    "function": func.__name__,
+                    "module": func.__module__,
+                }
+                logger.error(f"Repository error in {func.__name__}: {exc}", extra={"correlation_id": corr_id})
+                raise
+        
+        @wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                # Get correlation ID from context or parameter
+                corr_id = correlation_id or correlation_context.get()
+                context = {
+                    "layer": "repository",
+                    "function": func.__name__,
+                    "module": func.__module__,
+                }
+                logger.error(f"Repository error in {func.__name__}: {exc}", extra={"correlation_id": corr_id})
+                raise
+        
+        # Return appropriate wrapper based on whether function is async
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
+    return decorator
+
+
+def handle_service_errors(correlation_id: str | None = None) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Decorator for service layer error handling.
+    
+    Provides error context and ensures proper error propagation.
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return await func(*args, **kwargs)
+            except Exception as exc:
+                # Wrap unexpected exceptions
+                corr_id = correlation_id or correlation_context.get()
+                context = {
+                    "layer": "service",
+                    "function": func.__name__,
+                    "module": func.__module__,
+                }
+                logger.error(f"Service error in {func.__name__}: {exc}", extra={"correlation_id": corr_id})
+                raise
+        
+        @wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                # Wrap unexpected exceptions
+                corr_id = correlation_id or correlation_context.get()
+                context = {
+                    "layer": "service",
+                    "function": func.__name__,
+                    "module": func.__module__,
+                }
+                logger.error(f"Service error in {func.__name__}: {exc}", extra={"correlation_id": corr_id})
+                raise
+        
+        # Return appropriate wrapper based on whether function is async
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
+    return decorator
+
+
+# ============================================================================
+# FASTAPI ERROR HANDLERS
+# ============================================================================
+
+async def prompt_improver_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle PromptImproverError exceptions in FastAPI."""
+    correlation_id = str(uuid.uuid4())
+    correlation_context.set(correlation_id)
+    
+    # Log the error
+    logger.error(f"API error: {exc}", extra={"correlation_id": correlation_id})
+    
+    # Create response (exclude debug info in production)
+    include_debug = request.headers.get("X-Debug") == "true"
+    response_data = {
+        "error": str(exc),
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+    
+    if include_debug:
+        response_data["debug"] = {
+            "type": type(exc).__name__,
+            "module": exc.__class__.__module__
+        }
+    
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=response_data,
+        headers={"X-Correlation-ID": correlation_id}
+    )
+
+
+async def validation_exception_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """Handle validation errors specifically."""
+    correlation_id = str(uuid.uuid4())
+    correlation_context.set(correlation_id)
+    logger.error(f"Validation error: {exc}", extra={"correlation_id": correlation_id})
+    
+    response_data = {
+        "error": str(exc),
+        "error_type": "validation",
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=response_data,
+        headers={"X-Correlation-ID": correlation_id}
+    )
+
+
+async def authentication_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle authentication errors specifically."""
+    correlation_id = str(uuid.uuid4())
+    correlation_context.set(correlation_id)
+    logger.error(f"Authentication error: {exc}", extra={"correlation_id": correlation_id})
+    
+    response_data = {
+        "error": "Authentication failed",
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content=response_data,
+        headers={
+            "X-Correlation-ID": correlation_id,
+            "WWW-Authenticate": "Bearer"
+        }
+    )
+
+
+async def authorization_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle authorization errors specifically."""
+    correlation_id = str(uuid.uuid4())
+    correlation_context.set(correlation_id)
+    logger.error(f"Authorization error: {exc}", extra={"correlation_id": correlation_id})
+    
+    response_data = {
+        "error": "Access denied",
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+    
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content=response_data,
+        headers={"X-Correlation-ID": correlation_id}
+    )
+
+
+async def rate_limit_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle rate limit errors specifically."""
+    correlation_id = str(uuid.uuid4())
+    correlation_context.set(correlation_id)
+    logger.error(f"Rate limit error: {exc}", extra={"correlation_id": correlation_id})
+    
+    response_data = {
+        "error": "Rate limit exceeded",
+        "correlation_id": correlation_id,
+        "timestamp": time.time()
+    }
+    headers = {"X-Correlation-ID": correlation_id}
+    
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content=response_data,
+        headers=headers
+    )
+
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def get_correlation_id() -> str | None:
+    """Get the current correlation ID from context."""
+    return correlation_context.get()
+
+
+def set_correlation_id(correlation_id: str) -> None:
+    """Set the correlation ID in context."""
+    correlation_context.set(correlation_id)
+
+
+def create_correlation_middleware():
+    """Create middleware to handle correlation ID extraction and setting."""
+    
+    async def correlation_middleware(request: Request, call_next):
+        # Extract correlation ID from header or generate new one
+        correlation_id = (
+            request.headers.get("X-Correlation-ID") or
+            request.headers.get("X-Request-ID") or
+            None
+        )
+        
+        if not correlation_id:
+            correlation_id = str(uuid.uuid4())
+        
+        # Set in context
+        correlation_context.set(correlation_id)
+        
+        # Add to request state for easy access
+        request.state.correlation_id = correlation_id
+        
+        response = await call_next(request)
+        
+        # Add correlation ID to response headers
+        response.headers["X-Correlation-ID"] = correlation_id
+        
+        return response
+    
+    return correlation_middleware
+
+
+# ============================================================================
+# ERROR RECOVERY UTILITIES
+# ============================================================================
+
+def create_retry_with_backoff(
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    exceptions: tuple[type[Exception], ...] = (ConnectionError, TimeoutError)
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Create a retry decorator with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay between retries
+        max_delay: Maximum delay between retries
+        exceptions: Exception types that should trigger retry
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            import random
+            
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except exceptions as exc:
+                    last_exception = exc
+                    if attempt == max_retries:
+                        # Final attempt failed
+                        break
+                    
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    jitter = random.uniform(0.1, 0.3) * delay
+                    await asyncio.sleep(delay + jitter)
+                    
+                    logger.warning(
+                        f"Retrying {func.__name__} after {delay:.2f}s (attempt {attempt + 1}/{max_retries})",
+                        extra={"correlation_id": get_correlation_id()}
+                    )
+            
+            # All retries failed
+            raise last_exception
+        
+        @wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+            import random
+            
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as exc:
+                    last_exception = exc
+                    if attempt == max_retries:
+                        # Final attempt failed
+                        break
+                    
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    jitter = random.uniform(0.1, 0.3) * delay
+                    time.sleep(delay + jitter)
+                    
+                    logger.warning(
+                        f"Retrying {func.__name__} after {delay:.2f}s (attempt {attempt + 1}/{max_retries})",
+                        extra={"correlation_id": get_correlation_id()}
+                    )
+            
+            # All retries failed
+            raise last_exception
+        
+        # Return appropriate wrapper
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
     return decorator

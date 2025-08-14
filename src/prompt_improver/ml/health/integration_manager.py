@@ -13,7 +13,7 @@ from .ml_health_monitor import get_ml_health_monitor
 from .model_performance_tracker import get_performance_tracker
 logger = logging.getLogger(__name__)
 
-class MLHealthIntegrationManager:
+class MLHealthIntegrationService:
     """
     Manages integration between ML services and health monitoring systems.
     
@@ -218,12 +218,12 @@ class MLHealthIntegrationManager:
         if not recommendations:
             recommendations.append('ML system health is optimal - continue monitoring')
         return recommendations
-_integration_manager: MLHealthIntegrationManager | None = None
+_integration_manager: MLHealthIntegrationService | None = None
 
-async def get_ml_health_integration_manager() -> MLHealthIntegrationManager:
+async def get_ml_health_integration_manager() -> MLHealthIntegrationService:
     """Get or create global ML health integration manager"""
     global _integration_manager
     if _integration_manager is None:
-        _integration_manager = MLHealthIntegrationManager()
+        _integration_manager = MLHealthIntegrationService()
         await _integration_manager.initialize()
     return _integration_manager

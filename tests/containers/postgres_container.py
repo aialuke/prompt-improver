@@ -23,7 +23,7 @@ import asyncpg
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlmodel import SQLModel
-from testcontainers.postgres import PostgreSqlContainer
+from testcontainers.postgres import PostgresContainer
 from typing import List
 
 from prompt_improver.database import (
@@ -77,7 +77,7 @@ class PostgreSQLTestContainer:
         """Start PostgreSQL container and initialize database."""
         try:
             # Create and start PostgreSQL container
-            self._container = PostgreSqlContainer(
+            self._container = PostgresContainer(
                 image=f"postgres:{self.postgres_version}",
                 username=self.username,
                 password=self.password,

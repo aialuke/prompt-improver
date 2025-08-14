@@ -120,7 +120,7 @@ class FileCredentialProvider(CredentialProvider):
         return False
 
 
-class CredentialManager:
+class CredentialService:
     """Centralized credential management with multiple providers.
 
     Provides secure credential access with:

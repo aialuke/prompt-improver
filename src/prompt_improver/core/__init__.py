@@ -3,7 +3,7 @@
 Core services, setup utilities, and system-wide functionality.
 """
 
-from prompt_improver.core.di.container import (
+from prompt_improver.core.di.container_orchestrator import (
     DIContainer,
     get_container,
     get_datetime_service,
@@ -13,8 +13,8 @@ from prompt_improver.core.interfaces.datetime_service import (
     MockDateTimeService,
 )
 from prompt_improver.core.services.datetime_service import DateTimeService
-from prompt_improver.core.services.manager import APESServiceManager
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+from prompt_improver.core.services.manager import OrchestrationService as APESServiceManager
+# NOTE: PromptImprovementService moved to services.prompt.facade to break circular imports
 from prompt_improver.core.services.startup import (
     StartupOrchestrator,
     init_startup_tasks,
@@ -31,7 +31,7 @@ __all__: list[str] = [
     "DateTimeServiceProtocol",
     "MockDateTimeService",
     "PromptDataProtection",
-    "PromptImprovementService",
+    # "PromptImprovementService", # Moved to services.prompt.facade
     "StartupOrchestrator",
     "SystemInitializer",
     "get_container",

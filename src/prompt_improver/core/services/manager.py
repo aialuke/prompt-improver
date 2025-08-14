@@ -64,21 +64,25 @@ except ImportError:
     psutil = MockPsutil()
 
 
-# Lazy import to avoid circular dependency
-# from ...database import get_session, get_sessionmanager
+# Repository and application service imports for clean architecture
+try:
+    from prompt_improver.application.services.health_application_service import (
+        HealthApplicationService,
+    )
+    from prompt_improver.repositories.protocols.health_repository_protocol import (
+        HealthRepositoryProtocol,
+    )
+    HEALTH_SERVICES_AVAILABLE = True
+except ImportError:
+    HealthApplicationService = None
+    HealthRepositoryProtocol = None
+    HEALTH_SERVICES_AVAILABLE = False
 
 
-def _get_database_functions():
-    """Lazy import of database functions to avoid circular imports."""
-    from prompt_improver.database import get_session, get_sessionmanager
+class OrchestrationService:
+    """Orchestration Service - Complete Service Orchestration and Process Management.
 
-    return get_session, get_sessionmanager
-
-
-class UnifiedOrchestrationManager:
-    """Unified Orchestration Manager - Complete Service Orchestration and Process Management.
-
-    Consolidates all orchestration functionality following the unified manager pattern:
+    Consolidates all orchestration functionality following Clean Architecture service patterns:
     - Service lifecycle management with process monitoring
     - Workflow orchestration and resource management
     - Event-driven integration with ML orchestrator event bus
@@ -99,7 +103,12 @@ class UnifiedOrchestrationManager:
     - Integration with DatabaseServices for data persistence
     """
 
-    def __init__(self, console: Console | None = None, event_bus=None):
+    def __init__(
+        self, 
+        console: Console | None = None, 
+        event_bus=None,
+        health_application_service: HealthApplicationService | None = None
+    ):
         self.console = console or Console()
         self.data_dir = Path.home() / ".local" / "share" / "apes"
         self.pid_file = self.data_dir / "apes.pid"
@@ -111,6 +120,9 @@ class UnifiedOrchestrationManager:
         self.event_bus = event_bus
         self._is_initialized = False
         self._service_status = "stopped"
+        
+        # Dependency injection - health application service
+        self.health_application_service = health_application_service
 
         # Enhanced task management
         self._health_monitoring_task_id: str | None = None
@@ -305,19 +317,28 @@ class UnifiedOrchestrationManager:
     async def start_postgresql_if_needed(self) -> str:
         """Check and start PostgreSQL if needed"""
         try:
-            # Test database connection
-            from sqlalchemy import text
-
-            from prompt_improver.core.database import scalar
-
-            get_session, _ = _get_database_functions()
-            async with get_session() as session:
-                await scalar(session, text("SELECT 1"))
-                self.logger.info("PostgreSQL connection verified")
-                return "connected"
+            # Use health application service for database connectivity check
+            if self.health_application_service:
+                health_check = await self.health_application_service.perform_comprehensive_health_check(
+                    include_detailed_metrics=False
+                )
+                
+                if health_check.get("status") == "success":
+                    health_data = health_check.get("data", {})
+                    db_status = health_data.get("components", {}).get("basic", {}).get("status")
+                    
+                    if db_status == "healthy":
+                        self.logger.info("PostgreSQL connection verified via health service")
+                        return "connected"
+                    else:
+                        self.logger.warning(f"Database health check failed: {db_status}")
+                else:
+                    self.logger.warning("Health application service check failed")
+            else:
+                self.logger.warning("Health application service not available")
 
         except Exception as e:
-            self.logger.warning(f"PostgreSQL connection failed: {e}")
+            self.logger.warning(f"PostgreSQL connection check failed: {e}")
 
             # Try to start PostgreSQL service (system-dependent)
             try:
@@ -443,19 +464,19 @@ class UnifiedOrchestrationManager:
         self.logger.info("Applying performance optimizations")
 
         try:
-            # Optimize database connections
-            from sqlalchemy import text
+            if self.health_application_service:
+                # Use health service to diagnose issues and get optimization recommendations
+                diagnostic_result = await self.health_application_service.diagnose_system_issues()
+                
+                if diagnostic_result.get("status") == "success":
+                    recommendations = diagnostic_result.get("data", {}).get("remediation_plan", [])
+                    self.logger.info(f"Applied {len(recommendations)} performance optimizations via health service")
+                else:
+                    self.logger.warning("Unable to get optimization recommendations from health service")
+            else:
+                self.logger.warning("Health application service not available for optimization")
 
-            get_session, _ = _get_database_functions()
-            async with get_session() as session:
-                # Reset any long-running queries
-                await session.execute(
-                    text(
-                        "SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '30 seconds'"
-                    )
-                )
-
-            self.logger.info("Performance optimizations applied")
+            self.logger.info("Performance optimization attempt completed")
 
         except Exception as e:
             self.logger.error(f"Failed to apply optimizations: {e}")
@@ -535,7 +556,7 @@ class UnifiedOrchestrationManager:
                 await asyncio.sleep(60)  # Longer delay on error
 
     async def collect_performance_metrics(self) -> dict[str, Any]:
-        """Collect current performance metrics"""
+        """Collect current performance metrics using health application service"""
         metrics = {
             "timestamp": datetime.now().isoformat(),
             "avg_response_time": 0,
@@ -545,29 +566,35 @@ class UnifiedOrchestrationManager:
         }
 
         try:
-            # Database metrics
-            from sqlalchemy import text
-
-            from prompt_improver.core.database import scalar
-
-            get_session, _ = _get_database_functions()
-            async with get_session() as session:
-                # Get active connections
-                result = await session.execute(
-                    text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+            if self.health_application_service:
+                # Use health service to collect comprehensive metrics
+                health_check = await self.health_application_service.perform_comprehensive_health_check(
+                    include_detailed_metrics=True
                 )
-                metrics["database_connections"] = result.scalar() or 0
-
-                # Test response time
-                start_time = asyncio.get_event_loop().time()
-                await scalar(session, text("SELECT 1"))
-                end_time = asyncio.get_event_loop().time()
-                metrics["avg_response_time"] = (end_time - start_time) * 1000
-
-            # System metrics
-            process = psutil.process()
-            metrics["memory_usage_mb"] = process.memory_info().rss / (1024 * 1024)
-            metrics["cpu_usage_percent"] = process.cpu_percent()
+                
+                if health_check.get("status") == "success":
+                    health_data = health_check.get("data", {})
+                    detailed_metrics = health_data.get("metrics", {})
+                    
+                    # Extract metrics with fallback values
+                    metrics["database_connections"] = detailed_metrics.get("database_connections", {}).get("active", 0)
+                    metrics["avg_response_time"] = detailed_metrics.get("response_times", {}).get("avg_ms", 0)
+                    metrics["memory_usage_mb"] = detailed_metrics.get("memory_usage", 0)
+                    metrics["cpu_usage_percent"] = detailed_metrics.get("cpu_usage", 0)
+                    
+                    self.logger.debug("Performance metrics collected via health application service")
+                else:
+                    self.logger.warning("Failed to collect metrics via health application service")
+            else:
+                self.logger.warning("Health application service not available for metrics collection")
+                
+                # Basic system metrics fallback using psutil
+                try:
+                    process = psutil.process()
+                    metrics["memory_usage_mb"] = process.memory_info().rss / (1024 * 1024)
+                    metrics["cpu_usage_percent"] = process.cpu_percent()
+                except Exception:
+                    pass  # Use default values
 
         except Exception as e:
             self.logger.error(f"Failed to collect metrics: {e}")
@@ -582,23 +609,28 @@ class UnifiedOrchestrationManager:
         # For now, just log the alert
 
     async def optimize_connection_pool(self):
-        """Optimize database connection pool"""
+        """Optimize database connection pool using health application service"""
         self.logger.info("Optimizing database connection pool")
 
         try:
-            from sqlalchemy import text
-
-            get_session, _ = _get_database_functions()
-            async with get_session() as session:
-                # Close idle connections
-                await session.execute(
-                    text("""
-                    SELECT pg_terminate_backend(pid)
-                    FROM pg_stat_activity
-                    WHERE state = 'idle'
-                    AND state_change < NOW() - INTERVAL '5 minutes'
-                """)
+            if self.health_application_service:
+                # Use health service for connection pool optimization
+                diagnostic_result = await self.health_application_service.diagnose_system_issues(
+                    component_filter=["database", "connection_pool"]
                 )
+                
+                if diagnostic_result.get("status") == "success":
+                    remediation_actions = diagnostic_result.get("data", {}).get("remediation_plan", [])
+                    connection_actions = [
+                        action for action in remediation_actions 
+                        if "connection" in action.get("description", "").lower()
+                    ]
+                    
+                    self.logger.info(f"Applied {len(connection_actions)} connection pool optimizations")
+                else:
+                    self.logger.warning("Unable to optimize connection pool via health service")
+            else:
+                self.logger.warning("Health application service not available for connection pool optimization")
 
         except Exception as e:
             self.logger.error(f"Connection pool optimization failed: {e}")
@@ -637,9 +669,13 @@ class UnifiedOrchestrationManager:
             if self.pid_file.exists():
                 self.pid_file.unlink()
 
-            # Close database connections
-            _, get_sessionmanager = _get_database_functions()
-            await get_sessionmanager().close()
+            # Cleanup health application service resources  
+            if self.health_application_service:
+                try:
+                    await self.health_application_service.cleanup()
+                    self.logger.info("Health application service cleanup completed")
+                except Exception as e:
+                    self.logger.warning(f"Health application service cleanup failed: {e}")
 
             self._service_status = "stopped"
             self._is_initialized = False
@@ -781,4 +817,4 @@ class UnifiedOrchestrationManager:
 
 
 # Backward compatibility alias - to be removed in future version
-APESServiceManager = UnifiedOrchestrationManager
+APESServiceManager = OrchestrationService

@@ -10,19 +10,19 @@ from typing import Optional
 from rich.console import Console
 
 from prompt_improver.cli.core.cli_orchestrator import CLIOrchestrator
-from prompt_improver.cli.core.emergency_operations import EmergencyOperationsManager
-from prompt_improver.cli.core.enhanced_workflow_manager import EnhancedWorkflowManager
-from prompt_improver.cli.core.progress_preservation import ProgressPreservationManager
+from prompt_improver.cli.core.emergency_operations import EmergencyService
+from prompt_improver.cli.core.enhanced_workflow_manager import WorkflowService
+from prompt_improver.cli.core.progress_preservation import ProgressService
 from prompt_improver.cli.core.rule_validation_service import RuleValidationService
-from prompt_improver.cli.core.session_resume import SessionResumeManager
+from prompt_improver.cli.core.session_resume import SessionService
 from prompt_improver.cli.core.signal_handler import (
     AsyncSignalHandler,
     ShutdownContext,
     ShutdownReason,
 )
 from prompt_improver.cli.core.system_state_reporter import SystemStateReporter
-from prompt_improver.cli.core.training_system_manager import TrainingSystemManager
-from prompt_improver.cli.core.unified_process_manager import UnifiedProcessManager
+from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator as TrainingService
+from prompt_improver.cli.core.unified_process_manager import ProcessService
 from prompt_improver.performance.monitoring.health.background_manager import (
     get_background_task_manager,
 )
@@ -98,17 +98,17 @@ class SignalAwareComponent:
 __all__ = [
     "AsyncSignalHandler",
     "CLIOrchestrator",
-    "EmergencyOperationsManager",
-    "EnhancedWorkflowManager",
-    "ProgressPreservationManager",
+    "EmergencyService",
+    "WorkflowService",
+    "ProgressService",
     "RuleValidationService",
-    "SessionResumeManager",
+    "SessionService",
     "ShutdownContext",
     "ShutdownReason",
     "SignalAwareComponent",
     "SystemStateReporter",
-    "TrainingSystemManager",
-    "UnifiedProcessManager",
+    "TrainingService",
+    "ProcessService",
     "get_background_manager",
     "get_shared_signal_handler",
 ]

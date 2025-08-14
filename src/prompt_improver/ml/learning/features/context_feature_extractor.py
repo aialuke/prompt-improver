@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 import numpy as np
-from ....security import InputValidator, ValidationError
+from ....security import OWASP2025InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
 from ....utils.datetime_utils import aware_utc_now
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class ContextFeatureExtractor:
             config: Configuration for context feature extraction
         """
         self.config = config or ContextFeatureConfig()
-        self.input_validator = InputValidator()
+        self.input_validator = OWASP2025InputValidator()
         self.input_sanitizer = InputSanitizer()
         self.metrics = ContextExtractionMetrics()
         self.circuit_breaker_state = CircuitBreakerState.CLOSED

@@ -34,7 +34,7 @@ except ImportError:
     Gauge = Any
     Histogram = Any
 
-from prompt_improver.common.types import SecurityContext
+from prompt_improver.core.types import SecurityContext
 from prompt_improver.database.services.cache.database_cache import (
     DatabaseCache,
     DatabaseCacheConfig,

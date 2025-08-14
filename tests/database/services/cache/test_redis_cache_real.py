@@ -28,7 +28,7 @@ from prompt_improver.database.services.cache.redis_cache import (
     SerializationFormat,
     create_redis_cache,
 )
-from prompt_improver.common.types import SecurityContext
+from prompt_improver.core.types import SecurityContext
 
 
 class TestRedisCacheConfig:

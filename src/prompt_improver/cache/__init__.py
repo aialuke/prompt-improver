@@ -18,34 +18,40 @@ Features:
 - Real-time metrics collection with circuit breaker protection
 """
 
-from prompt_improver.cache.redis_health import (
-    ConnectionMetrics,
-    KeyspaceMetrics,
-    MemoryMetrics,
-    PerformanceMetrics,
-    PersistenceMetrics,
-    RedisHealthChecker,
-    RedisHealthMonitor,
+# Import from new focused services
+from prompt_improver.monitoring.redis.health import (
+    RedisHealthManager,
+    RedisHealthChecker as NewRedisHealthChecker,
     RedisHealthStatus,
     RedisRole,
-    ReplicationMetrics,
-    SlowLogMetrics,
-    create_redis_health_checker,
-    get_redis_health_summary,
+    HealthMetrics,
+    ConnectionPoolMetrics as ConnectionMetrics,
+    PerformanceMetrics,
 )
 
+# Legacy compatibility removed - clean break modernization
+
+# Legacy metric types (simplified for compatibility)
+MemoryMetrics = HealthMetrics  # Backward compatibility
+PersistenceMetrics = dict  # Legacy - use dict for compatibility
+ReplicationMetrics = dict  # Legacy - use dict for compatibility
+KeyspaceMetrics = dict  # Legacy - use dict for compatibility
+SlowLogMetrics = dict  # Legacy - use dict for compatibility
+
 __all__ = [
-    "ConnectionMetrics",
-    "KeyspaceMetrics",
-    "MemoryMetrics",
-    "PerformanceMetrics",
-    "PersistenceMetrics",
-    "RedisHealthChecker",
-    "RedisHealthMonitor",
+    # New focused services (recommended)
+    "RedisHealthManager",
+    "NewRedisHealthChecker",
     "RedisHealthStatus",
     "RedisRole",
-    "ReplicationMetrics",
+    "HealthMetrics",
+    
+    # Compatibility metric types
+    "ConnectionMetrics",
+    "PerformanceMetrics",
+    "MemoryMetrics",
+    "KeyspaceMetrics",
+    "PersistenceMetrics",
+    "ReplicationMetrics", 
     "SlowLogMetrics",
-    "create_redis_health_checker",
-    "get_redis_health_summary",
 ]

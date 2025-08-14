@@ -43,12 +43,14 @@ logger = logging.getLogger(__name__)
 
 
 class ServerServices(BaseModel):
-    """Container for all MCP server services - Unified Security Architecture"""
+    """Container for all MCP server services - Unified Security Architecture via Facades"""
 
     config: Any
-    security_manager: Any  # UnifiedSecurityManager
-    validation_manager: Any  # UnifiedValidationManager
-    authentication_manager: Any  # UnifiedAuthenticationManager
+    security_facade: Any  # SecurityServiceFacade - main entry point
+    security_manager: Any  # SecurityServiceFacade (backward compatibility)
+    validation_manager: Any  # ValidationComponent via facade
+    authentication_manager: Any  # AuthenticationComponent via facade
+    authorization_manager: Any  # AuthorizationComponent via facade
     security_stack: Any  # UnifiedSecurityStack
     input_validator: Any  # InputValidator
     output_validator: Any  # OutputValidator

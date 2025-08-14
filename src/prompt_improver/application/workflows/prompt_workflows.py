@@ -8,12 +8,12 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.repositories.protocols.prompt_repository_protocol import (
     PromptRepositoryProtocol,
 )
 from prompt_improver.rule_engine.base import RuleEngine
-from prompt_improver.security.input_validator import InputValidator
+from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
 from prompt_improver.utils.session_store import SessionStore
 
 
@@ -41,7 +41,7 @@ class PromptImprovementWorkflow(WorkflowBase):
         self,
         prompt_improvement_service: PromptImprovementService,
         rule_engine: RuleEngine,
-        input_validator: InputValidator,
+        input_validator: OWASP2025InputValidator,
         prompt_repository: PromptRepositoryProtocol,
         session_store: SessionStore,
     ):
@@ -140,12 +140,19 @@ class PromptImprovementWorkflow(WorkflowBase):
             }
 
     async def _validate_input(self, prompt: str) -> Dict[str, Any]:
-        """Validate input prompt for security and format."""
+        """Validate input prompt for security and format using OWASP 2025 compliance."""
         try:
-            is_valid = await self.input_validator.validate_prompt(prompt)
-            return {"valid": is_valid, "error": None if is_valid else "Invalid prompt format"}
+            validation_result = self.input_validator.validate_prompt(prompt)
+            if validation_result.is_blocked:
+                error_msg = (
+                    f"Security threat detected - {validation_result.threat_type}: "
+                    f"Score {validation_result.threat_score:.2f}, "
+                    f"Patterns: {', '.join(validation_result.detected_patterns[:3])}"
+                )
+                return {"valid": False, "error": error_msg}
+            return {"valid": validation_result.is_valid, "error": None if validation_result.is_valid else "Invalid prompt format"}
         except Exception as e:
-            return {"valid": False, "error": str(e)}
+            return {"valid": False, "error": f"OWASP validation error: {str(e)}"}
 
     async def _load_session_context(
         self, session_id: str, improvement_options: Dict[str, Any] | None

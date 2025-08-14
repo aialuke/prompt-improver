@@ -30,7 +30,7 @@ async def test_di_container_integration_fix():
     print("🧪 DI Container Integration Fix Validation")
     print("=" * 50)
     try:
-        from prompt_improver.core.di.container import get_container
+        from prompt_improver.core.di.container_orchestrator import get_container
 
         container = await get_container()
         print("✅ DI container created successfully")
@@ -84,7 +84,7 @@ async def test_di_container_integration_fix():
             f"✅ Analytics callbacks using modern pattern: {len(analytics_callbacks)}"
         )
         print("\n5️⃣ Testing Error Handling...")
-        from prompt_improver.core.di.container import ServiceNotRegisteredError
+        from prompt_improver.core.di.container_orchestrator import ServiceNotRegisteredError
 
         NonExistentService = type("NonExistentService", (), {})
         try:

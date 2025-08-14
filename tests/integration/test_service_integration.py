@@ -17,7 +17,7 @@ class TestPromptServiceIntegration:
 
     async def test_service_database_integration(self, test_db_session):
         """Test service operations with real database interactions."""
-        from prompt_improver.services.prompt_improvement import PromptImprovementService
+        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -189,7 +189,7 @@ class TestPerformanceIntegration:
 
     async def test_concurrent_operations_performance(self, test_db_session):
         """Test performance under sequential operations (avoiding concurrent db session issues)."""
-        from prompt_improver.services.prompt_improvement import PromptImprovementService
+        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -242,7 +242,7 @@ class TestErrorHandlingIntegration:
 
     async def test_service_error_propagation(self, test_db_session):
         """Test error propagation through service layers."""
-        from prompt_improver.services.prompt_improvement import PromptImprovementService
+        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
         service = PromptImprovementService()
         result = await service.improve_prompt(

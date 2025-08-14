@@ -44,74 +44,76 @@ except Exception as e:
     print(f"batch_processor import failed: {e}")
 QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE or BATCH_PROCESSOR_AVAILABLE
 try:
-    from prompt_improver.performance.database import get_session
+    from prompt_improver.repositories.protocols.health_repository_protocol import (
+        HealthRepositoryProtocol,
+    )
 
-    DATABASE_AVAILABLE = True
+    HEALTH_REPOSITORY_AVAILABLE = True
 except Exception:
-    DATABASE_AVAILABLE = False
-    get_session = None
+    HEALTH_REPOSITORY_AVAILABLE = False
+    HealthRepositoryProtocol = None
 
 
 class DatabaseHealthChecker(HealthChecker):
     """Database connectivity and performance health checker"""
 
-    def __init__(self):
+    def __init__(self, health_repository: HealthRepositoryProtocol | None = None):
         super().__init__("database")
+        self.health_repository = health_repository
 
     async def check(self) -> HealthResult:
         """Check database connectivity and performance"""
-        if not DATABASE_AVAILABLE or get_session is None:
+        if not HEALTH_REPOSITORY_AVAILABLE or self.health_repository is None:
             return HealthResult(
                 status=HealthStatus.WARNING,
                 component=self.name,
-                message="Database configuration not available",
-                error="Database credentials not configured",
+                message="Health repository not available",
+                error="Repository dependency not injected",
             )
         try:
-            from sqlalchemy import text
-
-            from prompt_improver.performance.database import scalar
-
             start_time = time.time()
-            async with get_session() as session:
-                await scalar(session, text("SELECT 1"))
-                response_time = (time.time() - start_time) * 1000
-                long_queries = await scalar(
-                    session,
-                    text(
-                        "\n                    SELECT count(*)\n                    FROM pg_stat_activity\n                    WHERE state = 'active'\n                    AND query_start < NOW() - INTERVAL '30 seconds'\n                "
-                    ),
-                )
-                long_queries = long_queries or 0
-                active_connections = await scalar(
-                    session,
-                    text(
-                        "SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"
-                    ),
-                )
-                active_connections = active_connections or 0
-                if response_time > 500 or long_queries > 0:
-                    status = HealthStatus.FAILED
-                elif response_time > 100:
-                    status = HealthStatus.WARNING
-                else:
-                    status = HealthStatus.HEALTHY
-                return HealthResult(
-                    status=status,
-                    component=self.name,
-                    response_time_ms=response_time,
-                    message=f"Database responding in {response_time:.1f}ms",
-                    details={
-                        "long_running_queries": long_queries,
-                        "active_connections": active_connections,
-                    },
-                )
+            # Use repository for database health checking
+            health_status = await self.health_repository.check_database_health()
+            response_time = (time.time() - start_time) * 1000
+            
+            # Map repository health status to our status enum
+            status_mapping = {
+                "healthy": HealthStatus.HEALTHY,
+                "warning": HealthStatus.WARNING,
+                "critical": HealthStatus.FAILED,
+                "unknown": HealthStatus.WARNING,
+            }
+            
+            mapped_status = status_mapping.get(health_status.status, HealthStatus.FAILED)
+            
+            # Get additional database metrics for details
+            db_metrics = None
+            try:
+                db_metrics = await self.health_repository.get_database_metrics()
+            except Exception:
+                pass  # Metrics are optional
+            
+            details = health_status.details or {}
+            if db_metrics:
+                details.update({
+                    "active_connections": db_metrics.active_connections,
+                    "connection_utilization": db_metrics.connection_utilization,
+                    "slow_query_count": db_metrics.slow_query_count,
+                })
+            
+            return HealthResult(
+                status=mapped_status,
+                component=self.name,
+                response_time_ms=health_status.response_time_ms or response_time,
+                message=health_status.error_message or f"Database health check via repository: {health_status.status}",
+                details=details,
+            )
         except Exception as e:
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
                 error=str(e),
-                message="Database connection failed",
+                message="Database health check failed via repository",
             )
 
 
@@ -411,38 +413,10 @@ class SystemResourcesHealthChecker(HealthChecker):
             )
 
     async def _check_event_loop_performance(self) -> dict[str, Any]:
-        """Check event loop type and performance metrics using database services."""
+        """Check event loop type and performance metrics without direct database services."""
         try:
-            from prompt_improver.database import (
-                ManagerMode,
-                get_database_services,
-            )
-
-            manager = await await get_database_services(ManagerMode.HIGH_AVAILABILITY)
-            loop = asyncio.get_running_loop()
-            loop_type = type(loop).__name__
-            uvloop_enabled = "uvloop" in loop_type.lower()
-            latencies = []
-            for _ in range(10):
-                start = time.perf_counter()
-                async with manager.get_async_session() as session:
-                    await asyncio.sleep(0)
-                end = time.perf_counter()
-                latency_ms = (end - start) * 1000
-                latencies.append(latency_ms)
-            avg_latency = sum(latencies) / len(latencies)
-            min_latency = min(latencies)
-            max_latency = max(latencies)
-            return {
-                "loop_type": loop_type,
-                "uvloop_enabled": uvloop_enabled,
-                "avg_latency_ms": avg_latency,
-                "min_latency_ms": min_latency,
-                "max_latency_ms": max_latency,
-                "samples": len(latencies),
-                "enhanced_monitoring": True,
-            }
-        except ImportError:
+            # Use fallback implementation for event loop checking
+            # Enhanced database integration would require repository injection
             return await self._fallback_event_loop_check()
         except Exception as e:
             return {
@@ -503,9 +477,11 @@ class RedisHealthChecker(HealthChecker):
     async def check(self) -> HealthResult:
         """Check Redis health using comprehensive monitoring"""
         try:
-            from prompt_improver.cache.redis_health import get_redis_health_summary
+            from prompt_improver.monitoring.redis.health import RedisHealthManager, DefaultRedisClientProvider
 
-            health_data = await get_redis_health_summary()
+            client_provider = DefaultRedisClientProvider()
+            health_manager = RedisHealthManager(client_provider)
+            health_data = await health_manager.get_health_summary()
             status_mapping = {
                 "healthy": HealthStatus.HEALTHY,
                 "warning": HealthStatus.WARNING,

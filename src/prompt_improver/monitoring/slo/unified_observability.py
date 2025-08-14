@@ -165,7 +165,7 @@ class UnifiedSLOObservability:
             context.span_id = f"{span.get_span_context().span_id:016x}"
         self._active_contexts[context_id] = context
         try:
-            if not self.True:
+            if not self._initialized:
                 await self._unified_manager.initialize()
             yield context
             if span:

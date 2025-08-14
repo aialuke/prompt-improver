@@ -60,37 +60,13 @@ def __getattr__(name: str):
     if name in legacy_mappings:
         _deprecation_warning(name, legacy_mappings[name])
         
-        # Try to import from legacy location
-        try:
-            if name == "AnalyticsService":
-                from .legacy.analytics_service import AnalyticsService
-                return AnalyticsService
-            elif name == "EventBasedMLAnalysisService":
-                from .legacy.ml_analysis_service import EventBasedMLAnalysisService
-                return EventBasedMLAnalysisService
-            elif name == "ModernABTestingService":
-                from .legacy.ab_testing_service import ModernABTestingService
-                return ModernABTestingService
-            elif name == "MemoryOptimizedAnalyticsService":
-                from .legacy.memory_optimizer import MemoryOptimizedAnalyticsService
-                return MemoryOptimizedAnalyticsService
-            elif name == "SessionSummaryReporter":
-                from .legacy.session_summary_reporter import SessionSummaryReporter
-                return SessionSummaryReporter
-            elif name == "SessionComparisonAnalyzer":
-                from .legacy.session_comparison_analyzer import SessionComparisonAnalyzer
-                return SessionComparisonAnalyzer
-            elif name == "PerformanceImprovementCalculator":
-                from .legacy.performance_improvement_calculator import PerformanceImprovementCalculator
-                return PerformanceImprovementCalculator
-        except ImportError:
-            # Legacy service not available, suggest new service
-            warnings.warn(
-                f"Legacy service {name} not found. Please migrate to {legacy_mappings[name]}.",
-                ImportWarning,
-                stacklevel=2
-            )
-            return None
+        # Legacy services are no longer available - suggest new services
+        warnings.warn(
+            f"Legacy service {name} has been removed. Please migrate to {legacy_mappings[name]}.",
+            ImportWarning,
+            stacklevel=2
+        )
+        return None
     
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 

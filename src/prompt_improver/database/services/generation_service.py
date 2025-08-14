@@ -13,7 +13,7 @@ from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 
-from ...common.error_handling import handle_repository_errors
+from ...utils.error_handlers import handle_repository_errors
 from ...common.exceptions import DatabaseError, ValidationError
 from ...utils.datetime_utils import naive_utc_now
 from ..models import (

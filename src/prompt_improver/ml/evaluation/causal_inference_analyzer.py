@@ -168,7 +168,7 @@ class CausalInferenceAnalyzer:
         Returns:
             Comprehensive causal inference result
         """
-        from prompt_improver.common.datetime_utils import format_compact_timestamp
+        from prompt_improver.utils.datetime_utils import format_compact_timestamp
         analysis_id = f"causal_analysis_{format_compact_timestamp(datetime.utcnow())}"
         try:
             logger.info('Starting causal inference analysis: %s', analysis_id)

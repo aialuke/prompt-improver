@@ -27,12 +27,8 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from ...database.models import GenerationSession, TrainingIteration, TrainingSession
 from ...utils.datetime_utils import naive_utc_now
-# MIGRATION NOTE: PerformanceImprovementCalculator is now part of unified analytics service
-# Use: analytics = await create_analytics_service(db_session); await analytics.analyze_performance(...)
-try:
-    from .performance_improvement_calculator import PerformanceImprovementCalculator
-except ImportError:
-    from ...analytics.legacy.performance_improvement_calculator import PerformanceImprovementCalculator
+# PerformanceImprovementCalculator is available in the local ml.analytics module
+from .performance_improvement_calculator import PerformanceImprovementCalculator
 from .session_summary_reporter import SessionSummary, SessionSummaryReporter
 logger = logging.getLogger(__name__)
 

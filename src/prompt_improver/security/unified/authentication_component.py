@@ -11,7 +11,7 @@ Key Features:
 - Comprehensive audit logging and security monitoring
 - Fail-secure authentication policies (deny by default)
 - Zero-trust security architecture
-- Integration with UnifiedKeyManager for secure operations
+- Integration with UnifiedKeyService for secure operations
 
 Security Standards:
 - OWASP authentication guidelines compliance
@@ -43,17 +43,15 @@ from prompt_improver.security.key_manager import (
     AuditEvent,
     SecurityAuditLogger,
     SecurityLevel,
-    UnifiedKeyManager,
+    UnifiedKeyService,
 )
 from prompt_improver.security.unified.protocols import (
     AuthenticationProtocol,
     SecurityComponentStatus,
     SecurityOperationResult,
 )
-from prompt_improver.security.unified_rate_limiter import (
-    RateLimitTier,
-    get_unified_rate_limiter,
-)
+# Rate limiting functionality moved to SecurityServiceFacade
+# This component now delegates rate limiting to the facade
 from prompt_improver.utils.session_store import SessionStore
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -117,9 +115,9 @@ class AuthenticationComponent:
         self._initialization_lock = asyncio.Lock()
         
         # Core components
-        self._key_manager: Optional[UnifiedKeyManager] = None
+        self._key_manager: Optional[UnifiedKeyService] = None
         self._session_store: Optional[SessionStore] = None
-        self._rate_limiter = None
+        # Rate limiting delegated to SecurityServiceFacade
         self._security_auditor: Optional[SecurityAuditLogger] = None
         
         # Authentication storage
@@ -168,9 +166,9 @@ class AuthenticationComponent:
             
             try:
                 # Initialize core components
-                self._key_manager = UnifiedKeyManager()
+                self._key_manager = UnifiedKeyService()
                 self._session_store = SessionStore()
-                self._rate_limiter = await get_unified_rate_limiter()
+                # Rate limiting delegated to SecurityServiceFacade
                 self._security_auditor = SecurityAuditLogger("AuthenticationComponent")
                 
                 # Start background cleanup task

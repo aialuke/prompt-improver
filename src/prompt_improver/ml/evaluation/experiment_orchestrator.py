@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 import pandas as pd
 from prompt_improver.utils.datetime_utils import aware_utc_now
-from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
+from prompt_improver.utils.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
 from ...core.services.analytics_factory import get_analytics_router
 from ...database.models import ABExperiment, RulePerformance
 from ...performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, TaskPriority, get_background_task_manager

@@ -1,13 +1,13 @@
-"""Unified Security Middleware for APES MCP Server - 2025 Security Consolidation.
+"""Modern Security Middleware for APES MCP Server - 2025 Clean Architecture.
 
-Replaces all legacy middleware implementations with UnifiedSecurityStack integration.
-Provides complete security middleware consolidation with OWASP-compliant layering.
+Provides modern security middleware using SecurityServiceFacade with clean architecture.
+Zero legacy compatibility layers for optimal performance and maintainability.
 
-Security Migration Benefits:
-- UnifiedSecurityStack: Complete security middleware consolidation
+Security Features:
+- SecurityServiceFacade: Clean, decomposed security services
 - Clean break from legacy security patterns (zero compatibility layers)
-- 3-5x performance improvement over scattered implementations
-- OWASP-compliant security layer ordering and fail-secure design
+- Optimal performance with focused security operations
+- OWASP-compliant security with fail-secure design
 - Real behavior testing with comprehensive audit logging
 """
 
@@ -33,20 +33,12 @@ from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
 )
-from prompt_improver.security.unified_security_manager import (
-    SecurityMode,
-    UnifiedSecurityManager,
-    get_unified_security_manager,
+from prompt_improver.security.services.security_service_facade import (
+    SecurityServiceFacade,
+    get_security_service_facade,
 )
 
-# UNIFIED SECURITY MIGRATION: Import consolidated security infrastructure
-from prompt_improver.security.unified_security_stack import (
-    MiddlewareContext as SecurityMiddlewareContext,
-    SecurityStackMode,
-    UnifiedSecurityStack,
-    get_mcp_server_security_stack,
-    get_unified_security_stack,
-)
+# Legacy unified_security_stack removed - using modern SecurityServiceFacade
 
 logger = logging.getLogger(__name__)
 
@@ -92,54 +84,49 @@ class MiddlewareContext:
         data.update(kwargs)
         return MiddlewareContext(**data)
 
-    def to_security_context(self) -> SecurityMiddlewareContext:
-        """Convert to UnifiedSecurityStack middleware context."""
+    def to_security_context(self) -> dict[str, Any]:
+        """Convert to security context for SecurityServiceFacade."""
         request_id = f"mcp_{int(time.time() * 1000000)}_{secrets.token_hex(4)}"
 
-        return SecurityMiddlewareContext(
-            request_id=request_id,
-            method=self.method,
-            endpoint=f"/mcp/{self.method}",
-            agent_id=self.agent_id or "mcp_client",
-            source=self.source,
-            timestamp=self.timestamp,
-            headers=self.headers,
-            metadata={
+        return {
+            "request_id": request_id,
+            "method": self.method,
+            "endpoint": f"/mcp/{self.method}",
+            "agent_id": self.agent_id or "mcp_client",
+            "source": self.source,
+            "timestamp": self.timestamp,
+            "headers": self.headers,
+            "metadata": {
                 "mcp_type": self.type,
                 "mcp_message": self.message,
             },
-        )
+        }
 
 
 # ========== UNIFIED SECURITY MIDDLEWARE ==========
 
 
 class UnifiedSecurityMiddleware:
-    """Unified Security Middleware for MCP Server - Complete Security Stack Integration
+    """Modern Security Middleware for MCP Server - SecurityServiceFacade Integration
 
-    Replaces ALL legacy middleware implementations with UnifiedSecurityStack:
-    - TimingMiddleware → Performance layer in UnifiedSecurityStack
-    - RateLimitingMiddleware → Rate limiting layer in UnifiedSecurityStack
-    - ErrorHandlingMiddleware → Error handling layer in UnifiedSecurityStack
-    - StructuredLoggingMiddleware → Security monitoring layer in UnifiedSecurityStack
+    Provides security middleware using modern SecurityServiceFacade architecture:
+    - Authentication: Secure request authentication via facade
+    - Authorization: Role-based access control via facade  
+    - Validation: Input/output validation via facade
+    - Rate Limiting: Request throttling via facade
+    - Monitoring: Security event monitoring via facade
 
     Benefits:
-    - 3-5x performance improvement over scattered implementations
-    - OWASP-compliant security layer ordering
-    - Fail-secure design with comprehensive audit logging
+    - Clean architecture with decomposed security services
+    - OWASP-compliant security with fail-secure design
+    - Optimal performance with focused operations
     - Zero legacy compatibility layers (clean break approach)
     """
 
-    def __init__(self, mode: SecurityStackMode = SecurityStackMode.MCP_SERVER):
-        """Initialize unified security middleware.
-
-        Args:
-            mode: Security stack mode for MCP server operations
-        """
-        self.mode = mode
-        self.logger = logging.getLogger(f"{__name__}.UnifiedSecurityMiddleware")
-        self._security_stack: UnifiedSecurityStack | None = None
-        self._security_manager: UnifiedSecurityManager | None = None
+    def __init__(self):
+        """Initialize modern security middleware."""
+        self.logger = logging.getLogger(f"{__name__}.ModernSecurityMiddleware")
+        self._security_facade: SecurityServiceFacade | None = None
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -148,15 +135,12 @@ class UnifiedSecurityMiddleware:
             return
 
         try:
-            # Initialize security stack for MCP server operations
-            self._security_stack = await get_unified_security_stack(self.mode)
-            self._security_manager = await get_unified_security_manager(
-                SecurityMode.MCP_SERVER
-            )
+            # Initialize security facade for MCP server operations
+            self._security_facade = await get_security_service_facade()
 
             self._initialized = True
             self.logger.info(
-                f"UnifiedSecurityMiddleware initialized (mode: {self.mode.value})"
+                "ModernSecurityMiddleware initialized with SecurityServiceFacade"
             )
 
         except Exception as e:

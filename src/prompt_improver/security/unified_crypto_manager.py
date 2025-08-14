@@ -42,7 +42,7 @@ from prompt_improver.security.key_manager import (
     AuditEvent,
     KeyRotationConfig,
     SecurityLevel,
-    UnifiedKeyManager,
+    UnifiedKeyService,
 )
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -124,8 +124,8 @@ class CryptoMetrics:
         return stats
 
 
-class UnifiedCryptoManager:
-    """Unified cryptographic operations manager.
+class UnifiedCryptoService:
+    """Unified cryptographic operations service.
 
     Centralizes all cryptographic operations through the existing KeyManager
     infrastructure to ensure consistent security practices and audit trails.
@@ -133,7 +133,7 @@ class UnifiedCryptoManager:
 
     def __init__(
         self,
-        key_manager: UnifiedKeyManager | None = None,
+        key_manager: UnifiedKeyService | None = None,
         security_level: SecurityLevel = SecurityLevel.enhanced,
     ):
         """Initialize the unified crypto manager.
@@ -142,7 +142,7 @@ class UnifiedCryptoManager:
             key_manager: Optional existing key manager instance
             security_level: Security level for operations
         """
-        self.key_manager = key_manager or UnifiedKeyManager()
+        self.key_manager = key_manager or UnifiedKeyService()
         self.security_level = security_level
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.metrics = CryptoMetrics()
@@ -623,7 +623,7 @@ class UnifiedCryptoManager:
             return
         audit_entry = {
             "timestamp": aware_utc_now().isoformat(),
-            "component": "UnifiedCryptoManager",
+            "component": "UnifiedCryptoService",
             "event": event.value,
             "security_level": self.security_level.value,
             "details": details,
@@ -649,23 +649,23 @@ class UnifiedCryptoManager:
         self.logger.error(f"Crypto operation failed: {operation} - {error}")
 
 
-_default_crypto_manager: UnifiedCryptoManager | None = None
+_default_crypto_manager: UnifiedCryptoService | None = None
 
 
 def get_crypto_manager(
     security_level: SecurityLevel = SecurityLevel.enhanced,
-) -> UnifiedCryptoManager:
+) -> UnifiedCryptoService:
     """Get global unified crypto manager instance.
 
     Args:
         security_level: Security level for operations
 
     Returns:
-        UnifiedCryptoManager instance
+        UnifiedCryptoService instance
     """
     global _default_crypto_manager
     if _default_crypto_manager is None:
-        _default_crypto_manager = UnifiedCryptoManager(security_level=security_level)
+        _default_crypto_manager = UnifiedCryptoService(security_level=security_level)
     return _default_crypto_manager
 
 

@@ -405,7 +405,7 @@ except ImportError:
 
 #### 8. Utility & Cache Patterns (1 pattern)
 
-**8.1 Multi-level Cache Performance** - `src/prompt_improver/utils/multi_level_cache.py:39-53`
+**8.1 Unified Cache Performance** - `src/prompt_improver/services/cache/cache_facade.py` (Replaced legacy multi_level_cache)
 ```python
 try:
     from ..performance.optimization.performance_optimizer import measure_cache_operation

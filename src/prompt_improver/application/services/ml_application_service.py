@@ -13,14 +13,16 @@ from prompt_improver.application.protocols.application_service_protocols import 
     MLApplicationServiceProtocol,
 )
 from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.database import DatabaseServices
-from prompt_improver.database.models import (
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.repositories.protocols.apriori_repository_protocol import (
     AprioriAnalysisRequest,
     AprioriAnalysisResponse,
     PatternDiscoveryRequest,
     PatternDiscoveryResponse,
 )
-from prompt_improver.ml.core.ml_integration import MLModelService
+from prompt_improver.ml.core import MLModelService  # Now points to facade
 from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
 )

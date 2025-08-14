@@ -111,7 +111,7 @@ class SLAMonitor:
         """Get Redis client for distributed metrics via DatabaseServices exclusively."""
         if self._unified_manager is None:
             self._unified_manager = await get_database_services(ManagerMode.HIGH_AVAILABILITY)
-            if not self.True:
+            if not self._initialized:
                 await self._unified_manager.initialize()
         if (
             self._unified_manager

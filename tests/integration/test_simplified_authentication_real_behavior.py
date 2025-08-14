@@ -162,7 +162,7 @@ async def test_mcp_server_real_behavior():
 async def test_prompt_improvement_real_behavior():
     """Test prompt improvement service functionality."""
     try:
-        from prompt_improver.core.services.prompt_improvement import (
+        from prompt_improver.services.prompt.facade import PromptServiceFacade as (
             PromptImprovementService,
         )
 

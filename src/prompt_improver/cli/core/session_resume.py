@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select, text, update
 
-from prompt_improver.cli.core.progress_preservation import ProgressPreservationManager
-from prompt_improver.cli.core.training_system_manager import TrainingSystemManager
-from prompt_improver.database import get_session_context
+from prompt_improver.cli.core.progress_preservation import ProgressService
+from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator as TrainingService
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import TrainingSession
 
 
@@ -59,15 +59,15 @@ class WorkflowState:
     performance_metrics: dict[str, Any]
 
 
-class SessionResumeManager:
-    """Manages training session resume capabilities with state detection and workflow reconstruction.
+class SessionService:
+    """Session service implementing Clean Architecture patterns for training session resume capabilities with state detection and workflow reconstruction.
 
     Features:
     - Automatic detection of interrupted training sessions
     - Session state classification and recovery assessment
     - Workflow state reconstruction from database records
     - Data integrity verification for safe resume operations
-    - Integration with TrainingSystemManager and ProgressPreservationManager
+    - Integration with TrainingService and ProgressService
     - Comprehensive resume coordination and monitoring
     """
 
@@ -75,7 +75,7 @@ class SessionResumeManager:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./session_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_manager = ProgressPreservationManager(backup_dir=self.backup_dir)
+        self.progress_manager = ProgressService(backup_dir=self.backup_dir)
         self.detected_sessions: dict[str, SessionResumeContext] = {}
         self.resume_history: list[dict[str, Any]] = []
         self.resume_lock = asyncio.Lock()
@@ -90,7 +90,7 @@ class SessionResumeManager:
         async with self.detection_lock:
             self.logger.info("Detecting interrupted training sessions")
             try:
-                async with get_session_context() as db_session:
+                async with self.session_manager.session_context() as db_session:
                     result = await db_session.execute(select(TrainingSession))
                     all_sessions = result.scalars().all()
                     cutoff_time = datetime.now(UTC) - timedelta(minutes=30)
@@ -319,7 +319,7 @@ class SessionResumeManager:
         """
         try:
             self.logger.info(f"Reconstructing workflow state for session: {session_id}")
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 result = await db_session.execute(
                     select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
@@ -431,7 +431,7 @@ class SessionResumeManager:
     async def resume_training_session(
         self,
         session_id: str,
-        training_manager: TrainingSystemManager,
+        training_manager: TrainingService,
         force_resume: bool = False,
     ) -> dict[str, Any]:
         """Resume interrupted training session with full workflow reconstruction.
@@ -480,7 +480,7 @@ class SessionResumeManager:
                         "session_id": session_id,
                         "integrity_check": integrity_check,
                     }
-                async with get_session_context() as db_session:
+                async with self.session_manager.session_context() as db_session:
                     await db_session.execute(
                         update(TrainingSession)
                         .where(text(f"session_id = '{session_id}'"))
@@ -522,7 +522,7 @@ class SessionResumeManager:
         """Verify data integrity before resuming session."""
         try:
             integrity_issues = []
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 result = await db_session.execute(
                     select(TrainingSession).where(text(f"session_id = '{session_id}'"))
                 )
@@ -560,11 +560,11 @@ class SessionResumeManager:
         session_id: str,
         context: SessionResumeContext,
         workflow_state: WorkflowState,
-        training_manager: TrainingSystemManager,
+        training_manager: TrainingService,
     ) -> dict[str, Any]:
         """Perform the actual resume operation."""
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 await db_session.execute(
                     update(TrainingSession)
                     .where(text(f"session_id = '{session_id}'"))

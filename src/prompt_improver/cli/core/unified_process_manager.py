@@ -120,10 +120,10 @@ class RecoveryResult:
     recommendations: list[str]
 
 
-class UnifiedProcessManager:
-    """Unified process manager combining PID management and crash recovery.
+class ProcessService:
+    """Process service implementing Clean Architecture patterns for PID management and crash recovery.
 
-    This manager consolidates PIDManager and CrashRecoveryManager functionality
+    This service consolidates PID management and crash recovery functionality
     using composition to provide both process tracking and crash recovery
     capabilities in a single, unified interface.
     """
@@ -161,7 +161,7 @@ class UnifiedProcessManager:
         self.detection_lock = asyncio.Lock()
         self._secure_directories()
         self._init_signal_handlers()
-        logger.info("UnifiedProcessManager initialized")
+        logger.info("ProcessService initialized")
 
     def _secure_directories(self):
         """Ensure directories have proper security settings."""
@@ -204,7 +204,7 @@ class UnifiedProcessManager:
             self.logger.warning(f"Signal handling integration not available: {e}")
 
     def _register_signal_handlers(self):
-        """Register UnifiedProcessManager-specific signal handlers."""
+        """Register ProcessService-specific signal handlers."""
         if self.signal_handler is None:
             self.logger.warning(
                 "Signal handler not initialized, skipping signal registration"
@@ -213,7 +213,7 @@ class UnifiedProcessManager:
         import signal
 
         self.signal_handler.register_shutdown_handler(
-            "UnifiedProcessManager_shutdown", self.graceful_process_shutdown
+            "ProcessService_shutdown", self.graceful_process_shutdown
         )
         self.signal_handler.register_operation_handler(
             SignalOperation.CHECKPOINT, self.perform_emergency_crash_detection
@@ -231,7 +231,7 @@ class UnifiedProcessManager:
             self.prepare_process_interruption,
             priority=self._shutdown_priority,
         )
-        self.logger.info("UnifiedProcessManager signal handlers registered")
+        self.logger.info("ProcessService signal handlers registered")
 
     async def create_process_checkpoint(self, signal_context):
         """Alias for perform_emergency_crash_detection to match naming convention."""
@@ -239,7 +239,7 @@ class UnifiedProcessManager:
 
     async def graceful_process_shutdown(self, shutdown_context):
         """Handle graceful shutdown with comprehensive process and crash cleanup."""
-        self.logger.info("UnifiedProcessManager graceful shutdown initiated")
+        self.logger.info("ProcessService graceful shutdown initiated")
         try:
             check_result = await self.full_system_check_and_recovery()
             cleaned_pids = await self.cleanup_stale_pids()
@@ -261,17 +261,17 @@ class UnifiedProcessManager:
                     })
             return {
                 "status": "success",
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "system_check": check_result,
                 "cleaned_stale_pids": len(cleaned_pids),
                 "active_sessions_cleaned": len(cleanup_results),
                 "cleanup_results": cleanup_results,
             }
         except Exception as e:
-            self.logger.error(f"UnifiedProcessManager shutdown error: {e}")
+            self.logger.error(f"ProcessService shutdown error: {e}")
             return {
                 "status": "error",
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "error": str(e),
             }
 
@@ -340,7 +340,7 @@ class UnifiedProcessManager:
         try:
             preparation_status = {
                 "prepared": True,
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "active_sessions": len(self.active_sessions),
                 "pid_files": len(self.pid_files),
                 "detected_crashes": len(self.detected_crashes),
@@ -351,7 +351,7 @@ class UnifiedProcessManager:
             self.logger.error(f"Process cleanup preparation failed: {e}")
             return {
                 "prepared": False,
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "error": str(e),
             }
 
@@ -361,7 +361,7 @@ class UnifiedProcessManager:
         try:
             interruption_preparation = {
                 "prepared": True,
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "interruption_type": "user_requested",
                 "active_sessions": list(self.active_sessions.keys()),
                 "stale_pid_cleanup_ready": True,
@@ -372,7 +372,7 @@ class UnifiedProcessManager:
             self.logger.error(f"Process interruption preparation failed: {e}")
             return {
                 "prepared": False,
-                "component": "UnifiedProcessManager",
+                "component": "ProcessService",
                 "error": str(e),
             }
 
@@ -840,13 +840,13 @@ class UnifiedProcessManager:
             return {"error": str(e), "check_completed": False}
 
 
-_unified_process_manager = UnifiedProcessManager()
+_unified_process_manager = ProcessService()
 
 
-def get_unified_process_manager() -> UnifiedProcessManager:
+def get_unified_process_manager() -> ProcessService:
     """Get the global unified process manager instance.
 
     Returns:
-        Global UnifiedProcessManager instance
+        Global ProcessService instance
     """
     return _unified_process_manager

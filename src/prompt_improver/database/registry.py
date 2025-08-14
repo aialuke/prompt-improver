@@ -47,8 +47,8 @@ class PromptImproverBase(DeclarativeBase):
     metadata = _centralized_metadata
 
 
-class RegistryManager:
-    """Registry manager for handling SQLAlchemy model registration.
+class RegistryService:
+    """Registry service for handling SQLAlchemy model registration.
 
     Provides utilities to:
     - Clear registries for test isolation

@@ -19,28 +19,20 @@ from prompt_improver.core.protocols.ml_protocols import (
     ComponentRegistryProtocol,
     ComponentSpec,
 )
-from prompt_improver.database import (
-    DatabaseServices,
-    ManagerMode,
-    create_database_services,
-    get_database_services,
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
 )
-from prompt_improver.database.models import (
-    AprioriAnalysisRequest,
-    AprioriAnalysisResponse,
-    AprioriAssociationRule,
-    AprioriPatternDiscovery,
-    PatternDiscoveryRequest,
-    PatternDiscoveryResponse,
+from prompt_improver.application.protocols.application_service_protocols import (
+    AprioriApplicationServiceProtocol,
+    PatternApplicationServiceProtocol,
 )
-from prompt_improver.ml.core.ml_integration import MLModelService, get_ml_service
-from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
-    AdvancedPatternDiscovery,
+from prompt_improver.application.services.apriori_application_service import (
+    AprioriApplicationService,
 )
-from prompt_improver.ml.learning.patterns.apriori_analyzer import (
-    AprioriAnalyzer,
-    AprioriConfig,
+from prompt_improver.application.services.pattern_application_service import (
+    PatternApplicationService,
 )
+# Cache manager handled through dependency injection
 from prompt_improver.repositories.factory import get_apriori_repository
 from prompt_improver.repositories.protocols.apriori_repository_protocol import (
     AprioriRepositoryProtocol,
@@ -70,23 +62,52 @@ async def get_apriori_repository_dep(
     return await get_apriori_repository(db_manager)
 
 
-async def get_apriori_analyzer() -> AprioriAnalyzer:
-    """Dependency to get AprioriAnalyzer instance with unified manager"""
-    db_manager = await get_database_services(ManagerMode.ML_TRAINING)
-    return AprioriAnalyzer(db_manager=db_manager)
+async def get_apriori_application_service(
+    db_manager: DatabaseServices = Depends(get_ml_database_services),
+    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
+) -> AprioriApplicationServiceProtocol:
+    """Get Apriori application service with proper dependencies"""
+    from prompt_improver.repositories.factory import get_ml_repository
+    from prompt_improver.core.caching import create_cache_manager
+    
+    ml_repository = await get_ml_repository(db_manager)
+    cache_manager = await create_cache_manager()
+    
+    service = AprioriApplicationService(
+        db_services=db_manager,
+        apriori_repository=apriori_repository,
+        ml_repository=ml_repository,
+        cache_manager=cache_manager,
+    )
+    await service.initialize()
+    return service
 
 
-async def get_pattern_discovery() -> AdvancedPatternDiscovery:
-    """Dependency to get AdvancedPatternDiscovery instance with unified manager"""
-    db_manager = await get_database_services(ManagerMode.ML_TRAINING)
-    return AdvancedPatternDiscovery(db_manager=db_manager)
+async def get_pattern_application_service(
+    db_manager: DatabaseServices = Depends(get_ml_database_services),
+    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
+) -> PatternApplicationServiceProtocol:
+    """Get Pattern application service with proper dependencies"""
+    from prompt_improver.repositories.factory import get_ml_repository
+    from prompt_improver.core.caching import create_cache_manager
+    
+    ml_repository = await get_ml_repository(db_manager)
+    cache_manager = await create_cache_manager()
+    
+    service = PatternApplicationService(
+        db_services=db_manager,
+        apriori_repository=apriori_repository,
+        ml_repository=ml_repository,
+        cache_manager=cache_manager,
+    )
+    await service.initialize()
+    return service
 
 
 @apriori_router.post("/analyze", response_model=AprioriAnalysisResponse)
 async def run_apriori_analysis(
     request: AprioriAnalysisRequest,
-    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
-    apriori_analyzer: AprioriAnalyzer = Depends(get_apriori_analyzer),
+    apriori_service: AprioriApplicationServiceProtocol = Depends(get_apriori_application_service),
 ) -> AprioriAnalysisResponse:
     """Run Apriori association rule mining analysis.
 
@@ -108,8 +129,15 @@ async def run_apriori_analysis(
     try:
         logger.info(f"Starting Apriori analysis with config: {request.model_dump()}")
 
-        # Use repository to run analysis
-        result = await apriori_repository.run_apriori_analysis(request)
+        # Use application service for orchestrated analysis
+        result = await apriori_service.execute_apriori_analysis(request)
+        
+        if result.status == "error":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Apriori analysis failed: {result.error}",
+            )
+            
         return result
     except HTTPException:
         raise
@@ -124,8 +152,7 @@ async def run_apriori_analysis(
 @apriori_router.post("/discover-patterns", response_model=PatternDiscoveryResponse)
 async def comprehensive_pattern_discovery(
     request: PatternDiscoveryRequest,
-    ml_service: Annotated[MLModelService, Depends(get_ml_service)],
-    db_manager: DatabaseServices = Depends(get_ml_database_services),
+    pattern_service: PatternApplicationServiceProtocol = Depends(get_pattern_application_service),
 ) -> PatternDiscoveryResponse:
     """Run comprehensive pattern discovery combining traditional ML with Apriori analysis.
 
@@ -147,49 +174,34 @@ async def comprehensive_pattern_discovery(
     Raises:
         HTTPException: If pattern discovery fails
     """
-    async with db_manager.get_async_session() as session:
-        try:
-            logger.info(
-                f"Starting comprehensive pattern discovery: {request.model_dump()}"
-            )
-            results = await ml_service.discover_patterns(
-                db_session=session,
-                min_effectiveness=request.min_effectiveness,
-                min_support=request.min_support,
-                use_advanced_discovery=request.use_advanced_discovery,
-                include_apriori=request.include_apriori,
-            )
-            if results.get("status") == "error":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Pattern discovery failed: {results.get('error')}",
-                )
-            discovery_run_id = str(uuid.uuid4())
-            await _store_pattern_discovery_results(session, discovery_run_id, results)
-            return PatternDiscoveryResponse(
-                status=results.get("status", "success"),
-                discovery_run_id=discovery_run_id,
-                traditional_patterns=results.get("traditional_patterns"),
-                advanced_patterns=results.get("advanced_patterns"),
-                apriori_patterns=results.get("apriori_patterns"),
-                cross_validation=results.get("cross_validation"),
-                unified_recommendations=results.get("unified_recommendations", []),
-                business_insights=results.get("business_insights", {}),
-                discovery_metadata=results.get("discovery_metadata", {}),
-            )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Comprehensive pattern discovery failed: {e}")
+    try:
+        logger.info(
+            f"Starting comprehensive pattern discovery: {request.model_dump()}"
+        )
+        
+        # Use application service for orchestrated pattern discovery
+        result = await pattern_service.execute_comprehensive_pattern_discovery(request)
+        
+        if result.status == "error":
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Internal error during pattern discovery: {e!s}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Pattern discovery failed: {result.business_insights.get('error', 'Unknown error')}",
             )
+            
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Comprehensive pattern discovery failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal error during pattern discovery: {e!s}",
+        )
 
 
 @apriori_router.get("/rules", response_model=list[dict[str, Any]])
 async def get_association_rules(
-    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
+    apriori_service: AprioriApplicationServiceProtocol = Depends(get_apriori_application_service),
     min_confidence: float = 0.6,
     min_lift: float = 1.0,
     pattern_category: str | None = None,
@@ -208,9 +220,7 @@ async def get_association_rules(
         List of association rules with metrics and insights
     """
     try:
-        from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-            AssociationRuleFilter,
-        )
+        from prompt_improver.repositories.protocols.apriori_repository_protocol import AssociationRuleFilter
 
         # Create filter from parameters
         filters = AssociationRuleFilter(
@@ -219,32 +229,13 @@ async def get_association_rules(
             pattern_category=pattern_category,
         )
 
-        # Use repository to get rules
-        rules = await apriori_repository.get_association_rules(
+        # Use application service to get rules
+        rule_list = await apriori_service.get_association_rules(
             filters=filters,
             sort_by="lift",
             sort_desc=True,
             limit=limit,
         )
-
-        # Convert to response format
-        rule_list = []
-        for rule in rules:
-            rule_dict = {
-                "id": rule.id,
-                "antecedents": rule.antecedents,
-                "consequents": rule.consequents,
-                "support": rule.support,
-                "confidence": rule.confidence,
-                "lift": rule.lift,
-                "conviction": rule.conviction,
-                "rule_strength": rule.rule_strength,
-                "business_insight": rule.business_insight,
-                "pattern_category": rule.pattern_category,
-                "created_at": rule.created_at.isoformat(),
-                "discovery_run_id": rule.discovery_run_id,
-            }
-            rule_list.append(rule_dict)
 
         logger.info(f"Retrieved {len(rule_list)} association rules")
         return rule_list
@@ -259,8 +250,7 @@ async def get_association_rules(
 @apriori_router.post("/contextualized-patterns")
 async def get_contextualized_patterns(
     context_items: list[str],
-    ml_service: Annotated[MLModelService, Depends(get_ml_service)],
-    db_manager: DatabaseServices = Depends(get_ml_database_services),
+    apriori_service: AprioriApplicationServiceProtocol = Depends(get_apriori_application_service),
     min_confidence: float = 0.6,
 ) -> dict[str, Any]:
     """Get patterns relevant to a specific context using Apriori and ML analysis.
@@ -278,21 +268,15 @@ async def get_contextualized_patterns(
         Dictionary with contextualized patterns and recommendations
     """
     try:
-        async with db_manager.get_async_session() as session:
-            logger.info(f"Getting contextualized patterns for: {context_items}")
-            results = await ml_service.get_contextualized_patterns(
-                context_items=context_items,
-                db_session=session,
-                min_confidence=min_confidence,
-            )
-            if "error" in results:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Contextualized pattern analysis failed: {results['error']}",
-                )
-            return results
-    except HTTPException:
-        raise
+        logger.info(f"Getting contextualized patterns for: {context_items}")
+        
+        # Use application service for contextualized pattern analysis
+        results = await apriori_service.get_contextualized_patterns(
+            context_items=context_items,
+            min_confidence=min_confidence,
+        )
+        
+        return results
     except Exception as e:
         logger.error(f"Error getting contextualized patterns: {e}")
         raise HTTPException(
@@ -303,7 +287,7 @@ async def get_contextualized_patterns(
 
 @apriori_router.get("/discovery-runs", response_model=list[dict[str, Any]])
 async def get_discovery_runs(
-    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
+    pattern_service: PatternApplicationServiceProtocol = Depends(get_pattern_application_service),
     limit: int = 20,
     status_filter: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -318,45 +302,21 @@ async def get_discovery_runs(
         List of discovery run metadata
     """
     try:
-        from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-            PatternDiscoveryFilter,
-        )
+        from prompt_improver.repositories.protocols.apriori_repository_protocol import PatternDiscoveryFilter
 
         # Create filter from parameters
         filters = (
             PatternDiscoveryFilter(status=status_filter) if status_filter else None
         )
 
-        # Use repository to get discovery runs
-        runs = await apriori_repository.get_pattern_discoveries(
+        # Use application service to get discovery runs
+        run_list = await pattern_service.get_pattern_discoveries(
             filters=filters,
             sort_by="created_at",
             sort_desc=True,
             limit=limit,
         )
-
-        # Convert to response format
-        run_list = []
-        for run in runs:
-            run_dict = {
-                "discovery_run_id": run.discovery_run_id,
-                "status": run.status,
-                "transaction_count": run.transaction_count,
-                "frequent_itemsets_count": run.frequent_itemsets_count,
-                "association_rules_count": run.association_rules_count,
-                "execution_time_seconds": run.execution_time_seconds,
-                "created_at": run.created_at.isoformat(),
-                "completed_at": run.completed_at.isoformat()
-                if run.completed_at
-                else None,
-                "config": {
-                    "min_support": run.min_support,
-                    "min_confidence": run.min_confidence,
-                    "min_lift": run.min_lift,
-                    "data_window_days": run.data_window_days,
-                },
-            }
-            run_list.append(run_dict)
+        
         return run_list
     except Exception as e:
         logger.error(f"Error retrieving discovery runs: {e}")
@@ -369,7 +329,7 @@ async def get_discovery_runs(
 @apriori_router.get("/insights/{discovery_run_id}")
 async def get_discovery_insights(
     discovery_run_id: str,
-    apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
+    pattern_service: PatternApplicationServiceProtocol = Depends(get_pattern_application_service),
 ) -> dict[str, Any]:
     """Get detailed insights for a specific discovery run.
 
@@ -381,20 +341,15 @@ async def get_discovery_insights(
         Detailed insights and patterns from the discovery run
     """
     try:
-        # Use repository to get comprehensive discovery results summary
-        insights = await apriori_repository.get_discovery_results_summary(
-            discovery_run_id
-        )
-
-        if not insights:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Discovery run {discovery_run_id} not found",
-            )
-
+        # Use application service to get comprehensive discovery results summary
+        insights = await pattern_service.get_discovery_insights(discovery_run_id)
+        
         return insights
-    except HTTPException:
-        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
     except Exception as e:
         logger.error(f"Error retrieving discovery insights: {e}")
         raise HTTPException(
@@ -403,73 +358,4 @@ async def get_discovery_insights(
         )
 
 
-async def _store_apriori_analysis_metadata(
-    session: AsyncSession,
-    discovery_run_id: str,
-    request: AprioriAnalysisRequest,
-    results: dict[str, Any],
-) -> None:
-    """Store Apriori analysis metadata in database"""
-    try:
-        discovery_record = AprioriPatternDiscovery(
-            discovery_run_id=discovery_run_id,
-            min_support=request.min_support,
-            min_confidence=request.min_confidence,
-            min_lift=request.min_lift,
-            max_itemset_length=request.max_itemset_length,
-            data_window_days=request.window_days,
-            transaction_count=results.get("transaction_count", 0),
-            frequent_itemsets_count=results.get("frequent_itemsets_count", 0),
-            association_rules_count=results.get("association_rules_count", 0),
-            top_patterns_summary=results.get("top_itemsets", []),
-            pattern_insights=results.get("pattern_insights", {}),
-            status="completed",
-        )
-        session.add(discovery_record)
-        await session.commit()
-        logger.info(f"Stored Apriori analysis metadata for run {discovery_run_id}")
-    except Exception as e:
-        logger.error(f"Error storing Apriori analysis metadata: {e}")
-        await session.rollback()
-
-
-async def _store_pattern_discovery_results(
-    session: AsyncSession, discovery_run_id: str, results: dict[str, Any]
-) -> None:
-    """Store comprehensive pattern discovery results"""
-    try:
-        from prompt_improver.database.models import AdvancedPatternResults
-
-        metadata = results.get("discovery_metadata", {})
-        results_record = AdvancedPatternResults(
-            discovery_run_id=discovery_run_id,
-            algorithms_used=metadata.get("algorithms_used", []),
-            discovery_modes=metadata.get("discovery_modes", []),
-            parameter_patterns=results.get("traditional_patterns"),
-            sequence_patterns=results.get("advanced_patterns", {}).get(
-                "sequence_patterns"
-            ),
-            performance_patterns=results.get("advanced_patterns", {}).get(
-                "performance_patterns"
-            ),
-            semantic_patterns=results.get("advanced_patterns", {}).get(
-                "semantic_patterns"
-            ),
-            apriori_patterns=results.get("apriori_patterns"),
-            cross_validation=results.get("cross_validation"),
-            ensemble_analysis=results.get("advanced_patterns", {}).get(
-                "ensemble_analysis"
-            ),
-            unified_recommendations=results.get("unified_recommendations", []),
-            business_insights=results.get("business_insights", {}),
-            execution_time_seconds=metadata.get("execution_time_seconds", 0.0),
-            total_patterns_discovered=metadata.get("total_patterns_discovered", 0),
-            discovery_quality_score=metadata.get("discovery_quality_score"),
-            algorithms_count=metadata.get("algorithms_count", 1),
-        )
-        session.add(results_record)
-        await session.commit()
-        logger.info(f"Stored pattern discovery results for run {discovery_run_id}")
-    except Exception as e:
-        logger.error(f"Error storing pattern discovery results: {e}")
-        await session.rollback()
+# Helper functions removed - now handled by application services

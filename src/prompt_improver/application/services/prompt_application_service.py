@@ -13,20 +13,16 @@ from typing import Any, Dict, List, Optional
 from prompt_improver.application.protocols.application_service_protocols import (
     PromptApplicationServiceProtocol,
 )
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-from prompt_improver.database import DatabaseServices
-from prompt_improver.database.services.cache.cache_manager import (
-    CacheManager,
-    CacheManagerConfig,
-)
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+# Cache manager handled through dependency injection - no direct database imports
 from prompt_improver.repositories.protocols.prompt_repository_protocol import (
     PromptRepositoryProtocol,
 )
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
-from prompt_improver.rule_engine.base import RuleEngine
-from prompt_improver.security.input_validator import InputValidator
+from prompt_improver.rule_engine import RuleEngine
+from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
 from prompt_improver.utils.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
@@ -46,18 +42,16 @@ class PromptApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
-        prompt_repository: PromptRepositoryProtocol,
         session_manager: SessionManagerProtocol,
+        prompt_repository: PromptRepositoryProtocol,
         rule_engine: RuleEngine,
         session_store: SessionStore,
-        input_validator: InputValidator,
+        input_validator: OWASP2025InputValidator,
         prompt_improvement_service: PromptImprovementService,
-        cache_manager: Optional[CacheManager] = None,
+        cache_manager = None,  # Cache manager from performance layer
     ):
-        self.db_services = db_services
-        self.prompt_repository = prompt_repository
         self.session_manager = session_manager
+        self.prompt_repository = prompt_repository
         self.rule_engine = rule_engine
         self.session_store = session_store
         self.input_validator = input_validator
@@ -176,7 +170,7 @@ class PromptApplicationService:
             )
             
             # 3. Transaction boundary - entire workflow
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # 4. Core improvement workflow
                     improvement_result = await self.prompt_improvement_service.improve_prompt(
@@ -288,7 +282,7 @@ class PromptApplicationService:
             session_context = await self._load_session_context(session_id)
             
             # Transaction boundary for rule application
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Apply rules through rule engine
                     rule_results = await self.rule_engine.apply_rules(
@@ -357,7 +351,7 @@ class PromptApplicationService:
                 return {"status": "error", "error": "Invalid initial prompt"}
             
             # Create session with transaction boundary
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Create session record
                     session_data = {
@@ -422,7 +416,7 @@ class PromptApplicationService:
             self.logger.info(f"Finalizing improvement session {session_id}")
             
             # Transaction boundary for session finalization
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Load session data
                     session_data = await self.session_store.get_session(session_id)
@@ -472,11 +466,18 @@ class PromptApplicationService:
     # Private helper methods
 
     async def _validate_prompt_input(self, prompt: str) -> bool:
-        """Validate prompt input for security and format."""
+        """Validate prompt input for security and format using OWASP 2025 compliance."""
         try:
-            return await self.input_validator.validate_prompt(prompt)
+            validation_result = self.input_validator.validate_prompt(prompt)
+            if validation_result.is_blocked:
+                self.logger.warning(
+                    f"Prompt blocked by OWASP validator - Threat: {validation_result.threat_type}, "
+                    f"Score: {validation_result.threat_score:.2f}, "
+                    f"Patterns: {validation_result.detected_patterns}"
+                )
+            return validation_result.is_valid
         except Exception as e:
-            self.logger.error(f"Prompt validation failed: {e}")
+            self.logger.error(f"OWASP prompt validation failed: {e}")
             return False
 
     async def _load_or_create_session_context(

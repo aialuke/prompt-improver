@@ -25,7 +25,7 @@ from prompt_improver.database import get_session_context
 from prompt_improver.database.models import ImprovementSession, RulePerformance
 from prompt_improver.rule_engine import RuleEngine
 from prompt_improver.services.analytics import AnalyticsService
-from prompt_improver.services.prompt_improvement import PromptImprovementService
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.utils.session_store import SessionStore
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))

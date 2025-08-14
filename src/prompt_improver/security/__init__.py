@@ -1,4 +1,8 @@
-"""Real security services for production use and integration testing."""
+"""Modern security services - Clean architecture with decomposed services.
+
+Provides secure, fail-secure security operations through specialized services
+following the 2025 security patterns with zero legacy compatibility layers.
+"""
 
 from prompt_improver.security.adversarial_defense import AdversarialDefenseSystem
 from prompt_improver.security.authorization import (
@@ -9,6 +13,11 @@ from prompt_improver.security.authorization import (
 from prompt_improver.security.differential_privacy import DifferentialPrivacyService
 from prompt_improver.security.federated_learning import FederatedLearningService
 from prompt_improver.security.input_sanitization import InputSanitizer
+from prompt_improver.security.owasp_input_validator import (
+    OWASP2025InputValidator,
+    ThreatType,
+    ValidationResult,
+)
 from prompt_improver.security.input_validator import (
     InputValidator,
     ValidationError,
@@ -16,16 +25,20 @@ from prompt_improver.security.input_validator import (
 )
 from prompt_improver.security.key_manager import (
     KeyRotationConfig,
-    UnifiedKeyManager,
+    UnifiedKeyService,
     get_key_manager,
 )
 from prompt_improver.security.memory_guard import MemoryGuard, get_memory_guard
 from prompt_improver.security.secure_logging import SecureLogger
+from prompt_improver.security.services.security_service_facade import (
+    SecurityServiceFacade,
+    get_security_service_facade,
+)
 from prompt_improver.security.unified_crypto_manager import (
     CryptoAuditEvent,
     HashAlgorithm,
     RandomType,
-    UnifiedCryptoManager,
+    UnifiedCryptoService,
     decrypt_data,
     encrypt_data,
     generate_cache_key,
@@ -39,49 +52,47 @@ from prompt_improver.security.unified_crypto_manager import (
 )
 
 __all__ = [
+    # Core security services (modern architecture)
+    "SecurityServiceFacade",
+    "get_security_service_facade",
+    
+    # Specialized security components
     "AdversarialDefenseSystem",
     "AuthorizationService",
-    "CryptoAuditEvent",
     "DifferentialPrivacyService",
     "FederatedLearningService",
-    "HashAlgorithm",
     "InputSanitizer",
-    "InputValidator",
-    "KeyRotationConfig",
+    "InputValidator",  # Legacy validator (being phased out)
+    "OWASP2025InputValidator",  # Modern OWASP-compliant validator
     "MemoryGuard",
-    "Permission",
-    "RandomType",
-    "Role",
     "SecureLogger",
-    "ThreatDetection",
-    "ThreatSeverity",
+    
+    # Security models and enums
+    "Permission",
+    "Role",
     "ThreatType",
-    "UnifiedCryptoManager",
-    "UnifiedKeyManager",
-    "UnifiedValidationManager",
-    "ValidationConfiguration",
     "ValidationError",
-    "ValidationMode",
     "ValidationResult",
     "ValidationSchema",
-    "create_security_aware_validation_manager",
-    "create_validation_test_adapter",
+    
+    # Cryptographic services
+    "CryptoAuditEvent",
+    "HashAlgorithm",
+    "KeyRotationConfig",
+    "RandomType",
+    "UnifiedCryptoService",
+    "UnifiedKeyService",
+    
+    # Utility functions
     "decrypt_data",
     "encrypt_data",
     "generate_cache_key",
     "generate_token_bytes",
     "generate_token_hex",
     "generate_token_urlsafe",
-    "get_admin_validation_manager",
-    "get_api_validation_manager",
     "get_crypto_manager",
-    "get_high_security_validation_manager",
-    "get_internal_validation_manager",
     "get_key_manager",
-    "get_mcp_validation_manager",
     "get_memory_guard",
-    "get_ml_validation_manager",
-    "get_unified_validation_manager",
     "hash_md5",
     "hash_sha256",
     "secure_compare",

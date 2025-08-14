@@ -24,6 +24,8 @@ from prompt_improver.database.factories import (
     create_security_context,
     create_security_context_from_auth_result,
 )
+# Security integration imports removed to avoid circular imports
+# Import directly from security_integration module if needed
 from prompt_improver.database.models import (
     ABExperiment,
     DiscoveredPattern,
@@ -181,6 +183,7 @@ __all__ = [
     "create_database_services",
     "create_security_context",
     "create_security_context_from_auth_result",
+    # "create_security_context_from_security_manager", # Removed to avoid circular imports
     "database_services",
     "db_session",
     "get_async_session_factory",

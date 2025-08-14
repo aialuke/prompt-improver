@@ -12,10 +12,10 @@ New decomposed services following SOLID principles:
 
 # MIGRATION NOTE: AnalyticsService now points to unified service
 from prompt_improver.analytics import AnalyticsServiceFacade as AnalyticsService
-from prompt_improver.core.services.manager import APESServiceManager
+from prompt_improver.core.services.manager import OrchestrationService as APESServiceManager
 from prompt_improver.core.services.ml_eventing_service import MLEventingService
 from prompt_improver.core.services.persistence_service import PersistenceService
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+# NOTE: PromptImprovementService moved to services.prompt.facade to break circular imports
 from prompt_improver.core.services.protocols import (
     IAnalyticsService,
     IMLEventingService,
@@ -36,7 +36,7 @@ __all__ = [
     # Main services
     "APESServiceManager",
     "PromptDataProtection",
-    "PromptImprovementService",
+    # "PromptImprovementService", # Moved to services.prompt.facade
     "StartupOrchestrator",
     # Decomposed services
     "AnalyticsService",

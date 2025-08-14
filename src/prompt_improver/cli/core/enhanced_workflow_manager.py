@@ -55,8 +55,8 @@ class WorkflowCompletionResult:
     progress_data: dict[str, Any] | None = None
 
 
-class EnhancedWorkflowManager:
-    """Enhanced workflow manager implementing 2025 best practices for:
+class WorkflowService:
+    """Workflow service implementing Clean Architecture and 2025 best practices for:
     - Configurable timeout management with exponential backoff
     - Rich progress monitoring with real-time updates
     - Graceful vs force shutdown modes

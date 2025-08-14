@@ -9,7 +9,7 @@ import asyncio
 import os
 import sys
 
-from prompt_improver.core.di.container import DIContainer
+from prompt_improver.core.di.container_orchestrator import DIContainer
 from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisInterface,
     MLHealthInterface,

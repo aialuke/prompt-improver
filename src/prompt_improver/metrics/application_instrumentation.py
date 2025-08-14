@@ -667,9 +667,7 @@ def instrument_application_startup():
     try:
         logger.info("Starting application instrumentation for business metrics...")
         try:
-            from prompt_improver.core.services.prompt_improvement import (
-                PromptImprovementService,
-            )
+            from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
             PromptImprovementInstrumentation.instrument_prompt_service(
                 PromptImprovementService

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 import json
 import logging
-from prompt_improver.common.datetime_utils import format_compact_timestamp, format_display_date
+from prompt_improver.utils.datetime_utils import format_compact_timestamp, format_display_date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 

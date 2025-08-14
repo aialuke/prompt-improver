@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.common.datetime_utils import (
+from prompt_improver.utils.datetime_utils import (
     format_compact_timestamp,
     format_date_only,
     format_display_date,
@@ -36,12 +36,8 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-try:
-    from prompt_improver.database import get_session
-
-    DATABASE_AVAILABLE = True
-except ImportError:
-    DATABASE_AVAILABLE = False
+# Database functionality removed - baseline collector is primarily file-based
+DATABASE_AVAILABLE = False
 try:
     REDIS_AVAILABLE = True
 except ImportError:

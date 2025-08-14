@@ -60,4 +60,4 @@ class ResourceQuotaInfo:
     memory_used: str
     gpu_used: str
 
-# KubernetesResourceManager class removed - functionality consolidated into UnifiedOrchestrationManager
+# KubernetesResourceManager class removed - functionality consolidated into OrchestrationService

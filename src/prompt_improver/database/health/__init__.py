@@ -5,13 +5,9 @@ connection pool optimization, and performance analysis.
 
 ## Architecture Overview
 
-This package provides both the original monolithic DatabaseHealthMonitor and
-the new decomposed service architecture for health monitoring:
+This package provides decomposed service architecture for health monitoring:
 
-### Original Architecture (Deprecated but maintained for compatibility)
-- **DatabaseHealthMonitor**: 1787-line god object (deprecated)
-
-### New Decomposed Architecture (Recommended)
+### Decomposed Architecture
 - **DatabaseHealthService**: Unified interface with focused service composition
 - **DatabaseConnectionService**: Connection pool monitoring and health assessment  
 - **HealthMetricsService**: Performance metrics collection and analysis
@@ -20,14 +16,7 @@ the new decomposed service architecture for health monitoring:
 
 ## Migration Path
 
-**Current (Deprecated):**
-```python
-from prompt_improver.database.health import get_database_health_monitor
-monitor = get_database_health_monitor()
-metrics = await monitor.collect_comprehensive_metrics()
-```
-
-**New (Recommended):**
+**Usage:**
 ```python
 from prompt_improver.database.health.services import get_database_health_service
 service = get_database_health_service(session_manager)
@@ -56,18 +45,9 @@ from prompt_improver.database.health.services import (
 )
 ```
 
-### For Legacy Compatibility
-```python
-# Deprecated but still functional
-from prompt_improver.database.health import DatabaseHealthMonitor
-```
 """
 
-# Legacy imports for backward compatibility (DEPRECATED)
-from prompt_improver.database.health.database_health_monitor import (
-    DatabaseHealthMonitor,
-    get_database_health_monitor,
-)
+# Legacy DatabaseHealthMonitor was removed - use new decomposed services
 
 # Utility components (still active)
 from prompt_improver.database.health.index_health_assessor import IndexHealthAssessor
@@ -101,9 +81,7 @@ from prompt_improver.database.health.services import (
 )
 
 __all__ = [
-    # Legacy components (deprecated but maintained for compatibility)
-    "DatabaseHealthMonitor",
-    "get_database_health_monitor",
+    # Legacy components removed - use decomposed services
     
     # Utility components (active)
     "IndexHealthAssessor", 
@@ -138,8 +116,8 @@ __all__ = [
 # Version and architecture information
 __version__ = "2025.1.0"
 __architecture_status__ = {
-    "legacy": "DatabaseHealthMonitor (deprecated)",
+    "legacy": "DatabaseHealthMonitor (removed)",
     "current": "Decomposed focused services",
     "performance_improvement": "60-80% faster",
-    "migration_status": "backward_compatible",
+    "migration_status": "clean_break_no_legacy",
 }

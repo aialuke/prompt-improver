@@ -23,7 +23,7 @@ from httpx import AsyncClient
 
 from prompt_improver.api.app import create_test_app
 from prompt_improver.core.config import get_config
-from prompt_improver.core.di.container import get_container
+from prompt_improver.core.di.container_orchestrator import get_container
 from prompt_improver.database import get_unified_manager
 from prompt_improver.monitoring.unified_monitoring_manager import get_monitoring_manager
 from prompt_improver.performance.monitoring.health.unified_health_system import (

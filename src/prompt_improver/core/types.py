@@ -33,6 +33,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+# Import SecurityContext from shared types for compatibility
+from prompt_improver.shared.types.core import SecurityContext
+
+# SQLModel availability check
+try:
+    import sqlmodel
+    SQLMODEL_AVAILABLE = True
+except ImportError:
+    SQLMODEL_AVAILABLE = False
+
 if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
@@ -600,6 +610,7 @@ __all__ = [
     "RedisConfig",
     "RetryCount",
     "Score",
+    "SecurityContext",
     "ServiceStatus",
     "SessionId",
     "TimestampedModel",

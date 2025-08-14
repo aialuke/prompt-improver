@@ -3,7 +3,7 @@
 Advanced learning algorithms for context awareness, failure analysis,
 and insights generation, along with feature engineering components.
 """
-from ..optimization.algorithms.clustering_optimizer import ClusteringOptimizer as ContextClusteringEngine
+from ..clustering.services.clustering_optimizer_facade import ClusteringOptimizerFacade as ContextClusteringEngine
 from .algorithms import ContextConfig, ContextLearner, InsightGenerationEngine, RuleAnalyzer
 from .algorithms.context_aware_weighter import ContextAwareFeatureWeighter
 from .clustering import ClusteringConfig

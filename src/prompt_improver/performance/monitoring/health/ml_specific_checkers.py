@@ -105,7 +105,7 @@ class MLModelHealthChecker(HealthChecker):
     async def _check_deployed_models(self) -> dict[str, Any]:
         """Check the health of deployed models."""
         try:
-            from prompt_improver.ml.core.ml_integration import MLModelService
+            from prompt_improver.ml.core import MLModelService  # Now points to facade
 
             ml_service = MLModelService()
             cache_stats = ml_service.get_cache_stats()
@@ -121,7 +121,7 @@ class MLModelHealthChecker(HealthChecker):
     async def _check_model_cache(self) -> dict[str, Any]:
         """Check the health of model cache."""
         try:
-            from prompt_improver.ml.core.ml_integration import MLModelService
+            from prompt_improver.ml.core import MLModelService  # Now points to facade
 
             ml_service = MLModelService()
             cache_stats = ml_service.get_cache_stats()

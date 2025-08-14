@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 import numpy as np
-from ....security import InputValidator, ValidationError
+from ....security import OWASP2025InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
 from ....utils.datetime_utils import aware_utc_now
 from ...analysis.domain_detector import PromptDomain
@@ -152,7 +152,7 @@ class DomainFeatureExtractor:
             config: Configuration for domain feature extraction
         """
         self.config = config or DomainFeatureConfig()
-        self.input_validator = InputValidator()
+        self.input_validator = OWASP2025InputValidator()
         self.input_sanitizer = InputSanitizer()
         if DOMAIN_ANALYSIS_AVAILABLE and self.config.use_domain_analyzer:
             try:

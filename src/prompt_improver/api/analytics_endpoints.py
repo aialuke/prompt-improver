@@ -34,11 +34,8 @@ from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisInterface,
     request_ml_analysis_via_events,
 )
-from prompt_improver.database import (
-    DatabaseServices,
-    ManagerMode,
-    create_database_services,
-    get_database_services,
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
 )
 from prompt_improver.repositories.factory import get_analytics_repository
 from prompt_improver.repositories.protocols.analytics_repository_protocol import (
@@ -50,39 +47,8 @@ from prompt_improver.repositories.protocols.analytics_repository_protocol import
 logger = logging.getLogger(__name__)
 
 
-# WebSocket connection manager (would normally be imported from a WebSocket module)
-class ConnectionManager:
-    """Placeholder connection manager for WebSocket connections."""
-
-    async def connect_to_group(self, websocket, group: str, user_id: str):
-        """Connect to a WebSocket group."""
-        await websocket.accept()
-
-    async def connect(self, websocket, channel: str, user_id: str):
-        """Connect to a WebSocket channel."""
-        await websocket.accept()
-
-    async def send_to_connection(self, websocket, message: dict):
-        """Send message to WebSocket connection."""
-        await websocket.send_json(message)
-
-    async def broadcast_to_group(self, group: str, message: dict):
-        """Broadcast message to group."""
-        # Placeholder
-
-    def get_connection_count(self, channel: str = None) -> int:
-        """Get connection count."""
-        return 0
-
-    async def disconnect(self, websocket):
-        """Disconnect WebSocket."""
-        try:
-            await websocket.close()
-        except:
-            pass
-
-
-connection_manager = ConnectionManager()
+# Import shared WebSocket connection manager
+from .websocket_manager import websocket_manager as connection_manager
 
 
 class UserRole(Enum):
@@ -213,7 +179,7 @@ async def get_unified_analytics_service(
 
 async def get_ml_analysis_interface() -> MLAnalysisInterface:
     """Get ML analysis interface via dependency injection"""
-    from prompt_improver.core.di.container import get_container
+    from prompt_improver.core.di.container_orchestrator import get_container
 
     container = await get_container()
     return await container.get(MLAnalysisInterface)

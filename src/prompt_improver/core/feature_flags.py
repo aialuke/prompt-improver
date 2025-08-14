@@ -137,8 +137,8 @@ class FileWatcher(FileSystemEventHandler):
             logger.error(f"Error in file watcher callback: {e}")
 
 
-class FeatureFlagManager:
-    """Advanced feature flag manager with hot-reloading and percentage rollouts.
+class FeatureFlagService:
+    """Advanced feature flag service with hot-reloading and percentage rollouts implementing Clean Architecture patterns.
 
     Features:
     - Hot-reload configuration changes without restart
@@ -447,20 +447,20 @@ class FeatureFlagManager:
         self._metrics.clear()
 
 
-_default_manager: FeatureFlagManager | None = None
+_default_manager: FeatureFlagService | None = None
 
 
 async def initialize_feature_flags(
     config_path: str | Path, watch_files: bool = True
-) -> FeatureFlagManager:
+) -> FeatureFlagService:
     """Initialize the global feature flag manager."""
     global _default_manager
-    _default_manager = FeatureFlagManager(config_path, watch_files)
+    _default_manager = FeatureFlagService(config_path, watch_files)
     await _default_manager.async_init()
     return _default_manager
 
 
-def get_feature_flag_manager() -> FeatureFlagManager | None:
+def get_feature_flag_manager() -> FeatureFlagService | None:
     """Get the global feature flag manager."""
     return _default_manager
 

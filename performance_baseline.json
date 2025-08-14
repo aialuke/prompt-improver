@@ -1,0 +1,122 @@
+{
+  "ml_circuit_breaker": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 1000000,
+    "baseline_established": "2025-08-14T10:08:59.408902+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "ml_rule_analysis": {
+    "target_response_ms": 50.0,
+    "target_throughput_ops_sec": 100,
+    "baseline_established": "2025-08-14T10:08:59.408904+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "ml_predictions": {
+    "target_response_ms": 100.0,
+    "target_throughput_ops_sec": 20,
+    "baseline_established": "2025-08-14T10:08:59.408905+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "ml_intelligence_facade": {
+    "target_response_ms": 200.0,
+    "target_throughput_ops_sec": 10,
+    "baseline_established": "2025-08-14T10:08:59.408906+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "retry_configuration": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 1000000,
+    "baseline_established": "2025-08-14T10:08:59.408906+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "backoff_strategy": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 1000000,
+    "baseline_established": "2025-08-14T10:08:59.408907+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "circuit_breaker": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 100000,
+    "baseline_established": "2025-08-14T10:08:59.408908+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "retry_facade": {
+    "target_response_ms": 5.0,
+    "target_throughput_ops_sec": 1000,
+    "baseline_established": "2025-08-14T10:08:59.408909+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "error_handling_facade": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 100000,
+    "baseline_established": "2025-08-14T10:08:59.408910+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "database_error_service": {
+    "target_response_ms": 2.0,
+    "target_throughput_ops_sec": 500,
+    "baseline_established": "2025-08-14T10:08:59.408911+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "network_error_service": {
+    "target_response_ms": 2.0,
+    "target_throughput_ops_sec": 500,
+    "baseline_established": "2025-08-14T10:08:59.408911+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "validation_error_service": {
+    "target_response_ms": 2.0,
+    "target_throughput_ops_sec": 1000,
+    "baseline_established": "2025-08-14T10:08:59.408912+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "l1_cache": {
+    "target_response_ms": 1.0,
+    "target_throughput_ops_sec": 500000,
+    "baseline_established": "2025-08-14T10:08:59.408913+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "l2_cache": {
+    "target_response_ms": 10.0,
+    "target_throughput_ops_sec": 200,
+    "baseline_established": "2025-08-14T10:08:59.408914+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "l3_cache": {
+    "target_response_ms": 50.0,
+    "target_throughput_ops_sec": 100,
+    "baseline_established": "2025-08-14T10:08:59.408915+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "cache_coordination": {
+    "target_response_ms": 5.0,
+    "target_throughput_ops_sec": 300,
+    "baseline_established": "2025-08-14T10:08:59.408916+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "configuration_system": {
+    "target_response_ms": 100.0,
+    "target_throughput_ops_sec": 1000000,
+    "baseline_established": "2025-08-14T10:08:59.408917+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "security_facade": {
+    "target_response_ms": 100.0,
+    "target_throughput_ops_sec": 100,
+    "baseline_established": "2025-08-14T10:08:59.408918+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "database_repository": {
+    "target_response_ms": 100.0,
+    "target_throughput_ops_sec": 500,
+    "baseline_established": "2025-08-14T10:08:59.408918+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  },
+  "di_container": {
+    "target_response_ms": 5.0,
+    "target_throughput_ops_sec": 1000,
+    "baseline_established": "2025-08-14T10:08:59.408919+00:00",
+    "source": "comprehensive_performance_validation_2025"
+  }
+}

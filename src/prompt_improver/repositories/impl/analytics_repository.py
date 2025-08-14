@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.common.error_handling import handle_repository_errors
+from prompt_improver.utils.error_handlers import handle_repository_errors
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.services.cache.cache_manager import (
     CacheManager,

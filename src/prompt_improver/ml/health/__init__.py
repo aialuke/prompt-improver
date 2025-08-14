@@ -13,8 +13,8 @@ This module provides comprehensive health monitoring for ML models and inference
 Integrates with the existing PromptImprover health check system for unified monitoring.
 """
 from .drift_detector import ModelDriftDetector
-from .integration_manager import MLHealthIntegrationManager
+from .integration_manager import MLHealthIntegrationService
 from .ml_health_monitor import MLHealthMonitor
 from .model_performance_tracker import ModelPerformanceTracker
 from .resource_monitor import ResourceMonitor
-__all__ = ['MLHealthMonitor', 'ModelPerformanceTracker', 'ResourceMonitor', 'ModelDriftDetector', 'MLHealthIntegrationManager']
+__all__ = ['MLHealthMonitor', 'ModelPerformanceTracker', 'ResourceMonitor', 'ModelDriftDetector', 'MLHealthIntegrationService']

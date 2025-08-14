@@ -400,10 +400,8 @@ class AsyncOptimizer:
         self, operation: Callable, *args, max_retries: int | None = None, **kwargs
     ) -> Any:
         """Execute operation with unified retry logic."""
-        from prompt_improver.core.retry_manager import (
-            RetryConfig,
-            RetryStrategy,
-            get_retry_manager,
+        from prompt_improver.core.services.resilience.retry_service_facade import (
+            get_retry_service as get_retry_manager,
         )
 
         max_retries = max_retries or self.config.retry_attempts

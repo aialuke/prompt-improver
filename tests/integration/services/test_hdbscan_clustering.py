@@ -38,12 +38,10 @@ class TestHDBSCANClusteringEnhancements:
     @pytest.fixture
     async def discovery_service(self, real_db_session):
         """Create AdvancedPatternDiscovery service with real database connection."""
-        from prompt_improver.database.connection import DatabaseManager
-
-        db_manager = DatabaseManager(
-            database_url="postgresql+asyncpg://postgres:password@localhost:5432/prompt_improver_test"
-        )
-        service = AdvancedPatternDiscovery(db_manager=db_manager)
+        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+        
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        service = AdvancedPatternDiscovery(session_manager=services)
         return service
 
     @pytest.fixture
@@ -311,12 +309,13 @@ class HDBSCANStateMachine(RuleBasedStateMachine):
 
     def __init__(self):
         super().__init__()
-        from prompt_improver.database.connection import DatabaseManager
-
-        db_manager = DatabaseManager(
-            database_url="postgresql+asyncpg://postgres:password@localhost:5432/prompt_improver_test"
-        )
-        self.discovery_service = AdvancedPatternDiscovery(db_manager=db_manager)
+        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+        import asyncio
+        
+        # Create services in sync context
+        loop = asyncio.get_event_loop()
+        services = loop.run_until_complete(create_database_services(ManagerMode.ASYNC_MODERN))
+        self.discovery_service = AdvancedPatternDiscovery(session_manager=services)
         self.current_patterns = []
 
     @rule(
@@ -363,12 +362,10 @@ class TestHDBSCANEdgeCases:
     @pytest.fixture
     async def minimal_discovery_service(self, real_db_session):
         """Create discovery service for minimal data testing."""
-        from prompt_improver.database.connection import DatabaseManager
-
-        db_manager = DatabaseManager(
-            database_url="postgresql+asyncpg://postgres:password@localhost:5432/prompt_improver_test"
-        )
-        return AdvancedPatternDiscovery(db_manager=db_manager)
+        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+        
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        return AdvancedPatternDiscovery(session_manager=services)
 
     @pytest.mark.asyncio
     async def test_insufficient_data_handling(

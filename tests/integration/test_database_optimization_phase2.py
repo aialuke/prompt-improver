@@ -12,13 +12,12 @@ from typing import Any, Dict, List
 
 import pytest
 
-from prompt_improver.database import ManagerMode, get_unified_manager
+from prompt_improver.database import ManagerMode, DatabaseServices, create_database_services
 from prompt_improver.database.cache_layer import (
     CachePolicy,
     CacheStrategy,
     DatabaseCacheLayer,
 )
-from prompt_improver.database.connection import get_session_context
 from prompt_improver.database.models import PromptImprovement, Rule, Session
 from prompt_improver.database.query_optimizer import (
     OptimizedQueryExecutor,
@@ -71,7 +70,10 @@ class TestDatabaseOptimizationPhase2:
         params = {}
 
         async def execute_query(q, p):
-            return await client.fetch_raw(q, p)
+            services = await create_database_services(ManagerMode.ASYNC_MODERN)
+            async with services.database.get_session() as session:
+                result = await session.execute(q, p)
+                return result.fetchall()
 
         start1 = time.perf_counter()
         result1, was_cached1 = await cache_layer.get_or_execute(
@@ -103,7 +105,10 @@ class TestDatabaseOptimizationPhase2:
         query = "SELECT * FROM sessions WHERE user_id = %(user_id)s LIMIT 5"
 
         async def execute_query(q, p):
-            return await client.fetch_raw(q, p)
+            services = await create_database_services(ManagerMode.ASYNC_MODERN)
+            async with services.database.get_session() as session:
+                result = await session.execute(q, p)
+                return result.fetchall()
 
         result1, cached1 = await cache_layer.get_or_execute(
             query, {"user_id": "user1"}, execute_query
@@ -127,7 +132,10 @@ class TestDatabaseOptimizationPhase2:
         query = "SELECT COUNT(*) as count FROM rules WHERE active = true"
 
         async def execute_query(q, p):
-            return await client.fetch_raw(q, p)
+            services = await create_database_services(ManagerMode.ASYNC_MODERN)
+            async with services.database.get_session() as session:
+                result = await session.execute(q, p)
+                return result.fetchall()
 
         result1, _ = await cache_layer.get_or_execute(query, {}, execute_query)
         count1 = result1[0]["count"]
@@ -142,7 +150,8 @@ class TestDatabaseOptimizationPhase2:
     @pytest.mark.asyncio
     async def test_optimized_query_executor_with_caching(self, query_executor):
         """Test OptimizedQueryExecutor with integrated caching"""
-        async with get_session_context() as session:
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        async with services.database.get_session() as session:
             query = "SELECT id, name FROM rules WHERE active = true ORDER BY created_at DESC LIMIT 20"
             start1 = time.perf_counter()
             async with query_executor.execute_optimized_query(
@@ -172,10 +181,9 @@ class TestDatabaseOptimizationPhase2:
         initial_metrics = await pool_optimizer.collect_pool_metrics()
 
         async def simulate_db_operation(operation_id: int):
-            manager = get_database_services(ManagerMode.ASYNC_MODERN)
-            async with client.connection() as conn, conn.cursor() as cur:
-                await cur.execute("SELECT pg_sleep(0.01)")
-                await cur.fetchone()
+            services = await create_database_services(ManagerMode.ASYNC_MODERN)
+            async with services.database.get_session() as session:
+                await session.execute("SELECT pg_sleep(0.01)")
 
         tasks = [simulate_db_operation(i) for i in range(20)]
         await asyncio.gather(*tasks)
@@ -217,7 +225,8 @@ class TestDatabaseOptimizationPhase2:
         ]
         total_executions = 0
         cache_hits = 0
-        async with get_session_context() as session:
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        async with services.database.get_session() as session:
             for _ in range(3):
                 for query, params in queries:
                     async with query_executor.execute_optimized_query(
@@ -257,7 +266,10 @@ class TestDatabaseOptimizationPhase2:
         query = "SELECT id, name FROM rules WHERE active = true ORDER BY id LIMIT 5"
 
         async def execute_query(q, p):
-            return await client.fetch_raw(q, p)
+            services = await create_database_services(ManagerMode.ASYNC_MODERN)
+            async with services.database.get_session() as session:
+                result = await session.execute(q, p)
+                return result.fetchall()
 
         await cache_layer.get_or_execute(query, {}, execute_query)
 

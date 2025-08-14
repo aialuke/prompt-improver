@@ -9,7 +9,10 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from prompt_improver.database import ManagerMode, get_database_services
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.core.di import get_container
 
 if TYPE_CHECKING:
     from prompt_improver.mcp_server.server import APESMCPServer

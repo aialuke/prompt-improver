@@ -11,16 +11,16 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import psutil
 
-from prompt_improver.cli.core.progress_preservation import ProgressPreservationManager
-from prompt_improver.database import get_session_context
+from prompt_improver.cli.core.progress_preservation import ProgressService
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import TrainingSession
 
 if TYPE_CHECKING:
     from prompt_improver.cli.core.signal_handler import SignalContext
 
 
-class EmergencyOperationsManager:
-    """Manages emergency operations triggered by signals.
+class EmergencyService:
+    """Emergency service implementing Clean Architecture patterns for operations triggered by signals.
 
     Features:
     - On-demand checkpoint creation (SIGUSR1)
@@ -34,7 +34,7 @@ class EmergencyOperationsManager:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./emergency_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_manager = ProgressPreservationManager(backup_dir=self.backup_dir)
+        self.progress_manager = ProgressService(backup_dir=self.backup_dir)
         self.operation_history: dict[str, list] = {
             "checkpoints": [],
             "status_reports": [],
@@ -217,7 +217,7 @@ class EmergencyOperationsManager:
     async def _gather_training_state(self) -> dict[str, Any]:
         """Gather current training session state."""
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 from sqlalchemy import select, text
 
                 result = await db_session.execute(

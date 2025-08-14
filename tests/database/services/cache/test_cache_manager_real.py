@@ -31,7 +31,7 @@ from prompt_improver.database.services.cache.cache_manager import (
 from prompt_improver.database.services.cache.memory_cache import MemoryCache, EvictionPolicy
 from prompt_improver.database.services.cache.redis_cache import RedisCache, RedisCacheConfig
 from prompt_improver.database.services.cache.database_cache import DatabaseCache, DatabaseCacheConfig
-from prompt_improver.common.types import SecurityContext
+from prompt_improver.core.types import SecurityContext
 
 
 class TestCacheManagerConfig:

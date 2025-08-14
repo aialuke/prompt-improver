@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 
 from prompt_improver.api import api_router
 from prompt_improver.api.health import health_router
-from prompt_improver.common.error_handling import (
+from prompt_improver.utils.error_handlers import (
     authentication_exception_handler,
     authorization_exception_handler,
     create_correlation_middleware,
@@ -30,7 +30,7 @@ from prompt_improver.common.error_handling import (
     rate_limit_exception_handler,
     validation_exception_handler,
 )
-from prompt_improver.common.exceptions import (
+from prompt_improver.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
     PromptImproverError,
@@ -38,10 +38,13 @@ from prompt_improver.common.exceptions import (
     ValidationError,
 )
 from prompt_improver.core.config import get_config
-from prompt_improver.core.di.container import get_container, initialize_container
-from prompt_improver.database import get_database_services
+from prompt_improver.core.di.container_orchestrator import get_container
+from prompt_improver.core.di.clean_container import initialize_clean_container
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
 from prompt_improver.monitoring.opentelemetry.integration import setup_fastapi_telemetry
-from prompt_improver.monitoring.unified_monitoring_manager import get_monitoring_manager
+from prompt_improver.monitoring.unified.facade import UnifiedMonitoringFacade
 from prompt_improver.performance.monitoring.health.unified_health_system import (
     get_unified_health_monitor,
 )
@@ -66,7 +69,7 @@ async def lifespan(app: FastAPI):
         )
 
         # Initialize dependency injection container
-        await initialize_container()
+        await initialize_clean_container()
         container = await get_container()
         logger.info("Dependency injection container initialized")
 
@@ -76,9 +79,9 @@ async def lifespan(app: FastAPI):
         logger.info("Database manager initialized")
 
         # Initialize monitoring and health systems
-        monitoring_manager = get_monitoring_manager()
-        await monitoring_manager.initialize()
-        logger.info("Monitoring manager initialized")
+        monitoring_manager = UnifiedMonitoringFacade()
+        await monitoring_manager.start_monitoring()
+        logger.info("Unified monitoring initialized")
 
         health_monitor = get_unified_health_monitor()
         await health_monitor.initialize()
@@ -114,9 +117,8 @@ async def lifespan(app: FastAPI):
                 await health_monitor.cleanup()
                 logger.info("Health monitor cleaned up")
 
-            if hasattr(monitoring_manager, "cleanup"):
-                await monitoring_manager.cleanup()
-                logger.info("Monitoring manager cleaned up")
+            await monitoring_manager.stop_monitoring()
+            logger.info("Unified monitoring cleaned up")
 
             if hasattr(db_manager, "cleanup"):
                 await db_manager.cleanup()

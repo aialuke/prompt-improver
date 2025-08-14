@@ -191,9 +191,9 @@ class ResourceUsage:
             data['last_updated'] = datetime.fromisoformat(data['last_updated'])
         return cls(**data)
 
-class ResourceManager:
+class ResourceService:
     """
-    Resource Manager for ML Pipeline orchestration.
+    Resource Service for ML Pipeline orchestration.
 
     Manages:
     - CPU and memory allocation

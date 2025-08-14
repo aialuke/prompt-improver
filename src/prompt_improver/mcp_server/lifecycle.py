@@ -13,8 +13,11 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from prompt_improver.core.config import get_config
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-from prompt_improver.database import ManagerMode, get_database_services
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.core.di import get_container
 from prompt_improver.mcp_server.security import create_security_services
 from prompt_improver.mcp_server.transport import select_transport_mode
 from prompt_improver.performance.monitoring.health.unified_health_system import (

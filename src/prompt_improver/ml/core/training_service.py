@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.models import MLModelPerformance, RuleMetadata
-from prompt_improver.security.input_validator import InputValidator
+from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
 from prompt_improver.utils.datetime_utils import aware_utc_now
 from .protocols import TrainingServiceProtocol, ModelRegistryProtocol
 
@@ -46,7 +46,7 @@ class MLTrainingService(TrainingServiceProtocol):
         model_registry: ModelRegistryProtocol,
         db_manager=None,
         orchestrator_event_bus=None,
-        input_validator: InputValidator | None = None
+        input_validator: OWASP2025InputValidator | None = None
     ):
         """Initialize training service.
         
@@ -59,7 +59,7 @@ class MLTrainingService(TrainingServiceProtocol):
         self.model_registry = model_registry
         self.db_manager = db_manager
         self.orchestrator_event_bus = orchestrator_event_bus
-        self.input_validator = input_validator or InputValidator()
+        self.input_validator = input_validator or OWASP2025InputValidator()
         
         # MLflow setup
         mlruns_path = Path("mlruns").resolve()

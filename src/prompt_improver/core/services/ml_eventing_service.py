@@ -46,7 +46,7 @@ class MLEventingService:
         if not self.enable_automl:
             return
         try:
-            from prompt_improver.core.di.container import get_container
+            from prompt_improver.core.di.container_orchestrator import get_container
 
             container = await get_container()
             self.ml_interface = await container.get(MLModelInterface)

@@ -45,7 +45,7 @@ except ImportError:
     Gauge = Any
     Histogram = Any
 
-from prompt_improver.common.types import SecurityContext
+from prompt_improver.core.types import SecurityContext
 
 logger = logging.getLogger(__name__)
 

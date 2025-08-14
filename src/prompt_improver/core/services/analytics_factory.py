@@ -29,17 +29,17 @@ async def create_analytics_service(
 
 
 def get_analytics_interface() -> Any | None:
-    """Get the AnalyticsQueryInterface class for direct instantiation.
+    """Get the AnalyticsServiceFacade class for direct instantiation.
     
     DEPRECATED: Use create_analytics_service() for the unified service instead.
     """
     logger.warning("get_analytics_interface() is deprecated. Use create_analytics_service() instead.")
     try:
-        from prompt_improver.analytics.legacy.analytics_service import AnalyticsQueryInterface
+        from prompt_improver.analytics.unified.analytics_service_facade import AnalyticsServiceFacade
 
-        return AnalyticsQueryInterface
+        return AnalyticsServiceFacade
     except ImportError as e:
-        logger.error(f"Failed to import legacy AnalyticsQueryInterface: {e}")
+        logger.error(f"Failed to import AnalyticsServiceFacade: {e}")
         return None
 
 
@@ -50,11 +50,11 @@ def get_session_reporter() -> Any | None:
     """
     logger.warning("get_session_reporter() is deprecated. Use create_analytics_service() instead.")
     try:
-        from prompt_improver.analytics.legacy.session_summary_reporter import SessionSummaryReporter
+        from prompt_improver.ml.analytics.session_summary_reporter import SessionSummaryReporter
 
         return SessionSummaryReporter
     except ImportError as e:
-        logger.error(f"Failed to import legacy SessionSummaryReporter: {e}")
+        logger.error(f"Failed to import SessionSummaryReporter: {e}")
         return None
 
 

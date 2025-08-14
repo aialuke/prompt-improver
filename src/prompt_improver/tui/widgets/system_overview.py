@@ -20,7 +20,7 @@ from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 
-from prompt_improver.common.datetime_utils import (
+from prompt_improver.utils.datetime_utils import (
     format_compact_timestamp,
     format_date_only,
     format_display_date,

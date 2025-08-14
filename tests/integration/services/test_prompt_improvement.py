@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlmodel import select
 
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.database.models import (
     ABExperiment,
     DiscoveredPattern,

@@ -18,7 +18,7 @@ from prompt_improver.core.services.analytics_factory import get_analytics_interf
 
 def _get_sessionmanager():
     """Lazy import of sessionmanager to avoid circular imports."""
-    from prompt_improver.database import get_sessionmanager
+    # Database session manager will be injected via constructor
 
     return get_sessionmanager
 

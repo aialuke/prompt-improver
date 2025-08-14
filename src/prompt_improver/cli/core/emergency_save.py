@@ -13,8 +13,8 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.cli.core.progress_preservation import ProgressPreservationManager
-from prompt_improver.database import get_session_context
+from prompt_improver.cli.core.progress_preservation import ProgressService
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import TrainingSession
 
 
@@ -50,7 +50,7 @@ class EmergencySaveManager:
 
     Features:
     - Atomic save operations with rollback capability
-    - Integration with existing ProgressPreservationManager
+    - Integration with existing ProgressService
     - CoreDis-aware database connection handling
     - Multi-level validation and verification
     - Emergency save triggers and monitoring
@@ -61,7 +61,7 @@ class EmergencySaveManager:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./emergency_saves")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_manager = ProgressPreservationManager(backup_dir=self.backup_dir)
+        self.progress_manager = ProgressService(backup_dir=self.backup_dir)
         self.active_saves: dict[str, EmergencySaveContext] = {}
         self.save_history: list[EmergencySaveResult] = []
         self.temp_dir = self.backup_dir / "temp"
@@ -255,7 +255,7 @@ class EmergencySaveManager:
     async def _gather_training_sessions(self) -> dict[str, Any]:
         """Gather training session data for emergency save."""
         try:
-            async with get_session_context() as db_session:
+            async with self.session_manager.session_context() as db_session:
                 from sqlalchemy import select
 
                 result = await db_session.execute(select(TrainingSession))

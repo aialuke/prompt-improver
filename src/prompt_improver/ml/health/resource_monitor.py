@@ -19,13 +19,13 @@ class ResourceSnapshot:
     timestamp: datetime
     cpu_percent: float
     cpu_count: int
-    load_avg_1m: float | None = None
-    load_avg_5m: float | None = None
-    load_avg_15m: float | None = None
     memory_total_gb: float
     memory_available_gb: float
     memory_used_gb: float
     memory_percent: float
+    load_avg_1m: float | None = None
+    load_avg_5m: float | None = None
+    load_avg_15m: float | None = None
     gpu_count: int = 0
     gpu_total_memory_gb: float = 0.0
     gpu_used_memory_gb: float = 0.0

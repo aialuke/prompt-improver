@@ -64,6 +64,39 @@ from prompt_improver.core.config.validation import (
     validate_configuration,
 )
 
+# Consolidated configuration components (new in 2025)
+from prompt_improver.core.config.schema import (
+    ConfigSchemaVersion,
+    ConfigMigration,
+    ConfigurationSchema,
+    UnifiedConfigService,
+    schema_manager,
+    migrate_configuration,
+)
+from prompt_improver.core.config.logging import (
+    ConfigurationEvent,
+    ConfigurationLogger,
+    get_config_logger,
+    setup_config_logging,
+)
+from prompt_improver.core.config.validator import (
+    validate_startup_configuration,
+    save_validation_report,
+)
+from prompt_improver.core.config.textstat import (
+    TextStatConfig,
+    TextStatMetrics,
+    TextStatWrapper,
+    get_textstat_wrapper,
+    text_analysis,
+)
+from prompt_improver.core.config.retry import (
+    RetryStrategy,
+    RetryConfig,
+    StandardRetryConfigs,
+    create_retry_config,
+)
+
 __all__ = [
     # Main configuration
     "AppConfig",
@@ -95,4 +128,33 @@ __all__ = [
     "ValidationReport", 
     "validate_configuration",
     "validate_config_file",
+    "validate_startup_configuration",
+    "save_validation_report",
+    
+    # Schema management and migration
+    "ConfigSchemaVersion",
+    "ConfigMigration",
+    "ConfigurationSchema",
+    "UnifiedConfigService",
+    "schema_manager",
+    "migrate_configuration",
+    
+    # Configuration logging
+    "ConfigurationEvent",
+    "ConfigurationLogger",
+    "get_config_logger",
+    "setup_config_logging",
+    
+    # TextStat configuration
+    "TextStatConfig",
+    "TextStatMetrics", 
+    "TextStatWrapper",
+    "get_textstat_wrapper",
+    "text_analysis",
+    
+    # Retry configuration
+    "RetryStrategy",
+    "RetryConfig",
+    "StandardRetryConfigs", 
+    "create_retry_config",
 ]

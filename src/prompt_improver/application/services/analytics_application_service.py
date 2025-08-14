@@ -12,12 +12,14 @@ from typing import Any, Dict, List, Optional
 from prompt_improver.application.protocols.application_service_protocols import (
     AnalyticsApplicationServiceProtocol,
 )
-from prompt_improver.common.error_handling import handle_service_errors
+from prompt_improver.utils.error_handlers import handle_service_errors
 from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisInterface,
     request_ml_analysis_via_events,
 )
-from prompt_improver.database import DatabaseServices
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
 from prompt_improver.repositories.protocols.analytics_repository_protocol import (
     AnalyticsRepositoryProtocol,
     MetricType,

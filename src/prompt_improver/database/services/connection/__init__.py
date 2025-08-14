@@ -1,6 +1,17 @@
 """Database connection management services."""
 
 from .connection_metrics import ConnectionMetrics
+# Export decomposed components for direct access if needed
+from .connection_pool_core import ConnectionPoolCore
+from .pool_monitoring_service import PoolMonitoringService
+from .pool_protocols import (
+    ConnectionPoolCoreProtocol,
+    PoolManagerFacadeProtocol,
+    PoolMonitoringServiceProtocol,
+    PoolScalingManagerProtocol,
+)
+from .pool_scaling_manager import PoolScalingManager
+from .pool_shared_context import PoolSharedContext
 from .pool_scaler import (
     BurstDetector,
     PoolScaler,

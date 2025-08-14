@@ -62,7 +62,7 @@ class AuditEvent(Enum):
 class SecurityAuditLogger:
     """Enhanced security audit logging for compliance (2025)."""
 
-    def __init__(self, component_name: str = "UnifiedKeyManager"):
+    def __init__(self, component_name: str = "UnifiedKeyService"):
         self.component_name = component_name
         self.logger = logging.getLogger(f"{__name__}.{component_name}.Audit")
 
@@ -225,8 +225,8 @@ class KeyInfo:
         }
 
 
-class SecureKeyManager:
-    """Enhanced secure key management with 2025 security best practices.
+class SecureKeyService:
+    """Enhanced secure key service with 2025 security best practices.
 
     features:
     - Zero Trust Architecture compliance
@@ -243,7 +243,7 @@ class SecureKeyManager:
         self.current_key_id: str | None = None
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.audit_logger = (
-            SecurityAuditLogger("UnifiedKeyManager")
+            SecurityAuditLogger("UnifiedKeyService")
             if self.config.enable_audit_logging
             else None
         )
@@ -768,10 +768,10 @@ class SecureKeyManager:
         }
 
 
-class UnifiedKeyManager:
+class UnifiedKeyService:
     """Unified key management system combining secure key management and Fernet encryption.
 
-    This manager consolidates SecureKeyManager and FernetKeyManager functionality
+    This service consolidates SecureKeyService and FernetKeyManager functionality
     using composition to provide both key management and encryption capabilities
     in a single, unified interface.
     """
@@ -787,7 +787,7 @@ class UnifiedKeyManager:
         self.current_key_id: str | None = None
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.audit_logger = (
-            SecurityAuditLogger("UnifiedKeyManager")
+            SecurityAuditLogger("UnifiedKeyService")
             if self.config.enable_audit_logging
             else None
         )
@@ -1183,14 +1183,14 @@ class UnifiedKeyManager:
 _default_key_manager = None
 
 
-def get_key_manager() -> UnifiedKeyManager:
+def get_key_manager() -> UnifiedKeyService:
     """Get global unified key manager instance."""
     global _default_key_manager
     if _default_key_manager is None:
-        _default_key_manager = UnifiedKeyManager()
+        _default_key_manager = UnifiedKeyService()
     return _default_key_manager
 
 
-def get_unified_key_manager() -> UnifiedKeyManager:
+def get_unified_key_manager() -> UnifiedKeyService:
     """Get global unified key manager instance."""
     return get_key_manager()

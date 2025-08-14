@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from prompt_improver.core.textstat_config import get_textstat_wrapper
+from prompt_improver.core.config.textstat import get_textstat_wrapper
 from prompt_improver.rule_engine.models import PromptCharacteristics
 
 try:

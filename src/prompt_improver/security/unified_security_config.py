@@ -18,7 +18,7 @@ from datetime import timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from prompt_improver.common.exceptions import ConfigurationError, ValidationError
+from prompt_improver.core.exceptions import ConfigurationError, ValidationError
 
 from pydantic import BaseModel, Field
 
@@ -365,8 +365,8 @@ class UnifiedSecurityConfig(BaseModel):
     )
 
 
-class UnifiedSecurityConfigManager:
-    """Unified security configuration manager with environment-specific profiles
+class UnifiedSecurityConfigService:
+    """Unified security configuration service with environment-specific profiles
     and comprehensive validation.
     """
 

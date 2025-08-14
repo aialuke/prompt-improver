@@ -192,8 +192,8 @@ class TelemetryConfig:
         )
 
 
-class TelemetryManager:
-    """Production-ready OpenTelemetry manager with async support."""
+class TelemetryServiceFacade:
+    """Production-ready OpenTelemetry facade with async support."""
 
     def __init__(self, config: TelemetryConfig | None = None):
         self.config = config or TelemetryConfig.from_environment()
@@ -373,7 +373,7 @@ class TelemetryManager:
             self._initialized = False
 
 
-_telemetry_manager: TelemetryManager | None = None
+_telemetry_manager: TelemetryServiceFacade | None = None
 
 
 def init_telemetry(
@@ -382,7 +382,7 @@ def init_telemetry(
     environment: str = "production",
     otlp_endpoint: str | None = None,
     config: TelemetryConfig | None = None,
-) -> TelemetryManager:
+) -> TelemetryServiceFacade:
     """Initialize global OpenTelemetry telemetry.
 
     Args:
@@ -393,7 +393,7 @@ def init_telemetry(
         config: Complete telemetry configuration
 
     Returns:
-        TelemetryManager instance
+        TelemetryServiceFacade instance
     """
     global _telemetry_manager
     if config is None:
@@ -403,7 +403,7 @@ def init_telemetry(
         config.environment = environment
         if otlp_endpoint:
             config.otlp_endpoint_grpc = otlp_endpoint
-    _telemetry_manager = TelemetryManager(config)
+    _telemetry_manager = TelemetryServiceFacade(config)
     _telemetry_manager.initialize()
     return _telemetry_manager
 
@@ -431,7 +431,7 @@ def shutdown_telemetry(timeout_millis: int = 30000) -> None:
 @contextmanager
 def telemetry_context(config: TelemetryConfig | None = None):
     """Context manager for temporary telemetry setup."""
-    manager = TelemetryManager(config)
+    manager = TelemetryServiceFacade(config)
     manager.initialize()
     try:
         yield manager
@@ -442,7 +442,7 @@ def telemetry_context(config: TelemetryConfig | None = None):
 @asynccontextmanager
 async def async_telemetry_context(config: TelemetryConfig | None = None):
     """Async context manager for temporary telemetry setup."""
-    manager = TelemetryManager(config)
+    manager = TelemetryServiceFacade(config)
     manager.initialize()
     try:
         yield manager

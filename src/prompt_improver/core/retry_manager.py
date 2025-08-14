@@ -23,6 +23,8 @@ Architecture:
 - Modern error classification and intelligent backoff strategies
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import random
@@ -33,7 +35,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, Union, cast
 
 from prompt_improver.core.protocols.retry_protocols import (
     RetryableErrorType,
@@ -515,8 +517,8 @@ class CircuitBreaker:
             logger.info(f"Circuit breaker reset for {self.operation_name}")
 
 
-class UnifiedSystemManager:
-    """Unified System Manager - Complete System Resilience and Control.
+class UnifiedSystemService:
+    """Unified System Service - Complete System Resilience and Control.
 
     Consolidates all system resilience functionality:
     - Comprehensive retry management with intelligent policies
@@ -1155,10 +1157,10 @@ class RetryExecutor:
 
     def __init__(
         self,
-        retry_manager: RetryManager,
+        retry_manager: UnifiedSystemService,
         config: RetryConfig,
         context: RetryContext,
-        circuit_breaker: "CircuitBreaker | NoOpCircuitBreaker",
+        circuit_breaker: CircuitBreaker | NoOpCircuitBreaker,
     ):
         self.retry_manager = retry_manager
         self.config = config
@@ -1172,10 +1174,10 @@ class RetryExecutor:
         )
 
 
-_global_retry_manager: RetryManager | None = None
+_global_retry_manager: UnifiedSystemService | None = None
 
 
-def get_retry_manager() -> RetryManager:
+def get_retry_manager() -> UnifiedSystemService:
     """Get the global retry manager instance.
 
     Returns:
@@ -1183,11 +1185,11 @@ def get_retry_manager() -> RetryManager:
     """
     global _global_retry_manager
     if _global_retry_manager is None:
-        _global_retry_manager = RetryManager()
+        _global_retry_manager = UnifiedSystemService()
     return _global_retry_manager
 
 
-def set_retry_manager(manager: RetryManager):
+def set_retry_manager(manager: UnifiedSystemService):
     """Set the global retry manager instance.
 
     Args:
@@ -1280,7 +1282,7 @@ def retry(
 
 
 # Backward compatibility alias - to be removed in future version
-RetryManager = UnifiedSystemManager
+RetryManager = UnifiedSystemService
 
 __all__ = [
     "CircuitBreaker",
@@ -1291,7 +1293,7 @@ __all__ = [
     "RetryManager",
     "RetryStrategy",
     "RetryableErrorType",
-    "UnifiedSystemManager",
+    "UnifiedSystemService",
     "get_retry_manager",
     "retry",
     "retry_database_operation",

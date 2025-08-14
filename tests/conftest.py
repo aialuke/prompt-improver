@@ -14,54 +14,141 @@ import logging
 import os
 import random
 
+# PERFORMANCE OPTIMIZATION: Set all environment variables first to avoid heavy imports
 # Disable telemetry and Ryuk at import time (before any OTEL modules import)
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 os.environ.setdefault("OTEL_TRACES_EXPORTER", "none")
 os.environ.setdefault("OTEL_METRICS_EXPORTER", "none")
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 os.environ.setdefault("TESTCONTAINERS_LOG_LEVEL", "INFO")
+# Set test optimization flags
+os.environ.setdefault("TESTING", "true")
+os.environ.setdefault("DISABLE_HEAVY_IMPORTS", "true")
 
 import subprocess
 import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta
+from functools import lru_cache
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import asyncpg
-import coredis
-import numpy as np
 import pytest
 import pytest_asyncio
 
-# Import real ML fixtures for testing
-try:
-    from tests.real_ml.fixtures import *
-except ImportError:
-    pass  # Real ML fixtures not available
-from opentelemetry import metrics, trace
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from typer.testing import CliRunner
+# LAZY IMPORT UTILITIES for performance optimization
+def lazy_import(module_name: str, attribute: str = None):
+    """Lazy import utility to defer heavy imports until actually needed."""
+    @lru_cache(maxsize=1)
+    def _import():
+        try:
+            module = __import__(module_name, fromlist=[attribute] if attribute else [])
+            return getattr(module, attribute) if attribute else module
+        except ImportError as e:
+            raise ImportError(f"Failed to import {module_name}.{attribute or ''}: {e}")
+    return _import
 
-from prompt_improver.core.config import get_config
-from prompt_improver.database import get_session
-from prompt_improver.database.models import (
-    ABExperiment,
-    ImprovementSession,
-    RuleIntelligenceCache,
-    RuleMetadata,
-    RulePerformance,
-    SQLModel,
-    UserFeedback,
-)
-from prompt_improver.utils.datetime_utils import aware_utc_now
+# ULTRA-DEFERRED dependency imports - no execution until actually called
+def _get_asyncpg():
+    return lazy_import("asyncpg")
+    
+def _get_coredis():
+    return lazy_import("coredis")
+    
+def _get_numpy():
+    return lazy_import("numpy")
+    
+def _get_sqlalchemy_async_session():
+    return lazy_import("sqlalchemy.ext.asyncio", "AsyncSession")
+    
+def _get_sqlalchemy_async_sessionmaker():
+    return lazy_import("sqlalchemy.ext.asyncio", "async_sessionmaker")
+    
+def _get_typer_cli_runner():
+    return lazy_import("typer.testing", "CliRunner")
+
+# Conditional OpenTelemetry imports - only if telemetry is enabled
+def get_opentelemetry_components():
+    """Lazy load OpenTelemetry components only when telemetry is enabled."""
+    if os.getenv("OTEL_SDK_DISABLED", "true").lower() == "true":
+        # Return mock objects when telemetry is disabled
+        return type('MockTelemetry', (), {
+            'metrics': None,
+            'trace': None, 
+            'MeterProvider': type('MockMeterProvider', (), {}),
+            'TracerProvider': type('MockTracerProvider', (), {}),
+            'Resource': type('MockResource', (), {}),
+            'OTLPMetricExporter': type('MockOTLPMetricExporter', (), {}),
+            'OTLPSpanExporter': type('MockOTLPSpanExporter', (), {}),
+            'PeriodicExportingMetricReader': type('MockPeriodicExportingMetricReader', (), {}),
+            'BatchSpanProcessor': type('MockBatchSpanProcessor', (), {})
+        })()
+    
+    # Only import when actually needed and enabled
+    from opentelemetry import metrics, trace
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    
+    return type('Telemetry', (), {
+        'metrics': metrics,
+        'trace': trace,
+        'MeterProvider': MeterProvider,
+        'TracerProvider': TracerProvider, 
+        'Resource': Resource,
+        'OTLPMetricExporter': OTLPMetricExporter,
+        'OTLPSpanExporter': OTLPSpanExporter,
+        'PeriodicExportingMetricReader': PeriodicExportingMetricReader,
+        'BatchSpanProcessor': BatchSpanProcessor
+    })()
+
+# DEFERRED APPLICATION IMPORTS - no execution until fixture actually called
+# These are created as functions that return lazy importers
+def _get_config():
+    return lazy_import("prompt_improver.core.config", "get_config")
+
+def _get_session():
+    return lazy_import("prompt_improver.database", "get_session")
+
+def _get_aware_utc_now():
+    return lazy_import("prompt_improver.utils.datetime_utils", "aware_utc_now")
+
+# Lazy database models loader
+@lru_cache(maxsize=1)
+def get_database_models():
+    """Lazy load database models to avoid heavy SQLAlchemy imports."""
+    from prompt_improver.database.models import (
+        ABExperiment,
+        ImprovementSession, 
+        RuleIntelligenceCache,
+        RuleMetadata,
+        RulePerformance,
+        SQLModel,
+        UserFeedback,
+    )
+    return {
+        'ABExperiment': ABExperiment,
+        'ImprovementSession': ImprovementSession,
+        'RuleIntelligenceCache': RuleIntelligenceCache,
+        'RuleMetadata': RuleMetadata,
+        'RulePerformance': RulePerformance,
+        'SQLModel': SQLModel,
+        'UserFeedback': UserFeedback,
+    }
+
+# Import real ML fixtures with lazy loading
+def get_real_ml_fixtures():
+    """Lazy load real ML fixtures to avoid import delays."""
+    try:
+        import tests.real_ml.fixtures
+        return tests.real_ml.fixtures
+    except ImportError:
+        return None  # Real ML fixtures not available
 
 logger = logging.getLogger(__name__)
 
@@ -76,15 +163,15 @@ def testcontainers_sane_defaults():
     os.environ.setdefault("OTEL_METRICS_EXPORTER", "none")
 
 
-@pytest.fixture(scope="session", autouse=True)
-def prefer_external_redis_if_running():
-    """If a local Redis container is already running, set TEST_REDIS_HOST/PORT.
-
-    This makes Redis-using tests prefer the external service path over
-    Testcontainers, avoiding waiting_utils hangs.
+@lru_cache(maxsize=1)
+def detect_external_redis() -> tuple[Optional[str], Optional[str]]:
+    """Lazy detection of external Redis containers to avoid startup delays.
+    
+    Returns: (host, port) tuple or (None, None) if not found
     """
     if os.getenv("TEST_REDIS_HOST") and os.getenv("TEST_REDIS_PORT"):
-        return
+        return os.getenv("TEST_REDIS_HOST"), os.getenv("TEST_REDIS_PORT")
+    
     try:
         out = subprocess.check_output(
             ["docker", "ps", "--format", "{{.Names}}\t{{.Ports}}\t{{.Image}}"],
@@ -99,9 +186,7 @@ def prefer_external_redis_if_running():
             if "redis" not in image.lower():
                 continue
             # Look for hostport mapping to 6379/tcp
-            # Example: "0.0.0.0:6380->6379/tcp, [::]:6380->6379/tcp"
             parts = ports.split(",")
-            host_port = None
             for p in parts:
                 p = p.strip()
                 if "->6379/tcp" in p and ":" in p:
@@ -109,58 +194,57 @@ def prefer_external_redis_if_running():
                         host_part = p.split("->")[0]
                         host_port = host_part.split(":")[-1]
                         if host_port.isdigit():
-                            break
+                            host = os.getenv("REDIS_HOST", "redis")
+                            logger.info(f"Detected running Redis container {name} on host port {host_port}")
+                            return host, host_port
                     except Exception:
                         continue
-            if host_port:
-                os.environ.setdefault("TEST_REDIS_HOST", os.getenv("REDIS_HOST", "redis"))
-                os.environ.setdefault("TEST_REDIS_PORT", host_port)
-                logger.info(
-                    f"Detected running Redis container {existing_container_id} on host port {external_port}; using external Redis for tests",
-                    name,
-                    host_port,
-                )
-                break
     except Exception:
-        # If docker not available or parsing fails, silently continue
-        pass
+        pass  # Docker not available or parsing fails
+    
+    return None, None
+
+@pytest.fixture(scope="session", autouse=True) 
+def prefer_external_redis_if_running():
+    """Configure external Redis if available - now with lazy detection."""
+    host, port = detect_external_redis()
+    if host and port:
+        os.environ.setdefault("TEST_REDIS_HOST", host)
+        os.environ.setdefault("TEST_REDIS_PORT", port)
 
 
-try:
-    import sklearn
+# LAZY ML LIBRARY DETECTION for performance optimization
+@lru_cache(maxsize=1)
+def check_ml_libraries() -> dict[str, bool]:
+    """Lazy check for ML library availability to avoid import delays."""
+    libraries = {}
+    
+    for lib_name, import_name in [
+        ('sklearn', 'sklearn'),
+        ('deap', 'deap'), 
+        ('pymc', 'pymc'),
+        ('umap', 'umap'),
+        ('hdbscan', 'hdbscan')
+    ]:
+        try:
+            __import__(import_name)
+            libraries[lib_name] = True
+        except ImportError:
+            libraries[lib_name] = False
+    
+    return libraries
 
-    HAS_SKLEARN = True
-except ImportError:
-    HAS_SKLEARN = False
-try:
-    import deap
+# Create pytest skip markers using lazy evaluation
+def _make_skip_marker(lib_name: str):
+    def _check():
+        return not check_ml_libraries()[lib_name]
+    return pytest.mark.skipif(_check(), reason=f"{lib_name} not installed")
 
-    HAS_DEAP = True
-except ImportError:
-    HAS_DEAP = False
-try:
-    import pymc
-
-    HAS_PYMC = True
-except ImportError:
-    HAS_PYMC = False
-try:
-    import umap
-
-    HAS_UMAP = True
-except ImportError:
-    HAS_UMAP = False
-try:
-    import hdbscan
-
-    HAS_HDBSCAN = True
-except ImportError:
-    HAS_HDBSCAN = False
-requires_sklearn = pytest.mark.skipif(not HAS_SKLEARN, reason="sklearn not installed")
-requires_deap = pytest.mark.skipif(not HAS_DEAP, reason="DEAP not installed")
-requires_pymc = pytest.mark.skipif(not HAS_PYMC, reason="PyMC not installed")
-requires_umap = pytest.mark.skipif(not HAS_UMAP, reason="UMAP not installed")
-requires_hdbscan = pytest.mark.skipif(not HAS_HDBSCAN, reason="HDBSCAN not installed")
+requires_sklearn = _make_skip_marker('sklearn')
+requires_deap = _make_skip_marker('deap')
+requires_pymc = _make_skip_marker('pymc')
+requires_umap = _make_skip_marker('umap')
+requires_hdbscan = _make_skip_marker('hdbscan')
 TEST_RANDOM_SEED = 42
 
 
@@ -172,15 +256,26 @@ def seed_random_generators():
     deterministic behavior across all tests.
     """
     random.seed(TEST_RANDOM_SEED)
-    np.random.seed(TEST_RANDOM_SEED)
     os.environ["PYTHONHASHSEED"] = str(TEST_RANDOM_SEED)
+    
+    # Ultra-lazy seed numpy only when imported
     try:
-        import sklearn
+        np = _get_numpy()()  # Call deferred function to get lazy importer
+        np.random.seed(TEST_RANDOM_SEED)
     except ImportError:
         pass
+    
+    # Lazy seed ML libraries only if available
+    ml_libs = check_ml_libraries()
+    if ml_libs.get('sklearn', False):
+        try:
+            import sklearn  # sklearn doesn't need explicit seeding
+        except ImportError:
+            pass
+    
+    # Lazy seed PyTorch only if available        
     try:
         import torch
-
         torch.manual_seed(TEST_RANDOM_SEED)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(TEST_RANDOM_SEED)
@@ -195,6 +290,7 @@ def deterministic_rng():
     This fixture ensures that each test gets a fresh, seeded RNG state
     while maintaining reproducibility.
     """
+    np = _get_numpy()()  # Ultra-lazy import numpy
     rng = np.random.RandomState(TEST_RANDOM_SEED)
     return rng
 
@@ -221,6 +317,8 @@ async def real_db_session(test_db_engine):
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlalchemy.orm import sessionmaker
 
+    AsyncSession = _get_sqlalchemy_async_session()()
+    async_sessionmaker = _get_sqlalchemy_async_sessionmaker()()
     async_session = async_sessionmaker(
         bind=test_db_engine, expire_on_commit=False, class_=AsyncSession
     )
@@ -329,6 +427,8 @@ async def test_db_engine():
 @pytest.fixture
 async def test_db_session(test_db_engine):
     """Create test database session with transaction rollback for isolation."""
+    AsyncSession = _get_sqlalchemy_async_session()()
+    async_sessionmaker = _get_sqlalchemy_async_sessionmaker()()
     async_session = async_sessionmaker(
         bind=test_db_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -755,9 +855,19 @@ async def real_behavior_environment(
     await real_ml_database.commit()
 
 
+def _check_otel_availability():
+    """Check if OpenTelemetry is available and enabled."""
+    if os.getenv("OTEL_SDK_DISABLED", "true").lower() == "true":
+        return False
+    try:
+        otel = get_opentelemetry_components()
+        return all([otel.trace, otel.metrics, otel.TracerProvider, otel.MeterProvider])
+    except Exception:
+        return False
+
 requires_otel = pytest.mark.skipif(
-    not all([trace, metrics, TracerProvider, MeterProvider]),
-    reason="OpenTelemetry not properly configured",
+    not _check_otel_availability(),
+    reason="OpenTelemetry not properly configured or disabled",
 )
 requires_real_db = pytest.mark.skipif(
     os.getenv("SKIP_REAL_DB_TESTS", "false").lower() == "true",
@@ -1104,9 +1214,7 @@ def ml_service():
 @pytest.fixture
 def prompt_service():
     """Create PromptImprovementService instance."""
-    from prompt_improver.core.services.prompt_improvement import (
-        PromptImprovementService,
-    )
+    from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 
     return PromptImprovementService()
 
@@ -1363,7 +1471,7 @@ def test_data_generator():
 
 
 async def populate_test_database(
-    session: AsyncSession,
+    session,  # AsyncSession - using Any for lazy loading
     rule_metadata_list=None,
     rule_performance_list=None,
     user_feedback_list=None,

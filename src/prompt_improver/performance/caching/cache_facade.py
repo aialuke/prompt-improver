@@ -18,8 +18,8 @@ from prompt_improver.performance.optimization.performance_optimizer import (
     measure_cache_operation,
     get_performance_optimizer,
 )
-from prompt_improver.utils.multi_level_cache import (
-    MultiLevelCache, 
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as MultiLevelCache, 
     get_cache,
     cached_get,
     cached_set,

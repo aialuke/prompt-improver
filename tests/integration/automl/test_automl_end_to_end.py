@@ -61,13 +61,13 @@ import optuna
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-from prompt_improver.database.connection import DatabaseManager, get_database_url
-from prompt_improver.database.registry import clear_registry
-from prompt_improver.database import (
-    ManagerMode,
-    get_unified_manager,
-)
+from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+# Clean architecture: Use repository pattern instead of direct database access
+from prompt_improver.repositories.factory import get_ml_repository, get_analytics_repository
+from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
+from prompt_improver.repositories.protocols.analytics_repository_protocol import AnalyticsRepositoryProtocol
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
+from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
 from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
@@ -83,12 +83,11 @@ class TestAutoMLEndToEndWorkflow:
     """Test complete AutoML workflow integration with real services."""
 
     @pytest.fixture
-    async def temp_database(self):
-        """PostgreSQL database for integration testing."""
-        database_url = get_database_url()
-        db_manager = DatabaseManager(database_url)
-        yield db_manager
-        db_manager.close()
+    async def database_services(self):
+        """DatabaseServices for integration testing using testcontainers."""
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        yield services
+        await services.cleanup()
 
     @pytest.fixture
     def ab_testing_service(self):
@@ -114,18 +113,19 @@ class TestAutoMLEndToEndWorkflow:
 
     @pytest.fixture
     async def orchestrator(
-        self, automl_config, temp_database, ab_testing_service, websocket_manager
+        self, automl_config, database_services, ab_testing_service, websocket_manager
     ):
         """Fully configured AutoML orchestrator with real services."""
         import os
 
         import coredis
 
-        postgres_url = get_database_url()
+        # Use testcontainer database URL from conftest.py
+        postgres_url = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
         automl_config.storage_url = postgres_url + "?options=-c search_path=test_schema"
         automl_config.n_trials = 3
         automl_config.timeout = 10
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        redis_url = os.getenv("TEST_REDIS_URL", "redis://localhost:6379/0")
         redis_client = None
         try:
             redis_client = coredis.from_url(redis_url)
@@ -135,7 +135,7 @@ class TestAutoMLEndToEndWorkflow:
         analytics_service = RealTimeAnalyticsService(None, redis_client)
         orchestrator = AutoMLOrchestrator(
             config=automl_config,
-            db_manager=temp_database,
+            session_manager=database_services,
             analytics_service=analytics_service,
         )
         yield orchestrator
@@ -257,11 +257,9 @@ class TestAutoMLEndToEndWorkflow:
             timeout=2,
             enable_real_time_feedback=False,
         )
-        database_url = get_database_url()
-        db_manager = DatabaseManager(database_url)
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
         ab_service = ABTestingService()
-        storage_url = get_database_url()
-        orchestrator = AutoMLOrchestrator(config=config, db_manager=db_manager)
+        orchestrator = AutoMLOrchestrator(config=config, session_manager=services)
         start_time = datetime.now()
         await orchestrator.start_optimization()
         await asyncio.sleep(3)
@@ -336,11 +334,10 @@ class TestAutoMLServiceIntegration:
     @pytest.mark.integration
     async def test_service_automl_initialization(self, real_prompt_service):
         """Test AutoML initialization through service layer."""
-        database_url = get_database_url()
-        db_manager = DatabaseManager(database_url)
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
         if hasattr(real_prompt_service, "initialize_automl"):
             try:
-                await real_prompt_service.initialize_automl(db_manager)
+                await real_prompt_service.initialize_automl(services)
                 if hasattr(real_prompt_service, "automl_orchestrator"):
                     assert real_prompt_service.automl_orchestrator is not None
             except Exception as e:
@@ -354,11 +351,10 @@ class TestAutoMLServiceIntegration:
     @pytest.mark.integration
     async def test_service_optimization_lifecycle(self, real_prompt_service):
         """Test complete optimization lifecycle through service."""
-        database_url = get_database_url()
-        db_manager = DatabaseManager(database_url)
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
         if hasattr(real_prompt_service, "initialize_automl"):
             try:
-                await real_prompt_service.initialize_automl(db_manager)
+                await real_prompt_service.initialize_automl(services)
             except Exception:
                 pass
         if hasattr(real_prompt_service, "start_automl_optimization"):
@@ -370,19 +366,16 @@ class TestAutoMLServiceIntegration:
         assert real_prompt_service.enable_automl in [True, False]
 
     @pytest.fixture
-    async def temp_database(self):
-        """PostgreSQL database for integration testing."""
-        database_url = get_database_url()
-        db_manager = DatabaseManager(database_url)
-        yield db_manager
-        db_manager.close()
+    async def database_services_2(self):
+        """DatabaseServices for integration testing using testcontainers."""
+        services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        yield services
+        await services.cleanup()
 
     @pytest.fixture
-    async def async_session(self):
+    async def async_session(self, database_services_2):
         """Async session for A/B testing service."""
-        from prompt_improver.database.connection import get_session_context
-
-        async with get_session_context() as session:
+        async with database_services_2.database.get_session() as session:
             yield session
 
     @pytest.mark.asyncio

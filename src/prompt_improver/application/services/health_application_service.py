@@ -12,10 +12,12 @@ from typing import Any, Dict, List, Optional
 from prompt_improver.application.protocols.application_service_protocols import (
     HealthApplicationServiceProtocol,
 )
-from prompt_improver.database import DatabaseServices
-from prompt_improver.monitoring.health_check import HealthCheckService
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
+from prompt_improver.monitoring.unified.services import HealthCheckService
 from prompt_improver.performance.monitoring.performance_benchmark import (
-    PerformanceBenchmarkService,
+    MCPPerformanceBenchmark,
 )
 from prompt_improver.repositories.protocols.health_repository_protocol import (
     HealthRepositoryProtocol,
@@ -39,12 +41,12 @@ class HealthApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
+        session_manager: SessionManagerProtocol,
         health_repository: HealthRepositoryProtocol,
         health_check_service: HealthCheckService,
-        performance_benchmark_service: PerformanceBenchmarkService,
+        performance_benchmark_service: MCPPerformanceBenchmark,
     ):
-        self.db_services = db_services
+        self.session_manager = session_manager
         self.health_repository = health_repository
         self.health_check_service = health_check_service
         self.performance_benchmark_service = performance_benchmark_service

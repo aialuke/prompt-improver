@@ -23,7 +23,7 @@ class EvaluationConfig:
         if self.evaluation_metrics is None:
             self.evaluation_metrics = ['accuracy', 'precision', 'recall', 'f1_score']
 
-class EvaluationPipelineManager:
+class EvaluationPipelineService:
     """
     Coordinates evaluation components and manages evaluation workflows.
     

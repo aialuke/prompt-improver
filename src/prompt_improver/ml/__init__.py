@@ -5,13 +5,13 @@ including training data management, model lifecycle, optimization algorithms,
 and evaluation frameworks.
 """
 from .automl.orchestrator import AutoMLOrchestrator
-from .core.ml_integration import MLModelService
+from .core import MLModelService  # Now points to facade
 from .core.training_data_loader import TrainingDataLoader, get_training_data_stats
 from .learning.algorithms import ContextLearner, InsightGenerationEngine, RuleAnalyzer
 from .models.model_manager import ModelManager
 from .models.production_registry import ProductionModelRegistry
-from .optimization.algorithms.clustering_optimizer import ClusteringOptimizer
-from .optimization.algorithms.dimensionality_reducer import AdvancedDimensionalityReducer as DimensionalityReducer
+from .clustering.services.clustering_optimizer_facade import ClusteringOptimizerFacade as ClusteringOptimizer
+from .dimensionality.services.dimensionality_reducer_facade import DimensionalityReducerFacade as DimensionalityReducer
 from .optimization.algorithms.multi_armed_bandit import MultiarmedBanditFramework
 from .optimization.algorithms.rule_optimizer import RuleOptimizer
 # NLTK manager removed - use EnglishNLTKManager from ml.learning.features.english_nltk_manager

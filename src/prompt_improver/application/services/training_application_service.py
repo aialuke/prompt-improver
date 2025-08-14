@@ -15,14 +15,16 @@ from prompt_improver.application.protocols.application_service_protocols import 
     TrainingApplicationServiceProtocol,
 )
 from prompt_improver.cli.core.enhanced_workflow_manager import (
-    EnhancedWorkflowManager,
+    WorkflowService,
     WorkflowCompletionResult,
     WorkflowMonitorConfig,
     WorkflowStopMode,
 )
-from prompt_improver.cli.core.training_system_manager import TrainingSystemManager
-from prompt_improver.core.services.ml_training_service import MLTrainingService
-from prompt_improver.database import DatabaseServices
+from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator as TrainingService
+from prompt_improver.core.services.ml_training_service import EventBasedMLTrainingService as MLTrainingService
+from prompt_improver.repositories.protocols.session_manager_protocol import (
+    SessionManagerProtocol,
+)
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
     MLRepositoryProtocol,
 )
@@ -57,13 +59,13 @@ class TrainingApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
+        session_manager: SessionManagerProtocol,
         ml_repository: MLRepositoryProtocol,
         ml_training_service: MLTrainingService,
-        training_system_manager: TrainingSystemManager,
-        enhanced_workflow_manager: EnhancedWorkflowManager,
+        training_system_manager: TrainingService,
+        enhanced_workflow_manager: WorkflowService,
     ):
-        self.db_services = db_services
+        self.session_manager = session_manager
         self.ml_repository = ml_repository
         self.ml_training_service = ml_training_service
         self.training_system_manager = training_system_manager
@@ -124,7 +126,7 @@ class TrainingApplicationService:
                 }
             
             # 2. Initialize workflow context and resources
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Create workflow record
                     workflow_context = await self._create_workflow_context(
@@ -306,7 +308,7 @@ class TrainingApplicationService:
             pause_time = datetime.now(timezone.utc)
             
             # Transaction boundary for pause operation
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Create checkpoint
                     checkpoint_result = await self._create_workflow_checkpoint(
@@ -396,7 +398,7 @@ class TrainingApplicationService:
             resume_time = datetime.now(timezone.utc)
             
             # Transaction boundary for resume operation
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Restore from checkpoint
                     checkpoint_result = await self._restore_from_checkpoint(
@@ -490,7 +492,7 @@ class TrainingApplicationService:
             workflow_info["status"] = TrainingWorkflowStatus.STOPPING
             
             # Transaction boundary for stopping workflow
-            async with self.db_services.get_session() as db_session:
+            async with self.session_manager.get_session() as db_session:
                 try:
                     # Stop using enhanced workflow manager
                     stop_mode = WorkflowStopMode.GRACEFUL if graceful else WorkflowStopMode.FORCE

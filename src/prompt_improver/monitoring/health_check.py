@@ -45,9 +45,9 @@ class HealthChecker:
         """Check database connectivity and performance."""
         start_time = time.time()
         try:
-            from prompt_improver.database import get_session
+            # Database session will be injected via repository protocol
 
-            async with get_session() as session:
+            async with self.session_manager.session_context() as session:
                 result = await session.execute("SELECT 1")
                 await result.fetchone()
             response_time = time.time() - start_time

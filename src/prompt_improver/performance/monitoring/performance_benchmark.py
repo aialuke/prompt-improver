@@ -21,7 +21,7 @@ from prompt_improver.performance.optimization.performance_optimizer import (
 
 def _get_database_session():
     """Lazy import of database session to avoid circular imports."""
-    from prompt_improver.database import get_session
+    # Database session will be injected via repository protocol
 
     return get_session
 

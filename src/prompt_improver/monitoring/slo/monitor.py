@@ -256,9 +256,10 @@ class ErrorBudgetMonitor:
 
     def __init__(self, slo_definition: SLODefinition, unified_manager=None):
         self.slo_definition = slo_definition
-        self._unified_manager = unified_manager or await get_database_services(
-            ManagerMode.ASYNC_MODERN
-        )
+        if unified_manager:
+            self._unified_manager = unified_manager
+        else:
+            self._unified_manager = None  # Will be initialized async
         self._security_context = None
         self.error_budgets: dict[str, ErrorBudget] = {}
         self.budget_history: list[dict[str, Any]] = []
@@ -474,7 +475,7 @@ class SLOMonitor:
     ):
         self.slo_definition = slo_definition
         self.alert_callbacks = alert_callbacks or []
-        self._unified_manager = await get_database_services(ManagerMode.ASYNC_MODERN)
+        self._unified_manager = None  # Will be initialized async
         self.calculators: dict[str, MultiWindowSLICalculator] = {}
         for target in slo_definition.targets:
             self.calculators[target.name] = MultiWindowSLICalculator(

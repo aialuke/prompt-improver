@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.database import get_sessionmanager
+from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import RuleMetadata
 
 
@@ -25,7 +25,8 @@ class RuleValidationService:
     - Intelligent rule recommendations
     """
 
-    def __init__(self):
+    def __init__(self, session_manager: SessionManagerProtocol):
+        self.session_manager = session_manager
         self.logger = logging.getLogger("apes.rule_validation")
         self.expected_rules = {
             "clarity_enhancement": {
@@ -88,7 +89,7 @@ class RuleValidationService:
             "validation_time_ms": 0,
         }
         try:
-            session_manager = get_sessionmanager()
+            session_manager = self.session_manager
             async with session_manager.get_async_session() as db_session:
                 rule_existence = await self._validate_rule_existence(db_session)
                 validation_report["rule_count"]["found"] = rule_existence["total_rules"]

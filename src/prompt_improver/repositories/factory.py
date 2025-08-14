@@ -11,7 +11,7 @@ from prompt_improver.database import DatabaseServices
 from prompt_improver.repositories.impl.analytics_repository import AnalyticsRepository
 from prompt_improver.repositories.impl.apriori_repository import AprioriRepository
 from prompt_improver.repositories.impl.health_repository import HealthRepository
-from prompt_improver.repositories.impl.ml_repository import MLRepository
+from prompt_improver.repositories.impl.ml_repository_service import MLRepositoryFacade
 from prompt_improver.repositories.impl.user_feedback_repository import (
     UserFeedbackRepository,
 )
@@ -64,7 +64,7 @@ class RepositoryFactory:
             self._repository_cache[AprioriRepositoryProtocol] = AprioriRepository(
                 self.connection_manager
             )
-            self._repository_cache[MLRepositoryProtocol] = MLRepository(
+            self._repository_cache[MLRepositoryProtocol] = MLRepositoryFacade(
                 self.connection_manager
             )
             self._repository_cache[UserFeedbackRepositoryProtocol] = (

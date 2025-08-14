@@ -19,8 +19,8 @@ from rich.progress import (
 
 from prompt_improver.cli.core import get_background_manager, get_shared_signal_handler
 from prompt_improver.cli.core.cli_orchestrator import CLIOrchestrator
-from prompt_improver.cli.core.progress_preservation import ProgressPreservationManager
-from prompt_improver.cli.core.training_system_manager import TrainingSystemManager
+from prompt_improver.cli.core.progress_preservation import ProgressService
+from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator
 
 app = typer.Typer(
     name="apes", help="APES - Ultra-Minimal ML Training System", rich_markup_mode="rich"
@@ -28,7 +28,7 @@ app = typer.Typer(
 console = Console()
 signal_handler = get_shared_signal_handler()
 background_manager = get_background_manager()
-training_manager = TrainingSystemManager(console)
+training_manager = TrainingOrchestrator(console)
 cli_orchestrator = CLIOrchestrator(console)
 current_training_session = None
 shutdown_requested = False
@@ -712,9 +712,9 @@ def stop(
 
     async def enhanced_stop_training():
         try:
-            training_manager = TrainingSystemManager()
+            training_manager = TrainingOrchestrator(console)
             cli_orchestrator = CLIOrchestrator()
-            progress_manager = ProgressPreservationManager()
+            progress_manager = ProgressService()
             active_sessions = await training_manager.get_active_sessions()
             if not active_sessions:
                 console.print("💤 No active training sessions to stop", style="dim")
