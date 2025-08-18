@@ -31,10 +31,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Tuple
 from pathlib import Path
 
-import jsonschema
-from jsonschema import ValidationError as JSONSchemaValidationError
+import msgspec
+from msgspec import ValidationError as MsgspecValidationError
 
-from prompt_improver.core.services.security import SecurityLevel, PrivacyTechnique
+from prompt_improver.core.domain.enums import SecurityLevel, PrivacyTechnique
 from prompt_improver.performance.monitoring.metrics_registry import (
     StandardMetrics,
     get_metrics_registry,
@@ -294,7 +294,7 @@ class ValidationErrorService:
         self,
         input_data: Any,
         context: str = "user_input",
-        security_level: SecurityLevel = SecurityLevel.internal
+        security_level: SecurityLevel = SecurityLevel.AUTHENTICATED
     ) -> ValidationErrorContext:
         """Validate input for security threats and PII.
         
@@ -364,13 +364,14 @@ class ValidationErrorService:
         error_type = type(error)
         error_msg = str(error).lower()
         
-        # JSONSchema validation errors
-        if isinstance(error, JSONSchemaValidationError):
-            if "type" in error.message.lower():
+        # Msgspec validation errors
+        if isinstance(error, MsgspecValidationError):
+            error_msg_lower = str(error).lower()
+            if "type" in error_msg_lower:
                 return (ValidationErrorCategory.TYPE_VALIDATION_ERROR, ValidationErrorSeverity.MEDIUM)
-            elif "format" in error.message.lower():
+            elif "format" in error_msg_lower:
                 return (ValidationErrorCategory.FORMAT_VALIDATION_ERROR, ValidationErrorSeverity.MEDIUM)
-            elif "required" in error.message.lower():
+            elif "required" in error_msg_lower:
                 return (ValidationErrorCategory.SCHEMA_VALIDATION_ERROR, ValidationErrorSeverity.HIGH)
             else:
                 return (ValidationErrorCategory.SCHEMA_VALIDATION_ERROR, ValidationErrorSeverity.MEDIUM)

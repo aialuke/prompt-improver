@@ -4,6 +4,7 @@ Comprehensive database configuration with connection pooling, health checks,
 and environment-specific settings.
 """
 
+from typing import Any
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -99,6 +100,37 @@ class DatabaseConfig(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
             f"?sslmode={self.ssl_mode}"
         )
+
+    # DatabaseConfigProtocol implementation
+    def get_database_url(self) -> str:
+        """Get database connection URL (DatabaseConfigProtocol implementation)."""
+        return self.get_connection_url()
+
+    def get_connection_pool_config(self) -> dict[str, Any]:
+        """Get connection pool configuration (DatabaseConfigProtocol implementation)."""
+        return {
+            "pool_size": self.pool_min_size,
+            "max_overflow": self.pool_max_size - self.pool_min_size,
+            "pool_timeout": self.pool_timeout,
+            "pool_recycle": self.pool_recycle,
+            "pool_pre_ping": True,
+            # Legacy compatibility
+            "database_pool_size": self.database_pool_size,
+            "database_max_overflow": self.database_max_overflow,
+            "database_pool_timeout": self.database_pool_timeout,
+        }
+
+    def get_retry_config(self) -> dict[str, Any]:
+        """Get retry configuration (DatabaseConfigProtocol implementation)."""
+        return {
+            "max_retries": 3,
+            "base_delay": 1.0,
+            "max_delay": 60.0,
+            "exponential_base": 2.0,
+            "jitter": True,
+            "timeout": self.health_check_timeout,
+            "health_check_timeout": self.health_check_timeout,
+        }
 
     model_config = {
         "env_prefix": "POSTGRES_",

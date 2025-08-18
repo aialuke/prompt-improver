@@ -1,5 +1,7 @@
 """Comprehensive configuration validation system for startup integrity checks.
 Ensures all services can start successfully with the provided configuration.
+
+Uses ValidationServiceProtocol to break circular dependencies with core.config.
 """
 
 import asyncio
@@ -12,83 +14,83 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from prompt_improver.core.config import AppConfig
+from typing import TYPE_CHECKING
+
+from prompt_improver.core.config.validation import ValidationResult, ValidationReport
+
+if TYPE_CHECKING:
+    from prompt_improver.core.protocols.prompt_service.prompt_protocols import ValidationServiceProtocol
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ValidationResult:
-    """Result of a configuration validation check."""
-
-    component: str
-    is_valid: bool
-    message: str
-    details: dict[str, Any] | None = None
-    critical: bool = True
-
-
-@dataclass
-class ConfigurationValidationReport:
-    """Complete configuration validation report."""
-
-    timestamp: datetime = field(default_factory=datetime.now)
-    environment: str = "unknown"
-    overall_valid: bool = False
-    results: list[ValidationResult] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    critical_failures: list[str] = field(default_factory=list)
-
-    def model_dump(self) -> dict[str, Any]:
-        """Convert report to dictionary for JSON serialization."""
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "environment": self.environment,
-            "overall_valid": self.overall_valid,
-            "results": [
-                {
-                    "component": r.component,
-                    "is_valid": r.is_valid,
-                    "message": r.message,
-                    "details": r.details,
-                    "critical": r.critical,
-                }
-                for r in self.results
-            ],
-            "warnings": self.warnings,
-            "critical_failures": self.critical_failures,
-        }
+# Use ValidationReport from validation module instead of duplicate
 
 
 class ConfigurationValidator:
     """Comprehensive startup configuration validator.
 
+    Uses ValidationServiceProtocol to break circular dependencies.
     Validates all configuration values at startup and performs connectivity tests
     to ensure all services can start successfully.
     """
 
-    def __init__(self, environment: str | None = None):
-        """Initialize validator with optional environment override."""
+    def __init__(
+        self, 
+        validation_service: "ValidationServiceProtocol",
+        environment: str | None = None
+    ):
+        """Initialize validator with validation service and optional environment override."""
+        self.validation_service = validation_service
         self.environment = environment or os.getenv("ENVIRONMENT", "development")
-        self.security_validator = None
-        self.db_config = AppConfig().database
 
-    async def validate_all(self) -> ConfigurationValidationReport:
+    async def validate_all(self) -> ValidationReport:
         """Perform comprehensive configuration validation."""
-        report = ConfigurationValidationReport(environment=self.environment)
-        validators = [
+        report = ValidationReport(environment=self.environment)
+        
+        # Use ValidationServiceProtocol methods for core validation
+        validation_methods = [
+            ("startup_configuration", self.validation_service.validate_startup_configuration),
+            ("database_configuration", self.validation_service.validate_database_configuration),
+            ("security_configuration", self.validation_service.validate_security_configuration),
+            ("monitoring_configuration", self.validation_service.validate_monitoring_configuration),
+        ]
+        
+        # Execute validation methods from the protocol
+        for component_name, validation_method in validation_methods:
+            try:
+                if component_name == "startup_configuration":
+                    result = await validation_method(self.environment)
+                elif component_name == "database_configuration":
+                    result = await validation_method(test_connectivity=True)
+                elif component_name == "security_configuration":
+                    result = await validation_method()
+                elif component_name == "monitoring_configuration":
+                    result = await validation_method(include_connectivity_tests=False)
+                
+                report.results.append(result)
+            except Exception as e:
+                logger.exception(f"Validation error in {component_name}")
+                report.results.append(
+                    ValidationResult(
+                        component=component_name,
+                        is_valid=False,
+                        message=f"Validation error: {e!s}",
+                        critical=True,
+                    )
+                )
+        
+        # Add additional comprehensive validation checks
+        additional_validators = [
             self._validate_environment_setup,
-            self._validate_security_configuration,
-            self._validate_database_configuration,
-            self._validate_database_connectivity,
             self._validate_redis_configuration,
             self._validate_redis_connectivity,
             self._validate_ml_configuration,
             self._validate_api_configuration,
             self._validate_health_check_configuration,
-            self._validate_monitoring_configuration,
         ]
-        for validator_func in validators:
+        
+        for validator_func in additional_validators:
             try:
                 result = await validator_func()
                 if isinstance(result, list):
@@ -105,6 +107,7 @@ class ConfigurationValidator:
                         critical=True,
                     )
                 )
+        
         critical_failures = [r for r in report.results if not r.is_valid and r.critical]
         warnings = [r for r in report.results if not r.is_valid and (not r.critical)]
         report.critical_failures = [
@@ -137,116 +140,7 @@ class ConfigurationValidator:
             message="All required environment variables are set",
         )
 
-    async def _validate_security_configuration(self) -> ValidationResult:
-        """Validate security configuration using existing validator."""
-        is_valid, issues = (True, [])
-        return ValidationResult(
-            component="security",
-            is_valid=is_valid,
-            message="Security validation passed"
-            if is_valid
-            else f"Security issues found: {len(issues)}",
-            details={"issues": issues} if issues else None,
-        )
-
-    async def _validate_database_configuration(self) -> ValidationResult:
-        """Validate database configuration parameters."""
-        try:
-            db_config = self.db_config
-            if db_config.postgres_port < 1 or db_config.postgres_port > 65535:
-                return ValidationResult(
-                    component="database_config",
-                    is_valid=False,
-                    message=f"Invalid database port: {db_config.postgres_port}",
-                )
-            if db_config.pool_min_size > db_config.pool_max_size:
-                return ValidationResult(
-                    component="database_config",
-                    is_valid=False,
-                    message=f"Pool min size ({db_config.pool_min_size}) cannot exceed max size ({db_config.pool_max_size})",
-                )
-            return ValidationResult(
-                component="database_config",
-                is_valid=True,
-                message="Database configuration is valid",
-                details={
-                    "host": db_config.postgres_host,
-                    "port": db_config.postgres_port,
-                    "database": db_config.postgres_database,
-                    "pool_settings": {
-                        "min_size": db_config.pool_min_size,
-                        "max_size": db_config.pool_max_size,
-                        "timeout": db_config.pool_timeout,
-                    },
-                },
-            )
-        except Exception as e:
-            return ValidationResult(
-                component="database_config",
-                is_valid=False,
-                message=f"Database configuration error: {e!s}",
-            )
-
-    async def _validate_database_connectivity(self) -> ValidationResult:
-        """Test database connectivity using DatabaseServices health check."""
-        try:
-            from prompt_improver.database import (
-                ManagerMode,
-                get_database_services,
-            )
-
-            unified_manager = await get_database_services(ManagerMode.ASYNC_MODERN)
-            await unified_manager.initialize()
-            health_status = await unified_manager.health_check()
-            database_healthy = (
-                health_status.get("components", {}).get("async_database") == "healthy"
-            )
-            response_time_ms = health_status.get("response_time_ms", 0)
-            overall_status = health_status.get("status", "unknown")
-            if database_healthy and overall_status in ["healthy", "degraded"]:
-                return ValidationResult(
-                    component="database_connectivity",
-                    is_valid=True,
-                    message="Database connectivity test passed via DatabaseServices",
-                    details={
-                        "response_time_ms": round(response_time_ms, 2),
-                        "overall_status": overall_status,
-                        "health_components": health_status.get("components", {}),
-                        "manager_mode": unified_manager.mode.value,
-                    },
-                )
-            error_details = []
-            for component, status in health_status.get("components", {}).items():
-                if "unhealthy" in str(status):
-                    error_details.append(f"{component}: {status}")
-            error_message = f"Database connectivity failed - Status: {overall_status}"
-            if error_details:
-                error_message += f" - Issues: {'; '.join(error_details)}"
-            return ValidationResult(
-                component="database_connectivity",
-                is_valid=False,
-                message=error_message,
-                details={
-                    "response_time_ms": round(response_time_ms, 2),
-                    "overall_status": overall_status,
-                    "health_components": health_status.get("components", {}),
-                    "error": health_status.get("error"),
-                },
-            )
-        except ImportError as e:
-            return ValidationResult(
-                component="database_connectivity",
-                is_valid=False,
-                message=f"DatabaseServices not available: {e!s}",
-                critical=False,
-            )
-        except Exception as e:
-            return ValidationResult(
-                component="database_connectivity",
-                is_valid=False,
-                message=f"Database connectivity failed via DatabaseServices: {e!s}",
-                details={"error_type": type(e).__name__},
-            )
+    # Database and security configuration validation now handled by ValidationServiceProtocol
 
     async def _validate_redis_configuration(self) -> ValidationResult:
         """Validate Redis configuration parameters."""
@@ -282,40 +176,30 @@ class ConfigurationValidator:
                 critical=False,
             )
         try:
-            from prompt_improver.database import (
-                ManagerMode,
-                get_database_services,
-            )
-
-            unified_manager = await get_database_services(ManagerMode.HIGH_AVAILABILITY)
-            await unified_manager.initialize()
-            # Access Redis through the cache manager
-            if hasattr(unified_manager, "cache") and hasattr(
-                unified_manager.cache, "redis_client"
-            ):
-                client = unified_manager.cache.redis_client
-            else:
-                return ValidationResult(
-                    component="redis_connectivity",
-                    is_valid=False,
-                    message="Redis client not available via DatabaseServices",
-                    issues=["DatabaseServices Redis initialization failed"],
-                )
+            # Use direct Redis connection instead of database services
+            # to avoid circular dependency
+            import coredis
+            
+            client = coredis.Redis.from_url(redis_url)
             await client.ping()
             test_key = "config_validator_test"
             await client.set(test_key, "test_value", ex=5)
             value = await client.get(test_key)
             await client.delete(test_key)
+            await client.close()
+            
             if value == b"test_value":
                 return ValidationResult(
                     component="redis_connectivity",
                     is_valid=True,
                     message="Redis connectivity test passed",
+                    details={"test_method": "direct_coredis_connection"},
                 )
             return ValidationResult(
                 component="redis_connectivity",
                 is_valid=False,
                 message="Redis connectivity test failed - data integrity issue",
+                details={"test_method": "direct_coredis_connection"},
             )
         except ImportError:
             return ValidationResult(
@@ -482,16 +366,23 @@ class ConfigurationValidator:
 
 async def validate_startup_configuration(
     environment: str | None = None,
-) -> tuple[bool, ConfigurationValidationReport]:
+    validation_service: "ValidationServiceProtocol | None" = None
+) -> tuple[bool, ValidationReport]:
     """Main entry point for startup configuration validation.
 
     Args:
         environment: Optional environment override
+        validation_service: Optional validation service (will create default if not provided)
 
     Returns:
         Tuple of (is_valid, validation_report)
     """
-    validator = ConfigurationValidator(environment)
+    # Create default validation service if none provided
+    if validation_service is None:
+        from prompt_improver.services.prompt.validation_service import ValidationService
+        validation_service = ValidationService()
+    
+    validator = ConfigurationValidator(validation_service, environment)
     report = await validator.validate_all()
     if report.overall_valid:
         logger.info("✅ Configuration validation passed")
@@ -513,14 +404,14 @@ async def validate_startup_configuration(
 
 
 def save_validation_report(
-    report: ConfigurationValidationReport, output_file: str | None = None
+    report: ValidationReport, output_file: str | None = None
 ) -> None:
     """Save validation report to JSON file."""
     if output_file is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"config_validation_report_{timestamp}.json"
     output_path = Path(output_file)
-    output_path.write_text(json.dumps(report.model_dump(), indent=2))
+    output_path.write_text(json.dumps(report.to_dict(), indent=2))
     logger.info(f"Configuration validation report saved to: {output_path}")
 
 
@@ -539,7 +430,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     async def main():
-        is_valid, report = await validate_startup_configuration(args.environment)
+        # Create validation service for CLI usage
+        from prompt_improver.services.prompt.validation_service import ValidationService
+        validation_service = ValidationService()
+        
+        is_valid, report = await validate_startup_configuration(
+            args.environment, validation_service
+        )
         if args.output:
             save_validation_report(report, args.output)
         if args.exit_on_failure and (not is_valid):

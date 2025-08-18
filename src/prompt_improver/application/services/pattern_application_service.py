@@ -8,18 +8,22 @@ clean separation from the ML layer.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from prompt_improver.application.protocols.application_service_protocols import (
     ApplicationServiceProtocol,
 )
-from prompt_improver.performance.caching import CacheKey
+if TYPE_CHECKING:
+    from prompt_improver.database.composition import DatabaseServices
+from prompt_improver.services.cache import CacheCoordinatorService
+# CacheKey moved to unified cache facade - using string keys
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
-from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-    PatternDiscoveryRequest,
-    PatternDiscoveryResponse,
+# Import domain DTOs instead of database models for Clean Architecture
+from prompt_improver.core.domain.types import (
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
 )
 from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
@@ -40,9 +44,9 @@ class PatternApplicationServiceProtocol(ApplicationServiceProtocol):
 
     async def execute_comprehensive_pattern_discovery(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         session_id: str | None = None,
-    ) -> PatternDiscoveryResponse:
+    ) -> PatternDiscoveryResponseData:
         """Execute comprehensive pattern discovery workflow."""
         ...
 
@@ -79,10 +83,10 @@ class PatternApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
+        db_services: "DatabaseServices",
         apriori_repository: AprioriRepositoryProtocol,
         ml_repository: MLRepositoryProtocol,
-        cache_manager: CacheManager,
+        cache_manager: CacheCoordinatorService,
     ):
         """
         Initialize the Pattern application service.
@@ -118,9 +122,9 @@ class PatternApplicationService:
 
     async def execute_comprehensive_pattern_discovery(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         session_id: str | None = None,
-    ) -> PatternDiscoveryResponse:
+    ) -> PatternDiscoveryResponseData:
         """
         Execute comprehensive pattern discovery workflow.
         
@@ -139,7 +143,7 @@ class PatternApplicationService:
             session_id: Optional session identifier for tracking
             
         Returns:
-            PatternDiscoveryResponse with comprehensive pattern analysis
+            PatternDiscoveryResponseData with comprehensive pattern analysis
         """
         discovery_run_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
@@ -157,7 +161,7 @@ class PatternApplicationService:
             # Validate discovery configuration
             validation_result = await self._validate_discovery_config(request)
             if not validation_result["valid"]:
-                return PatternDiscoveryResponse(
+                return PatternDiscoveryResponseData(
                     status="error",
                     discovery_run_id=discovery_run_id,
                     unified_recommendations=[],
@@ -235,7 +239,7 @@ class PatternApplicationService:
                     )
                     
                     # Create response
-                    response = PatternDiscoveryResponse(
+                    response = PatternDiscoveryResponseData(
                         status="success",
                         discovery_run_id=discovery_run_id,
                         traditional_patterns=traditional_patterns,
@@ -266,7 +270,7 @@ class PatternApplicationService:
                 except Exception as e:
                     await db_session.rollback()
                     self.logger.error(f"Error in pattern discovery transaction: {e}")
-                    return PatternDiscoveryResponse(
+                    return PatternDiscoveryResponseData(
                         status="error",
                         discovery_run_id=discovery_run_id,
                         unified_recommendations=[],
@@ -281,7 +285,7 @@ class PatternApplicationService:
                     
         except Exception as e:
             self.logger.error(f"Error in pattern discovery workflow: {e}")
-            return PatternDiscoveryResponse(
+            return PatternDiscoveryResponseData(
                 status="error",
                 discovery_run_id=discovery_run_id,
                 unified_recommendations=[],
@@ -378,10 +382,7 @@ class PatternApplicationService:
         """
         try:
             # Check cache first
-            cache_key = CacheKey(
-                namespace="discovery_insights",
-                key=discovery_run_id,
-            )
+            cache_key = f"discovery_insights:{discovery_run_id}"
             cached_insights = await self.cache_manager.get(cache_key)
             if cached_insights is not None:
                 return cached_insights
@@ -407,7 +408,7 @@ class PatternApplicationService:
             self.logger.error(f"Error retrieving discovery insights: {e}")
             raise
 
-    async def _validate_discovery_config(self, request: PatternDiscoveryRequest) -> Dict[str, Any]:
+    async def _validate_discovery_config(self, request: PatternDiscoveryRequestData) -> Dict[str, Any]:
         """Validate pattern discovery configuration."""
         if request.min_effectiveness < 0 or request.min_effectiveness > 1:
             return {
@@ -425,7 +426,7 @@ class PatternApplicationService:
 
     async def _execute_traditional_patterns(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         db_session,
     ) -> Dict[str, Any]:
         """Execute traditional ML pattern analysis."""
@@ -444,7 +445,7 @@ class PatternApplicationService:
     async def _execute_advanced_patterns(
         self,
         pattern_engine: AdvancedPatternDiscovery,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         db_session,
     ) -> Dict[str, Any]:
         """Execute advanced pattern discovery (HDBSCAN, FP-Growth)."""
@@ -465,7 +466,7 @@ class PatternApplicationService:
 
     async def _execute_apriori_patterns(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         db_session,
     ) -> Dict[str, Any] | None:
         """Execute Apriori association rule mining."""
@@ -539,7 +540,7 @@ class PatternApplicationService:
         # Implementation would store results using repository pattern
         pass
 
-    def _get_algorithms_used(self, request: PatternDiscoveryRequest) -> List[str]:
+    def _get_algorithms_used(self, request: PatternDiscoveryRequestData) -> List[str]:
         """Get list of algorithms used in discovery."""
         algorithms = ["traditional_ml"]
         if request.use_advanced_discovery:
@@ -548,7 +549,7 @@ class PatternApplicationService:
             algorithms.append("apriori")
         return algorithms
 
-    def _get_discovery_modes(self, request: PatternDiscoveryRequest) -> List[str]:
+    def _get_discovery_modes(self, request: PatternDiscoveryRequestData) -> List[str]:
         """Get list of discovery modes used."""
         modes = ["parameter_analysis"]
         if request.use_advanced_discovery:
@@ -571,12 +572,9 @@ class PatternApplicationService:
             count += len(apriori_patterns.get("association_rules", []))
         return count
 
-    def _create_discovery_cache_key(self, request: PatternDiscoveryRequest) -> CacheKey:
+    def _create_discovery_cache_key(self, request: PatternDiscoveryRequestData) -> str:
         """Create cache key for pattern discovery request."""
-        return CacheKey(
-            namespace="pattern_discovery",
-            key=f"{request.min_effectiveness}:{request.min_support}:{request.use_advanced_discovery}:{request.include_apriori}",
-        )
+        return f"pattern_discovery:{request.min_effectiveness}:{request.min_support}:{request.use_advanced_discovery}:{request.include_apriori}"
 
     def _create_discoveries_cache_key(
         self,
@@ -584,13 +582,10 @@ class PatternApplicationService:
         sort_by: str,
         sort_desc: bool,
         limit: int,
-    ) -> CacheKey:
+    ) -> str:
         """Create cache key for pattern discoveries request."""
         filter_key = "none"
         if filters:
             filter_key = f"{filters.status}"
         
-        return CacheKey(
-            namespace="pattern_discoveries",
-            key=f"{filter_key}:{sort_by}:{sort_desc}:{limit}",
-        )
+        return f"pattern_discoveries:{filter_key}:{sort_by}:{sort_desc}:{limit}"

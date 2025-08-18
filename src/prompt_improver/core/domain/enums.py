@@ -90,3 +90,12 @@ class MonitoringLevel(Enum):
     BASIC = "basic"
     DETAILED = "detailed"
     COMPREHENSIVE = "comprehensive"
+
+
+class PrivacyTechnique(Enum):
+    """Privacy preservation techniques."""
+    redaction = "redaction"
+    masking = "masking"
+    tokenization = "tokenization"
+    DIFFERENTIAL_PRIVACY = "differential_privacy"
+    HOMOMORPHIC_ENCRYPTION = "homomorphic_encryption"

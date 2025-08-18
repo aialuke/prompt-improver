@@ -209,7 +209,7 @@ class ComponentInvoker:
 
         try:
             # Import retry configuration
-            from ....core.retry_manager import RetryConfig
+            from ....core.services.resilience.retry_configuration_service import RetryConfig
 
             # Create retry configuration
             retry_config = RetryConfig(

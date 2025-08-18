@@ -9,7 +9,7 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer
+    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
 
 logger = logging.getLogger(__name__)
 

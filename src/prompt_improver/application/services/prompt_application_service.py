@@ -23,7 +23,7 @@ from prompt_improver.repositories.protocols.session_manager_protocol import (
 )
 from prompt_improver.rule_engine import RuleEngine
 from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class PromptApplicationService:
         session_manager: SessionManagerProtocol,
         prompt_repository: PromptRepositoryProtocol,
         rule_engine: RuleEngine,
-        session_store: SessionStore,
+        cache_facade: CacheFacade,
         input_validator: OWASP2025InputValidator,
         prompt_improvement_service: PromptImprovementService,
         cache_manager = None,  # Cache manager from performance layer
@@ -53,7 +53,7 @@ class PromptApplicationService:
         self.session_manager = session_manager
         self.prompt_repository = prompt_repository
         self.rule_engine = rule_engine
-        self.session_store = session_store
+        self.cache_facade = cache_facade
         self.input_validator = input_validator
         self.prompt_improvement_service = prompt_improvement_service
         self.logger = logger
@@ -369,7 +369,7 @@ class PromptApplicationService:
                     }
                     
                     # Store in session store
-                    await self.session_store.set_session(session_id, session_data)
+                    await self.cache_facade.set_session(session_id, session_data, ttl=3600)
                     
                     # Store in database
                     await self.session_manager.create_session(
@@ -419,7 +419,7 @@ class PromptApplicationService:
             async with self.session_manager.get_session() as db_session:
                 try:
                     # Load session data
-                    session_data = await self.session_store.get_session(session_id)
+                    session_data = await self.cache_facade.get_session(session_id)
                     if not session_data:
                         return {"status": "error", "error": "Session not found"}
                     
@@ -434,7 +434,7 @@ class PromptApplicationService:
                     )
                     
                     # Update session store
-                    await self.session_store.set_session(session_id, session_data)
+                    await self.cache_facade.set_session(session_id, session_data, ttl=3600)
                     
                     await db_session.commit()
                     
@@ -484,7 +484,7 @@ class PromptApplicationService:
         self, session_id: str, improvement_options: Dict[str, Any] | None
     ) -> Dict[str, Any]:
         """Load existing session context or create new one."""
-        session_data = await self.session_store.get_session(session_id)
+        session_data = await self.cache_facade.get_session(session_id)
         
         if not session_data:
             # Create new session context
@@ -499,7 +499,7 @@ class PromptApplicationService:
                     "avg_processing_time_ms": 0,
                 }
             }
-            await self.session_store.set_session(session_id, session_data)
+            await self.cache_facade.set_session(session_id, session_data, ttl=3600)
             
         return session_data
 
@@ -553,7 +553,7 @@ class PromptApplicationService:
 
     async def _load_session_context(self, session_id: str) -> Dict[str, Any]:
         """Load existing session context."""
-        session_data = await self.session_store.get_session(session_id)
+        session_data = await self.cache_facade.get_session(session_id)
         if not session_data:
             raise ValueError(f"Session {session_id} not found")
         return session_data
@@ -610,7 +610,7 @@ class PromptApplicationService:
         })
         
         # Update session store
-        await self.session_store.set_session(session_id, session_context)
+        await self.cache_facade.set_session(session_id, session_context, ttl=3600)
 
     def _calculate_session_duration(self, session_data: Dict[str, Any]) -> float:
         """Calculate session duration in seconds."""

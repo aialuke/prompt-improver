@@ -58,15 +58,5 @@ def get_session_reporter() -> Any | None:
         return None
 
 
-def get_analytics_router() -> Any | None:
-    """Get the analytics router for real-time functionality.
-
-    Modern pattern: Returns the FastAPI router directly for endpoint registration.
-    """
-    try:
-        from prompt_improver.api.analytics_endpoints import analytics_router
-
-        return analytics_router
-    except ImportError as e:
-        logger.error(f"Failed to import analytics_router: {e}")
-        return None
+# Note: get_analytics_router() moved to api.factories.analytics_api_factory
+# to respect Clean Architecture - API components belong in presentation layer

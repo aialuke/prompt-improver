@@ -20,7 +20,7 @@ from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
     RuleApplicationServiceProtocol,
     ValidationServiceProtocol,
 )
-from prompt_improver.database.models import UserFeedback
+from prompt_improver.core.domain.types import UserFeedbackData
 from prompt_improver.rule_engine.base import BasePromptRule
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -327,7 +327,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
 
     async def process_feedback(
         self,
-        feedback: UserFeedback,
+        feedback: UserFeedbackData,
         session_id: UUID
     ) -> Dict[str, Any]:
         """Process user feedback for a session."""

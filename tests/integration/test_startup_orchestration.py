@@ -154,15 +154,15 @@ class TestStartupOrchestration:
         session_store = result["component_refs"]["session_store"]
         test_key = "test_session"
         test_value = {"user_id": "123", "data": "test"}
-        success = await session_store.set(test_key, test_value)
+        success = await session_store.set_session(test_key, test_value)
         assert success
-        retrieved_value = await session_store.get(test_key)
+        retrieved_value = await session_store.get_session(test_key)
         assert retrieved_value == test_value
-        touched = await session_store.touch(test_key)
+        touched = await session_store.touch_session(test_key)
         assert touched
-        deleted = await session_store.delete(test_key)
+        deleted = await session_store.delete_session(test_key)
         assert deleted
-        retrieved_again = await session_store.get(test_key)
+        retrieved_again = await session_store.get_session(test_key)
         assert retrieved_again is None
         await shutdown_startup_tasks()
 

@@ -14,12 +14,12 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.utils.error_handlers import handle_repository_errors
+from prompt_improver.services.error_handling.facade import ErrorHandlingFacadeProtocol, ErrorServiceType
 from prompt_improver.database import DatabaseServices
-from prompt_improver.database.services.cache.cache_manager import (
-    CacheManager,
-    CacheManagerConfig,
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as CacheManager,
 )
+# CacheManagerConfig removed - use CacheFacade constructor parameters instead
 from prompt_improver.database.models import (
     ImprovementSession,
     PromptSession,
@@ -39,12 +39,32 @@ from prompt_improver.repositories.protocols.analytics_repository_protocol import
 logger = logging.getLogger(__name__)
 
 
+def handle_repository_errors():
+    """Decorator for repository error handling - will be configured per instance."""
+    def decorator(func):
+        async def wrapper(self, *args, **kwargs):
+            try:
+                return await func(self, *args, **kwargs)
+            except Exception as e:
+                # Use injected error handler from repository instance
+                await self.error_handler.handle_unified_error(
+                    error=e,
+                    operation_name=f"analytics_repository.{func.__name__}",
+                    service_type=ErrorServiceType.DATABASE,  # This is a database repository
+                )
+                # Re-raise with context for now - error handler logs/tracks the error
+                raise
+        return wrapper
+    return decorator
+
+
 class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProtocol):
     """Analytics repository implementation with comprehensive analytics operations and caching."""
 
     def __init__(
         self, 
         connection_manager: DatabaseServices,
+        error_handler: ErrorHandlingFacadeProtocol,
         cache_manager: Optional[CacheManager] = None
     ):
         super().__init__(
@@ -52,6 +72,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             connection_manager=connection_manager,
         )
         self.connection_manager = connection_manager
+        self.error_handler = error_handler
         
         # Performance optimization - multi-level caching for dashboard queries
         self.cache_manager = cache_manager
@@ -361,7 +382,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                from prompt_improver.database.query_optimizer import execute_optimized_query
+                from prompt_improver.services.cache.cache_facade import CacheFacade
                 
                 # Map granularity to PostgreSQL date_trunc format
                 truncation_map = {
@@ -412,18 +433,45 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                     FROM aggregated_data
                 """)
                 
-                result = await execute_optimized_query(
-                    session,
-                    str(time_series_query),
-                    params={
+                # Initialize cache for query results
+                import hashlib
+                import json
+                cache = CacheFacade(l1_max_size=500, l2_default_ttl=300, enable_l2=True, enable_l3=False)
+                
+                # Generate cache key
+                cache_data = {
+                    "query": str(time_series_query),
+                    "params": {
+                        "granularity": truncation_map[granularity],
+                        "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                        "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date),
+                        "metric_name": metric_name
+                    }
+                }
+                cache_string = json.dumps(cache_data, sort_keys=True)
+                cache_key = f"analytics:time_series:{hashlib.md5(cache_string.encode()).hexdigest()}"
+                
+                # Try cache first
+                cached_result = await cache.get(cache_key)
+                if cached_result is not None:
+                    result_rows = cached_result
+                else:
+                    # Execute query directly
+                    query_result = await session.execute(time_series_query, {
                         "granularity": truncation_map[granularity],
                         "start_date": start_date,
                         "end_date": end_date,
                         "metric_name": metric_name
-                    },
-                    cache_ttl=300,
-                    enable_cache=True
-                )
+                    })
+                    result_rows = query_result.fetchall()
+                    
+                    # Cache the result
+                    serializable_rows = [
+                        {k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v 
+                         for k, v in row._asdict().items()} 
+                        for row in result_rows
+                    ]
+                    await cache.set(cache_key, serializable_rows, l2_ttl=300)
                 
                 return [
                     TimeSeriesPoint(
@@ -436,7 +484,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                             "std_dev": float(row.std_dev or 0)
                         },
                     )
-                    for row in result
+                    for row in result_rows
                 ]
 
             except Exception as e:
@@ -760,7 +808,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                from prompt_improver.database.query_optimizer import execute_optimized_query
+                from prompt_improver.services.cache.cache_facade import CacheFacade
                 
                 histogram_query = text("""
                     WITH performance_data AS (
@@ -882,7 +930,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                from prompt_improver.database.query_optimizer import execute_optimized_query
+                from prompt_improver.services.cache.cache_facade import CacheFacade
                 
                 correlation_query = text("""
                     WITH session_metrics AS (

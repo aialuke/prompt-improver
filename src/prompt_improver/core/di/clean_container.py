@@ -32,7 +32,10 @@ from prompt_improver.repositories.interfaces.repository_interfaces import (
     ISessionManager,
 )
 from prompt_improver.core.services.persistence_service_clean import CleanPersistenceService
-from prompt_improver.core.services.rule_selection_service_clean import CleanRuleSelectionService
+# CLEAN ARCHITECTURE 2025: Rule selection moved to application layer
+from prompt_improver.application.services.rule_selection_application_service import (
+    RuleSelectionApplicationService,
+)
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")

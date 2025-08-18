@@ -15,6 +15,7 @@ from prompt_improver.core.domain.types import (
     UserFeedbackData,
 )
 from prompt_improver.rule_engine.base import BasePromptRule
+from prompt_improver.core.config.validation import ValidationResult
 
 
 @runtime_checkable
@@ -234,6 +235,63 @@ class ValidationServiceProtocol(Protocol):
             
         Returns:
             Sanitized prompt
+        """
+        ...
+    
+    # Configuration validation methods to break circular dependencies
+    async def validate_startup_configuration(
+        self,
+        environment: Optional[str] = None
+    ) -> ValidationResult:
+        """Validate overall startup configuration integrity.
+        
+        Args:
+            environment: Optional environment override for validation
+            
+        Returns:
+            ValidationResult with startup configuration validation status
+        """
+        ...
+    
+    async def validate_database_configuration(
+        self,
+        test_connectivity: bool = True
+    ) -> ValidationResult:
+        """Validate database configuration and connectivity.
+        
+        Args:
+            test_connectivity: Whether to test actual database connectivity
+            
+        Returns:
+            ValidationResult with database configuration validation status
+        """
+        ...
+    
+    async def validate_security_configuration(
+        self,
+        security_profile: Optional[str] = None
+    ) -> ValidationResult:
+        """Validate security configuration and settings.
+        
+        Args:
+            security_profile: Optional security profile to validate against
+            
+        Returns:
+            ValidationResult with security configuration validation status
+        """
+        ...
+    
+    async def validate_monitoring_configuration(
+        self,
+        include_connectivity_tests: bool = False
+    ) -> ValidationResult:
+        """Validate monitoring and observability configuration.
+        
+        Args:
+            include_connectivity_tests: Whether to test monitoring endpoints
+            
+        Returns:
+            ValidationResult with monitoring configuration validation status
         """
         ...
 

@@ -13,7 +13,7 @@ import pandas as pd
 from ....database import ManagerMode, get_database_services
 from ....repositories.factory import get_ml_repository
 from ....repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
-from ....utils.error_handlers import handle_common_errors as handle_errors
+from ....services.error_handling.facade import handle_common_errors as handle_errors
 try:
     from mlxtend.frequent_patterns import apriori, association_rules
     from mlxtend.preprocessing import TransactionEncoder
@@ -61,7 +61,7 @@ class AprioriAnalyzer:
         self._association_rules_cache = {}
         self._last_analysis_time = None
 
-    @handle_errors(return_format='dict')
+    @handle_errors
     async def extract_transactions_from_database(self, window_days: int=30, min_sessions: int=10) -> list[list[str]]:
         """Extract transaction data using repository pattern for Apriori analysis.
         
@@ -339,7 +339,7 @@ class AprioriAnalyzer:
         self.logger.info('Found %s frequent itemsets', len(frequent_itemsets))
         return frequent_itemsets
 
-    @handle_errors(return_format='dict')
+    @handle_errors
     def generate_association_rules(self, frequent_itemsets: pd.DataFrame, min_confidence: float | None=None, min_lift: float | None=None) -> pd.DataFrame:
         """Generate association rules from frequent itemsets.
         
@@ -434,7 +434,7 @@ class AprioriAnalyzer:
             insights['quality_improvement_patterns'] = [f"{list(row['antecedents'])} → High Quality (confidence: {row['confidence']:.2f}, lift: {row['lift']:.2f})" for _, row in quality_rules.head(3).iterrows()]
         return insights
 
-    @handle_errors(return_format='dict')
+    @handle_errors
     def _save_association_rules(self, rules: pd.DataFrame) -> bool:
         """Save discovered association rules to database."""
         try:

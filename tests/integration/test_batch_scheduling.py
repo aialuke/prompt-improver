@@ -494,9 +494,9 @@ class TestBatchSchedulingIntegration:
 
     async def test_batch_processor_with_session_store_real_behavior(self):
         """Test real batch processor integration with session store."""
-        from prompt_improver.utils.session_store import SessionStore
+        from prompt_improver.services.cache.cache_facade import CacheFacade
 
-        session_store = SessionStore(maxsize=100, ttl=300)
+        session_store = CacheFacade(l1_max_size=100, l2_default_ttl=300, enable_l2=False, enable_l3=False)
         config = BatchProcessorConfig(batch_size=5, dry_run=True)
         processor = BatchProcessor(config)
         async with session_store:

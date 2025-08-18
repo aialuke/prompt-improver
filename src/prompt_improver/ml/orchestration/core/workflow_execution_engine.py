@@ -124,7 +124,8 @@ class WorkflowExecutor:
 
     async def _execute_step_with_retry(self, step: WorkflowStep, parameters: dict[str, Any]) -> None:
         """Execute a workflow step with unified retry manager."""
-        from ....core.retry_manager import RetryConfig, RetryStrategy
+        from ....core.services.resilience.retry_configuration_service import RetryConfig
+        from ....core.services.resilience.backoff_strategy_service import RetryStrategy
         retry_config = RetryConfig(max_attempts=step.max_retries + 1, strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=self.config.workflow_retry_delay, operation_name=f'workflow_step_{step.name}', enable_circuit_breaker=True)
 
         async def step_operation():

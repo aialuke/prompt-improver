@@ -273,107 +273,107 @@ class DatabasePerformanceMonitor:
         """Emit performance snapshot event for orchestrator coordination."""
         if not self.event_bus:
             return
-        try:
-            from prompt_improver.ml.orchestration.events.event_types import (
-                EventType,
-                MLEvent,
-            )
+        from prompt_improver.database.services.optional_registry import get_optional_services_registry
+        from prompt_improver.database.protocols.events import EventType
 
-            await self.event_bus.emit(
-                MLEvent(
-                    event_type=EventType.DATABASE_PERFORMANCE_SNAPSHOT_TAKEN,
-                    source="database_performance_monitor",
-                    data={
-                        "snapshot": {
-                            "timestamp": snapshot.timestamp.isoformat(),
-                            "cache_hit_ratio": snapshot.cache_hit_ratio,
-                            "active_connections": snapshot.active_connections,
-                            "total_queries": snapshot.total_queries,
-                            "avg_query_time_ms": snapshot.avg_query_time_ms,
-                            "slow_queries_count": snapshot.slow_queries_count,
-                            "database_size_mb": snapshot.database_size_mb,
-                            "index_hit_ratio": snapshot.index_hit_ratio,
-                        }
-                    },
-                )
-            )
-        except Exception as e:
-            pass
+        registry = get_optional_services_registry()
+        
+        event_data = {
+            "snapshot": {
+                "timestamp": snapshot.timestamp.isoformat(),
+                "cache_hit_ratio": snapshot.cache_hit_ratio,
+                "active_connections": snapshot.active_connections,
+                "total_queries": snapshot.total_queries,
+                "avg_query_time_ms": snapshot.avg_query_time_ms,
+                "slow_queries_count": snapshot.slow_queries_count,
+                "database_size_mb": snapshot.database_size_mb,
+                "index_hit_ratio": snapshot.index_hit_ratio,
+            },
+            "source": "database_performance_monitor",
+        }
+        
+        # Use optional registry for graceful degradation
+        success = await registry.dispatch_event_if_available(
+            EventType.DATABASE_OPTIMIZATION_COMPLETED, 
+            event_data
+        )
+        
+        if success:
+            logger.debug("Database performance snapshot event dispatched successfully")
+        else:
+            logger.debug("No ML event dispatcher available - performance snapshot taken without ML integration")
 
     async def _check_and_emit_performance_alerts(
         self, snapshot: DatabasePerformanceSnapshot
     ):
-        """Check performance thresholds and emit alerts if needed."""
-        if not self.event_bus:
-            return
-        try:
-            from datetime import timedelta
+        """Check performance thresholds and emit alerts using protocol-based approach."""
+        from datetime import timedelta
+        from prompt_improver.database.services.optional_registry import get_optional_services_registry
+        from prompt_improver.database.protocols.events import EventType
 
-            from prompt_improver.ml.orchestration.events.event_types import (
-                EventType,
-                MLEvent,
-            )
-
-            current_time = datetime.now(UTC)
-            if snapshot.cache_hit_ratio < 90.0:
-                last_alert = self._last_alert_times.get("cache_hit_ratio")
-                if not last_alert or current_time - last_alert > timedelta(minutes=5):
-                    await self.event_bus.emit(
-                        MLEvent(
-                            event_type=EventType.DATABASE_CACHE_HIT_RATIO_LOW,
-                            source="database_performance_monitor",
-                            data={
-                                "cache_hit_ratio": snapshot.cache_hit_ratio,
-                                "threshold": 90.0,
-                                "severity": "warning",
-                            },
-                        )
-                    )
-                    self._last_alert_times["cache_hit_ratio"] = current_time
-            if snapshot.avg_query_time_ms > 50.0:
-                last_alert = self._last_alert_times.get("slow_queries")
-                if not last_alert or current_time - last_alert > timedelta(minutes=5):
-                    await self.event_bus.emit(
-                        MLEvent(
-                            event_type=EventType.DATABASE_SLOW_QUERY_DETECTED,
-                            source="database_performance_monitor",
-                            data={
-                                "avg_query_time_ms": snapshot.avg_query_time_ms,
-                                "threshold": 50.0,
-                                "slow_queries_count": snapshot.slow_queries_count,
-                                "severity": "warning",
-                            },
-                        )
-                    )
-                    self._last_alert_times["slow_queries"] = current_time
-            performance_issues = []
-            if snapshot.cache_hit_ratio < 80.0:
-                performance_issues.append("critical_cache_hit_ratio")
-            if snapshot.avg_query_time_ms > 100.0:
-                performance_issues.append("critical_query_time")
-            if snapshot.active_connections > 25:
-                performance_issues.append("high_connection_count")
-            if performance_issues:
-                last_alert = self._last_alert_times.get("performance_degraded")
-                if not last_alert or current_time - last_alert > timedelta(minutes=10):
-                    await self.event_bus.emit(
-                        MLEvent(
-                            event_type=EventType.DATABASE_PERFORMANCE_DEGRADED,
-                            source="database_performance_monitor",
-                            data={
-                                "issues": performance_issues,
-                                "snapshot_data": {
-                                    "cache_hit_ratio": snapshot.cache_hit_ratio,
-                                    "avg_query_time_ms": snapshot.avg_query_time_ms,
-                                    "active_connections": snapshot.active_connections,
-                                },
-                                "severity": "critical",
-                            },
-                        )
-                    )
-                    self._last_alert_times["performance_degraded"] = current_time
-        except Exception as e:
-            pass
+        registry = get_optional_services_registry()
+        current_time = datetime.now(UTC)
+        
+        # Check cache hit ratio threshold
+        if snapshot.cache_hit_ratio < 90.0:
+            last_alert = self._last_alert_times.get("cache_hit_ratio")
+            if not last_alert or current_time - last_alert > timedelta(minutes=5):
+                event_data = {
+                    "cache_hit_ratio": snapshot.cache_hit_ratio,
+                    "threshold": 90.0,
+                    "severity": "warning",
+                    "source": "database_performance_monitor",
+                }
+                await registry.dispatch_event_if_available(
+                    EventType.DATABASE_CACHE_HIT_RATIO_LOW, 
+                    event_data
+                )
+                self._last_alert_times["cache_hit_ratio"] = current_time
+                
+        # Check slow query threshold  
+        if snapshot.avg_query_time_ms > 50.0:
+            last_alert = self._last_alert_times.get("slow_queries")
+            if not last_alert or current_time - last_alert > timedelta(minutes=5):
+                event_data = {
+                    "avg_query_time_ms": snapshot.avg_query_time_ms,
+                    "threshold": 50.0,
+                    "slow_queries_count": snapshot.slow_queries_count,
+                    "severity": "warning",
+                    "source": "database_performance_monitor",
+                }
+                await registry.dispatch_event_if_available(
+                    EventType.DATABASE_SLOW_QUERY_DETECTED, 
+                    event_data
+                )
+                self._last_alert_times["slow_queries"] = current_time
+                
+        # Check for critical performance issues
+        performance_issues = []
+        if snapshot.cache_hit_ratio < 80.0:
+            performance_issues.append("critical_cache_hit_ratio")
+        if snapshot.avg_query_time_ms > 100.0:
+            performance_issues.append("critical_query_time")
+        if snapshot.active_connections > 25:
+            performance_issues.append("high_connection_count")
+            
+        if performance_issues:
+            last_alert = self._last_alert_times.get("performance_degraded")
+            if not last_alert or current_time - last_alert > timedelta(minutes=10):
+                event_data = {
+                    "issues": performance_issues,
+                    "snapshot_data": {
+                        "cache_hit_ratio": snapshot.cache_hit_ratio,
+                        "avg_query_time_ms": snapshot.avg_query_time_ms,
+                        "active_connections": snapshot.active_connections,
+                    },
+                    "severity": "critical",
+                    "source": "database_performance_monitor",
+                }
+                await registry.dispatch_event_if_available(
+                    EventType.DATABASE_PERFORMANCE_DEGRADED, 
+                    event_data
+                )
+                self._last_alert_times["performance_degraded"] = current_time
 
 
 _monitor: DatabasePerformanceMonitor | None = None

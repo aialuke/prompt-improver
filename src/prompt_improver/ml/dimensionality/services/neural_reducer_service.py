@@ -12,7 +12,7 @@ Follows clean architecture patterns with protocol-based interfaces.
 import logging
 import time
 import warnings
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from sklearn.preprocessing import RobustScaler
@@ -21,7 +21,13 @@ from . import ReductionProtocol, ReductionResult
 
 logger = logging.getLogger(__name__)
 
-# Neural network imports with fallback
+# Neural network imports with fallback using TYPE_CHECKING pattern
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+
 try:
     import torch
     import torch.nn as nn
@@ -29,8 +35,14 @@ try:
     from torch.utils.data import DataLoader, TensorDataset
     TORCH_AVAILABLE = True
 except ImportError:
+    # Create dummy classes for when torch is unavailable
+    class nn:
+        class Module:
+            def __init__(self): pass
+    
     TORCH_AVAILABLE = False
     warnings.warn("PyTorch not available. Neural network methods will be disabled.")
+
 
 class StandardAutoencoder(nn.Module):
     """Standard autoencoder for dimensionality reduction."""

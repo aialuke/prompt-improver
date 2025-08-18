@@ -5,13 +5,18 @@ PHASE 3: Health Check Consolidation - Component Checkers
 import asyncio
 import time
 from datetime import datetime
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
     HealthResult,
     HealthStatus,
 )
+
+if TYPE_CHECKING:
+    from prompt_improver.ml.optimization.batch import (
+        UnifiedBatchProcessor as BatchProcessor,
+    )
 
 try:
     from prompt_improver.performance.monitoring.health.redis_monitor import (
@@ -31,18 +36,31 @@ try:
 except Exception:
     BACKGROUND_MANAGER_AVAILABLE = False
     get_background_task_manager = None
-try:
-    from prompt_improver.ml.optimization.batch import (
-        UnifiedBatchProcessor as BatchProcessor,
-    )
+# Lazy loading for batch processor to avoid ML import chain during module load
+BATCH_PROCESSOR_AVAILABLE = None
+batch_processor = None
 
-    BATCH_PROCESSOR_AVAILABLE = True
-    batch_processor = BatchProcessor
-except Exception as e:
-    BATCH_PROCESSOR_AVAILABLE = False
-    batch_processor = None
-    print(f"batch_processor import failed: {e}")
-QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE or BATCH_PROCESSOR_AVAILABLE
+def _get_batch_processor():
+    """Lazy load batch processor to avoid ML dependencies during module import."""
+    global BATCH_PROCESSOR_AVAILABLE, batch_processor
+    if BATCH_PROCESSOR_AVAILABLE is None:
+        try:
+            from prompt_improver.ml.optimization.batch import (
+                UnifiedBatchProcessor as BatchProcessor,
+            )
+            BATCH_PROCESSOR_AVAILABLE = True
+            batch_processor = BatchProcessor
+        except Exception as e:
+            BATCH_PROCESSOR_AVAILABLE = False
+            batch_processor = None
+            print(f"batch_processor import failed: {e}")
+    return batch_processor if BATCH_PROCESSOR_AVAILABLE else None
+def _queue_services_available():
+    """Check if queue services are available (lazy evaluation)."""
+    batch_available = _get_batch_processor() is not None
+    return BACKGROUND_MANAGER_AVAILABLE or batch_available
+
+QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE  # Conservative default
 try:
     from prompt_improver.repositories.protocols.health_repository_protocol import (
         HealthRepositoryProtocol,

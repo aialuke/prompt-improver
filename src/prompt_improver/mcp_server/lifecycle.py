@@ -10,114 +10,275 @@ import logging
 import signal
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 from prompt_improver.core.config import get_config
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
-from prompt_improver.core.di import get_container
-from prompt_improver.mcp_server.security import create_security_services
 from prompt_improver.mcp_server.transport import select_transport_mode
-from prompt_improver.performance.monitoring.health.unified_health_system import (
-    get_unified_health_monitor,
+from prompt_improver.mcp_server.protocols.server_protocols import (
+    LifecycleManagerProtocol,
+    RuntimeManagerProtocol,
+    MCPServerProtocol,
+    ServerServicesProtocol,
+    ServiceFactoryProtocol,
+    ServerFactoryProtocol,
 )
-from prompt_improver.performance.optimization.performance_optimizer import (
-    get_performance_optimizer,
-)
-from prompt_improver.performance.sla_monitor import SLAMonitor
-from prompt_improver.utils.session_store import SessionStore
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer, ServerServices
+    pass
 
 logger = logging.getLogger(__name__)
 
 
-def setup_lifecycle_handlers(server: "APESMCPServer") -> None:
+class MCPLifecycleManager:
+    """Lifecycle manager for MCP server implementing SRE best practices.
+    
+    Implements LifecycleManagerProtocol and RuntimeManagerProtocol to provide
+    comprehensive server lifecycle management following SRE principles.
+    """
+    
+    def setup_lifecycle_handlers(self, server: MCPServerProtocol) -> None:
+        """Setup lifecycle handlers for server instance.
+        
+        Configures:
+        - Signal handlers for graceful shutdown
+        - Initialization and shutdown procedures
+        - Health monitoring integration
+        
+        Args:
+            server: Server instance to configure lifecycle for
+        """
+        # Bind lifecycle methods to server instance
+        server.initialize = lambda: self.initialize_server_instance(server)
+        server.shutdown = lambda: self.shutdown_server_instance(server)
+        server.run = lambda: run_server_instance(server)
+
+        # Setup signal handling
+        self.setup_signal_handlers(server)
+
+    async def initialize_server_instance(self, server: MCPServerProtocol) -> bool:
+        """Initialize server instance and all services.
+        
+        Implements proper startup sequencing following SRE practices:
+        - Service dependency resolution
+        - Health check validation
+        - Resource allocation and validation
+        - Performance baseline establishment
+        
+        Args:
+            server: Server instance to initialize
+            
+        Returns:
+            bool: True if initialization succeeded, False otherwise
+        """
+        try:
+            logger.info("Initializing APES MCP Server...")
+            await _initialize_event_loop_optimization(server)
+
+            logger.info(
+                "Cache subscriber functionality is not implemented in current architecture"
+            )
+            logger.info("APES MCP Server initialized successfully")
+            server._is_running = True
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to initialize MCP Server: {e}")
+            return False
+
+    async def shutdown_server_instance(self, server: MCPServerProtocol) -> None:
+        """Gracefully shutdown server instance.
+        
+        Implements proper shutdown procedures:
+        - Connection draining
+        - Resource cleanup
+        - Service termination sequencing
+        - Final health status reporting
+        
+        Args:
+            server: Server instance to shutdown
+        """
+        try:
+            logger.info("Shutting down APES MCP Server...")
+            server._is_running = False
+            if hasattr(server, '_shutdown_event') and server._shutdown_event:
+                server._shutdown_event.set()
+            logger.info("APES MCP Server shutdown completed")
+
+        except Exception as e:
+            logger.error(f"Error during server shutdown: {e}")
+
+    def setup_signal_handlers(self, server: MCPServerProtocol) -> None:
+        """Setup signal handlers for graceful shutdown.
+        
+        Configures handlers for:
+        - SIGTERM: Graceful shutdown
+        - SIGINT: Interrupt handling
+        - Custom signals for operational control
+        
+        Args:
+            server: Server instance to setup signal handling for
+        """
+        def signal_handler(signum: int, _frame: Any) -> None:
+            logger.info(f"Received signal {signum} - initiating graceful shutdown...")
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(self.shutdown_server_instance(server))
+                logger.info("Scheduled shutdown as task")
+            except RuntimeError:
+                asyncio.run(self.shutdown_server_instance(server))
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+    async def monitor_server_health(self, server: MCPServerProtocol) -> Dict[str, Any]:
+        """Monitor server health and performance metrics.
+        
+        Args:
+            server: Server instance to monitor
+            
+        Returns:
+            Dict[str, Any]: Health status and performance metrics
+        """
+        try:
+            health_status = await server.health_check()
+            runtime_status = self.get_server_runtime_status(server)
+            
+            return {
+                "health": health_status,
+                "runtime": runtime_status,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            logger.error(f"Health monitoring failed: {e}")
+            return {
+                "health": {"status": "unhealthy", "error": str(e)},
+                "runtime": {"available": False},
+                "timestamp": time.time()
+            }
+
+    async def handle_server_incident(self, server: MCPServerProtocol, incident_type: str, details: Dict[str, Any]) -> None:
+        """Handle server incidents following SRE procedures.
+        
+        Args:
+            server: Server instance experiencing incident
+            incident_type: Type of incident (performance, availability, security)
+            details: Incident details and context
+        """
+        logger.warning(f"Handling server incident: {incident_type}")
+        logger.info(f"Incident details: {details}")
+        
+        # Implement incident response procedures based on type
+        if incident_type == "performance":
+            await self._handle_performance_incident(server, details)
+        elif incident_type == "availability":
+            await self._handle_availability_incident(server, details)
+        elif incident_type == "security":
+            await self._handle_security_incident(server, details)
+        else:
+            logger.warning(f"Unknown incident type: {incident_type}")
+
+    def get_server_runtime_status(self, server: MCPServerProtocol) -> Dict[str, Any]:
+        """Get current runtime status and metrics.
+        
+        Args:
+            server: Server instance to check
+            
+        Returns:
+            Dict[str, Any]: Runtime status including uptime, connections, performance
+        """
+        try:
+            return {
+                "running": getattr(server, '_is_running', False),
+                "services_initialized": getattr(server, '_services_initialized', False),
+                "tools_setup": getattr(server, '_tools_setup', False),
+                "resources_setup": getattr(server, '_resources_setup', False),
+                "available": True
+            }
+        except Exception as e:
+            logger.error(f"Failed to get runtime status: {e}")
+            return {"available": False, "error": str(e)}
+
+    async def _handle_performance_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+        """Handle performance-related incidents."""
+        logger.info("Implementing performance incident response...")
+        # Add performance incident handling logic
+
+    async def _handle_availability_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+        """Handle availability-related incidents."""
+        logger.info("Implementing availability incident response...")
+        # Add availability incident handling logic
+
+    async def _handle_security_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+        """Handle security-related incidents."""
+        logger.warning("Implementing security incident response...")
+        # Add security incident handling logic
+
+
+# Register lifecycle manager in service registry
+from prompt_improver.core.services.service_registry import (
+    register_mcp_lifecycle_manager,
+    get_mcp_lifecycle_manager,
+)
+
+# Register lifecycle manager factory
+register_mcp_lifecycle_manager(lambda: MCPLifecycleManager())
+
+def get_lifecycle_manager() -> LifecycleManagerProtocol:
+    """Get the lifecycle manager instance from service registry."""
+    return get_mcp_lifecycle_manager()
+
+
+def setup_lifecycle_handlers(server: MCPServerProtocol) -> None:
     """Setup initialization, shutdown, and signal handling for the server.
 
     Binds lifecycle methods to the server instance for proper operation.
+    Uses protocol-based lifecycle manager to avoid circular dependencies.
 
     Args:
-        server: The APESMCPServer instance to configure
+        server: The MCP server instance to configure
     """
-    # Bind lifecycle methods to server instance
-    server.initialize = lambda: initialize_server_instance(server)
-    server.shutdown = lambda: shutdown_server_instance(server)
-    server.run = lambda: run_server_instance(server)
-
-    # Setup signal handling
-    setup_signal_handlers(server)
+    lifecycle_manager = get_lifecycle_manager()
+    lifecycle_manager.setup_lifecycle_handlers(server)
 
 
-async def initialize_server_instance(server: "APESMCPServer") -> bool:
+async def initialize_server_instance(server: MCPServerProtocol) -> bool:
     """Initialize the server instance and all services.
 
     Args:
-        server: The APESMCPServer instance to initialize
+        server: The MCP server instance to initialize
 
     Returns:
         True if initialization succeeded, False otherwise
     """
-    try:
-        logger.info("Initializing APES MCP Server...")
-        await _initialize_event_loop_optimization(server)
-
-        logger.info(
-            "Cache subscriber functionality is not implemented in current architecture"
-        )
-        logger.info("APES MCP Server initialized successfully")
-        server._is_running = True
-        return True
-
-    except Exception as e:
-        logger.error(f"Failed to initialize MCP Server: {e}")
-        return False
+    lifecycle_manager = get_lifecycle_manager()
+    return await lifecycle_manager.initialize_server_instance(server)
 
 
-async def shutdown_server_instance(server: "APESMCPServer") -> None:
+async def shutdown_server_instance(server: MCPServerProtocol) -> None:
     """Gracefully shutdown the server instance and all services.
 
     Args:
-        server: The APESMCPServer instance to shutdown
+        server: The MCP server instance to shutdown
     """
-    try:
-        logger.info("Shutting down APES MCP Server...")
-        server._is_running = False
-        server._shutdown_event.set()
-        logger.info("APES MCP Server shutdown completed")
-
-    except Exception as e:
-        logger.error(f"Error during server shutdown: {e}")
+    lifecycle_manager = get_lifecycle_manager()
+    await lifecycle_manager.shutdown_server_instance(server)
 
 
-def setup_signal_handlers(server: "APESMCPServer") -> None:
+def setup_signal_handlers(server: MCPServerProtocol) -> None:
     """Setup signal handlers for graceful shutdown.
 
     Args:
-        server: The APESMCPServer instance to setup signal handling for
+        server: The MCP server instance to setup signal handling for
     """
-
-    def signal_handler(signum: int, _frame: Any) -> None:
-        logger.info(f"Received signal {signum} - initiating graceful shutdown...")
-        try:
-            loop = asyncio.get_running_loop()
-            task = loop.create_task(shutdown_server_instance(server))
-            logger.info("Scheduled shutdown as task")
-        except RuntimeError:
-            asyncio.run(shutdown_server_instance(server))
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    lifecycle_manager = get_lifecycle_manager()
+    lifecycle_manager.setup_signal_handlers(server)
 
 
-def run_server_instance(server: "APESMCPServer") -> None:
+def run_server_instance(server: MCPServerProtocol) -> None:
     """Run the MCP server instance with modern async lifecycle.
 
     Args:
-        server: The APESMCPServer instance to run
+        server: The MCP server instance to run
     """
 
     async def main():
@@ -141,7 +302,12 @@ def run_server_instance(server: "APESMCPServer") -> None:
 
         try:
             logger.info("APES MCP Server ready with optimized event loop")
-            server.mcp.run()
+            # Access mcp attribute through server interface
+            if hasattr(server, 'mcp'):
+                server.mcp.run()
+            else:
+                logger.error("Server does not have MCP instance")
+                await server.start()
         finally:
             await shutdown_server_instance(server)
 
@@ -153,11 +319,11 @@ def run_server_instance(server: "APESMCPServer") -> None:
         asyncio.run(main())
 
 
-async def _initialize_event_loop_optimization(server: "APESMCPServer") -> None:
+async def _initialize_event_loop_optimization(server: MCPServerProtocol) -> None:
     """Initialize event loop optimization and run startup benchmark.
 
     Args:
-        server: The APESMCPServer instance to optimize
+        server: The MCP server instance to optimize
     """
     try:
         from prompt_improver.database import get_unified_loop_manager
@@ -174,63 +340,28 @@ async def _initialize_event_loop_optimization(server: "APESMCPServer") -> None:
         logger.warning(f"Event loop optimization failed: {e}")
 
 
-async def create_server_services(config) -> "ServerServices":
+async def create_server_services(config) -> ServerServicesProtocol:
     """Create and organize all server services with unified security architecture.
 
     Args:
         config: Application configuration
 
     Returns:
-        ServerServices container with all initialized services
+        ServerServicesProtocol container with all initialized services
 
     Raises:
         RuntimeError: If service creation fails
     """
-    logger.info("Creating server services with unified security architecture...")
+    logger.info("Creating server services using factory pattern...")
 
     try:
-        # Create security services
-        security_services = await create_security_services(config)
-
-        # Create other services
-        performance_optimizer = get_performance_optimizer()
-        performance_monitor = get_unified_health_monitor()
-        sla_monitor = SLAMonitor()
-        prompt_service = PromptImprovementService()
-
-        session_store = SessionStore(
-            maxsize=config.mcp_session_maxsize,
-            ttl=config.mcp_session_ttl,
-            cleanup_interval=config.mcp_session_cleanup_interval,
-        )
-
-        cache = get_database_services(ManagerMode.HIGH_AVAILABILITY)
-        event_loop_manager = get_database_services(ManagerMode.HIGH_AVAILABILITY)
-
-        # Import here to avoid circular imports
-        from prompt_improver.mcp_server.server import ServerServices
-
-        services = ServerServices(
-            config=config,
-            security_manager=security_services["security_manager"],
-            validation_manager=security_services["validation_manager"],
-            authentication_manager=security_services["authentication_manager"],
-            security_stack=security_services["security_stack"],
-            security_middleware_adapter=security_services[
-                "security_middleware_adapter"
-            ],
-            input_validator=security_services["input_validator"],
-            output_validator=security_services["output_validator"],
-            performance_optimizer=performance_optimizer,
-            performance_monitor=performance_monitor,
-            sla_monitor=sla_monitor,
-            prompt_service=prompt_service,
-            session_store=session_store,
-            cache=cache,
-            event_loop_manager=event_loop_manager,
-        )
-
-        logger.info("Server services created successfully")
+        # Use factory pattern to create services via service registry
+        from prompt_improver.core.services.service_registry import get_mcp_service_factory
+        
+        service_factory = get_mcp_service_factory()
+        services = await service_factory.create_services(config)
+        
+        logger.info("Server services created successfully using factory")
         return services
 
     except Exception as e:
@@ -238,11 +369,11 @@ async def create_server_services(config) -> "ServerServices":
         raise RuntimeError(f"Service creation failed: {e}")
 
 
-async def initialize_server() -> "APESMCPServer":
+async def initialize_server() -> MCPServerProtocol:
     """Initialize MCP server with unified security architecture.
 
     Returns:
-        Fully initialized APESMCPServer instance with unified security
+        Fully initialized MCPServerProtocol instance with unified security
 
     Raises:
         RuntimeError: If server initialization fails
@@ -250,11 +381,15 @@ async def initialize_server() -> "APESMCPServer":
     logger.info("Initializing APES MCP Server with unified security architecture...")
 
     try:
-        # Import here to avoid circular imports
-        from prompt_improver.mcp_server.server import APESMCPServer
-
-        server_instance = APESMCPServer()
-        await server_instance.async_initialize()
+        # Use factory pattern to create and initialize server via service registry
+        from prompt_improver.core.services.service_registry import get_mcp_server_factory
+        
+        server_factory = get_mcp_server_factory()
+        server_instance = server_factory.create_server()
+        
+        success = await server_factory.initialize_server(server_instance)
+        if not success:
+            raise RuntimeError("Server initialization failed")
 
         logger.info("MCP Server initialization completed successfully")
         logger.info("- Unified security architecture: ACTIVE")

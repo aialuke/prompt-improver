@@ -31,8 +31,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Protocol, runtime_checkable
-from collections.abc import AsyncContextManager
+from typing import Any, Dict, List, Optional, Union, Protocol, runtime_checkable, AsyncContextManager
 
 from prompt_improver.services.error_handling.database_error_service import (
     DatabaseErrorService,
@@ -49,7 +48,7 @@ from prompt_improver.services.error_handling.validation_error_service import (
     ValidationErrorContext,
     ValidationErrorCategory,
 )
-from prompt_improver.core.services.security import SecurityLevel
+from prompt_improver.core.domain.enums import SecurityLevel
 from prompt_improver.performance.monitoring.metrics_registry import (
     StandardMetrics,
     get_metrics_registry,
@@ -174,7 +173,7 @@ class ErrorHandlingFacade:
         correlation_id: Optional[str] = None,
         enable_caching: bool = True,
         enable_batch_processing: bool = True,
-        default_security_level: SecurityLevel = SecurityLevel.internal
+        default_security_level: SecurityLevel = SecurityLevel.AUTHENTICATED
     ):
         """Initialize error handling facade.
         
@@ -721,3 +720,255 @@ class ErrorHandlingFacade:
             "service_statistics": service_stats,
             "service_health": "operational",
         }
+
+
+# Global facade instance for decorator functions
+_global_facade: Optional[ErrorHandlingFacade] = None
+
+
+def _get_global_facade() -> ErrorHandlingFacade:
+    """Get or create the global error handling facade."""
+    global _global_facade
+    if _global_facade is None:
+        _global_facade = ErrorHandlingFacade()
+    return _global_facade
+
+
+# Decorator functions for backward compatibility
+def handle_common_errors(func):
+    """Decorator for common error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.SYSTEM
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.SYSTEM
+                ))
+            except RuntimeError:
+                # No event loop, just log the error
+                import logging
+                logging.error(f"Error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_database_errors(func):
+    """Decorator for database error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.DATABASE
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.DATABASE
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Database error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_network_errors(func):
+    """Decorator for network error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.NETWORK
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.NETWORK
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Network error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_validation_errors(func):
+    """Decorator for validation error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.VALIDATION
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.VALIDATION
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Validation error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_filesystem_errors(func):
+    """Decorator for filesystem error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.SYSTEM
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.SYSTEM
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Filesystem error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_repository_errors(func):
+    """Decorator for repository error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.DATABASE
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.DATABASE
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Repository error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def handle_service_errors(func):
+    """Decorator for service error handling."""
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            await facade.handle_unified_error(
+                e, func.__name__, ErrorServiceType.SYSTEM
+            )
+            raise
+    
+    def sync_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            facade = _get_global_facade()
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(facade.handle_unified_error(
+                    e, func.__name__, ErrorServiceType.SYSTEM
+                ))
+            except RuntimeError:
+                import logging
+                logging.error(f"Service error in {func.__name__}: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper

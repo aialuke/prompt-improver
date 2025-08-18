@@ -25,11 +25,11 @@ from prompt_improver.performance.validation.performance_benchmark_suite import (
     PerformanceBenchmarkSuite,
     run_performance_benchmark,
 )
-from prompt_improver.database.services.cache.cache_manager import (
-    CacheManager,
-    CacheManagerConfig,
-    create_cache_manager,
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as CacheManager,
+    get_cache,
 )
+# Using CacheFacade unified cache architecture
 
 # Set up logging
 logging.basicConfig(
@@ -44,21 +44,19 @@ async def create_test_services():
     """Create test service instances for benchmarking."""
     logger.info("Creating test service instances...")
     
-    # Create cache manager for testing
-    cache_config = CacheManagerConfig(
-        enable_l1_memory=True,
-        enable_l2_redis=True,  # Will gracefully degrade if Redis unavailable
-        enable_l3_database=False,  # Skip for testing
-        l1_ttl_seconds=300,
-        l2_ttl_seconds=900,
+    # Create unified cache facade for testing
+    cache_manager = CacheManager(
+        l1_max_size=1000,
+        l2_default_ttl=900,
+        enable_l2=True,  # Will gracefully degrade if Redis unavailable
+        enable_l3=False,  # Skip for testing
     )
-    cache_manager = CacheManager(cache_config)
     
     try:
-        await cache_manager.initialize()
-        logger.info("Cache manager initialized successfully")
+        # CacheFacade doesn't need explicit initialization
+        logger.info("Cache facade created successfully")
     except Exception as e:
-        logger.warning(f"Cache manager initialization failed: {e}")
+        logger.warning(f"Cache facade creation failed: {e}")
         # Continue with degraded caching
     
     # Create mock services for demonstration
@@ -366,9 +364,10 @@ async def run_demo_benchmark(iterations: int = 50, verbose: bool = False) -> Non
         # Cleanup
         if cache_manager:
             try:
-                await cache_manager.shutdown()
+                # CacheFacade doesn't require explicit shutdown
+                logger.info("Cache facade cleanup completed")
             except Exception as e:
-                logger.warning(f"Error shutting down cache manager: {e}")
+                logger.warning(f"Error during cache facade cleanup: {e}")
         
         print("\\n🎉 Performance validation demo completed!")
         

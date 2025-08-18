@@ -12,16 +12,16 @@ Part of the PromptServiceFacade decomposition following Clean Architecture princ
 import json
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from datetime import datetime
 from uuid import UUID
 
-from prompt_improver.core.events.ml_event_bus import (
-    MLEvent,
-    MLEventType,
-    get_ml_event_bus,
-)
-from prompt_improver.core.interfaces.ml_interface import MLModelInterface
+if TYPE_CHECKING:
+    from prompt_improver.core.events.ml_event_bus import (
+        MLEvent,
+        MLEventType,
+    )
+    from prompt_improver.core.interfaces.ml_interface import MLModelInterface
 from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
     PromptAnalysisServiceProtocol,
 )
@@ -36,13 +36,36 @@ class PromptAnalysisService(PromptAnalysisServiceProtocol):
 
     def __init__(
         self,
-        ml_interface: Optional[MLModelInterface] = None,
+        ml_interface: Optional["MLModelInterface"] = None,
         enable_automl: bool = True,
     ):
         self.ml_interface = ml_interface
         self.enable_automl = enable_automl
         self.analysis_cache = {}
         self.cache_ttl = 300
+        self.logger = logging.getLogger(__name__)
+
+    async def _get_ml_event_bus(self):
+        """Lazy load ML event bus to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import get_ml_event_bus
+            return await get_ml_event_bus()
+        except ImportError:
+            self.logger.info("ML event bus not available (torch not installed)")
+            return None
+
+    def _create_ml_event(self, event_type: str, source: str, data: Dict[str, Any]):
+        """Lazy create ML event to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import MLEvent, MLEventType
+            return MLEvent(
+                event_type=getattr(MLEventType, event_type),
+                source=source,
+                data=data
+            )
+        except ImportError:
+            self.logger.info("ML events not available (torch not installed)")
+            return None
 
     async def analyze_prompt(
         self,
@@ -204,9 +227,12 @@ class PromptAnalysisService(PromptAnalysisServiceProtocol):
                 return {"status": "ml_disabled", "recommendations": []}
 
             # Request ML recommendations via event bus
-            event_bus = await get_ml_event_bus()
-            ml_event = MLEvent(
-                event_type=MLEventType.PREDICTION_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return {"status": "ml_unavailable", "recommendations": []}
+                
+            ml_event = self._create_ml_event(
+                event_type="PREDICTION_REQUEST",
                 source="prompt_analysis_service",
                 data={
                     "operation": "get_recommendations",

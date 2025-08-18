@@ -8,13 +8,21 @@ original god object with focused, testable services.
 import logging
 from typing import Any, Optional
 
-from prompt_improver.core.types import CacheType
+from .protocols import CacheType
 
 from .cache_coordinator_service import CacheCoordinatorService
 from .cache_monitoring_service import CacheMonitoringService
 from .l1_cache_service import L1CacheService
 from .l2_redis_service import L2RedisService
 from .l3_database_service import L3DatabaseService
+
+# Import secure cache wrapper for session encryption
+try:
+    from .secure_cache_wrapper import SecureCacheWrapper
+    SECURE_CACHING_AVAILABLE = True
+except ImportError:
+    SECURE_CACHING_AVAILABLE = False
+    SecureCacheWrapper = None
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +49,7 @@ class CacheFacade:
         enable_l3: bool = False,
         enable_warming: bool = True,
         session_manager: Any = None,
+        session_encryption_key: Optional[str] = None,
     ) -> None:
         """Initialize cache facade with decomposed services.
         
@@ -51,6 +60,7 @@ class CacheFacade:
             enable_l3: Enable L3 (Database) cache
             enable_warming: Enable intelligent cache warming
             session_manager: Database session manager for L3 cache
+            session_encryption_key: Encryption key for session data (auto-generated if None)
         """
         # Initialize individual cache services
         self._l1_cache = L1CacheService(max_size=l1_max_size)
@@ -72,6 +82,20 @@ class CacheFacade:
         self._l2_default_ttl = l2_default_ttl
         self._enable_l2 = enable_l2
         self._enable_l3 = enable_l3
+        
+        # Initialize secure session wrapper if available
+        if SECURE_CACHING_AVAILABLE and SecureCacheWrapper:
+            try:
+                import os
+                encryption_key = session_encryption_key or os.getenv("SESSION_ENCRYPTION_KEY")
+                self._secure_wrapper = SecureCacheWrapper(self._coordinator, encryption_key)
+                logger.info("Secure session encryption enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize secure session wrapper: {e}")
+                self._secure_wrapper = None
+        else:
+            logger.warning("Secure session encryption not available - cryptography library required")
+            self._secure_wrapper = None
 
     async def get(
         self,
@@ -131,6 +155,156 @@ class CacheFacade:
     async def clear(self) -> None:
         """Clear all cache levels."""
         await self._coordinator.clear()
+
+    async def invalidate_pattern(self, pattern: str) -> int:
+        """Invalidate cache entries matching a pattern across all levels.
+        
+        Args:
+            pattern: Pattern to match (supports wildcards like 'prefix:*')
+            
+        Returns:
+            Number of cache entries invalidated
+        """
+        return await self._coordinator.invalidate_pattern(pattern)
+
+    async def get_or_set(
+        self,
+        key: str,
+        value_func: Any,
+        l2_ttl: Optional[int] = None,
+        l1_ttl: Optional[int] = None,
+    ) -> Any:
+        """Get value from cache or compute and set if not found.
+        
+        Args:
+            key: Cache key
+            value_func: Function to compute value if not cached
+            l2_ttl: TTL for L2 cache
+            l1_ttl: TTL for L1 cache
+            
+        Returns:
+            Cached or computed value
+        """
+        # Try to get from cache first
+        cached_value = await self.get(key)
+        if cached_value is not None:
+            return cached_value
+            
+        # Compute value and cache it
+        if callable(value_func):
+            import asyncio
+            if asyncio.iscoroutinefunction(value_func):
+                computed_value = await value_func()
+            else:
+                computed_value = value_func()
+        else:
+            computed_value = value_func
+            
+        await self.set(key, computed_value, l2_ttl, l1_ttl)
+        return computed_value
+
+    # Session management convenience methods
+    
+    async def set_session(self, session_id: str, data: Any, ttl: int = 3600) -> bool:
+        """Set session data with secure encryption and session namespace.
+        
+        Args:
+            session_id: Session identifier
+            data: Session data to store
+            ttl: Time to live in seconds (default: 1 hour)
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # SECURITY: Use encrypted storage for session data
+            if self._secure_wrapper:
+                return await self._secure_wrapper.set_encrypted(
+                    f"session:{session_id}", 
+                    data, 
+                    ttl,
+                    metadata={"session_id": session_id, "type": "session"}
+                )
+            else:
+                # Fallback to unencrypted (with warning)
+                logger.warning(f"Storing session {session_id} without encryption - security risk")
+                await self.set(f"session:{session_id}", data, l2_ttl=ttl, l1_ttl=ttl // 4)
+                return True
+        except Exception as e:
+            logger.error(f"Failed to set session {session_id}: {e}")
+            return False
+
+    async def get_session(self, session_id: str) -> Optional[Any]:
+        """Get session data by session ID with secure decryption.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            Session data or None if not found
+        """
+        try:
+            # SECURITY: Use encrypted retrieval for session data
+            if self._secure_wrapper:
+                return await self._secure_wrapper.get_encrypted(f"session:{session_id}")
+            else:
+                # Fallback to unencrypted (with warning)
+                logger.warning(f"Retrieving session {session_id} without decryption")
+                return await self.get(f"session:{session_id}")
+        except Exception as e:
+            logger.error(f"Failed to get session {session_id}: {e}")
+            return None
+
+    async def delete_session(self, session_id: str) -> bool:
+        """Delete session data by session ID with secure cleanup.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # SECURITY: Use encrypted deletion for session data
+            if self._secure_wrapper:
+                return await self._secure_wrapper.delete_encrypted(f"session:{session_id}")
+            else:
+                # Fallback to unencrypted deletion
+                await self.delete(f"session:{session_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to delete session {session_id}: {e}")
+            return False
+
+    async def touch_session(self, session_id: str, ttl: int = 3600) -> bool:
+        """Extend session TTL by re-setting the data.
+        
+        Args:
+            session_id: Session identifier
+            ttl: New TTL in seconds
+            
+        Returns:
+            True if successful, False if session not found
+        """
+        try:
+            session_data = await self.get_session(session_id)
+            if session_data is not None:
+                return await self.set_session(session_id, session_data, ttl)
+            return False
+        except Exception as e:
+            logger.error(f"Failed to touch session {session_id}: {e}")
+            return False
+
+    async def clear_sessions(self, pattern: str = "session:*") -> int:
+        """Clear session data matching pattern.
+        
+        Args:
+            pattern: Session pattern to clear (default: all sessions)
+            
+        Returns:
+            Number of sessions cleared
+        """
+        return await self.invalidate_pattern(pattern)
 
     async def warm_cache(self, keys: list[str]) -> dict[str, bool]:
         """Manually warm cache with specific keys.

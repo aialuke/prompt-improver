@@ -4,22 +4,13 @@ This module provides unified caching facades that integrate with existing
 multi-level cache infrastructure for optimal performance.
 """
 
-from .cache_facade import (
-    PerformanceCacheFacade,
-    get_performance_cache,
-    CacheStrategy,
-    CacheKey,
+# MIGRATION: Performance cache facade moved to unified services/cache/
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as PerformanceCacheFacade,
 )
 from .repository_cache import RepositoryCacheDecorator
-from .ml_service_cache import MLServiceCache
-from .api_cache import APIResponseCache
 
 __all__ = [
     "PerformanceCacheFacade",
-    "get_performance_cache", 
-    "CacheStrategy",
-    "CacheKey",
     "RepositoryCacheDecorator",
-    "MLServiceCache",
-    "APIResponseCache",
 ]

@@ -26,13 +26,17 @@ from pydantic import BaseModel
 from sqlmodel import Field
 
 from prompt_improver.core.config import get_config
-from prompt_improver.mcp_server.lifecycle import (
-    create_server_services,
-    setup_lifecycle_handlers,
-)
 from prompt_improver.mcp_server.resources import setup_resources
 from prompt_improver.mcp_server.tools import setup_tools
 from prompt_improver.mcp_server.transport import setup_transport_handlers
+from prompt_improver.mcp_server.protocols.server_protocols import (
+    ServiceFactoryProtocol,
+    ServerFactoryProtocol,
+    LifecycleManagerProtocol,
+    RuntimeManagerProtocol,
+    MCPServerProtocol,
+    ServerServicesProtocol,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,10 +62,139 @@ class ServerServices(BaseModel):
     performance_monitor: Any
     sla_monitor: Any  # SLAMonitor
     prompt_service: Any  # PromptImprovementService
-    session_store: Any  # SessionStore
+    session_store: Any  # CacheFacade
     cache: Any
     event_loop_manager: Any
     security_middleware_adapter: Any = None  # SecurityMiddlewareAdapter | None
+    
+    async def get_database_session(self):
+        """Get database session context manager for MCP operations.
+        
+        Implements ServerServicesProtocol.get_database_session() to eliminate
+        circular dependencies by encapsulating database access.
+        
+        Returns:
+            Database session context manager for async operations
+        """
+        from prompt_improver.database import get_database_services
+        from prompt_improver.database.registry import ManagerMode
+        
+        database_services = await get_database_services(ManagerMode.MCP_SERVER)
+        return database_services.database.get_session()
+
+
+class ServerServiceFactory:
+    """Factory for creating MCP server services.
+    
+    Implements ServiceFactoryProtocol to eliminate circular dependencies
+    between server and lifecycle modules.
+    """
+    
+    async def create_services(self, config: Any, **service_dependencies) -> ServerServicesProtocol:
+        """Create server services container with dependencies.
+        
+        Args:
+            config: Application configuration  
+            **service_dependencies: Additional service dependencies
+            
+        Returns:
+            ServerServicesProtocol: Configured services container
+        """
+        from prompt_improver.mcp_server.security import create_security_services
+        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.performance.monitoring.health.unified_health_system import (
+            get_unified_health_monitor,
+        )
+        from prompt_improver.performance.optimization.performance_optimizer import (
+            get_performance_optimizer,
+        )
+        from prompt_improver.performance.sla_monitor import SLAMonitor
+        from prompt_improver.services.cache.cache_facade import CacheFacade
+        
+        logger.info("Creating server services with unified security architecture...")
+        
+        try:
+            # Create security services
+            security_services = await create_security_services(config)
+            
+            # Create other services
+            performance_optimizer = get_performance_optimizer()
+            performance_monitor = get_unified_health_monitor()
+            sla_monitor = SLAMonitor()
+            prompt_service = PromptImprovementService()
+            
+            # Create unified cache facade for session management
+            session_store = CacheFacade(
+                l1_max_size=config.mcp_session_maxsize,
+                l2_default_ttl=config.mcp_session_ttl,
+                enable_l2=True,  # Enable Redis for persistent sessions
+                enable_l3=False,  # L3 not needed for sessions
+                enable_warming=True,
+            )
+            
+            # Cache and event loop manager will be initialized through other services
+            cache = None  # Will be set via service dependencies
+            event_loop_manager = None  # Will be set via service dependencies
+            
+            services = ServerServices(
+                config=config,
+                security_facade=security_services["security_manager"],
+                security_manager=security_services["security_manager"],
+                validation_manager=security_services["validation_manager"],
+                authentication_manager=security_services["authentication_manager"],
+                authorization_manager=security_services["authorization_manager"],
+                security_stack=security_services.get("security_stack"),
+                security_middleware_adapter=security_services[
+                    "security_middleware_adapter"
+                ],
+                input_validator=security_services["input_validator"],
+                output_validator=security_services["output_validator"],
+                performance_optimizer=performance_optimizer,
+                performance_monitor=performance_monitor,
+                sla_monitor=sla_monitor,
+                prompt_service=prompt_service,
+                session_store=session_store,
+                cache=cache,
+                event_loop_manager=event_loop_manager,
+            )
+            
+            logger.info("Server services created successfully")
+            return services
+            
+        except Exception as e:
+            logger.error(f"Failed to create server services: {e}")
+            raise RuntimeError(f"Service creation failed: {e}")
+
+
+class ServerFactory:
+    """Factory for creating and initializing MCP server instances.
+    
+    Implements ServerFactoryProtocol following SRE best practices.
+    """
+    
+    def create_server(self) -> MCPServerProtocol:
+        """Create a new MCP server instance.
+        
+        Returns:
+            MCPServerProtocol: Uninitialized server instance
+        """
+        return APESMCPServer()
+    
+    async def initialize_server(self, server: MCPServerProtocol) -> bool:
+        """Initialize server instance with async components.
+        
+        Args:
+            server: Server instance to initialize
+            
+        Returns:
+            bool: True if initialization succeeded, False otherwise
+        """
+        try:
+            await server.async_initialize()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize server: {e}")
+            return False
 
 
 class APESMCPServer:
@@ -96,18 +229,32 @@ class APESMCPServer:
         self._is_running = False
         self._shutdown_event = None  # Will be set in lifecycle module
 
-        # Setup modular handlers
-        setup_lifecycle_handlers(self)
+        # Setup modular handlers using protocols
+        self._setup_lifecycle_handlers()
         setup_transport_handlers(self)
 
         logger.info(
             "MCP Server orchestrator initialized - awaiting async component initialization"
         )
 
+    def _setup_lifecycle_handlers(self) -> None:
+        """Setup lifecycle handlers using protocol-based approach."""
+        # Delay import to avoid circular dependency
+        # This will be set up later during initialization
+        pass
+
+    def _setup_lifecycle_handlers_delayed(self) -> None:
+        """Setup lifecycle handlers with delayed import to avoid circular dependency."""
+        from prompt_improver.mcp_server.lifecycle import get_lifecycle_manager
+        
+        lifecycle_manager = get_lifecycle_manager()
+        lifecycle_manager.setup_lifecycle_handlers(self)
+
     async def _create_services(self) -> ServerServices:
-        """Create all server services using modular architecture."""
-        logger.info("Creating services with modular architecture...")
-        return await create_server_services(self.config)
+        """Create all server services using factory pattern."""
+        logger.info("Creating services with factory architecture...")
+        factory = ServerServiceFactory()
+        return await factory.create_services(self.config)
 
     async def async_initialize(self) -> None:
         """Async initialization using modular architecture.
@@ -120,6 +267,9 @@ class APESMCPServer:
 
         try:
             logger.info("Starting async initialization with modular architecture...")
+
+            # Setup lifecycle handlers during initialization
+            self._setup_lifecycle_handlers_delayed()
 
             # Create services using lifecycle module
             self.services = await self._create_services()
@@ -299,7 +449,7 @@ class ServerServicesMsgspec(msgspec.Struct):
     performance_monitor: Any
     sla_monitor: Any  # SLAMonitor
     prompt_service: Any  # PromptImprovementService
-    session_store: Any  # SessionStore
+    session_store: Any  # CacheFacade
     cache: Any
     event_loop_manager: Any
     security_middleware_adapter: Any = None  # SecurityMiddlewareAdapter | None
@@ -397,6 +547,26 @@ class MCPMessageCodec:
         return msgspec.json.encode(obj).decode("utf-8")
 
 
+# Register factory instances in service registry for protocol-based access
+from prompt_improver.core.services.service_registry import (
+    register_mcp_service_factory,
+    register_mcp_server_factory,
+    get_mcp_service_factory,
+    get_mcp_server_factory,
+)
+
+# Register factories in service registry
+register_mcp_service_factory(lambda: ServerServiceFactory())
+register_mcp_server_factory(lambda: ServerFactory())
+
+def get_service_factory() -> ServiceFactoryProtocol:
+    """Get the service factory instance from service registry."""
+    return get_mcp_service_factory()
+
+def get_server_factory() -> ServerFactoryProtocol:
+    """Get the server factory instance from service registry."""
+    return get_mcp_server_factory()
+
 # Global server instance for compatibility
 server = None
 
@@ -405,7 +575,7 @@ server = None
 # This maintains backward compatibility while organizing code properly
 
 if __name__ == "__main__":
-    # Import and call the main function from lifecycle module
-    from prompt_improver.mcp_server.lifecycle import main
-
-    main()
+    # Server should not be run directly anymore
+    # Use the lifecycle module main entry point instead
+    logger.error("Server should not be run directly. Use: python -m prompt_improver.mcp_server.lifecycle")
+    sys.exit(1)

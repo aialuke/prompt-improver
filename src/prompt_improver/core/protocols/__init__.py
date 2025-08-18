@@ -7,6 +7,50 @@ interface definitions without implementation dependencies.
 2025 Best Practice: Use typing.Protocol for dependency inversion.
 """
 
+# Heavy ML imports moved to TYPE_CHECKING and lazy loading to avoid torch dependency
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prompt_improver.core.protocols.ml_protocol import (
+        AutoMLProtocol,
+        DataPipelineProtocol,
+        ExperimentTrackingProtocol,
+        FeatureStoreProtocol,
+        MLMonitoringProtocol,
+        MLPlatformProtocol,
+        ModelProtocol,
+        ModelRegistryProtocol,
+        ModelServingProtocol,
+        ModelTrainingProtocol,
+    )
+
+def _get_ml_protocols():
+    """Lazy load ML protocols when needed to avoid torch import on database access."""
+    from prompt_improver.core.protocols.ml_protocol import (
+        AutoMLProtocol,
+        DataPipelineProtocol,
+        ExperimentTrackingProtocol,
+        FeatureStoreProtocol,
+        MLMonitoringProtocol,
+        MLPlatformProtocol,
+        ModelProtocol,
+        ModelRegistryProtocol,
+        ModelServingProtocol,
+        ModelTrainingProtocol,
+    )
+    return {
+        'AutoMLProtocol': AutoMLProtocol,
+        'DataPipelineProtocol': DataPipelineProtocol,
+        'ExperimentTrackingProtocol': ExperimentTrackingProtocol,
+        'FeatureStoreProtocol': FeatureStoreProtocol,
+        'MLMonitoringProtocol': MLMonitoringProtocol,
+        'MLPlatformProtocol': MLPlatformProtocol,
+        'ModelProtocol': ModelProtocol,
+        'ModelRegistryProtocol': ModelRegistryProtocol,
+        'ModelServingProtocol': ModelServingProtocol,
+        'ModelTrainingProtocol': ModelTrainingProtocol,
+    }
+
 from prompt_improver.core.protocols.cache_protocol import (
     AdvancedCacheProtocol,
     BasicCacheProtocol,
@@ -36,18 +80,6 @@ from prompt_improver.core.protocols.health_protocol import (
     HealthCheckResult as SimpleHealthCheckResult,
     HealthMonitorProtocol,
     HealthStatus as SimpleHealthStatus,
-)
-from prompt_improver.core.protocols.ml_protocol import (
-    AutoMLProtocol,
-    DataPipelineProtocol,
-    ExperimentTrackingProtocol,
-    FeatureStoreProtocol,
-    MLMonitoringProtocol,
-    MLPlatformProtocol,
-    ModelProtocol,
-    ModelRegistryProtocol,
-    ModelServingProtocol,
-    ModelTrainingProtocol,
 )
 from prompt_improver.core.protocols.monitoring_protocol import (
     AdvancedHealthCheckProtocol,
@@ -81,13 +113,28 @@ from prompt_improver.core.protocols.retry_protocols import (
     RetryStrategy as SimpleRetryStrategy,
 )
 
+# ML protocols are lazy-loaded - use _get_ml_protocols() to access them
+def __getattr__(name: str):
+    """Lazy loading for ML protocols to avoid torch import on database access."""
+    ml_protocol_names = {
+        'AutoMLProtocol', 'DataPipelineProtocol', 'ExperimentTrackingProtocol',
+        'FeatureStoreProtocol', 'MLMonitoringProtocol', 'MLPlatformProtocol',
+        'ModelProtocol', 'ModelRegistryProtocol', 'ModelServingProtocol',
+        'ModelTrainingProtocol'
+    }
+    
+    if name in ml_protocol_names:
+        ml_protocols = _get_ml_protocols()
+        return ml_protocols[name]
+    
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
 __all__ = [
     "AdvancedCacheProtocol",
     "AdvancedHealthCheckProtocol",
     "AlertingProtocol",
     "AnyMetricsRegistry",
     "AnyRetryConfig",
-    "AutoMLProtocol",
     "BackgroundTaskProtocol",
     "BasicCacheProtocol",
     "BasicHealthCheckProtocol",
@@ -97,27 +144,18 @@ __all__ = [
     "CircuitBreakerProtocol",
     "ConnectionManagerProtocol",
     "ConnectionMode",
-    "DataPipelineProtocol",
     "DatabaseConfigProtocol",
     "DatabaseHealthProtocol",
     "DatabaseProtocol",
     "DatabaseSessionProtocol",
     "DateTimeServiceProtocol",
     "DateTimeUtilsProtocol",
-    "ExperimentTrackingProtocol",
-    "FeatureStoreProtocol",
     "HealthCheckResult",
     "HealthMonitorProtocol",
     "HealthServiceProtocol",
     "HealthStatus",
-    "MLMonitoringProtocol",
-    "MLPlatformProtocol",
     "MetricsCollectorProtocol",
     "MetricsRegistryProtocol",
-    "ModelProtocol",
-    "ModelRegistryProtocol",
-    "ModelServingProtocol",
-    "ModelTrainingProtocol",
     "MonitoringCircuitBreakerProtocol",
     "MultiLevelCacheProtocol",
     "PerformanceMonitorProtocol",
@@ -139,4 +177,15 @@ __all__ = [
     "SimpleRetryManagerProtocol",
     "SimpleRetryStrategy",
     "TimeZoneServiceProtocol",
+    # ML protocols are available via lazy loading
+    "AutoMLProtocol",
+    "DataPipelineProtocol", 
+    "ExperimentTrackingProtocol",
+    "FeatureStoreProtocol",
+    "MLMonitoringProtocol",
+    "MLPlatformProtocol",
+    "ModelProtocol",
+    "ModelRegistryProtocol",
+    "ModelServingProtocol",
+    "ModelTrainingProtocol",
 ]

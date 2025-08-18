@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
-from collections.abc import AsyncContextManager
+from typing import AsyncContextManager
 from urllib.parse import urlparse, parse_qs
 
 import aiohttp

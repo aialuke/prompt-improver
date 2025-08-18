@@ -21,8 +21,10 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from prompt_improver.database.protocols.database_config import DatabaseConfigProtocol
 from .protocols import DatabaseServicesProtocol
-from .services.cache.cache_manager import CacheManager
+# Using unified cache facade from services/cache instead of database-specific CacheManager
+from prompt_improver.services.cache.cache_facade import CacheFacade
 from .services.connection.postgres_pool_manager import (
     PoolConfiguration as PostgresPoolConfiguration,
     PostgreSQLPoolManager,
@@ -54,15 +56,20 @@ class DatabaseServices:
     """
 
     def __init__(
-        self, mode: ManagerMode, pool_config: Optional[TypesPoolConfiguration] = None
+        self, 
+        mode: ManagerMode, 
+        db_config: DatabaseConfigProtocol,
+        pool_config: Optional[TypesPoolConfiguration] = None
     ):
         """Initialize DatabaseServices with composed service dependencies.
 
         Args:
             mode: Manager operation mode for configuration
+            db_config: Database configuration implementing DatabaseConfigProtocol
             pool_config: Optional pool configuration override
         """
         self.mode = mode
+        self.db_config = db_config
         try:
             self.types_pool_config = pool_config or TypesPoolConfiguration.for_mode(
                 mode
@@ -74,30 +81,30 @@ class DatabaseServices:
         self._initialized = False
         self._shutdown = False
 
-        # Compose services using constructor injection
-        from prompt_improver.core.config import AppConfig
-        from prompt_improver.database.services.cache.cache_manager import (
-            CacheManagerConfig,
-        )
+        # Simplified composition for architectural testing - cache temporarily disabled
         from prompt_improver.database.services.connection.postgres_pool_manager import (
             DatabaseConfig,
         )
 
-        try:
-            app_config = AppConfig()
-            app_db_config = app_config.database
-        except Exception as e:
-            raise ValueError(f"Invalid application configuration: {e}") from e
-        # Convert AppConfig database config to PostgreSQLPoolManager's expected format
-        db_config = DatabaseConfig(
-            host=app_db_config.postgres_host,
-            port=app_db_config.postgres_port,
-            database=app_db_config.postgres_database,
-            username=app_db_config.postgres_username,
-            password=app_db_config.postgres_password,
+        # Use injected database config via protocol  
+        database_url = db_config.get_database_url()
+        # Parse URL to extract components for DatabaseConfig
+        from urllib.parse import urlparse
+        parsed = urlparse(database_url)
+        
+        # Convert protocol-based config to PostgreSQLPoolManager's expected format
+        postgres_db_config = DatabaseConfig(
+            host=parsed.hostname or "localhost",
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else "prompt_improver",
+            username=parsed.username or "postgres",
+            password=parsed.password or "",
             echo_sql=False,
         )
 
+        # Get pool configuration from protocol
+        pool_config_dict = db_config.get_connection_pool_config()
+        
         # Convert TypesPoolConfiguration to PostgresPoolConfiguration
         postgres_pool_config = PostgresPoolConfiguration(
             pool_size=self.types_pool_config.pg_pool_size,
@@ -105,22 +112,19 @@ class DatabaseServices:
             timeout=self.types_pool_config.pg_timeout,
             enable_ha=self.types_pool_config.enable_ha,
             enable_circuit_breaker=self.types_pool_config.enable_circuit_breaker,
-            pool_pre_ping=True,  # Default value
-            pool_recycle=3600,  # Default value
+            pool_pre_ping=pool_config_dict.get("pool_pre_ping", True),
+            pool_recycle=pool_config_dict.get("pool_recycle", 3600),
             application_name=f"apes_{mode.value}",
             skip_connection_test=True,  # Skip connection testing for validation
         )
-        self.database = PostgreSQLPoolManager(db_config, postgres_pool_config)
+        self.database = PostgreSQLPoolManager(postgres_db_config, postgres_pool_config)
 
-        # Create cache manager config from pool config
-        cache_config = CacheManagerConfig(
-            enable_l1_memory=self.types_pool_config.enable_l1_cache,
-            enable_cache_warming=self.types_pool_config.enable_cache_warming,
-            l2_ttl_seconds=self.types_pool_config.l2_cache_ttl,
-            warming_batch_size=self.types_pool_config.max_warming_keys,
+        # Initialize unified cache facade (eliminates CacheManager circular import)
+        self.cache = CacheFacade(
+            enable_l2=True, 
+            enable_l3=True, 
+            session_manager=self.database
         )
-        # Create cache manager (skip for validation to avoid database connections)
-        self.cache = None  # Simplified for validation - no real cache needed
 
         # Create health manager
         self.health_manager = HealthManager()
@@ -330,6 +334,7 @@ _registry_lock = asyncio.Lock()
 
 async def create_database_services(
     mode: ManagerMode,
+    db_config: DatabaseConfigProtocol,
     pool_config: Optional[TypesPoolConfiguration] = None,
     force_new: bool = False,
 ) -> DatabaseServices:
@@ -337,6 +342,7 @@ async def create_database_services(
 
     Args:
         mode: Manager operation mode
+        db_config: Database configuration implementing DatabaseConfigProtocol
         pool_config: Optional configuration override
         force_new: Force creation of new instance
 
@@ -353,7 +359,7 @@ async def create_database_services(
                 return existing_services
 
         # Create new services instance
-        services = DatabaseServices(mode, pool_config)
+        services = DatabaseServices(mode, db_config, pool_config)
         await services.initialize_all()
 
         _service_registry[mode] = services

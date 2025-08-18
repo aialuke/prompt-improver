@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Memory Schema",
+  "description": "Schema for individual agent persistent memory",
+  "type": "object",
+  "properties": {
+    "agent_name": {
+      "type": "string",
+      "description": "Name of the agent",
+      "enum": [
+        "database-specialist",
+        "ml-orchestrator", 
+        "performance-engineer",
+        "security-architect",
+        "infrastructure-specialist",
+        "data-pipeline-specialist",
+        "api-design-specialist",
+        "monitoring-observability-specialist",
+        "testing-strategy-specialist",
+        "configuration-management-specialist",
+        "documentation-specialist"
+      ]
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp of last memory update"
+    },
+    "task_history": {
+      "type": "array",
+      "description": "Recent task execution history",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Unique task identifier"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "task_description": {
+            "type": "string",
+            "description": "Brief description of the task"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "failure", "partial"],
+            "description": "Task execution outcome"
+          },
+          "key_insights": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Key insights or learnings from the task"
+          },
+          "delegations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "to_agent": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string"
+                }
+              },
+              "required": ["to_agent", "reason"]
+            },
+            "description": "Delegations made during this task"
+          }
+        },
+        "required": ["task_id", "timestamp", "task_description", "outcome"]
+      }
+    },
+    "domain_knowledge": {
+      "type": "object",
+      "description": "Domain-specific knowledge and patterns",
+      "properties": {
+        "common_patterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern_name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "frequency": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "success_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "last_used": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["pattern_name", "description", "frequency"]
+          }
+        },
+        "project_specific_context": {
+          "type": "object",
+          "description": "Project-specific knowledge and context",
+          "properties": {
+            "architecture_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "performance_baselines": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            },
+            "configuration_insights": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "optimization_insights": {
+      "type": "array",
+      "description": "Performance and optimization insights",
+      "items": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "description": "Area of optimization"
+          },
+          "insight": {
+            "type": "string",
+            "description": "Optimization insight or recommendation"
+          },
+          "impact": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Expected impact level"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence in the insight"
+          },
+          "discovered_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["area", "insight", "impact", "confidence", "discovered_at"]
+      }
+    },
+    "collaboration_patterns": {
+      "type": "object",
+      "description": "Patterns of collaboration with other agents",
+      "properties": {
+        "frequent_collaborators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agent_name": {
+                "type": "string"
+              },
+              "collaboration_frequency": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "success_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "common_tasks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["agent_name", "collaboration_frequency"]
+          }
+        },
+        "delegation_effectiveness": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "success_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "average_resolution_time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "common_issues": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["agent_name", "last_updated", "task_history", "domain_knowledge"],
+  "additionalProperties": false
+}

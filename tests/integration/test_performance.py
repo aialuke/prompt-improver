@@ -26,7 +26,7 @@ from prompt_improver.database.models import ImprovementSession, RulePerformance
 from prompt_improver.rule_engine import RuleEngine
 from prompt_improver.services.analytics import AnalyticsService
 from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
@@ -36,7 +36,7 @@ class PerformanceTester:
 
     def __init__(self):
         self.results = {}
-        self.session_store = SessionStore()
+        self.session_store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
         self.analytics_service = None
         self.improvement_service = None
         self.rule_engine = None
@@ -56,17 +56,17 @@ class PerformanceTester:
         if self.analytics_service:
             self.analytics_service = None
         if self.session_store:
-            await self.session_store.clear()
-            await self.session_store.stop_cleanup_task()
+            await self.session_store.clear_sessions()
+            # Cleanup handled automatically by CacheFacade
 
     @asynccontextmanager
     async def test_session(self, session_id: str):
         """Context manager for test sessions with proper cleanup"""
         try:
-            await self.session_store.set(session_id, {"test_session": True})
+            await self.session_store.set_session(session_id, {"test_session": True}, ttl=3600)
             yield session_id
         finally:
-            await self.session_store.delete(session_id)
+            await self.session_store.delete_session(session_id)
 
     async def test_improve_prompt_performance(
         self, iterations: int = 10

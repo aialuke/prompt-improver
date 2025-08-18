@@ -7,12 +7,12 @@ trend analysis, and dashboard generation while managing transaction boundaries.
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from prompt_improver.application.protocols.application_service_protocols import (
     AnalyticsApplicationServiceProtocol,
 )
-from prompt_improver.utils.error_handlers import handle_service_errors
+from prompt_improver.services.error_handling.facade import handle_service_errors
 from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisInterface,
     request_ml_analysis_via_events,
@@ -25,6 +25,9 @@ from prompt_improver.repositories.protocols.analytics_repository_protocol import
     MetricType,
     TimeGranularity,
 )
+
+if TYPE_CHECKING:
+    from prompt_improver.database.composition import DatabaseServices
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ class AnalyticsApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
+        db_services: "DatabaseServices",
         analytics_repository: AnalyticsRepositoryProtocol,
         ml_analysis_interface: MLAnalysisInterface,
     ):
@@ -60,7 +63,7 @@ class AnalyticsApplicationService:
         """Clean up application service resources."""
         self.logger.info("Cleaning up AnalyticsApplicationService")
 
-    @handle_service_errors()
+    @handle_service_errors
     async def generate_dashboard_data(
         self,
         time_range_hours: int = 24,
@@ -147,7 +150,7 @@ class AnalyticsApplicationService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-    @handle_service_errors()
+    @handle_service_errors
     async def execute_trend_analysis(
         self,
         metric_type: str,
@@ -258,7 +261,7 @@ class AnalyticsApplicationService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-    @handle_service_errors()
+    @handle_service_errors
     async def execute_session_comparison(
         self,
         session_a_id: str,
@@ -345,7 +348,7 @@ class AnalyticsApplicationService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-    @handle_service_errors()
+    @handle_service_errors
     async def generate_session_summary(
         self,
         session_id: str,
@@ -439,7 +442,7 @@ class AnalyticsApplicationService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-    @handle_service_errors()
+    @handle_service_errors
     async def export_session_report(
         self,
         session_id: str,

@@ -1,0 +1,394 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shared Context Schema",
+  "description": "Schema for cross-agent shared context and communication",
+  "type": "object",
+  "properties": {
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp of last update"
+    },
+    "project_context": {
+      "type": "object",
+      "description": "Current project state and context",
+      "properties": {
+        "project_name": {
+          "type": "string",
+          "description": "Current project name"
+        },
+        "current_phase": {
+          "type": "string",
+          "description": "Current development or implementation phase"
+        },
+        "active_objectives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "objective": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              },
+              "assigned_agents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "type": "string",
+                "enum": ["pending", "in_progress", "completed", "blocked"]
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["objective", "priority", "status", "created_at"]
+          }
+        },
+        "system_health": {
+          "type": "object",
+          "properties": {
+            "overall_status": {
+              "type": "string",
+              "enum": ["healthy", "degraded", "critical", "unknown"]
+            },
+            "performance_metrics": {
+              "type": "object",
+              "properties": {
+                "response_time_p95": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "cache_hit_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "error_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "throughput": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "last_health_check": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    },
+    "inter_agent_messages": {
+      "type": "array",
+      "description": "Messages and context shared between agents",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "Unique message identifier"
+          },
+          "from_agent": {
+            "type": "string",
+            "description": "Agent that created the message"
+          },
+          "target_agents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Target agents for this message (empty for broadcast)"
+          },
+          "message_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["insight", "warning", "recommendation", "context", "delegation_result"],
+                "description": "Known message types with specific handling"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$|^[a-z]$",
+                "description": "Custom message types (lowercase, underscores allowed)"
+              }
+            ],
+            "description": "Type of message - either a known type or a custom type"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional message metadata",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "urgent"]
+              },
+              "expiry": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this message expires and can be cleaned up"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledged_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agent": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": ["agent", "timestamp"]
+            }
+          }
+        },
+        "required": ["message_id", "from_agent", "message_type", "content", "timestamp"]
+      }
+    },
+    "global_insights": {
+      "type": "array",
+      "description": "Project-wide insights and learnings",
+      "items": {
+        "type": "object",
+        "properties": {
+          "insight_id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["performance", "security", "architecture", "testing", "deployment", "monitoring"]
+          },
+          "insight": {
+            "type": "string"
+          },
+          "contributing_agents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "impact_assessment": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_validated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["insight_id", "category", "insight", "contributing_agents", "confidence", "created_at"]
+      }
+    },
+    "architectural_decisions": {
+      "type": "array",
+      "description": "Recent architectural decisions and their context",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "alternatives_considered": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impact_areas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decided_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decision_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "review_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this decision should be reviewed"
+          }
+        },
+        "required": ["decision_id", "title", "decision", "rationale", "decided_by", "decision_date"]
+      }
+    },
+    "performance_baselines": {
+      "type": "object",
+      "description": "System-wide performance baselines and trends",
+      "properties": {
+        "database_performance": {
+          "type": "object",
+          "properties": {
+            "query_response_time_p95": {
+              "type": "number"
+            },
+            "connection_pool_utilization": {
+              "type": "number"
+            },
+            "cache_hit_rate": {
+              "type": "number"
+            }
+          }
+        },
+        "api_performance": {
+          "type": "object",
+          "properties": {
+            "endpoint_response_time_p95": {
+              "type": "number"
+            },
+            "throughput_rps": {
+              "type": "number"
+            },
+            "error_rate": {
+              "type": "number"
+            }
+          }
+        },
+        "ml_performance": {
+          "type": "object",
+          "properties": {
+            "training_time": {
+              "type": "number"
+            },
+            "inference_latency": {
+              "type": "number"
+            },
+            "model_accuracy": {
+              "type": "number"
+            }
+          }
+        },
+        "last_baseline_update": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "context_evolution": {
+      "type": "object",
+      "description": "Context evolution tracking and intelligence synthesis",
+      "properties": {
+        "last_evolution": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evolution_results": {
+          "type": "object",
+          "properties": {
+            "knowledge_synthesis": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "area": {"type": "string"},
+                  "contributing_agents": {"type": "array", "items": {"type": "string"}},
+                  "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                  "synthesis_opportunity": {"type": "string"}
+                }
+              }
+            },
+            "pattern_discoveries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {"type": "string"},
+                  "pattern": {"type": "string"},
+                  "agents_involved": {"type": "array", "items": {"type": "string"}},
+                  "strength": {"type": "number"}
+                }
+              }
+            },
+            "optimization_opportunities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "area": {"type": "string"},
+                  "optimization_count": {"type": "number"},
+                  "recommendation": {"type": "string"}
+                }
+              }
+            },
+            "risk_assessments": {
+              "type": "array",
+              "items": {"type": "object"}
+            },
+            "collaboration_improvements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "primary_agent": {"type": "string"},
+                  "preferred_collaborator": {"type": "string"},
+                  "success_frequency": {"type": "number"},
+                  "recommendation": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["last_updated", "project_context", "inter_agent_messages"],
+  "additionalProperties": false
+}

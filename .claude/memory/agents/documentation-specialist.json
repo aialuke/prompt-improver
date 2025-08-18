@@ -1,0 +1,51 @@
+{
+  "agent_name": "documentation-specialist",
+  "last_updated": "2025-01-15T00:00:00Z",
+  "task_history": [],
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "pattern_name": "technical_documentation",
+        "description": "Technical documentation, API docs, and architecture decisions",
+        "frequency": 1,
+        "success_rate": 0.91
+      },
+      {
+        "pattern_name": "api_documentation",
+        "description": "OpenAPI documentation and developer guides",
+        "frequency": 1,
+        "success_rate": 0.93
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "Comprehensive architecture documentation (ARCHITECTURE_PATTERNS_2025_UPDATED.md)",
+        "Agent ecosystem documentation and best practices",
+        "MCP integration documentation and usage guides",
+        "Performance optimization and monitoring documentation"
+      ],
+      "performance_baselines": {
+        "documentation_completeness": 0.95,
+        "documentation_accuracy": 0.92,
+        "update_frequency_days": 7
+      },
+      "configuration_insights": [
+        "Living documentation that evolves with system changes",
+        "Integration with development workflow for automatic updates",
+        "Comprehensive examples and usage patterns"
+      ]
+    }
+  },
+  "optimization_insights": [],
+  "collaboration_patterns": {
+    "frequent_collaborators": [
+      {
+        "agent_name": "api-design-specialist",
+        "collaboration_frequency": 4,
+        "success_rate": 0.90,
+        "common_tasks": ["API documentation", "OpenAPI specs"]
+      }
+    ],
+    "delegation_effectiveness": {}
+  }
+}

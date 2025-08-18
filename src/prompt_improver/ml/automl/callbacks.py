@@ -272,7 +272,7 @@ def create_standard_callbacks(orchestrator: 'AutoMLOrchestrator') -> list:
     """
     callbacks = []
     callbacks.append(AutoMLCallback(orchestrator))
-    from ...core.services.analytics_factory import get_analytics_router
+    from ...api.factories.analytics_api_factory import get_analytics_router
     analytics_router = get_analytics_router()
     if analytics_router:
         callbacks.append(RealTimeAnalyticsCallback(analytics_router))

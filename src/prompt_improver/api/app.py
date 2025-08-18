@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 
 from prompt_improver.api import api_router
 from prompt_improver.api.health import health_router
-from prompt_improver.utils.error_handlers import (
+from prompt_improver.services.error_handling.facade import (
     authentication_exception_handler,
     authorization_exception_handler,
     create_correlation_middleware,

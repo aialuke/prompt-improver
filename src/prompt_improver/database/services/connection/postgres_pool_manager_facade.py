@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.database.services.cache.cache_manager import CacheManager
+from prompt_improver.services.cache.cache_facade import CacheFacade as CacheManager
 from prompt_improver.database.services.connection.connection_pool_core import (
     ConnectionPoolCore,
 )

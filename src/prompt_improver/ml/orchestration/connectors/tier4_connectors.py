@@ -283,7 +283,8 @@ class RetryManagerConnector(ComponentConnector):
     async def _initialize_component(self) -> None:
         """Initialize RetryManager component."""
         try:
-            from ....core.retry_manager import RetryConfig, RetryManager
+            from ....core.services.resilience.retry_configuration_service import RetryConfig
+            from ....core.services.resilience.retry_service_facade import RetryServiceFacade as RetryManager
             default_config = RetryConfig(max_attempts=3, base_delay=0.1, max_delay=30.0, enable_circuit_breaker=True, enable_metrics=True, enable_tracing=True)
             self.component = RetryManager(default_config)
             self.logger.info('RetryManager connector initialized')
@@ -319,7 +320,8 @@ class RetryManagerConnector(ComponentConnector):
             raise RuntimeError('RetryManager component not initialized')
         operation_name = parameters.get('operation_name', 'unknown_operation')
         retry_config_params = parameters.get('retry_config', {})
-        from ....core.retry_manager import RetryConfig, RetryStrategy
+        from ....core.services.resilience.retry_configuration_service import RetryConfig
+        from ....core.services.resilience.backoff_strategy_service import RetryStrategy
         retry_config = RetryConfig(max_attempts=retry_config_params.get('max_attempts', 3), strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=retry_config_params.get('base_delay', 0.1), max_delay=retry_config_params.get('max_delay', 30.0), enable_circuit_breaker=retry_config_params.get('enable_circuit_breaker', True), operation_name=operation_name)
 
         async def demo_operation():

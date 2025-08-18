@@ -11,10 +11,6 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
-from prompt_improver.ml.optimization.batch import (
-    UnifiedBatchConfig as BatchProcessorConfig,
-    UnifiedBatchProcessor as BatchProcessor,
-)
 from prompt_improver.performance.monitoring.health.background_manager import (
     EnhancedBackgroundTaskManager,
     get_background_task_manager,
@@ -22,10 +18,28 @@ from prompt_improver.performance.monitoring.health.background_manager import (
 
 # Lazy import to avoid circular dependency - imported in functions where needed
 if TYPE_CHECKING:
-    from prompt_improver.utils.session_store import SessionStore
+    from prompt_improver.ml.optimization.batch import (
+        UnifiedBatchConfig as BatchProcessorConfig,
+        UnifiedBatchProcessor as BatchProcessor,
+    )
+    from prompt_improver.services.cache.cache_facade import CacheFacade
 
 # Module logger
 logger = logging.getLogger(__name__)
+
+
+def _get_batch_processor_classes():
+    """Lazy import batch processor classes to avoid ML import chain."""
+    try:
+        from prompt_improver.ml.optimization.batch import (
+            UnifiedBatchConfig as BatchProcessorConfig,
+            UnifiedBatchProcessor as BatchProcessor,
+        )
+        return BatchProcessorConfig, BatchProcessor
+    except ImportError as e:
+        logger.warning(f"ML batch processor not available: {e}")
+        return None, None
+
 
 # Global startup state tracking
 _startup_tasks: set[asyncio.Task] = set()
@@ -37,14 +51,14 @@ async def init_startup_tasks(
     max_concurrent_tasks: int = 10,
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
-    batch_config: BatchProcessorConfig | None = None,
-    session_store: "SessionStore | None" = None,
+    batch_config: Any | None = None,  # BatchProcessorConfig when available
+    cache_facade: "CacheFacade | None" = None,
 ) -> dict[str, any]:
     """Initialize and start all core system components.
 
     This function orchestrates the startup of:
     1. EnhancedEnhancedBackgroundTaskManager - For managing async background tasks
-    2. SessionStore cleanup - For automatic session cleanup
+    2. CacheFacade session management - For unified session caching
     3. Periodic batch processor - For training data processing
     4. Health monitor - For system health monitoring
 
@@ -53,7 +67,7 @@ async def init_startup_tasks(
         session_ttl: Session time-to-live in seconds
         cleanup_interval: Session cleanup interval in seconds
         batch_config: Optional batch processor configuration (BatchProcessorConfig)
-        session_store: Optional pre-configured SessionStore instance (if None, creates new one)
+        cache_facade: Optional pre-configured CacheFacade instance (if None, creates new one)
 
     Returns:
         Dictionary with startup status and component references
@@ -85,53 +99,62 @@ async def init_startup_tasks(
             logger.error(f"❌ EnhancedBackgroundTaskManager startup failed: {e}")
             raise
 
-        # Step 2: Initialize SessionStore with cleanup
-        logger.info("💾 Initializing SessionStore with automatic cleanup...")
+        # Step 2: Initialize CacheFacade for session management
+        logger.info("💾 Initializing CacheFacade for unified session management...")
         try:
-            if session_store is None:
+            if cache_facade is None:
                 # Lazy import to avoid circular dependency
-                from prompt_improver.utils.session_store import SessionStore
+                from prompt_improver.services.cache.cache_facade import CacheFacade
 
-                # Create new session store with provided configuration
-                session_store = SessionStore(
-                    maxsize=1000, ttl=session_ttl, cleanup_interval=cleanup_interval
+                # Create new cache facade with session configuration
+                cache_facade = CacheFacade(
+                    l1_max_size=1000,
+                    l2_default_ttl=session_ttl,
+                    enable_l2=True,  # Enable Redis for persistent sessions
+                    enable_l3=False,  # L3 not needed for sessions
+                    enable_warming=True,
                 )
-                await session_store.start_cleanup_task()
                 logger.info(
-                    f"✅ SessionStore created and started (TTL: {session_ttl}s, cleanup: {cleanup_interval}s)"
+                    f"✅ CacheFacade created for session management (TTL: {session_ttl}s, cleanup: {cleanup_interval}s)"
                 )
             else:
-                # Use injected session store (already configured and potentially started)
+                # Use injected cache facade (already configured)
                 logger.info(
-                    "✅ SessionStore injected from external source (pre-configured)"
+                    "✅ CacheFacade injected from external source (pre-configured)"
                 )
 
-            components["session_store"] = session_store
+            components["cache_facade"] = cache_facade  
         except Exception as e:
-            startup_errors.append(f"SessionStore failed: {e}")
-            logger.error(f"❌ SessionStore startup failed: {e}")
+            startup_errors.append(f"CacheFacade failed: {e}")
+            logger.error(f"❌ CacheFacade startup failed: {e}")
             raise
 
         # Step 3: Initialize Batch Processor
         logger.info("⚙️ Initializing Batch Processor...")
         try:
-            if batch_config is None:
-                batch_config = BatchProcessorConfig(
-                    batch_size=10,
-                    batch_timeout=30,
-                    max_attempts=3,
-                    concurrency=3,
-                )
+            BatchProcessorConfig, BatchProcessor = _get_batch_processor_classes()
+            if BatchProcessorConfig is None or BatchProcessor is None:
+                logger.warning("❌ Batch Processor classes not available, skipping...")
+                components["batch_processor"] = None
+            else:
+                if batch_config is None:
+                    batch_config = BatchProcessorConfig(
+                        batch_size=10,
+                        batch_timeout=30,
+                        max_attempts=3,
+                        concurrency=3,
+                    )
 
-            batch_processor = BatchProcessor(batch_config)
-            components["batch_processor"] = batch_processor
-            logger.info(
-                f"✅ Batch Processor initialized (size: {batch_config.batch_size})"
-            )
+                batch_processor = BatchProcessor(batch_config)
+                components["batch_processor"] = batch_processor
+                logger.info(
+                    f"✅ Batch Processor initialized (size: {getattr(batch_config, 'batch_size', 'unknown')})"
+                )
         except Exception as e:
             startup_errors.append(f"Batch Processor failed: {e}")
             logger.error(f"❌ Batch Processor startup failed: {e}")
-            raise
+            # Don't raise - allow startup to continue without batch processor
+            components["batch_processor"] = None
 
         # Step 4: Start Periodic Batch Processing Task
         logger.info("🔄 Starting periodic batch processing...")
@@ -205,7 +228,7 @@ async def init_startup_tasks(
             "startup_time_ms": startup_time,
             "components": {
                 "background_manager": type(components["background_manager"]).__name__,
-                "session_store": type(components["session_store"]).__name__,
+                "cache_facade": type(components["cache_facade"]).__name__,
                 "batch_processor": type(components["batch_processor"]).__name__,
                 "health_monitor": type(components["health_monitor"]).__name__,
             },
@@ -284,22 +307,14 @@ async def cleanup_partial_startup(components: dict) -> None:
     """
     logger.info("🧹 Cleaning up partially initialized components...")
 
-    # Stop session store cleanup if initialized and we created it
-    if "session_store" in components:
+    # Close cache facade if initialized
+    if "cache_facade" in components:
         try:
-            # Only stop cleanup if this was a locally created session store
-            # External session stores (like from APESMCPServer) manage their own lifecycle
-            session_store_instance = components["session_store"]
-            if (
-                hasattr(session_store_instance, "_cleanup_task")
-                and session_store_instance._cleanup_task
-            ):
-                await session_store_instance.stop_cleanup_task()
-                logger.debug("✅ SessionStore cleanup stopped")
-            else:
-                logger.debug("✅ SessionStore cleanup managed externally")
+            cache_facade_instance = components["cache_facade"]
+            await cache_facade_instance.close()
+            logger.debug("✅ CacheFacade closed and resources cleaned up")
         except Exception as e:
-            logger.error(f"❌ Error stopping SessionStore: {e}")
+            logger.error(f"❌ Error closing CacheFacade: {e}")
 
     # Cancel any started background tasks
     for task in _startup_tasks:
@@ -407,8 +422,8 @@ async def startup_context(
     max_concurrent_tasks: int = 10,
     session_ttl: int = 3600,
     cleanup_interval: int = 300,
-    batch_config: BatchProcessorConfig | None = None,
-    session_store: "SessionStore | None" = None,
+    batch_config: Any | None = None,  # BatchProcessorConfig when available
+    cache_facade: "CacheFacade | None" = None,
 ):
     """Async context manager for APES startup/shutdown lifecycle.
 
@@ -423,7 +438,7 @@ async def startup_context(
         session_ttl=session_ttl,
         cleanup_interval=cleanup_interval,
         batch_config=batch_config,
-        session_store=session_store,
+        cache_facade=cache_facade,
     )
 
     if startup_result["status"] != "success":
@@ -485,9 +500,9 @@ class StartupOrchestrator:
 
     async def startup(
         self,
-        batch_processor: BatchProcessor | None = None,
+        batch_processor: Any | None = None,  # BatchProcessor when available
         health_service: Any | None = None,
-        session_store: Optional["SessionStore"] = None,
+        cache_facade: Optional["CacheFacade"] = None,
         startup_delay: float = 2.0,
     ) -> dict[str, Any]:
         """Initialize all services with proper dependency injection.
@@ -495,7 +510,7 @@ class StartupOrchestrator:
         Args:
             batch_processor: Optional batch processor instance
             health_service: Optional health monitoring service
-            session_store: Optional session storage service
+            cache_facade: Optional unified cache facade for session management
             startup_delay: Delay before starting services
 
         Returns:
@@ -508,8 +523,8 @@ class StartupOrchestrator:
         self._is_running = True
 
         try:
-            # Use existing init_startup_tasks function with session_store injection
-            components = await init_startup_tasks(session_store=session_store)
+            # Use existing init_startup_tasks function with cache_facade injection
+            components = await init_startup_tasks(cache_facade=cache_facade)
 
             self._initialized_components = components
             self._startup_complete = True

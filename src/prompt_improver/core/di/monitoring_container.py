@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional, Type, TypeVar
 
-from prompt_improver.core.di.protocols import ContainerRegistryProtocol
+from prompt_improver.core.di.protocols import ContainerRegistryProtocol, MonitoringContainerProtocol
 from prompt_improver.core.protocols.retry_protocols import MetricsRegistryProtocol
 from prompt_improver.shared.interfaces.ab_testing import IABTestingService
 
@@ -39,7 +39,7 @@ class MonitoringServiceRegistration:
     health_check: Callable[[], Any] | None = None
 
 
-class MonitoringContainer(ContainerRegistryProtocol):
+class MonitoringContainer(ContainerRegistryProtocol, MonitoringContainerProtocol):
     """Specialized DI container for monitoring services.
     
     Manages monitoring and observability services including:
@@ -282,6 +282,22 @@ class MonitoringContainer(ContainerRegistryProtocol):
                     
         return implementation(**kwargs)
 
+    def _create_noop_performance_monitor(self) -> Any:
+        """Create a no-op performance monitor for fallback scenarios."""
+        class NoOpPerformanceMonitor:
+            """No-op performance monitor that provides safe fallback behavior."""
+            
+            async def run_baseline_benchmark(self, samples_per_operation: int = 50):
+                return {}
+                
+            async def health_check(self):
+                return {"status": "healthy", "type": "noop"}
+                
+            def generate_performance_report(self, baselines):
+                return "No-op performance monitor: no metrics available"
+                
+        return NoOpPerformanceMonitor()
+
     def is_registered(self, interface: Type[T]) -> bool:
         """Check if service is registered.
         
@@ -378,24 +394,29 @@ class MonitoringContainer(ContainerRegistryProtocol):
         self.logger.debug("Registered A/B testing service factory")
 
     def register_performance_monitoring_factory(self) -> None:
-        """Register factory for performance monitoring service."""
-        def create_performance_monitoring():
+        """Register factory for performance monitoring service.
+        
+        Uses service locator pattern to eliminate circular dependencies while
+        maintaining full functionality. No longer imports MCP server components directly.
+        """
+        async def create_performance_monitoring():
             try:
-                from prompt_improver.performance.monitoring.performance_benchmark import (
-                    PerformanceBenchmark,
+                # Use the factory pattern to create performance benchmark with service locator
+                from prompt_improver.performance.monitoring.performance_benchmark_factory import (
+                    create_performance_benchmark_from_container,
                 )
-                return PerformanceBenchmark()
+                # Pass this container to extract dependencies safely
+                return await create_performance_benchmark_from_container(self)
             except ImportError:
-                # Fallback to basic performance monitoring
-                from prompt_improver.monitoring.basic_performance_monitor import BasicPerformanceMonitor
-                return BasicPerformanceMonitor()
+                # Fallback to no-op performance monitor
+                return self._create_noop_performance_monitor()
 
         self.register_factory(
             "performance_monitor",
             create_performance_monitoring,
-            tags={"performance", "monitoring", "benchmark"}
+            tags={"performance", "monitoring", "benchmark", "service_locator"}
         )
-        self.logger.debug("Registered performance monitoring factory")
+        self.logger.debug("Registered performance monitoring factory with service locator pattern")
 
     def register_alert_manager_factory(self) -> None:
         """Register factory for alert management service."""

@@ -22,7 +22,25 @@ from datetime import UTC, datetime, timezone
 from functools import lru_cache
 from typing import Any, Dict, Optional, Protocol, Union
 
-import textstat
+# Move textstat import to lazy loading to avoid pkg_resources warning on module import
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import textstat
+
+def _get_textstat():
+    """Lazy load textstat when needed to avoid pkg_resources warning on module import."""
+    # Suppress warnings during import
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="pkg_resources is deprecated.*",
+            category=UserWarning,
+            module="pkg_resources.*",
+        )
+        import textstat
+        return textstat
+
 from pydantic import BaseModel, Field, field_validator
 
 from prompt_improver.core.types import TimestampedModel
@@ -157,6 +175,7 @@ class TextStatWrapper:
         """Initialize TextStat with optimal configuration."""
         try:
             # Set language for CMUdict optimization (100% syllable accuracy)
+            textstat = _get_textstat()
             textstat.set_lang(self.config.language)  # type: ignore[attr-defined]
             self._initialized = True
             logger.info(f"TextStat configured with language: {self.config.language}")
@@ -222,6 +241,7 @@ class TextStatWrapper:
     @lru_cache(maxsize=1024)
     def flesch_reading_ease(self, text: str) -> float:
         """Calculate Flesch Reading Ease score (0-100, higher = easier)."""
+        textstat = _get_textstat()
         return self._safe_textstat_call(
             "flesch_reading_ease",
             textstat.flesch_reading_ease,  # type: ignore[attr-defined]

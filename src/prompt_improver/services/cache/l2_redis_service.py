@@ -4,15 +4,21 @@ Provides Redis-based caching with 1-10ms response times for shared data.
 Handles connection management, serialization, and error recovery gracefully.
 """
 
-import asyncio
-import contextlib
 import inspect
 import json
 import logging
 import os
 import time
-from datetime import UTC, datetime, timedelta
-from typing import Any, Optional, Union
+from datetime import UTC, datetime
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from coredis import Redis as CoredisRedis
+else:
+    try:
+        from coredis import Redis as CoredisRedis
+    except ImportError:
+        CoredisRedis = None
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +38,7 @@ class L2RedisService:
 
     def __init__(self) -> None:
         """Initialize L2 Redis service."""
-        self._client: Optional["coredis.Redis"] = None
+        self._client: CoredisRedis | None = None
         self._connection_error_logged = False
         self._ever_connected = False
         self._last_reconnect = False
@@ -46,136 +52,92 @@ class L2RedisService:
         self._connection_attempts = 0
         self._last_health_check = None
 
-    async def get(self, key: str) -> Optional[Any]:
-        """Get value from Redis cache.
+    def _track_operation(self, start_time: float, success: bool, operation: str, key: str = "") -> None:
+        """Track operation performance and log slow operations."""
+        response_time = time.perf_counter() - start_time
+        self._total_operations += 1
+        self._total_response_time += response_time
         
-        Args:
-            key: Cache key
+        if success:
+            self._successful_operations += 1
+        else:
+            self._failed_operations += 1
             
-        Returns:
-            Deserialized value or None if not found/error
-        """
+        # Log slow operations (should be <10ms)
+        if response_time > 0.01:
+            logger.warning(f"L2 Redis {operation} took {response_time*1000:.2f}ms (key: {key[:50]}...)")
+
+    async def get(self, key: str) -> Any | None:
+        """Get value from Redis cache."""
         start_time = time.perf_counter()
         
         try:
             client = await self._get_client()
             if client is None:
+                self._track_operation(start_time, False, "GET", key)
                 return None
                 
             raw_value = await client.get(key)
             if raw_value is None:
+                self._track_operation(start_time, True, "GET", key)
                 return None
                 
-            # Deserialize value
             value = json.loads(raw_value.decode("utf-8"))
-            self._successful_operations += 1
-            
+            self._track_operation(start_time, True, "GET", key)
             return value
             
         except Exception as e:
-            self._failed_operations += 1
             logger.warning(f"L2 Redis GET error for key {key}: {e}")
+            self._track_operation(start_time, False, "GET", key)
             return None
-            
-        finally:
-            response_time = time.perf_counter() - start_time
-            self._total_operations += 1
-            self._total_response_time += response_time
-            
-            # Log slow operations (should be <10ms)
-            if response_time > 0.01:
-                logger.warning(
-                    f"L2 Redis GET operation took {response_time*1000:.2f}ms (key: {key[:50]}...)"
-                )
 
-    async def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> bool:
-        """Set value in Redis cache.
-        
-        Args:
-            key: Cache key
-            value: Value to cache (will be JSON serialized)
-            ttl_seconds: Time to live in seconds
-            
-        Returns:
-            True if successful, False otherwise
-        """
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> bool:
+        """Set value in Redis cache."""
         start_time = time.perf_counter()
         
         try:
             client = await self._get_client()
             if client is None:
+                self._track_operation(start_time, False, "SET", key)
                 return False
                 
-            # Serialize value
             serialized_value = json.dumps(value, default=str).encode("utf-8")
             
-            # Set with optional expiration
             if ttl_seconds and ttl_seconds > 0:
                 await client.set(key, serialized_value, ex=ttl_seconds)
             else:
                 await client.set(key, serialized_value)
             
-            self._successful_operations += 1
+            self._track_operation(start_time, True, "SET", key)
             return True
             
         except Exception as e:
-            self._failed_operations += 1
             logger.warning(f"L2 Redis SET error for key {key}: {e}")
+            self._track_operation(start_time, False, "SET", key)
             return False
-            
-        finally:
-            response_time = time.perf_counter() - start_time
-            self._total_operations += 1
-            self._total_response_time += response_time
-            
-            if response_time > 0.01:
-                logger.warning(
-                    f"L2 Redis SET operation took {response_time*1000:.2f}ms (key: {key[:50]}...)"
-                )
 
     async def delete(self, key: str) -> bool:
-        """Delete key from Redis cache.
-        
-        Args:
-            key: Cache key
-            
-        Returns:
-            True if key was deleted, False otherwise
-        """
+        """Delete key from Redis cache."""
         start_time = time.perf_counter()
         
         try:
             client = await self._get_client()
             if client is None:
+                self._track_operation(start_time, False, "DELETE", key)
                 return False
                 
-            # Delete key (coredis expects list of keys)
             result = await client.delete([key])
             success = (result or 0) > 0
-            
-            if success:
-                self._successful_operations += 1
-            else:
-                self._failed_operations += 1
-                
+            self._track_operation(start_time, success, "DELETE", key)
             return success
             
         except Exception as e:
-            self._failed_operations += 1
             logger.warning(f"L2 Redis DELETE error for key {key}: {e}")
+            self._track_operation(start_time, False, "DELETE", key)
             return False
-            
-        finally:
-            response_time = time.perf_counter() - start_time
-            self._total_operations += 1
-            self._total_response_time += response_time
 
     async def clear(self) -> None:
-        """Clear cache (not implemented for Redis for safety).
-        
-        Note: Redis FLUSHDB is dangerous and not implemented here.
-        Use delete() for specific keys or implement pattern-based clearing.
-        """
+        """Clear cache - not implemented for Redis safety."""
         logger.info("L2 Redis clear requested - use specific key deletion for safety")
 
     async def exists(self, key: str) -> bool:
@@ -187,17 +149,57 @@ class L2RedisService:
         Returns:
             True if key exists, False otherwise
         """
+        start_time = time.perf_counter()
+        
         try:
             client = await self._get_client()
             if client is None:
+                self._track_operation(start_time, False, "EXISTS", key)
                 return False
                 
-            result = await client.exists(key)
-            return result > 0
+            result = await client.exists([key])
+            exists = result > 0
+            self._track_operation(start_time, True, "EXISTS", key)
+            return exists
             
         except Exception as e:
             logger.warning(f"L2 Redis EXISTS error for key {key}: {e}")
+            self._track_operation(start_time, False, "EXISTS", key)
             return False
+
+    async def invalidate_pattern(self, pattern: str) -> int:
+        """Invalidate L2 cache entries matching pattern.
+        
+        Args:
+            pattern: Pattern to match against cache keys (supports Redis glob patterns)
+            
+        Returns:
+            Number of entries invalidated
+        """
+        start_time = time.perf_counter()
+        
+        try:
+            client = await self._get_client()
+            if client is None:
+                return 0
+                
+            # Use Redis SCAN to find matching keys
+            keys = [key async for key in client.scan_iter(match=pattern)]
+            
+            if keys:
+                # Delete all matching keys
+                result = await client.delete(keys)
+                deleted_count = result or 0
+            else:
+                deleted_count = 0
+                
+            self._track_operation(start_time, True, "INVALIDATE_PATTERN", pattern)
+            return deleted_count
+            
+        except Exception as e:
+            logger.warning(f"L2 Redis pattern invalidation failed '{pattern}': {e}")
+            self._track_operation(start_time, False, "INVALIDATE_PATTERN", pattern)
+            return 0
 
     async def ping(self) -> bool:
         """Ping Redis to check connection health.
@@ -217,7 +219,7 @@ class L2RedisService:
             logger.warning(f"L2 Redis ping failed: {e}")
             return False
 
-    async def _get_client(self) -> Optional["coredis.Redis"]:
+    async def _get_client(self) -> CoredisRedis | None:
         """Get or create Redis client with connection management.
         
         Returns:
@@ -227,45 +229,51 @@ class L2RedisService:
             return self._client
 
         try:
-            import coredis
+            if CoredisRedis is None:
+                if not self._connection_error_logged:
+                    logger.warning("coredis not available - L2 Redis cache disabled")
+                    self._connection_error_logged = True
+                return None
             
             self._connection_attempts += 1
             
-            # Try to get configuration
-            try:
-                from prompt_improver.core.config import get_config
-                
-                config = get_config()
-                redis_config = config.redis
-                self._client = coredis.Redis(
-                    host=redis_config.host,
-                    port=redis_config.port,
-                    db=redis_config.database,
-                    password=redis_config.password,
-                    username=redis_config.username or None,
-                    socket_connect_timeout=redis_config.connection_timeout,
-                    socket_timeout=redis_config.socket_timeout,
-                    max_connections=redis_config.max_connections,
-                    decode_responses=False,
-                )
-                
-            except ImportError:
-                # Fallback to environment variables
-                redis_host = os.getenv("REDIS_HOST", "redis.external.service")
-                redis_port = int(os.getenv("REDIS_PORT", "6379"))
-                redis_db = int(os.getenv("REDIS_DB", "0"))
-                redis_password = os.getenv("REDIS_PASSWORD")
-                
-                self._client = coredis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    password=redis_password,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    max_connections=20,
-                    decode_responses=False,
-                )
+            # Modern environment-based configuration with security enhancements
+            redis_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
+            redis_ssl_cert_reqs = os.getenv("REDIS_SSL_CERT_REQS", "required")
+            redis_ssl_ca_certs = os.getenv("REDIS_SSL_CA_CERTS")
+            redis_ssl_certfile = os.getenv("REDIS_SSL_CERTFILE")  
+            redis_ssl_keyfile = os.getenv("REDIS_SSL_KEYFILE")
+            
+            # SECURITY: Configure TLS/SSL for production security
+            ssl_config = {}
+            if redis_ssl:
+                ssl_config.update({
+                    "ssl": True,
+                    "ssl_cert_reqs": redis_ssl_cert_reqs,
+                })
+                if redis_ssl_ca_certs:
+                    ssl_config["ssl_ca_certs"] = redis_ssl_ca_certs
+                if redis_ssl_certfile:
+                    ssl_config["ssl_certfile"] = redis_ssl_certfile  
+                if redis_ssl_keyfile:
+                    ssl_config["ssl_keyfile"] = redis_ssl_keyfile
+                    
+                logger.info("Redis client configured with TLS/SSL encryption")
+            else:
+                logger.warning("Redis client configured WITHOUT TLS/SSL - not recommended for production")
+            
+            self._client = CoredisRedis(
+                host=os.getenv("REDIS_HOST", "localhost"),
+                port=int(os.getenv("REDIS_PORT", "6379")),
+                db=int(os.getenv("REDIS_DB", "0")),
+                password=os.getenv("REDIS_PASSWORD"),
+                username=os.getenv("REDIS_USERNAME"),
+                socket_connect_timeout=int(os.getenv("REDIS_CONNECT_TIMEOUT", "5")),
+                socket_timeout=int(os.getenv("REDIS_SOCKET_TIMEOUT", "5")),
+                max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "20")),
+                decode_responses=False,
+                **ssl_config,  # Apply SSL configuration
+            )
 
             # Test connection
             await self._client.ping()
@@ -277,12 +285,6 @@ class L2RedisService:
             
             return self._client
 
-        except ImportError:
-            if not self._connection_error_logged:
-                logger.warning("coredis not available - L2 Redis cache disabled")
-                self._connection_error_logged = True
-            return None
-            
         except Exception as e:
             if not self._connection_error_logged:
                 logger.warning(f"Failed to connect to Redis - L2 cache disabled: {e}")
@@ -296,28 +298,11 @@ class L2RedisService:
         """Close Redis connection gracefully."""
         if self._client is not None:
             try:
-                # Try multiple close methods depending on coredis version
-                if hasattr(self._client, "close") and inspect.iscoroutinefunction(
-                    self._client.close
-                ):
-                    await self._client.close()
-                elif hasattr(self._client, "aclose") and inspect.iscoroutinefunction(
-                    self._client.aclose
-                ):
-                    await self._client.aclose()
-                elif hasattr(self._client, "close"):
-                    try:
-                        self._client.close()  # type: ignore[attr-defined]
-                    except Exception:
-                        pass
-                elif hasattr(self._client, "connection_pool"):
-                    pool = getattr(self._client, "connection_pool", None)
-                    if pool is not None and hasattr(pool, "disconnect"):
-                        try:
-                            pool.disconnect()
-                        except Exception:
-                            pass
-                            
+                if hasattr(self._client, "close"):
+                    if inspect.iscoroutinefunction(self._client.close):
+                        await self._client.close()
+                    else:
+                        self._client.close()
             except Exception as e:
                 logger.warning(f"Error closing L2 Redis connection: {e}")
             finally:

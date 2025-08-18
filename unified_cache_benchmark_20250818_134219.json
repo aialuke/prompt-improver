@@ -1,0 +1,95 @@
+{
+  "timestamp": "2025-08-18T13:42:19.305193+00:00",
+  "samples_per_test": 100,
+  "benchmark_results": {
+    "l1_cache": {
+      "set_avg_ms": 0.000602690561208874,
+      "set_p99_ms": 0.0016249832697212696,
+      "get_avg_ms": 0.0004719107528217137,
+      "get_p99_ms": 0.0007080088835209608,
+      "overall_avg_ms": 0.0005373006570152938,
+      "overall_p99_ms": 0.0010420044418424368,
+      "hit_rate": 1.0,
+      "memory_per_entry_bytes": 363.27272727272725,
+      "sample_count": 200
+    },
+    "l2_cache": {
+      "available": true,
+      "set_avg_ms": 0.08890741068171337,
+      "set_p99_ms": 0.14162500156089664,
+      "get_avg_ms": 0.06899459956912324,
+      "get_p99_ms": 0.09366602171212435,
+      "overall_avg_ms": 0.0789510051254183,
+      "overall_p99_ms": 0.132125016534701,
+      "hit_rate": 1.0,
+      "sample_count": 200
+    },
+    "l3_cache": {
+      "available": true,
+      "set_avg_ms": 0.0001624997821636498,
+      "set_p99_ms": 0.0004580069798976183,
+      "get_avg_ms": 0.00014359975466504693,
+      "get_p99_ms": 0.00033300602808594704,
+      "overall_avg_ms": 0.00015304976841434836,
+      "overall_p99_ms": 0.0004580069798976183,
+      "hit_rate": 0.0,
+      "sample_count": 40
+    },
+    "cache_coordination": {
+      "coordination_avg_ms": 0.16143330198246986,
+      "coordination_p99_ms": 1.6961249930318445,
+      "fallback_avg_ms": 0.07497910410165787,
+      "fallback_max_ms": 0.07887498941272497,
+      "sample_count": 50,
+      "fallback_sample_count": 10
+    },
+    "cache_facade": {
+      "facade_avg_ms": 0.1435173989739269,
+      "facade_p99_ms": 0.8123749867081642,
+      "sample_count": 50
+    },
+    "memory_efficiency": {
+      "total_entries": 100,
+      "estimated_memory_bytes": 37330,
+      "memory_per_entry_bytes": 373.3,
+      "memory_per_entry_kb": 0.36455078125,
+      "memory_overhead_ratio": 2.806766917293233
+    },
+    "session_operations": {
+      "session_lifecycle_avg_ms": 0.1330748584587127,
+      "session_lifecycle_p99_ms": 0.17029201262630522,
+      "sample_count": 50
+    }
+  },
+  "performance_analysis": {
+    "target_compliance": {
+      "l1_cache": {
+        "avg_target_met": true,
+        "p99_target_met": true,
+        "hit_rate_target_met": true
+      },
+      "l2_cache": {
+        "avg_target_met": true,
+        "p99_target_met": true,
+        "hit_rate_target_met": true
+      },
+      "cache_coordination": {
+        "coordination_target_met": true,
+        "fallback_target_met": true
+      },
+      "memory_efficiency": {
+        "memory_overhead_target_met": true
+      }
+    },
+    "performance_highlights": {
+      "l1_ultra_fast": "L1 average: 0.001ms",
+      "memory_efficient": "Memory per entry: 373.3 bytes"
+    },
+    "improvement_opportunities": [],
+    "overall_targets_met": true,
+    "overall_performance_score": 100.0
+  },
+  "benchmark_report": "================================================================================\nUNIFIED CACHE ARCHITECTURE PERFORMANCE BENCHMARK REPORT\n================================================================================\nGenerated: 2025-08-18T13:42:19.305176+00:00\nPerformance Targets (2025 Standards):\n  L1 Cache: <1.0ms avg, <2.0ms P99\n  L2 Cache: <10.0ms avg, <20.0ms P99\n  L3 Cache: <50.0ms avg, <100.0ms P99\n  Coordination: <50.0ms max\n  Hit Rates: >95% L1, >96% overall\n  Memory: <1.0KB per entry\n\nL1 CACHE (MEMORY) PERFORMANCE: \u2705\n  Average Response Time: 0.001ms\n  P99 Response Time: 0.001ms\n  Hit Rate: 100.00%\n  Memory per Entry: 363.27272727272725 bytes\n  Samples: 200\n\nL2 CACHE (REDIS) PERFORMANCE: \u2705\n  Average Response Time: 0.079ms\n  P99 Response Time: 0.132ms\n  Hit Rate: 100.00%\n  Samples: 200\n\nCACHE COORDINATION PERFORMANCE: \u2705\n  Coordination Average: 0.161ms\n  Fallback Maximum: 0.079ms\n  Samples: 50 coordination, 10 fallback\n\nOVERALL PERFORMANCE SUMMARY:\n  Performance Score: 100.0/100\n  Targets Met: \u2705 ALL\n\nPERFORMANCE HIGHLIGHTS:\n  \ud83d\ude80 l1_ultra_fast: L1 average: 0.001ms\n  \ud83d\ude80 memory_efficient: Memory per entry: 373.3 bytes\n\n================================================================================",
+  "targets_met": true,
+  "performance_score": 100.0
+}

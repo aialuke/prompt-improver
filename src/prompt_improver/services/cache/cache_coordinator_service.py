@@ -11,7 +11,10 @@ import logging
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Optional
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # AccessPattern class is defined below
 
 from .l1_cache_service import L1CacheService
 from .l2_redis_service import L2RedisService
@@ -34,65 +37,34 @@ class CacheCoordinatorService:
     - L3 hit: <50ms
     """
 
-    def __init__(
-        self,
-        l1_cache: L1CacheService | None = None,
-        l2_cache: L2RedisService | None = None,
-        l3_cache: L3DatabaseService | None = None,
-        enable_warming: bool = True,
-        warming_threshold: float = 2.0,
-        warming_interval: int = 300,
-        max_warming_keys: int = 50,
-    ) -> None:
-        """Initialize cache coordinator.
-        
-        Args:
-            l1_cache: L1 cache service instance
-            l2_cache: L2 cache service instance  
-            l3_cache: L3 cache service instance
-            enable_warming: Enable intelligent cache warming
-            warming_threshold: Access frequency threshold for warming
-            warming_interval: Warming cycle interval in seconds
-            max_warming_keys: Maximum keys to warm per cycle
-        """
-        # Cache level services
-        self._l1_cache = l1_cache or L1CacheService()
-        self._l2_cache = l2_cache
-        self._l3_cache = l3_cache
-        
-        # Cache warming configuration
-        self._enable_warming = enable_warming
-        self._warming_threshold = warming_threshold
-        self._warming_interval = warming_interval
-        self._max_warming_keys = max_warming_keys
-        
-        # Access pattern tracking for warming
+    def __init__(self, l1_cache: L1CacheService | None = None, l2_cache: L2RedisService | None = None, l3_cache: L3DatabaseService | None = None, enable_warming: bool = True, warming_threshold: float = 2.0, warming_interval: int = 300, max_warming_keys: int = 50) -> None:
+        """Initialize cache coordinator."""
+        self._l1_cache, self._l2_cache, self._l3_cache = l1_cache or L1CacheService(), l2_cache, l3_cache
+        self._enable_warming, self._warming_threshold, self._warming_interval, self._max_warming_keys = enable_warming, warming_threshold, warming_interval, max_warming_keys
         self._access_patterns: dict[str, AccessPattern] = {}
         self._last_warming_time = datetime.now(UTC)
+        self._background_warming_task, self._warming_stop_event = None, asyncio.Event()
+        self._l1_hits = self._l2_hits = self._l3_hits = self._total_requests = 0
+        self._total_response_time, self._created_at = 0.0, datetime.now(UTC)
+        if self._enable_warming: self._start_background_warming()
+
+    def _track_operation(self, start_time: float, operation: str, key: str = "", pattern: str = "") -> None:
+        """Track operation performance and log slow operations."""
+        response_time = time.perf_counter() - start_time
+        self._total_response_time += response_time
         
-        # Background warming task
-        self._background_warming_task: asyncio.Task | None = None
-        self._warming_stop_event = asyncio.Event()
-        
-        # Performance tracking
-        self._l1_hits = 0
-        self._l2_hits = 0
-        self._l3_hits = 0
-        self._total_requests = 0
-        self._total_response_time = 0.0
-        self._created_at = datetime.now(UTC)
-        
-        # Start warming if enabled
-        if self._enable_warming:
-            self._start_background_warming()
+        # Log slow operations (should be <50ms for coordinator)
+        if response_time > 0.05:
+            identifier = key or pattern
+            logger.warning(f"Cache coordinator {operation} took {response_time*1000:.2f}ms ({identifier[:50]}...)")
 
     async def get(
         self,
         key: str,
-        fallback_func: Optional[Callable[[], Any]] = None,
-        l2_ttl: Optional[int] = None,
-        l1_ttl: Optional[int] = None,
-    ) -> Optional[Any]:
+        fallback_func: Callable[[], Any] | None = None,
+        l2_ttl: int | None = None,
+        l1_ttl: int | None = None,
+    ) -> Any | None:
         """Get value from multi-level cache with fallback.
         
         Tries L1 -> L2 -> L3 -> fallback_func in order.
@@ -153,177 +125,117 @@ class CacheCoordinatorService:
             return None
             
         finally:
-            response_time = time.perf_counter() - operation_start
-            self._total_response_time += response_time
-            
-            # Log slow operations
-            if response_time > 0.05:  # 50ms
-                logger.warning(
-                    f"Cache coordinator GET operation took {response_time*1000:.2f}ms (key: {key[:50]}...)"
-                )
+            self._track_operation(operation_start, "GET", key)
 
     async def set(
         self,
         key: str,
         value: Any,
-        l2_ttl: Optional[int] = None,
-        l1_ttl: Optional[int] = None,
+        l2_ttl: int | None = None,
+        l1_ttl: int | None = None,
     ) -> None:
-        """Set value in multi-level cache.
-        
-        Sets value in all available cache levels for consistency.
-        
-        Args:
-            key: Cache key
-            value: Value to cache
-            l2_ttl: TTL for L2 cache
-            l1_ttl: TTL for L1 cache
-        """
+        """Set value in multi-level cache."""
         operation_start = time.perf_counter()
         
         try:
-            # Set in all cache levels concurrently
-            tasks = []
+            tasks = [self._l1_cache.set(key, value, l1_ttl)]
             
-            # Always set in L1
-            tasks.append(self._l1_cache.set(key, value, l1_ttl))
-            
-            # Set in L2 if available
             if self._l2_cache:
                 tasks.append(self._l2_cache.set(key, value, l2_ttl))
-            
-            # Set in L3 if available
             if self._l3_cache:
                 tasks.append(self._l3_cache.set(key, value, l2_ttl))
             
-            # Execute all sets concurrently
             await asyncio.gather(*tasks, return_exceptions=True)
             
         finally:
-            response_time = time.perf_counter() - operation_start
-            
-            if response_time > 0.05:
-                logger.warning(
-                    f"Cache coordinator SET operation took {response_time*1000:.2f}ms (key: {key[:50]}...)"
-                )
+            self._track_operation(operation_start, "SET", key)
 
     async def delete(self, key: str) -> None:
-        """Delete key from all cache levels.
-        
-        Args:
-            key: Cache key to delete
-        """
+        """Delete key from all cache levels."""
         operation_start = time.perf_counter()
         
         try:
-            # Delete from all cache levels concurrently
-            tasks = []
-            
-            tasks.append(self._l1_cache.delete(key))
+            tasks = [self._l1_cache.delete(key)]
             
             if self._l2_cache:
                 tasks.append(self._l2_cache.delete(key))
-            
             if self._l3_cache:
                 tasks.append(self._l3_cache.delete(key))
             
             await asyncio.gather(*tasks, return_exceptions=True)
             
         finally:
-            response_time = time.perf_counter() - operation_start
-            
-            if response_time > 0.05:
-                logger.warning(
-                    f"Cache coordinator DELETE operation took {response_time*1000:.2f}ms (key: {key[:50]}...)"
-                )
+            self._track_operation(operation_start, "DELETE", key)
 
     async def clear(self) -> None:
         """Clear all cache levels."""
-        tasks = []
-        
-        tasks.append(self._l1_cache.clear())
-        
-        if self._l2_cache:
-            tasks.append(self._l2_cache.clear())
-        
-        if self._l3_cache:
-            tasks.append(self._l3_cache.clear())
-        
+        tasks = [self._l1_cache.clear()]
+        if self._l2_cache: tasks.append(self._l2_cache.clear())
+        if self._l3_cache: tasks.append(self._l3_cache.clear())
         await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Reset statistics
-        self._l1_hits = 0
-        self._l2_hits = 0
-        self._l3_hits = 0
-        self._total_requests = 0
+        self._l1_hits = self._l2_hits = self._l3_hits = self._total_requests = 0
         self._total_response_time = 0.0
         self._access_patterns.clear()
 
-    async def warm_cache(self, keys: list[str]) -> dict[str, bool]:
-        """Manually warm cache with specific keys.
+    async def invalidate_pattern(self, pattern: str) -> int:
+        """Invalidate cache entries matching a pattern across all levels."""
+        operation_start = time.perf_counter()
+        total_invalidated = 0
         
-        Attempts to promote keys from L3 -> L2 -> L1.
-        
-        Args:
-            keys: List of cache keys to warm
+        try:
+            tasks = [self._invalidate_l1_pattern(pattern)]
             
-        Returns:
-            Dictionary mapping keys to warming success status
-        """
+            if self._l2_cache:
+                tasks.append(self._invalidate_l2_pattern(pattern))
+            if self._l3_cache:
+                tasks.append(self._invalidate_l3_pattern(pattern))
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for result in results:
+                if isinstance(result, int):
+                    total_invalidated += result
+                elif isinstance(result, Exception):
+                    logger.warning(f"Pattern invalidation failed: {result}")
+            
+            logger.debug(f"Pattern invalidation '{pattern}' removed {total_invalidated} entries")
+            return total_invalidated
+            
+        finally:
+            self._track_operation(operation_start, "INVALIDATE_PATTERN", pattern=pattern)
+
+    async def warm_cache(self, keys: list[str]) -> dict[str, bool]:
+        """Manually warm cache with specific keys."""
         results = {}
-        
         for key in keys:
             try:
-                # Try to warm from L3 to L2 and L1
                 warmed = False
-                
-                if self._l3_cache:
-                    l3_value = await self._l3_cache.get(key)
-                    if l3_value is not None:
-                        # Promote to L1 and L2
-                        await self._l1_cache.set(key, l3_value)
-                        if self._l2_cache:
-                            await self._l2_cache.set(key, l3_value)
-                        warmed = True
-                
-                # If not in L3, try L2 to L1
-                if not warmed and self._l2_cache:
-                    l2_value = await self._l2_cache.get(key)
-                    if l2_value is not None:
-                        await self._l1_cache.set(key, l2_value)
-                        warmed = True
-                
+                if self._l3_cache and (l3_val := await self._l3_cache.get(key)):
+                    await self._l1_cache.set(key, l3_val)
+                    if self._l2_cache: await self._l2_cache.set(key, l3_val)
+                    warmed = True
+                elif self._l2_cache and (l2_val := await self._l2_cache.get(key)):
+                    await self._l1_cache.set(key, l2_val)
+                    warmed = True
                 results[key] = warmed
-                
             except Exception as e:
                 logger.warning(f"Failed to warm cache key {key}: {e}")
                 results[key] = False
-        
         return results
 
     def _start_background_warming(self) -> None:
         """Start background cache warming task."""
-        if self._background_warming_task is None:
-            self._background_warming_task = asyncio.create_task(
-                self._background_warming_loop()
-            )
+        if self._background_warming_task is None: self._background_warming_task = asyncio.create_task(self._background_warming_loop())
 
     async def _background_warming_loop(self) -> None:
         """Background loop for intelligent cache warming."""
         logger.info("Starting cache warming background task")
-        
         try:
             while not self._warming_stop_event.is_set():
                 try:
-                    # Wait for warming interval or stop event
-                    await asyncio.wait_for(
-                        self._warming_stop_event.wait(),
-                        timeout=self._warming_interval
-                    )
+                    await asyncio.wait_for(self._warming_stop_event.wait(), timeout=self._warming_interval)
                 except asyncio.TimeoutError:
-                    # Perform warming cycle
                     await self._perform_warming_cycle()
-                    
         except asyncio.CancelledError:
             logger.info("Cache warming background task cancelled")
         except Exception as e:
@@ -331,170 +243,105 @@ class CacheCoordinatorService:
 
     async def _perform_warming_cycle(self) -> None:
         """Perform one cycle of intelligent cache warming."""
-        if not self._enable_warming:
-            return
-            
-        warming_start = time.perf_counter()
-        hot_keys = self._get_hot_keys_for_warming()
-        
-        if not hot_keys:
-            return
-        
+        if not self._enable_warming or not (hot_keys := self._get_hot_keys_for_warming()): return
         logger.debug(f"Warming {len(hot_keys)} hot cache keys")
-        
-        # Warm keys in batches to avoid overwhelming the system
         batch_size = min(10, self._max_warming_keys)
         for i in range(0, len(hot_keys), batch_size):
-            batch = hot_keys[i:i + batch_size]
-            batch_keys = [key for key, _ in batch]
-            
-            # Warm batch
-            await self.warm_cache(batch_keys)
-            
-            # Small delay between batches
+            await self.warm_cache([key for key, _ in hot_keys[i:i + batch_size]])
             await asyncio.sleep(0.1)
-        
-        warming_duration = time.perf_counter() - warming_start
         self._last_warming_time = datetime.now(UTC)
-        
-        logger.debug(
-            f"Cache warming cycle completed: processed {len(hot_keys)} keys in {warming_duration:.2f}s"
-        )
 
     def _get_hot_keys_for_warming(self) -> list[tuple[str, "AccessPattern"]]:
         """Get keys that should be warmed based on access patterns."""
         now = datetime.now(UTC)
-        hot_keys = []
-        
-        for key, pattern in self._access_patterns.items():
-            # Skip keys accessed too long ago
-            if (now - pattern.last_access).total_seconds() > 3600:  # 1 hour
-                continue
-                
-            # Check if access frequency meets threshold
-            if pattern.access_frequency >= self._warming_threshold:
-                hot_keys.append((key, pattern))
-        
-        # Sort by warming priority (frequency + recency)
-        hot_keys.sort(key=lambda x: x[1].warming_priority, reverse=True)
-        
-        return hot_keys[:self._max_warming_keys]
+        hot_keys = [(k, p) for k, p in self._access_patterns.items() if (now - p.last_access).total_seconds() <= 3600 and p.access_frequency >= self._warming_threshold]
+        return sorted(hot_keys, key=lambda x: x[1].warming_priority, reverse=True)[:self._max_warming_keys]
 
     def _record_access_pattern(self, key: str) -> None:
         """Record access pattern for intelligent warming."""
-        if not self._enable_warming:
-            return
-            
-        if key not in self._access_patterns:
-            self._access_patterns[key] = AccessPattern(key=key)
-        
+        if not self._enable_warming: return
+        if key not in self._access_patterns: self._access_patterns[key] = AccessPattern(key=key)
         self._access_patterns[key].record_access()
-        
-        # Cleanup old patterns periodically
-        if len(self._access_patterns) > 10000:
-            self._cleanup_old_patterns()
+        if len(self._access_patterns) > 10000: self._cleanup_old_patterns()
 
     def _cleanup_old_patterns(self) -> None:
         """Clean up old access patterns to prevent memory growth."""
-        now = datetime.now(UTC)
-        cutoff = now - timedelta(days=1)
-        
-        old_keys = [
-            key for key, pattern in self._access_patterns.items()
-            if pattern.last_access < cutoff
-        ]
-        
-        for key in old_keys:
-            del self._access_patterns[key]
-        
-        logger.debug(f"Cleaned up {len(old_keys)} old access patterns")
+        cutoff = datetime.now(UTC) - timedelta(days=1)
+        old_keys = [k for k, p in self._access_patterns.items() if p.last_access < cutoff]
+        for key in old_keys: del self._access_patterns[key]
+        if old_keys: logger.debug(f"Cleaned up {len(old_keys)} old access patterns")
 
     async def stop_warming(self) -> None:
         """Stop background cache warming."""
         self._enable_warming = False
         self._warming_stop_event.set()
-        
         if self._background_warming_task and not self._background_warming_task.done():
             self._background_warming_task.cancel()
-            try:
-                await self._background_warming_task
-            except asyncio.CancelledError:
-                pass
-        
+            try: await self._background_warming_task
+            except asyncio.CancelledError: pass
         self._background_warming_task = None
         logger.info("Cache warming stopped")
 
     def get_performance_stats(self) -> dict[str, Any]:
-        """Get comprehensive cache performance statistics.
-        
-        Returns:
-            Performance statistics across all cache levels
-        """
+        """Get comprehensive cache performance statistics."""
         total_hits = self._l1_hits + self._l2_hits + self._l3_hits
-        overall_hit_rate = total_hits / self._total_requests if self._total_requests > 0 else 0
-        avg_response_time = (
-            self._total_response_time / self._total_requests 
-            if self._total_requests > 0 else 0
-        )
+        reqs = self._total_requests
+        hit_rate = total_hits / reqs if reqs > 0 else 0
+        resp_time = self._total_response_time / reqs if reqs > 0 else 0
         
         return {
-            # Overall metrics
-            "total_requests": self._total_requests,
-            "overall_hit_rate": overall_hit_rate,
-            "avg_response_time_ms": avg_response_time * 1000,
-            
-            # Level-specific hits
-            "l1_hits": self._l1_hits,
-            "l2_hits": self._l2_hits,
-            "l3_hits": self._l3_hits,
-            
-            # Hit rates by level
-            "l1_hit_rate": self._l1_hits / self._total_requests if self._total_requests > 0 else 0,
-            "l2_hit_rate": self._l2_hits / self._total_requests if self._total_requests > 0 else 0,
-            "l3_hit_rate": self._l3_hits / self._total_requests if self._total_requests > 0 else 0,
-            
-            # Cache warming
-            "warming_enabled": self._enable_warming,
-            "tracked_patterns": len(self._access_patterns),
+            "total_requests": reqs, "overall_hit_rate": hit_rate, "avg_response_time_ms": resp_time * 1000,
+            "l1_hits": self._l1_hits, "l2_hits": self._l2_hits, "l3_hits": self._l3_hits,
+            "l1_hit_rate": self._l1_hits / reqs if reqs > 0 else 0,
+            "l2_hit_rate": self._l2_hits / reqs if reqs > 0 else 0,
+            "l3_hit_rate": self._l3_hits / reqs if reqs > 0 else 0,
+            "warming_enabled": self._enable_warming, "tracked_patterns": len(self._access_patterns),
             "last_warming_time": self._last_warming_time.isoformat(),
-            
-            # Individual cache stats
             "l1_cache_stats": self._l1_cache.get_stats(),
             "l2_cache_stats": self._l2_cache.get_stats() if self._l2_cache else None,
             "l3_cache_stats": self._l3_cache.get_stats() if self._l3_cache else None,
-            
-            # Health and uptime
             "health_status": self._get_health_status(),
             "uptime_seconds": (datetime.now(UTC) - self._created_at).total_seconds(),
         }
 
     def _get_health_status(self) -> str:
         """Get overall health status based on all cache levels."""
-        if self._total_requests == 0:
-            return "healthy"
-            
-        # Check individual cache health
-        l1_health = self._l1_cache.get_stats()["health_status"]
-        l2_health = self._l2_cache.get_stats()["health_status"] if self._l2_cache else "healthy"
-        l3_health = self._l3_cache.get_stats()["health_status"] if self._l3_cache else "healthy"
-        
-        # Overall response time
-        avg_response_time = self._total_response_time / self._total_requests
-        
-        # Determine overall health
-        healths = [l1_health, l2_health, l3_health]
-        
-        if "unhealthy" in healths or avg_response_time > 0.1:  # 100ms
-            return "unhealthy"
-        elif "degraded" in healths or avg_response_time > 0.05:  # 50ms
-            return "degraded"
-        else:
-            return "healthy"
+        if self._total_requests == 0: return "healthy"
+        healths = [self._l1_cache.get_stats()["health_status"], self._l2_cache.get_stats()["health_status"] if self._l2_cache else "healthy", self._l3_cache.get_stats()["health_status"] if self._l3_cache else "healthy"]
+        avg_time = self._total_response_time / self._total_requests
+        return "unhealthy" if "unhealthy" in healths or avg_time > 0.1 else "degraded" if "degraded" in healths or avg_time > 0.05 else "healthy"
+
+    async def _invalidate_l1_pattern(self, pattern: str) -> int:
+        """Invalidate L1 cache entries matching pattern."""
+        try:
+            return await self._l1_cache.invalidate_pattern(pattern)
+        except Exception as e:
+            logger.warning(f"L1 pattern invalidation failed '{pattern}': {e}")
+            return 0
+
+    async def _invalidate_l2_pattern(self, pattern: str) -> int:
+        """Invalidate L2 cache entries matching pattern."""
+        try:
+            if self._l2_cache and hasattr(self._l2_cache, 'invalidate_pattern'):
+                return await self._l2_cache.invalidate_pattern(pattern)
+            return 0
+        except Exception as e:
+            logger.warning(f"L2 pattern invalidation failed '{pattern}': {e}")
+            return 0
+
+    async def _invalidate_l3_pattern(self, pattern: str) -> int:
+        """Invalidate L3 cache entries matching pattern."""
+        try:
+            if self._l3_cache and hasattr(self._l3_cache, 'invalidate_pattern'):
+                return await self._l3_cache.invalidate_pattern(pattern)
+            return 0
+        except Exception as e:
+            logger.warning(f"L3 pattern invalidation failed '{pattern}': {e}")
+            return 0
 
 
 class AccessPattern:
     """Access pattern tracking for cache warming."""
-    
     def __init__(self, key: str) -> None:
         self.key = key
         self.access_count = 0
@@ -504,21 +351,15 @@ class AccessPattern:
         self.warming_priority = 0.0
 
     def record_access(self) -> None:
-        """Record a new access and update frequency metrics."""
+        """Record access and update frequency metrics."""
         now = datetime.now(UTC)
         self.access_count += 1
         self.last_access = now
         self.access_times.append(now)
-        
-        # Keep only recent access times (24 hours)
         cutoff = now - timedelta(hours=24)
         self.access_times = [t for t in self.access_times if t > cutoff]
-        
-        # Calculate frequency (accesses per hour)
         if len(self.access_times) >= 2:
             time_span = (self.access_times[-1] - self.access_times[0]).total_seconds() / 3600
             self.access_frequency = len(self.access_times) / max(time_span, 0.1)
-        
-        # Calculate warming priority (frequency + recency weight)
         recency_weight = max(0.0, 1 - (now - self.last_access).total_seconds() / 3600)
         self.warming_priority = self.access_frequency * (1 + recency_weight)

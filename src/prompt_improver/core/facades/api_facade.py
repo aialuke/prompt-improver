@@ -147,7 +147,7 @@ class APIFacade(APIFacadeProtocol):
 
     def setup_error_handlers(self, app: Any) -> None:
         """Setup error handlers for the FastAPI app."""
-        from prompt_improver.utils.error_handlers import (
+        from prompt_improver.services.error_handling.facade import (
             authentication_exception_handler,
             authorization_exception_handler,
             create_correlation_middleware,

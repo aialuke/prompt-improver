@@ -12,16 +12,17 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-from prompt_improver.database.models import (
-    AdvancedPatternResults,
-    AprioriAnalysisRequest,
-    AprioriAnalysisResponse,
-    AprioriAssociationRule,
-    AprioriPatternDiscovery,
-    FrequentItemset,
-    PatternDiscoveryRequest,
-    PatternDiscoveryResponse,
-    PatternEvaluation,
+# CLEAN ARCHITECTURE 2025: Use domain DTOs instead of database models
+from prompt_improver.core.domain.types import (
+    AdvancedPatternResultsData,
+    AprioriAnalysisRequestData,
+    AprioriAnalysisResponseData,
+    AprioriAssociationRuleData,
+    AprioriPatternDiscoveryData,
+    FrequentItemsetData,
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
+    PatternEvaluationData,
 )
 
 
@@ -77,7 +78,7 @@ class AprioriRepositoryProtocol(Protocol):
     # Association Rules Management
     async def create_association_rule(
         self, rule_data: dict[str, Any]
-    ) -> AprioriAssociationRule:
+    ) -> AprioriAssociationRuleData:
         """Create a new association rule."""
         ...
 
@@ -88,25 +89,25 @@ class AprioriRepositoryProtocol(Protocol):
         sort_desc: bool = True,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[AprioriAssociationRule]:
+    ) -> list[AprioriAssociationRuleData]:
         """Retrieve association rules with filtering and sorting."""
         ...
 
     async def get_association_rule_by_id(
         self, rule_id: int
-    ) -> AprioriAssociationRule | None:
+    ) -> AprioriAssociationRuleData | None:
         """Get association rule by ID."""
         ...
 
     async def get_association_rules_by_pattern(
         self, antecedents: list[str] | None = None, consequents: list[str] | None = None
-    ) -> list[AprioriAssociationRule]:
+    ) -> list[AprioriAssociationRuleData]:
         """Find rules containing specific antecedents or consequents."""
         ...
 
     async def update_association_rule(
         self, rule_id: int, update_data: dict[str, Any]
-    ) -> AprioriAssociationRule | None:
+    ) -> AprioriAssociationRuleData | None:
         """Update association rule metadata."""
         ...
 
@@ -117,7 +118,7 @@ class AprioriRepositoryProtocol(Protocol):
     # Frequent Itemsets Management
     async def create_frequent_itemset(
         self, itemset_data: dict[str, Any]
-    ) -> FrequentItemset:
+    ) -> FrequentItemsetData:
         """Create a new frequent itemset."""
         ...
 
@@ -129,7 +130,7 @@ class AprioriRepositoryProtocol(Protocol):
         itemset_type: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[FrequentItemset]:
+    ) -> list[FrequentItemsetData]:
         """Retrieve frequent itemsets with filters."""
         ...
 
@@ -144,14 +145,14 @@ class AprioriRepositoryProtocol(Protocol):
         length: int,
         discovery_run_id: str | None = None,
         min_support: float | None = None,
-    ) -> list[FrequentItemset]:
+    ) -> list[FrequentItemsetData]:
         """Get itemsets by specific length."""
         ...
 
     # Pattern Discovery Management
     async def create_pattern_discovery(
         self, discovery_data: dict[str, Any]
-    ) -> AprioriPatternDiscovery:
+    ) -> AprioriPatternDiscoveryData:
         """Create pattern discovery run record."""
         ...
 
@@ -162,19 +163,19 @@ class AprioriRepositoryProtocol(Protocol):
         sort_desc: bool = True,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[AprioriPatternDiscovery]:
+    ) -> list[AprioriPatternDiscoveryData]:
         """Retrieve pattern discovery runs."""
         ...
 
     async def get_pattern_discovery_by_id(
         self, discovery_run_id: str
-    ) -> AprioriPatternDiscovery | None:
+    ) -> AprioriPatternDiscoveryData | None:
         """Get pattern discovery run by ID."""
         ...
 
     async def update_pattern_discovery(
         self, discovery_run_id: str, update_data: dict[str, Any]
-    ) -> AprioriPatternDiscovery | None:
+    ) -> AprioriPatternDiscoveryData | None:
         """Update pattern discovery run."""
         ...
 
@@ -187,13 +188,13 @@ class AprioriRepositoryProtocol(Protocol):
     # Advanced Pattern Results
     async def create_advanced_pattern_results(
         self, results_data: dict[str, Any]
-    ) -> AdvancedPatternResults:
+    ) -> AdvancedPatternResultsData:
         """Store advanced pattern discovery results."""
         ...
 
     async def get_advanced_pattern_results(
         self, discovery_run_id: str
-    ) -> AdvancedPatternResults | None:
+    ) -> AdvancedPatternResultsData | None:
         """Get advanced pattern results by discovery run ID."""
         ...
 
@@ -203,14 +204,14 @@ class AprioriRepositoryProtocol(Protocol):
         algorithms_used: list[str] | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[AdvancedPatternResults]:
+    ) -> list[AdvancedPatternResultsData]:
         """Get all advanced pattern results with filters."""
         ...
 
     # Pattern Evaluation and Validation
     async def create_pattern_evaluation(
         self, evaluation_data: dict[str, Any]
-    ) -> PatternEvaluation:
+    ) -> PatternEvaluationData:
         """Create pattern evaluation record."""
         ...
 
@@ -222,13 +223,13 @@ class AprioriRepositoryProtocol(Protocol):
         min_validation_score: float | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[PatternEvaluation]:
+    ) -> list[PatternEvaluationData]:
         """Get pattern evaluations with filters."""
         ...
 
     async def update_pattern_evaluation(
         self, evaluation_id: int, update_data: dict[str, Any]
-    ) -> PatternEvaluation | None:
+    ) -> PatternEvaluationData | None:
         """Update pattern evaluation."""
         ...
 
@@ -264,14 +265,14 @@ class AprioriRepositoryProtocol(Protocol):
 
     # Bulk Operations and Analytics
     async def run_apriori_analysis(
-        self, request: AprioriAnalysisRequest
-    ) -> AprioriAnalysisResponse:
+        self, request: AprioriAnalysisRequestData
+    ) -> AprioriAnalysisResponseData:
         """Execute complete Apriori analysis workflow."""
         ...
 
     async def run_pattern_discovery(
-        self, request: PatternDiscoveryRequest
-    ) -> PatternDiscoveryResponse:
+        self, request: PatternDiscoveryRequestData
+    ) -> PatternDiscoveryResponseData:
         """Execute comprehensive pattern discovery workflow."""
         ...
 

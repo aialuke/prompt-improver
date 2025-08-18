@@ -21,7 +21,7 @@ from sqlalchemy import and_, case, func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.models import TrainingIteration, TrainingSession
-from prompt_improver.database.query_optimizer import execute_optimized_query
+from prompt_improver.services.cache.cache_facade import CacheFacade
 from prompt_improver.utils.datetime_utils import naive_utc_now
 
 logger = logging.getLogger(__name__)

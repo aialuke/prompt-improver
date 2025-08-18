@@ -10,7 +10,11 @@ Based on research synthesis from:
 import re
 from typing import Any
 
-from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
+# Heavy ML import moved to TYPE_CHECKING for lazy loading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
 from prompt_improver.rule_engine.base import (
     BasePromptRule,
     RuleCheckResult,
@@ -138,7 +142,7 @@ class SpecificityRule(BasePromptRule):
     """
 
     def __init__(self):
-        self.llm_transformer = LLMTransformerService()
+        self._llm_transformer = None
         self.config = {
             "vague_language_threshold": 0.3,
             "require_specific_outcomes": True,
@@ -155,6 +159,13 @@ class SpecificityRule(BasePromptRule):
         }
         self.rule_id = "specificity_enhancement"
         self.priority = 9
+
+    def _get_llm_transformer(self):
+        """Lazy load LLM transformer when needed."""
+        if self._llm_transformer is None:
+            from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
+            self._llm_transformer = LLMTransformerService()
+        return self._llm_transformer
 
     def configure(self, params: dict[str, Any]):
         """Configure rule parameters from database"""

@@ -12,7 +12,9 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.config import AppConfig
+# Removed core.protocols import that triggered massive DI chain
+# Database layer now uses its own protocol definitions
+from prompt_improver.database.protocols.database_config import DatabaseConfigProtocol
 from prompt_improver.database.composition import (
     DatabaseServices,
     create_database_services,
@@ -49,13 +51,25 @@ from prompt_improver.database.types import (
 from prompt_improver.database.utils import scalar
 
 _global_services = None
+_global_config = None
+
+
+def _get_default_config() -> DatabaseConfigProtocol:
+    """Get default database configuration - lazy imported to avoid circular dependencies."""
+    global _global_config
+    if _global_config is None:
+        # Import here to avoid circular dependency
+        from prompt_improver.core.config import get_database_config
+        _global_config = get_database_config()
+    return _global_config
 
 
 async def _get_global_services():
     """Get or create the global DatabaseServices instance."""
     global _global_services
     if _global_services is None or _global_services._shutdown:
-        _global_services = await create_database_services(ManagerMode.ASYNC_MODERN)
+        db_config = _get_default_config()
+        _global_services = await create_database_services(ManagerMode.ASYNC_MODERN, db_config)
     return _global_services
 
 
@@ -114,7 +128,8 @@ async def get_database_services_dependency(
     """FastAPI dependency function to get database services instance."""
     services = await get_database_services(mode)
     if services is None:
-        services = await create_database_services(mode)
+        db_config = _get_default_config()
+        services = await create_database_services(mode, db_config)
     return services
 
 
@@ -123,7 +138,8 @@ async def get_mcp_session():
     """Get MCP session using the new composition layer."""
     services = await get_database_services(ManagerMode.MCP_SERVER)
     if services is None:
-        services = await create_database_services(ManagerMode.MCP_SERVER)
+        db_config = _get_default_config()
+        services = await create_database_services(ManagerMode.MCP_SERVER, db_config)
     return services.database.get_session(ConnectionMode.read_write)
 
 
@@ -161,7 +177,6 @@ database_services = Annotated[
 
 __all__ = [
     "ABExperiment",
-    "AppConfig",
     "ConnectionMode",
     "DatabaseServices",
     "DiscoveredPattern",

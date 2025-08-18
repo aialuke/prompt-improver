@@ -5,17 +5,37 @@ readability, syntactic complexity, entity richness, and structural clarity.
 """
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from prompt_improver.ml.analysis.linguistic_analyzer import (
-    LinguisticAnalyzer,
-    LinguisticConfig,
-)
 from prompt_improver.rule_engine.base import (
     BasePromptRule,
     RuleCheckResult,
     TransformationResult,
 )
+
+if TYPE_CHECKING:
+    from prompt_improver.ml.analysis.linguistic_analyzer import (
+        LinguisticAnalyzer,
+        LinguisticConfig,
+    )
+
+
+class _MinimalLinguisticAnalyzer:
+    """Minimal fallback analyzer when ML components are not available."""
+    
+    def analyze(self, text: str) -> dict:
+        """Provide basic text analysis without ML dependencies."""
+        return {
+            "readability_score": 0.5,  # Default moderate readability
+            "complexity_score": 0.5,   # Default moderate complexity
+            "entity_analysis": {"entities": [], "diversity_score": 0.0},
+            "dependency_analysis": {"clarity_score": 0.5},
+            "prompt_components": {"instruction_clarity": 0.5},
+            "sentence_analysis": {
+                "avg_length": len(text.split()) / max(len(text.split('.')), 1),
+                "max_length": max(len(s.split()) for s in text.split('.')) if text.split('.') else 0
+            }
+        }
 
 
 class LinguisticQualityRule(BasePromptRule):
@@ -32,16 +52,7 @@ class LinguisticQualityRule(BasePromptRule):
     def __init__(self):
         """Initialize the linguistic quality rule."""
         self.logger = logging.getLogger(__name__)
-        config = LinguisticConfig(
-            enable_ner=True,
-            enable_dependency_parsing=True,
-            enable_readability=True,
-            enable_complexity_metrics=True,
-            enable_prompt_segmentation=True,
-            use_transformers_ner=False,
-            enable_caching=True,
-        )
-        self.linguistic_analyzer = LinguisticAnalyzer(config)
+        self._linguistic_analyzer = None  # Lazy initialization
         self.thresholds = {
             "min_readability": 0.4,
             "max_complexity": 0.8,
@@ -50,6 +61,31 @@ class LinguisticQualityRule(BasePromptRule):
             "optimal_sentence_length": 20,
             "max_sentence_length": 40,
         }
+
+    @property
+    def linguistic_analyzer(self):
+        """Lazy-loaded linguistic analyzer to avoid ML import chain during module import."""
+        if self._linguistic_analyzer is None:
+            try:
+                from prompt_improver.ml.analysis.linguistic_analyzer import (
+                    LinguisticAnalyzer,
+                    LinguisticConfig,
+                )
+                config = LinguisticConfig(
+                    enable_ner=True,
+                    enable_dependency_parsing=True,
+                    enable_readability=True,
+                    enable_complexity_metrics=True,
+                    enable_prompt_segmentation=True,
+                    use_transformers_ner=False,
+                    enable_caching=True,
+                )
+                self._linguistic_analyzer = LinguisticAnalyzer(config)
+            except ImportError as e:
+                self.logger.warning(f"ML analysis not available: {e}")
+                # Return a minimal analyzer that provides basic functionality
+                self._linguistic_analyzer = _MinimalLinguisticAnalyzer()
+        return self._linguistic_analyzer
 
     @property
     def metadata(self):

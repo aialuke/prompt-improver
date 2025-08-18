@@ -40,6 +40,7 @@ from prompt_improver.core.di.monitoring_container import (
     shutdown_monitoring_container,
 )
 from prompt_improver.core.di.ml_container import MLServiceContainer
+from prompt_improver.core.di.protocols import MonitoringContainerProtocol
 
 __all__ = [
     # Main orchestrator interface
@@ -59,6 +60,7 @@ __all__ = [
     "SecurityContainer",
     "DatabaseContainer",
     "MonitoringContainer",
+    "MonitoringContainerProtocol",
     "MLServiceContainer",
     
     # Container factories

@@ -6,7 +6,20 @@ injection and testability while maintaining strict separation of concerns.
 
 from collections.abc import Callable
 from datetime import datetime
+from enum import Enum
 from typing import Any, Optional, Protocol, runtime_checkable
+
+
+class CacheType(Enum):
+    """Cache type enumeration for specialized cache instances.
+    
+    Local definition to avoid circular imports with core.types.
+    """
+    RULE = "rule"
+    SESSION = "session" 
+    ANALYTICS = "analytics"
+    PROMPT = "prompt"
+    APPLICATION = "application"
 
 
 @runtime_checkable
@@ -60,6 +73,17 @@ class CacheServiceProtocol(Protocol):
             
         Returns:
             True if key exists, False otherwise
+        """
+        ...
+
+    async def invalidate_pattern(self, pattern: str) -> int:
+        """Invalidate cache entries matching pattern.
+        
+        Args:
+            pattern: Pattern to match against cache keys (supports wildcards)
+            
+        Returns:
+            Number of entries invalidated
         """
         ...
 

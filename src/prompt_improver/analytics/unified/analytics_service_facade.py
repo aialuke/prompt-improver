@@ -538,24 +538,120 @@ class AnalyticsServiceFacade(AnalyticsServiceProtocol):
             return None
     
     async def _initialize_cache(self) -> Optional[CacheProtocol]:
-        """Initialize cache component"""
+        """Initialize unified cache architecture with 2025 best practices.
+        
+        Uses CacheCoordinatorService with L1-only configuration optimized for analytics:
+        - Larger L1 cache (2000 entries) for analytics queries
+        - Intelligent cache warming for predictable access patterns  
+        - Sub-10ms performance targets with >95% hit rates
+        - Graceful degradation with circuit breaker protection
+        - Local development friendly (no external dependencies)
+        
+        Returns:
+            UnifiedCacheAdapter implementing CacheProtocol or None on failure
+        """
         try:
-            # Try to use Redis cache if available
-            from prompt_improver.utils.redis_cache import AsyncRedisCache
+            # Import unified cache services following 2025 architecture patterns
+            from prompt_improver.services.cache.cache_coordinator_service import CacheCoordinatorService
+            from prompt_improver.services.cache.l1_cache_service import L1CacheService
+            
+            # Analytics-optimized configuration
             cache_config = self.config.get("cache", {})
-            return AsyncRedisCache(
-                host=cache_config.get("host", "localhost"),
-                port=cache_config.get("port", 6379),
-                db=cache_config.get("db", 0)
+            
+            # L1 Cache: Larger size for analytics queries (2000 vs default 1000)
+            l1_max_size = cache_config.get("l1_max_size", 2000)
+            l1_cache = L1CacheService(max_size=l1_max_size)
+            
+            # Cache warming configuration - beneficial for analytics patterns
+            enable_warming = cache_config.get("enable_warming", True)
+            warming_threshold = cache_config.get("warming_threshold", 2.0)  # Higher threshold for analytics
+            warming_interval = cache_config.get("warming_interval", 600)    # 10 minutes for analytics
+            max_warming_keys = cache_config.get("max_warming_keys", 100)    # More keys for analytics
+            
+            # Initialize CacheCoordinatorService with L1-only configuration
+            # No L2/L3 for local development simplicity
+            coordinator = CacheCoordinatorService(
+                l1_cache=l1_cache,
+                l2_cache=None,  # Local development: no Redis dependency
+                l3_cache=None,  # Analytics doesn't need database cache
+                enable_warming=enable_warming,
+                warming_threshold=warming_threshold,
+                warming_interval=warming_interval,
+                max_warming_keys=max_warming_keys
             )
-        except ImportError:
-            self.logger.warning("Redis cache not available, using memory cache")
-            try:
-                from .memory_cache import MemoryCache
-                return MemoryCache(max_size=self.config.get("cache", {}).get("max_size", 1000))
-            except Exception as e:
-                self.logger.error(f"Failed to initialize any cache: {e}")
-                return None
+            
+            # Create adapter to implement CacheProtocol interface
+            class UnifiedCacheAdapter:
+                """Adapter to bridge CacheCoordinatorService to CacheProtocol interface.
+                
+                Implements 2025 adapter pattern for interface compatibility while
+                maintaining performance characteristics and error handling.
+                """
+                
+                def __init__(self, coordinator: CacheCoordinatorService):
+                    self._coordinator = coordinator
+                    self.logger = logger
+                
+                async def get(self, key: str) -> Optional[Any]:
+                    """Get cached value with CacheProtocol interface."""
+                    try:
+                        return await self._coordinator.get(key)
+                    except Exception as e:
+                        self.logger.warning(f"Cache GET error for key {key}: {e}")
+                        return None
+                
+                async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+                    """Set cached value with CacheProtocol interface."""
+                    try:
+                        await self._coordinator.set(key, value, l2_ttl=ttl, l1_ttl=ttl)
+                        return True
+                    except Exception as e:
+                        self.logger.warning(f"Cache SET error for key {key}: {e}")
+                        return False
+                
+                async def delete(self, key: str) -> bool:
+                    """Delete cached value with CacheProtocol interface."""
+                    try:
+                        await self._coordinator.delete(key)
+                        return True
+                    except Exception as e:
+                        self.logger.warning(f"Cache DELETE error for key {key}: {e}")
+                        return False
+                
+                async def clear_pattern(self, pattern: str) -> int:
+                    """Clear keys matching pattern with CacheProtocol interface."""
+                    try:
+                        return await self._coordinator.invalidate_pattern(pattern)
+                    except Exception as e:
+                        self.logger.warning(f"Cache CLEAR_PATTERN error for pattern {pattern}: {e}")
+                        return 0
+                
+                def get_performance_stats(self) -> Dict[str, Any]:
+                    """Expose coordinator performance statistics."""
+                    return self._coordinator.get_performance_stats()
+            
+            adapter = UnifiedCacheAdapter(coordinator)
+            
+            self.logger.info(
+                f"Unified cache initialized: L1({l1_max_size} entries), "
+                f"warming={enable_warming}, targets=>95% hit rate, <10ms ops"
+            )
+            
+            return adapter
+            
+        except ImportError as e:
+            self.logger.error(
+                f"Failed to import unified cache services - architecture violation detected: {e}. "
+                f"Ensure CacheCoordinatorService and L1CacheService are available."
+            )
+            return None
+            
+        except Exception as e:
+            self.logger.error(
+                f"Failed to initialize unified cache architecture: {e}. "
+                f"Analytics service will operate without caching (degraded performance)."
+            )
+            return None
     
     async def _route_data_collection(self, data_type: str, data: Dict[str, Any]) -> bool:
         """Route data collection to appropriate component"""

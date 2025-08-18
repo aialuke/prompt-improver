@@ -27,13 +27,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Type, Union
-from collections.abc import AsyncContextManager
+from contextlib import AbstractAsyncContextManager as AsyncContextManager
 
 import asyncpg
 import sqlalchemy.exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.pool import QueuePool
 
+from prompt_improver.core.config.retry import RetryConfig, RetryStrategy
 from prompt_improver.core.services.resilience.retry_service_facade import (
     RetryServiceFacade as RetryManager,
     get_retry_service as get_retry_manager,

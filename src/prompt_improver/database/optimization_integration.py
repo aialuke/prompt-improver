@@ -7,9 +7,11 @@ to achieve 50% database load reduction.
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from prompt_improver.core.di.ml_container import MLServiceContainer
+if TYPE_CHECKING:
+    from prompt_improver.core.di.ml_container import MLServiceContainer
+
 from prompt_improver.core.protocols.ml_protocols import (
     DatabaseServiceProtocol,
     MLflowServiceProtocol,
@@ -24,8 +26,8 @@ from prompt_improver.database.cache_layer import (
     DatabaseCacheLayer,
 )
 from prompt_improver.database.performance_monitor import get_performance_monitor
-from prompt_improver.database.query_optimizer import get_query_executor
-from prompt_improver.ml.orchestration.events.event_bus import get_event_bus
+from prompt_improver.services.cache.cache_facade import CacheFacade
+# Removed ML orchestration import - using optional service registry pattern instead
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
@@ -52,13 +54,14 @@ class DatabaseOptimizationIntegration:
         self.event_bus = None
         self._initialized = False
         self._monitoring_task_id = None
+        self._ml_container: Optional["MLServiceContainer"] = None
 
     async def initialize(self, cache_policy: CachePolicy | None = None):
         """Initialize all optimization components"""
         if self._initialized:
             return
         logger.info("Initializing database optimization components...")
-        self.event_bus = get_event_bus()
+        # Use optional service registry instead of direct ML event bus
         self.cache_layer = DatabaseCacheLayer(
             cache_policy
             or CachePolicy(
@@ -66,39 +69,56 @@ class DatabaseOptimizationIntegration:
             )
         )
         self.pool_optimizer = await get_database_services(ManagerMode.ASYNC_MODERN)
-        self.query_executor = get_query_executor()
-        self.performance_monitor = await get_performance_monitor(self.event_bus)
+        self.query_cache = CacheFacade(l1_max_size=500, l2_default_ttl=600, enable_l2=True, enable_l3=False)
+        self.performance_monitor = await get_performance_monitor(None)  # No event bus dependency
         await self._setup_event_handlers()
         self._initialized = True
         logger.info("Database optimization components initialized")
 
     async def _setup_event_handlers(self):
-        """Set up event handlers for coordination"""
-        from prompt_improver.ml.orchestration.events.event_types import EventType
+        """Set up optimization event handlers using protocol-based approach."""
+        from prompt_improver.database.services.optional_registry import get_optional_services_registry
+        from prompt_improver.database.protocols.events import OptimizationEventProtocol
 
-        async def handle_slow_queries(event):
-            if event.data.get("avg_query_time_ms", 0) > 100:
-                logger.warning("Slow queries detected, switching to aggressive caching")
-                self.cache_layer.policy.strategy = CacheStrategy.AGGRESSIVE
+        class DatabaseOptimizationHandler:
+            """Handles database optimization events without ML dependencies."""
+            
+            def __init__(self, integration_instance):
+                self.integration = integration_instance
+                
+            async def handle_performance_degradation(self, metrics):
+                """Handle performance degradation by optimizing various components."""
+                avg_query_time = metrics.get("avg_query_time_ms", 0)
+                cache_hit_ratio = metrics.get("cache_hit_ratio", 100)
+                
+                if avg_query_time > 100:
+                    logger.warning("Slow queries detected, switching to aggressive caching")
+                    if hasattr(self.integration.cache_layer, 'policy'):
+                        self.integration.cache_layer.policy.strategy = CacheStrategy.AGGRESSIVE
+                        
+                if cache_hit_ratio < 50:
+                    logger.warning("Low cache hit ratio, optimizing cache policy")
+                    if hasattr(self.integration.cache_layer, 'optimize_cache_policy'):
+                        await self.integration.cache_layer.optimize_cache_policy()
+                        
+            async def handle_cache_optimization(self, cache_stats):
+                """Handle cache optimization requests."""
+                logger.info("Cache optimization requested")
+                if hasattr(self.integration.cache_layer, 'optimize_cache_policy'):
+                    await self.integration.cache_layer.optimize_cache_policy()
+                    
+            async def handle_query_optimization(self, query_data):
+                """Handle query optimization requests."""
+                logger.info("Query optimization requested")
+                if hasattr(self.integration.pool_optimizer, 'optimize_pool_size'):
+                    await self.integration.pool_optimizer.optimize_pool_size()
 
-        async def handle_cache_hit_ratio_low(event):
-            if event.data.get("cache_hit_ratio", 100) < 50:
-                logger.warning("Low cache hit ratio, optimizing cache policy")
-                await self.cache_layer.optimize_cache_policy()
-
-        async def handle_pool_stressed(event):
-            logger.warning("Connection pool stressed, optimizing pool size")
-            await self.pool_optimizer.optimize_pool_size()
-
-        self.event_bus.subscribe(
-            EventType.DATABASE_SLOW_QUERY_DETECTED, handle_slow_queries
-        )
-        self.event_bus.subscribe(
-            EventType.DATABASE_CACHE_HIT_RATIO_LOW, handle_cache_hit_ratio_low
-        )
-        self.event_bus.subscribe(
-            EventType.DATABASE_PERFORMANCE_DEGRADED, handle_pool_stressed
-        )
+        # Register our optimization handler with the optional services registry
+        handler = DatabaseOptimizationHandler(self)
+        registry = get_optional_services_registry()
+        registry.register_optimization_handler(handler)
+        
+        logger.info("Database optimization event handlers registered successfully")
 
     async def start_optimization(self):
         """Start all optimization processes"""
@@ -170,7 +190,7 @@ class DatabaseOptimizationIntegration:
             return {"error": "Not initialized"}
         cache_stats = await self.cache_layer.get_cache_stats()
         pool_stats = await self.pool_optimizer.get_health_status()
-        executor_stats = await self.query_executor.get_performance_summary()
+        query_cache_stats = self.query_cache.get_performance_stats()  # Use unified cache metrics
         perf_summary = await self.performance_monitor.get_performance_summary(hours=1)
         cache_reduction = cache_stats.get("database_load_reduction_percent", 0)
         pool_reduction = pool_stats["optimization"]["database_load_reduction_percent"]
@@ -194,12 +214,9 @@ class DatabaseOptimizationIntegration:
                 "health": pool_stats["current_state"],
             },
             "query_performance": {
-                "avg_query_time_ms": executor_stats.get("avg_execution_time_ms", 0),
-                "cache_hit_rate": executor_stats.get("cache_hit_rate", 0),
-                "queries_meeting_target": executor_stats.get(
-                    "target_compliance_rate", 0
-                )
-                * 100,
+                "avg_query_time_ms": query_cache_stats.get("avg_response_time_ms", 0),
+                "cache_hit_rate": query_cache_stats.get("hit_rate", 0),
+                "queries_meeting_target": query_cache_stats.get("l1_hits", 0) / max(1, query_cache_stats.get("total_requests", 1)) * 100,
             },
             "system_performance": {
                 "cache_hit_ratio": perf_summary.get("avg_cache_hit_ratio", 0),
@@ -222,6 +239,19 @@ class DatabaseOptimizationIntegration:
 
 
 _optimization_integration: DatabaseOptimizationIntegration | None = None
+
+
+def _get_ml_container_optional() -> Optional["MLServiceContainer"]:
+    """Get ML container with lazy loading to avoid torch dependencies."""
+    try:
+        from prompt_improver.core.di.ml_container import MLServiceContainer
+        return MLServiceContainer()
+    except ImportError:
+        logger.info("ML container not available (torch not installed)")
+        return None
+    except Exception as e:
+        logger.warning(f"ML container initialization failed: {e}")
+        return None
 
 
 async def get_optimization_integration() -> DatabaseOptimizationIntegration:

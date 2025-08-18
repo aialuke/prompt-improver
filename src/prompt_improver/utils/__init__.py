@@ -6,14 +6,9 @@ This package provides common utilities for:
 - Health checking components
 """
 
-from prompt_improver.utils.error_handlers import (
-    handle_common_errors,
-    handle_database_errors,
-    handle_filesystem_errors,
-    handle_network_errors,
-    handle_validation_errors,
-)
-from prompt_improver.utils.session_store import SessionStore
+# Removed service layer imports to fix circular dependency
+# Error handlers should be imported directly from services.error_handling.facade
+# SessionStore eliminated - use services.cache.cache_facade.CacheFacade session methods instead
 from prompt_improver.utils.subprocess_security import (
     SecureSubprocessManager,
     ensure_running,
@@ -21,18 +16,7 @@ from prompt_improver.utils.subprocess_security import (
 )
 
 __all__ = [
-    "RedisCache",
     "SecureSubprocessManager",
-    "SessionStore",
     "ensure_running",
-    "get",
-    "handle_common_errors",
-    "handle_database_errors",
-    "handle_filesystem_errors",
-    "handle_network_errors",
-    "handle_validation_errors",
-    "invalidate",
     "secure_subprocess",
-    "set",
-    "with_singleflight",
 ]

@@ -1,0 +1,57 @@
+{
+  "agent_name": "api-design-specialist",
+  "last_updated": "2025-01-15T00:00:00Z",
+  "task_history": [],
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "pattern_name": "fastapi_optimization",
+        "description": "FastAPI endpoint optimization with async patterns and caching",
+        "frequency": 1,
+        "success_rate": 0.89
+      },
+      {
+        "pattern_name": "openapi_documentation",
+        "description": "Comprehensive OpenAPI 3.0 documentation with examples",
+        "frequency": 1,
+        "success_rate": 0.95
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "FastAPI with real service integrations (database, Redis, ML)",
+        "WebSocket support for real-time analytics",
+        "Circuit breaker patterns for reliability",
+        "OpenTelemetry instrumentation for distributed tracing"
+      ],
+      "performance_baselines": {
+        "api_response_time_p95": 100,
+        "websocket_connection_capacity": 1000,
+        "api_throughput_rps": 500
+      },
+      "configuration_insights": [
+        "High-performance async/await patterns for database operations",
+        "Multi-level caching integration for analytics endpoints",
+        "Real-time WebSocket endpoints for live data streaming"
+      ]
+    }
+  },
+  "optimization_insights": [],
+  "collaboration_patterns": {
+    "frequent_collaborators": [
+      {
+        "agent_name": "database-specialist",
+        "collaboration_frequency": 4,
+        "success_rate": 0.90,
+        "common_tasks": ["query optimization", "API data access"]
+      },
+      {
+        "agent_name": "security-architect",
+        "collaboration_frequency": 3,
+        "success_rate": 0.88,
+        "common_tasks": ["authentication flows", "API security"]
+      }
+    ],
+    "delegation_effectiveness": {}
+  }
+}

@@ -13,20 +13,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-import mlflow
-import mlflow.sklearn
-import numpy as np
-import optuna
-from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    RandomForestClassifier,
-    StackingClassifier,
-)
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score
-from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+# Heavy ML dependencies moved to TYPE_CHECKING and lazy loading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import mlflow
+    import mlflow.sklearn
+    import numpy as np
+    import optuna
+    from sklearn.ensemble import (
+        GradientBoostingClassifier,
+        RandomForestClassifier,
+        StackingClassifier,
+    )
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import accuracy_score, precision_score, recall_score
+    from sklearn.model_selection import StratifiedKFold, cross_val_score
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +52,7 @@ class MLTrainingService(TrainingServiceProtocol):
         orchestrator_event_bus=None,
         input_validator: OWASP2025InputValidator | None = None
     ):
-        """Initialize training service.
+        """Initialize training service with lazy loading for ML dependencies.
         
         Args:
             model_registry: Registry for caching trained models
@@ -61,15 +65,61 @@ class MLTrainingService(TrainingServiceProtocol):
         self.orchestrator_event_bus = orchestrator_event_bus
         self.input_validator = input_validator or OWASP2025InputValidator()
         
-        # MLflow setup
-        mlruns_path = Path("mlruns").resolve()
-        mlflow.set_tracking_uri(f"file://{mlruns_path}")
-        mlflow.set_experiment("apes_rule_optimization")
+        # MLflow setup moved to lazy initialization
+        self._mlflow_initialized = False
         
         # Configure ML performance
         self._configure_ml_performance()
         
         logger.info("ML Training Service initialized")
+
+    def _get_ml_modules(self):
+        """Lazy import ML modules when needed."""
+        try:
+            import mlflow
+            import mlflow.sklearn
+            import numpy as np
+            import optuna
+            from sklearn.ensemble import (
+                GradientBoostingClassifier,
+                RandomForestClassifier,
+                StackingClassifier,
+            )
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.metrics import accuracy_score, precision_score, recall_score
+            from sklearn.model_selection import StratifiedKFold, cross_val_score
+            from sklearn.pipeline import Pipeline
+            from sklearn.preprocessing import StandardScaler
+            
+            return {
+                'mlflow': mlflow,
+                'np': np,
+                'optuna': optuna,
+                'GradientBoostingClassifier': GradientBoostingClassifier,
+                'RandomForestClassifier': RandomForestClassifier,
+                'StackingClassifier': StackingClassifier,
+                'LogisticRegression': LogisticRegression,
+                'accuracy_score': accuracy_score,
+                'precision_score': precision_score,
+                'recall_score': recall_score,
+                'StratifiedKFold': StratifiedKFold,
+                'cross_val_score': cross_val_score,
+                'Pipeline': Pipeline,
+                'StandardScaler': StandardScaler,
+            }
+        except ImportError as e:
+            logger.error(f"ML modules not available: {e}")
+            raise ImportError("Required ML libraries not installed. Install with: pip install scikit-learn mlflow numpy optuna")
+
+    def _ensure_mlflow_initialized(self):
+        """Ensure MLflow is initialized when first needed."""
+        if not self._mlflow_initialized:
+            ml_modules = self._get_ml_modules()
+            mlflow = ml_modules['mlflow']
+            mlruns_path = Path("mlruns").resolve()
+            mlflow.set_tracking_uri(f"file://{mlruns_path}")
+            mlflow.set_experiment("apes_rule_optimization")
+            self._mlflow_initialized = True
 
     async def optimize_rules(
         self,

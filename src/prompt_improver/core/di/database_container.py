@@ -10,21 +10,38 @@ import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar
 
 from prompt_improver.core.di.protocols import (
     ContainerRegistryProtocol,
     DatabaseContainerProtocol,
 )
-from prompt_improver.core.protocols.ml_protocols import (
-    CacheServiceProtocol,
-    DatabaseServiceProtocol,
-    ServiceConnectionInfo,
-    ServiceStatus,
-)
+
+if TYPE_CHECKING:
+    from prompt_improver.core.protocols.ml_protocols import (
+        CacheServiceProtocol,
+        DatabaseServiceProtocol,
+        ServiceConnectionInfo,
+        ServiceStatus,
+    )
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
+
+
+def _get_ml_protocols():
+    """Lazy import ML protocols to avoid torch dependencies."""
+    try:
+        from prompt_improver.core.protocols.ml_protocols import (
+            CacheServiceProtocol,
+            DatabaseServiceProtocol,
+            ServiceConnectionInfo,
+            ServiceStatus,
+        )
+        return CacheServiceProtocol, DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus
+    except ImportError:
+        logger.info("ML protocols not available (torch not installed)")
+        return None, None, None, None
 
 
 class ServiceLifetime(Enum):
@@ -301,14 +318,27 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         return interface in self._services
 
     # Database service factory methods
-    def register_database_service_factory(self, config: ServiceConnectionInfo | None = None) -> None:
+    def register_database_service_factory(self, config: Any = None) -> None:
         """Register factory for PostgreSQL database service with connection pooling.
         
         Args:
             config: PostgreSQL service connection configuration
         """
-        if config is None:
-            config = ServiceConnectionInfo(
+        def _get_config():
+            """Lazy load config objects to avoid ML protocol imports."""
+            protocols = _get_ml_protocols()
+            if protocols[0] is None:  # ML protocols not available
+                return {
+                    "service_name": "postgresql",
+                    "connection_status": "healthy",
+                    "connection_details": {
+                        "host": os.getenv("POSTGRES_HOST", "postgres"),
+                        "port": int(os.getenv("POSTGRES_PORT", "5432"))
+                    }
+                }
+            
+            CacheServiceProtocol, DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
+            return ServiceConnectionInfo(
                 service_name="postgresql",
                 connection_status=ServiceStatus.HEALTHY,
                 connection_details={
@@ -316,8 +346,11 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     "port": int(os.getenv("POSTGRES_PORT", "5432"))
                 }
             )
+        
+        if config is None:
+            config = _get_config()
 
-        async def create_database_service() -> DatabaseServiceProtocol:
+        async def create_database_service():
             try:
                 from prompt_improver.integrations.postgresql_service import PostgreSQLService
                 service = PostgreSQLService(config)
@@ -328,25 +361,45 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 from prompt_improver.database.services.mock_database_service import MockDatabaseService
                 return MockDatabaseService()
 
-        async def cleanup_database_service(service: DatabaseServiceProtocol):
+        async def cleanup_database_service(service):
             if hasattr(service, "shutdown"):
                 await service.shutdown()
 
+        # Use lazy loading for DatabaseServiceProtocol to avoid import issues
+        def _get_database_protocol():
+            protocols = _get_ml_protocols()
+            if protocols[1] is not None:  # DatabaseServiceProtocol available
+                return protocols[1]
+            return "database_service"  # Use string key as fallback
+
         self.register_factory(
-            DatabaseServiceProtocol,
+            _get_database_protocol(),
             create_database_service,
             tags={"postgresql", "database", "external"}
         )
         self.logger.debug("Registered database service factory")
 
-    def register_cache_service_factory(self, config: ServiceConnectionInfo | None = None) -> None:
+    def register_cache_service_factory(self, config: Any = None) -> None:
         """Register factory for Redis cache service with connection pooling.
         
         Args:
             config: Redis service connection configuration
         """
-        if config is None:
-            config = ServiceConnectionInfo(
+        def _get_cache_config():
+            """Lazy load config objects to avoid ML protocol imports."""
+            protocols = _get_ml_protocols()
+            if protocols[0] is None:  # ML protocols not available
+                return {
+                    "service_name": "redis",
+                    "connection_status": "healthy",
+                    "connection_details": {
+                        "host": os.getenv("REDIS_HOST", "redis"),
+                        "port": int(os.getenv("REDIS_PORT", "6379"))
+                    }
+                }
+            
+            CacheServiceProtocol, DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
+            return ServiceConnectionInfo(
                 service_name="redis",
                 connection_status=ServiceStatus.HEALTHY,
                 connection_details={
@@ -354,8 +407,11 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     "port": int(os.getenv("REDIS_PORT", "6379"))
                 }
             )
+        
+        if config is None:
+            config = _get_cache_config()
 
-        async def create_cache_service() -> CacheServiceProtocol:
+        async def create_cache_service():
             try:
                 from prompt_improver.integrations.redis_service import RedisService
                 service = RedisService(config)
@@ -363,15 +419,22 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 return service
             except ImportError:
                 # Fallback to memory cache service
-                from prompt_improver.utils.cache_service.memory_cache_service import MemoryCacheService
+                from prompt_improver.services.cache.l1_cache_service import L1CacheService as MemoryCacheService
                 return MemoryCacheService()
 
-        async def cleanup_cache_service(service: CacheServiceProtocol):
+        async def cleanup_cache_service(service):
             if hasattr(service, "shutdown"):
                 await service.shutdown()
 
+        # Use lazy loading for CacheServiceProtocol to avoid import issues
+        def _get_cache_protocol():
+            protocols = _get_ml_protocols()
+            if protocols[0] is not None:  # CacheServiceProtocol available
+                return protocols[0]
+            return "cache_service"  # Use string key as fallback
+
         self.register_factory(
-            CacheServiceProtocol,
+            _get_cache_protocol(),
             create_cache_service,
             tags={"redis", "cache", "external"}
         )
@@ -475,9 +538,13 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Get database connection manager instance."""
         return await self.get("connection_manager")
 
-    async def get_cache_service(self) -> CacheServiceProtocol:
+    async def get_cache_service(self):
         """Get cache service instance."""
-        return await self.get(CacheServiceProtocol)
+        # Use lazy loading to avoid import issues
+        protocols = _get_ml_protocols()
+        if protocols[0] is not None:
+            return await self.get(protocols[0])  # CacheServiceProtocol
+        return await self.get("cache_service")
 
     async def get_session_manager(self) -> Any:
         """Get session manager instance."""
@@ -487,9 +554,13 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Get repository factory instance."""
         return await self.get("repository_factory")
 
-    async def get_database_service(self) -> DatabaseServiceProtocol:
+    async def get_database_service(self):
         """Get database service instance."""
-        return await self.get(DatabaseServiceProtocol)
+        # Use lazy loading to avoid import issues
+        protocols = _get_ml_protocols()
+        if protocols[1] is not None:
+            return await self.get(protocols[1])  # DatabaseServiceProtocol
+        return await self.get("database_service")
 
     async def get_migration_service(self) -> Any:
         """Get migration service instance."""

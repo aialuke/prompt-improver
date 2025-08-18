@@ -1,0 +1,108 @@
+{
+  "benchmark_info": {
+    "python_version": "3.13.3 (v3.13.3:6280bb54784, Apr  8 2025, 10:47:54) [Clang 15.0.0 (clang-1500.3.9.4)]",
+    "platform": "darwin",
+    "timestamp": 1755257193.394782,
+    "pid": 56427
+  },
+  "import_performance": {
+    "prompt_improver.database.models": {
+      "import_time_ms": 45444.76829198538,
+      "memory_delta_mb": 583.796875,
+      "tracemalloc_current_mb": 423.31877517700195,
+      "tracemalloc_peak_mb": 423.39047622680664,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.ml.core.training_service": {
+      "import_time_ms": 1.5471669903490692,
+      "memory_delta_mb": 4.3125,
+      "tracemalloc_current_mb": 0.045149803161621094,
+      "tracemalloc_peak_mb": 0.0875253677368164,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.services.prompt.facade": {
+      "import_time_ms": 1.7440420051570982,
+      "memory_delta_mb": 1.03125,
+      "tracemalloc_current_mb": 0.028565406799316406,
+      "tracemalloc_peak_mb": 0.049957275390625,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.utils": {
+      "import_time_ms": 1.2126670044381171,
+      "memory_delta_mb": 0.0625,
+      "tracemalloc_current_mb": 0.0022716522216796875,
+      "tracemalloc_peak_mb": 0.007724761962890625,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.services.error_handling.facade": {
+      "import_time_ms": 3.5534159978851676,
+      "memory_delta_mb": 1.859375,
+      "tracemalloc_current_mb": 0.10928535461425781,
+      "tracemalloc_peak_mb": 0.36036109924316406,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.database.services.cache.cache_manager": {
+      "import_time_ms": 4.922583000734448,
+      "memory_delta_mb": 0.5625,
+      "tracemalloc_current_mb": 0.10497760772705078,
+      "tracemalloc_peak_mb": 0.3515357971191406,
+      "success": true,
+      "error": null
+    },
+    "prompt_improver.core.services.manager": {
+      "import_time_ms": 3.290874999947846,
+      "memory_delta_mb": 0.5,
+      "tracemalloc_current_mb": 0.06967353820800781,
+      "tracemalloc_peak_mb": 0.12311935424804688,
+      "success": true,
+      "error": null
+    }
+  },
+  "import_order_performance": {
+    "order_1": {
+      "total_time_ms": 50.35475001204759,
+      "memory_delta_mb": 4.59375,
+      "modules": [
+        "prompt_improver.utils",
+        "prompt_improver.services.error_handling.facade",
+        "prompt_improver.database.models"
+      ]
+    },
+    "order_2": {
+      "total_time_ms": 46.89312499249354,
+      "memory_delta_mb": 3.6875,
+      "modules": [
+        "prompt_improver.services.error_handling.facade",
+        "prompt_improver.utils",
+        "prompt_improver.database.models"
+      ]
+    },
+    "order_3": {
+      "total_time_ms": 47.15504200430587,
+      "memory_delta_mb": 4.921875,
+      "modules": [
+        "prompt_improver.database.models",
+        "prompt_improver.utils",
+        "prompt_improver.services.error_handling.facade"
+      ]
+    }
+  },
+  "runtime_performance": {
+    "error_handling": {
+      "error": "'MetricsRegistry' object has no attribute 'get_metric'"
+    },
+    "utils_session_store": {
+      "error": "'SessionStore' object has no attribute 'store_session'"
+    }
+  },
+  "startup_performance": {
+    "total_startup_time_ms": 251.58616600674577,
+    "memory_footprint_mb": 30.828125,
+    "modules_loaded": 281
+  }
+}

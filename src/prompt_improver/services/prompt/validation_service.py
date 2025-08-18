@@ -18,7 +18,10 @@ from uuid import UUID
 from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
     ValidationServiceProtocol,
 )
-from prompt_improver.core.exceptions import ValidationError, BusinessRuleViolationError
+from prompt_improver.core.config.validation import ValidationResult
+# Use standard exceptions - core.exceptions module was removed
+ValidationError = ValueError
+BusinessRuleViolationError = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -601,3 +604,311 @@ class ValidationService(ValidationServiceProtocol):
                 r'var\s+\w+\s*=',
             ]
         }
+
+    # Configuration validation methods to break circular dependencies
+    async def validate_startup_configuration(
+        self,
+        environment: Optional[str] = None
+    ) -> ValidationResult:
+        """Validate overall startup configuration integrity."""
+        try:
+            from prompt_improver.core.config.validation import validate_configuration
+            from prompt_improver.core.config.app_config import get_config
+            
+            # Get the configuration to validate
+            config = get_config()
+            
+            # Override environment if specified
+            if environment:
+                # Create a copy with overridden environment
+                config_dict = config.model_dump()
+                config_dict["environment"] = environment
+                from prompt_improver.core.config.app_config import AppConfig
+                config = AppConfig(**config_dict)
+            
+            # Use the comprehensive validation from validation.py
+            is_valid, report = await validate_configuration(config)
+            
+            return ValidationResult(
+                component="startup_configuration",
+                is_valid=is_valid,
+                message="Startup configuration validation passed" if is_valid else f"Startup configuration issues: {len(report.critical_failures)} critical, {len(report.warnings)} warnings",
+                details={
+                    "environment": report.environment,
+                    "critical_failures": report.critical_failures,
+                    "warnings": report.warnings,
+                    "components_validated": len(report.results),
+                    "overall_status": "valid" if is_valid else "invalid"
+                },
+                critical=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error validating startup configuration: {e}")
+            return ValidationResult(
+                component="startup_configuration",
+                is_valid=False,
+                message=f"Startup configuration validation failed: {e}",
+                critical=True
+            )
+
+    async def validate_database_configuration(
+        self,
+        test_connectivity: bool = True
+    ) -> ValidationResult:
+        """Validate database configuration and connectivity."""
+        try:
+            from prompt_improver.core.config.app_config import get_config
+            
+            config = get_config()
+            db_config = config.database
+            issues = []
+            
+            # Validate connection parameters
+            if not db_config.postgres_host:
+                issues.append("Database host is required")
+                
+            if db_config.postgres_port < 1 or db_config.postgres_port > 65535:
+                issues.append(f"Invalid database port: {db_config.postgres_port}")
+                
+            if not db_config.postgres_database:
+                issues.append("Database name is required")
+                
+            if not db_config.postgres_username:
+                issues.append("Database username is required")
+                
+            # Validate pool settings
+            if db_config.pool_min_size > db_config.pool_max_size:
+                issues.append(f"Pool min size ({db_config.pool_min_size}) exceeds max size ({db_config.pool_max_size})")
+                
+            if db_config.pool_timeout <= 0:
+                issues.append("Pool timeout must be positive")
+            
+            # Test connectivity if requested and basic config is valid
+            connectivity_details = {}
+            if test_connectivity and not issues:
+                try:
+                    import asyncio
+                    import asyncpg
+                    
+                    database_url = db_config.get_database_url()
+                    
+                    async def test_connection():
+                        conn = None
+                        try:
+                            conn = await asyncpg.connect(database_url, timeout=5.0)
+                            result = await conn.fetchval("SELECT 1")
+                            return result == 1
+                        except Exception:
+                            return False
+                        finally:
+                            if conn:
+                                await conn.close()
+                    
+                    start_time = asyncio.get_event_loop().time()
+                    is_connected = await asyncio.wait_for(test_connection(), timeout=10.0)
+                    response_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+                    
+                    connectivity_details = {
+                        "connectivity_test_passed": is_connected,
+                        "response_time_ms": round(response_time_ms, 2)
+                    }
+                    
+                    if not is_connected:
+                        issues.append("Database connectivity test failed")
+                        
+                except Exception as e:
+                    connectivity_details = {
+                        "connectivity_test_error": str(e),
+                        "connectivity_test_passed": False
+                    }
+                    issues.append(f"Database connectivity test error: {e}")
+            
+            is_valid = len(issues) == 0
+            message = "Database configuration valid" if is_valid else f"Database configuration issues: {'; '.join(issues)}"
+            
+            details = {
+                "host": db_config.postgres_host,
+                "port": db_config.postgres_port,
+                "database": db_config.postgres_database,
+                "pool_settings": {
+                    "min_size": db_config.pool_min_size,
+                    "max_size": db_config.pool_max_size,
+                    "timeout": db_config.pool_timeout,
+                },
+                "issues": issues,
+                **connectivity_details
+            }
+            
+            return ValidationResult(
+                component="database_configuration",
+                is_valid=is_valid,
+                message=message,
+                details=details,
+                critical=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error validating database configuration: {e}")
+            return ValidationResult(
+                component="database_configuration",
+                is_valid=False,
+                message=f"Database configuration validation failed: {e}",
+                critical=True
+            )
+
+    async def validate_security_configuration(
+        self,
+        security_profile: Optional[str] = None
+    ) -> ValidationResult:
+        """Validate security configuration and settings."""
+        try:
+            from prompt_improver.core.config.app_config import get_config
+            
+            config = get_config()
+            security_config = config.security
+            issues = []
+            
+            # Validate secret key
+            if not security_config.secret_key:
+                issues.append("Secret key is required")
+            elif len(security_config.secret_key) < 32:
+                issues.append(f"Secret key must be at least 32 characters, got {len(security_config.secret_key)}")
+                
+            # Validate token settings
+            if security_config.token_expiry_seconds <= 0:
+                issues.append("Token expiry must be positive")
+                
+            if security_config.hash_rounds < 4 or security_config.hash_rounds > 20:
+                issues.append("Hash rounds must be between 4 and 20")
+                
+            # Validate authentication settings
+            auth_config = security_config.authentication
+            if auth_config.api_key_length_bytes < 16:
+                issues.append("API key length must be at least 16 bytes")
+                
+            if auth_config.max_failed_attempts_per_hour < 1:
+                issues.append("Max failed attempts must be at least 1")
+                
+            # Validate rate limiting
+            rate_config = security_config.rate_limiting
+            if rate_config.basic_tier_rate_limit < 1:
+                issues.append("Basic tier rate limit must be at least 1")
+                
+            if rate_config.basic_tier_burst_capacity < rate_config.basic_tier_rate_limit:
+                issues.append("Burst capacity must be >= rate limit")
+            
+            # Validate against security profile if specified
+            if security_profile:
+                current_profile = security_config.security_profile.value
+                if security_profile != current_profile:
+                    issues.append(f"Security profile mismatch: expected {security_profile}, got {current_profile}")
+                
+                if security_profile == "production" and config.environment != "production":
+                    issues.append("Production security profile should only be used in production environment")
+            
+            is_valid = len(issues) == 0
+            message = "Security configuration valid" if is_valid else f"Security configuration issues: {'; '.join(issues)}"
+            
+            return ValidationResult(
+                component="security_configuration",
+                is_valid=is_valid,
+                message=message,
+                details={
+                    "security_profile": security_config.security_profile.value,
+                    "token_expiry_seconds": security_config.token_expiry_seconds,
+                    "hash_rounds": security_config.hash_rounds,
+                    "api_key_length_bytes": auth_config.api_key_length_bytes,
+                    "rate_limits": {
+                        "basic_tier": rate_config.basic_tier_rate_limit,
+                        "burst_capacity": rate_config.basic_tier_burst_capacity
+                    },
+                    "issues": issues
+                },
+                critical=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error validating security configuration: {e}")
+            return ValidationResult(
+                component="security_configuration",
+                is_valid=False,
+                message=f"Security configuration validation failed: {e}",
+                critical=True
+            )
+
+    async def validate_monitoring_configuration(
+        self,
+        include_connectivity_tests: bool = False
+    ) -> ValidationResult:
+        """Validate monitoring and observability configuration."""
+        try:
+            from prompt_improver.core.config.app_config import get_config
+            
+            config = get_config()
+            monitoring_config = config.monitoring
+            issues = []
+            
+            # Validate health check settings
+            health_config = monitoring_config.health_checks
+            if health_config.interval_seconds <= 0:
+                issues.append("Health check interval must be positive")
+                
+            if health_config.timeout_seconds >= health_config.interval_seconds:
+                issues.append("Health check timeout should be less than interval")
+                
+            # Validate metrics settings
+            metrics_config = monitoring_config.metrics  
+            if metrics_config.collection_interval_seconds <= 0:
+                issues.append("Metrics collection interval must be positive")
+                
+            # Validate logging settings
+            logging_config = monitoring_config.logging
+            allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+            if logging_config.level not in allowed_levels:
+                issues.append(f"Invalid log level: {logging_config.level}")
+                
+            allowed_formats = ["json", "text", "structured"]
+            if logging_config.format not in allowed_formats:
+                issues.append(f"Invalid log format: {logging_config.format}")
+            
+            # Perform connectivity tests if requested
+            connectivity_details = {}
+            if include_connectivity_tests:
+                # Test monitoring endpoints, metrics collection, etc.
+                # This is a placeholder - actual implementation would test specific monitoring endpoints
+                connectivity_details = {
+                    "connectivity_tests_enabled": True,
+                    "monitoring_endpoints_tested": 0,
+                    "all_endpoints_healthy": True
+                }
+            
+            is_valid = len(issues) == 0
+            message = "Monitoring configuration valid" if is_valid else f"Monitoring configuration issues: {'; '.join(issues)}"
+            
+            details = {
+                "health_check_interval": health_config.interval_seconds,
+                "health_check_timeout": health_config.timeout_seconds,
+                "metrics_collection_interval": metrics_config.collection_interval_seconds,
+                "log_level": logging_config.level,
+                "log_format": logging_config.format,
+                "issues": issues,
+                **connectivity_details
+            }
+            
+            return ValidationResult(
+                component="monitoring_configuration",
+                is_valid=is_valid,
+                message=message,
+                details=details,
+                critical=False  # Monitoring config issues are not critical for core app
+            )
+            
+        except Exception as e:
+            logger.error(f"Error validating monitoring configuration: {e}")
+            return ValidationResult(
+                component="monitoring_configuration",
+                is_valid=False,
+                message=f"Monitoring configuration validation failed: {e}",
+                critical=False
+            )

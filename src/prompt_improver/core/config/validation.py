@@ -8,7 +8,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from prompt_improver.core.config.app_config import AppConfig
 
@@ -22,7 +22,7 @@ class ValidationResult:
     component: str
     is_valid: bool
     message: str
-    details: Dict[str, Any] | None = None
+    details: dict[str, Any] | None = None
     critical: bool = True
     
     
@@ -33,11 +33,11 @@ class ValidationReport:
     timestamp: datetime = field(default_factory=datetime.now)
     environment: str = "unknown"
     overall_valid: bool = False
-    results: List[ValidationResult] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    critical_failures: List[str] = field(default_factory=list)
+    results: list[ValidationResult] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    critical_failures: list[str] = field(default_factory=list)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert report to dictionary for JSON serialization."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -206,20 +206,28 @@ class ConfigurationValidator:
             )
     
     async def _validate_database_connectivity(self) -> ValidationResult:
-        """Test database connectivity using real connection."""
+        """Test database connectivity using existing health service."""
         try:
-            from prompt_improver.database import get_database_services, ManagerMode
+            from prompt_improver.core.services.service_registry import get_database_health_service
             
-            # Try to get database services and test connectivity
-            unified_manager = await get_database_services(ManagerMode.ASYNC_MODERN)
-            await unified_manager.initialize()
+            # Use existing database health service for connectivity testing
+            try:
+                health_service = get_database_health_service()
+                health_status = await health_service.health_check()
+            except ValueError:
+                # Health service not registered, try fallback approach
+                return ValidationResult(
+                    component="database_connectivity",
+                    is_valid=False,
+                    message="Database health service not available for connectivity test",
+                    critical=False,
+                )
             
-            health_status = await unified_manager.health_check()
-            database_healthy = health_status.get("components", {}).get("async_database") == "healthy"
-            response_time_ms = health_status.get("response_time_ms", 0)
-            overall_status = health_status.get("status", "unknown")
+            database_healthy = health_status.get("overall_status") in ["healthy", "warning"]
+            response_time_ms = health_status.get("check_time_ms", 0)
+            overall_status = health_status.get("overall_status", "unknown")
             
-            if database_healthy and overall_status in ["healthy", "degraded"]:
+            if database_healthy and overall_status in ["healthy", "warning"]:
                 return ValidationResult(
                     component="database_connectivity",
                     is_valid=True,
@@ -234,8 +242,8 @@ class ConfigurationValidator:
             # Build error message
             error_details = []
             for component, status in health_status.get("components", {}).items():
-                if "unhealthy" in str(status):
-                    error_details.append(f"{component}: {status}")
+                if status.get("status") in ["error", "critical"]:
+                    error_details.append(f"{component}: {status.get('status', 'unknown')}")
                     
             error_message = f"Database connectivity failed - Status: {overall_status}"
             if error_details:
@@ -257,7 +265,7 @@ class ConfigurationValidator:
             return ValidationResult(
                 component="database_connectivity",
                 is_valid=False,
-                message="Database services not available for connectivity test",
+                message="Service registry not available for connectivity test",
                 critical=False,
             )
         except Exception as e:
@@ -459,7 +467,7 @@ class ConfigurationValidator:
             )
 
 
-async def validate_configuration(config: AppConfig | None = None) -> Tuple[bool, ValidationReport]:
+async def validate_configuration(config: AppConfig | None = None) -> tuple[bool, ValidationReport]:
     """Main entry point for configuration validation.
     
     Args:

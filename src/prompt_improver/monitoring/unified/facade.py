@@ -22,10 +22,11 @@ from prompt_improver.core.protocols.health_protocol import (
     HealthCheckResult as ProtocolHealthCheckResult,
     HealthStatus as ProtocolHealthStatus,
 )
-from prompt_improver.database import ManagerMode
+# TYPE_CHECKING import to break circular import
+from prompt_improver.database.types import ManagerMode
 
 from .alerting_service import AlertingService
-from .cache_monitoring_service import CacheMonitoringService
+from .cache_performance_calculator import CachePerformanceCalculator
 from .health_reporter_service import HealthReporterService
 from .metrics_collector_service import MetricsCollectorService
 from .monitoring_orchestrator_service import MonitoringOrchestratorService

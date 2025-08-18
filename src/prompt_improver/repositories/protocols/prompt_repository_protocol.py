@@ -12,11 +12,12 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-from prompt_improver.database.models import (
-    ABExperiment,
-    DiscoveredPattern,
-    ImprovementSession,
-    ImprovementSessionCreate,
+# CLEAN ARCHITECTURE 2025: Use domain DTOs instead of database models
+from prompt_improver.core.domain.types import (
+    ABExperimentData,
+    DiscoveredPatternData,
+    ImprovementSessionData,
+    ImprovementSessionCreateData,
 )
 
 
@@ -81,12 +82,12 @@ class PromptRepositoryProtocol(Protocol):
 
     # Session Management
     async def create_session(
-        self, session_data: ImprovementSessionCreate
-    ) -> ImprovementSession:
+        self, session_data: ImprovementSessionCreateData
+    ) -> ImprovementSessionData:
         """Create a new improvement session."""
         ...
 
-    async def get_session(self, session_id: str) -> ImprovementSession | None:
+    async def get_session(self, session_id: str) -> ImprovementSessionData | None:
         """Get session by session ID."""
         ...
 
@@ -97,13 +98,13 @@ class PromptRepositoryProtocol(Protocol):
         sort_desc: bool = True,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[ImprovementSession]:
+    ) -> list[ImprovementSessionData]:
         """Get sessions with filtering and pagination."""
         ...
 
     async def update_session(
         self, session_id: str, update_data: dict[str, Any]
-    ) -> ImprovementSession | None:
+    ) -> ImprovementSessionData | None:
         """Update session data."""
         ...
 
@@ -118,16 +119,16 @@ class PromptRepositoryProtocol(Protocol):
 
     async def get_recent_sessions(
         self, hours_back: int = 24, limit: int = 50
-    ) -> list[ImprovementSession]:
+    ) -> list[ImprovementSessionData]:
         """Get recent improvement sessions."""
         ...
 
     # A/B Experiment Management
-    async def create_experiment(self, experiment_data: dict[str, Any]) -> ABExperiment:
+    async def create_experiment(self, experiment_data: dict[str, Any]) -> ABExperimentData:
         """Create a new A/B experiment."""
         ...
 
-    async def get_experiment(self, experiment_id: str) -> ABExperiment | None:
+    async def get_experiment(self, experiment_id: str) -> ABExperimentData | None:
         """Get experiment by ID."""
         ...
 
@@ -138,34 +139,34 @@ class PromptRepositoryProtocol(Protocol):
         sort_desc: bool = True,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[ABExperiment]:
+    ) -> list[ABExperimentData]:
         """Get experiments with filtering."""
         ...
 
     async def update_experiment(
         self, experiment_id: str, update_data: dict[str, Any]
-    ) -> ABExperiment | None:
+    ) -> ABExperimentData | None:
         """Update experiment data."""
         ...
 
     async def get_active_experiments(
         self, target_metric: str | None = None
-    ) -> list[ABExperiment]:
+    ) -> list[ABExperimentData]:
         """Get currently running experiments."""
         ...
 
     async def complete_experiment(
         self, experiment_id: str, results: dict[str, Any]
-    ) -> ABExperiment | None:
+    ) -> ABExperimentData | None:
         """Mark experiment as completed with results."""
         ...
 
     # Discovered Pattern Management
-    async def create_pattern(self, pattern_data: dict[str, Any]) -> DiscoveredPattern:
+    async def create_pattern(self, pattern_data: dict[str, Any]) -> DiscoveredPatternData:
         """Store a discovered pattern."""
         ...
 
-    async def get_pattern(self, pattern_id: str) -> DiscoveredPattern | None:
+    async def get_pattern(self, pattern_id: str) -> DiscoveredPatternData | None:
         """Get pattern by ID."""
         ...
 
@@ -176,19 +177,19 @@ class PromptRepositoryProtocol(Protocol):
         sort_desc: bool = True,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[DiscoveredPattern]:
+    ) -> list[DiscoveredPatternData]:
         """Get patterns with filtering."""
         ...
 
     async def get_effective_patterns(
         self, min_effectiveness: float = 0.7, min_support: int = 5, limit: int = 20
-    ) -> list[DiscoveredPattern]:
+    ) -> list[DiscoveredPatternData]:
         """Get most effective discovered patterns."""
         ...
 
     async def update_pattern(
         self, pattern_id: str, update_data: dict[str, Any]
-    ) -> DiscoveredPattern | None:
+    ) -> DiscoveredPatternData | None:
         """Update pattern data."""
         ...
 

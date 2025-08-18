@@ -7,20 +7,25 @@ and model deployment while managing complex transaction boundaries and resource 
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from prompt_improver.application.protocols.application_service_protocols import (
     MLApplicationServiceProtocol,
 )
+if TYPE_CHECKING:
+    from prompt_improver.database.composition import DatabaseServices
 from prompt_improver.core.di.ml_container import MLServiceContainer
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
 from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-    AprioriAnalysisRequest,
-    AprioriAnalysisResponse,
-    PatternDiscoveryRequest,
-    PatternDiscoveryResponse,
+    AprioriRepositoryProtocol,
+)
+from prompt_improver.core.domain.types import (
+    AprioriAnalysisRequestData,
+    AprioriAnalysisResponseData,
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
 )
 from prompt_improver.ml.core import MLModelService  # Now points to facade
 from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
@@ -49,7 +54,7 @@ class MLApplicationService:
 
     def __init__(
         self,
-        db_services: DatabaseServices,
+        db_services: "DatabaseServices",
         ml_repository: MLRepositoryProtocol,
         ml_service_container: MLServiceContainer,
         ml_model_service: MLModelService,
@@ -180,9 +185,9 @@ class MLApplicationService:
 
     async def execute_pattern_discovery(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         session_id: str | None = None,
-    ) -> PatternDiscoveryResponse:
+    ) -> PatternDiscoveryResponseData:
         """
         Execute comprehensive pattern discovery workflow.
         
@@ -198,7 +203,7 @@ class MLApplicationService:
             session_id: Optional session identifier
             
         Returns:
-            PatternDiscoveryResponse with comprehensive patterns
+            PatternDiscoveryResponseData with comprehensive patterns
         """
         discovery_run_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
@@ -220,7 +225,7 @@ class MLApplicationService:
                     
                     # Validate discovery results
                     if discovery_results.get("status") == "error":
-                        return PatternDiscoveryResponse(
+                        return PatternDiscoveryResponseData(
                             status="error",
                             discovery_run_id=discovery_run_id,
                             error_message=discovery_results.get("error"),
@@ -239,7 +244,7 @@ class MLApplicationService:
                     end_time = datetime.now(timezone.utc)
                     duration_seconds = (end_time - start_time).total_seconds()
                     
-                    return PatternDiscoveryResponse(
+                    return PatternDiscoveryResponseData(
                         status=discovery_results.get("status", "success"),
                         discovery_run_id=discovery_run_id,
                         traditional_patterns=discovery_results.get("traditional_patterns"),
@@ -264,7 +269,7 @@ class MLApplicationService:
                     
         except Exception as e:
             self.logger.error(f"Pattern discovery workflow failed: {e}")
-            return PatternDiscoveryResponse(
+            return PatternDiscoveryResponseData(
                 status="error",
                 discovery_run_id=discovery_run_id,
                 error_message=str(e),
@@ -275,9 +280,9 @@ class MLApplicationService:
 
     async def execute_apriori_analysis(
         self,
-        request: AprioriAnalysisRequest,
+        request: AprioriAnalysisRequestData,
         session_id: str | None = None,
-    ) -> AprioriAnalysisResponse:
+    ) -> AprioriAnalysisResponseData:
         """
         Execute Apriori association rule mining workflow.
         
@@ -293,7 +298,7 @@ class MLApplicationService:
             session_id: Optional session identifier
             
         Returns:
-            AprioriAnalysisResponse with discovered patterns
+            AprioriAnalysisResponseData with discovered patterns
         """
         analysis_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
@@ -340,7 +345,7 @@ class MLApplicationService:
                     
         except Exception as e:
             self.logger.error(f"Apriori analysis workflow failed: {e}")
-            return AprioriAnalysisResponse(
+            return AprioriAnalysisResponseData(
                 status="error",
                 analysis_id=analysis_id,
                 error_message=str(e),
@@ -564,7 +569,7 @@ class MLApplicationService:
         )
 
     async def _store_pattern_discovery_metadata(
-        self, discovery_run_id: str, request: PatternDiscoveryRequest, results: Dict[str, Any], db_session
+        self, discovery_run_id: str, request: PatternDiscoveryRequestData, results: Dict[str, Any], db_session
     ) -> None:
         """Store pattern discovery metadata."""
         await self.ml_repository.store_pattern_discovery_metadata(
@@ -575,7 +580,7 @@ class MLApplicationService:
         )
 
     async def _store_apriori_metadata(
-        self, analysis_id: str, request: AprioriAnalysisRequest, results: Any, db_session
+        self, analysis_id: str, request: AprioriAnalysisRequestData, results: Any, db_session
     ) -> None:
         """Store Apriori analysis metadata."""
         await self.ml_repository.store_apriori_metadata(

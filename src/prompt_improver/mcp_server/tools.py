@@ -17,12 +17,11 @@ from sqlmodel import Field
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
-from prompt_improver.core.di import get_container
 from prompt_improver.mcp_server.middleware import MiddlewareContext
 from prompt_improver.security.structured_prompts import create_rule_application_prompt
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer
+    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
 
 logger = logging.getLogger(__name__)
 
@@ -402,7 +401,7 @@ async def _set_session_impl(
     """Implementation of set_session tool using unified session management."""
     try:
         await server._ensure_unified_session_manager()
-        success = await server.services.session_store.set(session_id, data)
+        success = await server.services.session_store.set_session(session_id, data, ttl=3600)
         return {
             "session_id": session_id,
             "success": success,
@@ -428,7 +427,7 @@ async def _touch_session_impl(
 ) -> dict[str, Any]:
     """Implementation of touch_session tool."""
     try:
-        success = await server.services.session_store.touch(session_id)
+        success = await server.services.session_store.touch_session(session_id, ttl=3600)
         return {
             "session_id": session_id,
             "success": success,
@@ -451,7 +450,7 @@ async def _delete_session_impl(
 ) -> dict[str, Any]:
     """Implementation of delete_session tool."""
     try:
-        success = await server.services.session_store.delete(session_id)
+        success = await server.services.session_store.delete_session(session_id)
         return {
             "session_id": session_id,
             "success": success,
@@ -735,8 +734,7 @@ async def _store_prompt_impl(
             }
 
         # Database storage
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-        async with database_services.database.get_session() as session:
+        async with await server.services.get_database_session() as session:
             from sqlalchemy import text
 
             query = text("""
@@ -840,8 +838,7 @@ async def _query_database_impl(
                 "timestamp": time.time(),
             }
 
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-        async with database_services.database.get_session() as session:
+        async with await server.services.get_database_session() as session:
             from sqlalchemy import text
 
             sql_query = text(query)
@@ -885,8 +882,7 @@ async def _list_tables_impl(server: "APESMCPServer") -> dict[str, Any]:
     start_time = time.time()
 
     try:
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-        async with database_services.database.get_session() as session:
+        async with await server.services.get_database_session() as session:
             from sqlalchemy import text
 
             query = text("""
@@ -957,8 +953,7 @@ async def _describe_table_impl(
                 "timestamp": time.time(),
             }
 
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-        async with database_services.database.get_session() as session:
+        async with await server.services.get_database_session() as session:
             from sqlalchemy import text
 
             query = text("""

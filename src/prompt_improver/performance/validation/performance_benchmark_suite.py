@@ -36,10 +36,10 @@ from prompt_improver.repositories.impl.analytics_repository import (
 from prompt_improver.database.services.connection.postgres_pool_manager import (
     PostgreSQLPoolManager,
 )
-from prompt_improver.database.services.cache.cache_manager import (
-    CacheManager,
-    CacheManagerConfig,
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as CacheManager,
 )
+# CacheManagerConfig removed - use CacheFacade constructor parameters instead
 
 logger = logging.getLogger(__name__)
 

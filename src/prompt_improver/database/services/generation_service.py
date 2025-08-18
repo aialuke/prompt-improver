@@ -13,8 +13,10 @@ from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 
-from ...utils.error_handlers import handle_repository_errors
-from ...common.exceptions import DatabaseError, ValidationError
+from ...services.error_handling.facade import handle_repository_errors
+# Use standard exceptions for compatibility (common module removed)
+DatabaseError = Exception
+ValidationError = ValueError
 from ...utils.datetime_utils import naive_utc_now
 from ..models import (
     GenerationAnalytics,
@@ -34,7 +36,7 @@ class GenerationDatabaseService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    @handle_repository_errors()
+    @handle_repository_errors
     async def create_generation_session(
         self,
         generation_method: str,
@@ -101,7 +103,7 @@ class GenerationDatabaseService:
                 table="generation_sessions"
             ) from exc
 
-    @handle_repository_errors()
+    @handle_repository_errors
     async def update_session_status(
         self,
         session_id: str,

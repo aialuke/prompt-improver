@@ -14,16 +14,53 @@ from typing import Any, Optional
 
 from rich.console import Console
 
-# Modern ML service integration imports
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.factories.ml_pipeline_factory import (
-    MLPipelineOrchestratorFactory,
-)
-from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
-from prompt_improver.performance.monitoring.health.background_manager import (
-    TaskPriority,
-    get_background_task_manager,
-)
+# Heavy ML imports moved to TYPE_CHECKING and lazy loading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prompt_improver.core.di.ml_container import MLServiceContainer
+    from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineOrchestratorFactory
+    from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
+    from prompt_improver.performance.monitoring.health.background_manager import TaskPriority
+
+def _get_ml_components():
+    """Lazy load ML components when needed with graceful degradation."""
+    components = {}
+    
+    # Optional ML container
+    try:
+        from prompt_improver.core.di.ml_container import MLServiceContainer
+        components['MLServiceContainer'] = MLServiceContainer
+    except ImportError:
+        components['MLServiceContainer'] = None
+    
+    # Optional ML pipeline factory
+    try:
+        from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineOrchestratorFactory
+        components['MLPipelineOrchestratorFactory'] = MLPipelineOrchestratorFactory
+    except ImportError:
+        components['MLPipelineOrchestratorFactory'] = None
+    
+    # Optional ML protocols
+    try:
+        from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
+        components['ServiceContainerProtocol'] = ServiceContainerProtocol
+    except ImportError:
+        components['ServiceContainerProtocol'] = None
+    
+    # Optional background task manager (this was loading 41 ML modules!)
+    try:
+        from prompt_improver.performance.monitoring.health.background_manager import (
+            TaskPriority,
+            get_background_task_manager,
+        )
+        components['TaskPriority'] = TaskPriority
+        components['get_background_task_manager'] = get_background_task_manager
+    except ImportError:
+        components['TaskPriority'] = None
+        components['get_background_task_manager'] = None
+    
+    return components
 from prompt_improver.utils.subprocess_security import ensure_running
 
 # Optional psutil import
@@ -65,18 +102,24 @@ except ImportError:
 
 
 # Repository and application service imports for clean architecture
-try:
-    from prompt_improver.application.services.health_application_service import (
-        HealthApplicationService,
-    )
-    from prompt_improver.repositories.protocols.health_repository_protocol import (
-        HealthRepositoryProtocol,
-    )
-    HEALTH_SERVICES_AVAILABLE = True
-except ImportError:
-    HealthApplicationService = None
-    HealthRepositoryProtocol = None
-    HEALTH_SERVICES_AVAILABLE = False
+# TEMPORARILY DISABLED: These imports load 41 ML modules via health_repository_protocol
+# TODO: Fix health_repository_protocol to not import ML modules for basic operation
+HEALTH_SERVICES_AVAILABLE = False
+HealthApplicationService = None
+HealthRepositoryProtocol = None
+
+# Uncomment when health services are fixed to not load ML modules:
+# try:
+#     from prompt_improver.application.services.health_application_service import (
+#         HealthApplicationService,
+#     )
+#     from prompt_improver.repositories.protocols.health_repository_protocol import (
+#         HealthRepositoryProtocol,
+#     )
+#     HEALTH_SERVICES_AVAILABLE = True
+# except ImportError:
+#     HealthApplicationService = None
+#     HealthRepositoryProtocol = None
 
 
 class OrchestrationService:
@@ -105,9 +148,9 @@ class OrchestrationService:
 
     def __init__(
         self, 
-        console: Console | None = None, 
+        console: Optional[Console] = None, 
         event_bus=None,
-        health_application_service: HealthApplicationService | None = None
+        health_application_service: Optional[Any] = None
     ):
         self.console = console or Console()
         self.data_dir = Path.home() / ".local" / "share" / "apes"
@@ -408,13 +451,20 @@ class OrchestrationService:
     async def verify_service_health(self) -> dict[str, Any]:
         """Verify service health and performance using unified health monitor"""
         try:
-            from prompt_improver.performance.monitoring.health.unified_health_system import (
-                get_unified_health_monitor,
-            )
-
-            health_monitor = get_unified_health_monitor()
-            check_results = await health_monitor.check_health()
-            overall_result = await health_monitor.get_overall_health()
+            # Optional ML health monitoring - graceful degradation
+            try:
+                from prompt_improver.performance.monitoring.health.unified_health_system import (
+                    get_unified_health_monitor,
+                )
+                health_monitor = get_unified_health_monitor()
+                check_results = await health_monitor.check_health()
+                overall_result = await health_monitor.get_overall_health()
+                ml_health_available = True
+            except ImportError:
+                # Graceful degradation when ML monitoring unavailable
+                check_results = {"basic_health": "operational"}
+                overall_result = {"status": "healthy_without_ml"}
+                ml_health_available = False
 
             # Convert to required format
             health_status = {
@@ -489,13 +539,18 @@ class OrchestrationService:
 
         while not self.shutdown_event.is_set():
             try:
-                from prompt_improver.performance.monitoring.health.unified_health_system import (
-                    get_unified_health_monitor,
-                )
-
-                health_monitor = get_unified_health_monitor()
-                check_results = await health_monitor.check_health()
-                overall_result = await health_monitor.get_overall_health()
+                # Optional ML health monitoring - graceful degradation
+                try:
+                    from prompt_improver.performance.monitoring.health.unified_health_system import (
+                        get_unified_health_monitor,
+                    )
+                    health_monitor = get_unified_health_monitor()
+                    check_results = await health_monitor.check_health()
+                    overall_result = await health_monitor.get_overall_health()
+                except ImportError:
+                    # Basic health check without ML monitoring
+                    check_results = {"status": "operational"}
+                    overall_result = {"status": "healthy_without_ml"}
 
                 # Monitor critical performance indicators
                 mcp_check = check_results.get("mcp_server")
@@ -741,33 +796,43 @@ class OrchestrationService:
         """
         if self.event_bus:
             try:
-                # Import here to avoid circular dependencies
-                from prompt_improver.ml.orchestration.events.event_types import (
-                    EventType,
-                    MLEvent,
+                # Optional ML event system - graceful degradation
+                try:
+                    from prompt_improver.ml.orchestration.events.event_types import (
+                        EventType,
+                        MLEvent,
+                    )
+                    ml_events_available = True
+                except ImportError:
+                    # Skip ML event publishing when ML components unavailable
+                    self.logger.debug("ML events unavailable - skipping event publication")
+                    ml_events_available = False
+
+                if ml_events_available:
+                    # Map service events to orchestrator event types
+                    event_type_mapping = {
+                        "service.starting": EventType.COMPONENT_STARTED,
+                        "service.started": EventType.COMPONENT_STARTED,
+                        "service.failed": EventType.COMPONENT_ERROR,
+                        "service.stopping": EventType.COMPONENT_STOPPED,
+                        "service.stopped": EventType.COMPONENT_STOPPED,
+                    }
+
+                    orchestrator_event_type = event_type_mapping.get(
+                        event_type, EventType.COMPONENT_STARTED
+                    )
+
+                    event = MLEvent(
+                        event_type=orchestrator_event_type,
+                        source="apes_service_manager",
+                        data=data,
                 )
 
-                # Map service events to orchestrator event types
-                event_type_mapping = {
-                    "service.starting": EventType.COMPONENT_STARTED,
-                    "service.started": EventType.COMPONENT_STARTED,
-                    "service.failed": EventType.COMPONENT_ERROR,
-                    "service.stopping": EventType.COMPONENT_STOPPED,
-                    "service.stopped": EventType.COMPONENT_STOPPED,
-                }
-
-                orchestrator_event_type = event_type_mapping.get(
-                    event_type, EventType.COMPONENT_STARTED
-                )
-
-                event = MLEvent(
-                    event_type=orchestrator_event_type,
-                    source="apes_service_manager",
-                    data=data,
-                )
-
-                await self.event_bus.emit(event)
-                self.logger.debug(f"Emitted service event: {event_type}")
+                    await self.event_bus.emit(event)
+                    self.logger.debug(f"Emitted service event: {event_type}")
+                else:
+                    # Basic event logging when ML events unavailable
+                    self.logger.info(f"Service event: {event_type} (ML events disabled)")
 
             except Exception as e:
                 self.logger.warning(f"Failed to emit service event {event_type}: {e}")

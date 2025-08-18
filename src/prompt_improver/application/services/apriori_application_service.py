@@ -12,16 +12,18 @@ from typing import Any, Dict, List, Optional
 from prompt_improver.application.protocols.application_service_protocols import (
     ApplicationServiceProtocol,
 )
-from prompt_improver.performance.caching import CacheKey
+# str moved to unified cache facade - using string keys
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
 # Removed direct ML analyzer import - handled through repository
 from prompt_improver.repositories.protocols.apriori_repository_protocol import (
     AprioriRepositoryProtocol,
-    AprioriAnalysisRequest,
-    AprioriAnalysisResponse,
     AssociationRuleFilter,
+)
+from prompt_improver.core.domain.types import (
+    AprioriAnalysisRequestData,
+    AprioriAnalysisResponseData,
 )
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
     MLRepositoryProtocol,
@@ -35,9 +37,9 @@ class AprioriApplicationServiceProtocol(ApplicationServiceProtocol):
 
     async def execute_apriori_analysis(
         self,
-        request: AprioriAnalysisRequest,
+        request: AprioriAnalysisRequestData,
         session_id: str | None = None,
-    ) -> AprioriAnalysisResponse:
+    ) -> AprioriAnalysisResponseData:
         """Execute complete Apriori analysis workflow."""
         ...
 
@@ -107,9 +109,9 @@ class AprioriApplicationService:
 
     async def execute_apriori_analysis(
         self,
-        request: AprioriAnalysisRequest,
+        request: AprioriAnalysisRequestData,
         session_id: str | None = None,
-    ) -> AprioriAnalysisResponse:
+    ) -> AprioriAnalysisResponseData:
         """
         Execute complete Apriori analysis workflow.
         
@@ -126,7 +128,7 @@ class AprioriApplicationService:
             session_id: Optional session identifier for tracking
             
         Returns:
-            AprioriAnalysisResponse with analysis results
+            AprioriAnalysisResponseData with analysis results
         """
         analysis_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
@@ -144,7 +146,7 @@ class AprioriApplicationService:
             # Validate configuration
             validation_result = await self._validate_analysis_config(request)
             if not validation_result["valid"]:
-                return AprioriAnalysisResponse(
+                return AprioriAnalysisResponseData(
                     status="error",
                     error=validation_result["error"],
                     analysis_run_id=analysis_id,
@@ -174,7 +176,7 @@ class AprioriApplicationService:
                     )
                     
                     if analysis_result.get("status") == "error":
-                        return AprioriAnalysisResponse(
+                        return AprioriAnalysisResponseData(
                             status="error",
                             error=analysis_result.get("error", "Analysis failed"),
                             analysis_run_id=analysis_id,
@@ -204,7 +206,7 @@ class AprioriApplicationService:
                 except Exception as e:
                     await db_session.rollback()
                     self.logger.error(f"Error in Apriori analysis transaction: {e}")
-                    return AprioriAnalysisResponse(
+                    return AprioriAnalysisResponseData(
                         status="error",
                         error=f"Analysis transaction failed: {str(e)}",
                         analysis_run_id=analysis_id,
@@ -212,7 +214,7 @@ class AprioriApplicationService:
                     
         except Exception as e:
             self.logger.error(f"Error in Apriori analysis workflow: {e}")
-            return AprioriAnalysisResponse(
+            return AprioriAnalysisResponseData(
                 status="error",
                 error=f"Workflow execution failed: {str(e)}",
                 analysis_run_id=analysis_id,
@@ -365,7 +367,7 @@ class AprioriApplicationService:
             self.logger.error(f"Error getting contextualized patterns: {e}")
             raise
 
-    async def _validate_analysis_config(self, request: AprioriAnalysisRequest) -> Dict[str, Any]:
+    async def _validate_analysis_config(self, request: AprioriAnalysisRequestData) -> Dict[str, Any]:
         """Validate Apriori analysis configuration."""
         if request.min_support <= 0 or request.min_support > 1:
             return {
@@ -434,12 +436,9 @@ class AprioriApplicationService:
         
         return recommendations
 
-    def _create_analysis_cache_key(self, request: AprioriAnalysisRequest) -> CacheKey:
+    def _create_analysis_cache_key(self, request: AprioriAnalysisRequestData) -> str:
         """Create cache key for Apriori analysis request."""
-        return CacheKey(
-            namespace="apriori_analysis",
-            key=f"{request.min_support}:{request.min_confidence}:{request.min_lift}:{request.window_days}",
-        )
+        return f"apriori_analysis:{request.min_support}:{request.min_confidence}:{request.min_lift}:{request.window_days}"
 
     def _create_rules_cache_key(
         self,
@@ -447,25 +446,19 @@ class AprioriApplicationService:
         sort_by: str,
         sort_desc: bool,
         limit: int,
-    ) -> CacheKey:
+    ) -> str:
         """Create cache key for association rules request."""
         filter_key = "none"
         if filters:
             filter_key = f"{filters.min_confidence}:{filters.min_lift}:{filters.pattern_category}"
         
-        return CacheKey(
-            namespace="association_rules",
-            key=f"{filter_key}:{sort_by}:{sort_desc}:{limit}",
-        )
+        return f"association_rules:{filter_key}:{sort_by}:{sort_desc}:{limit}"
 
     def _create_context_cache_key(
         self,
         context_items: List[str],
         min_confidence: float,
-    ) -> CacheKey:
+    ) -> str:
         """Create cache key for contextualized patterns request."""
         context_key = ":".join(sorted(context_items))
-        return CacheKey(
-            namespace="context_patterns",
-            key=f"{context_key}:{min_confidence}",
-        )
+        return f"context_patterns:{context_key}:{min_confidence}"

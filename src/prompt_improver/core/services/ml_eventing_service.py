@@ -12,19 +12,27 @@ Follows single responsibility principle for ML event handling concerns.
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select as sqlmodel_select
 
-from prompt_improver.core.events.ml_event_bus import (
-    MLEvent,
-    MLEventType,
-    get_ml_event_bus,
-)
-from prompt_improver.core.interfaces.ml_interface import MLModelInterface
-from prompt_improver.shared.interfaces.ab_testing import IABTestingService
+if TYPE_CHECKING:
+    from prompt_improver.core.events.ml_event_bus import (
+        MLEvent,
+        MLEventType,
+        get_ml_event_bus,
+    )
+    from prompt_improver.core.interfaces.ml_interface import MLModelInterface
+    from prompt_improver.shared.interfaces.ab_testing import IABTestingService
+else:
+    # Lazy imports to avoid torch dependencies
+    MLEvent = None
+    MLEventType = None
+    get_ml_event_bus = None
+    MLModelInterface = None
+    IABTestingService = None
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +43,34 @@ class MLEventingService:
     def __init__(
         self,
         enable_automl: bool = True,
-        ab_testing_service: IABTestingService | None = None,
+        ab_testing_service: Any = None,  # Use Any to avoid TYPE_CHECKING issues
     ):
         self.enable_automl = enable_automl
-        self.ml_interface: MLModelInterface | None = None
+        self.ml_interface: Any = None  # Use Any to avoid TYPE_CHECKING issues
         self.ab_testing_service = ab_testing_service
 
+    async def _get_ml_event_bus(self):
+        """Lazy load ML event bus to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import get_ml_event_bus
+            return await get_ml_event_bus()
+        except ImportError:
+            logger.info("ML event bus not available (torch not installed)")
+            return None
+    
+    def _create_ml_event(self, event_type: str, source: str, data: dict[str, Any]):
+        """Lazy create ML event to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import MLEvent, MLEventType
+            return MLEvent(
+                event_type=getattr(MLEventType, event_type),
+                source=source,
+                data=data
+            )
+        except ImportError:
+            logger.info("ML events not available (torch not installed)")
+            return None
+    
     async def initialize_automl(self) -> None:
         """Initialize AutoML via event bus communication"""
         if not self.enable_automl:
@@ -49,10 +79,20 @@ class MLEventingService:
             from prompt_improver.core.di.container_orchestrator import get_container
 
             container = await get_container()
-            self.ml_interface = await container.get(MLModelInterface)
-            event_bus = await get_ml_event_bus()
-            init_event = MLEvent(
-                event_type=MLEventType.TRAINING_REQUEST,
+            # Use lazy loading for ML interface
+            try:
+                from prompt_improver.core.interfaces.ml_interface import MLModelInterface
+                self.ml_interface = await container.get(MLModelInterface)
+            except ImportError:
+                logger.info("ML interface not available (torch not installed)")
+                self.ml_interface = None
+                
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return
+                
+            init_event = self._create_ml_event(
+                event_type="TRAINING_REQUEST",
                 source="ml_eventing_service",
                 data={
                     "operation": "initialize_automl",
@@ -68,7 +108,8 @@ class MLEventingService:
                     },
                 },
             )
-            await event_bus.publish(init_event)
+            if init_event:
+                await event_bus.publish(init_event)
             logger.info("AutoML initialization requested via event bus")
         except Exception as e:
             logger.error(f"Failed to request AutoML initialization: {e}")
@@ -97,9 +138,11 @@ class MLEventingService:
                 ]
 
             if len(available_rules) >= 2:
-                event_bus = await get_ml_event_bus()
-                experiment_event = MLEvent(
-                    event_type=MLEventType.TRAINING_REQUEST,
+                event_bus = await self._get_ml_event_bus()
+                if not event_bus:
+                    return None
+                experiment_event = self._create_ml_event(
+                    event_type="TRAINING_REQUEST",
                     source="ml_eventing_service",
                     data={
                         "operation": "initialize_bandit_experiment",
@@ -151,8 +194,8 @@ class MLEventingService:
                     else:
                         weighted_reward = normalized_reward * 0.8
 
-                    reward_event = MLEvent(
-                        event_type=MLEventType.TRAINING_PROGRESS,
+                    reward_event = self._create_ml_event(
+                        event_type="TRAINING_PROGRESS",
                         source="ml_eventing_service",
                         data={
                             "operation": "update_bandit_reward",
@@ -180,9 +223,11 @@ class MLEventingService:
             return {"status": "disabled", "message": "No bandit experiment ID provided"}
 
         try:
-            event_bus = await get_ml_event_bus()
-            summary_event = MLEvent(
-                event_type=MLEventType.PERFORMANCE_METRICS_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return None
+            summary_event = self._create_ml_event(
+                event_type="PERFORMANCE_METRICS_REQUEST",
                 source="ml_eventing_service",
                 data={
                     "operation": "get_bandit_performance",
@@ -260,9 +305,11 @@ class MLEventingService:
             )
 
         if len(features) >= 10:
-            event_bus = await get_ml_event_bus()
-            optimization_event = MLEvent(
-                event_type=MLEventType.TRAINING_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return None
+            optimization_event = self._create_ml_event(
+                event_type="TRAINING_REQUEST",
                 source="ml_eventing_service",
                 data={
                     "operation": "optimize_rules",
@@ -271,7 +318,8 @@ class MLEventingService:
                     "rule_ids": None,
                 },
             )
-            await event_bus.publish(optimization_event)
+            if optimization_event:
+                await event_bus.publish(optimization_event)
 
             # Simulate optimization result
             optimization_result = {
@@ -310,9 +358,11 @@ class MLEventingService:
         self, rule_ids: list[str] | None, db_session: AsyncSession
     ) -> dict[str, Any]:
         """Run ML optimization for specified rules with automatic real+synthetic data"""
-        event_bus = await get_ml_event_bus()
-        data_request_event = MLEvent(
-            event_type=MLEventType.ANALYSIS_REQUEST,
+        event_bus = await self._get_ml_event_bus()
+        if not event_bus:
+            return None
+        data_request_event = self._create_ml_event(
+            event_type="ANALYSIS_REQUEST",
             source="ml_eventing_service",
             data={
                 "operation": "load_training_data",
@@ -323,7 +373,8 @@ class MLEventingService:
                 "rule_ids": rule_ids,
             },
         )
-        await event_bus.publish(data_request_event)
+        if data_request_event:
+            await event_bus.publish(data_request_event)
 
         # Simulate training data response
         training_data = {
@@ -360,8 +411,8 @@ class MLEventingService:
             f"{training_data['metadata']['synthetic_samples']} synthetic"
         )
 
-        optimization_event = MLEvent(
-            event_type=MLEventType.TRAINING_REQUEST,
+        optimization_event = self._create_ml_event(
+            event_type="TRAINING_REQUEST",
             source="ml_eventing_service",
             data={
                 "operation": "optimize_rules",
@@ -382,8 +433,8 @@ class MLEventingService:
 
         if optimization_result.get("status") == "success":
             if len(features) >= 50:
-                ensemble_event = MLEvent(
-                    event_type=MLEventType.TRAINING_REQUEST,
+                ensemble_event = self._create_ml_event(
+                    event_type="TRAINING_REQUEST",
                     source="ml_eventing_service",
                     data={
                         "operation": "optimize_ensemble_rules",
@@ -412,9 +463,11 @@ class MLEventingService:
         self, min_effectiveness: float, min_support: int, db_session: AsyncSession
     ) -> dict[str, Any]:
         """Discover new patterns from successful improvements via event bus"""
-        event_bus = await get_ml_event_bus()
-        pattern_event = MLEvent(
-            event_type=MLEventType.ANALYSIS_REQUEST,
+        event_bus = await self._get_ml_event_bus()
+        if not event_bus:
+            return None
+        pattern_event = self._create_ml_event(
+            event_type="ANALYSIS_REQUEST",
             source="ml_eventing_service",
             data={
                 "operation": "discover_patterns",
@@ -422,7 +475,8 @@ class MLEventingService:
                 "min_support": min_support,
             },
         )
-        await event_bus.publish(pattern_event)
+        if pattern_event:
+            await event_bus.publish(pattern_event)
 
         # Simulate pattern discovery result
         result = {
@@ -474,9 +528,11 @@ class MLEventingService:
             }
         try:
             logger.info(f"Starting AutoML optimization for {optimization_target}")
-            event_bus = await get_ml_event_bus()
-            automl_event = MLEvent(
-                event_type=MLEventType.TRAINING_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return None
+            automl_event = self._create_ml_event(
+                event_type="TRAINING_REQUEST",
                 source="ml_eventing_service",
                 data={
                     "operation": "start_automl_optimization",
@@ -484,7 +540,8 @@ class MLEventingService:
                     "experiment_config": experiment_config or {},
                 },
             )
-            await event_bus.publish(automl_event)
+            if automl_event:
+                await event_bus.publish(automl_event)
 
             # Simulate AutoML result
             result = {
@@ -522,13 +579,16 @@ class MLEventingService:
         if not self.enable_automl:
             return {"status": "not_enabled"}
         try:
-            event_bus = await get_ml_event_bus()
-            status_event = MLEvent(
-                event_type=MLEventType.SYSTEM_STATUS_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return None
+            status_event = self._create_ml_event(
+                event_type="SYSTEM_STATUS_REQUEST",
                 source="ml_eventing_service",
                 data={"operation": "get_automl_status"},
             )
-            await event_bus.publish(status_event)
+            if status_event:
+                await event_bus.publish(status_event)
             return {
                 "status": "running",
                 "current_trial": 23,
@@ -544,13 +604,16 @@ class MLEventingService:
         if not self.enable_automl:
             return {"status": "not_enabled"}
         try:
-            event_bus = await get_ml_event_bus()
-            stop_event = MLEvent(
-                event_type=MLEventType.SHUTDOWN_REQUEST,
+            event_bus = await self._get_ml_event_bus()
+            if not event_bus:
+                return None
+            stop_event = self._create_ml_event(
+                event_type="SHUTDOWN_REQUEST",
                 source="ml_eventing_service",
                 data={"operation": "stop_automl_optimization"},
             )
-            await event_bus.publish(stop_event)
+            if stop_event:
+                await event_bus.publish(stop_event)
             return {
                 "status": "stopped",
                 "message": "AutoML optimization stop requested",

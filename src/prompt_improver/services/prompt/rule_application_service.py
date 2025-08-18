@@ -11,15 +11,15 @@ Part of the PromptServiceFacade decomposition following Clean Architecture princ
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from prompt_improver.core.events.ml_event_bus import (
-    MLEvent,
-    MLEventType,
-    get_ml_event_bus,
-)
+if TYPE_CHECKING:
+    from prompt_improver.core.events.ml_event_bus import (
+        MLEvent,
+        MLEventType,
+    )
 from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
     RuleApplicationServiceProtocol,
 )
@@ -37,6 +37,29 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
         self.compatibility_cache = {}
         self.execution_stats = {}
         self.cache_ttl = 600  # 10 minutes
+        self.logger = logging.getLogger(__name__)
+
+    async def _get_ml_event_bus(self):
+        """Lazy load ML event bus to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import get_ml_event_bus
+            return await get_ml_event_bus()
+        except ImportError:
+            self.logger.info("ML event bus not available (torch not installed)")
+            return None
+
+    def _create_ml_event(self, event_type: str, source: str, data: Dict[str, Any]):
+        """Lazy create ML event to avoid torch dependencies."""
+        try:
+            from prompt_improver.core.events.ml_event_bus import MLEvent, MLEventType
+            return MLEvent(
+                event_type=getattr(MLEventType, event_type),
+                source=source,
+                data=data
+            )
+        except ImportError:
+            self.logger.info("ML events not available (torch not installed)")
+            return None
 
     async def apply_rules(
         self,

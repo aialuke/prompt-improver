@@ -80,6 +80,7 @@ from prompt_improver.core.config.logging import (
     setup_config_logging,
 )
 from prompt_improver.core.config.validator import (
+    ConfigurationValidator,
     validate_startup_configuration,
     save_validation_report,
 )

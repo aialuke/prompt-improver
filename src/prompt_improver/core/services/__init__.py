@@ -4,16 +4,26 @@ System services including prompt improvement, startup orchestration,
 service management, and security.
 
 New decomposed services following SOLID principles:
-- RuleSelectionService: Rule discovery and selection
 - PersistenceService: Database operations
 - MLEventingService: ML event coordination
 - AnalyticsService: Unified analytics facade (v2.0)
+
+NOTE: RuleSelectionService moved to application layer (Clean Architecture 2025)
 """
 
+from typing import TYPE_CHECKING
+
 # MIGRATION NOTE: AnalyticsService now points to unified service
-from prompt_improver.analytics import AnalyticsServiceFacade as AnalyticsService
+# Move to TYPE_CHECKING to break circular import chain
+if TYPE_CHECKING:
+    from prompt_improver.analytics import AnalyticsServiceFacade as AnalyticsService
+else:
+    AnalyticsService = None
 from prompt_improver.core.services.manager import OrchestrationService as APESServiceManager
-from prompt_improver.core.services.ml_eventing_service import MLEventingService
+if TYPE_CHECKING:
+    from prompt_improver.core.services.ml_eventing_service import MLEventingService
+else:
+    MLEventingService = None
 from prompt_improver.core.services.persistence_service import PersistenceService
 # NOTE: PromptImprovementService moved to services.prompt.facade to break circular imports
 from prompt_improver.core.services.protocols import (
@@ -22,7 +32,9 @@ from prompt_improver.core.services.protocols import (
     IPersistenceService,
     IRuleSelectionService,
 )
-from prompt_improver.core.services.rule_selection_service import RuleSelectionService
+# CLEAN ARCHITECTURE 2025: RuleSelectionService moved to application layer
+# REMOVED: Direct import violates layer separation and causes circular imports
+# Applications should import from application layer directly
 from prompt_improver.core.services.security import PromptDataProtection
 from prompt_improver.core.services.startup import (
     StartupOrchestrator,
@@ -42,7 +54,7 @@ __all__ = [
     "AnalyticsService",
     "MLEventingService",
     "PersistenceService",
-    "RuleSelectionService",
+    # "RuleSelectionService",  # REMOVED: Moved to application layer
     # Service protocols
     "IAnalyticsService",
     "IMLEventingService",

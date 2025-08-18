@@ -17,8 +17,8 @@ import aiofiles
 
 from prompt_improver.database.types import ManagerMode
 from prompt_improver.performance.monitoring import get_unified_health_monitor
-from prompt_improver.performance.monitoring.performance_benchmark import (
-    MCPPerformanceBenchmark,
+from prompt_improver.performance.monitoring.performance_benchmark_factory import (
+    create_performance_benchmark,
 )
 from prompt_improver.performance.optimization.performance_optimizer import (
     get_performance_optimizer,
@@ -65,10 +65,15 @@ class PerformanceValidator:
     """Comprehensive performance validation system."""
 
     def __init__(self):
-        self.benchmark = MCPPerformanceBenchmark()
+        self.benchmark = None  # Will be initialized async
         self.optimizer = get_performance_optimizer()
         self.monitor = get_unified_health_monitor()
         self.target_response_time_ms = 200
+        
+    async def _ensure_benchmark_initialized(self):
+        """Ensure benchmark is initialized using factory pattern."""
+        if self.benchmark is None:
+            self.benchmark = await create_performance_benchmark()
 
     async def run_comprehensive_validation(
         self, samples_per_test: int = 100

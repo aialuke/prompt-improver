@@ -12,15 +12,18 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from opentelemetry import trace
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
-import optuna
-from optuna.integration import OptunaSearchCV
-from optuna.storages import RDBStorage
 from prompt_improver.utils.datetime_utils import aware_utc_now
-from .callbacks import AutoMLCallback
+
+# Lazy imports for heavy ML dependencies
+if TYPE_CHECKING:
+    import numpy as np
+    import optuna
+    from optuna.integration import OptunaSearchCV
+    from optuna.storages import RDBStorage
+    from .callbacks import AutoMLCallback
 tracer = trace.get_tracer(__name__)
 if TYPE_CHECKING:
-    from ...core.services.analytics_factory import get_analytics_router
+    from ...api.factories.analytics_api_factory import get_analytics_router
     from prompt_improver.database import DatabaseServices
     from ..evaluation.experiment_orchestrator import ExperimentOrchestrator
     from ..optimization.algorithms.rule_optimizer import OptimizationConfig, RuleOptimizer
@@ -97,14 +100,35 @@ class AutoMLOrchestrator:
         self.best_configurations = {}
         logger.info('AutoML Orchestrator initialized with mode: %s', config.optimization_mode)
 
-    def _create_storage(self) -> RDBStorage:
+    def _get_optuna_modules(self):
+        """Lazy import optuna modules when needed."""
+        try:
+            import optuna
+            from optuna.storages import RDBStorage
+            return optuna, RDBStorage
+        except ImportError as e:
+            logger.error(f"Optuna not available: {e}")
+            raise ImportError("Optuna is required for AutoML functionality. Install with: pip install optuna")
+
+    def _get_numpy(self):
+        """Lazy import numpy when needed."""
+        try:
+            import numpy as np
+            return np
+        except ImportError as e:
+            logger.error(f"NumPy not available: {e}")
+            raise ImportError("NumPy is required for AutoML functionality. Install with: pip install numpy")
+
+    def _create_storage(self):
         """Create Optuna storage following 2025 best practices"""
         try:
+            optuna, RDBStorage = self._get_optuna_modules()
             storage = RDBStorage(url=self.config.storage_url, heartbeat_interval=60, grace_period=120)
             logger.info('Created RDBStorage with heartbeat monitoring')
             return storage
         except Exception as e:
             logger.warning('Failed to create RDBStorage: %s, falling back to InMemoryStorage', e)
+            optuna, _ = self._get_optuna_modules()
             return optuna.storages.InMemoryStorage()
 
     def _setup_callbacks(self) -> list[Callable]:
@@ -142,6 +166,7 @@ class AutoMLOrchestrator:
             logger.info('Starting AutoML optimization for target: %s', optimization_target)
             start_time = time.time()
             try:
+                optuna, _ = self._get_optuna_modules()
                 self.study = optuna.create_study(study_name=self.config.study_name, storage=self.storage, direction='maximize' if 'score' in optimization_target else 'minimize', sampler=self._create_sampler(), load_if_exists=True)
                 callbacks = self._setup_callbacks()
                 objective_function = self._create_objective_function(optimization_target, experiment_config)
@@ -158,8 +183,9 @@ class AutoMLOrchestrator:
                 span.set_attribute('error', str(e))
                 return {'error': str(e), 'execution_time': time.time() - start_time}
 
-    def _create_sampler(self) -> optuna.samplers.BaseSampler:
+    def _create_sampler(self):
         """Create appropriate Optuna sampler based on optimization mode"""
+        optuna, _ = self._get_optuna_modules()
         if self.config.optimization_mode == AutoMLMode.MULTI_OBJECTIVE_PARETO:
             return optuna.samplers.NSGAIISampler(population_size=50, mutation_prob=0.1, crossover_prob=0.9)
         if self.config.optimization_mode == AutoMLMode.HYPERPARAMETER_OPTIMIZATION:
@@ -173,7 +199,7 @@ class AutoMLOrchestrator:
         coordinate multiple ML components through a single interface
         """
 
-        async def async_objective_impl(trial: optuna.Trial) -> float:
+        async def async_objective_impl(trial) -> float:
             """Async implementation of objective function for internal use."""
             try:
                 if self.rule_optimizer:
@@ -184,6 +210,7 @@ class AutoMLOrchestrator:
                         performance_data = {'test_rule': {'total_applications': 50, 'avg_improvement': 0.7, 'consistency_score': 0.8, 'success_rate': 0.75}}
                         optimization_result = await self.rule_optimizer.optimize_rule(rule_id='test_rule', performance_data=performance_data, historical_data=[])
                     else:
+                        np = self._get_numpy()
                         optimization_result = {'effectiveness': np.random.random()}
                 else:
                     test_config = {'sample_size': trial.suggest_int('sample_size', 100, 1000), 'confidence_level': trial.suggest_float('confidence_level', 0.9, 0.99), 'effect_size_threshold': trial.suggest_float('effect_size_threshold', 0.1, 0.5)}
@@ -191,6 +218,7 @@ class AutoMLOrchestrator:
                         experiment_result = await self.experiment_orchestrator.run_experiment(experiment_config={**experiment_config, **test_config})
                         optimization_result = experiment_result
                     else:
+                        np = self._get_numpy()
                         optimization_result = {'effectiveness': np.random.random()}
                 if optimization_target == 'rule_effectiveness':
                     value = optimization_result.get('effectiveness', 0.0)
@@ -200,13 +228,14 @@ class AutoMLOrchestrator:
                     value = optimization_result.get('effectiveness', 0.0)
                 trial.report(value, step=0)
                 if trial.should_prune():
+                    optuna, _ = self._get_optuna_modules()
                     raise optuna.TrialPruned()
                 return value
             except Exception as e:
                 logger.error('Objective function failed: %s', e)
                 return -1.0 if 'score' in optimization_target else float('inf')
 
-        def objective(trial: optuna.Trial) -> float:
+        def objective(trial) -> float:
             """Synchronous objective function compatible with Optuna (2025 best practice)."""
             import asyncio
             try:
@@ -266,6 +295,7 @@ class AutoMLOrchestrator:
         try:
             pareto_trials = []
             for trial in self.study.trials:
+                optuna, _ = self._get_optuna_modules()
                 if trial.state == optuna.trial.TrialState.COMPLETE:
                     pareto_trials.append({'trial_number': trial.number, 'values': trial.values if hasattr(trial, 'values') else [trial.value], 'params': trial.params})
             pareto_trials.sort(key=lambda x: sum(x['values']), reverse=True)
@@ -279,6 +309,7 @@ class AutoMLOrchestrator:
         if not self.study or len(self.study.trials) < 10:
             return {}
         try:
+            optuna, _ = self._get_optuna_modules()
             importance = optuna.importance.get_param_importances(self.study)
             return {param: float(score) for param, score in importance.items()}
         except Exception as e:

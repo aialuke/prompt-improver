@@ -16,12 +16,7 @@ from prompt_improver.core.domain.types import (
     AssociationRuleFilterData,
     PatternDiscoveryFilterData,
 )
-from prompt_improver.database.models import (
-    PatternDiscoveryRequest,
-    AprioriAnalysisRequest,
-    PatternDiscoveryResponse,
-    AprioriAnalysisResponse,
-)
+# These are already imported above as domain DTOs - no database models needed
 
 
 class ApplicationServiceProtocol(Protocol):
@@ -87,17 +82,17 @@ class MLApplicationServiceProtocol(Protocol):
 
     async def execute_pattern_discovery(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         session_id: str | None = None,
-    ) -> PatternDiscoveryResponse:
+    ) -> PatternDiscoveryResponseData:
         """Execute comprehensive pattern discovery workflow."""
         ...
 
     async def execute_apriori_analysis(
         self,
-        request: AprioriAnalysisRequest,
+        request: AprioriAnalysisRequestData,
         session_id: str | None = None,
-    ) -> AprioriAnalysisResponse:
+    ) -> AprioriAnalysisResponseData:
         """Execute Apriori association rule mining workflow."""
         ...
 
@@ -245,9 +240,9 @@ class AprioriApplicationServiceProtocol(Protocol):
 
     async def execute_apriori_analysis(
         self,
-        request: AprioriAnalysisRequest,
+        request: AprioriAnalysisRequestData,
         session_id: str | None = None,
-    ) -> AprioriAnalysisResponse:
+    ) -> AprioriAnalysisResponseData:
         """Execute complete Apriori analysis workflow."""
         ...
 
@@ -275,15 +270,15 @@ class PatternApplicationServiceProtocol(Protocol):
 
     async def execute_comprehensive_pattern_discovery(
         self,
-        request: PatternDiscoveryRequest,
+        request: PatternDiscoveryRequestData,
         session_id: str | None = None,
-    ) -> PatternDiscoveryResponse:
+    ) -> PatternDiscoveryResponseData:
         """Execute comprehensive pattern discovery workflow."""
         ...
 
     async def get_pattern_discoveries(
         self,
-        filters: PatternDiscoveryFilter | None = None,
+        filters: PatternDiscoveryFilterData | None = None,
         sort_by: str = "created_at",
         sort_desc: bool = True,
         limit: int = 20,

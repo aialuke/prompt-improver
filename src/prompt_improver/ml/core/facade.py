@@ -17,10 +17,10 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.database.services.cache.cache_manager import (
-    CacheManager,
-    CacheManagerConfig,
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as CacheManager,
 )
+# CacheManagerConfig removed - use CacheFacade constructor parameters instead
 from .protocols import MLServiceProtocol
 from .registry import MLModelRegistry
 from .training_service import MLTrainingService

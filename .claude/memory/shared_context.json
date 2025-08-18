@@ -1,0 +1,2765 @@
+{
+  "architectural_decisions": [
+    {
+      "alternatives_considered": [
+        "JSONB database integration",
+        "Redis-based memory",
+        "SQLite local storage"
+      ],
+      "decided_by": [
+        "user",
+        "claude"
+      ],
+      "decision": "Use JSON files for local agent memory storage instead of database integration",
+      "decision_date": "2025-01-15T00:00:00Z",
+      "decision_id": "json_memory_system",
+      "impact_areas": [
+        "agent_performance",
+        "system_complexity",
+        "maintenance"
+      ],
+      "rationale": "Simplified implementation, reduced complexity, easier maintenance while maintaining effectiveness",
+      "review_date": "2025-03-15T00:00:00Z",
+      "title": "JSON File-Based Agent Memory System"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T14:27:10.169234Z",
+      "decision_id": "3760eaff-f076-4eff-8073-8456ea058f26",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T14:27:10.169239Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:07:00.513748Z",
+      "decision_id": "0d3abc50-ecb5-43c3-b36d-bbcab14f6fe9",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:07:00.513753Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:08:53.615752Z",
+      "decision_id": "bcf04880-0af3-4eed-9d7e-938fca54a7cf",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:08:53.615756Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:11:10.015476Z",
+      "decision_id": "8bd6e403-7e60-4eee-ade1-70364d50331a",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:11:10.015478Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:17:39.505574+00:00Z",
+      "decision_id": "548b9734-e375-4f08-bcc9-027396c38835",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:17:39.505576+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:18:25.875259+00:00Z",
+      "decision_id": "2c4f5a6f-042e-484a-9f58-0b19caacdc6f",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:18:25.875262+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:18:48.376801+00:00Z",
+      "decision_id": "9e6147ce-b2b6-4680-8141-bd42638f12e5",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:18:48.376803+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T15:20:16.900042+00:00Z",
+      "decision_id": "e97986fd-40f4-4f2d-a8cc-2cfde91435bf",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T15:20:16.900049+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T17:09:29.776183+00:00Z",
+      "decision_id": "1a3d2d39-697f-4a34-8649-0f1944c2d700",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T17:09:29.776185+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Database storage",
+        "Redis storage"
+      ],
+      "decided_by": [
+        "test-suite"
+      ],
+      "decision": "Use JSON for agent memory storage",
+      "decision_date": "2025-08-15T17:11:03.673371+00:00Z",
+      "decision_id": "cbe59bf5-159f-4608-ac21-d46f1048a741",
+      "impact_areas": [
+        "performance",
+        "maintenance"
+      ],
+      "implementation_progress": {},
+      "lessons_learned": [],
+      "rationale": "Simplicity and maintainability",
+      "review_date": "2025-11-13T17:11:03.673375+00:00Z",
+      "status": "active",
+      "title": "Test Decision"
+    }
+  ],
+  "context_evolution": {
+    "evolution_results": {
+      "collaboration_improvements": [],
+      "knowledge_synthesis": [],
+      "optimization_opportunities": [],
+      "pattern_discoveries": [],
+      "risk_assessments": []
+    },
+    "last_evolution": "2025-08-15T17:11:03.724465+00:00Z"
+  },
+  "global_insights": [
+    {
+      "category": "performance",
+      "confidence": 0.95,
+      "contributing_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "created_at": "2025-01-15T00:00:00Z",
+      "impact_assessment": "high",
+      "insight": "Multi-level caching architecture (L1/L2/L3) achieved 96.67% hit rates with <2ms critical path response times",
+      "insight_id": "performance_optimization_2025",
+      "last_validated": "2025-01-15T00:00:00Z"
+    },
+    {
+      "category": "architecture",
+      "confidence": 0.98,
+      "contributing_agents": [
+        "ml-orchestrator",
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-01-15T00:00:00Z",
+      "impact_assessment": "high",
+      "insight": "God object decomposition strategy successfully reduced complexity: 1,043-line MLPipelineOrchestrator \u2192 5 focused services <400 lines each",
+      "insight_id": "architecture_modernization_2025",
+      "last_validated": "2025-01-15T00:00:00Z"
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.95,
+      "contributing_agents": [
+        "database-specialist",
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T14:19:01.189280Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Agent memory system achieving 100% workflow success with 4.0 insights per workflow",
+      "insight_id": "e28351b6-1429-4416-8af1-8510095da38e",
+      "last_validated": "2025-08-15T14:19:01.189288Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T14:27:10.154010Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "ba34b0b5-3f8a-467b-a00a-ae1c3b2aff0e",
+      "last_validated": "2025-08-15T14:27:10.154015Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:07:00.493880Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "04320468-ca18-4452-a387-b9499f858aa4",
+      "last_validated": "2025-08-15T15:07:00.493885Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:08:53.596781Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "dc1e27ac-456c-46a0-9f11-a393b66a9fa6",
+      "last_validated": "2025-08-15T15:08:53.596783Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:11:09.994991Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "8f6c4a8d-1afd-4590-9528-4384f089f5f8",
+      "last_validated": "2025-08-15T15:11:09.994993Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:17:39.483774+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "35d18f98-eab1-4694-85fa-1b1c6dbc0d03",
+      "last_validated": "2025-08-15T15:17:39.483776+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:18:25.850980+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "6d5a457d-22a5-4fbe-9ab9-6df5066476c6",
+      "last_validated": "2025-08-15T15:18:25.850982+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:18:48.351836+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "15c80749-1348-4f61-bf69-2048c795d896",
+      "last_validated": "2025-08-15T15:18:48.351838+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:20:16.870849+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "d34cfb78-bae8-4294-a737-dd50011db823",
+      "last_validated": "2025-08-15T15:20:16.870852+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.95,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T15:21:37.208299+00:00Z",
+      "evidence": [
+        "5.2s \u2192 0.3s query time",
+        "96.7% cache hit rate",
+        "Production validated"
+      ],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Database composite indexing strategy achieving 90%+ query performance improvements",
+      "insight_id": "cfc2d8c4-7ddf-4542-9225-e8ad96f8bda2",
+      "last_validated": "2025-08-15T15:21:37.208304+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.95,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T17:03:54.945238+00:00Z",
+      "evidence": [
+        "5.2s \u2192 0.3s query time",
+        "96.7% cache hit rate"
+      ],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Database composite indexing achieving 90%+ improvements",
+      "insight_id": "ecf949c5-676a-4ed1-a82a-6e1f453d4455",
+      "last_validated": "2025-08-15T17:03:54.945241+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T17:09:29.741848+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "561ba890-c81b-46f1-bf60-291ca71cb0ee",
+      "last_validated": "2025-08-15T17:09:29.741850+00:00Z",
+      "validation_count": 0
+    },
+    {
+      "category": "performance",
+      "challenges": [],
+      "confidence": 0.9,
+      "contributing_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "created_at": "2025-08-15T17:11:03.637664+00:00Z",
+      "evidence": [],
+      "evolution_history": [],
+      "impact_assessment": "high",
+      "insight": "Test global insight",
+      "insight_id": "b511bb86-14dd-4933-8e16-093c5a733649",
+      "last_validated": "2025-08-15T17:11:03.637666+00:00Z",
+      "validation_count": 0
+    }
+  ],
+  "inter_agent_messages": [
+    {
+      "acknowledged_by": [],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "4ed6f696-2c1b-43f9-bf9c-780777b9c5d6",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T17:11:05.344667+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T17:11:04.351429+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "371d02d4-b306-494b-86ac-97b213af14db",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "c0911423-63ee-40e5-aa74-50a6dc349aef",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:11:03.928408+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:11:03.906653+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "bf0ce5a1-8b8a-40a7-8f01-430290aecdfe",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:11:03.891795+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:11:04.324679+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "b445f266-7818-45b6-b14b-d816f38a47b6",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T17:11:03.857229+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:11:03.761230+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "1fade608-75aa-42e5-8c63-b63961201ead",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "cbe59bf5-159f-4608-ac21-d46f1048a741",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:11:03.687469+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:11:03.776226+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:11:03.805434+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "cf51e3b9-924d-458c-8ccf-d68d9287f144",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "b511bb86-14dd-4933-8e16-093c5a733649",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T17:11:03.652155+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:11:03.563343+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "e882f96b-5515-42da-b700-8901d264de8d",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T17:11:03.541977+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:11:03.615328+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "84d779bc-05cb-4636-8736-de89492f1d68",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T17:09:31.467060+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T17:09:30.474078+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "797f73aa-ac4d-461d-ac5c-f447fa54ec95",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "bddf1919-e64f-4751-a3e7-6d46a2e13be7",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:09:30.073924+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:30.052847+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "9b822e86-625e-4222-8764-41bb02a8b8ae",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:09:30.038619+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:09:30.446497+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:11:03.819937+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "43e27224-8732-4572-ad18-66227df2e668",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T17:09:30.003305+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:09:29.864417+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "f6f03308-d4f6-4dd6-899e-82d0bab74c35",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "1a3d2d39-697f-4a34-8649-0f1944c2d700",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T17:09:29.790130+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:09:29.878637+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.907453+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "0b054c8b-43d3-40f2-846f-00b8f365c4a0",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "561ba890-c81b-46f1-bf60-291ca71cb0ee",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T17:09:29.755377+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.668192+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "72af677d-fc71-4334-a4c6-c8cd6feab5b3",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T17:09:29.647785+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.921721+00:00Z"
+        }
+      ],
+      "content": "Test message for validation",
+      "from_agent": "database-specialist",
+      "message_id": "77f0a6ff-01c7-4585-a6bb-f3bf572470a5",
+      "message_type": "test_validation",
+      "metadata": {
+        "priority": "medium"
+      },
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T17:09:29.596657+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T17:09:29.720050+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.936511+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Database composite indexing achieving 90%+ improvements",
+      "from_agent": "shared-context-system",
+      "message_id": "137f08e0-cdde-4149-b226-96e7668bf041",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.95,
+        "impact_level": "high",
+        "insight_id": "ecf949c5-676a-4ed1-a82a-6e1f453d4455",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T17:03:54.958212+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.951408+00:00Z"
+        }
+      ],
+      "content": "Database optimization complete: 94% query performance improvement",
+      "from_agent": "database-specialist",
+      "message_id": "ba8a3f26-b8db-404a-9092-b0ddc12f71b6",
+      "message_type": "optimization",
+      "metadata": {
+        "improvement_percent": 94,
+        "method": "composite_indexing",
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T17:03:54.932231+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "Need performance validation for database optimization",
+      "from_agent": "database-specialist",
+      "message_id": "58e55ece-f492-4d6b-af2f-98d0bf180ef4",
+      "message_type": "collaboration_request",
+      "metadata": {
+        "priority": "high",
+        "task_id": "caf3972b-d6b4-4b7b-aa2a-871dca4ded3b"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:03:54.909612+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "Query optimization patterns documented",
+      "from_agent": "database-specialist",
+      "message_id": "d775f6cb-0693-4600-9b4f-aa88f38f98fb",
+      "message_type": "insight_sharing",
+      "metadata": {
+        "priority": "medium"
+      },
+      "target_agents": [
+        "documentation-specialist"
+      ],
+      "timestamp": "2025-08-15T17:03:14.786663+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "Need performance validation for query optimizations",
+      "from_agent": "monitoring-observability-specialist",
+      "message_id": "a42ce5a9-dd2e-4d8b-a207-ba816d3fe45c",
+      "message_type": "collaboration_request",
+      "metadata": {
+        "priority": "medium",
+        "task_id": "3b12253d-8599-468a-ba13-3bfffea87be1"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T17:03:14.770873+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T17:09:29.965524+00:00Z"
+        }
+      ],
+      "content": "Database query optimization achieved 94% improvement",
+      "from_agent": "database-specialist",
+      "message_id": "279d00e9-5b28-4ad5-9be6-755254323a0a",
+      "message_type": "optimization",
+      "metadata": {
+        "improvement_percent": 94,
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T17:03:14.343331+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:53.998965+00:00Z"
+        },
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:21:54.373910+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.399313+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:21:54.868217+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.369795+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Database composite indexing strategy achieving 90%+ query performance improvements",
+      "from_agent": "shared-context-system",
+      "message_id": "3006d5a1-4540-487f-b096-e022a0a56b5e",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.95,
+        "impact_level": "high",
+        "insight_id": "cfc2d8c4-7ddf-4542-9225-e8ad96f8bda2",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:21:37.219798+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:21:22.474230+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "cb795721-a6f0-4100-88b7-da191c844bd3",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:20:18.534229+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:20:17.539741+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "27956b32-ee8d-42fe-b2a0-a04eb7ec3c85",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "09956fab-0854-454c-9f48-aac6bbc90151",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:20:17.109414+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:20:17.092888+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "bde9b969-1d38-4cff-9066-47c42d4c387a",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:20:17.081807+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:20:17.514804+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.010496+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.411675+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:21:54.880948+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.382310+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "195d4a67-6b03-4057-97f4-a82716d3fd1b",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:20:17.054137+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:20:16.973688+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "e14f9106-6b11-4ca3-89e3-1152423b7bf1",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "e97986fd-40f4-4f2d-a8cc-2cfde91435bf",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:20:16.910820+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:20:16.984714+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:20:17.008722+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.021687+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.424076+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.395493+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "758acae8-b6ee-41c5-8e7b-b9db625a872e",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "d34cfb78-bae8-4294-a737-dd50011db823",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:20:16.881863+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:20:16.810315+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "5f472411-f1aa-4fe4-9388-96e76cc49904",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:20:16.794424+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:20:16.850841+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "255ca1bd-a0f0-44ad-bcfc-075f1317d923",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:18:49.962889+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:18:48.968140+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "7b06b8e5-acae-498d-9511-b1b8e8b2a5bd",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "2cfa3dca-d639-4dd9-92c4-e0329462945e",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:18:48.572350+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:48.556523+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "b352e05f-0ad7-4e9f-b0b3-95cb9703b07c",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:18:48.546036+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:48.943088+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:20:17.020259+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.033129+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.435763+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.408424+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "35604ece-2301-4111-9638-a94b25114918",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:18:48.520500+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:48.446098+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "eebf2e9d-6114-49bd-83ec-089f4e8f0bca",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "9e6147ce-b2b6-4680-8141-bd42638f12e5",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:18:48.387144+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:48.456488+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:48.478705+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.044817+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.448137+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.420696+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "40641c2e-9407-42a2-8ef9-4a5fcaef3c33",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "15c80749-1348-4f61-bf69-2048c795d896",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:18:48.361866+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:48.295216+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "f382dea3-dbe6-4352-844e-315c4cabd49e",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:18:48.280501+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:48.332966+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "41d79258-a180-40a7-bf21-9584fc0a3832",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:18:27.468327+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:18:26.472826+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "f9942d91-e580-4846-acda-3bac5ee631e3",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "3bbbd66c-8ade-4be1-99be-2fd06024b266",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:18:26.060488+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:26.046112+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "4350a663-6f7f-44e8-8c98-3e1191a35bcc",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:18:26.036584+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:26.449000+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:48.489207+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.056510+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.460421+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.433306+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "c7c50775-05c3-4c1c-bb33-edcf32e3b70f",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:18:26.012542+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:25.942146+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "61ad0dcd-aa7d-4073-9bf4-e7d7d05b27d7",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "2c4f5a6f-042e-484a-9f58-0b19caacdc6f",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:18:25.885166+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:25.951565+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:25.972859+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.067714+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.472575+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.446541+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "3733cd7b-ebfc-45ca-8b99-6729fd83776f",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "6d5a457d-22a5-4fbe-9ab9-6df5066476c6",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:18:25.860732+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:25.796520+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "e05fb9b5-73c7-40ea-a9ea-ee861ebc187d",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:18:25.783127+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:18:25.832417+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "bcc9b1e6-fb17-4a99-a427-fb943cecbb7b",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:17:41.060227+00:00Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:17:40.064791+00:00Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "5f6c46ad-1fde-461c-8908-8319bbb05880",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "bc6e01ff-360b-470c-a44a-265122922cbe",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:17:39.683434+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:17:39.670159+00:00Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "b2d00bce-ec1a-4ec6-b4b3-09ed5750aecb",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:17:39.660519+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:17:40.042214+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:18:25.982391+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.079058+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.485666+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.459626+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "dcaaba6c-88bf-4c9d-9f75-4547f61bb0f6",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:17:39.637917+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:17:39.570640+00:00Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "9de1445f-0101-4ddd-8d72-428745a51d18",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "548b9734-e375-4f08-bcc9-027396c38835",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:17:39.514474+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:17:39.579380+00:00Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:17:39.600464+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.090581+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.504325+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.474865+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "20d66286-70ab-41a3-a6ca-6bd39078b49b",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "35d18f98-eab1-4694-85fa-1b1c6dbc0d03",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:17:39.492594+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:17:39.431423+00:00Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "678f1036-c967-4dec-9ce0-102e61c4e6bb",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:17:39.418518+00:00Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:17:39.464994+00:00Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "321189d9-444e-4adc-aa00-6407d9aa983c",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:11:12.625913Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:11:11.630029Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "88995893-b93a-4788-88ba-e47970f1e63d",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "b3ce0426-11f3-4e89-b9ed-dc5ecde8979c",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:11:10.245633Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:11:10.233297Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "202b5875-cfd4-410a-a20a-c0c24b866171",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:11:10.224633Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:11:11.521354Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:17:39.609430+00:00Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.102307+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.533092+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.487554+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "1ef506ae-c4cf-4c01-a715-d44cded2bdff",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:11:10.204013Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:11:10.092176Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "25faa7c0-c54f-4d1e-884b-e16c9489df10",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "8bd6e403-7e60-4eee-ade1-70364d50331a",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:11:10.023901Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:11:10.100661Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:11:10.120150Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.114114+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.548811+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.500369+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "266dd07e-296e-4b19-960c-d8bad1167f4c",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "8f6c4a8d-1afd-4590-9528-4384f089f5f8",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:11:10.003300Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:11:09.921633Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "3f4c4430-d326-43b8-87df-4f3d645a2390",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:11:09.908986Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:11:09.954313Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "33f372ad-756b-48af-a702-19f53e644e28",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:08:55.153665Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:08:54.157370Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "cf0ad0e8-0b03-43d4-8a04-dcdb8fc995fc",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "cba20980-a39e-4b69-bd59-d20b44519e07",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:08:53.763186Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:08:53.751736Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "7bca4bfa-17b8-4192-b545-1027ae4cd4fb",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:08:53.743927Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:11:09.962131Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:11:10.128786Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.125543+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.567127+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.513029+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "561f00e1-d14b-4ca9-98d5-d96ada805061",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:08:53.724754Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:08:53.670686Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "469c08de-7903-48a2-92c2-a57016bb5785",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "bcf04880-0af3-4eed-9d7e-938fca54a7cf",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:08:53.623426Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:08:53.678086Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:08:53.694408Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.137162+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.582804+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.526474+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "1ceff052-577a-4c93-a3e5-a3768bf5156f",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "dc1e27ac-456c-46a0-9f11-a393b66a9fa6",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:08:53.604562Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:08:53.542557Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "b08e5590-1e63-49c5-bed6-653913276d67",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:08:53.531748Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:08:53.574011Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "e1ecd1ca-6294-46ea-9a56-ff65cc29844c",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T15:07:02.015121Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T15:07:01.018838Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** performance optimization\n**Expected Outcome:** Improved query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "bc8471d1-c35f-4f56-9e63-e9445a7735dc",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "df51f444-cc3c-43b5-b58d-7cd877e31795",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "performance optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:07:00.743486Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.731996Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "19ff7c32-aa5c-4e4a-ae9d-1f4d21918591",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:07:00.724173Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:08:53.581231Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:08:53.702742Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.148589+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.602802+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.539070+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "e37ae8b6-6101-4734-9bf0-160c8951e9c8",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:07:00.705381Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.570064Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "3f06d16e-349b-4565-b6f3-dd1ef0bfac65",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "0d3abc50-ecb5-43c3-b36d-bbcab14f6fe9",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "database-specialist",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:07:00.522453Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.577318Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.593226Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.159964+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.616673+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.551504+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "0233a30d-1186-4d92-9293-c808ad929303",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "04320468-ca18-4452-a387-b9499f858aa4",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:07:00.501366Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.370437Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "959bace9-715e-429f-beb9-a25db4adce35",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T15:07:00.360554Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.398120Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.600778Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.171539+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.631076+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.564051+00:00Z"
+        }
+      ],
+      "content": "Final test custom_workflow",
+      "from_agent": "database-specialist",
+      "message_id": "235c1492-2bbe-4970-8b46-51eca0d5b1e9",
+      "message_type": "custom_workflow",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:05:06.112099Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.404673Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.608287Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.182835+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.664972+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.576687+00:00Z"
+        }
+      ],
+      "content": "Final test collaboration",
+      "from_agent": "database-specialist",
+      "message_id": "9054b600-6230-4a99-bea0-b59d84b6de8a",
+      "message_type": "collaboration",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:05:06.105927Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.411087Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.615746Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.194591+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.677693+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.589063+00:00Z"
+        }
+      ],
+      "content": "Final test insight",
+      "from_agent": "database-specialist",
+      "message_id": "a1536b1f-21d2-4aa5-a8c7-7ce8adb1e904",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:05:06.099600Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** query_optimization\n**Expected Outcome:** Improve query performance\n**Priority:** HIGH\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "7da163c4-550b-4600-a90d-b54aac0d2449",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "73fbfcf2-8fbc-47cd-9997-db1d90b36291",
+        "primary_agent": "database-specialist",
+        "priority": "high",
+        "task_type": "query_optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T15:04:46.209943Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.417668Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.623250Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.206615+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.690258+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.601942+00:00Z"
+        }
+      ],
+      "content": "Test task_status message",
+      "from_agent": "database-specialist",
+      "message_id": "e87fe94c-69d4-429b-88ea-01dd060f2ed7",
+      "message_type": "task_status",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:04:33.847274Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.424081Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.630794Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.218175+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.703407+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.614786+00:00Z"
+        }
+      ],
+      "content": "Test custom_workflow message",
+      "from_agent": "database-specialist",
+      "message_id": "9d2ee282-56c0-48cc-97ac-2d9426903eb2",
+      "message_type": "custom_workflow",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:04:33.841302Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.430496Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.638689Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.229843+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.715970+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.627781+00:00Z"
+        }
+      ],
+      "content": "Test collaboration message",
+      "from_agent": "database-specialist",
+      "message_id": "01085526-e363-4d68-8eaf-21a47f36b4ab",
+      "message_type": "collaboration",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:04:33.835074Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.437124Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.645927Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.241518+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.728684+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.640731+00:00Z"
+        }
+      ],
+      "content": "Test warning message",
+      "from_agent": "database-specialist",
+      "message_id": "295ad425-1b11-49de-a5e7-e8ec3684a5e8",
+      "message_type": "warning",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:04:33.828341Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.443867Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.653301Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.253427+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.741484+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.653590+00:00Z"
+        }
+      ],
+      "content": "Test insight message",
+      "from_agent": "database-specialist",
+      "message_id": "5513bbe7-ef15-4f79-b7f8-80f11664f0f3",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T15:04:33.821519Z"
+    },
+    {
+      "acknowledged_by": [],
+      "content": "\ud83e\udd1d **COLLABORATION OPPORTUNITY**\n\n**Primary Agent:** database-specialist\n**Target Agents:** performance-engineer\n**Task Type:** query_optimization\n**Expected Outcome:** Improve query performance to < 100ms\n**Priority:** MEDIUM\n\n**Recommended Approach:**\nBased on historical collaboration patterns, this task would benefit from coordinated effort.\nConsider establishing a collaboration workflow with clear responsibilities and success metrics.",
+      "from_agent": "shared-context-system",
+      "message_id": "5194ae7f-c4b9-41b6-884d-038d00c3cceb",
+      "message_type": "collaboration",
+      "metadata": {
+        "collaboration_id": "f7bf97f2-7be3-444a-9882-dcb8e0a1984a",
+        "primary_agent": "database-specialist",
+        "priority": "medium",
+        "task_type": "query_optimization"
+      },
+      "target_agents": [
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T14:50:42.485920Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.450929Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.660724Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.265192+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.754166+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.666610+00:00Z"
+        }
+      ],
+      "content": "Test custom workflow message",
+      "from_agent": "test-agent",
+      "message_id": "9e07c665-e668-482d-9220-8d3f6165a938",
+      "message_type": "custom_workflow",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:50:15.593495Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.457697Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.668216Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.276912+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.766620+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.679275+00:00Z"
+        }
+      ],
+      "content": "Test collaboration message",
+      "from_agent": "test-agent",
+      "message_id": "ca30f449-1e85-4fd8-8296-f6a6ed5c132d",
+      "message_type": "collaboration",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:50:15.587443Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.464407Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.675748Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.289061+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.779242+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.692279+00:00Z"
+        }
+      ],
+      "content": "Test insight message",
+      "from_agent": "test-agent",
+      "message_id": "fd00c483-06f5-42dd-821a-4a4d90f59fa2",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:50:15.580666Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.471199Z"
+        }
+      ],
+      "content": "Expiring message",
+      "from_agent": "test-agent",
+      "message_id": "9cf87dc7-b665-4acc-b685-54b4cf0bb7b2",
+      "message_type": "warning",
+      "metadata": {
+        "expiry": "2025-08-15T14:27:11.755505Z"
+      },
+      "target_agents": [
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T14:27:10.758321Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:27:10.331728Z"
+        }
+      ],
+      "content": "Acknowledgment test",
+      "from_agent": "database-specialist",
+      "message_id": "c272d94a-4d47-4df8-b90d-9a7d864e42f6",
+      "message_type": "recommendation",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator",
+        "performance-engineer"
+      ],
+      "timestamp": "2025-08-15T14:27:10.314785Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T15:07:00.477661Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T15:07:00.683276Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.300797+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.791762+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.705193+00:00Z"
+        }
+      ],
+      "content": "Broadcast test message",
+      "from_agent": "shared-context-system",
+      "message_id": "bd47070e-ca9b-43ca-954d-dcdf37fc60d1",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:27:10.296849Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T14:27:10.220263Z"
+        }
+      ],
+      "content": "Architectural Decision: Test Decision - Use JSON for agent memory storage...",
+      "from_agent": "shared-context-system",
+      "message_id": "71cb9653-b7d1-4b64-a63a-50378fdb345a",
+      "message_type": "context",
+      "metadata": {
+        "decision_id": "3760eaff-f076-4eff-8073-8456ea058f26",
+        "impact_areas": [
+          "performance",
+          "maintenance"
+        ],
+        "priority": "high"
+      },
+      "target_agents": [
+        "performance-engineer",
+        "database-specialist"
+      ],
+      "timestamp": "2025-08-15T14:27:10.175029Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T14:27:10.226475Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:27:10.239640Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.312398+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.804048+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.718308+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Test global insight",
+      "from_agent": "shared-context-system",
+      "message_id": "b1e51669-636e-4902-9da3-caf16cc5adcf",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.9,
+        "impact_level": "high",
+        "insight_id": "ba34b0b5-3f8a-467b-a00a-ae1c3b2aff0e",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:27:10.159964Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:27:10.116735Z"
+        }
+      ],
+      "content": "Test message",
+      "from_agent": "database-specialist",
+      "message_id": "9a28b31f-1d76-4a8b-acc4-166dfcef1b7a",
+      "message_type": "insight",
+      "metadata": {},
+      "target_agents": [
+        "ml-orchestrator"
+      ],
+      "timestamp": "2025-08-15T14:27:10.107803Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T14:23:56.587797Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:27:10.245483Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.324426+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.816898+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.731568+00:00Z"
+        }
+      ],
+      "content": "Global Insight (performance): Agent memory system achieving 100% workflow success with 4.0 insights per workflow",
+      "from_agent": "shared-context-system",
+      "message_id": "c539e9ea-3c3e-4674-ba71-dc5372778b92",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.95,
+        "impact_level": "high",
+        "insight_id": "e28351b6-1429-4416-8af1-8510095da38e",
+        "priority": "high"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:19:01.194842Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:14:11.986090Z"
+        },
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T14:23:56.593969Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.336472+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.829424+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.744733+00:00Z"
+        }
+      ],
+      "content": "High-impact optimization: Applied query optimization techniques with connection pool",
+      "from_agent": "database-specialist",
+      "message_id": "d4e50ff8-679f-4978-9821-6b17813e3568",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.85,
+        "impact_level": "high",
+        "priority": "high",
+        "task_id": "3489da7b-08ac-49ad-be3e-cc9d78687c71"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:14:11.971135Z"
+    },
+    {
+      "acknowledged_by": [
+        {
+          "agent": "database-specialist",
+          "timestamp": "2025-08-15T14:14:10.940347Z"
+        },
+        {
+          "agent": "ml-orchestrator",
+          "timestamp": "2025-08-15T14:14:11.991463Z"
+        },
+        {
+          "agent": "security-architect",
+          "timestamp": "2025-08-15T15:21:54.348797+00:00Z"
+        },
+        {
+          "agent": "infrastructure-specialist",
+          "timestamp": "2025-08-15T15:21:54.841992+00:00Z"
+        },
+        {
+          "agent": "monitoring-observability-specialist",
+          "timestamp": "2025-08-15T17:03:14.757669+00:00Z"
+        }
+      ],
+      "content": "High-impact optimization: Applied query optimization techniques with response time, cache hit",
+      "from_agent": "database-specialist",
+      "message_id": "0eb14b35-80fd-4a0c-8d32-b27b944d7201",
+      "message_type": "insight",
+      "metadata": {
+        "confidence": 0.95,
+        "impact_level": "high",
+        "priority": "high",
+        "task_id": "dd90eea3-4732-42ca-8453-acbd6c882c32"
+      },
+      "target_agents": [],
+      "timestamp": "2025-08-15T14:12:49.006291Z"
+    }
+  ],
+  "last_updated": "2025-08-15T17:11:04.351433+00:00Z",
+  "performance_baselines": {
+    "api_performance": {
+      "endpoint_response_time_p95": 100,
+      "error_rate": 0.02,
+      "throughput_rps": 500
+    },
+    "database_performance": {
+      "cache_hit_rate": 0.9667,
+      "connection_pool_utilization": 0.75,
+      "query_response_time_p95": 100
+    },
+    "last_baseline_update": "2025-01-15T00:00:00Z",
+    "ml_performance": {
+      "inference_latency": 50,
+      "model_accuracy": 0.85,
+      "training_time": 300
+    }
+  },
+  "project_context": {
+    "active_objectives": [
+      {
+        "assigned_agents": [
+          "all"
+        ],
+        "created_at": "2025-01-15T00:00:00Z",
+        "objective": "Implement JSON file-based agent memory system",
+        "priority": "high",
+        "status": "in_progress"
+      }
+    ],
+    "current_phase": "agent_memory_system_implementation",
+    "project_name": "prompt-improver (APES - Adaptive Prompt Enhancement System)",
+    "system_health": {
+      "last_health_check": "2025-01-15T00:00:00Z",
+      "overall_status": "healthy",
+      "performance_metrics": {
+        "cache_hit_rate": 0.9667,
+        "error_rate": 0.02,
+        "response_time_p95": 100,
+        "throughput": 500
+      }
+    }
+  }
+}

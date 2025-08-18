@@ -38,7 +38,7 @@ except ImportError:
     orchestration_duration = None
 
 from .alerting_service import AlertingService
-from .cache_monitoring_service import CacheMonitoringService  
+from .cache_performance_calculator import CachePerformanceCalculator  
 from .health_reporter_service import HealthReporterService
 from .metrics_collector_service import MetricsCollectorService
 from .protocols import MonitoringOrchestratorProtocol, MonitoringRepositoryProtocol
@@ -72,7 +72,7 @@ class MonitoringOrchestratorService:
         self.metrics_collector = MetricsCollectorService(config, repository)
         self.alerting_service = AlertingService(config, repository)
         self.health_reporter = HealthReporterService(config, repository)
-        self.cache_monitor = CacheMonitoringService(config, repository)
+        self.cache_monitor = CachePerformanceCalculator(config, repository)
         
         # Orchestration state
         self.is_running = False
@@ -513,6 +513,6 @@ class MonitoringOrchestratorService:
         """Get health reporter service."""
         return self.health_reporter
     
-    def get_cache_monitor(self) -> CacheMonitoringService:
+    def get_cache_monitor(self) -> CachePerformanceCalculator:
         """Get cache monitoring service."""
         return self.cache_monitor

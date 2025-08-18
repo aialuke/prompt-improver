@@ -26,11 +26,13 @@ class DatabaseHealthChecker:
         start_time = time.time()
         
         try:
-            # Import here to avoid circular dependencies
-            from prompt_improver.database import get_session
+            # Use repository pattern instead of direct database access
+            from prompt_improver.core.di.container_orchestrator import get_container
+            container = await get_container()
+            session_manager = container.get_session_manager()
             
             async with asyncio.timeout(self.timeout_seconds):
-                async with get_session() as session:
+                async with session_manager.get_session() as session:
                     # Simple connectivity test
                     result = await session.execute("SELECT 1")
                     await result.fetchone()

@@ -16,8 +16,8 @@ from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
 from prompt_improver.monitoring.unified.services import HealthCheckService
-from prompt_improver.performance.monitoring.performance_benchmark import (
-    MCPPerformanceBenchmark,
+from prompt_improver.performance.monitoring.performance_benchmark_factory import (
+    create_performance_benchmark,
 )
 from prompt_improver.repositories.protocols.health_repository_protocol import (
     HealthRepositoryProtocol,
@@ -44,7 +44,7 @@ class HealthApplicationService:
         session_manager: SessionManagerProtocol,
         health_repository: HealthRepositoryProtocol,
         health_check_service: HealthCheckService,
-        performance_benchmark_service: MCPPerformanceBenchmark,
+        performance_benchmark_service: Any,  # Use Any for now to avoid circular imports
     ):
         self.session_manager = session_manager
         self.health_repository = health_repository

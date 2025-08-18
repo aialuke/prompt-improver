@@ -1,0 +1,105 @@
+{
+  "agent_name": "database-specialist",
+  "collaboration_patterns": {
+    "delegation_effectiveness": {},
+    "frequent_collaborators": []
+  },
+  "domain_knowledge": {
+    "common_patterns": [],
+    "project_specific_context": {
+      "architecture_patterns": [],
+      "configuration_insights": [],
+      "performance_baselines": {}
+    }
+  },
+  "last_updated": "2025-08-15T17:11:04.296867+00:00Z",
+  "optimization_insights": [
+    {
+      "area": "test_persistence",
+      "confidence": 0.9,
+      "discovered_at": "2025-08-15T17:11:03.627592+00:00Z",
+      "impact": "high",
+      "insight": "Test persistence insight"
+    },
+    {
+      "area": "race_test_0",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.274308+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 0"
+    },
+    {
+      "area": "race_test_1",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.276667+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 1"
+    },
+    {
+      "area": "race_test_2",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.279017+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 2"
+    },
+    {
+      "area": "race_test_3",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.281357+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 3"
+    },
+    {
+      "area": "race_test_4",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.283857+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 4"
+    },
+    {
+      "area": "race_test_5",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.286347+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 5"
+    },
+    {
+      "area": "race_test_6",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.288921+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 6"
+    },
+    {
+      "area": "race_test_7",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.291564+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 7"
+    },
+    {
+      "area": "race_test_8",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.294210+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 8"
+    },
+    {
+      "area": "race_test_9",
+      "confidence": 0.7,
+      "discovered_at": "2025-08-15T17:11:04.296866+00:00Z",
+      "impact": "low",
+      "insight": "Race condition test 9"
+    }
+  ],
+  "task_history": [
+    {
+      "delegations": [],
+      "key_insights": [],
+      "outcome": "success",
+      "task_description": "Concurrent test 0",
+      "task_id": "concurrent_test_0",
+      "timestamp": "2025-08-15T17:11:04.261554+00:00Z"
+    }
+  ]
+}

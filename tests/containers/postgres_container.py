@@ -68,7 +68,7 @@ class PostgreSQLTestContainer:
         self.password = password
         self.port = port
         
-        self._container: Optional[PostgreSqlContainer] = None
+        self._container: Optional[PostgresContainer] = None
         self._engine: Optional[AsyncEngine] = None
         self._connection_manager: Optional[DatabaseServices] = None
         self._connection_url: Optional[str] = None
@@ -114,11 +114,8 @@ class PostgreSQLTestContainer:
                 }
             )
             
-            # Initialize DatabaseServices for compatibility
-            self._connection_manager = DatabaseServices(
-                mode=ManagerMode.ASYNC_MODERN,
-                connection_url=self._connection_url
-            )
+            # Initialize DatabaseServices for compatibility (skip for now - not needed for L3 test)
+            self._connection_manager = None
             
             # Wait for container to be ready and create schema
             await self._wait_for_readiness()
@@ -144,7 +141,7 @@ class PostgreSQLTestContainer:
                 self._engine = None
                 
             if self._connection_manager:
-                await self._connection_manager.cleanup()
+                # DatabaseServices doesn't have cleanup method - just clear reference
                 self._connection_manager = None
                 
             if self._container:
@@ -158,9 +155,12 @@ class PostgreSQLTestContainer:
 
     async def _wait_for_readiness(self, max_retries: int = 30, retry_delay: float = 1.0):
         """Wait for PostgreSQL to be ready for connections."""
+        # Convert asyncpg URL to basic PostgreSQL URL for asyncpg
+        basic_url = self._connection_url.replace("postgresql+asyncpg://", "postgresql://")
+        
         for attempt in range(max_retries):
             try:
-                conn = await asyncpg.connect(self._connection_url)
+                conn = await asyncpg.connect(basic_url)
                 await conn.execute("SELECT 1")
                 await conn.close()
                 logger.debug(f"PostgreSQL ready after {attempt + 1} attempts")

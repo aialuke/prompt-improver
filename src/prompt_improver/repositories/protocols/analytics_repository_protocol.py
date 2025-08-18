@@ -14,11 +14,14 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-from prompt_improver.database.models import (
-    ImprovementSession,
-    PromptSession,
-    RuleEffectivenessStats,
-    UserSatisfactionStats,
+# CLEAN ARCHITECTURE 2025: Use domain DTOs instead of database models
+from prompt_improver.core.domain.types import (
+    ImprovementSessionData,
+    PromptSessionData,
+    RuleEffectivenessData,
+    UserSatisfactionData,
+    SessionId,
+    UserId,
 )
 
 
@@ -92,7 +95,7 @@ class AnalyticsRepositoryProtocol(Protocol):
         end_date: datetime | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[PromptSession]:
+    ) -> list[PromptSessionData]:
         """Retrieve prompt sessions with filters."""
         ...
 
@@ -103,7 +106,7 @@ class AnalyticsRepositoryProtocol(Protocol):
         min_improvement_score: float | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[ImprovementSession]:
+    ) -> list[ImprovementSessionData]:
         """Retrieve improvement sessions with filters."""
         ...
 
@@ -136,7 +139,7 @@ class AnalyticsRepositoryProtocol(Protocol):
         rule_ids: list[str] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-    ) -> list[RuleEffectivenessStats]:
+    ) -> list[RuleEffectivenessData]:
         """Get detailed rule effectiveness statistics."""
         ...
 
@@ -156,7 +159,7 @@ class AnalyticsRepositoryProtocol(Protocol):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         granularity: TimeGranularity = TimeGranularity.DAY,
-    ) -> list[UserSatisfactionStats]:
+    ) -> list[UserSatisfactionData]:
         """Get user satisfaction statistics over time."""
         ...
 

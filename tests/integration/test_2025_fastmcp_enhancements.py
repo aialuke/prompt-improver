@@ -27,7 +27,7 @@ from prompt_improver.mcp_server.middleware import (
     create_default_middleware_stack,
 )
 from prompt_improver.mcp_server.server import APESMCPServer
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 

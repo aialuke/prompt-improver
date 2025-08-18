@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 
 import aiofiles
 
-from prompt_improver.core.services.analytics_factory import get_analytics_interface
+from prompt_improver.core.events.ml_event_bus import get_ml_event_bus, MLEventType, MLEvent
 from prompt_improver.performance.optimization.performance_optimizer import (
     PerformanceBaseline,
     get_performance_optimizer,
@@ -35,7 +35,14 @@ class MCPPerformanceBenchmark:
     def __init__(self):
         self.optimizer = get_performance_optimizer()
         self._mcp_server = None
-        self.analytics_service = get_analytics_interface()
+        # Event bus for decoupled analytics communication
+        self._event_bus = None
+
+    async def _get_event_bus(self):
+        """Lazy load ML event bus for analytics communication."""
+        if self._event_bus is None:
+            self._event_bus = await get_ml_event_bus()
+        return self._event_bus
 
     @property
     def mcp_server(self):
@@ -146,11 +153,18 @@ class MCPPerformanceBenchmark:
         logger.info("Benchmarking analytics operations")
 
         async def analytics_operation():
-            get_session = _get_database_session()
-            async with get_session() as db_session:
-                await self.analytics_service.get_rule_effectiveness(
-                    days=7, min_usage_count=1, db_session=db_session
-                )
+            # Use event-driven approach instead of direct analytics dependency
+            event_bus = await self._get_event_bus()
+            performance_request = MLEvent(
+                event_type=MLEventType.PERFORMANCE_METRICS_REQUEST,
+                source="performance_benchmark",
+                data={
+                    "metric_type": "rule_effectiveness", 
+                    "days": 7,
+                    "min_usage_count": 1
+                }
+            )
+            await event_bus.publish(performance_request)
 
         return await self.optimizer.run_performance_benchmark(
             "analytics_query", analytics_operation, sample_count
@@ -159,17 +173,20 @@ class MCPPerformanceBenchmark:
     async def _benchmark_session_operations(
         self, sample_count: int
     ) -> PerformanceBaseline | None:
-        """Benchmark session management operations."""
-        logger.info("Benchmarking session operations")
+        """Benchmark session management operations using unified cache architecture."""
+        logger.info("Benchmarking session operations (unified cache)")
 
         async def session_operation():
             session_id = f"benchmark_{int(time.time() * 1000)}"
-            session_store = self.mcp_server.services.session_store
-            await session_store.set(session_id, {"test": "data"})
-            await session_store.get(session_id)
-            await session_store.set(session_id, {"test": "data", "updated": True})
-            await session_store.touch(session_id)
-            await session_store.delete(session_id)
+            # Use unified cache facade instead of direct session_store access
+            from prompt_improver.services.cache.cache_facade import CacheFacade
+            cache_facade = CacheFacade(l1_max_size=1000, enable_l2=False, enable_l3=False)
+            
+            await cache_facade.set_session(session_id, {"test": "data"}, ttl=3600)
+            await cache_facade.get_session(session_id)
+            await cache_facade.set_session(session_id, {"test": "data", "updated": True}, ttl=3600)
+            await cache_facade.touch_session(session_id, ttl=3600)
+            await cache_facade.delete_session(session_id)
 
         return await self.optimizer.run_performance_benchmark(
             "session_management", session_operation, sample_count

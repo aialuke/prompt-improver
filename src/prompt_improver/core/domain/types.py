@@ -149,6 +149,30 @@ class ModelMetricsData:
 
 
 @dataclass(frozen=True)
+class RuleEffectivenessData:
+    """Domain representation of rule effectiveness statistics."""
+    rule_id: RuleId
+    total_applications: int
+    success_rate: float
+    average_improvement: float
+    confidence_level: float
+    performance_metrics: Dict[str, float]
+    last_updated: datetime
+
+
+@dataclass(frozen=True)
+class UserSatisfactionData:
+    """Domain representation of user satisfaction statistics."""
+    metric_period: str
+    total_responses: int
+    average_rating: float
+    satisfaction_distribution: Dict[str, int]
+    improvement_feedback: Dict[str, Any]
+    trends: Dict[str, float]
+    calculated_at: datetime
+
+
+@dataclass(frozen=True)
 class TrainingResultData:
     """Domain representation of training results."""
     model_id: ModelId
@@ -319,3 +343,128 @@ class MLExperimentData:
     results: Dict[str, Any]
     status: str
     created_at: datetime
+
+
+# Apriori and Pattern Mining Domain Types
+@dataclass(frozen=True)
+class AprioriAssociationRuleData:
+    """Domain representation of Apriori association rule."""
+    id: int
+    discovery_run_id: str
+    antecedents: List[str]
+    consequents: List[str]
+    support: float
+    confidence: float
+    lift: float
+    conviction: Optional[float]
+    rule_metadata: Dict[str, Any]
+    business_relevance: Optional[str]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class FrequentItemsetData:
+    """Domain representation of frequent itemset."""
+    id: int
+    discovery_run_id: str
+    itemset: str
+    support: float
+    itemset_length: int
+    itemset_type: Optional[str]
+    business_relevance: Optional[str]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class AprioriPatternDiscoveryData:
+    """Domain representation of Apriori pattern discovery run."""
+    id: str
+    dataset_source: str
+    algorithm_config: Dict[str, Any]
+    execution_status: str
+    total_patterns_found: int
+    execution_time: float
+    quality_metrics: Dict[str, float]
+    created_at: datetime
+    completed_at: Optional[datetime]
+    error_message: Optional[str]
+
+
+@dataclass(frozen=True)
+class AdvancedPatternResultsData:
+    """Domain representation of advanced pattern results."""
+    id: int
+    discovery_run_id: str
+    analysis_type: str
+    results_summary: Dict[str, Any]
+    quality_score: float
+    algorithms_used: List[str]
+    performance_metrics: Dict[str, float]
+    recommendations: List[str]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class PatternEvaluationData:
+    """Domain representation of pattern evaluation."""
+    id: int
+    pattern_id: str
+    pattern_type: str
+    evaluation_criteria: Dict[str, Any]
+    validation_score: float
+    evaluation_status: str
+    business_impact_score: Optional[float]
+    recommendations: List[str]
+    evaluated_at: datetime
+
+
+# Additional domain types for prompt repository protocol
+@dataclass(frozen=True)
+class ABExperimentData:
+    """Domain representation of A/B experiment."""
+    id: str
+    name: str
+    description: str
+    hypothesis: str
+    target_metric: str
+    control_version: str
+    treatment_version: str
+    sample_size_target: int
+    current_sample_size: int
+    status: str  # 'draft', 'running', 'completed', 'stopped'
+    statistical_power: float
+    confidence_level: float
+    results_summary: Dict[str, Any]
+    metadata: Dict[str, Any]
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class DiscoveredPatternData:
+    """Domain representation of discovered pattern."""
+    id: str
+    pattern_type: str
+    pattern_description: str
+    pattern_config: Dict[str, Any]
+    avg_effectiveness: float
+    support_count: int
+    confidence_level: float
+    business_context: Optional[str]
+    discovery_run_id: str
+    validation_status: str
+    pattern_metadata: Dict[str, Any]
+    discovered_at: datetime
+    last_validated: Optional[datetime]
+
+
+@dataclass(frozen=True)
+class ImprovementSessionCreateData:
+    """Domain representation for creating improvement session."""
+    original_prompt: str
+    user_id: Optional[UserId]
+    context: Dict[str, Any]
+    expected_outcome: Optional[str]
+    priority: int
+    session_config: Dict[str, Any]

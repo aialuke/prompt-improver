@@ -1,0 +1,1 @@
+{"server_name": "mcpServers", "test_type": "connectivity", "success": false, "duration_seconds": 9.5367431640625e-07, "response_data": null, "error_message": "No command specified in server config", "timestamp": "2025-08-15T23:25:23.646565"}

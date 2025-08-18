@@ -18,10 +18,10 @@ from uuid import uuid4
 
 from tests.containers.postgres_container import PostgreSQLTestContainer
 from tests.containers.real_redis_container import RealRedisTestContainer
-from src.prompt_improver.utils.cache_service.l1_cache_service import L1CacheService
-from src.prompt_improver.utils.cache_service.l2_cache_service import L2CacheService
-# from src.prompt_improver.utils.cache_service.l3_cache_service import L3CacheService
-# from src.prompt_improver.utils.cache_service.cache_service_facade import CacheServiceFacade
+from prompt_improver.services.cache.l1_cache_service import L1CacheService
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
+from prompt_improver.services.cache.l3_database_service import L3DatabaseService
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 
 class TestL1CacheRealBehavior:
@@ -185,7 +185,7 @@ class TestL2CacheRealBehavior:
         os.environ["REDIS_HOST"] = redis_container.get_host()
         os.environ["REDIS_PORT"] = str(redis_container.get_port())
         
-        cache = L2CacheService()
+        cache = L2RedisService()
         yield cache
         await cache.close()
 
@@ -349,7 +349,7 @@ class TestCacheServiceFacadeRealBehavior:
         # For now, test individual services coordination
         
         l1_cache = L1CacheService(max_size=50)
-        l2_cache = L2CacheService()
+        l2_cache = L2RedisService()
         
         try:
             # Simulate cache miss scenario - data not in L1, check L2
@@ -382,7 +382,7 @@ class TestCacheServiceFacadeRealBehavior:
     async def test_cache_performance_end_to_end(self, test_infrastructure):
         """Test end-to-end cache performance across all levels."""
         l1_cache = L1CacheService(max_size=100)
-        l2_cache = L2CacheService()
+        l2_cache = L2RedisService()
         
         try:
             test_scenarios = [
@@ -448,7 +448,7 @@ class TestCacheSystemResilience:
         # This would require complex container manipulation
         # For now, test graceful degradation
         
-        l2_cache = L2CacheService()
+        l2_cache = L2RedisService()
         
         # Test with invalid Redis connection
         import os

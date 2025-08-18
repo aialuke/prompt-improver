@@ -20,7 +20,7 @@ from prompt_improver.security.unified.security_service_facade import (
 # Legacy imports removed - now using modern SecurityServiceFacade
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer, ServerServices
+    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer, ServerServicesProtocol as ServerServices
 
 logger = logging.getLogger(__name__)
 

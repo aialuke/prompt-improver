@@ -1,0 +1,100 @@
+{
+  "benchmark_suite": "Phase 3 Performance Optimizations",
+  "overall_success": false,
+  "total_duration_seconds": 1.78233,
+  "total_test_iterations": 60,
+  "targets_met": "4/6",
+  "avg_cache_hit_rate": 0.3,
+  "timestamp": "2025-08-18T23:41:04.764745",
+  "test_results": [
+    {
+      "test_name": "Prompt Improvement Workflow",
+      "target_met": false,
+      "target_response_time_ms": 20.0,
+      "actual_p95_response_time_ms": 57.03902244567871,
+      "avg_response_time_ms": 52.312660217285156,
+      "cache_hit_rate": 0.0,
+      "cache_enabled": true,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    },
+    {
+      "test_name": "Analytics Dashboard Queries",
+      "target_met": true,
+      "target_response_time_ms": 50.0,
+      "actual_p95_response_time_ms": 32.5009822845459,
+      "avg_response_time_ms": 31.80365562438965,
+      "cache_hit_rate": 0.0,
+      "cache_enabled": true,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    },
+    {
+      "test_name": "ML Inference Pipeline",
+      "target_met": false,
+      "target_response_time_ms": 10.0,
+      "actual_p95_response_time_ms": 10.766983032226562,
+      "avg_response_time_ms": 9.531021118164062,
+      "cache_hit_rate": 0.0,
+      "cache_enabled": true,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    },
+    {
+      "test_name": "Health Check Endpoints",
+      "target_met": true,
+      "target_response_time_ms": 5.0,
+      "actual_p95_response_time_ms": 2.3651123046875,
+      "avg_response_time_ms": 2.312326431274414,
+      "cache_hit_rate": 0.0,
+      "cache_enabled": false,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    },
+    {
+      "test_name": "PostgreSQL Connection Pool",
+      "target_met": true,
+      "target_response_time_ms": 50.0,
+      "actual_p95_response_time_ms": 21.96192741394043,
+      "avg_response_time_ms": 21.45249843597412,
+      "cache_hit_rate": 0.5,
+      "cache_enabled": true,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    },
+    {
+      "test_name": "Cache Manager Performance",
+      "target_met": true,
+      "target_response_time_ms": 5.0,
+      "actual_p95_response_time_ms": 0.030040740966796875,
+      "avg_response_time_ms": 0.009012222290039062,
+      "cache_hit_rate": 1.0,
+      "cache_enabled": true,
+      "test_iterations": 10,
+      "success_rate": 1.0,
+      "performance_improvement_ratio": null
+    }
+  ],
+  "performance_summary": {
+    "prompt_improvement_p95_ms": 57.03902244567871,
+    "analytics_queries_p95_ms": 32.5009822845459,
+    "ml_inference_p95_ms": 10.766983032226562,
+    "health_checks_p95_ms": 2.3651123046875
+  },
+  "recommendations": [
+    "\u274c Prompt Improvement Workflow: P95 57.04ms exceeds target 20.0ms",
+    "\ud83d\udca1 Consider increasing cache TTL for Prompt Improvement Workflow (current hit rate: 0.00%)",
+    "\u2705 Analytics Dashboard Queries: Meeting performance target (P95: 32.50ms)",
+    "\u274c ML Inference Pipeline: P95 10.77ms exceeds target 10.0ms",
+    "\ud83d\udca1 Consider increasing cache TTL for ML Inference Pipeline (current hit rate: 0.00%)",
+    "\u2705 Health Check Endpoints: Meeting performance target (P95: 2.37ms)",
+    "\u2705 PostgreSQL Connection Pool: Meeting performance target (P95: 21.96ms)",
+    "\u2705 Cache Manager Performance: Meeting performance target (P95: 0.03ms)",
+    "\ud83d\udca1 Overall cache hit rate 30.00% is below 80% target. Consider tuning cache TTL and warming strategies."
+  ]
+}

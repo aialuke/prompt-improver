@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 import asyncpg
 
 from prompt_improver.database.services.connection.connection_metrics import ConnectionMetrics
-from prompt_improver.database.services.cache.cache_manager import CacheManager
+from prompt_improver.services.cache.cache_facade import CacheFacade as CacheManager
 
 
 class PoolState(Enum):

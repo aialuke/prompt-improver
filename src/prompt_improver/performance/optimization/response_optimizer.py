@@ -1,7 +1,7 @@
 """Response optimization for minimal latency and payload size.
 
 This module implements 2025 best practices for response optimization:
-- High-performance JSON serialization with orjson
+- High-performance JSON serialization with msgspec
 - Response compression with multiple algorithms
 - Payload size reduction techniques
 - Streaming responses for large data
@@ -17,18 +17,11 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import lz4.frame
+import msgspec.json
 
 from prompt_improver.performance.optimization.performance_optimizer import (
     measure_mcp_operation,
 )
-
-try:
-    import orjson
-
-    HAS_ORJSON = True
-except ImportError:
-    HAS_ORJSON = False
-    orjson = None
 try:
     import brotli
 
@@ -76,31 +69,27 @@ class CompressionResult:
 
 
 class FastJSONSerializer:
-    """High-performance JSON serialization with multiple backends."""
+    """High-performance JSON serialization with msgspec."""
 
-    def __init__(self, use_orjson: bool = True):
-        self.use_orjson = use_orjson and HAS_ORJSON
-        if self.use_orjson:
-            logger.info("Using orjson for high-performance JSON serialization")
+    def __init__(self, use_msgspec: bool = True):
+        self.use_msgspec = use_msgspec
+        if self.use_msgspec:
+            logger.info("Using msgspec for high-performance JSON serialization")
         else:
-            logger.info(
-                "Using standard json library (consider installing orjson for better performance)"
-            )
+            logger.info("Using standard json library")
 
     def serialize(self, data: Any) -> bytes:
         """Serialize data to JSON bytes with optimal performance."""
-        if self.use_orjson:
-            return orjson.dumps(
-                data, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_SERIALIZE_DATACLASS
-            )
+        if self.use_msgspec:
+            return msgspec.json.encode(data)
         return json.dumps(
             data, separators=(",", ":"), ensure_ascii=False, default=self._json_default
         ).encode("utf-8")
 
     def deserialize(self, data: bytes) -> Any:
         """Deserialize JSON bytes to Python objects."""
-        if self.use_orjson:
-            return orjson.loads(data)
+        if self.use_msgspec:
+            return msgspec.json.decode(data)
         return json.loads(data.decode("utf-8"))
 
     def _json_default(self, obj: Any) -> Any:
@@ -336,7 +325,7 @@ class EnhancedPayloadOptimizer:
                 "compression_ratio": compression_result.compression_ratio,
                 "size_reduction_percent": compression_result.size_reduction_percent,
                 "optimization_time_ms": optimization_time,
-                "serializer": "orjson" if self.json_serializer.use_orjson else "json",
+                "serializer": "msgspec" if self.json_serializer.use_msgspec else "json",
             }
         return result
 
@@ -519,7 +508,7 @@ class ResponseOptimizer:
             "compression_algorithm_usage": self._optimization_stats[
                 "compression_algorithm_usage"
             ],
-            "orjson_available": HAS_ORJSON,
+            "msgspec_available": True,
         }
 
 

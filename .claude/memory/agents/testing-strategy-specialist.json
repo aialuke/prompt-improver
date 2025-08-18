@@ -1,0 +1,57 @@
+{
+  "agent_name": "testing-strategy-specialist",
+  "last_updated": "2025-01-15T00:00:00Z",
+  "task_history": [],
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "pattern_name": "real_behavior_testing",
+        "description": "Real behavior testing with testcontainers and actual services",
+        "frequency": 1,
+        "success_rate": 0.875
+      },
+      {
+        "pattern_name": "contract_testing",
+        "description": "API contract testing and MCP protocol validation",
+        "frequency": 1,
+        "success_rate": 0.90
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "Real behavior testing with 87.5% validation success",
+        "Comprehensive testcontainer infrastructure",
+        "Zero-mock policy for integration testing",
+        "Property-based testing for ML algorithms"
+      ],
+      "performance_baselines": {
+        "test_execution_time_seconds": 120,
+        "test_success_rate": 0.875,
+        "coverage_percentage": 85
+      },
+      "configuration_insights": [
+        "Multi-service testing scenarios with proper isolation",
+        "Real database and cache behavior validation",
+        "Comprehensive security and performance testing integration"
+      ]
+    }
+  },
+  "optimization_insights": [],
+  "collaboration_patterns": {
+    "frequent_collaborators": [
+      {
+        "agent_name": "infrastructure-specialist",
+        "collaboration_frequency": 5,
+        "success_rate": 0.88,
+        "common_tasks": ["testcontainer setup", "test environment"]
+      },
+      {
+        "agent_name": "database-specialist",
+        "collaboration_frequency": 3,
+        "success_rate": 0.92,
+        "common_tasks": ["database testing", "data integrity"]
+      }
+    ],
+    "delegation_effectiveness": {}
+  }
+}

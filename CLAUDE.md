@@ -83,16 +83,47 @@ from prompt_improver.services.prompt.facade import PromptServiceFacade as Prompt
 
 ## Tool & Agent Usage
 
-**Delegate to specialized agents for domain expertise:**
-- **code-reviewer**: Code review, refactoring, technical debt analysis, quality assessment
-- **system-reliability-engineer**: Monitoring, health checks, incident response, observability  
-- **database-specialist**: Query optimization, schema design, migrations, connection pooling
-- **security-architect**: Authentication, authorization, vulnerability assessment, security reviews
-- **ml-orchestrator**: ML training issues, pipeline design, feature engineering, model optimization
-- **performance-engineer**: Slow performance, profiling, load testing, bottleneck analysis
-- **infrastructure-specialist**: Testcontainers, CI/CD, development environments, testing infrastructure
+**Core Infrastructure Agents:**
+- **database-specialist**: PostgreSQL/JSONB optimization, custom SQL migrations, query performance (APES schema)
+- **ml-orchestrator**: ML pipelines (5 services), model registry (@champion/@production), feature engineering
+- **performance-engineer**: Cross-cutting performance, SLO monitoring, cache optimization (96.67% hit rate)
+- **security-architect**: Security policies, OWASP 2025, authentication/authorization design
+- **infrastructure-specialist**: Docker/testcontainers, CI/CD, real behavior testing (no mocks)
 
-**Delegation triggers:** review, optimize, secure, monitor, test, deploy, analyze, refactor, troubleshoot
+**Specialized Domain Agents:**
+- **data-pipeline-specialist**: ETL processes, analytics pipelines, data transformation
+- **api-design-specialist**: FastAPI design, OpenAPI docs, REST architecture
+- **monitoring-observability-specialist**: OpenTelemetry, distributed tracing, SLO monitoring
+- **testing-strategy-specialist**: Real behavior testing, testcontainers, quality assurance
+- **configuration-management-specialist**: Environment configs, settings management
+- **documentation-specialist**: Technical docs, API documentation, ADRs
+
+**Automatic Agent Selection Triggers:**
+Database: query|schema|migration|PostgreSQL|SQL → database-specialist
+ML/AI: model|training|feature|pipeline|ML → ml-orchestrator
+Performance: slow|optimize|bottleneck|cache → performance-engineer
+Security: auth|security|vulnerability|encrypt → security-architect
+Infrastructure: docker|container|CI/CD|deploy → infrastructure-specialist
+API: endpoint|FastAPI|OpenAPI|REST → api-design-specialist
+Testing: test|testcontainer|quality → testing-strategy-specialist
+Data: ETL|analytics|data processing → data-pipeline-specialist
+Monitoring: observability|tracing|metrics → monitoring-observability-specialist
+Config: config|environment|settings → configuration-management-specialist
+Docs: documentation|ADR|technical writing → documentation-specialist
+
+**Delegation Flow:**
+performance-engineer → database-specialist (query optimization)
+performance-engineer → ml-orchestrator (ML performance)
+security-architect → infrastructure-specialist (security tool deployment)
+ml-orchestrator → infrastructure-specialist (deployment infrastructure)
+infrastructure-specialist → database-specialist (database infrastructure)
+
+**APES Architecture Integration:**
+- PostgreSQL 15+ with JSONB optimization (database-specialist)
+- Custom SQL migrations in database/migrations/ (database-specialist)
+- Testcontainers for real behavior testing (infrastructure-specialist + testing-strategy-specialist)
+- Multi-level caching L1/L2/L3 achieving <2ms response (performance-engineer)
+- Model registry aliases @champion/@production/@challenger (ml-orchestrator)
 
 **External tool integration:**
 - Search previous solutions via memory tools first
@@ -101,6 +132,8 @@ from prompt_improver.services.prompt.facade import PromptServiceFacade as Prompt
 - Fall back to manual analysis when MCP unavailable
 
 **Parallel execution patterns:** Always batch independent operations - file reads, searches, validations. Default to parallel unless sequential dependencies exist.
+
+**Comprehensive Documentation:** → docs/architecture/CLAUDE_CODE_AGENT_BEST_PRACTICES.md
 
 ## Extended Thinking & Context Management
 

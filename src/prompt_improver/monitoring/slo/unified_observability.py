@@ -165,7 +165,7 @@ class UnifiedSLOObservability:
             context.span_id = f"{span.get_span_context().span_id:016x}"
         self._active_contexts[context_id] = context
         try:
-            if not self._initialized:
+            if hasattr(self._unified_manager, 'initialize') and not getattr(self._unified_manager, '_initialized', False):
                 await self._unified_manager.initialize()
             yield context
             if span:
@@ -340,7 +340,7 @@ class UnifiedSLOObservability:
             "timestamp": datetime.now(UTC).isoformat(),
             "cache_stats": cache_stats,
             "cache_context": cache_context or {},
-            "unified_manager_initialized": self.True,
+            "unified_manager_initialized": True,
             "unified_manager_mode": self._unified_manager.mode.value
             if hasattr(self._unified_manager, "mode")
             else "unknown",
@@ -420,7 +420,7 @@ class UnifiedSLOObservability:
             "operation_statistics": self.get_operation_statistics(),
             "active_contexts": len(self._active_contexts),
             "unified_manager_status": {
-                "initialized": self.True,
+                "initialized": True,
                 "mode": self._unified_manager.mode.value
                 if hasattr(self._unified_manager, "mode")
                 else "unknown",

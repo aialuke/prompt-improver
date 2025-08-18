@@ -1,0 +1,51 @@
+{
+  "agent_name": "configuration-management-specialist",
+  "last_updated": "2025-01-15T00:00:00Z",
+  "task_history": [],
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "pattern_name": "environment_config",
+        "description": "Environment-specific configuration management with validation",
+        "frequency": 1,
+        "success_rate": 0.94
+      },
+      {
+        "pattern_name": "config_validation",
+        "description": "Configuration validation and schema enforcement",
+        "frequency": 1,
+        "success_rate": 0.96
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "Clean Architecture configuration with environment variables",
+        "Configuration consolidation and validation systems",
+        "Environment-based configuration injection patterns",
+        "Secure configuration management with secret handling"
+      ],
+      "performance_baselines": {
+        "config_load_time_ms": 50,
+        "validation_success_rate": 0.98,
+        "environment_switch_time_ms": 100
+      },
+      "configuration_insights": [
+        "Externalized configuration with environment variables",
+        "Configuration validation at application startup",
+        "Environment-specific overrides with fallback mechanisms"
+      ]
+    }
+  },
+  "optimization_insights": [],
+  "collaboration_patterns": {
+    "frequent_collaborators": [
+      {
+        "agent_name": "security-architect",
+        "collaboration_frequency": 2,
+        "success_rate": 0.90,
+        "common_tasks": ["secret management", "config security"]
+      }
+    ],
+    "delegation_effectiveness": {}
+  }
+}

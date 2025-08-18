@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from sqlmodel import Field
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer
+    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ async def _set_session_impl(
     """Implementation of set_session tool using unified session management."""
     try:
         await server._ensure_unified_session_manager()
-        success = await server.services.session_store.set(session_id, data)
+        success = await server.services.session_store.set_session(session_id, data, ttl=3600)
         return {
             "session_id": session_id,
             "success": success,
@@ -115,7 +115,7 @@ async def _touch_session_impl(
 ) -> dict[str, Any]:
     """Implementation of touch_session tool."""
     try:
-        success = await server.services.session_store.touch(session_id)
+        success = await server.services.session_store.touch_session(session_id, ttl=3600)
         return {
             "session_id": session_id,
             "success": success,
@@ -138,7 +138,7 @@ async def _delete_session_impl(
 ) -> dict[str, Any]:
     """Implementation of delete_session tool."""
     try:
-        success = await server.services.session_store.delete(session_id)
+        success = await server.services.session_store.delete_session(session_id)
         return {
             "session_id": session_id,
             "success": success,

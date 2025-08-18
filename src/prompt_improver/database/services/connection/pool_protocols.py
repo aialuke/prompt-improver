@@ -8,8 +8,15 @@ from typing import Any, AsyncContextManager, AsyncIterator, Dict, Optional, Prot
 from sqlalchemy.ext.asyncio import AsyncSession
 import asyncpg
 
-from prompt_improver.core.protocols.connection_protocol import ConnectionMode
-from prompt_improver.core.types import SecurityContext
+# Removed core.protocols imports that trigger DI container chain
+# Local definitions to maintain database layer isolation
+from enum import Enum
+
+class ConnectionMode(Enum):
+    """Connection mode for database operations."""
+    READ_WRITE = "read_write"
+    READ_ONLY = "read_only"
+    BATCH = "batch"
 
 
 @runtime_checkable

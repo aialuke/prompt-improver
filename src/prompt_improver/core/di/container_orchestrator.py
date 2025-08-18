@@ -17,39 +17,41 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Type, TypeVar
 
 if TYPE_CHECKING:
     from prompt_improver.core.events.ml_event_bus import MLEventBus
+    from prompt_improver.core.di.ml_container import MLServiceContainer
+    from prompt_improver.core.interfaces.ml_interface import (
+        MLAnalysisInterface,
+        MLHealthInterface,
+        MLModelInterface,
+        MLServiceInterface,
+        MLTrainingInterface,
+    )
+    from prompt_improver.core.protocols.ml_protocols import (
+        ComponentInvokerProtocol,
+        ComponentLoaderProtocol,
+        ComponentRegistryProtocol,
+        EventBusProtocol,
+        MLflowServiceProtocol,
+        MLPipelineFactoryProtocol,
+        ResourceManagerProtocol,
+        WorkflowEngineProtocol,
+    )
+    from prompt_improver.core.services.ml_service import EventBasedMLService
 
+# Core non-ML imports - safe to import at module level
 from prompt_improver.core.di.core_container import CoreContainer, get_core_container
 from prompt_improver.core.di.database_container import DatabaseContainer, get_database_container
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.di.monitoring_container import MonitoringContainer, get_monitoring_container
-from prompt_improver.core.di.protocols import ContainerFacadeProtocol
+from prompt_improver.core.di.protocols import ContainerFacadeProtocol, MonitoringContainerProtocol
 from prompt_improver.core.di.security_container import SecurityContainer, get_security_container
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
-from prompt_improver.core.interfaces.ml_interface import (
-    MLAnalysisInterface,
-    MLHealthInterface,
-    MLModelInterface,
-    MLServiceInterface,
-    MLTrainingInterface,
-)
 from prompt_improver.core.protocols.ml_protocols import (
     CacheServiceProtocol,
-    ComponentInvokerProtocol,
-    ComponentLoaderProtocol,
-    ComponentRegistryProtocol,
     DatabaseServiceProtocol,
-    EventBusProtocol,
     ExternalServicesConfigProtocol,
     HealthMonitorProtocol,
-    MLflowServiceProtocol,
-    MLPipelineFactoryProtocol,
-    ResourceManagerProtocol,
     ServiceConnectionInfo,
     ServiceStatus,
-    WorkflowEngineProtocol,
 )
 from prompt_improver.core.protocols.retry_protocols import MetricsRegistryProtocol
-from prompt_improver.core.services.ml_service import EventBasedMLService
 from prompt_improver.shared.interfaces.ab_testing import IABTestingService
 
 T = TypeVar("T")
@@ -145,8 +147,8 @@ class DIContainer(ContainerFacadeProtocol):
         self._core_container = get_core_container()
         self._security_container = get_security_container()
         self._database_container = get_database_container()
-        self._monitoring_container = get_monitoring_container()
-        self._ml_container = MLServiceContainer()
+        self._monitoring_container = self._create_monitoring_container()
+        self._ml_container = None  # Lazy-loaded to avoid torch dependencies
         
         # Service routing maps
         self._domain_routing = self._build_domain_routing()
@@ -163,8 +165,37 @@ class DIContainer(ContainerFacadeProtocol):
         
         self.logger.debug(f"Container orchestrator '{self.name}' initialized")
 
+    def _create_monitoring_container(self) -> MonitoringContainerProtocol:
+        """Create monitoring container with lazy loading to avoid circular dependencies.
+        
+        This factory method delays the import of the concrete MonitoringContainer
+        until needed, breaking the circular dependency chain.
+        """
+        from prompt_improver.core.di.monitoring_container import MonitoringContainer
+        return MonitoringContainer()
+
+    def _create_ml_container(self) -> Optional["MLServiceContainer"]:
+        """Create ML container with lazy loading to avoid torch dependencies.
+        
+        This factory method delays the import of ML services until needed,
+        breaking the torch import chain. Returns None if torch is not available.
+        """
+        try:
+            from prompt_improver.core.di.ml_container import MLServiceContainer
+            return MLServiceContainer()
+        except ImportError as e:
+            self.logger.info(f"ML container not available (torch not installed): {e}")
+            return None
+        except Exception as e:
+            self.logger.warning(f"ML container initialization failed: {e}")
+            return None
+
     def _build_domain_routing(self) -> dict[type[Any], str]:
-        """Build service type to container domain routing map."""
+        """Build service type to container domain routing map.
+        
+        Note: ML service types are handled by name-based routing since they're
+        in TYPE_CHECKING blocks to avoid torch import chain.
+        """
         return {
             # Core services
             DateTimeServiceProtocol: "core",
@@ -177,20 +208,7 @@ class DIContainer(ContainerFacadeProtocol):
             MetricsRegistryProtocol: "monitoring",
             IABTestingService: "monitoring",
             
-            # ML services
-            MLServiceInterface: "ml",
-            MLAnalysisInterface: "ml",
-            MLTrainingInterface: "ml",
-            MLHealthInterface: "ml",
-            MLModelInterface: "ml",
-            EventBusProtocol: "ml",
-            WorkflowEngineProtocol: "ml",
-            ResourceManagerProtocol: "ml",
-            ComponentRegistryProtocol: "ml",
-            ComponentLoaderProtocol: "ml",
-            ComponentInvokerProtocol: "ml",
-            MLPipelineFactoryProtocol: "ml",
-            MLflowServiceProtocol: "ml",
+            # External services configuration
             ExternalServicesConfigProtocol: "core",
             
             # String-based services (legacy support)
@@ -214,19 +232,21 @@ class DIContainer(ContainerFacadeProtocol):
         elif any(keyword in service_name.lower() for keyword in ["metric", "health", "monitor", "alert", "trace"]):
             return self._monitoring_container
         elif any(keyword in service_name.lower() for keyword in ["ml", "model", "training", "workflow", "pipeline"]):
-            return self._ml_container
+            return self.get_ml_container()
         else:
             # Default to core container
             return self._core_container
 
     def _get_container_by_domain(self, domain: str) -> Any:
         """Get container by domain name."""
+        if domain == "ml":
+            return self.get_ml_container()
+        
         containers = {
             "core": self._core_container,
             "security": self._security_container,
             "database": self._database_container,
             "monitoring": self._monitoring_container,
-            "ml": self._ml_container,
         }
         return containers.get(domain, self._core_container)
 
@@ -235,8 +255,14 @@ class DIContainer(ContainerFacadeProtocol):
         """Get core services container."""
         return self._core_container
 
-    def get_ml_container(self) -> MLServiceContainer:
-        """Get ML services container.""" 
+    def get_ml_container(self) -> Optional["MLServiceContainer"]:
+        """Get ML services container with lazy loading.
+        
+        Returns:
+            MLServiceContainer if torch is available, None otherwise
+        """
+        if self._ml_container is None:
+            self._ml_container = self._create_ml_container()
         return self._ml_container
 
     def get_security_container(self) -> SecurityContainer:
@@ -247,7 +273,7 @@ class DIContainer(ContainerFacadeProtocol):
         """Get database services container."""
         return self._database_container
 
-    def get_monitoring_container(self) -> MonitoringContainer:
+    def get_monitoring_container(self) -> MonitoringContainerProtocol:
         """Get monitoring services container."""
         return self._monitoring_container
 

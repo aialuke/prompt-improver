@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Tuple
 
 from rich.console import Console
 
+from prompt_improver.core.domain.enums import PrivacyTechnique
 from prompt_improver.core.services.analytics_factory import get_analytics_interface
 
 
@@ -31,15 +32,6 @@ class SecurityLevel(Enum):
     confidential = "confidential"
     restricted = "restricted"
 
-
-class PrivacyTechnique(Enum):
-    """Privacy preservation techniques."""
-
-    redaction = "redaction"
-    masking = "masking"
-    tokenization = "tokenization"
-    DIFFERENTIAL_PRIVACY = "differential_privacy"
-    HOMOMORPHIC_ENCRYPTION = "homomorphic_encryption"
 
 
 @dataclass

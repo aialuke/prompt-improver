@@ -221,3 +221,43 @@ def get_analytics_service() -> Any:
 def get_real_time_analytics_service() -> Any:
     """Get real-time analytics service"""
     return get_service("real_time_analytics")
+
+
+def register_database_health_service(factory: Callable[[], Any]) -> None:
+    """Register database health service for connectivity validation"""
+    register_service("database_health", factory, ServiceScope.SINGLETON)
+
+
+def get_database_health_service() -> Any:
+    """Get database health service for connectivity validation"""
+    return get_service("database_health")
+
+
+def register_mcp_service_factory(factory: Callable[[], Any]) -> None:
+    """Register MCP service factory for lifecycle management"""
+    register_service("mcp_service_factory", factory, ServiceScope.SINGLETON)
+
+
+def register_mcp_server_factory(factory: Callable[[], Any]) -> None:
+    """Register MCP server factory for lifecycle management"""
+    register_service("mcp_server_factory", factory, ServiceScope.SINGLETON)
+
+
+def register_mcp_lifecycle_manager(factory: Callable[[], Any]) -> None:
+    """Register MCP lifecycle manager for server management"""
+    register_service("mcp_lifecycle_manager", factory, ServiceScope.SINGLETON)
+
+
+def get_mcp_service_factory() -> Any:
+    """Get MCP service factory for lifecycle management"""
+    return get_service("mcp_service_factory")
+
+
+def get_mcp_server_factory() -> Any:
+    """Get MCP server factory for lifecycle management"""
+    return get_service("mcp_server_factory")
+
+
+def get_mcp_lifecycle_manager() -> Any:
+    """Get MCP lifecycle manager for server management"""
+    return get_service("mcp_lifecycle_manager")

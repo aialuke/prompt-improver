@@ -12,7 +12,8 @@ from uuid import uuid4
 
 import pytest
 import requests
-from jsonschema import validate, ValidationError
+import msgspec
+from msgspec import ValidationError as MsgspecValidationError
 from pydantic import BaseModel, ValidationError as PydanticValidationError
 
 # API Contract Testing
@@ -113,10 +114,12 @@ def schema_validator(api_schemas):
             raise ValueError(f"Unknown schema: {schema_name}")
         
         try:
-            validate(instance=data, schema=api_schemas[schema_name])
+            # Convert schema to msgspec Struct for validation
+            schema_struct = msgspec.convert(api_schemas[schema_name], type=dict)
+            msgspec.validate(data, type=type(schema_struct))
             return True
-        except ValidationError as e:
-            pytest.fail(f"Schema validation failed for {schema_name}: {e.message}")
+        except MsgspecValidationError as e:
+            pytest.fail(f"Schema validation failed for {schema_name}: {str(e)}")
     
     return validate_schema
 

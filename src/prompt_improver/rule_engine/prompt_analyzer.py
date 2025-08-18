@@ -21,14 +21,28 @@ import numpy as np
 from prompt_improver.core.config.textstat import get_textstat_wrapper
 from prompt_improver.rule_engine.models import PromptCharacteristics
 
-try:
+# Heavy ML imports moved to TYPE_CHECKING and lazy loading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
     import torch
     from transformers import AutoModel, AutoTokenizer, pipeline
 
-    ML_AVAILABLE = True
-except ImportError:
-    logger.warning("Transformers not available, using fallback analysis")
-    ML_AVAILABLE = False
+def _get_ml_modules():
+    """Lazy load ML modules when needed."""
+    try:
+        import torch
+        from transformers import AutoModel, AutoTokenizer, pipeline
+        return {
+            'torch': torch,
+            'AutoModel': AutoModel,
+            'AutoTokenizer': AutoTokenizer,
+            'pipeline': pipeline,
+            'available': True
+        }
+    except ImportError:
+        logger.warning("Transformers not available, using fallback analysis")
+        return {'available': False}
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +64,7 @@ class PromptAnalyzer:
         Args:
             enable_ml_analysis: Enable ML-based analysis features
         """
-        self.enable_ml_analysis = enable_ml_analysis and ML_AVAILABLE
+        self.enable_ml_analysis = enable_ml_analysis and _get_ml_modules()['available']
         self.domain_keywords = {
             "technical": {
                 "primary": [

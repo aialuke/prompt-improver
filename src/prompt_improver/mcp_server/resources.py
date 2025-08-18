@@ -12,10 +12,9 @@ from typing import TYPE_CHECKING, Any
 from prompt_improver.repositories.protocols.session_manager_protocol import (
     SessionManagerProtocol,
 )
-from prompt_improver.core.di import get_container
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.server import APESMCPServer
+    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +138,8 @@ async def _get_rule_status_impl(server: "APESMCPServer") -> dict[str, Any]:
 async def _get_session_store_status_impl(server: "APESMCPServer") -> dict[str, Any]:
     """Implementation of session_store/status resource."""
     try:
-        if hasattr(server.services.session_store, "get_stats"):
-            stats: dict[str, Any] = server.services.session_store.get_stats()
+        if hasattr(server.services.session_store, "get_performance_stats"):
+            stats: dict[str, Any] = server.services.session_store.get_performance_stats()
         else:
             stats = {
                 "count": 0,
@@ -185,8 +184,11 @@ async def _health_live_impl(server: "APESMCPServer") -> dict[str, Any]:
 async def _health_ready_impl(server: "APESMCPServer") -> dict[str, Any]:
     """Implementation of health/ready resource."""
     try:
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-        health_results = await database_services.health_check_all()
+        async with await server.services.get_database_session() as session:
+            from sqlalchemy import text
+            # Basic database connectivity check
+            await session.execute(text("SELECT 1"))
+            health_results = {"database": "healthy"}
         db_health = health_results.get("database", "unknown")
 
         # Test rule application capability
@@ -388,7 +390,7 @@ async def _get_session_history_impl(
         path_parts = session_id.split("/")
         base_session_id = path_parts[0]
 
-        session_data = await server.services.session_store.get(base_session_id)
+        session_data = await server.services.session_store.get_session(base_session_id)
         if not session_data:
             return {
                 "session_id": session_id,
@@ -436,9 +438,7 @@ async def _get_rule_category_performance_impl(
 
     try:
         categories = rule_category.split("/")
-        database_services = await get_database_services(ManagerMode.MCP_SERVER)
-
-        async with database_services.database.get_session() as session:
+        async with await server.services.get_database_session() as session:
             from sqlalchemy import text
 
             query = text("""
@@ -599,11 +599,13 @@ async def _get_hierarchical_metrics_impl(
             }
 
         elif path_parts[0] == "sessions":
+            cache_stats = server.services.session_store.get_stats()
             session_metrics = {
-                "active_sessions": len(server.services.session_store._store),
-                "max_size": server.services.session_store.maxsize,
-                "ttl": server.services.session_store.ttl,
-                "cleanup_interval": server.services.session_store.cleanup_interval,
+                "active_sessions": cache_stats.get("l1_cache_size", 0),
+                "max_size": cache_stats.get("l1_max_size", 1000),
+                "ttl": cache_stats.get("l2_default_ttl", 3600),
+                "cache_implementation": "unified_cache_facade",
+                "hit_rate": cache_stats.get("overall_hit_rate", 0.0),
             }
 
             return {

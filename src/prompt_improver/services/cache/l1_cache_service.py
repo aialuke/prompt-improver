@@ -216,6 +216,43 @@ class L1CacheService:
             
         return True
 
+    async def invalidate_pattern(self, pattern: str) -> int:
+        """Invalidate L1 cache entries matching pattern.
+        
+        Args:
+            pattern: Pattern to match against cache keys (supports glob wildcards)
+            
+        Returns:
+            Number of entries invalidated
+        """
+        start_time = time.perf_counter()
+        
+        try:
+            import fnmatch
+            
+            matching_keys = [key for key in self._cache.keys() if fnmatch.fnmatch(key, pattern)]
+            removed_count = 0
+            
+            for key in matching_keys:
+                del self._cache[key]
+                removed_count += 1
+            
+            response_time = time.perf_counter() - start_time
+            self._total_operations += 1
+            self._total_response_time += response_time
+            
+            if response_time > 0.001:
+                logger.warning(f"L1 cache INVALIDATE_PATTERN took {response_time*1000:.2f}ms (pattern: {pattern[:50]}...)")
+            
+            return removed_count
+            
+        except Exception as e:
+            logger.warning(f"L1 pattern invalidation failed '{pattern}': {e}")
+            response_time = time.perf_counter() - start_time
+            self._total_operations += 1
+            self._total_response_time += response_time
+            return 0
+
     def get_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics for monitoring.
         

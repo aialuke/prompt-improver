@@ -20,7 +20,7 @@ try:
 except ImportError:
     health_monitor = None
 try:
-    from prompt_improver.core.services.analytics_factory import get_analytics_router
+    from prompt_improver.api.factories.analytics_api_factory import get_analytics_router
 
     real_time_analytics_service = get_analytics_router
 except ImportError:

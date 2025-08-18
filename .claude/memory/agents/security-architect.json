@@ -1,0 +1,203 @@
+{
+  "agent_name": "security-architect",
+  "collaboration_patterns": {
+    "delegation_effectiveness": {
+      "infrastructure-specialist": {
+        "average_resolution_time": 400,
+        "common_issues": [
+          "deployment complexity"
+        ],
+        "success_rate": 0.88
+      }
+    },
+    "frequent_collaborators": [
+      {
+        "agent_name": "infrastructure-specialist",
+        "collaboration_frequency": 6,
+        "common_tasks": [
+          "security tool deployment",
+          "container hardening"
+        ],
+        "success_rate": 0.88
+      }
+    ]
+  },
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "description": "OAuth2, JWT, and multi-factor authentication implementation",
+        "frequency": 1,
+        "pattern_name": "authentication_flow_design",
+        "success_rate": 0.91
+      },
+      {
+        "description": "OWASP 2025 compliance and security threat modeling",
+        "frequency": 1,
+        "pattern_name": "vulnerability_assessment",
+        "success_rate": 0.94
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "SecurityServiceFacade with protocol-based dependency injection",
+        "Modern security patterns with decomposed services",
+        "OWASP 2025 compliance features",
+        "ML-specific security: adversarial defense patterns"
+      ],
+      "configuration_insights": [
+        "Unified security facade eliminates service proliferation",
+        "Protocol-based DI for authentication and authorization",
+        "Advanced threat modeling for ML and analytics systems"
+      ],
+      "performance_baselines": {
+        "auth_response_time_ms": 50,
+        "security_scan_completion_rate": 0.98,
+        "token_validation_time_ms": 5
+      }
+    }
+  },
+  "last_updated": "2025-08-15T17:11:05.883063+00:00Z",
+  "optimization_insights": [
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:18:50.500635+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:18:50.500656+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:18:50.500660+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:18:50.500663+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:18:50.500665+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:20:19.075828+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:20:19.075846+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:20:19.075850+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:20:19.075853+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T15:20:19.075855+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:09:32.015080+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:09:32.015098+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:09:32.015101+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:09:32.015103+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:09:32.015105+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:11:05.883044+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:11:05.883055+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:11:05.883058+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:11:05.883059+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    },
+    {
+      "area": "duplicate_test",
+      "confidence": 0.8,
+      "discovered_at": "2025-08-15T17:11:05.883061+00:00Z",
+      "impact": "medium",
+      "insight": "Duplicate insight content"
+    }
+  ],
+  "task_history": []
+}

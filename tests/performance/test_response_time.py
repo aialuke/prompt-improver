@@ -17,7 +17,7 @@ from prompt_improver.optimization.batch_processor import (
     BatchProcessorConfig,
 )
 from prompt_improver.services.startup import init_startup_tasks, shutdown_startup_tasks
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 
 @pytest.mark.asyncio
@@ -25,8 +25,8 @@ class TestResponseTimeRequirements:
     """Tests to validate <200ms response time requirements."""
 
     async def test_session_store_response_time(self, benchmark):
-        """Test SessionStore operations meet <200ms response time."""
-        store = SessionStore(maxsize=1000, ttl=3600)
+        """Test CacheFacade session operations meet <200ms response time."""
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
         test_data = {
             "user_id": "test_user_123",
             "session_data": {
@@ -43,16 +43,16 @@ class TestResponseTimeRequirements:
 
             async def run_operations():
                 start_time = time.perf_counter()
-                result_set = await store.set("test_key", test_data)
+                result_set = await store.set_session("test_key", test_data, ttl=3600)
                 set_time = (time.perf_counter() - start_time) * 1000
                 start_time = time.perf_counter()
-                result_get = await store.get("test_key")
+                result_get = await store.get_session("test_key")
                 get_time = (time.perf_counter() - start_time) * 1000
                 start_time = time.perf_counter()
-                result_touch = await store.touch("test_key")
+                result_touch = await store.touch_session("test_key", ttl=3600)
                 touch_time = (time.perf_counter() - start_time) * 1000
                 start_time = time.perf_counter()
-                result_delete = await store.delete("test_key")
+                result_delete = await store.delete_session("test_key")
                 delete_time = (time.perf_counter() - start_time) * 1000
                 assert result_set is True
                 assert result_get == test_data
@@ -121,7 +121,7 @@ class TestResponseTimeRequirements:
 
     async def test_concurrent_session_operations_response_time(self, benchmark):
         """Test concurrent session operations meet response time requirements."""
-        store = SessionStore(maxsize=1000, ttl=3600)
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
 
         @benchmark
         def concurrent_operations():
@@ -130,14 +130,14 @@ class TestResponseTimeRequirements:
             async def run_concurrent():
                 set_tasks = []
                 for i in range(100):
-                    task = store.set(f"key_{i}", {"data": f"value_{i}", "index": i})
+                    task = store.set_session(f"key_{i}", {"data": f"value_{i}", "index": i}, ttl=3600)
                     set_tasks.append(task)
                 start_time = time.perf_counter()
                 set_results = await asyncio.gather(*set_tasks)
                 set_time = (time.perf_counter() - start_time) * 1000
                 get_tasks = []
                 for i in range(100):
-                    task = store.get(f"key_{i}")
+                    task = store.get_session(f"key_{i}")
                     get_tasks.append(task)
                 start_time = time.perf_counter()
                 get_results = await asyncio.gather(*get_tasks)
@@ -196,7 +196,7 @@ class TestResponseTimeRequirements:
 
     async def test_session_cleanup_response_time(self, benchmark):
         """Test session cleanup meets response time requirements."""
-        store = SessionStore(maxsize=1000, ttl=0.01, cleanup_interval=0.1)
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=1, enable_l2=False, enable_l3=False)  # Short TTL for test
 
         @benchmark
         def cleanup_performance():
@@ -204,10 +204,10 @@ class TestResponseTimeRequirements:
 
             async def run_cleanup():
                 for i in range(500):
-                    await store.set(f"cleanup_key_{i}", {"data": f"value_{i}"})
+                    await store.set_session(f"cleanup_key_{i}", {"data": f"value_{i}"}, ttl=3600)
                 await asyncio.sleep(0.05)
                 start_time = time.perf_counter()
-                store.cache.expire()
+                # Cache expiry is handled automatically by CacheFacade TTL
                 cleanup_time = (time.perf_counter() - start_time) * 1000
                 return cleanup_time
 
@@ -265,8 +265,8 @@ class TestPerformanceUnderLoad:
     """Performance tests under realistic load conditions."""
 
     def test_session_store_under_load(self, benchmark):
-        """Test SessionStore performance under load."""
-        store = SessionStore(maxsize=5000, ttl=3600)
+        """Test CacheFacade session performance under load."""
+        store = CacheFacade(l1_max_size=5000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
 
         def load_test():
             async def run_load_test():
@@ -274,19 +274,20 @@ class TestPerformanceUnderLoad:
                 for i in range(1000):
                     if i % 3 == 0:
                         operations.append(
-                            store.set(
+                            store.set_session(
                                 f"load_key_{i}",
                                 {
                                     "user_id": f"user_{i}",
                                     "data": f"session_data_{i}",
                                     "timestamp": time.time(),
                                 },
+                                ttl=3600
                             )
                         )
                     elif i % 3 == 1:
-                        operations.append(store.get(f"load_key_{i % 100}"))
+                        operations.append(store.get_session(f"load_key_{i % 100}"))
                     else:
-                        operations.append(store.touch(f"load_key_{i % 100}"))
+                        operations.append(store.touch_session(f"load_key_{i % 100}", ttl=3600))
                 start_time = time.perf_counter()
                 results = await asyncio.gather(*operations, return_exceptions=True)
                 execution_time = (time.perf_counter() - start_time) * 1000

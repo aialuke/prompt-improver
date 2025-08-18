@@ -1,0 +1,51 @@
+{
+  "agent_name": "data-pipeline-specialist",
+  "last_updated": "2025-01-15T00:00:00Z",
+  "task_history": [],
+  "domain_knowledge": {
+    "common_patterns": [
+      {
+        "pattern_name": "etl_optimization",
+        "description": "ETL pipeline optimization for analytics data processing",
+        "frequency": 1,
+        "success_rate": 0.90
+      },
+      {
+        "pattern_name": "data_quality_validation",
+        "description": "Data quality checks and validation in analytics pipelines",
+        "frequency": 1,
+        "success_rate": 0.93
+      }
+    ],
+    "project_specific_context": {
+      "architecture_patterns": [
+        "Analytics pipeline with JSONB metadata processing",
+        "Real-time data streaming for user behavior analytics",
+        "Data transformation for ML feature engineering",
+        "Multi-source data integration with quality validation"
+      ],
+      "performance_baselines": {
+        "pipeline_throughput_rps": 1000,
+        "data_quality_pass_rate": 0.95,
+        "transformation_latency_ms": 100
+      },
+      "configuration_insights": [
+        "Real-time analytics data processing capabilities",
+        "Integration with ML orchestrator for feature pipelines",
+        "Data quality gates for production analytics"
+      ]
+    }
+  },
+  "optimization_insights": [],
+  "collaboration_patterns": {
+    "frequent_collaborators": [
+      {
+        "agent_name": "ml-orchestrator",
+        "collaboration_frequency": 5,
+        "success_rate": 0.92,
+        "common_tasks": ["feature engineering", "data preparation"]
+      }
+    ],
+    "delegation_effectiveness": {}
+  }
+}

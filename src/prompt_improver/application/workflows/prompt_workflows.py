@@ -14,7 +14,7 @@ from prompt_improver.repositories.protocols.prompt_repository_protocol import (
 )
 from prompt_improver.rule_engine.base import RuleEngine
 from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 
 class WorkflowBase(ABC):
@@ -43,13 +43,13 @@ class PromptImprovementWorkflow(WorkflowBase):
         rule_engine: RuleEngine,
         input_validator: OWASP2025InputValidator,
         prompt_repository: PromptRepositoryProtocol,
-        session_store: SessionStore,
+        cache_facade: CacheFacade,
     ):
         self.prompt_improvement_service = prompt_improvement_service
         self.rule_engine = rule_engine
         self.input_validator = input_validator
         self.prompt_repository = prompt_repository
-        self.session_store = session_store
+        self.cache_facade = cache_facade
 
     async def execute(
         self,
@@ -158,7 +158,7 @@ class PromptImprovementWorkflow(WorkflowBase):
         self, session_id: str, improvement_options: Dict[str, Any] | None
     ) -> Dict[str, Any]:
         """Load or create session context."""
-        session_data = await self.session_store.get_session(session_id)
+        session_data = await self.cache_facade.get_session(session_id)
         
         if not session_data:
             session_data = {
@@ -168,7 +168,7 @@ class PromptImprovementWorkflow(WorkflowBase):
                 "improvement_history": [],
                 "performance_metrics": {"total_improvements": 0},
             }
-            await self.session_store.set_session(session_id, session_data)
+            await self.cache_facade.set_session(session_id, session_data, ttl=3600)
         
         return session_data
 
@@ -231,7 +231,7 @@ class PromptImprovementWorkflow(WorkflowBase):
                 "quality_score": quality_assessment.get("improvement_score", 0),
             })
             
-            await self.session_store.set_session(session_id, session_context)
+            await self.cache_facade.set_session(session_id, session_context, ttl=3600)
             
             return {
                 "improved_prompt": improvement_result.get("improved_prompt"),
@@ -257,11 +257,11 @@ class RuleApplicationWorkflow(WorkflowBase):
         self,
         rule_engine: RuleEngine,
         prompt_repository: PromptRepositoryProtocol,
-        session_store: SessionStore,
+        cache_facade: CacheFacade,
     ):
         self.rule_engine = rule_engine
         self.prompt_repository = prompt_repository
-        self.session_store = session_store
+        self.cache_facade = cache_facade
 
     async def execute(
         self,
@@ -296,7 +296,7 @@ class RuleApplicationWorkflow(WorkflowBase):
                 }
             
             # Phase 2: Load session context
-            session_context = await self.session_store.get_session(session_id)
+            session_context = await self.cache_facade.get_session(session_id)
             if not session_context:
                 session_context = {"session_id": session_id}
             
@@ -414,10 +414,10 @@ class SessionManagementWorkflow(WorkflowBase):
     
     def __init__(
         self,
-        session_store: SessionStore,
+        cache_facade: CacheFacade,
         prompt_repository: PromptRepositoryProtocol,
     ):
-        self.session_store = session_store
+        self.cache_facade = cache_facade
         self.prompt_repository = prompt_repository
 
     async def execute(
@@ -487,7 +487,7 @@ class SessionManagementWorkflow(WorkflowBase):
         }
         
         # Store in session store
-        await self.session_store.set_session(session_id, new_session_data)
+        await self.cache_facade.set_session(session_id, new_session_data, ttl=3600)
         
         # Store in database
         if db_session:
@@ -512,7 +512,7 @@ class SessionManagementWorkflow(WorkflowBase):
         current_time = datetime.now(timezone.utc)
         
         # Load existing session
-        existing_session = await self.session_store.get_session(session_id)
+        existing_session = await self.cache_facade.get_session(session_id)
         if not existing_session:
             return {
                 "status": "error",
@@ -527,7 +527,7 @@ class SessionManagementWorkflow(WorkflowBase):
             existing_session["updated_at"] = current_time.isoformat()
         
         # Store updated session
-        await self.session_store.set_session(session_id, existing_session)
+        await self.cache_facade.set_session(session_id, existing_session, ttl=3600)
         
         # Update database if session provided
         if db_session:
@@ -552,7 +552,7 @@ class SessionManagementWorkflow(WorkflowBase):
         current_time = datetime.now(timezone.utc)
         
         # Load session
-        session_data = await self.session_store.get_session(session_id)
+        session_data = await self.cache_facade.get_session(session_id)
         if not session_data:
             return {
                 "status": "error",
@@ -582,7 +582,7 @@ class SessionManagementWorkflow(WorkflowBase):
         session_data["final_metrics"] = final_metrics
         
         # Store finalized session
-        await self.session_store.set_session(session_id, session_data)
+        await self.cache_facade.set_session(session_id, session_data, ttl=3600)
         
         # Finalize in database
         if db_session:
@@ -608,7 +608,7 @@ class SessionManagementWorkflow(WorkflowBase):
         
         try:
             # Remove from session store
-            await self.session_store.delete_session(session_id)
+            await self.cache_facade.delete_session(session_id)
             
             # Archive in database
             if db_session:

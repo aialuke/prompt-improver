@@ -634,7 +634,7 @@ networkx_module, NETWORKX_AVAILABLE = optional_import('networkx', 'Graph analysi
 **For Memory-Intensive ML Libraries**:
 ```python
 from prompt_improver.performance.baseline import track_operation
-from prompt_improver.utils.error_handlers import handle_validation_errors
+from prompt_improver.services.error_handling.facade import handle_validation_errors
 
 @track_operation("heavy_ml_import")
 @handle_validation_errors(return_format="raise", operation_name="causal_model_training")
@@ -771,7 +771,7 @@ except ImportError:
 # After:
 from prompt_improver.core.optional_deps import optional_import
 from prompt_improver.performance.baseline import track_operation
-from prompt_improver.utils.error_handlers import handle_validation_errors
+from prompt_improver.services.error_handling.facade import handle_validation_errors
 
 # Module-level availability check with enterprise monitoring
 _, GRAPH_ANALYSIS_AVAILABLE = optional_import('networkx', 'Graph analysis', 'ml-advanced')

@@ -30,7 +30,7 @@ from prompt_improver.services.startup import (
     shutdown_startup_tasks,
     startup_context,
 )
-from prompt_improver.utils.session_store import SessionStore
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 
 @pytest.mark.asyncio
