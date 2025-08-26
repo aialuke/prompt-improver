@@ -1,20 +1,19 @@
 """MCP Server Health Monitor
 Comprehensive health monitoring and alerting for native MCP server deployment
-Provides real-time monitoring, alerting, and automated recovery
+Provides real-time monitoring, alerting, and automated recovery.
 """
 
 import asyncio
 import json
 import logging
-import os
 import signal
 import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import psutil
 
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class HealthMetrics:
-    """Health metrics data structure"""
+    """Health metrics data structure."""
 
     timestamp: float
     pid: int | None
@@ -47,7 +46,7 @@ class HealthMetrics:
 
 @dataclass
 class HealthThresholds:
-    """Configurable health check thresholds"""
+    """Configurable health check thresholds."""
 
     memory_mb_warning: float = 500.0
     memory_mb_critical: float = 1000.0
@@ -61,9 +60,9 @@ class HealthThresholds:
 
 
 class MCPHealthMonitor:
-    """Comprehensive MCP server health monitoring system"""
+    """Comprehensive MCP server health monitoring system."""
 
-    def __init__(self, config_path: str | None = None):
+    def __init__(self, config_path: str | None = None) -> None:
         self.config = self._load_config(config_path)
         self.thresholds = HealthThresholds(**self.config.get("thresholds", {}))
         self.pid_file = Path(self.config.get("pid_file", "/var/run/mcp-server.pid"))
@@ -87,7 +86,7 @@ class MCPHealthMonitor:
         logger.addHandler(file_handler)
 
     def _load_config(self, config_path: str | None) -> dict[str, Any]:
-        """Load configuration from file or use defaults"""
+        """Load configuration from file or use defaults."""
         default_config = {
             "monitor_interval": 30,
             "metrics_history_size": 100,
@@ -101,7 +100,7 @@ class MCPHealthMonitor:
         }
         if config_path and Path(config_path).exists():
             try:
-                with open(config_path) as f:
+                with open(config_path, encoding="utf-8") as f:
                     user_config = json.load(f)
                 default_config.update(user_config)
                 logger.info("Loaded configuration from: %s", config_path)
@@ -110,7 +109,7 @@ class MCPHealthMonitor:
         return default_config
 
     async def start_monitoring(self):
-        """Start the health monitoring loop"""
+        """Start the health monitoring loop."""
         logger.info("Starting MCP server health monitoring...")
         logger.info("PID file: %s", self.pid_file)
         logger.info("Metrics file: %s", self.metrics_file)
@@ -123,16 +122,16 @@ class MCPHealthMonitor:
                 await self._monitor_cycle()
                 await asyncio.sleep(self.config["monitor_interval"])
             except Exception as e:
-                logger.error("Monitor cycle error: %s", e)
+                logger.exception("Monitor cycle error: %s", e)
                 await asyncio.sleep(5)
 
-    def _signal_handler(self, signum: int, frame):
-        """Handle shutdown signals"""
+    def _signal_handler(self, signum: int, frame) -> None:
+        """Handle shutdown signals."""
         logger.info("Received signal %s, shutting down monitoring...", signum)
         self.running = False
 
-    async def _monitor_cycle(self):
-        """Single monitoring cycle"""
+    async def _monitor_cycle(self) -> None:
+        """Single monitoring cycle."""
         try:
             pid = self._get_process_pid()
             if pid is None:
@@ -150,14 +149,14 @@ class MCPHealthMonitor:
             logger.warning("MCP server process no longer exists")
             await self._handle_process_not_found()
         except Exception as e:
-            logger.error("Monitoring cycle error: %s", e)
+            logger.exception("Monitoring cycle error: %s", e)
 
     def _get_process_pid(self) -> int | None:
-        """Get MCP server PID from PID file"""
+        """Get MCP server PID from PID file."""
         try:
             if not self.pid_file.exists():
                 return None
-            with open(self.pid_file) as f:
+            with open(self.pid_file, encoding="utf-8") as f:
                 pid = int(f.read().strip())
             if psutil.pid_exists(pid):
                 proc = psutil.Process(pid)
@@ -171,7 +170,7 @@ class MCPHealthMonitor:
             return None
 
     async def _collect_metrics(self) -> HealthMetrics:
-        """Collect comprehensive health metrics"""
+        """Collect comprehensive health metrics."""
         if not self.process:
             raise ValueError("No process to monitor")
         memory_info = self.process.memory_info()
@@ -200,7 +199,7 @@ class MCPHealthMonitor:
         )
 
     async def _test_response_time(self) -> float | None:
-        """Test MCP server response time"""
+        """Test MCP server response time."""
         endpoint = self.config.get("health_check_endpoint")
         if not endpoint:
             return None
@@ -211,22 +210,21 @@ class MCPHealthMonitor:
             async with aiohttp.ClientSession() as session:
                 async with session.get(endpoint, timeout=5) as response:
                     await response.text()
-            response_time = (time.time() - start_time) * 1000
-            return response_time
+            return (time.time() - start_time) * 1000
         except Exception as e:
             logger.debug("Health check endpoint test failed: %s", e)
             return None
 
     def _get_error_count(self) -> int:
-        """Get current error count (simplified implementation)"""
+        """Get current error count (simplified implementation)."""
         return 0
 
     def _get_last_error(self) -> str | None:
-        """Get last error message (simplified implementation)"""
+        """Get last error message (simplified implementation)."""
         return None
 
     def _analyze_health(self, metrics: HealthMetrics) -> str:
-        """Analyze health metrics and return status"""
+        """Analyze health metrics and return status."""
         issues = []
         if metrics.memory_mb > self.thresholds.memory_mb_critical:
             issues.append(
@@ -253,7 +251,7 @@ class MCPHealthMonitor:
                 issues.append(
                     f"WARNING: Response time {metrics.response_time_ms:.1f}ms exceeds warning threshold {self.thresholds.response_time_ms_warning}ms"
                 )
-        if metrics.status not in ["running", "sleeping"]:
+        if metrics.status not in {"running", "sleeping"}:
             issues.append(f"WARNING: Process status is {metrics.status}")
         if metrics.uptime_seconds < self.thresholds.uptime_minimum_seconds:
             issues.append(
@@ -265,8 +263,8 @@ class MCPHealthMonitor:
             return "warning"
         return "healthy"
 
-    async def _handle_health_status(self, status: str, metrics: HealthMetrics):
-        """Handle health status with alerting and recovery"""
+    async def _handle_health_status(self, status: str, metrics: HealthMetrics) -> None:
+        """Handle health status with alerting and recovery."""
         if status == "healthy":
             self._clear_alerts()
             logger.debug(
@@ -291,20 +289,20 @@ class MCPHealthMonitor:
         if status == "critical" and self.config.get("auto_restart", False):
             await self._attempt_recovery(metrics)
 
-    async def _handle_process_not_found(self):
-        """Handle the case when MCP server process is not found"""
+    async def _handle_process_not_found(self) -> None:
+        """Handle the case when MCP server process is not found."""
         logger.error("MCP server process not found")
         await self._send_alert("critical", None, "MCP server process not found")
         if self.config.get("auto_restart", False):
             await self._attempt_restart()
 
-    async def _attempt_recovery(self, metrics: HealthMetrics):
-        """Attempt to recover from critical health issues"""
+    async def _attempt_recovery(self, metrics: HealthMetrics) -> None:
+        """Attempt to recover from critical health issues."""
         logger.info("Attempting automatic recovery...")
         await self._attempt_restart()
 
-    async def _attempt_restart(self):
-        """Attempt to restart the MCP server"""
+    async def _attempt_restart(self) -> None:
+        """Attempt to restart the MCP server."""
         restart_attempts = getattr(self, "_restart_attempts", 0)
         max_attempts = self.config.get("max_restart_attempts", 3)
         if restart_attempts >= max_attempts:
@@ -334,10 +332,10 @@ class MCPHealthMonitor:
             if startup_script.exists():
                 logger.info("Attempting restart using startup script")
         except Exception as e:
-            logger.error("Restart attempt failed: %s", e)
+            logger.exception("Restart attempt failed: %s", e)
 
     def _is_systemd_service(self) -> bool:
-        """Check if MCP server is running as a systemd service"""
+        """Check if MCP server is running as a systemd service."""
         try:
             result = subprocess.run(
                 ["systemctl", "is-active", "mcp-server"],
@@ -352,8 +350,8 @@ class MCPHealthMonitor:
 
     async def _send_alert(
         self, status: str, metrics: HealthMetrics | None, message: str = ""
-    ):
-        """Send health alert with cooldown"""
+    ) -> None:
+        """Send health alert with cooldown."""
         alert_key = f"{status}_{message[:50]}"
         cooldown_seconds = self.config.get("alert_cooldown_seconds", 300)
         last_alert = self.alert_cooldown.get(alert_key, 0)
@@ -373,32 +371,31 @@ class MCPHealthMonitor:
             try:
                 await self._send_webhook_alert(webhook_url, alert_data)
             except Exception as e:
-                logger.error("Failed to send webhook alert to %s: %s", webhook_url, e)
+                logger.exception("Failed to send webhook alert to %s: %s", webhook_url, e)
 
-    async def _send_webhook_alert(self, webhook_url: str, alert_data: dict):
-        """Send alert to webhook endpoint"""
+    async def _send_webhook_alert(self, webhook_url: str, alert_data: dict) -> None:
+        """Send alert to webhook endpoint."""
         try:
             import aiohttp
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    webhook_url, json=alert_data, timeout=10
-                ) as response:
-                    if response.status == 200:
-                        logger.debug("Alert sent to webhook: %s", webhook_url)
-                    else:
-                        logger.warning("Webhook returned status %s", response.status)
+            async with aiohttp.ClientSession() as session, session.post(
+                webhook_url, json=alert_data, timeout=10
+            ) as response:
+                if response.status == 200:
+                    logger.debug("Alert sent to webhook: %s", webhook_url)
+                else:
+                    logger.warning("Webhook returned status %s", response.status)
         except Exception as e:
-            logger.error("Webhook error: %s", e)
+            logger.exception("Webhook error: %s", e)
 
-    def _clear_alerts(self):
-        """Clear alert cooldowns when health is restored"""
+    def _clear_alerts(self) -> None:
+        """Clear alert cooldowns when health is restored."""
         if self.alert_cooldown:
             logger.debug("Clearing alert cooldowns - health restored")
             self.alert_cooldown.clear()
 
-    def _store_metrics(self, metrics: HealthMetrics):
-        """Store metrics to file and memory"""
+    def _store_metrics(self, metrics: HealthMetrics) -> None:
+        """Store metrics to file and memory."""
         self.health_history.append(metrics)
         try:
             metrics_data = {
@@ -407,19 +404,19 @@ class MCPHealthMonitor:
                 "monitor_uptime": time.time() - self.start_time,
             }
             self.metrics_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.metrics_file, "w") as f:
+            with open(self.metrics_file, "w", encoding="utf-8") as f:
                 json.dump(metrics_data, f, indent=2)
         except Exception as e:
-            logger.error("Failed to store metrics: %s", e)
+            logger.exception("Failed to store metrics: %s", e)
 
-    def _cleanup_metrics(self):
-        """Remove old metrics from history"""
+    def _cleanup_metrics(self) -> None:
+        """Remove old metrics from history."""
         max_history = self.config.get("metrics_history_size", 100)
         if len(self.health_history) > max_history:
             self.health_history = self.health_history[-max_history:]
 
     def get_health_summary(self) -> dict[str, Any]:
-        """Get current health summary"""
+        """Get current health summary."""
         if not self.health_history:
             return {"status": "no_data", "message": "No health data available"}
         latest = self.health_history[-1]
@@ -433,7 +430,7 @@ class MCPHealthMonitor:
 
 
 async def main():
-    """Main entry point"""
+    """Main entry point."""
     import argparse
 
     parser = argparse.ArgumentParser(description="MCP Server Health Monitor")
@@ -469,7 +466,7 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Monitoring stopped by user")
     except Exception as e:
-        logger.error("Monitor error: %s", e)
+        logger.exception("Monitor error: %s", e)
         return 1
     return 0
 

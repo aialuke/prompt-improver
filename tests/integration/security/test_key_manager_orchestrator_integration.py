@@ -15,12 +15,9 @@ Integration Test Coverage:
 - Performance validation in integrated environment
 """
 
-import asyncio
 import json
 import tempfile
 import time
-from pathlib import Path
-from typing import Any, Dict, List
 
 import numpy as np
 import pytest
@@ -35,7 +32,7 @@ from prompt_improver.ml.orchestration.core.component_registry import (
     ComponentRegistry,
     ComponentTier,
 )
-from prompt_improver.security.key_manager import UnifiedKeyManager, get_key_manager
+from prompt_improver.security.key_manager import UnifiedKeyManager
 
 
 class TestKeyManagerComponentRegistration:
@@ -417,7 +414,7 @@ class TestSecurityComplianceIntegration:
                 "orchestrator_compatible": result.get("orchestrator_compatible"),
             })
         for i, (operation, params) in enumerate(operations[1:], start=2):
-            if operation in ["encrypt", "test_encryption"]:
+            if operation in {"encrypt", "test_encryption"}:
                 result = fernet_mgr.run_orchestrated_analysis(
                     operation=operation, parameters=params
                 )

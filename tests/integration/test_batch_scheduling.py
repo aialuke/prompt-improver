@@ -11,10 +11,9 @@ Migrated from mock-based testing to real behavior testing following 2025 best pr
 """
 
 import asyncio
-import logging
+import contextlib
 import time
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -206,10 +205,8 @@ class TestBatchScheduling:
         )
         await asyncio.sleep(0.5)
         periodic_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await periodic_task
-        except asyncio.CancelledError:
-            pass
         final_queue_size = processor.get_queue_size()
         assert final_queue_size < initial_queue_size
         assert processor.metrics["processed"] > 0
@@ -426,9 +423,7 @@ class TestBatchSchedulingPerformance:
         """Test that real batch processing meets < 200ms response time requirement."""
         config = BatchProcessorConfig(batch_size=10, concurrency=5, dry_run=True)
         processor = BatchProcessor(config)
-        test_batch = []
-        for i in range(50):
-            test_batch.append({
+        test_batch = [{
                 "original": f"Real test prompt {i} with realistic content and complexity",
                 "enhanced": f"Enhanced real test prompt {i} with improved structure and clarity",
                 "metrics": {
@@ -438,16 +433,15 @@ class TestBatchSchedulingPerformance:
                 },
                 "session_id": f"real_session_{i % 10}",
                 "priority": i % 5,
-            })
+            } for i in range(50)]
 
         def process_training_batch():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                result = loop.run_until_complete(
+                return loop.run_until_complete(
                     processor.process_training_batch(test_batch)
                 )
-                return result
             finally:
                 loop.close()
 
@@ -496,7 +490,7 @@ class TestBatchSchedulingIntegration:
         """Test real batch processor integration with session store."""
         from prompt_improver.services.cache.cache_facade import CacheFacade
 
-        session_store = CacheFacade(l1_max_size=100, l2_default_ttl=300, enable_l2=False, enable_l3=False)
+        session_store = CacheFacade(l1_max_size=100, l2_default_ttl=300, enable_l2=False)
         config = BatchProcessorConfig(batch_size=5, dry_run=True)
         processor = BatchProcessor(config)
         async with session_store:

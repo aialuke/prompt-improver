@@ -1,4 +1,4 @@
-"""Core System Components
+"""Core System Components.
 
 Core services, setup utilities, and system-wide functionality.
 """
@@ -13,7 +13,10 @@ from prompt_improver.core.interfaces.datetime_service import (
     MockDateTimeService,
 )
 from prompt_improver.core.services.datetime_service import DateTimeService
-from prompt_improver.core.services.manager import OrchestrationService as APESServiceManager
+from prompt_improver.core.services.manager import (
+    OrchestrationService as APESServiceManager,
+)
+
 # NOTE: PromptImprovementService moved to services.prompt.facade to break circular imports
 from prompt_improver.core.services.startup import (
     StartupOrchestrator,

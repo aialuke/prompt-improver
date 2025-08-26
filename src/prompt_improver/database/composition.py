@@ -19,24 +19,21 @@ Following research-validated patterns:
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
-from prompt_improver.database.protocols.database_config import DatabaseConfigProtocol
-from .protocols import DatabaseServicesProtocol
-# Using unified cache facade from services/cache instead of database-specific CacheManager
-from prompt_improver.services.cache.cache_facade import CacheFacade
-from .services.connection.postgres_pool_manager import (
+from prompt_improver.database.services.connection.postgres_pool_manager import (
     PoolConfiguration as PostgresPoolConfiguration,
     PostgreSQLPoolManager,
 )
-from .services.health.health_manager import HealthManager
-from .services.locking.lock_manager import DistributedLockManager
-from .services.pubsub.pubsub_manager import PubSubManager
-from .types import (
-    HealthStatus,
+from prompt_improver.database.services.health.health_manager import HealthManager
+from prompt_improver.database.types import (
     ManagerMode,
     PoolConfiguration as TypesPoolConfiguration,
 )
+
+# Using unified cache facade from services/cache instead of database-specific CacheManager
+from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.shared.interfaces.protocols.database import DatabaseConfigProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +43,7 @@ class DatabaseServices:
 
     Implements constructor dependency injection to compose all extracted services:
     - PostgreSQLPoolManager for database connections
-    - CacheManager for multi-level caching (L1, L2, L3)
+    - CacheManager for multi-level caching (L1, L2)
     - DistributedLockManager for distributed locking
     - PubSubManager for publish/subscribe messaging
     - HealthManager for service health monitoring
@@ -56,11 +53,11 @@ class DatabaseServices:
     """
 
     def __init__(
-        self, 
-        mode: ManagerMode, 
+        self,
+        mode: ManagerMode,
         db_config: DatabaseConfigProtocol,
-        pool_config: Optional[TypesPoolConfiguration] = None
-    ):
+        pool_config: TypesPoolConfiguration | None = None
+    ) -> None:
         """Initialize DatabaseServices with composed service dependencies.
 
         Args:
@@ -86,12 +83,12 @@ class DatabaseServices:
             DatabaseConfig,
         )
 
-        # Use injected database config via protocol  
+        # Use injected database config via protocol
         database_url = db_config.get_database_url()
         # Parse URL to extract components for DatabaseConfig
         from urllib.parse import urlparse
         parsed = urlparse(database_url)
-        
+
         # Convert protocol-based config to PostgreSQLPoolManager's expected format
         postgres_db_config = DatabaseConfig(
             host=parsed.hostname or "localhost",
@@ -104,7 +101,7 @@ class DatabaseServices:
 
         # Get pool configuration from protocol
         pool_config_dict = db_config.get_connection_pool_config()
-        
+
         # Convert TypesPoolConfiguration to PostgresPoolConfiguration
         postgres_pool_config = PostgresPoolConfiguration(
             pool_size=self.types_pool_config.pg_pool_size,
@@ -121,8 +118,7 @@ class DatabaseServices:
 
         # Initialize unified cache facade (eliminates CacheManager circular import)
         self.cache = CacheFacade(
-            enable_l2=True, 
-            enable_l3=True, 
+            enable_l2=True,
             session_manager=self.database
         )
 
@@ -175,7 +171,7 @@ class DatabaseServices:
         except ValueError as e:
             # Configuration validation errors - fail fast with clear message
             error_msg = f"Invalid service configuration: {e}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             await self._cleanup_partial_initialization()
             raise ValueError(error_msg) from e
 
@@ -184,7 +180,7 @@ class DatabaseServices:
             error_msg = (
                 f"Failed to initialize database services: {type(e).__name__}: {e}"
             )
-            logger.error(error_msg)
+            logger.exception(error_msg)
             # Cleanup any partially initialized services
             await self._cleanup_partial_initialization()
             raise RuntimeError(error_msg) from e
@@ -230,14 +226,14 @@ class DatabaseServices:
 
         logger.info("All database services shutdown complete")
 
-    async def health_check_all(self) -> Dict[str, HealthStatus]:
+    async def health_check_all(self) -> dict[str, str]:
         """Health check all composed services.
 
         Returns:
             Dictionary mapping service names to health status
         """
         if not self._initialized:
-            return {"overall": HealthStatus.UNKNOWN}
+            return {"overall": "unknown"}
 
         # Use health manager's check method and convert to simple dict
         result = await self.health_manager.check_all_components_health()
@@ -250,7 +246,7 @@ class DatabaseServices:
             "details": result.overall_status.value,
         }
 
-    async def get_metrics_all(self) -> Dict[str, Any]:
+    async def get_metrics_all(self) -> dict[str, Any]:
         """Get comprehensive metrics from all services.
 
         Returns:
@@ -298,20 +294,17 @@ class DatabaseServices:
 
         return metrics
 
-    async def _cleanup_partial_initialization(self):
+    async def _cleanup_partial_initialization(self) -> None:
         """Cleanup any partially initialized services."""
         logger.warning("Cleaning up partially initialized services")
 
-        cleanup_tasks = []
-        for service in [
+        cleanup_tasks = [service.shutdown() for service in [
             self.health_manager,
             self.pubsub,
             self.lock_manager,
             self.cache,
             self.database,
-        ]:
-            if hasattr(service, "shutdown"):
-                cleanup_tasks.append(service.shutdown())
+        ] if hasattr(service, "shutdown")]
 
         if cleanup_tasks:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
@@ -328,14 +321,14 @@ class DatabaseServices:
 
 
 # Global service registry for factory functions
-_service_registry: Dict[ManagerMode, DatabaseServices] = {}
+_service_registry: dict[ManagerMode, DatabaseServices] = {}
 _registry_lock = asyncio.Lock()
 
 
 async def create_database_services(
     mode: ManagerMode,
     db_config: DatabaseConfigProtocol,
-    pool_config: Optional[TypesPoolConfiguration] = None,
+    pool_config: TypesPoolConfiguration | None = None,
     force_new: bool = False,
 ) -> DatabaseServices:
     """Factory function to create or retrieve DatabaseServices instance.
@@ -367,7 +360,7 @@ async def create_database_services(
         return services
 
 
-async def get_database_services(mode: ManagerMode) -> Optional[DatabaseServices]:
+async def get_database_services(mode: ManagerMode) -> DatabaseServices | None:
     """Get existing DatabaseServices instance without creating new one.
 
     Args:
@@ -393,10 +386,7 @@ async def shutdown_all_services():
             f"Shutting down {len(_service_registry)} DatabaseServices instances"
         )
 
-        shutdown_tasks = []
-        for services in _service_registry.values():
-            if not services._shutdown:
-                shutdown_tasks.append(services.shutdown_all())
+        shutdown_tasks = [services.shutdown_all() for services in _service_registry.values() if not services._shutdown]
 
         if shutdown_tasks:
             await asyncio.gather(*shutdown_tasks, return_exceptions=True)

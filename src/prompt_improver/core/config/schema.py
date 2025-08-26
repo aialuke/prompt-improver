@@ -4,19 +4,16 @@ Ensures backward compatibility and smooth transitions between configuration vers
 
 import json
 import logging
-import os
-import sys
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from pydantic import BaseModel
 from sqlmodel import (
     Field as SQLModelField,
-    SQLModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,7 +93,7 @@ class UnifiedConfigService:
     - EnvironmentConfigManager (environment config)
     """
 
-    def __init__(self, feature_flags_config_path: str | Path | None = None):
+    def __init__(self, feature_flags_config_path: str | Path | None = None) -> None:
         """Initialize unified configuration manager.
 
         Args:
@@ -111,7 +108,7 @@ class UnifiedConfigService:
         if feature_flags_config_path:
             self._init_feature_flags_manager(feature_flags_config_path)
 
-    def _init_feature_flags_manager(self, config_path: str | Path):
+    def _init_feature_flags_manager(self, config_path: str | Path) -> None:
         """Initialize integrated feature flags management."""
         try:
             from prompt_improver.core.feature_flags import FeatureFlagService
@@ -124,7 +121,7 @@ class UnifiedConfigService:
 
     # Feature flag methods (delegated to internal manager)
     def is_enabled(
-        self, flag_key: str, user_id: str | None = None, context: dict = None
+        self, flag_key: str, user_id: str | None = None, context: dict | None = None
     ) -> bool:
         """Check if a feature flag is enabled for user/context."""
         if self._feature_flags_manager:
@@ -138,7 +135,7 @@ class UnifiedConfigService:
         flag_key: str,
         default=None,
         user_id: str | None = None,
-        context: dict = None,
+        context: dict | None = None,
     ):
         """Get feature flag value with fallback to default."""
         if self._feature_flags_manager:
@@ -147,7 +144,7 @@ class UnifiedConfigService:
             )
         return default
 
-    def get_all_flags(self, user_id: str | None = None, context: dict = None) -> dict:
+    def get_all_flags(self, user_id: str | None = None, context: dict | None = None) -> dict:
         """Get all feature flags for user/context."""
         if self._feature_flags_manager:
             return self._feature_flags_manager.get_all_flags(user_id, context or {})
@@ -254,12 +251,12 @@ class UnifiedConfigService:
             )
             return False
         try:
-            if config_path.suffix in [".json"]:
+            if config_path.suffix in {".json"}:
                 config_data = json.loads(config_path.read_text())
             else:
                 config_data = self._parse_env_file(config_path)
         except Exception as e:
-            logger.error(f"Could not load configuration from {config_path}: {e}")
+            logger.exception(f"Could not load configuration from {config_path}: {e}")
             return False
         applied_migrations = []
         for migration in migration_path:
@@ -269,13 +266,13 @@ class UnifiedConfigService:
                     f"{migration.from_version.value}->{migration.to_version.value}"
                 )
             except Exception as e:
-                logger.error(f"Migration failed: {migration.description}: {e}")
+                logger.exception(f"Migration failed: {migration.description}: {e}")
                 return False
         try:
             backup_path = config_path.with_suffix(f"{config_path.suffix}.backup")
             backup_path.write_text(config_path.read_text())
             logger.info(f"Created backup: {backup_path}")
-            if config_path.suffix in [".json"]:
+            if config_path.suffix in {".json"}:
                 config_path.write_text(json.dumps(config_data, indent=2))
             else:
                 self._write_env_file(config_path, config_data)
@@ -291,7 +288,7 @@ class UnifiedConfigService:
             )
             return True
         except Exception as e:
-            logger.error(f"Could not save migrated configuration: {e}")
+            logger.exception(f"Could not save migrated configuration: {e}")
             return False
 
     def _find_migration_path(
@@ -402,25 +399,17 @@ class UnifiedConfigService:
 
     def _validate_v2_0_schema(self, config_data: dict[str, Any]) -> list[str]:
         """Validate V2.0 schema compliance."""
-        issues = []
         required_v2_vars = [
             "FEATURE_FLAG_ML_IMPROVEMENTS",
             "SECURITY_ENABLE_RATE_LIMITING",
             "MONITORING_ENABLED",
         ]
-        for var in required_v2_vars:
-            if var not in config_data:
-                issues.append(f"Missing required V2.0 variable: {var}")
-        return issues
+        return [f"Missing required V2.0 variable: {var}" for var in required_v2_vars if var not in config_data]
 
     def _validate_v1_2_schema(self, config_data: dict[str, Any]) -> list[str]:
         """Validate V1.2 schema compliance."""
-        issues = []
         required_v1_2_vars = ["MONITORING_ENABLED", "ML_MODEL_PATH"]
-        for var in required_v1_2_vars:
-            if var not in config_data:
-                issues.append(f"Missing required V1.2 variable: {var}")
-        return issues
+        return [f"Missing required V1.2 variable: {var}" for var in required_v1_2_vars if var not in config_data]
 
 
 # Create unified instance and backward compatibility alias

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 import pandas as pd
 from ....database import ManagerMode, get_database_services
 from ....repositories.factory import get_ml_repository
@@ -17,6 +17,7 @@ from ....services.error_handling.facade import handle_common_errors as handle_er
 try:
     from mlxtend.frequent_patterns import apriori, association_rules
     from mlxtend.preprocessing import TransactionEncoder
+    from prompt_improver.core.utils.lazy_ml_loader import get_numpy
     MLXTEND_AVAILABLE = True
 except ImportError:
     MLXTEND_AVAILABLE = False

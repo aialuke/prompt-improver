@@ -8,12 +8,11 @@ into the clustering and analysis pipeline.
 import os
 import random
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pytest
 
-from prompt_improver.analysis.linguistic_analyzer import LinguisticAnalyzer
 from prompt_improver.learning.context_learner import (
     ContextConfig,
     ContextSpecificLearner,
@@ -165,7 +164,7 @@ class TestLinguisticMLIntegration:
         assert len(learner.linguistic_cache) == 1, (
             "Cache should have one entry after first extraction"
         )
-        cache_key = list(learner.linguistic_cache.keys())[0]
+        cache_key = next(iter(learner.linguistic_cache.keys()))
         cached_features = learner.linguistic_cache[cache_key]
         features2 = learner._extract_linguistic_features(result)
         assert len(learner.linguistic_cache) == 1, (

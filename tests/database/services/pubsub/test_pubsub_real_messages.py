@@ -14,9 +14,7 @@ Integration tests using mock Redis that simulates real Redis pub/sub behavior.
 import asyncio
 import json
 import time
-from datetime import datetime, UTC
 from typing import Dict, Any, List, Set
-from unittest.mock import AsyncMock, MagicMock
 from collections import defaultdict
 
 import pytest
@@ -24,9 +22,8 @@ import pytest
 from prompt_improver.database.services.pubsub.pubsub_manager import (
     PubSubManager,
     PubSubConfig,
-    SubscriptionInfo,
-    create_pubsub_manager,
 )
+from tests.utils.mocks import MockRedisClient
 
 
 class MockRedisPubSub:
@@ -121,6 +118,65 @@ class MockRedisPubSub:
         return False
 
 
+class MockL2RedisService:
+    """Mock L2RedisService that wraps MockRedisClient for testing."""
+    
+    def __init__(self, redis_client: MockRedisClient):
+        self._redis_client = redis_client
+        self._available = True
+    
+    def is_available(self) -> bool:
+        """Check if Redis client is available."""
+        return self._available and self._redis_client is not None
+    
+    async def publish(self, channel: str, message: Any) -> int:
+        """Publish message via wrapped Redis client."""
+        if not self.is_available():
+            return 0
+        
+        # Serialize message like L2RedisService does
+        if isinstance(message, (str, bytes)):
+            serialized_message = message
+        else:
+            serialized_message = json.dumps(message, default=str)
+        
+        return await self._redis_client.publish(channel, serialized_message)
+    
+    def get_pipeline(self) -> Any | None:
+        """Get Redis pipeline object."""
+        if not self.is_available():
+            return None
+        return MockRedisPipeline(self._redis_client)
+    
+    def get_pubsub(self) -> Any | None:
+        """Get Redis pubsub object.""" 
+        if not self.is_available():
+            return None
+        return self._redis_client.pubsub()
+
+
+class MockRedisPipeline:
+    """Mock Redis pipeline for batch operations."""
+    
+    def __init__(self, redis_client: MockRedisClient):
+        self._redis_client = redis_client
+        self._commands = []
+    
+    def publish(self, channel: str, message: str):
+        """Queue publish command."""
+        self._commands.append(('publish', channel, message))
+    
+    async def execute(self):
+        """Execute queued commands."""
+        results = []
+        for cmd_type, channel, message in self._commands:
+            if cmd_type == 'publish':
+                result = await self._redis_client.publish(channel, message)
+                results.append(result)
+        self._commands.clear()
+        return results
+
+
 class MockRedisClient:
     """Mock Redis client that simulates pub/sub behavior."""
     
@@ -184,11 +240,12 @@ class TestPubSubManagerCore:
     def test_pubsub_manager_creation(self):
         """Test pub/sub manager initialization."""
         redis_client = MockRedisClient()
+        l2_redis_service = MockL2RedisService(redis_client)
         config = PubSubConfig(max_connections=5)
         
-        manager = PubSubManager(redis_client, config)
+        manager = PubSubManager(l2_redis_service, config)
         
-        assert manager.redis_client == redis_client
+        assert manager.l2_redis_service == l2_redis_service
         assert manager.config.max_connections == 5
         assert len(manager._subscriptions) == 0
         assert manager.total_publishes == 0
@@ -197,7 +254,8 @@ class TestPubSubManagerCore:
     async def test_basic_publish_subscribe(self):
         """Test basic publish/subscribe functionality."""
         redis_client = MockRedisClient()
-        manager = PubSubManager(redis_client)
+        l2_redis_service = MockL2RedisService(redis_client)
+        manager = PubSubManager(l2_redis_service)
         
         # Subscribe to channel
         subscriber_id = await manager.subscribe(["test_channel"])
@@ -232,7 +290,8 @@ class TestPubSubManagerCore:
     async def test_json_message_serialization(self):
         """Test automatic JSON serialization/deserialization."""
         redis_client = MockRedisClient()
-        manager = PubSubManager(redis_client, PubSubConfig(auto_serialize_json=True))
+        l2_redis_service = MockL2RedisService(redis_client)
+        manager = PubSubManager(l2_redis_service, PubSubConfig(auto_serialize_json=True))
         
         subscriber_id = await manager.subscribe(["json_channel"])
         
@@ -556,7 +615,8 @@ class TestPubSubManagerFailures:
     async def test_redis_connection_failure(self):
         """Test behavior when Redis connection fails."""
         failing_redis = MockRedisClient(should_fail=True)
-        manager = PubSubManager(failing_redis)
+        l2_redis_service = MockL2RedisService(failing_redis)
+        manager = PubSubManager(l2_redis_service)
         
         # Publishing should fail gracefully
         count = await manager.publish("test_channel", "test message")

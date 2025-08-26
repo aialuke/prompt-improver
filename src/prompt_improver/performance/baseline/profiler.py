@@ -6,25 +6,23 @@ import functools
 import io
 import logging
 import pstats
-import sys
 import time
 import tracemalloc
 import uuid
-import weakref
-from collections import defaultdict
 from collections.abc import Callable
-from contextlib import asynccontextmanager, contextmanager
-from datetime import UTC, datetime, timezone
+from contextlib import asynccontextmanager, contextmanager, suppress
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, ParamSpec, Tuple, TypeVar, Union
-
-from prompt_improver.performance.baseline.models import ProfileData
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 # Enhanced background task management
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
 )
+
+if TYPE_CHECKING:
+    from prompt_improver.performance.baseline.models import ProfileData
 
 # Advanced profiling
 try:
@@ -66,7 +64,7 @@ class ProfilerConfig:
         slow_function_threshold_ms: float = 50.0,  # Functions taking >50ms
         max_call_stack_depth: int = 20,
         output_directory: Path | None = None,
-    ):
+    ) -> None:
         """Initialize profiler configuration.
 
         Args:
@@ -97,7 +95,7 @@ class FunctionCallData:
 
     def __init__(
         self, function_name: str, module_name: str, filename: str, line_number: int
-    ):
+    ) -> None:
         self.function_name = function_name
         self.module_name = module_name
         self.filename = filename
@@ -149,7 +147,7 @@ class ContinuousProfiler:
     call patterns to identify performance hotspots and bottlenecks.
     """
 
-    def __init__(self, config: ProfilerConfig | None = None):
+    def __init__(self, config: ProfilerConfig | None = None) -> None:
         """Initialize continuous profiler.
 
         Args:
@@ -208,10 +206,8 @@ class ContinuousProfiler:
 
         if self._profiling_task:
             self._profiling_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._profiling_task
-            except asyncio.CancelledError:
-                pass
 
         # Stop any active cProfile session
         if self._current_profile:
@@ -329,7 +325,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def profile(func: Callable[P, T] | None = None, *, name: str | None = None):
+def profile[**P, T](func: Callable[P, T] | None = None, *, name: str | None = None):
     """Decorator for profiling function execution."""
 
     def decorator(f: Callable[P, T]) -> Callable[P, T]:

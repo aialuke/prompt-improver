@@ -10,9 +10,9 @@ import importlib
 import inspect
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
-from prompt_improver.core.protocols.ml_protocols import (
+from prompt_improver.shared.interfaces.protocols.ml import (
     ComponentFactoryProtocol,
     ComponentSpec,
     ServiceContainerProtocol,
@@ -33,7 +33,7 @@ class ComponentFactory(ComponentFactoryProtocol):
     - Logging for component creation lifecycle
     """
 
-    def __init__(self, service_container: ServiceContainerProtocol):
+    def __init__(self, service_container: ServiceContainerProtocol) -> None:
         """Initialize ComponentFactory with service container.
 
         Args:
@@ -91,7 +91,7 @@ class ComponentFactory(ComponentFactoryProtocol):
             self.logger.info(f"Successfully created component: {spec.name}")
             return component_instance
         except Exception as e:
-            self.logger.error(f"Failed to create component '{spec.name}': {e}")
+            self.logger.exception(f"Failed to create component '{spec.name}': {e}")
             raise RuntimeError(
                 f"Component creation failed for '{spec.name}': {e}"
             ) from e
@@ -121,12 +121,12 @@ class ComponentFactory(ComponentFactoryProtocol):
             self.logger.debug(f"Successfully imported class: {spec.class_name}")
             return component_class
         except ImportError as e:
-            self.logger.error(f"Failed to import module '{spec.module_path}': {e}")
+            self.logger.exception(f"Failed to import module '{spec.module_path}': {e}")
             raise ImportError(
                 f"Module import failed for '{spec.module_path}': {e}"
             ) from e
         except (AttributeError, TypeError) as e:
-            self.logger.error(f"Class resolution failed: {e}")
+            self.logger.exception(f"Class resolution failed: {e}")
             raise ImportError(
                 f"Class '{spec.class_name}' resolution failed: {e}"
             ) from e
@@ -167,7 +167,7 @@ class ComponentFactory(ComponentFactoryProtocol):
             self.logger.debug(f"Dependencies validated for component: {spec.name}")
             return True
         except Exception as e:
-            self.logger.error(f"Dependency validation failed for '{spec.name}': {e}")
+            self.logger.exception(f"Dependency validation failed for '{spec.name}': {e}")
             raise ValueError(f"Dependency validation failed: {e}") from e
 
     async def _resolve_dependencies(
@@ -227,7 +227,7 @@ class ComponentFactory(ComponentFactoryProtocol):
                 component_instance = component_class()
             return component_instance
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Component instantiation failed for {component_class.__name__}: {e}"
             )
             raise RuntimeError(f"Instantiation failed: {e}") from e
@@ -255,7 +255,7 @@ class ComponentFactory(ComponentFactoryProtocol):
                     component.start()
                     self.logger.debug(f"Sync started component: {spec.name}")
         except Exception as e:
-            self.logger.error(f"Component initialization failed for '{spec.name}': {e}")
+            self.logger.exception(f"Component initialization failed for '{spec.name}': {e}")
             raise RuntimeError(f"Initialization failed: {e}") from e
 
     async def create_component_by_name(
@@ -317,7 +317,7 @@ class ComponentFactory(ComponentFactoryProtocol):
                 component.shutdown()
             self.logger.debug(f"Shutdown component: {component_name}")
         except Exception as e:
-            self.logger.error(f"Component shutdown failed for '{component_name}': {e}")
+            self.logger.exception(f"Component shutdown failed for '{component_name}': {e}")
 
     def get_registered_specs(self) -> dict[str, ComponentSpec]:
         """Get all registered component specifications."""
@@ -349,7 +349,7 @@ class ComponentFactory(ComponentFactoryProtocol):
                     else:
                         component.shutdown()
                 except Exception as e:
-                    self.logger.error(f"Component lifecycle shutdown failed: {e}")
+                    self.logger.exception(f"Component lifecycle shutdown failed: {e}")
 
 
 class DependencyValidator:
@@ -359,7 +359,7 @@ class DependencyValidator:
     for complex component dependency graphs.
     """
 
-    def __init__(self, component_specs: dict[str, ComponentSpec]):
+    def __init__(self, component_specs: dict[str, ComponentSpec]) -> None:
         """Initialize validator with component specifications.
 
         Args:
@@ -380,11 +380,7 @@ class DependencyValidator:
         errors = []
         for spec in self.specs.values():
             if spec.dependencies:
-                for dep_name, service_key in spec.dependencies.items():
-                    if service_key not in available_services:
-                        errors.append(
-                            f"Component '{spec.name}' requires missing service: {service_key}"
-                        )
+                errors.extend(f"Component '{spec.name}' requires missing service: {service_key}" for service_key in spec.dependencies.values() if service_key not in available_services)
         circular_deps = self._detect_circular_dependencies()
         errors.extend([
             f"Circular dependency detected: {' -> '.join(cycle)}"

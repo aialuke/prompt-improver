@@ -63,7 +63,7 @@ class FewShotExampleRule(BasePromptRule):
     - Domain-specific example generation
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = {
             "optimal_example_count": 3,
             "require_diverse_examples": True,
@@ -78,12 +78,12 @@ class FewShotExampleRule(BasePromptRule):
         self.priority = 7
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "Few-Shot Example Integration Rule",
             "type": "Examples",
@@ -101,7 +101,7 @@ class FewShotExampleRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Check if prompt would benefit from few-shot examples"""
+        """Check if prompt would benefit from few-shot examples."""
         example_metrics = self._analyze_example_requirements(prompt)
         applies = (
             example_metrics["task_benefits_from_examples"]
@@ -128,7 +128,7 @@ class FewShotExampleRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply few-shot example enhancement"""
+        """Apply few-shot example enhancement."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -158,11 +158,11 @@ class FewShotExampleRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction for few-shot examples"""
+        """Generate research-based LLM instruction for few-shot examples."""
         return "\n<instruction>\nAdd few-shot examples using research-validated patterns:\n\n1. OPTIMAL COUNT (Brown et al. 2020):\n   - Use 2-5 examples (research shows diminishing returns beyond 5)\n   - Balance example count with prompt length constraints\n   - Prioritize quality over quantity\n\n2. EXAMPLE DIVERSITY (IBM Research):\n   - Include varied scenarios and edge cases\n   - Mix positive and negative examples when appropriate\n   - Cover different aspects of the task\n\n3. RECENCY BIAS OPTIMIZATION:\n   - Place strongest, most representative example last\n   - Order examples from simple to complex\n   - End with the most relevant case\n\n4. CLEAR FORMATTING:\n   - Use XML delimiters for structure (<example1>, <example2>)\n   - Maintain consistent format across examples\n   - Include input-output pairs where applicable\n\nFocus on examples that clearly demonstrate the expected format and quality.\n</instruction>\n"
 
     def _analyze_example_requirements(self, prompt: str) -> dict[str, Any]:
-        """Analyze prompt to determine few-shot example requirements"""
+        """Analyze prompt to determine few-shot example requirements."""
         words = prompt.lower().split()
         task_type = self._identify_task_type(prompt)
         domain = self._identify_domain(prompt)
@@ -188,7 +188,7 @@ class FewShotExampleRule(BasePromptRule):
             word
             for word in words
             if word
-            in [
+            in {
                 "complex",
                 "detailed",
                 "comprehensive",
@@ -198,10 +198,10 @@ class FewShotExampleRule(BasePromptRule):
                 "advanced",
                 "technical",
                 "specialized",
-            ]
+            }
         ])
         task_complexity = min(1.0, complexity_indicators / max(len(words), 1) * 10)
-        if task_type in ["generation", "transformation", "analysis"]:
+        if task_type in {"generation", "transformation", "analysis"}:
             task_complexity = max(task_complexity, 0.5)
         if task_complexity > 0.7:
             recommended_count = 5
@@ -223,7 +223,7 @@ class FewShotExampleRule(BasePromptRule):
         }
 
     def _identify_task_type(self, prompt: str) -> str:
-        """Identify the primary task type from the prompt"""
+        """Identify the primary task type from the prompt."""
         prompt_lower = prompt.lower()
         for task_type, patterns in TASK_TYPE_PATTERNS.items():
             for pattern in patterns:
@@ -232,7 +232,7 @@ class FewShotExampleRule(BasePromptRule):
         return "general"
 
     def _identify_domain(self, prompt: str) -> str:
-        """Identify the domain or subject area of the prompt"""
+        """Identify the domain or subject area of the prompt."""
         prompt_lower = prompt.lower()
         domain_keywords = {
             "business": [
@@ -284,7 +284,7 @@ class FewShotExampleRule(BasePromptRule):
         return "general"
 
     def _identify_format_requirements(self, prompt: str) -> dict[str, Any]:
-        """Identify specific format requirements from the prompt"""
+        """Identify specific format requirements from the prompt."""
         format_requirements = {
             "structured": False,
             "json": False,
@@ -311,7 +311,7 @@ class FewShotExampleRule(BasePromptRule):
     def _generate_examples(
         self, task_type: str, domain: str, count: int
     ) -> list[dict[str, str]]:
-        """Generate appropriate examples based on task type and domain"""
+        """Generate appropriate examples based on task type and domain."""
         example_templates = self._get_example_templates(task_type, domain)
         if not example_templates:
             return []
@@ -332,7 +332,7 @@ class FewShotExampleRule(BasePromptRule):
     def _get_example_templates(
         self, task_type: str, domain: str
     ) -> list[dict[str, str]]:
-        """Get example templates based on task type and domain"""
+        """Get example templates based on task type and domain."""
         base_templates = {
             "classification": [
                 {
@@ -383,7 +383,7 @@ class FewShotExampleRule(BasePromptRule):
     def _customize_for_domain(
         self, templates: list[dict[str, str]], domain: str
     ) -> list[dict[str, str]]:
-        """Customize examples for specific domain"""
+        """Customize examples for specific domain."""
         domain_customizations = {
             "business": {
                 "keywords": ["revenue", "strategy", "market", "client", "ROI"],
@@ -412,7 +412,7 @@ class FewShotExampleRule(BasePromptRule):
     def _select_diverse_examples(
         self, templates: list[dict[str, str]], count: int
     ) -> list[dict[str, str]]:
-        """Select diverse examples using research-based criteria"""
+        """Select diverse examples using research-based criteria."""
         if len(templates) <= count:
             return templates
         selected = []
@@ -438,7 +438,7 @@ class FewShotExampleRule(BasePromptRule):
     def _calculate_diversity_score(
         self, candidate: dict[str, str], selected: list[dict[str, str]]
     ) -> float:
-        """Calculate diversity score for example selection"""
+        """Calculate diversity score for example selection."""
         if not selected:
             return 1.0
         candidate_length = len(candidate.get("input", ""))
@@ -464,16 +464,15 @@ class FewShotExampleRule(BasePromptRule):
     def _optimize_example_order(
         self, examples: list[dict[str, str]]
     ) -> list[dict[str, str]]:
-        """Optimize example order for recency bias (strongest example last)"""
+        """Optimize example order for recency bias (strongest example last)."""
         if len(examples) <= 1:
             return examples
-        ordered = sorted(examples, key=lambda x: len(x.get("input", "")))
-        return ordered
+        return sorted(examples, key=lambda x: len(x.get("input", "")))
 
     def _create_example_variation(
         self, template: dict[str, str], variation_index: int
     ) -> dict[str, str]:
-        """Create a variation of an existing example"""
+        """Create a variation of an existing example."""
         input_text = template.get("input", "")
         output_text = template.get("output", "")
         variations = [
@@ -489,7 +488,7 @@ class FewShotExampleRule(BasePromptRule):
     def _integrate_examples(
         self, prompt: str, examples: list[dict[str, str]], metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Integrate examples into the prompt with optimal formatting"""
+        """Integrate examples into the prompt with optimal formatting."""
         if not examples:
             return (prompt, [])
         transformations = []

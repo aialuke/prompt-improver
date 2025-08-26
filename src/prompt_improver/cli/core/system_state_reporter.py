@@ -2,8 +2,8 @@
 Provides comprehensive system state reporting with component status, data metrics, and recommendations.
 """
 
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -21,7 +21,7 @@ class SystemStateReporter:
     - Export capabilities for system state
     """
 
-    def __init__(self, console: Console | None = None):
+    def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
 
     def generate_comprehensive_report(
@@ -306,6 +306,6 @@ class SystemStateReporter:
                 "recommendations_count": len(results.get("recommendations", [])),
             },
         }
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, default=str)
         return filepath

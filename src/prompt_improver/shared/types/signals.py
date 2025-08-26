@@ -1,15 +1,15 @@
 """Shared signal handling types to break circular dependencies
-Extracted from CLI modules following 2025 clean architecture patterns
+Extracted from CLI modules following 2025 clean architecture patterns.
 """
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class ShutdownReason(Enum):
-    """Enumeration of shutdown reasons for tracking and reporting"""
+    """Enumeration of shutdown reasons for tracking and reporting."""
 
     USER_INTERRUPT = "user_interrupt"
     SYSTEM_SHUTDOWN = "system_shutdown"
@@ -20,7 +20,7 @@ class ShutdownReason(Enum):
 
 
 class SignalOperation(Enum):
-    """Enumeration of signal-triggered operations"""
+    """Enumeration of signal-triggered operations."""
 
     CHECKPOINT = "checkpoint"
     STATUS_REPORT = "status_report"
@@ -30,7 +30,7 @@ class SignalOperation(Enum):
 
 
 class EmergencyOperation(Enum):
-    """Types of emergency operations that can be triggered"""
+    """Types of emergency operations that can be triggered."""
 
     BACKUP_STATE = "backup_state"
     SAVE_PROGRESS = "save_progress"
@@ -41,7 +41,7 @@ class EmergencyOperation(Enum):
 
 @dataclass
 class SignalContext:
-    """Context information for signal operations
+    """Context information for signal operations.
 
     Provides all necessary context for handling signal-triggered
     operations without circular dependencies.
@@ -58,7 +58,7 @@ class SignalContext:
     def create_shutdown_context(
         cls, reason: ShutdownReason, signal_num: int | None = None
     ) -> "SignalContext":
-        """Create context for shutdown operations
+        """Create context for shutdown operations.
 
         Args:
             reason: Reason for shutdown
@@ -79,7 +79,7 @@ class SignalContext:
     def create_emergency_context(
         cls, emergency_op: EmergencyOperation
     ) -> "SignalContext":
-        """Create context for emergency operations
+        """Create context for emergency operations.
 
         Args:
             emergency_op: Type of emergency operation
@@ -98,7 +98,7 @@ class SignalContext:
 
 @dataclass
 class OperationResult:
-    """Result from a signal-triggered operation"""
+    """Result from a signal-triggered operation."""
 
     success: bool
     operation: SignalOperation
@@ -114,7 +114,7 @@ class OperationResult:
         message: str = "",
         details: dict[str, Any] | None = None,
     ) -> "OperationResult":
-        """Create successful operation result"""
+        """Create successful operation result."""
         return cls(
             success=True,
             operation=operation,
@@ -131,7 +131,7 @@ class OperationResult:
         error_message: str,
         details: dict[str, Any] | None = None,
     ) -> "OperationResult":
-        """Create error operation result"""
+        """Create error operation result."""
         return cls(
             success=False,
             operation=operation,

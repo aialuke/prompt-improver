@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,9 @@ class HealthResult:
     status: HealthStatus
     response_time_ms: float
     message: str = ""
-    error: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    timestamp: Optional[datetime] = None
+    error: str | None = None
+    details: dict[str, Any] | None = None
+    timestamp: datetime | None = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -51,9 +51,9 @@ class HealthResult:
 
     def is_healthy(self) -> bool:
         """Check if the component is in a healthy state."""
-        return self.status in [HealthStatus.HEALTHY, HealthStatus.DEGRADED]
+        return self.status in {HealthStatus.HEALTHY, HealthStatus.DEGRADED}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert health result to dictionary for serialization."""
         return {
             "component": self.component,
@@ -71,7 +71,7 @@ class AggregatedHealthResult:
     """Aggregated health results from multiple components."""
 
     overall_status: HealthStatus
-    components: Dict[str, HealthResult]
+    components: dict[str, HealthResult]
     response_time_ms: float
     timestamp: datetime
     healthy_count: int = 0
@@ -104,7 +104,7 @@ class AggregatedHealthResult:
             if result.status == HealthStatus.DEGRADED
         ]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert aggregated result to dictionary."""
         return {
             "overall_status": self.overall_status.value,
@@ -127,11 +127,11 @@ class AggregatedHealthResult:
 class HealthChecker(ABC):
     """Abstract base class for component health checkers."""
 
-    def __init__(self, component_name: str, timeout_seconds: float = 5.0):
+    def __init__(self, component_name: str, timeout_seconds: float = 5.0) -> None:
         self.component_name = component_name
         self.timeout_seconds = timeout_seconds
-        self.last_check_time: Optional[datetime] = None
-        self.last_result: Optional[HealthResult] = None
+        self.last_check_time: datetime | None = None
+        self.last_result: HealthResult | None = None
 
     @abstractmethod
     async def check_health(self) -> HealthResult:
@@ -140,7 +140,6 @@ class HealthChecker(ABC):
         Returns:
             HealthResult with status, timing, and error details
         """
-        pass
 
     async def check_health_with_timing(self) -> HealthResult:
         """Wrapper that adds timing and error handling to health checks."""
@@ -174,10 +173,10 @@ class HealthChecker(ABC):
             self.last_check_time = datetime.now(UTC)
             self.last_result = error_result
 
-            logger.error(f"Health check failed for {self.component_name}: {e}")
+            logger.exception(f"Health check failed for {self.component_name}: {e}")
             return error_result
 
-    def get_cached_result(self) -> Optional[HealthResult]:
+    def get_cached_result(self) -> HealthResult | None:
         """Get the last cached health check result."""
         return self.last_result
 
@@ -195,7 +194,7 @@ class DatabaseHealthChecker(HealthChecker):
 
     def __init__(
         self, component_name: str, connection_pool, timeout_seconds: float = 5.0
-    ):
+    ) -> None:
         super().__init__(component_name, timeout_seconds)
         self.connection_pool = connection_pool
 
@@ -245,7 +244,7 @@ class DatabaseHealthChecker(HealthChecker):
 class RedisHealthChecker(HealthChecker):
     """Health checker for Redis connections."""
 
-    def __init__(self, component_name: str, redis_client, timeout_seconds: float = 2.0):
+    def __init__(self, component_name: str, redis_client, timeout_seconds: float = 2.0) -> None:
         super().__init__(component_name, timeout_seconds)
         self.redis_client = redis_client
 
@@ -287,7 +286,7 @@ class CacheHealthChecker(HealthChecker):
 
     def __init__(
         self, component_name: str, cache_service, timeout_seconds: float = 2.0
-    ):
+    ) -> None:
         super().__init__(component_name, timeout_seconds)
         self.cache_service = cache_service
 

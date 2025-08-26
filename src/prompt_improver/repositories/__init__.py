@@ -60,6 +60,11 @@ from prompt_improver.repositories.protocols import (
 )
 
 __all__ = [
+    # Repository Protocols for Implementation
+    "AnalyticsRepositoryProtocol",
+    "AprioriRepositoryProtocol",
+    "BaseRepositoryProtocol",
+    "HealthRepositoryProtocol",
     # Repository Interfaces for DI
     "IAnalyticsRepository",
     "IAprioriRepository",
@@ -68,11 +73,6 @@ __all__ = [
     "IRepositoryFactory",
     "IRulesRepository",
     "IUserFeedbackRepository",
-    # Repository Protocols for Implementation
-    "AnalyticsRepositoryProtocol",
-    "AprioriRepositoryProtocol",
-    "BaseRepositoryProtocol",
-    "HealthRepositoryProtocol",
     "MLRepositoryProtocol",
     "QueryBuilderProtocol",
     "RulesRepositoryProtocol",

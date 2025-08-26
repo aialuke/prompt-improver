@@ -29,13 +29,11 @@ from prompt_improver.core.config import get_config
 from prompt_improver.mcp_server.resources import setup_resources
 from prompt_improver.mcp_server.tools import setup_tools
 from prompt_improver.mcp_server.transport import setup_transport_handlers
-from prompt_improver.mcp_server.protocols.server_protocols import (
-    ServiceFactoryProtocol,
-    ServerFactoryProtocol,
-    LifecycleManagerProtocol,
-    RuntimeManagerProtocol,
+from prompt_improver.shared.interfaces.protocols.mcp import (
     MCPServerProtocol,
+    ServerFactoryProtocol,
     ServerServicesProtocol,
+    ServiceFactoryProtocol,
 )
 
 logging.basicConfig(
@@ -47,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 class ServerServices(BaseModel):
-    """Container for all MCP server services - Unified Security Architecture via Facades"""
+    """Container for all MCP server services - Unified Security Architecture via Facades."""
 
     config: Any
     security_facade: Any  # SecurityServiceFacade - main entry point
@@ -66,42 +64,41 @@ class ServerServices(BaseModel):
     cache: Any
     event_loop_manager: Any
     security_middleware_adapter: Any = None  # SecurityMiddlewareAdapter | None
-    
+
     async def get_database_session(self):
         """Get database session context manager for MCP operations.
-        
+
         Implements ServerServicesProtocol.get_database_session() to eliminate
         circular dependencies by encapsulating database access.
-        
+
         Returns:
             Database session context manager for async operations
         """
         from prompt_improver.database import get_database_services
         from prompt_improver.database.registry import ManagerMode
-        
+
         database_services = await get_database_services(ManagerMode.MCP_SERVER)
         return database_services.database.get_session()
 
 
 class ServerServiceFactory:
     """Factory for creating MCP server services.
-    
+
     Implements ServiceFactoryProtocol to eliminate circular dependencies
     between server and lifecycle modules.
     """
-    
+
     async def create_services(self, config: Any, **service_dependencies) -> ServerServicesProtocol:
         """Create server services container with dependencies.
-        
+
         Args:
-            config: Application configuration  
+            config: Application configuration
             **service_dependencies: Additional service dependencies
-            
+
         Returns:
             ServerServicesProtocol: Configured services container
         """
         from prompt_improver.mcp_server.security import create_security_services
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
         from prompt_improver.performance.monitoring.health.unified_health_system import (
             get_unified_health_monitor,
         )
@@ -110,32 +107,34 @@ class ServerServiceFactory:
         )
         from prompt_improver.performance.sla_monitor import SLAMonitor
         from prompt_improver.services.cache.cache_facade import CacheFacade
-        
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
+
         logger.info("Creating server services with unified security architecture...")
-        
+
         try:
             # Create security services
             security_services = await create_security_services(config)
-            
+
             # Create other services
             performance_optimizer = get_performance_optimizer()
             performance_monitor = get_unified_health_monitor()
             sla_monitor = SLAMonitor()
             prompt_service = PromptImprovementService()
-            
+
             # Create unified cache facade for session management
             session_store = CacheFacade(
                 l1_max_size=config.mcp_session_maxsize,
                 l2_default_ttl=config.mcp_session_ttl,
                 enable_l2=True,  # Enable Redis for persistent sessions
-                enable_l3=False,  # L3 not needed for sessions
                 enable_warming=True,
             )
-            
+
             # Cache and event loop manager will be initialized through other services
             cache = None  # Will be set via service dependencies
             event_loop_manager = None  # Will be set via service dependencies
-            
+
             services = ServerServices(
                 config=config,
                 security_facade=security_services["security_manager"],
@@ -157,35 +156,35 @@ class ServerServiceFactory:
                 cache=cache,
                 event_loop_manager=event_loop_manager,
             )
-            
+
             logger.info("Server services created successfully")
             return services
-            
+
         except Exception as e:
-            logger.error(f"Failed to create server services: {e}")
+            logger.exception(f"Failed to create server services: {e}")
             raise RuntimeError(f"Service creation failed: {e}")
 
 
 class ServerFactory:
     """Factory for creating and initializing MCP server instances.
-    
+
     Implements ServerFactoryProtocol following SRE best practices.
     """
-    
+
     def create_server(self) -> MCPServerProtocol:
         """Create a new MCP server instance.
-        
+
         Returns:
             MCPServerProtocol: Uninitialized server instance
         """
         return APESMCPServer()
-    
+
     async def initialize_server(self, server: MCPServerProtocol) -> bool:
         """Initialize server instance with async components.
-        
+
         Args:
             server: Server instance to initialize
-            
+
         Returns:
             bool: True if initialization succeeded, False otherwise
         """
@@ -193,7 +192,7 @@ class ServerFactory:
             await server.async_initialize()
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize server: {e}")
+            logger.exception(f"Failed to initialize server: {e}")
             return False
 
 
@@ -209,7 +208,7 @@ class APESMCPServer:
     - Improved maintainability and testability
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the MCP server orchestrator with modular architecture."""
         self.config = get_config()
         logger.info(
@@ -241,12 +240,11 @@ class APESMCPServer:
         """Setup lifecycle handlers using protocol-based approach."""
         # Delay import to avoid circular dependency
         # This will be set up later during initialization
-        pass
 
     def _setup_lifecycle_handlers_delayed(self) -> None:
         """Setup lifecycle handlers with delayed import to avoid circular dependency."""
         from prompt_improver.mcp_server.lifecycle import get_lifecycle_manager
-        
+
         lifecycle_manager = get_lifecycle_manager()
         lifecycle_manager.setup_lifecycle_handlers(self)
 
@@ -298,21 +296,21 @@ class APESMCPServer:
             )
 
         except Exception as e:
-            logger.error(f"Async initialization failed: {e}")
+            logger.exception(f"Async initialization failed: {e}")
             raise RuntimeError(
                 f"Failed to initialize MCP server with modular architecture: {e}"
             )
 
     # Tools are now setup by the tools module
     # This method is kept for backward compatibility but delegates to the tools module
-    def _setup_tools(self):
+    def _setup_tools(self) -> None:
         """Setup all MCP tools using the tools module."""
         logger.info("Setting up tools using modular architecture...")
         setup_tools(self)
 
     # Resources are now setup by the resources module
     # This method is kept for backward compatibility but delegates to the resources module
-    def _setup_resources(self):
+    def _setup_resources(self) -> None:
         """Setup all MCP resources using the resources module."""
         logger.info("Setting up resources using modular architecture...")
         setup_resources(self)
@@ -330,7 +328,7 @@ class APESMCPServer:
         unique_id = str(uuid.uuid4())[:8]
         return f"{prefix}_{timestamp}_{unique_id}"
 
-    async def _ensure_unified_session_manager(self):
+    async def _ensure_unified_session_manager(self) -> None:
         """Ensure unified session manager is available for MCP operations."""
         if (
             not hasattr(self, "_unified_session_manager")
@@ -405,7 +403,7 @@ class APESMCPServer:
 
 
 class PromptEnhancementRequest(BaseModel):
-    """Request model for modern 2025 prompt enhancement - breaking change from legacy API"""
+    """Request model for modern 2025 prompt enhancement - breaking change from legacy API."""
 
     prompt: str = Field(..., description="The prompt to enhance")
     session_id: str = Field(
@@ -417,7 +415,7 @@ class PromptEnhancementRequest(BaseModel):
 
 
 class PromptStorageRequest(BaseModel):
-    """Request model for modern 2025 prompt storage - breaking change from legacy API"""
+    """Request model for modern 2025 prompt storage - breaking change from legacy API."""
 
     original: str = Field(..., description="The original prompt")
     enhanced: str = Field(..., description="The enhanced prompt")
@@ -549,23 +547,26 @@ class MCPMessageCodec:
 
 # Register factory instances in service registry for protocol-based access
 from prompt_improver.core.services.service_registry import (
-    register_mcp_service_factory,
-    register_mcp_server_factory,
-    get_mcp_service_factory,
     get_mcp_server_factory,
+    get_mcp_service_factory,
+    register_mcp_server_factory,
+    register_mcp_service_factory,
 )
 
 # Register factories in service registry
-register_mcp_service_factory(lambda: ServerServiceFactory())
-register_mcp_server_factory(lambda: ServerFactory())
+register_mcp_service_factory(ServerServiceFactory)
+register_mcp_server_factory(ServerFactory)
+
 
 def get_service_factory() -> ServiceFactoryProtocol:
     """Get the service factory instance from service registry."""
     return get_mcp_service_factory()
 
+
 def get_server_factory() -> ServerFactoryProtocol:
     """Get the server factory instance from service registry."""
     return get_mcp_server_factory()
+
 
 # Global server instance for compatibility
 server = None

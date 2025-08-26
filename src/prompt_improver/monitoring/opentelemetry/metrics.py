@@ -1,4 +1,4 @@
-"""OpenTelemetry Metrics Collection for Production Monitoring
+"""OpenTelemetry Metrics Collection for Production Monitoring.
 =========================================================
 
 Provides comprehensive metrics collection following the RED method
@@ -6,15 +6,10 @@ Provides comprehensive metrics collection following the RED method
 """
 
 import logging
-import time
-from collections.abc import Callable
-from contextlib import contextmanager
-from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from prompt_improver.monitoring.opentelemetry.setup import get_meter
 
@@ -109,7 +104,7 @@ class StandardBuckets:
 class HttpMetrics:
     """HTTP-specific metrics collection for OpenTelemetry."""
 
-    def __init__(self, service_name: str = "prompt-improver"):
+    def __init__(self, service_name: str = "prompt-improver") -> None:
         self.service_name = service_name
         self.meter = get_meter(__name__)
         # Test visibility holders
@@ -140,10 +135,10 @@ class HttpMetrics:
         """Create no-op instrument when OpenTelemetry is not available."""
 
         class NoOpInstrument:
-            def add(self, *args, **kwargs):
+            def add(self, *args, **kwargs) -> None:
                 pass
 
-            def record(self, *args, **kwargs):
+            def record(self, *args, **kwargs) -> None:
                 pass
 
         return NoOpInstrument()
@@ -181,7 +176,7 @@ class HttpMetrics:
 class DatabaseMetrics:
     """Database-specific metrics collection for OpenTelemetry."""
 
-    def __init__(self, service_name: str = "prompt-improver"):
+    def __init__(self, service_name: str = "prompt-improver") -> None:
         self.service_name = service_name
         self.meter = get_meter(__name__)
         if OTEL_AVAILABLE and self.meter is not None:
@@ -209,10 +204,10 @@ class DatabaseMetrics:
         """Create no-op instrument when OpenTelemetry is not available."""
 
         class NoOpInstrument:
-            def add(self, *args, **kwargs):
+            def add(self, *args, **kwargs) -> None:
                 pass
 
-            def record(self, *args, **kwargs):
+            def record(self, *args, **kwargs) -> None:
                 pass
 
         return NoOpInstrument()
@@ -234,7 +229,7 @@ class DatabaseMetrics:
 class MLMetrics:
     """ML-specific metrics collection for OpenTelemetry."""
 
-    def __init__(self, service_name: str = "prompt-improver"):
+    def __init__(self, service_name: str = "prompt-improver") -> None:
         self.service_name = service_name
         self.meter = get_meter(__name__)
         if OTEL_AVAILABLE and self.meter is not None:
@@ -268,10 +263,10 @@ class MLMetrics:
         """Create no-op instrument when OpenTelemetry is not available."""
 
         class NoOpInstrument:
-            def add(self, *args, **kwargs):
+            def add(self, *args, **kwargs) -> None:
                 pass
 
-            def record(self, *args, **kwargs):
+            def record(self, *args, **kwargs) -> None:
                 pass
 
         return NoOpInstrument()
@@ -299,7 +294,7 @@ class MLMetrics:
 class BusinessMetrics:
     """Business-specific metrics collection for OpenTelemetry."""
 
-    def __init__(self, service_name: str = "prompt-improver"):
+    def __init__(self, service_name: str = "prompt-improver") -> None:
         self.service_name = service_name
         self.meter = get_meter(__name__)
         # Test visibility holders
@@ -342,10 +337,10 @@ class BusinessMetrics:
         """Create no-op instrument when OpenTelemetry is not available."""
 
         class NoOpInstrument:
-            def add(self, *args, **kwargs):
+            def add(self, *args, **kwargs) -> None:
                 pass
 
-            def record(self, *args, **kwargs):
+            def record(self, *args, **kwargs) -> None:
                 pass
 
         return NoOpInstrument()

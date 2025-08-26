@@ -1,0 +1,687 @@
+{
+  "validation_timestamp": "2025-08-25T00:08:29.639514",
+  "domain_isolation": {
+    "core": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 2,
+      "protocol_imports": []
+    },
+    "cache": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 4,
+      "protocol_imports": []
+    },
+    "database": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 8,
+      "protocol_imports": []
+    },
+    "security": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 2,
+      "protocol_imports": []
+    },
+    "cli": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 2,
+      "protocol_imports": []
+    },
+    "mcp": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 3,
+      "protocol_imports": []
+    },
+    "application": {
+      "status": "isolated",
+      "cross_domain_imports": [],
+      "total_imports": 4,
+      "protocol_imports": []
+    }
+  },
+  "runtime_checkability": {
+    "core.ServiceProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "initialize",
+        "shutdown"
+      ]
+    },
+    "core.HealthCheckProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "check_health",
+        "is_healthy"
+      ]
+    },
+    "cache.BasicCacheProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "clear",
+        "delete",
+        "exists",
+        "get",
+        "set"
+      ]
+    },
+    "cache.CacheHealthProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "calculate_slo_compliance",
+        "get_alert_metrics",
+        "get_info",
+        "get_memory_usage",
+        "get_monitoring_metrics",
+        "get_stats",
+        "health_check",
+        "ping"
+      ]
+    },
+    "cache.CacheServiceFacadeProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "configure",
+        "get",
+        "get_stats",
+        "set"
+      ]
+    },
+    "database.SessionManagerProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "close_all_sessions",
+        "get_connection_info",
+        "get_session",
+        "health_check",
+        "session_context",
+        "transaction_context"
+      ]
+    },
+    "database.DatabaseProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "analyze_performance",
+        "check_connection_pool",
+        "check_query_performance",
+        "check_table_health",
+        "get_connection_pool_config",
+        "get_database_url",
+        "get_execution_plan",
+        "get_retry_config",
+        "get_session",
+        "get_session_manager",
+        "health_check",
+        "optimize_query"
+      ]
+    },
+    "database.ConnectionPoolCoreProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "execute_cached_query",
+        "get_ha_connection",
+        "get_session",
+        "initialize",
+        "is_initialized",
+        "shutdown",
+        "test_connections"
+      ]
+    },
+    "security.AuthenticationProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "authenticate",
+        "validate_token"
+      ]
+    },
+    "security.AuthorizationProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "authorize",
+        "get_user_permissions"
+      ]
+    },
+    "security.EncryptionProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "decrypt",
+        "encrypt"
+      ]
+    },
+    "cli.CommandProcessorProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "execute_command",
+        "get_available_commands"
+      ]
+    },
+    "cli.UserInteractionProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "display_message",
+        "prompt_user"
+      ]
+    },
+    "cli.WorkflowManagerProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "execute_workflow",
+        "get_workflow_status"
+      ]
+    },
+    "mcp.MCPServerProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "get_server_info",
+        "health_check",
+        "initialize",
+        "start",
+        "start_server",
+        "stop",
+        "stop_server"
+      ]
+    },
+    "mcp.MCPToolProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "execute_tool",
+        "get_tool_schema",
+        "list_available_tools"
+      ]
+    },
+    "mcp.ServerServicesProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "get_database_session",
+        "is_initialized"
+      ]
+    },
+    "application.ApplicationServiceProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "cleanup",
+        "initialize"
+      ]
+    },
+    "application.WorkflowOrchestratorProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "get_workflow_definition",
+        "orchestrate_workflow"
+      ]
+    },
+    "application.ValidationServiceProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "get_validation_rules",
+        "validate_request"
+      ]
+    },
+    "ml.MLflowServiceProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "end_trace",
+        "get_model_metadata",
+        "log_experiment",
+        "log_model",
+        "start_trace"
+      ]
+    },
+    "ml.EventBusProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "publish",
+        "subscribe",
+        "unsubscribe"
+      ]
+    },
+    "monitoring.MetricsCollectorProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "collect_all_metrics",
+        "get_metrics_summary",
+        "record_metric"
+      ]
+    },
+    "monitoring.HealthCheckComponentProtocol": {
+      "status": "checkable",
+      "protocol_type": "<class 'typing._ProtocolMeta'>",
+      "methods": [
+        "check_health",
+        "get_component_name",
+        "get_timeout_seconds"
+      ]
+    }
+  },
+  "dependency_direction": {
+    "core_layer": {
+      "status": "valid",
+      "import_time": 9.5367431640625e-07,
+      "protocols": [
+        "HealthCheckProtocol",
+        "Protocol",
+        "ServiceProtocol"
+      ]
+    },
+    "application_layer": {
+      "status": "valid",
+      "import_time": 0.0,
+      "protocols": [
+        "AnalyticsApplicationServiceProtocol",
+        "ApplicationServiceProtocol",
+        "AprioriApplicationServiceProtocol",
+        "HealthApplicationServiceProtocol",
+        "MLApplicationServiceProtocol",
+        "PatternApplicationServiceProtocol",
+        "PromptApplicationServiceProtocol",
+        "Protocol",
+        "RetryStrategyProtocol",
+        "TrainingApplicationServiceProtocol",
+        "ValidationServiceProtocol",
+        "WorkflowOrchestratorProtocol"
+      ]
+    },
+    "infrastructure_layer": {
+      "status": "valid",
+      "import_time": 9.5367431640625e-07,
+      "database_protocols": [
+        "AlertingServiceProtocol",
+        "ConnectionPoolCoreProtocol",
+        "DatabaseConfigProtocol",
+        "DatabaseConnectionServiceProtocol",
+        "DatabaseHealthProtocol",
+        "DatabaseHealthServiceProtocol",
+        "DatabaseProtocol",
+        "DatabaseServiceProtocol",
+        "DatabaseServicesProtocol",
+        "DatabaseSessionProtocol",
+        "HealthMetricsServiceProtocol",
+        "HealthReportingServiceProtocol",
+        "PoolManagerFacadeProtocol",
+        "PoolMonitoringServiceProtocol",
+        "PoolScalingManagerProtocol",
+        "Protocol",
+        "QueryExecutorProtocol",
+        "QueryOptimizerProtocol",
+        "SessionManagerProtocol",
+        "SessionProtocol"
+      ],
+      "cache_protocols": [
+        "AdvancedCacheProtocol",
+        "BasicCacheProtocol",
+        "CacheHealthProtocol",
+        "CacheLockProtocol",
+        "CacheServiceFacadeProtocol",
+        "CacheServiceProtocol",
+        "CacheSubscriptionProtocol",
+        "CacheWarmingProtocol",
+        "ComprehensiveCacheProtocol",
+        "L1CacheServiceProtocol",
+        "L2CacheServiceProtocol",
+        "MultiLevelCacheProtocol",
+        "Protocol",
+        "RedisCacheProtocol"
+      ]
+    }
+  },
+  "security_isolation": {
+    "authentication": {
+      "status": "isolated",
+      "methods": [
+        "authenticate",
+        "validate_token"
+      ],
+      "isolation_check": "passed"
+    },
+    "authorization": {
+      "status": "isolated",
+      "methods": [
+        "authorize",
+        "get_user_permissions"
+      ],
+      "isolation_check": "passed"
+    },
+    "encryption": {
+      "status": "isolated",
+      "methods": [
+        "decrypt",
+        "encrypt"
+      ],
+      "isolation_check": "passed"
+    }
+  },
+  "lazy_loading": {
+    "default_loading": {
+      "ml_loaded": false,
+      "monitoring_loaded": false,
+      "status": "passed"
+    },
+    "ml_lazy_loading": {
+      "load_time": 9.5367431640625e-07,
+      "status": "passed",
+      "protocols": [
+        "CacheServiceProtocol",
+        "ComponentFactoryProtocol",
+        "ComponentInvokerProtocol",
+        "ComponentLoaderProtocol",
+        "ComponentRegistryProtocol",
+        "DatabaseServiceProtocol",
+        "EventBusProtocol",
+        "ExternalServicesConfigProtocol",
+        "HealthMonitorProtocol",
+        "InferenceServiceProtocol",
+        "MLPipelineFactoryProtocol",
+        "MLRepositoryProtocol",
+        "MLServiceProtocol",
+        "MLflowServiceProtocol",
+        "OrchestrationAdapterProtocol",
+        "PatternDiscoveryServiceProtocol",
+        "ProductionServiceProtocol",
+        "Protocol",
+        "ResourceManagerProtocol",
+        "ServiceContainerProtocol",
+        "ServiceModelRegistryProtocol",
+        "TrainingServiceProtocol",
+        "WorkflowEngineProtocol"
+      ]
+    },
+    "monitoring_lazy_loading": {
+      "load_time": 0.0,
+      "status": "passed",
+      "protocols": [
+        "AlertingServiceProtocol",
+        "CacheMonitoringProtocol",
+        "ConfigurationServiceProtocol",
+        "DatabaseServiceProtocol",
+        "HealthCheckComponentProtocol",
+        "HealthCheckServiceProtocol",
+        "HealthReporterProtocol",
+        "MLEventBusServiceProtocol",
+        "MetricsCollectionProtocol",
+        "MetricsCollectorProtocol",
+        "MonitoringOrchestratorProtocol",
+        "MonitoringRepositoryProtocol",
+        "PromptImprovementServiceProtocol",
+        "Protocol",
+        "RedisAlertingServiceProtocol",
+        "RedisBasicHealthCheckerProtocol",
+        "RedisClientProviderProtocol",
+        "RedisConnectionMonitorProtocol",
+        "RedisConnectionPoolMonitorProtocol",
+        "RedisHealthCheckerProtocol",
+        "RedisHealthManagerProtocol",
+        "RedisHealthOrchestratorProtocol",
+        "RedisMetricsCollectorProtocol",
+        "RedisPerformanceAnalysisProtocol",
+        "RedisPerformanceMonitorProtocol",
+        "RedisRecoveryServiceProtocol",
+        "SessionStoreServiceProtocol",
+        "UnifiedMonitoringFacadeProtocol"
+      ]
+    }
+  },
+  "performance_boundaries": {
+    "core": {
+      "import_time": 8.7738037109375e-05,
+      "status": "passed",
+      "protocols": [
+        "HealthCheckProtocol",
+        "Protocol",
+        "ServiceProtocol"
+      ]
+    },
+    "cache": {
+      "import_time": 0.0004119873046875,
+      "status": "passed",
+      "protocols": [
+        "AdvancedCacheProtocol",
+        "BasicCacheProtocol",
+        "CacheHealthProtocol",
+        "CacheLockProtocol",
+        "CacheServiceFacadeProtocol",
+        "CacheServiceProtocol",
+        "CacheSubscriptionProtocol",
+        "CacheWarmingProtocol",
+        "ComprehensiveCacheProtocol",
+        "L1CacheServiceProtocol",
+        "L2CacheServiceProtocol",
+        "MultiLevelCacheProtocol",
+        "Protocol",
+        "RedisCacheProtocol"
+      ]
+    },
+    "database": {
+      "import_time": 0.0005908012390136719,
+      "status": "passed",
+      "protocols": [
+        "AlertingServiceProtocol",
+        "ConnectionPoolCoreProtocol",
+        "DatabaseConfigProtocol",
+        "DatabaseConnectionServiceProtocol",
+        "DatabaseHealthProtocol",
+        "DatabaseHealthServiceProtocol",
+        "DatabaseProtocol",
+        "DatabaseServiceProtocol",
+        "DatabaseServicesProtocol",
+        "DatabaseSessionProtocol",
+        "HealthMetricsServiceProtocol",
+        "HealthReportingServiceProtocol",
+        "PoolManagerFacadeProtocol",
+        "PoolMonitoringServiceProtocol",
+        "PoolScalingManagerProtocol",
+        "Protocol",
+        "QueryExecutorProtocol",
+        "QueryOptimizerProtocol",
+        "SessionManagerProtocol",
+        "SessionProtocol"
+      ]
+    },
+    "security": {
+      "import_time": 0.00010085105895996094,
+      "status": "passed",
+      "protocols": [
+        "AuthenticationProtocol",
+        "AuthorizationProtocol",
+        "EncryptionProtocol",
+        "Protocol",
+        "SecurityMonitoringProtocol"
+      ]
+    },
+    "cli": {
+      "import_time": 0.00037384033203125,
+      "status": "passed",
+      "protocols": [
+        "BackgroundManagerProtocol",
+        "CLIOrchestratorProtocol",
+        "CLIServiceProtocol",
+        "CommandProcessorProtocol",
+        "EmergencyServiceProtocol",
+        "ProcessServiceProtocol",
+        "ProgressServiceProtocol",
+        "Protocol",
+        "RuleSelectionProtocol",
+        "RuleValidationServiceProtocol",
+        "SessionServiceProtocol",
+        "SignalHandlerProtocol",
+        "SystemStateReporterProtocol",
+        "TrainingServiceProtocol",
+        "UserInteractionProtocol",
+        "WorkflowManagerProtocol",
+        "WorkflowServiceProtocol"
+      ]
+    },
+    "mcp": {
+      "import_time": 0.00022125244140625,
+      "status": "passed",
+      "protocols": [
+        "LifecycleManagerProtocol",
+        "MCPResourceProtocol",
+        "MCPServerProtocol",
+        "MCPSessionProtocol",
+        "MCPToolProtocol",
+        "Protocol",
+        "RuntimeManagerProtocol",
+        "ServerConfigProtocol",
+        "ServerFactoryProtocol",
+        "ServerServicesProtocol",
+        "ServiceFactoryProtocol"
+      ]
+    },
+    "application": {
+      "import_time": 0.0002129077911376953,
+      "status": "passed",
+      "protocols": [
+        "AnalyticsApplicationServiceProtocol",
+        "ApplicationServiceProtocol",
+        "AprioriApplicationServiceProtocol",
+        "HealthApplicationServiceProtocol",
+        "MLApplicationServiceProtocol",
+        "PatternApplicationServiceProtocol",
+        "PromptApplicationServiceProtocol",
+        "Protocol",
+        "RetryStrategyProtocol",
+        "TrainingApplicationServiceProtocol",
+        "ValidationServiceProtocol",
+        "WorkflowOrchestratorProtocol"
+      ]
+    }
+  },
+  "clean_architecture": {
+    "presentation_isolation": {
+      "status": "passed",
+      "core_loaded": true,
+      "database_loaded": true,
+      "cache_loaded": true
+    },
+    "application_positioning": {
+      "status": "passed",
+      "can_import_core": true,
+      "protocols": [
+        "AnalyticsApplicationServiceProtocol",
+        "ApplicationServiceProtocol",
+        "AprioriApplicationServiceProtocol",
+        "HealthApplicationServiceProtocol",
+        "MLApplicationServiceProtocol",
+        "PatternApplicationServiceProtocol",
+        "PromptApplicationServiceProtocol",
+        "Protocol",
+        "RetryStrategyProtocol",
+        "TrainingApplicationServiceProtocol",
+        "ValidationServiceProtocol",
+        "WorkflowOrchestratorProtocol"
+      ]
+    },
+    "infrastructure_dependencies": {
+      "status": "passed",
+      "database_protocols": [
+        "AlertingServiceProtocol",
+        "ConnectionPoolCoreProtocol",
+        "DatabaseConfigProtocol",
+        "DatabaseConnectionServiceProtocol",
+        "DatabaseHealthProtocol",
+        "DatabaseHealthServiceProtocol",
+        "DatabaseProtocol",
+        "DatabaseServiceProtocol",
+        "DatabaseServicesProtocol",
+        "DatabaseSessionProtocol",
+        "HealthMetricsServiceProtocol",
+        "HealthReportingServiceProtocol",
+        "PoolManagerFacadeProtocol",
+        "PoolMonitoringServiceProtocol",
+        "PoolScalingManagerProtocol",
+        "Protocol",
+        "QueryExecutorProtocol",
+        "QueryOptimizerProtocol",
+        "SessionManagerProtocol",
+        "SessionProtocol"
+      ],
+      "cache_protocols": [
+        "AdvancedCacheProtocol",
+        "BasicCacheProtocol",
+        "CacheHealthProtocol",
+        "CacheLockProtocol",
+        "CacheServiceFacadeProtocol",
+        "CacheServiceProtocol",
+        "CacheSubscriptionProtocol",
+        "CacheWarmingProtocol",
+        "ComprehensiveCacheProtocol",
+        "L1CacheServiceProtocol",
+        "L2CacheServiceProtocol",
+        "MultiLevelCacheProtocol",
+        "Protocol",
+        "RedisCacheProtocol"
+      ]
+    }
+  },
+  "protocol_compliance": {
+    "ServiceProtocol": {
+      "required_methods": [
+        "initialize",
+        "shutdown"
+      ],
+      "actual_methods": [
+        "initialize",
+        "shutdown"
+      ],
+      "compliance": true,
+      "status": "compliant"
+    },
+    "HealthCheckProtocol": {
+      "required_methods": [
+        "check_health",
+        "is_healthy"
+      ],
+      "actual_methods": [
+        "check_health",
+        "is_healthy"
+      ],
+      "compliance": true,
+      "status": "compliant"
+    }
+  },
+  "summary": {
+    "total_validations": 8,
+    "passed_validations": 8,
+    "failed_validations": 0,
+    "warnings": 0,
+    "domain_coverage": {
+      "total_domains": 9,
+      "validated_domains": 7,
+      "lazy_domains": 2
+    },
+    "performance_metrics": {
+      "total_import_time": 0.001999378204345703,
+      "average_import_time": 0.0002856254577636719,
+      "domains_under_2ms": 7
+    },
+    "critical_issues": [],
+    "recommendations": []
+  }
+}

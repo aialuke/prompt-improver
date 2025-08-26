@@ -9,12 +9,11 @@ import os
 import shutil
 import time
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.cli.core.progress_preservation import ProgressService
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import TrainingSession
 
 
@@ -57,7 +56,7 @@ class EmergencySaveManager:
     - Comprehensive error handling and recovery
     """
 
-    def __init__(self, backup_dir: Path | None = None):
+    def __init__(self, backup_dir: Path | None = None) -> None:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./emergency_saves")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -107,7 +106,7 @@ class EmergencySaveManager:
                         saved_components.append(component)
                         total_size += component_result.get("size_bytes", 0)
                     except Exception as e:
-                        self.logger.error(f"Failed to save component {component}: {e}")
+                        self.logger.exception(f"Failed to save component {component}: {e}")
                         failed_components.append(component)
                         if context.atomic and failed_components:
                             await self._rollback_save(temp_save_dir, context.save_id)
@@ -152,7 +151,7 @@ class EmergencySaveManager:
                     error_message=str(e),
                 )
                 self.save_history.append(error_result)
-                self.logger.error(f"Emergency save failed: {context.save_id}: {e}")
+                self.logger.exception(f"Emergency save failed: {context.save_id}: {e}")
                 return error_result
             finally:
                 self.active_saves.pop(context.save_id, None)
@@ -250,7 +249,7 @@ class EmergencySaveManager:
                 shutil.rmtree(temp_dir)
             self.logger.info(f"Rolled back failed save: {save_id}")
         except Exception as e:
-            self.logger.error(f"Failed to rollback save {save_id}: {e}")
+            self.logger.exception(f"Failed to rollback save {save_id}: {e}")
 
     async def _gather_training_sessions(self) -> dict[str, Any]:
         """Gather training session data for emergency save."""

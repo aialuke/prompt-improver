@@ -1,4 +1,4 @@
-"""Unified Health System with Plugin Architecture
+"""Unified Health System with Plugin Architecture.
 
 Consolidates 15+ health checkers into a plugin-based architecture for:
 - EnhancedMLServiceHealthChecker
@@ -21,28 +21,31 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any
 
-from prompt_improver.core.protocols.health_protocol import (
-    HealthCheckResult,
-    HealthStatus,
-)
+# Import runtime types from base module (not protocols which are TYPE_CHECKING only)
+# HealthCheckResult and HealthStatus are available from base module for runtime use
+from prompt_improver.monitoring.unified.types import HealthCheckResult, HealthStatus
 from prompt_improver.performance.monitoring.health.base import (
-    AggregatedHealthResult,
-    HealthChecker,
     HealthResult,
     HealthStatus as BaseHealthStatus,
 )
+
+# Import protocol types for runtime use (needed for type annotations and runtime checks)
+# Temporarily disabled to fix circular import - using Any for type annotations
+# from prompt_improver.monitoring.unified.types import (
+#     HealthCheckResult,
+#     HealthStatus,
+# )
 
 logger = logging.getLogger(__name__)
 
 
 def _get_background_task_manager():
-    """Lazy import background task manager"""
+    """Lazy import background task manager."""
     from prompt_improver.performance.monitoring.health.background_manager import (
         get_background_task_manager,
     )
@@ -51,7 +54,7 @@ def _get_background_task_manager():
 
 
 def _get_task_priority():
-    """Lazy import TaskPriority"""
+    """Lazy import TaskPriority."""
     from prompt_improver.performance.monitoring.health.background_manager import (
         TaskPriority,
     )
@@ -60,7 +63,7 @@ def _get_task_priority():
 
 
 def _get_enhanced_health_checker():
-    """Lazy import EnhancedHealthChecker"""
+    """Lazy import EnhancedHealthChecker."""
     from prompt_improver.performance.monitoring.health.enhanced_base import (
         EnhancedHealthChecker,
     )
@@ -69,8 +72,8 @@ def _get_enhanced_health_checker():
 
 
 def _get_health_protocol_types():
-    """Lazy import health protocol types"""
-    from prompt_improver.core.protocols.health_protocol import (
+    """Lazy import health protocol types."""
+    from prompt_improver.shared.interfaces.protocols.monitoring import (
         HealthCheckResult,
         HealthMonitorProtocol,
         HealthStatus,
@@ -79,8 +82,8 @@ def _get_health_protocol_types():
     return (HealthMonitorProtocol, HealthCheckResult, HealthStatus)
 
 
-def _convert_base_status_to_protocol(status: BaseHealthStatus) -> HealthStatus:
-    """Convert base.HealthStatus to health_protocol.HealthStatus"""
+def _convert_base_status_to_protocol(status: BaseHealthStatus) -> Any:
+    """Convert base.HealthStatus to health_protocol.HealthStatus."""
     _, _, HealthStatus = _get_health_protocol_types()
     mapping = {
         BaseHealthStatus.HEALTHY: HealthStatus.HEALTHY,
@@ -90,8 +93,8 @@ def _convert_base_status_to_protocol(status: BaseHealthStatus) -> HealthStatus:
     return mapping.get(status, HealthStatus.UNKNOWN)
 
 
-def _convert_protocol_status_to_base(status: HealthStatus) -> BaseHealthStatus:
-    """Convert health_protocol.HealthStatus to base.HealthStatus"""
+def _convert_protocol_status_to_base(status: Any) -> BaseHealthStatus:
+    """Convert health_protocol.HealthStatus to base.HealthStatus."""
     _, _, HealthStatus = _get_health_protocol_types()
     mapping = {
         HealthStatus.HEALTHY: BaseHealthStatus.HEALTHY,
@@ -104,8 +107,8 @@ def _convert_protocol_status_to_base(status: HealthStatus) -> BaseHealthStatus:
 
 def _convert_health_result_to_check_result(
     health_result: HealthResult,
-) -> HealthCheckResult:
-    """Convert HealthResult to HealthCheckResult"""
+) -> Any:
+    """Convert HealthResult to HealthCheckResult."""
     _, HealthCheckResult, _ = _get_health_protocol_types()
     return HealthCheckResult(
         status=_convert_base_status_to_protocol(health_result.status),
@@ -117,9 +120,9 @@ def _convert_health_result_to_check_result(
 
 
 def _convert_check_result_to_health_result(
-    check_result: HealthCheckResult,
+    check_result: Any,
 ) -> HealthResult:
-    """Convert HealthCheckResult to HealthResult"""
+    """Convert HealthCheckResult to HealthResult."""
     return HealthResult(
         status=_convert_protocol_status_to_base(check_result.status),
         component=check_result.check_name,
@@ -132,7 +135,7 @@ def _convert_check_result_to_health_result(
 
 
 class HealthCheckCategory(Enum):
-    """Health check categories for organization and reporting"""
+    """Health check categories for organization and reporting."""
 
     ML = "ml"
     DATABASE = "database"
@@ -145,7 +148,7 @@ class HealthCheckCategory(Enum):
 
 @dataclass
 class HealthCheckPluginConfig:
-    """Configuration for health check plugins"""
+    """Configuration for health check plugins."""
 
     enabled: bool = True
     timeout_seconds: float = 10.0
@@ -172,21 +175,21 @@ class HealthCheckPlugin(ABC):
         name: str,
         category: HealthCheckCategory,
         config: HealthCheckPluginConfig | None = None,
-    ):
+    ) -> None:
         self.name = name
         self.category = category
         self.config = config or HealthCheckPluginConfig()
         self._last_check_time: datetime | None = None
-        self._last_result: HealthCheckResult | None = None
+        self._last_result: Any | None = None
         self._check_count = 0
         self._failure_count = 0
 
     @abstractmethod
-    async def execute_check(self) -> HealthCheckResult:
-        """Execute the actual health check logic"""
+    async def execute_check(self) -> Any:
+        """Execute the actual health check logic."""
 
-    async def check_health(self) -> HealthCheckResult:
-        """Perform health check with timing, error handling, and retry logic"""
+    async def check_health(self) -> Any:
+        """Perform health check with timing, error handling, and retry logic."""
         start_time = time.time()
         attempt = 0
         max_attempts = self.config.retry_count + 1
@@ -242,9 +245,10 @@ class HealthCheckPlugin(ABC):
                     return result
                 if self.config.retry_delay_seconds > 0:
                     await asyncio.sleep(self.config.retry_delay_seconds)
+        return None
 
     def get_plugin_metrics(self) -> dict[str, Any]:
-        """Get plugin-specific metrics"""
+        """Get plugin-specific metrics."""
         return {
             "name": self.name,
             "category": self.category.value,
@@ -270,7 +274,7 @@ class HealthCheckPlugin(ABC):
 
 @dataclass
 class HealthProfile:
-    """Environment-specific health check profile"""
+    """Environment-specific health check profile."""
 
     name: str
     enabled_plugins: set[str] = field(default_factory=set)
@@ -294,7 +298,7 @@ class UnifiedHealthMonitor:
     - Comprehensive reporting
     """
 
-    def __init__(self, default_profile: HealthProfile | None = None):
+    def __init__(self, default_profile: HealthProfile | None = None) -> None:
         self._plugins: dict[str, HealthCheckPlugin] = {}
         self._categories: dict[HealthCheckCategory, set[str]] = {
             category: set() for category in HealthCheckCategory
@@ -358,11 +362,11 @@ class UnifiedHealthMonitor:
         return True
 
     def get_registered_plugins(self) -> list[str]:
-        """Get list of all registered plugin names"""
+        """Get list of all registered plugin names."""
         return list(self._plugins.keys())
 
     def get_plugins_by_category(self, category: HealthCheckCategory) -> list[str]:
-        """Get plugins by category"""
+        """Get plugins by category."""
         return list(self._categories[category])
 
     async def check_health(
@@ -370,7 +374,7 @@ class UnifiedHealthMonitor:
         plugin_name: str | None = None,
         category: HealthCheckCategory | None = None,
         include_details: bool = True,
-    ) -> dict[str, HealthCheckResult]:
+    ) -> dict[str, Any]:
         """Perform health checks on registered plugins.
 
         Args:
@@ -486,7 +490,7 @@ class UnifiedHealthMonitor:
     def create_health_profile(
         self, name: str, enabled_plugins: set[str] | None = None, **kwargs
     ) -> HealthProfile:
-        """Create a new health profile"""
+        """Create a new health profile."""
         profile = HealthProfile(
             name=name, enabled_plugins=enabled_plugins or set(), **kwargs
         )
@@ -494,7 +498,7 @@ class UnifiedHealthMonitor:
         return profile
 
     def activate_profile(self, profile_name: str) -> bool:
-        """Activate a health profile"""
+        """Activate a health profile."""
         if profile_name not in self._health_profiles:
             return False
         self._active_profile = self._health_profiles[profile_name]
@@ -504,7 +508,7 @@ class UnifiedHealthMonitor:
     def _get_plugins_to_check(
         self, plugin_name: str | None, category: HealthCheckCategory | None
     ) -> list[HealthCheckPlugin]:
-        """Determine which plugins to check based on filters"""
+        """Determine which plugins to check based on filters."""
         if plugin_name:
             if plugin_name in self._plugins:
                 return [self._plugins[plugin_name]]
@@ -526,19 +530,19 @@ class UnifiedHealthMonitor:
 
     async def _execute_parallel_checks(
         self, plugins: list[HealthCheckPlugin]
-    ) -> dict[str, HealthCheckResult]:
-        """Execute health checks in parallel using asyncio tasks to collect results"""
-        tasks: dict[str, asyncio.Task[HealthCheckResult]] = {
+    ) -> dict[str, Any]:
+        """Execute health checks in parallel using asyncio tasks to collect results."""
+        tasks: dict[str, asyncio.Task[Any]] = {
             plugin.name: asyncio.create_task(plugin.check_health())
             for plugin in plugins
         }
-        results: dict[str, HealthCheckResult] = {}
+        results: dict[str, Any] = {}
         for name, task in tasks.items():
             try:
                 result = await asyncio.wait_for(task, timeout=30.0)
                 results[name] = result
             except Exception as e:
-                logger.error(f"Health check {name} failed with exception: {e}")
+                logger.exception(f"Health check {name} failed with exception: {e}")
 
                 results[name] = HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
@@ -549,14 +553,14 @@ class UnifiedHealthMonitor:
 
     async def _execute_sequential_checks(
         self, plugins: list[HealthCheckPlugin]
-    ) -> dict[str, HealthCheckResult]:
-        """Execute health checks sequentially"""
+    ) -> dict[str, Any]:
+        """Execute health checks sequentially."""
         results = {}
         for plugin in plugins:
             try:
                 results[plugin.name] = await plugin.check_health()
             except Exception as e:
-                logger.error(f"Health check {plugin.name} failed with exception: {e}")
+                logger.exception(f"Health check {plugin.name} failed with exception: {e}")
 
                 results[plugin.name] = HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
@@ -566,11 +570,11 @@ class UnifiedHealthMonitor:
         return results
 
     async def _start_periodic_check(self, plugin: HealthCheckPlugin) -> None:
-        """Start periodic health checking for a plugin using enhanced task management"""
+        """Start periodic health checking for a plugin using enhanced task management."""
         if not plugin.config.interval_seconds:
             return
 
-        async def periodic_checker():
+        async def periodic_checker() -> None:
             while True:
                 try:
                     await asyncio.sleep(plugin.config.interval_seconds)
@@ -578,7 +582,7 @@ class UnifiedHealthMonitor:
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
-                    logger.error(f"Periodic health check {plugin.name} failed: {e}")
+                    logger.exception(f"Periodic health check {plugin.name} failed: {e}")
 
         task_manager = _get_background_task_manager()
         TaskPriority = _get_task_priority()
@@ -595,7 +599,7 @@ class UnifiedHealthMonitor:
         self._periodic_checkers[plugin.name] = task_id
 
     async def shutdown(self) -> None:
-        """Shutdown the health monitor and cancel all background tasks"""
+        """Shutdown the health monitor and cancel all background tasks."""
         task_manager = _get_background_task_manager()
         for task_id in self._periodic_checkers.values():
             await task_manager.cancel_task(task_id)
@@ -612,7 +616,7 @@ _unified_health_monitor: UnifiedHealthMonitor | None = None
 
 
 def get_unified_health_monitor() -> UnifiedHealthMonitor:
-    """Get the global unified health monitor instance"""
+    """Get the global unified health monitor instance."""
     global _unified_health_monitor
     if _unified_health_monitor is None:
         _unified_health_monitor = UnifiedHealthMonitor()
@@ -620,7 +624,7 @@ def get_unified_health_monitor() -> UnifiedHealthMonitor:
 
 
 async def register_health_plugin(plugin: HealthCheckPlugin) -> bool:
-    """Register a health check plugin with the global monitor"""
+    """Register a health check plugin with the global monitor."""
     return await get_unified_health_monitor().register_plugin(plugin)
 
 

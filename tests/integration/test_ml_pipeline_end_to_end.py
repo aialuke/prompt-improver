@@ -6,15 +6,12 @@ and metric storage using actual OpenTelemetry infrastructure and real databases.
 Follows 2025 best practices with comprehensive real behavior validation.
 """
 
-import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
 import numpy as np
-import pytest
-from opentelemetry import metrics, trace
 from tests.conftest import requires_otel, requires_real_db, requires_sklearn
 
 from prompt_improver.ml.failure_analyzer import FailureAnalyzer
@@ -307,7 +304,7 @@ class TestMLPipelineEndToEnd:
         labels = []
         failure_types = ["timeout", "connection", "memory", "disk", "network"]
         for failure_type in failure_types:
-            for i in range(20):
+            for _i in range(20):
                 if failure_type == "timeout":
                     feature = [
                         np.random.uniform(0.6, 1.0),

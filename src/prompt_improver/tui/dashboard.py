@@ -4,12 +4,12 @@ Provides real-time monitoring of AutoML optimization, A/B testing, and system he
 
 import asyncio
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
-from textual.timer import Timer
 from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from prompt_improver.tui.data_provider import APESDataProvider
@@ -18,6 +18,9 @@ from prompt_improver.tui.widgets.automl_status import AutoMLStatusWidget
 from prompt_improver.tui.widgets.performance_metrics import PerformanceMetricsWidget
 from prompt_improver.tui.widgets.service_control import ServiceControlWidget
 from prompt_improver.tui.widgets.system_overview import SystemOverviewWidget
+
+if TYPE_CHECKING:
+    from textual.timer import Timer
 
 
 class APESDashboard(App):
@@ -35,7 +38,7 @@ class APESDashboard(App):
     system_status = reactive("initializing")
     last_update = reactive(datetime.now())
 
-    def __init__(self, console: Console | None = None):
+    def __init__(self, console: Console | None = None) -> None:
         super().__init__()
         self.console = console or Console()
         self.data_provider = APESDataProvider()
@@ -87,7 +90,6 @@ class APESDashboard(App):
 
     async def refresh_all_widgets(self) -> None:
         """Refresh data for all dashboard widgets."""
-        tasks = []
         widgets = [
             self.query_one("#system-overview", SystemOverviewWidget),
             self.query_one("#automl-status", AutoMLStatusWidget),
@@ -95,9 +97,7 @@ class APESDashboard(App):
             self.query_one("#performance-metrics", PerformanceMetricsWidget),
             self.query_one("#service-control", ServiceControlWidget),
         ]
-        for widget in widgets:
-            if hasattr(widget, "update_data"):
-                tasks.append(widget.update_data(self.data_provider))
+        tasks = [widget.update_data(self.data_provider) for widget in widgets if hasattr(widget, "update_data")]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 

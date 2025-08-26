@@ -24,7 +24,7 @@ import time
 from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ....security import OWASP2025InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
 from ....utils.datetime_utils import aware_utc_now
@@ -423,6 +423,7 @@ class ContextFeatureExtractor:
                 if output_path:
                     import json
                     import os
+                    from prompt_improver.core.utils.lazy_ml_loader import get_numpy
                     os.makedirs(os.path.dirname(output_path), exist_ok=True)
                     with open(output_path, 'w') as f:
                         json.dump(result, f, indent=2)

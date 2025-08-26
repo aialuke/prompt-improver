@@ -4,9 +4,9 @@ Tests integration with MCP server, CLI separation, and centralized utilities.
 """
 
 import asyncio
+import sys
 import time
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
 
 from src.prompt_improver.metrics.api_metrics import (
     APIMetricsCollector,
@@ -18,7 +18,6 @@ from src.prompt_improver.metrics.api_metrics import (
     UserJourneyStage,
     get_api_metrics_collector,
     record_api_request,
-    record_user_journey_event,
 )
 
 try:
@@ -199,12 +198,12 @@ class APESIntegrationTester:
             analytics = await self.test_collector.get_endpoint_analytics(hours=1)
             cli_endpoints = [
                 endpoint
-                for endpoint in analytics["endpoint_analytics"].keys()
+                for endpoint in analytics["endpoint_analytics"]
                 if "/cli/" in endpoint
             ]
             mcp_endpoints = [
                 endpoint
-                for endpoint in analytics["endpoint_analytics"].keys()
+                for endpoint in analytics["endpoint_analytics"]
                 if "/mcp/" in endpoint
             ]
             assert len(cli_endpoints) > 0, "CLI endpoints not found in analytics"
@@ -399,4 +398,4 @@ async def main():
 
 if __name__ == "__main__":
     success = asyncio.run(main())
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)

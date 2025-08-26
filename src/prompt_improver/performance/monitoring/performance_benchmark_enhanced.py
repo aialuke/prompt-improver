@@ -1,4 +1,4 @@
-"""Enhanced Performance Benchmark with Service Locator - 2025 Architecture
+"""Enhanced Performance Benchmark with Service Locator - 2025 Architecture.
 
 Enhanced version of MCPPerformanceBenchmark that uses service locator pattern
 for dependency injection to eliminate circular imports while maintaining all
@@ -9,27 +9,27 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
-from typing import Any, Dict, Optional
+
+# Heavy ML imports moved to TYPE_CHECKING and lazy loading
+from typing import Any
 
 import aiofiles
 
-# Heavy ML imports moved to TYPE_CHECKING and lazy loading
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from prompt_improver.core.events.ml_event_bus import MLEventType, MLEvent
 
 def _get_ml_event_modules():
     """Lazy load ML event modules when needed."""
-    from prompt_improver.core.events.ml_event_bus import MLEventType, MLEvent
+    from prompt_improver.core.events.ml_event_bus import MLEvent, MLEventType
     return {'MLEventType': MLEventType, 'MLEvent': MLEvent}
 
-from .performance_service_locator import PerformanceServiceLocator
-from .protocols import (
-    DatabaseServiceProtocol,
-    PromptImprovementServiceProtocol,
+
+from prompt_improver.performance.monitoring.performance_service_locator import (
+    PerformanceServiceLocator,
+)
+from prompt_improver.shared.interfaces.protocols.monitoring import (
     ConfigurationServiceProtocol,
+    DatabaseServiceProtocol,
     MLEventBusServiceProtocol,
+    PromptImprovementServiceProtocol,
     SessionStoreServiceProtocol,
 )
 
@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 class MCPPerformanceBenchmarkEnhanced:
     """Enhanced performance benchmark with service locator pattern.
-    
+
     This version eliminates circular dependencies by using the service locator
     pattern for dependency injection while maintaining all original functionality.
-    
+
     Features:
     - Service locator pattern for clean dependency injection
     - Protocol-based interfaces for testability
@@ -49,16 +49,16 @@ class MCPPerformanceBenchmarkEnhanced:
     - Graceful fallbacks for missing dependencies
     - Full compatibility with existing performance monitoring
     """
-    
-    def __init__(self, service_locator: PerformanceServiceLocator):
+
+    def __init__(self, service_locator: PerformanceServiceLocator) -> None:
         """Initialize with service locator for dependency injection.
-        
+
         Args:
             service_locator: Configured service locator instance
         """
         self.service_locator = service_locator
         self._optimizer = None
-        
+
         # Test data for benchmarking
         self.test_prompts = [
             "Write a Python function to calculate fibonacci numbers",
@@ -79,7 +79,7 @@ class MCPPerformanceBenchmarkEnhanced:
             {"domain": "data_science", "tool": "pandas"},
             {"domain": "devops", "platform": "aws"},
         ]
-        
+
     @property
     async def optimizer(self):
         """Lazy load performance optimizer."""
@@ -91,18 +91,20 @@ class MCPPerformanceBenchmarkEnhanced:
                 self._optimizer = get_performance_optimizer()
             except ImportError:
                 # Use factory fallback
-                from .performance_benchmark_factory import get_performance_optimizer
+                from prompt_improver.performance.monitoring.performance_benchmark_factory import (
+                    get_performance_optimizer,
+                )
                 self._optimizer = await get_performance_optimizer()
         return self._optimizer
-        
+
     async def run_baseline_benchmark(
         self, samples_per_operation: int = 50
     ) -> dict[str, Any]:
         """Run comprehensive baseline benchmark for all operations.
-        
+
         Args:
             samples_per_operation: Number of samples to collect per operation
-            
+
         Returns:
             Dictionary of operation names to baseline measurements
         """
@@ -110,143 +112,143 @@ class MCPPerformanceBenchmarkEnhanced:
             f"Starting baseline benchmark with {samples_per_operation} samples per operation"
         )
         baselines = {}
-        
+
         # Benchmark prompt improvement
         baseline = await self._benchmark_improve_prompt(samples_per_operation)
         if baseline:
             baselines["improve_prompt"] = baseline
-            
+
         # Benchmark database operations
         baseline = await self._benchmark_database_operations(samples_per_operation)
         if baseline:
             baselines["database_query"] = baseline
-            
+
         # Benchmark analytics operations
         baseline = await self._benchmark_analytics_operations(samples_per_operation)
         if baseline:
             baselines["analytics_query"] = baseline
-            
+
         # Benchmark session operations
         baseline = await self._benchmark_session_operations(samples_per_operation)
         if baseline:
             baselines["session_management"] = baseline
-            
+
         await self.save_benchmark_results(baselines)
         return baselines
-        
+
     async def _benchmark_improve_prompt(
         self, sample_count: int
     ) -> Any | None:
         """Benchmark the improve_prompt operation using service locator."""
         logger.info("Benchmarking improve_prompt operation")
-        
+
         try:
             prompt_service = await self.service_locator.get_service(PromptImprovementServiceProtocol)
         except ValueError:
             logger.warning("Prompt improvement service not available, skipping benchmark")
             return None
-            
-        async def improve_prompt_operation():
+
+        async def improve_prompt_operation() -> None:
             prompt_idx = len((await self.optimizer)._measurements.get("improve_prompt", [])) % len(self.test_prompts)
             context_idx = len((await self.optimizer)._measurements.get("improve_prompt", [])) % len(self.test_contexts)
-            
+
             prompt = self.test_prompts[prompt_idx]
             context = self.test_contexts[context_idx]
-            
+
             await prompt_service.improve_prompt(
                 prompt=prompt,
                 context=context,
                 session_id=f"benchmark_{int(time.time())}",
                 rate_limit_remaining=None,
             )
-            
+
         optimizer = await self.optimizer
         return await optimizer.run_performance_benchmark(
             "improve_prompt", improve_prompt_operation, sample_count
         )
-        
+
     async def _benchmark_database_operations(
         self, sample_count: int
     ) -> Any | None:
         """Benchmark database query operations using service locator."""
         logger.info("Benchmarking database operations")
-        
+
         try:
             database_service = await self.service_locator.get_service(DatabaseServiceProtocol)
         except ValueError:
             logger.warning("Database service not available, skipping benchmark")
             return None
-            
-        async def database_operation():
+
+        async def database_operation() -> None:
             async with await database_service.get_session() as db_session:
                 if db_session is not None:  # Check for no-op implementation
                     from sqlalchemy import text
                     result = await db_session.execute(text("SELECT 1"))
                     await result.fetchone()
-                    
+
         optimizer = await self.optimizer
         return await optimizer.run_performance_benchmark(
             "database_query", database_operation, sample_count
         )
-        
+
     async def _benchmark_analytics_operations(
         self, sample_count: int
     ) -> Any | None:
         """Benchmark analytics query operations using service locator."""
         logger.info("Benchmarking analytics operations")
-        
+
         try:
             event_bus_service = await self.service_locator.get_service(MLEventBusServiceProtocol)
         except ValueError:
             logger.warning("ML event bus service not available, skipping benchmark")
             return None
-            
-        async def analytics_operation():
+
+        async def analytics_operation() -> None:
             ml_modules = _get_ml_event_modules()
             MLEvent = ml_modules['MLEvent']
             MLEventType = ml_modules['MLEventType']
-            
+
             performance_request = MLEvent(
                 event_type=MLEventType.PERFORMANCE_METRICS_REQUEST,
                 source="performance_benchmark",
                 data={
-                    "metric_type": "rule_effectiveness", 
+                    "metric_type": "rule_effectiveness",
                     "days": 7,
                     "min_usage_count": 1
                 }
             )
             await event_bus_service.publish(performance_request)
-            
+
         optimizer = await self.optimizer
         return await optimizer.run_performance_benchmark(
             "analytics_query", analytics_operation, sample_count
         )
-        
+
     async def _benchmark_session_operations(
         self, sample_count: int
     ) -> Any | None:
         """Benchmark session management operations using service locator."""
         logger.info("Benchmarking session operations")
-        
+
         try:
             session_store = await self.service_locator.get_service(SessionStoreServiceProtocol)
         except ValueError:
             logger.warning("Session store service not available, skipping benchmark")
             return None
-            
-        async def session_operation():
+
+        async def session_operation() -> None:
             session_id = f"benchmark_{int(time.time() * 1000)}"
             await session_store.set_session(session_id, {"test": "data"})
             await session_store.get_session(session_id)
             await session_store.set_session(session_id, {"test": "data", "updated": True})
             await session_store.touch_session(session_id)
             await session_store.delete_session(session_id)
-            
+
         optimizer = await self.optimizer
         return await optimizer.run_performance_benchmark(
             "session_management", session_operation, sample_count
         )
-        
+
     async def save_benchmark_results(
         self,
         baselines: dict[str, Any],
@@ -272,7 +274,7 @@ class MCPPerformanceBenchmarkEnhanced:
         async with aiofiles.open(filepath, "w") as f:
             await f.write(json.dumps(results, indent=2))
         logger.info(f"Saved benchmark results to {filepath}")
-        
+
     async def compare_with_baseline(
         self, baseline_filepath: str = "performance_baseline.json"
     ) -> dict[str, Any]:
@@ -282,9 +284,9 @@ class MCPPerformanceBenchmarkEnhanced:
                 content = await f.read()
                 baseline_data = json.loads(content)
         except FileNotFoundError:
-            logger.error(f"Baseline file {baseline_filepath} not found")
+            logger.exception(f"Baseline file {baseline_filepath} not found")
             return {"error": "Baseline file not found"}
-            
+
         optimizer = await self.optimizer
         current_baselines = await optimizer.get_all_baselines()
         comparison = {
@@ -292,7 +294,7 @@ class MCPPerformanceBenchmarkEnhanced:
             "baseline_timestamp": baseline_data["timestamp"],
             "comparisons": {},
         }
-        
+
         for operation_name, baseline_info in baseline_data["baselines"].items():
             current_baseline = current_baselines.get(operation_name)
             if current_baseline:
@@ -313,7 +315,7 @@ class MCPPerformanceBenchmarkEnhanced:
                     "current_meets_target": current_baseline.meets_target(200),
                 }
         return comparison
-        
+
     def generate_performance_report(
         self, baselines: dict[str, Any]
     ) -> str:
@@ -328,7 +330,7 @@ class MCPPerformanceBenchmarkEnhanced:
             "OPERATION PERFORMANCE SUMMARY:",
             "-" * 40,
         ]
-        
+
         for operation_name, baseline in baselines.items():
             status = "✅ PASS" if baseline.meets_target(200) else "❌ FAIL"
             report_lines.extend([
@@ -341,7 +343,7 @@ class MCPPerformanceBenchmarkEnhanced:
                 f"  Samples: {baseline.sample_count}",
                 "",
             ])
-            
+
         total_operations = len(baselines)
         passing_operations = sum(1 for b in baselines.values() if b.meets_target(200))
         report_lines.extend([
@@ -357,7 +359,7 @@ class MCPPerformanceBenchmarkEnhanced:
             "=" * 80,
         ])
         return "\n".join(report_lines)
-        
+
     async def health_check(self) -> dict[str, Any]:
         """Check health of performance benchmark and its dependencies."""
         health = {
@@ -366,20 +368,17 @@ class MCPPerformanceBenchmarkEnhanced:
             "dependencies": {},
             "timestamp": datetime.now(UTC).isoformat()
         }
-        
+
         # Check service locator health
         try:
-            available_services = []
-            for protocol in [
+            available_services = [protocol.__name__ for protocol in [
                 DatabaseServiceProtocol,
                 PromptImprovementServiceProtocol,
                 ConfigurationServiceProtocol,
                 MLEventBusServiceProtocol,
                 SessionStoreServiceProtocol,
-            ]:
-                if self.service_locator.has_service(protocol):
-                    available_services.append(protocol.__name__)
-                    
+            ] if self.service_locator.has_service(protocol)]
+
             health["dependencies"]["service_locator"] = {
                 "status": "healthy",
                 "available_services": available_services
@@ -390,7 +389,7 @@ class MCPPerformanceBenchmarkEnhanced:
                 "error": str(e)
             }
             health["status"] = "degraded"
-            
+
         # Check optimizer health
         try:
             optimizer = await self.optimizer
@@ -404,7 +403,7 @@ class MCPPerformanceBenchmarkEnhanced:
                 "error": str(e)
             }
             health["status"] = "degraded"
-            
+
         return health
 
 
@@ -414,11 +413,11 @@ async def run_enhanced_performance_benchmark(
     samples_per_operation: int = 50,
 ) -> dict[str, Any]:
     """Run enhanced performance benchmark with service locator.
-    
+
     Args:
         service_locator: Configured service locator instance
         samples_per_operation: Number of samples to collect per operation
-        
+
     Returns:
         Dictionary of performance baselines
     """

@@ -7,9 +7,9 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from rich.console import Console
 
@@ -31,7 +31,6 @@ class SecurityLevel(Enum):
     internal = "internal"
     confidential = "confidential"
     restricted = "restricted"
-
 
 
 @dataclass
@@ -70,7 +69,7 @@ class PromptDataProtection:
 
     def __init__(
         self, console: Console | None = None, enable_differential_privacy: bool = True
-    ):
+    ) -> None:
         self.console = console or Console()
         self.enable_differential_privacy = enable_differential_privacy
         self.sensitive_patterns = [
@@ -374,12 +373,12 @@ class PromptDataProtection:
                     f"Enhanced security audit logged for session {session_id}"
                 )
         except Exception as e:
-            self.logger.error(f"Failed to log enhanced security audit: {e}")
+            self.logger.exception(f"Failed to log enhanced security audit: {e}")
 
     async def audit_redaction(
         self, session_id: str, redaction_count: int, redaction_details: dict[str, Any]
     ):
-        """Audit log redactions using existing database structure"""
+        """Audit log redactions using existing database structure."""
         try:
             get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
@@ -442,12 +441,12 @@ class PromptDataProtection:
                     f"Security audit logged for session {session_id}: {redaction_count} redactions"
                 )
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to audit redaction for session {session_id}: {e}"
             )
 
     async def get_security_audit_report(self, days: int = 30) -> dict[str, Any]:
-        """Generate security audit report using existing analytics framework"""
+        """Generate security audit report using existing analytics framework."""
         try:
             analytics_factory = get_analytics_interface()
             analytics = analytics_factory() if analytics_factory else None
@@ -471,7 +470,7 @@ class PromptDataProtection:
                     clean_sessions / total_sessions * 100 if total_sessions > 0 else 100
                 )
                 total_prompts = total_sessions
-                security_report = {
+                return {
                     "report_period_days": days,
                     "generated_at": datetime.now(UTC).isoformat(),
                     "summary": {
@@ -505,9 +504,8 @@ class PromptDataProtection:
                     },
                     "statistics": self.redaction_stats,
                 }
-                return security_report
         except Exception as e:
-            self.logger.error(f"Failed to generate security audit report: {e}")
+            self.logger.exception(f"Failed to generate security audit report: {e}")
             return {
                 "error": str(e),
                 "report_period_days": days,
@@ -515,7 +513,7 @@ class PromptDataProtection:
             }
 
     async def validate_prompt_safety(self, prompt: str) -> dict[str, Any]:
-        """Validate prompt for potential security issues without modification"""
+        """Validate prompt for potential security issues without modification."""
         safety_report = {
             "is_safe": True,
             "risk_level": "LOW",
@@ -547,7 +545,7 @@ class PromptDataProtection:
         return safety_report
 
     def _get_risk_level(self, pattern_type: str) -> str:
-        """Get risk level for detected pattern type"""
+        """Get risk level for detected pattern type."""
         critical_patterns = [
             "openai_api_key",
             "github_token",
@@ -568,11 +566,11 @@ class PromptDataProtection:
     def _generate_safety_recommendations(
         self, detected_patterns: list[dict[str, Any]]
     ) -> list[str]:
-        """Generate safety recommendations based on detected patterns"""
+        """Generate safety recommendations based on detected patterns."""
         recommendations = []
         for issue in detected_patterns:
             pattern_type = issue["type"]
-            if pattern_type in ["openai_api_key", "github_token", "api_key_field"]:
+            if pattern_type in {"openai_api_key", "github_token", "api_key_field"}:
                 recommendations.append(
                     "Remove API keys and tokens - use environment variables instead"
                 )
@@ -692,7 +690,7 @@ class PromptDataProtection:
             self.logger.info("PromptDataProtection component initialized successfully")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to initialize PromptDataProtection: {e}")
+            self.logger.exception(f"Failed to initialize PromptDataProtection: {e}")
             return False
 
     async def health_check(self) -> dict[str, Any]:
@@ -700,7 +698,7 @@ class PromptDataProtection:
         try:
             test_prompt = "test prompt with no sensitive data"
             start_time = datetime.now(UTC)
-            _, summary = await self.sanitize_prompt_before_storage(
+            _, _summary = await self.sanitize_prompt_before_storage(
                 test_prompt, "health_check_session", user_consent=True
             )
             processing_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
@@ -771,14 +769,14 @@ class PromptDataProtection:
             self.logger.info("PromptDataProtection component shutdown complete")
             return True
         except Exception as e:
-            self.logger.error(f"Error during PromptDataProtection shutdown: {e}")
+            self.logger.exception(f"Error during PromptDataProtection shutdown: {e}")
             return False
 
 
 class SecureMCPServer:
-    """MCP Server security configuration (builds on existing MCP server)"""
+    """MCP Server security configuration (builds on existing MCP server)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = {
             "host": "0.0.0.0",
             "port": 3000,
@@ -795,7 +793,7 @@ class SecureMCPServer:
     async def validate_request(
         self, request_data: dict[str, Any], client_ip: str = "0.0.0.0"
     ) -> tuple[bool, str]:
-        """Validate incoming MCP request for security"""
+        """Validate incoming MCP request for security."""
         if not await self._check_rate_limit(client_ip):
             return (False, "Rate limit exceeded")
         request_size = len(json.dumps(request_data))
@@ -810,7 +808,7 @@ class SecureMCPServer:
         return (True, "Valid request")
 
     async def _check_rate_limit(self, client_ip: str) -> bool:
-        """Check rate limiting for client IP"""
+        """Check rate limiting for client IP."""
         current_time = datetime.now().timestamp()
         if client_ip not in self.rate_limit_store:
             self.rate_limit_store[client_ip] = []
@@ -827,7 +825,7 @@ class SecureMCPServer:
         return True
 
     def get_security_headers(self) -> dict[str, str]:
-        """Get security headers for MCP responses"""
+        """Get security headers for MCP responses."""
         return {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
@@ -838,7 +836,7 @@ class SecureMCPServer:
         }
 
     async def log_security_event(self, event_type: str, details: dict[str, Any]):
-        """Log security-related events"""
+        """Log security-related events."""
         security_event = {
             "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
@@ -848,7 +846,7 @@ class SecureMCPServer:
         self.logger.warning(f"SECURITY_EVENT: {json.dumps(security_event)}")
 
     def get_rate_limit_status(self, client_ip: str = "0.0.0.0") -> dict[str, Any]:
-        """Get current rate limit status for client"""
+        """Get current rate limit status for client."""
         current_time = datetime.now().timestamp()
         time_window = current_time - self.config["rate_limit_period"]
         if client_ip in self.rate_limit_store:

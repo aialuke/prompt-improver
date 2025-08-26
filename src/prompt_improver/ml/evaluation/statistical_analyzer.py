@@ -10,12 +10,18 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-from statsmodels.stats.multitest import multipletests
-import numpy as np
-from scipy import stats
-from scipy.stats import normaltest, pearsonr, shapiro, spearmanr
-from sklearn.metrics import cohen_kappa_score
-from sklearn.utils import resample
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy, get_scipy_stats, get_sklearn, get_sklearn_utils
+
+try:
+    from statsmodels.stats.multitest import multipletests
+except ImportError:
+    # Fallback if statsmodels not available
+    def multipletests(pvals, alpha=0.05, method='fdr_bh'):
+        return [False] * len(pvals), pvals, alpha, alpha
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+# from get_scipy().stats import normaltest, pearsonr, shapiro, spearmanr  # Converted to lazy loading
+# Lazy loading imports will be handled within functions as needed
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -181,9 +187,9 @@ class StatisticalAnalyzer:
         metrics = ['overall_scores', 'clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         stats_dict = {}
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) > 0:
-                stats_dict[metric] = DescriptiveStats(count=len(values), mean=np.mean(values), median=np.median(values), mode=self._calculate_mode(values), standard_deviation=np.std(values, ddof=1) if len(values) > 1 else 0, variance=np.var(values, ddof=1) if len(values) > 1 else 0, min_value=np.min(values), max_value=np.max(values), range_value=np.max(values) - np.min(values), quartiles=self._calculate_quartiles(values), skewness=stats.skew(values) if len(values) > 2 else 0, kurtosis=stats.kurtosis(values) if len(values) > 3 else 0, coefficient_of_variation=np.std(values) / np.mean(values) if np.mean(values) != 0 else 0)
+                stats_dict[metric] = DescriptiveStats(count=len(values), mean=get_numpy().mean(values), median=get_numpy().median(values), mode=self._calculate_mode(values), standard_deviation=get_numpy().std(values, ddof=1) if len(values) > 1 else 0, variance=get_numpy().var(values, ddof=1) if len(values) > 1 else 0, min_value=get_numpy().min(values), max_value=get_numpy().max(values), range_value=get_numpy().max(values) - get_numpy().min(values), quartiles=self._calculate_quartiles(values), skewness=get_scipy_stats().skew(values) if len(values) > 2 else 0, kurtosis=get_scipy_stats().kurtosis(values) if len(values) > 3 else 0, coefficient_of_variation=get_numpy().std(values) / get_numpy().mean(values) if get_numpy().mean(values) != 0 else 0)
             else:
                 stats_dict[metric] = self._get_empty_stats()
         return stats_dict
@@ -191,7 +197,7 @@ class StatisticalAnalyzer:
     def _calculate_mode(self, values: list[float]) -> float | list[float]:
         """Calculate mode of values"""
         try:
-            mode_result = stats.mode(values, keepdims=True)
+            mode_result = get_scipy_stats().mode(values, keepdims=True)
             modes = mode_result.mode
             return modes[0] if len(modes) == 1 else modes.tolist()
         except:
@@ -199,7 +205,7 @@ class StatisticalAnalyzer:
 
     def _calculate_quartiles(self, values: list[float]) -> dict[str, float]:
         """Calculate quartiles"""
-        return {'q1': np.percentile(values, 25), 'q2': np.percentile(values, 50), 'q3': np.percentile(values, 75), 'iqr': np.percentile(values, 75) - np.percentile(values, 25)}
+        return {'q1': get_numpy().percentile(values, 25), 'q2': get_numpy().percentile(values, 50), 'q3': get_numpy().percentile(values, 75), 'iqr': get_numpy().percentile(values, 75) - get_numpy().percentile(values, 25)}
 
     def _get_empty_stats(self) -> DescriptiveStats:
         """Get empty statistics object"""
@@ -210,7 +216,7 @@ class StatisticalAnalyzer:
         metrics = ['overall_scores', 'clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         distributions = {}
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) >= self.config.minimum_sample_size:
                 distributions[metric] = DistributionAnalysis(normality_test=self._test_normality(values), histogram=self._create_histogram(values), outliers=self._detect_outliers(values), distribution_type=self._classify_distribution(values))
         return distributions
@@ -234,7 +240,7 @@ class StatisticalAnalyzer:
     def _create_histogram(self, values: list[float]) -> dict[str, Any]:
         """Create histogram data"""
         try:
-            hist, bin_edges = np.histogram(values, bins='auto')
+            hist, bin_edges = get_numpy().histogram(values, bins='auto')
             return {'counts': hist.tolist(), 'bin_edges': bin_edges.tolist(), 'bins': len(hist)}
         except:
             return {'counts': [], 'bin_edges': [], 'bins': 0}
@@ -242,8 +248,8 @@ class StatisticalAnalyzer:
     def _detect_outliers(self, values: list[float]) -> list[float]:
         """Detect outliers using IQR method"""
         try:
-            q1 = np.percentile(values, 25)
-            q3 = np.percentile(values, 75)
+            q1 = get_numpy().percentile(values, 25)
+            q3 = get_numpy().percentile(values, 75)
             iqr = q3 - q1
             lower_bound = q1 - 1.5 * iqr
             upper_bound = q3 + 1.5 * iqr
@@ -255,8 +261,8 @@ class StatisticalAnalyzer:
     def _classify_distribution(self, values: list[float]) -> str:
         """Classify distribution type"""
         try:
-            skewness = stats.skew(values)
-            kurtosis = stats.kurtosis(values)
+            skewness = get_scipy_stats().skew(values)
+            kurtosis = get_scipy_stats().kurtosis(values)
             if abs(skewness) < 0.5 and abs(kurtosis) < 0.5:
                 return 'normal'
             if skewness > 0.5:
@@ -298,25 +304,25 @@ class StatisticalAnalyzer:
         try:
             scores1 = [self._extract_score(r, 'overallScore') for r in group1]
             scores2 = [self._extract_score(r, 'overallScore') for r in group2]
-            scores1 = [s for s in scores1 if s is not None and (not np.isnan(s))]
-            scores2 = [s for s in scores2 if s is not None and (not np.isnan(s))]
+            scores1 = [s for s in scores1 if s is not None and (not get_numpy().isnan(s))]
+            scores2 = [s for s in scores2 if s is not None and (not get_numpy().isnan(s))]
             if len(scores1) < 3 or len(scores2) < 3:
                 return {'error': 'insufficient_sample_size'}
-            statistic, p_value = stats.ttest_ind(scores1, scores2)
-            pooled_std = np.sqrt(((len(scores1) - 1) * np.var(scores1, ddof=1) + (len(scores2) - 1) * np.var(scores2, ddof=1)) / (len(scores1) + len(scores2) - 2))
-            cohens_d = (np.mean(scores1) - np.mean(scores2)) / pooled_std if pooled_std != 0 else 0
-            return {'statistic': float(statistic), 'p_value': float(p_value), 'significant': p_value < self.config.significance_level, 'effect_size': float(cohens_d), 'effect_magnitude': self._interpret_effect_size(abs(cohens_d)), 'group1_mean': float(np.mean(scores1)), 'group2_mean': float(np.mean(scores2)), 'group1_n': len(scores1), 'group2_n': len(scores2)}
+            statistic, p_value = get_scipy_stats().ttest_ind(scores1, scores2)
+            pooled_std = get_numpy().sqrt(((len(scores1) - 1) * get_numpy().var(scores1, ddof=1) + (len(scores2) - 1) * get_numpy().var(scores2, ddof=1)) / (len(scores1) + len(scores2) - 2))
+            cohens_d = (get_numpy().mean(scores1) - get_numpy().mean(scores2)) / pooled_std if pooled_std != 0 else 0
+            return {'statistic': float(statistic), 'p_value': float(p_value), 'significant': p_value < self.config.significance_level, 'effect_size': float(cohens_d), 'effect_magnitude': self._interpret_effect_size(abs(cohens_d)), 'group1_mean': float(get_numpy().mean(scores1)), 'group2_mean': float(get_numpy().mean(scores2)), 'group1_n': len(scores1), 'group2_n': len(scores2)}
         except Exception as e:
             return {'error': str(e)}
 
     def _test_improvement_significance(self, data: dict[str, Any], baseline: float) -> dict[str, Any]:
         """Test if improvement over baseline is significant"""
         try:
-            scores = [s for s in data['overall_scores'] if s is not None and (not np.isnan(s))]
+            scores = [s for s in data['overall_scores'] if s is not None and (not get_numpy().isnan(s))]
             if len(scores) < 3:
                 return {'error': 'insufficient_sample_size'}
-            statistic, p_value = stats.ttest_1samp(scores, baseline)
-            return {'baseline': float(baseline), 'sample_mean': float(np.mean(scores)), 'statistic': float(statistic), 'p_value': float(p_value), 'significant_improvement': p_value < self.config.significance_level and np.mean(scores) > baseline, 'effect_size': (np.mean(scores) - baseline) / np.std(scores, ddof=1) if np.std(scores, ddof=1) != 0 else 0}
+            statistic, p_value = get_scipy_stats().ttest_1samp(scores, baseline)
+            return {'baseline': float(baseline), 'sample_mean': float(get_numpy().mean(scores)), 'statistic': float(statistic), 'p_value': float(p_value), 'significant_improvement': p_value < self.config.significance_level and get_numpy().mean(scores) > baseline, 'effect_size': (get_numpy().mean(scores) - baseline) / get_numpy().std(scores, ddof=1) if get_numpy().std(scores, ddof=1) != 0 else 0}
         except Exception as e:
             return {'error': str(e)}
 
@@ -326,8 +332,8 @@ class StatisticalAnalyzer:
         consistency_tests = {}
         for i, metric1 in enumerate(metrics):
             for metric2 in metrics[i + 1:]:
-                values1 = [v for v in data[metric1] if v is not None and (not np.isnan(v))]
-                values2 = [v for v in data[metric2] if v is not None and (not np.isnan(v))]
+                values1 = [v for v in data[metric1] if v is not None and (not get_numpy().isnan(v))]
+                values2 = [v for v in data[metric2] if v is not None and (not get_numpy().isnan(v))]
                 if len(values1) == len(values2) and len(values1) >= 3:
                     correlation, p_value = pearsonr(values1, values2)
                     consistency_tests[f'{metric1}_vs_{metric2}'] = {'correlation': float(correlation), 'p_value': float(p_value), 'significant': p_value < self.config.significance_level, 'consistent': correlation > 0.3 and p_value < self.config.significance_level}
@@ -351,14 +357,14 @@ class StatisticalAnalyzer:
         try:
             scores1 = [self._extract_score(r, 'overallScore') for r in group1]
             scores2 = [self._extract_score(r, 'overallScore') for r in group2]
-            scores1 = [s for s in scores1 if s is not None and (not np.isnan(s))]
-            scores2 = [s for s in scores2 if s is not None and (not np.isnan(s))]
+            scores1 = [s for s in scores1 if s is not None and (not get_numpy().isnan(s))]
+            scores2 = [s for s in scores2 if s is not None and (not get_numpy().isnan(s))]
             if len(scores1) < 2 or len(scores2) < 2:
                 return {'error': 'insufficient_sample_size'}
-            pooled_std = np.sqrt(((len(scores1) - 1) * np.var(scores1, ddof=1) + (len(scores2) - 1) * np.var(scores2, ddof=1)) / (len(scores1) + len(scores2) - 2))
+            pooled_std = get_numpy().sqrt(((len(scores1) - 1) * get_numpy().var(scores1, ddof=1) + (len(scores2) - 1) * get_numpy().var(scores2, ddof=1)) / (len(scores1) + len(scores2) - 2))
             if pooled_std == 0:
                 return {'cohens_d': 0, 'magnitude': 'none'}
-            cohens_d = (np.mean(scores1) - np.mean(scores2)) / pooled_std
+            cohens_d = (get_numpy().mean(scores1) - get_numpy().mean(scores2)) / pooled_std
             return {'cohens_d': float(cohens_d), 'magnitude': self._interpret_effect_size(abs(cohens_d))}
         except Exception as e:
             return {'error': str(e)}
@@ -379,22 +385,22 @@ class StatisticalAnalyzer:
         metrics = ['clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         metric_matrix = []
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) > 0:
                 metric_matrix.append(values)
         if len(metric_matrix) >= 2 and all(len(row) == len(metric_matrix[0]) for row in metric_matrix):
-            reliability['cronbachs_alpha'] = self._calculate_cronbachs_alpha(np.array(metric_matrix).T)
+            reliability['cronbachs_alpha'] = self._calculate_cronbachs_alpha(get_numpy().array(metric_matrix).T)
         if len(data.get('timestamps', [])) > 1:
             reliability['temporal_consistency'] = self._analyze_temporal_consistency(data)
         return reliability
 
-    def _calculate_cronbachs_alpha(self, item_matrix: np.ndarray) -> dict[str, Any]:
+    def _calculate_cronbachs_alpha(self, item_matrix: get_numpy().ndarray) -> dict[str, Any]:
         """Calculate Cronbach's alpha for internal consistency"""
         try:
             n_items = item_matrix.shape[1]
-            item_variances = np.var(item_matrix, axis=0, ddof=1)
-            total_variance = np.var(np.sum(item_matrix, axis=1), ddof=1)
-            alpha = n_items / (n_items - 1) * (1 - np.sum(item_variances) / total_variance)
+            item_variances = get_numpy().var(item_matrix, axis=0, ddof=1)
+            total_variance = get_numpy().var(get_numpy().sum(item_matrix, axis=1), ddof=1)
+            alpha = n_items / (n_items - 1) * (1 - get_numpy().sum(item_variances) / total_variance)
             if alpha >= 0.9:
                 interpretation = 'excellent'
             elif alpha >= 0.8:
@@ -422,8 +428,8 @@ class StatisticalAnalyzer:
             variances = []
             for i in range(len(scores) - window_size + 1):
                 window_scores = scores[i:i + window_size]
-                variances.append(np.var(window_scores, ddof=1))
-            temporal_consistency = 1 - np.mean(variances) / np.var(scores, ddof=1) if np.var(scores, ddof=1) != 0 else 1
+                variances.append(get_numpy().var(window_scores, ddof=1))
+            temporal_consistency = 1 - get_numpy().mean(variances) / get_numpy().var(scores, ddof=1) if get_numpy().var(scores, ddof=1) != 0 else 1
             return {'temporal_consistency': float(max(0, temporal_consistency)), 'acceptable': temporal_consistency >= self.config.validation_thresholds['consistency_threshold']}
         except Exception as e:
             return {'error': str(e)}
@@ -434,8 +440,8 @@ class StatisticalAnalyzer:
         related_pairs = [('clarity_scores', 'completeness_scores'), ('actionability_scores', 'effectiveness_scores'), ('clarity_scores', 'overall_scores'), ('effectiveness_scores', 'overall_scores')]
         convergent_validity = {}
         for metric1, metric2 in related_pairs:
-            values1 = [v for v in data[metric1] if v is not None and (not np.isnan(v))]
-            values2 = [v for v in data[metric2] if v is not None and (not np.isnan(v))]
+            values1 = [v for v in data[metric1] if v is not None and (not get_numpy().isnan(v))]
+            values2 = [v for v in data[metric2] if v is not None and (not get_numpy().isnan(v))]
             if len(values1) == len(values2) and len(values1) >= 3:
                 correlation, p_value = pearsonr(values1, values2)
                 convergent_validity[f'{metric1}_{metric2}'] = {'correlation': float(correlation), 'p_value': float(p_value), 'valid': correlation > self.config.validation_thresholds['validity_threshold'] and p_value < self.config.significance_level}
@@ -448,12 +454,12 @@ class StatisticalAnalyzer:
         assessment = {}
         metrics = ['overall_scores', 'clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) > 0:
-                min_val, max_val = (np.min(values), np.max(values))
+                min_val, max_val = (get_numpy().min(values), get_numpy().max(values))
                 reasonable_range = 0 <= min_val <= 1 and 0 <= max_val <= 1 or (0 <= min_val <= 100 and 0 <= max_val <= 100)
-                distribution_variance = np.var(values) > 0.01
-                mean_val = np.mean(values)
+                distribution_variance = get_numpy().var(values) > 0.01
+                mean_val = get_numpy().mean(values)
                 reasonable_mean = 0.1 <= mean_val <= 0.9 or 10 <= mean_val <= 90
                 assessment[metric] = {'reasonable_range': reasonable_range, 'has_variance': distribution_variance, 'reasonable_mean': reasonable_mean, 'face_valid': reasonable_range and distribution_variance and reasonable_mean}
         return assessment
@@ -464,8 +470,8 @@ class StatisticalAnalyzer:
         correlations = {}
         for i, metric1 in enumerate(metrics):
             for metric2 in metrics[i + 1:]:
-                values1 = [v for v in data[metric1] if v is not None and (not np.isnan(v))]
-                values2 = [v for v in data[metric2] if v is not None and (not np.isnan(v))]
+                values1 = [v for v in data[metric1] if v is not None and (not get_numpy().isnan(v))]
+                values2 = [v for v in data[metric2] if v is not None and (not get_numpy().isnan(v))]
                 if len(values1) == len(values2) and len(values1) >= 3:
                     correlation, p_value = pearsonr(values1, values2)
                     correlations[f'{metric1}_{metric2}'] = CorrelationResult(correlation=float(correlation), p_value=float(p_value), significance='significant' if p_value < self.config.significance_level else 'not_significant', strength=self._interpret_correlation_strength(abs(correlation)), direction='positive' if correlation > 0 else 'negative')
@@ -486,11 +492,11 @@ class StatisticalAnalyzer:
         metrics = ['overall_scores', 'clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         intervals = {}
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) >= 3:
-                mean = np.mean(values)
-                sem = stats.sem(values)
-                ci = stats.t.interval(self.config.confidence_level, len(values) - 1, loc=mean, scale=sem)
+                mean = get_numpy().mean(values)
+                sem = get_scipy_stats().sem(values)
+                ci = get_scipy_stats().t.interval(self.config.confidence_level, len(values) - 1, loc=mean, scale=sem)
                 bootstrap_ci = self._calculate_bootstrap_ci(values)
                 intervals[metric] = {'mean': float(mean), 'lower_bound': float(ci[0]), 'upper_bound': float(ci[1]), 'margin_of_error': float(ci[1] - mean), 'bootstrap_lower': float(bootstrap_ci[0]), 'bootstrap_upper': float(bootstrap_ci[1]), 'bootstrap_method': 'BCa'}
         return intervals
@@ -500,8 +506,8 @@ class StatisticalAnalyzer:
         differences = {}
         scores = data['overall_scores']
         if len(scores) > 1:
-            differences['score_variance'] = float(np.var(scores, ddof=1))
-            differences['score_range'] = float(np.max(scores) - np.min(scores))
+            differences['score_variance'] = float(get_numpy().var(scores, ddof=1))
+            differences['score_range'] = float(get_numpy().max(scores) - get_numpy().min(scores))
             differences['improvement_trend'] = self._calculate_trend(scores)
         return differences
 
@@ -510,11 +516,11 @@ class StatisticalAnalyzer:
         consistency = {}
         metrics = ['overall_scores', 'clarity_scores', 'completeness_scores', 'actionability_scores', 'effectiveness_scores']
         for metric in metrics:
-            values = [v for v in data[metric] if v is not None and (not np.isnan(v))]
+            values = [v for v in data[metric] if v is not None and (not get_numpy().isnan(v))]
             if len(values) > 1:
-                mean_val = np.mean(values)
+                mean_val = get_numpy().mean(values)
                 if mean_val != 0:
-                    cv = np.std(values, ddof=1) / mean_val
+                    cv = get_numpy().std(values, ddof=1) / mean_val
                     consistency[f'{metric}_cv'] = float(cv)
         return consistency
 
@@ -530,8 +536,8 @@ class StatisticalAnalyzer:
     def _calculate_trend(self, values: list[float]) -> float:
         """Calculate linear trend slope"""
         try:
-            x = np.arange(len(values))
-            slope, _, _, _, _ = stats.linregress(x, values)
+            x = get_numpy().arange(len(values))
+            slope, _, _, _, _ = get_scipy_stats().linregress(x, values)
             return float(slope)
         except:
             return 0.0
@@ -539,8 +545,8 @@ class StatisticalAnalyzer:
     def _calculate_trend_strength(self, values: list[float]) -> float:
         """Calculate strength of trend (R-squared)"""
         try:
-            x = np.arange(len(values))
-            _, _, r_value, _, _ = stats.linregress(x, values)
+            x = get_numpy().arange(len(values))
+            _, _, r_value, _, _ = get_scipy_stats().linregress(x, values)
             return float(r_value ** 2)
         except:
             return 0.0
@@ -597,45 +603,45 @@ class StatisticalAnalyzer:
         try:
             if len(values) < 3:
                 return (0.0, 0.0)
-            values_array = np.array(values)
+            values_array = get_numpy().array(values)
             bootstrap_means = []
             for _ in range(n_bootstrap):
-                sample = resample(values_array, n_samples=len(values_array), replace=True)
-                bootstrap_means.append(np.mean(sample))
-            bootstrap_means = np.array(bootstrap_means)
-            observed_mean = np.mean(values_array)
+                sample = get_sklearn_utils().resample(values_array, n_samples=len(values_array), replace=True)
+                bootstrap_means.append(get_numpy().mean(sample))
+            bootstrap_means = get_numpy().array(bootstrap_means)
+            observed_mean = get_numpy().mean(values_array)
             if method == 'percentile':
                 alpha = 1 - self.config.confidence_level
-                return (np.percentile(bootstrap_means, 100 * alpha / 2), np.percentile(bootstrap_means, 100 * (1 - alpha / 2)))
+                return (get_numpy().percentile(bootstrap_means, 100 * alpha / 2), get_numpy().percentile(bootstrap_means, 100 * (1 - alpha / 2)))
             if method == 'bca':
                 alpha = 1 - self.config.confidence_level
-                bias_correction = stats.norm.ppf(np.mean(bootstrap_means < observed_mean))
+                bias_correction = get_scipy_stats().norm.ppf(get_numpy().mean(bootstrap_means < observed_mean))
                 jackknife_means = []
                 for i in range(len(values_array)):
-                    jack_sample = np.delete(values_array, i)
-                    jackknife_means.append(np.mean(jack_sample))
-                jackknife_mean = np.mean(jackknife_means)
-                numerator = np.sum((jackknife_mean - jackknife_means) ** 3)
-                denominator = 6 * np.sum((jackknife_mean - jackknife_means) ** 2) ** 1.5
+                    jack_sample = get_numpy().delete(values_array, i)
+                    jackknife_means.append(get_numpy().mean(jack_sample))
+                jackknife_mean = get_numpy().mean(jackknife_means)
+                numerator = get_numpy().sum((jackknife_mean - jackknife_means) ** 3)
+                denominator = 6 * get_numpy().sum((jackknife_mean - jackknife_means) ** 2) ** 1.5
                 if denominator == 0:
                     acceleration = 0
                 else:
                     acceleration = numerator / denominator
-                z_alpha_2 = stats.norm.ppf(alpha / 2)
-                z_1_alpha_2 = stats.norm.ppf(1 - alpha / 2)
+                z_alpha_2 = get_scipy_stats().norm.ppf(alpha / 2)
+                z_1_alpha_2 = get_scipy_stats().norm.ppf(1 - alpha / 2)
                 alpha_1_numerator = bias_correction + z_alpha_2
                 alpha_1_denominator = 1 - acceleration * (bias_correction + z_alpha_2)
-                alpha_1 = stats.norm.cdf(bias_correction + alpha_1_numerator / alpha_1_denominator)
+                alpha_1 = get_scipy_stats().norm.cdf(bias_correction + alpha_1_numerator / alpha_1_denominator)
                 alpha_2_numerator = bias_correction + z_1_alpha_2
                 alpha_2_denominator = 1 - acceleration * (bias_correction + z_1_alpha_2)
-                alpha_2 = stats.norm.cdf(bias_correction + alpha_2_numerator / alpha_2_denominator)
+                alpha_2 = get_scipy_stats().norm.cdf(bias_correction + alpha_2_numerator / alpha_2_denominator)
                 alpha_1 = max(0.001, min(0.999, alpha_1))
                 alpha_2 = max(0.001, min(0.999, alpha_2))
-                return (np.percentile(bootstrap_means, 100 * alpha_1), np.percentile(bootstrap_means, 100 * alpha_2))
+                return (get_numpy().percentile(bootstrap_means, 100 * alpha_1), get_numpy().percentile(bootstrap_means, 100 * alpha_2))
         except Exception as e:
             self.logger.warning('Bootstrap CI calculation failed: %s', e)
             alpha = 1 - self.config.confidence_level
-            return (np.percentile(bootstrap_means, 100 * alpha / 2), np.percentile(bootstrap_means, 100 * (1 - alpha / 2)))
+            return (get_numpy().percentile(bootstrap_means, 100 * alpha / 2), get_numpy().percentile(bootstrap_means, 100 * (1 - alpha / 2)))
 
     def _calculate_effect_sizes(self, control: list[float], treatment: list[float]) -> dict[str, Any]:
         """Calculate multiple effect size measures following 2025 statistical guidelines.
@@ -645,13 +651,13 @@ class StatisticalAnalyzer:
         if len(control) < 2 or len(treatment) < 2:
             return {'error': 'Insufficient sample size'}
         n1, n2 = (len(control), len(treatment))
-        pooled_std = np.sqrt(((n1 - 1) * np.var(control, ddof=1) + (n2 - 1) * np.var(treatment, ddof=1)) / (n1 + n2 - 2))
+        pooled_std = get_numpy().sqrt(((n1 - 1) * get_numpy().var(control, ddof=1) + (n2 - 1) * get_numpy().var(treatment, ddof=1)) / (n1 + n2 - 2))
         if pooled_std == 0:
             return {'cohens_d': 0, 'hedges_g': 0, 'recommended_measure': 'none'}
-        cohens_d = (np.mean(treatment) - np.mean(control)) / pooled_std
+        cohens_d = (get_numpy().mean(treatment) - get_numpy().mean(control)) / pooled_std
         j = 1 - 3 / (4 * (n1 + n2) - 9)
         hedges_g = cohens_d * j
-        glass_delta = (np.mean(treatment) - np.mean(control)) / np.std(control, ddof=1)
+        glass_delta = (get_numpy().mean(treatment) - get_numpy().mean(control)) / get_numpy().std(control, ddof=1)
 
         def interpret_effect_size(effect_size, field='psychology'):
             if field == 'psychology':
@@ -692,9 +698,9 @@ class StatisticalAnalyzer:
             else:
                 rejected, p_corrected, alpha_sidak, alpha_bonf = multipletests(p_values, alpha=fdr_level, method='fdr_bh')
                 method_used = 'fdr_bh_standard'
-            num_discoveries = np.sum(rejected)
+            num_discoveries = get_numpy().sum(rejected)
             if num_discoveries > 0:
-                expected_false_discoveries = np.sum(p_corrected[rejected])
+                expected_false_discoveries = get_numpy().sum(p_corrected[rejected])
                 actual_fdr = expected_false_discoveries / num_discoveries
             else:
                 actual_fdr = 0.0

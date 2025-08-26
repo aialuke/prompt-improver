@@ -14,10 +14,9 @@ Success Criteria:
 """
 
 import asyncio
+import contextlib
 import logging
 import time
-from datetime import datetime
-from typing import Any, Dict
 
 # Set up logging
 logging.basicConfig(
@@ -34,12 +33,10 @@ async def test_automl_background_integration():
         from src.prompt_improver.ml.automl.orchestrator import (
             AutoMLConfig,
             AutoMLMode,
-            AutoMLOrchestrator,
             create_automl_orchestrator,
         )
         from src.prompt_improver.performance.monitoring.health.background_manager import (
             EnhancedBackgroundTaskManager,
-            TaskPriority,
         )
 
         logger.info("🚀 Starting AutoML Task Manager Integration Test")
@@ -177,7 +174,7 @@ async def test_automl_background_integration():
         completion_events = [
             e
             for e in captured_events
-            if e["type"] in ["ml.training.completed", "ml.training.failed"]
+            if e["type"] in {"ml.training.completed", "ml.training.failed"}
         ]
         assert len(completion_events) > 0, "No training completion events captured"
         logger.info(f"✅ {len(completion_events)} training completion events")
@@ -230,10 +227,8 @@ async def test_automl_background_integration():
 
         # Cancel the background task
         optimization_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await optimization_task
-        except asyncio.CancelledError:
-            pass
 
         # Verify cancellation worked
         status_after_cancel = await orchestrator.get_optimization_status()
@@ -309,7 +304,7 @@ async def test_automl_background_integration():
         return summary
 
     except Exception as e:
-        logger.error(f"❌ Test failed with error: {e}")
+        logger.exception(f"❌ Test failed with error: {e}")
         raise
     finally:
         # Cleanup
@@ -320,7 +315,7 @@ async def test_automl_background_integration():
                 await event_bus.shutdown()
             logger.info("🧹 Cleanup completed")
         except Exception as cleanup_error:
-            logger.error(f"⚠️ Cleanup error: {cleanup_error}")
+            logger.exception(f"⚠️ Cleanup error: {cleanup_error}")
 
 
 async def main():
@@ -352,10 +347,10 @@ async def main():
         logger.info("📈 Enhanced task observability and lifecycle management enabled")
 
     except Exception as e:
-        logger.error("=" * 60)
-        logger.error("❌ INTEGRATION TEST FAILED!")
-        logger.error("=" * 60)
-        logger.error(f"Error: {e}")
+        logger.exception("=" * 60)
+        logger.exception("❌ INTEGRATION TEST FAILED!")
+        logger.exception("=" * 60)
+        logger.exception(f"Error: {e}")
         raise
 
 

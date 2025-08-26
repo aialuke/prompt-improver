@@ -6,7 +6,7 @@ maintaining strict architectural separation between MCP and ML components.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.events.ml_event_bus import (
     MLEvent,
@@ -29,7 +29,7 @@ class EventBasedMLAnalysisService(MLAnalysisInterface):
     architectural separation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
         self._request_counter = 0
 
@@ -77,7 +77,7 @@ class EventBasedMLAnalysisService(MLAnalysisInterface):
                 "status": "completed",
             }
         except Exception as e:
-            self.logger.error(f"Failed to analyze prompt effectiveness: {e}")
+            self.logger.exception(f"Failed to analyze prompt effectiveness: {e}")
             return {"request_id": request_id, "error": str(e), "status": "failed"}
 
     async def discover_patterns(
@@ -122,7 +122,7 @@ class EventBasedMLAnalysisService(MLAnalysisInterface):
                 "status": "completed",
             }
         except Exception as e:
-            self.logger.error(f"Failed to discover patterns: {e}")
+            self.logger.exception(f"Failed to discover patterns: {e}")
             return {"request_id": request_id, "error": str(e), "status": "failed"}
 
     async def analyze_rule_performance(
@@ -165,7 +165,7 @@ class EventBasedMLAnalysisService(MLAnalysisInterface):
                 "status": "completed",
             }
         except Exception as e:
-            self.logger.error(f"Failed to analyze rule performance: {e}")
+            self.logger.exception(f"Failed to analyze rule performance: {e}")
             return {"request_id": request_id, "error": str(e), "status": "failed"}
 
     async def get_analysis_status(self, request_id: str) -> dict[str, Any]:

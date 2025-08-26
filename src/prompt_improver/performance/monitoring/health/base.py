@@ -1,5 +1,5 @@
 """Base health checker interface and result types for APES health monitoring.
-PHASE 3: Health Check Consolidation - Composite Pattern Implementation
+PHASE 3: Health Check Consolidation - Composite Pattern Implementation.
 """
 
 import time
@@ -9,11 +9,11 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 
 class HealthStatus(Enum):
-    """Health check status levels"""
+    """Health check status levels."""
 
     HEALTHY = "healthy"
     WARNING = "warning"
@@ -21,7 +21,7 @@ class HealthStatus(Enum):
 
 
 class HealthResult(BaseModel):
-    """Standardized health check result"""
+    """Standardized health check result."""
 
     status: HealthStatus
     component: str = Field(min_length=1, max_length=255)
@@ -37,7 +37,7 @@ class HealthResult(BaseModel):
 
 
 class AggregatedHealthResult(BaseModel):
-    """Aggregated health check results from multiple components"""
+    """Aggregated health check results from multiple components."""
 
     overall_status: HealthStatus
     checks: dict[str, HealthResult]
@@ -61,17 +61,17 @@ class AggregatedHealthResult(BaseModel):
 
 
 class HealthChecker(ABC):
-    """Base interface for health check components"""
+    """Base interface for health check components."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self.name = name
 
     @abstractmethod
     async def check(self) -> HealthResult:
-        """Perform health check and return result"""
+        """Perform health check and return result."""
 
     def _time_check(self, func):
-        """Utility to time a health check function"""
+        """Utility to time a health check function."""
 
         async def wrapper():
             start_time = time.time()

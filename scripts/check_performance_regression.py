@@ -1,17 +1,17 @@
-"""Performance Regression Check Script for Pre-commit Hook"""
+"""Performance Regression Check Script for Pre-commit Hook."""
 
 import json
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class PerformanceRegessionChecker:
     """Checks for performance regressions before commits."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.baseline_file = Path("performance_baseline.json")
         self.threshold_degradation = 0.2
         self.timeout_seconds = 30
@@ -109,10 +109,10 @@ class PerformanceRegessionChecker:
 
 def main():
     """Main performance check script."""
-    if os.environ.get("SKIP_PERFORMANCE_CHECK", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("SKIP_PERFORMANCE_CHECK", "").lower() in {"1", "true", "yes"}:
         print("⏭️  Performance check skipped (SKIP_PERFORMANCE_CHECK set)")
         return
-    if os.environ.get("CI", "").lower() in ("1", "true"):
+    if os.environ.get("CI", "").lower() in {"1", "true"}:
         print("⏭️  Performance check skipped in CI environment")
         return
     try:

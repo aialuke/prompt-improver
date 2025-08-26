@@ -1,4 +1,4 @@
-"""ML Eventing Service - ML event handling and coordination
+"""ML Eventing Service - ML event handling and coordination.
 
 Handles ML-related event communication including:
 - AutoML initialization and management
@@ -38,13 +38,13 @@ logger = logging.getLogger(__name__)
 
 
 class MLEventingService:
-    """Service focused on ML event handling and coordination"""
+    """Service focused on ML event handling and coordination."""
 
     def __init__(
         self,
         enable_automl: bool = True,
         ab_testing_service: Any = None,  # Use Any to avoid TYPE_CHECKING issues
-    ):
+    ) -> None:
         self.enable_automl = enable_automl
         self.ml_interface: Any = None  # Use Any to avoid TYPE_CHECKING issues
         self.ab_testing_service = ab_testing_service
@@ -57,7 +57,7 @@ class MLEventingService:
         except ImportError:
             logger.info("ML event bus not available (torch not installed)")
             return None
-    
+
     def _create_ml_event(self, event_type: str, source: str, data: dict[str, Any]):
         """Lazy create ML event to avoid torch dependencies."""
         try:
@@ -70,9 +70,9 @@ class MLEventingService:
         except ImportError:
             logger.info("ML events not available (torch not installed)")
             return None
-    
+
     async def initialize_automl(self) -> None:
-        """Initialize AutoML via event bus communication"""
+        """Initialize AutoML via event bus communication."""
         if not self.enable_automl:
             return
         try:
@@ -81,16 +81,18 @@ class MLEventingService:
             container = await get_container()
             # Use lazy loading for ML interface
             try:
-                from prompt_improver.core.interfaces.ml_interface import MLModelInterface
+                from prompt_improver.core.interfaces.ml_interface import (
+                    MLModelInterface,
+                )
                 self.ml_interface = await container.get(MLModelInterface)
             except ImportError:
                 logger.info("ML interface not available (torch not installed)")
                 self.ml_interface = None
-                
+
             event_bus = await self._get_ml_event_bus()
             if not event_bus:
                 return
-                
+
             init_event = self._create_ml_event(
                 event_type="TRAINING_REQUEST",
                 source="ml_eventing_service",
@@ -112,13 +114,13 @@ class MLEventingService:
                 await event_bus.publish(init_event)
             logger.info("AutoML initialization requested via event bus")
         except Exception as e:
-            logger.error(f"Failed to request AutoML initialization: {e}")
+            logger.exception(f"Failed to request AutoML initialization: {e}")
             self.ml_interface = None
 
     async def initialize_bandit_experiment(
         self, db_session: AsyncSession | None = None
     ) -> str | None:
-        """Initialize bandit experiment via event bus communication"""
+        """Initialize bandit experiment via event bus communication."""
         try:
             if db_session:
                 from prompt_improver.database.models import RuleMetadata
@@ -159,13 +161,12 @@ class MLEventingService:
                     f"Requested bandit experiment initialization for {len(available_rules)} rules"
                 )
                 return experiment_id
-            else:
-                logger.warning(
-                    "Insufficient rules for bandit optimization, using traditional selection"
-                )
-                return None
+            logger.warning(
+                "Insufficient rules for bandit optimization, using traditional selection"
+            )
+            return None
         except Exception as e:
-            logger.error(f"Failed to request bandit experiment initialization: {e}")
+            logger.exception(f"Failed to request bandit experiment initialization: {e}")
             return None
 
     async def update_bandit_rewards(
@@ -173,7 +174,7 @@ class MLEventingService:
         applied_rules: list[dict[str, Any]],
         experiment_id: str | None = None,
     ) -> None:
-        """Update bandit with rewards via event bus communication"""
+        """Update bandit with rewards via event bus communication."""
         if not experiment_id:
             logger.warning("No bandit experiment ID provided for reward updates")
             return
@@ -213,12 +214,12 @@ class MLEventingService:
                         f"Requested bandit reward update for {rule_id}: {weighted_reward:.4f}"
                     )
         except Exception as e:
-            logger.error(f"Error requesting bandit reward updates: {e}")
+            logger.exception(f"Error requesting bandit reward updates: {e}")
 
     async def get_bandit_performance_summary(
         self, experiment_id: str | None = None
     ) -> dict[str, Any]:
-        """Get performance summary via event bus communication"""
+        """Get performance summary via event bus communication."""
         if not experiment_id:
             return {"status": "disabled", "message": "No bandit experiment ID provided"}
 
@@ -253,13 +254,13 @@ class MLEventingService:
                 ],
             }
         except Exception as e:
-            logger.error(f"Error requesting bandit performance: {e}")
+            logger.exception(f"Error requesting bandit performance: {e}")
             return {"status": "error", "error": str(e)}
 
     async def trigger_optimization(
         self, feedback_id: int, db_session: AsyncSession
     ) -> dict[str, Any]:
-        """Trigger ML optimization based on feedback"""
+        """Trigger ML optimization based on feedback."""
         from prompt_improver.database.models import (
             RuleMetadata,
             RulePerformance,
@@ -357,7 +358,7 @@ class MLEventingService:
     async def run_ml_optimization(
         self, rule_ids: list[str] | None, db_session: AsyncSession
     ) -> dict[str, Any]:
-        """Run ML optimization for specified rules with automatic real+synthetic data"""
+        """Run ML optimization for specified rules with automatic real+synthetic data."""
         event_bus = await self._get_ml_event_bus()
         if not event_bus:
             return None
@@ -462,7 +463,7 @@ class MLEventingService:
     async def discover_patterns(
         self, min_effectiveness: float, min_support: int, db_session: AsyncSession
     ) -> dict[str, Any]:
-        """Discover new patterns from successful improvements via event bus"""
+        """Discover new patterns from successful improvements via event bus."""
         event_bus = await self._get_ml_event_bus()
         if not event_bus:
             return None
@@ -520,7 +521,7 @@ class MLEventingService:
         optimization_target: str = "rule_effectiveness",
         experiment_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Start AutoML optimization integrating Optuna with existing A/B testing"""
+        """Start AutoML optimization integrating Optuna with existing A/B testing."""
         if not self.enable_automl:
             return {
                 "error": "AutoML not enabled",
@@ -571,11 +572,11 @@ class MLEventingService:
                     )
             return result
         except Exception as e:
-            logger.error(f"AutoML optimization failed: {e}")
+            logger.exception(f"AutoML optimization failed: {e}")
             return {"error": str(e), "optimization_target": optimization_target}
 
     async def get_automl_status(self) -> dict[str, Any]:
-        """Get current AutoML optimization status via event bus"""
+        """Get current AutoML optimization status via event bus."""
         if not self.enable_automl:
             return {"status": "not_enabled"}
         try:
@@ -600,7 +601,7 @@ class MLEventingService:
             return {"status": "error", "error": str(e)}
 
     async def stop_automl_optimization(self) -> dict[str, Any]:
-        """Stop current AutoML optimization via event bus"""
+        """Stop current AutoML optimization via event bus."""
         if not self.enable_automl:
             return {"status": "not_enabled"}
         try:

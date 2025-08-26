@@ -7,7 +7,7 @@ Compares performance of old vs new string formatting approaches.
 import statistics
 import sys
 import time
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add src to path
@@ -17,7 +17,6 @@ from prompt_improver.utils.datetime_utils import (
     format_compact_timestamp,
     format_date_only,
     format_display_date,
-    format_log_timestamp,
 )
 
 

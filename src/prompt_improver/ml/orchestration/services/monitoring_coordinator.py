@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from ....core.protocols.ml_protocols import (
+from ....shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     ComponentInvokerProtocol,
     DatabaseServiceProtocol,

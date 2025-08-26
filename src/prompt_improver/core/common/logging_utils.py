@@ -4,14 +4,25 @@ Consolidates the pattern: logger = logging.getLogger(__name__)
 Found in 100+ files across the codebase.
 """
 
+import asyncio
 import logging
-from functools import lru_cache
-from typing import Any, Optional
+from typing import Any
+
+from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.services.cache.cache_factory import CacheFactory
 
 
-@lru_cache(maxsize=128)
+def get_logging_cache():
+    """Get optimized logging cache using singleton factory pattern.
+
+    Resolves performance issues by using CacheFactory singleton
+    instead of creating new instances per call.
+    """
+    return CacheFactory.get_utility_cache()
+
+
 def get_logger(name: str | None = None, level: str | None = None) -> logging.Logger:
-    """Get a configured logger instance with caching to avoid duplicate initialization.
+    """Get a configured logger instance with caching to avoid duplicate initialization using unified cache.
 
     Args:
         name: Logger name (defaults to caller's __name__)
@@ -30,6 +41,7 @@ def get_logger(name: str | None = None, level: str | None = None) -> logging.Log
     """
     import inspect
 
+    # Determine logger name if not provided
     if name is None:
         frame = inspect.currentframe()
         try:
@@ -44,10 +56,65 @@ def get_logger(name: str | None = None, level: str | None = None) -> logging.Log
         finally:
             if frame is not None:
                 del frame
-    logger = logging.getLogger(name)
+
+    # Create cache key that includes level to ensure different levels create different loggers
+    cache_key = f"util:logging:{name}:{level or 'default'}"
+    cache = get_logging_cache()
+
+    # If cache is not available, use direct execution - critical for logging
+    if cache is None:
+        return _create_logger_direct(name, level)
+
+    # Try to run in existing event loop or create new one
+    try:
+        loop = asyncio.get_running_loop()
+        # Create task for async cache operation
+        task = asyncio.create_task(_get_logger_cached(cache_key, cache, name, level))
+        # Run in current loop context with shorter timeout
+        return asyncio.run_coroutine_threadsafe(task, loop).result(timeout=0.5)
+    except RuntimeError:
+        # No event loop, create one with timeout
+        try:
+            async def run_with_timeout():
+                return await asyncio.wait_for(
+                    _get_logger_cached(cache_key, cache, name, level),
+                    timeout=0.5
+                )
+            return asyncio.run(run_with_timeout())
+        except Exception as e:
+            # Fallback to direct execution for logging - must be reliable
+            return _create_logger_direct(name, level)
+    except Exception as e:
+        # Fallback to direct execution for logging - must be reliable
+        return _create_logger_direct(name, level)
+
+
+async def _get_logger_cached(cache_key: str, cache: CacheFacade, name: str, level: str | None) -> logging.Logger:
+    """Get logger from cache or create if not cached."""
+    try:
+        # Try cache first
+        cached_logger = await cache.get(cache_key)
+        if cached_logger is not None:
+            return cached_logger
+
+        # Cache miss - create logger and cache result
+        logger_instance = _create_logger_direct(name, level)
+
+        # Cache for 1 hour with shorter L1 TTL for performance
+        await cache.set(cache_key, logger_instance, l2_ttl=3600, l1_ttl=900)
+
+        return logger_instance
+    except Exception as e:
+        # For logging, we must have a fallback that always works
+        return _create_logger_direct(name, level)
+
+
+def _create_logger_direct(name: str, level: str | None) -> logging.Logger:
+    """Create logger directly without caching."""
+    logger_instance = logging.getLogger(name)
     if level:
-        logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    return logger
+        logger_instance.setLevel(getattr(logging, level.upper(), logging.INFO))
+    return logger_instance
 
 
 def configure_logging(

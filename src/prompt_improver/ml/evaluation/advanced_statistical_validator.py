@@ -7,13 +7,16 @@ from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-from statsmodels.stats.multitest import multipletests
-from statsmodels.stats.power import ttest_power
-from statsmodels.stats.weightstats import ztest
-import numpy as np
+# Lazy loading for statsmodels imports
+# from statsmodels.stats.multitest import multipletests
+# from statsmodels.stats.power import ttest_power  
+# from statsmodels.stats.weightstats import ztest
+# import numpy as np  # Converted to lazy loading
 import pandas as pd
-from scipy import stats
-from scipy.stats import chi2_contingency, kruskal, mannwhitneyu
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
+# from scipy import stats  # Converted to lazy loading
+# from get_scipy().stats import chi2_contingency, kruskal, mannwhitneyu  # Converted to lazy loading
 logger = logging.getLogger(__name__)
 
 class CorrectionMethod(Enum):
@@ -159,8 +162,8 @@ class AdvancedStatisticalValidator:
         """
         validation_id = f"validation_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         try:
-            control_array = np.array(control_data, dtype=float)
-            treatment_array = np.array(treatment_data, dtype=float)
+            control_array = get_numpy().array(control_data, dtype=float)
+            treatment_array = get_numpy().array(treatment_data, dtype=float)
             self._validate_input_data(control_array, treatment_array)
             primary_test = self._perform_primary_test(control_array, treatment_array)
             effect_size_magnitude, practical_sig, clinical_sig = self._analyze_effect_size(control_array, treatment_array, primary_test.effect_size)
@@ -186,25 +189,25 @@ class AdvancedStatisticalValidator:
             logger.error('Error in advanced validation: %s', e)
             raise
 
-    def _validate_input_data(self, control: np.ndarray, treatment: np.ndarray):
+    def _validate_input_data(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray):
         """Validate input data quality"""
         if len(control) == 0 or len(treatment) == 0:
             raise ValueError('Control and treatment groups cannot be empty')
         if len(control) < 3 or len(treatment) < 3:
             raise ValueError('Minimum 3 observations required per group for statistical analysis')
-        if not np.all(np.isfinite(control)) or not np.all(np.isfinite(treatment)):
+        if not get_numpy().all(get_numpy().isfinite(control)) or not get_numpy().all(get_numpy().isfinite(treatment)):
             raise ValueError('Data contains infinite or NaN values')
-        if np.var(control) == 0 and np.var(treatment) == 0 and (np.mean(control) == np.mean(treatment)):
+        if get_numpy().var(control) == 0 and get_numpy().var(treatment) == 0 and (get_numpy().mean(control) == get_numpy().mean(treatment)):
             raise ValueError('Both groups have identical constant values - no variation to analyze')
 
-    def _perform_primary_test(self, control: np.ndarray, treatment: np.ndarray) -> StatisticalTestResult:
+    def _perform_primary_test(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> StatisticalTestResult:
         """Perform primary statistical test (Welch's t-test)"""
         try:
-            statistic, p_value = stats.ttest_ind(treatment, control, equal_var=False)
+            statistic, p_value = get_scipy_stats().ttest_ind(treatment, control, equal_var=False)
             effect_size = self._calculate_cohens_d(control, treatment)
             confidence_interval = self._calculate_difference_ci(control, treatment)
             n1, n2 = (len(control), len(treatment))
-            s1_sq, s2_sq = (np.var(control, ddof=1), np.var(treatment, ddof=1))
+            s1_sq, s2_sq = (get_numpy().var(control, ddof=1), get_numpy().var(treatment, ddof=1))
             if s1_sq == 0 and s2_sq == 0:
                 df = n1 + n2 - 2
             else:
@@ -215,63 +218,63 @@ class AdvancedStatisticalValidator:
             logger.error('Error in primary test: %s', e)
             raise
 
-    def _calculate_cohens_d(self, control: np.ndarray, treatment: np.ndarray) -> float:
+    def _calculate_cohens_d(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> float:
         """Calculate Cohen's d effect size"""
         try:
-            mean_diff = np.mean(treatment) - np.mean(control)
+            mean_diff = get_numpy().mean(treatment) - get_numpy().mean(control)
             n1, n2 = (len(control), len(treatment))
-            s1_sq, s2_sq = (np.var(control, ddof=1), np.var(treatment, ddof=1))
-            pooled_std = np.sqrt(((n1 - 1) * s1_sq + (n2 - 1) * s2_sq) / (n1 + n2 - 2))
+            s1_sq, s2_sq = (get_numpy().var(control, ddof=1), get_numpy().var(treatment, ddof=1))
+            pooled_std = get_numpy().sqrt(((n1 - 1) * s1_sq + (n2 - 1) * s2_sq) / (n1 + n2 - 2))
             if pooled_std == 0:
                 if abs(mean_diff) > 1e-10:
-                    mean_magnitude = max(abs(np.mean(control)), abs(np.mean(treatment)), 1.0)
+                    mean_magnitude = max(abs(get_numpy().mean(control)), abs(get_numpy().mean(treatment)), 1.0)
                     relative_diff = abs(mean_diff) / mean_magnitude
                     if relative_diff > 0.01:
-                        return np.sign(mean_diff) * 10.0
-                    return np.sign(mean_diff) * 0.05
+                        return get_numpy().sign(mean_diff) * 10.0
+                    return get_numpy().sign(mean_diff) * 0.05
                 return 0.0
             return mean_diff / pooled_std
         except Exception as e:
             logger.warning(f"Error calculating Cohen's d: {e}")
             return 0.0
 
-    def _calculate_difference_ci(self, control: np.ndarray, treatment: np.ndarray, confidence_level: float=0.95) -> tuple[float, float]:
+    def _calculate_difference_ci(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray, confidence_level: float=0.95) -> tuple[float, float]:
         """Calculate confidence interval for difference in means"""
         try:
-            mean_diff = np.mean(treatment) - np.mean(control)
+            mean_diff = get_numpy().mean(treatment) - get_numpy().mean(control)
             n1, n2 = (len(control), len(treatment))
-            se_control = np.std(control, ddof=1) / np.sqrt(n1)
-            se_treatment = np.std(treatment, ddof=1) / np.sqrt(n2)
-            se_diff = np.sqrt(se_control ** 2 + se_treatment ** 2)
-            s1_sq, s2_sq = (np.var(control, ddof=1), np.var(treatment, ddof=1))
+            se_control = get_numpy().std(control, ddof=1) / get_numpy().sqrt(n1)
+            se_treatment = get_numpy().std(treatment, ddof=1) / get_numpy().sqrt(n2)
+            se_diff = get_numpy().sqrt(se_control ** 2 + se_treatment ** 2)
+            s1_sq, s2_sq = (get_numpy().var(control, ddof=1), get_numpy().var(treatment, ddof=1))
             df = (s1_sq / n1 + s2_sq / n2) ** 2 / ((s1_sq / n1) ** 2 / (n1 - 1) + (s2_sq / n2) ** 2 / (n2 - 1))
             alpha = 1 - confidence_level
-            t_critical = stats.t.ppf(1 - alpha / 2, df)
+            t_critical = get_scipy_stats().t.ppf(1 - alpha / 2, df)
             margin_of_error = t_critical * se_diff
             return (mean_diff - margin_of_error, mean_diff + margin_of_error)
         except Exception as e:
             logger.warning('Error calculating confidence interval: %s', e)
             return (0.0, 0.0)
 
-    def _calculate_mde(self, control: np.ndarray, treatment: np.ndarray) -> float:
+    def _calculate_mde(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> float:
         """Calculate minimum detectable effect size"""
         try:
             n1, n2 = (len(control), len(treatment))
-            pooled_var = ((n1 - 1) * np.var(control, ddof=1) + (n2 - 1) * np.var(treatment, ddof=1)) / (n1 + n2 - 2)
-            se = np.sqrt(pooled_var * (1 / n1 + 1 / n2))
-            t_alpha = stats.t.ppf(1 - self.alpha / 2, n1 + n2 - 2)
-            t_beta = stats.t.ppf(self.power_threshold, n1 + n2 - 2)
+            pooled_var = ((n1 - 1) * get_numpy().var(control, ddof=1) + (n2 - 1) * get_numpy().var(treatment, ddof=1)) / (n1 + n2 - 2)
+            se = get_numpy().sqrt(pooled_var * (1 / n1 + 1 / n2))
+            t_alpha = get_scipy_stats().t.ppf(1 - self.alpha / 2, n1 + n2 - 2)
+            t_beta = get_scipy_stats().t.ppf(self.power_threshold, n1 + n2 - 2)
             mde = (t_alpha + t_beta) * se
             return float(mde)
         except Exception as e:
             logger.warning('Error calculating MDE: %s', e)
             return 0.0
 
-    def _analyze_effect_size(self, control: np.ndarray, treatment: np.ndarray, effect_size: float) -> tuple[EffectSizeMagnitude, bool, bool]:
+    def _analyze_effect_size(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray, effect_size: float) -> tuple[EffectSizeMagnitude, bool, bool]:
         """Analyze effect size magnitude and significance"""
         try:
             abs_effect = abs(effect_size)
-            if np.isinf(abs_effect) or abs_effect >= 5.0:
+            if get_numpy().isinf(abs_effect) or abs_effect >= 5.0:
                 magnitude = EffectSizeMagnitude.VERY_LARGE
             elif abs_effect < 0.1:
                 magnitude = EffectSizeMagnitude.negligible
@@ -283,8 +286,8 @@ class AdvancedStatisticalValidator:
                 magnitude = EffectSizeMagnitude.large
             else:
                 magnitude = EffectSizeMagnitude.VERY_LARGE
-            practical_significance = bool(np.isinf(abs_effect) or abs_effect >= self.min_effect_size)
-            mean_improvement = (np.mean(treatment) - np.mean(control)) / np.mean(control) if np.mean(control) != 0 else 0
+            practical_significance = bool(get_numpy().isinf(abs_effect) or abs_effect >= self.min_effect_size)
+            mean_improvement = (get_numpy().mean(treatment) - get_numpy().mean(control)) / get_numpy().mean(control) if get_numpy().mean(control) != 0 else 0
             clinical_significance = bool(abs(mean_improvement) >= 0.1)
             return (magnitude, practical_significance, clinical_significance)
         except Exception as e:
@@ -294,7 +297,7 @@ class AdvancedStatisticalValidator:
     def _apply_multiple_testing_correction(self, p_values: list[float], method: CorrectionMethod) -> MultipleTestingCorrection:
         """Apply multiple testing correction"""
         try:
-            p_array = np.array(p_values)
+            p_array = get_numpy().array(p_values)
             rejected, p_corrected, alpha_sidak, alpha_bonf = multipletests(p_array, alpha=self.alpha, method=method.value)
             if method == CorrectionMethod.bonferroni:
                 fwer = min(len(p_values) * self.alpha, 1.0)
@@ -310,37 +313,37 @@ class AdvancedStatisticalValidator:
             logger.error('Error in multiple testing correction: %s', e)
             raise
 
-    def _test_normality_assumptions(self, control: np.ndarray, treatment: np.ndarray) -> dict[str, StatisticalTestResult]:
+    def _test_normality_assumptions(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> dict[str, StatisticalTestResult]:
         """Test normality assumptions"""
         results = {}
         try:
             if len(control) < 5000:
-                stat_c, p_c = stats.shapiro(control)
+                stat_c, p_c = get_scipy_stats().shapiro(control)
                 results['shapiro_control'] = StatisticalTestResult(test_name='Shapiro-Wilk (Control)', statistic=float(stat_c), p_value=float(p_c), notes=['H0: Data is normally distributed'])
             if len(treatment) < 5000:
-                stat_t, p_t = stats.shapiro(treatment)
+                stat_t, p_t = get_scipy_stats().shapiro(treatment)
                 results['shapiro_treatment'] = StatisticalTestResult(test_name='Shapiro-Wilk (Treatment)', statistic=float(stat_t), p_value=float(p_t), notes=['H0: Data is normally distributed'])
-            stat_c, p_c = stats.kstest(control, 'norm', args=(np.mean(control), np.std(control, ddof=1)))
+            stat_c, p_c = get_scipy_stats().kstest(control, 'norm', args=(get_numpy().mean(control), get_numpy().std(control, ddof=1)))
             results['ks_control'] = StatisticalTestResult(test_name='Kolmogorov-Smirnov (Control)', statistic=float(stat_c), p_value=float(p_c), notes=['H0: Data follows normal distribution'])
-            stat_t, p_t = stats.kstest(treatment, 'norm', args=(np.mean(treatment), np.std(treatment, ddof=1)))
+            stat_t, p_t = get_scipy_stats().kstest(treatment, 'norm', args=(get_numpy().mean(treatment), get_numpy().std(treatment, ddof=1)))
             results['ks_treatment'] = StatisticalTestResult(test_name='Kolmogorov-Smirnov (Treatment)', statistic=float(stat_t), p_value=float(p_t), notes=['H0: Data follows normal distribution'])
         except Exception as e:
             logger.warning('Error in normality testing: %s', e)
         return results
 
-    def _test_homogeneity_assumptions(self, control: np.ndarray, treatment: np.ndarray) -> dict[str, StatisticalTestResult]:
+    def _test_homogeneity_assumptions(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> dict[str, StatisticalTestResult]:
         """Test homogeneity of variance assumptions"""
         results = {}
         try:
-            stat, p_value = stats.levene(control, treatment)
+            stat, p_value = get_scipy_stats().levene(control, treatment)
             results['levene'] = StatisticalTestResult(test_name="Levene's Test", statistic=float(stat), p_value=float(p_value), notes=['H0: Equal variances', 'Robust to non-normality'])
-            stat, p_value = stats.bartlett(control, treatment)
+            stat, p_value = get_scipy_stats().bartlett(control, treatment)
             results['bartlett'] = StatisticalTestResult(test_name="Bartlett's Test", statistic=float(stat), p_value=float(p_value), notes=['H0: Equal variances', 'Assumes normality'])
         except Exception as e:
             logger.warning('Error in homogeneity testing: %s', e)
         return results
 
-    def _perform_non_parametric_tests(self, control: np.ndarray, treatment: np.ndarray) -> dict[str, StatisticalTestResult]:
+    def _perform_non_parametric_tests(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> dict[str, StatisticalTestResult]:
         """Perform non-parametric robustness checks"""
         results = {}
         try:
@@ -354,7 +357,7 @@ class AdvancedStatisticalValidator:
             logger.warning('Error in non-parametric testing: %s', e)
         return results
 
-    def _calculate_post_hoc_power(self, control: np.ndarray, treatment: np.ndarray, effect_size: float) -> float:
+    def _calculate_post_hoc_power(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray, effect_size: float) -> float:
         """Calculate post-hoc statistical power"""
         try:
             n1, n2 = (len(control), len(treatment))
@@ -364,7 +367,7 @@ class AdvancedStatisticalValidator:
             logger.warning('Error calculating post-hoc power: %s', e)
             return 0.0
 
-    def _calculate_prospective_power(self, control: np.ndarray, treatment: np.ndarray) -> float:
+    def _calculate_prospective_power(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> float:
         """Calculate prospective power for minimum effect size"""
         try:
             n1, n2 = (len(control), len(treatment))
@@ -374,36 +377,36 @@ class AdvancedStatisticalValidator:
             logger.warning('Error calculating prospective power: %s', e)
             return 0.0
 
-    def _perform_bootstrap_analysis(self, control: np.ndarray, treatment: np.ndarray) -> dict[str, Any]:
+    def _perform_bootstrap_analysis(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> dict[str, Any]:
         """Perform bootstrap analysis for robust confidence intervals"""
         try:
             bootstrap_diffs = []
             bootstrap_effect_sizes = []
             for _ in range(self.bootstrap_samples):
-                control_boot = np.random.choice(control, size=len(control), replace=True)
-                treatment_boot = np.random.choice(treatment, size=len(treatment), replace=True)
-                diff = np.mean(treatment_boot) - np.mean(control_boot)
+                control_boot = get_numpy().random.choice(control, size=len(control), replace=True)
+                treatment_boot = get_numpy().random.choice(treatment, size=len(treatment), replace=True)
+                diff = get_numpy().mean(treatment_boot) - get_numpy().mean(control_boot)
                 bootstrap_diffs.append(diff)
                 effect_size = self._calculate_cohens_d(control_boot, treatment_boot)
                 bootstrap_effect_sizes.append(effect_size)
-            bootstrap_diffs = np.array(bootstrap_diffs)
-            bootstrap_effect_sizes = np.array(bootstrap_effect_sizes)
-            ci_lower_diff = np.percentile(bootstrap_diffs, 2.5)
-            ci_upper_diff = np.percentile(bootstrap_diffs, 97.5)
-            ci_lower_effect = np.percentile(bootstrap_effect_sizes, 2.5)
-            ci_upper_effect = np.percentile(bootstrap_effect_sizes, 97.5)
-            return {'n_bootstrap_samples': self.bootstrap_samples, 'mean_difference': {'bootstrap_mean': float(np.mean(bootstrap_diffs)), 'bootstrap_std': float(np.std(bootstrap_diffs)), 'confidence_interval_95': [float(ci_lower_diff), float(ci_upper_diff)]}, 'effect_size': {'bootstrap_mean': float(np.mean(bootstrap_effect_sizes)), 'bootstrap_std': float(np.std(bootstrap_effect_sizes)), 'confidence_interval_95': [float(ci_lower_effect), float(ci_upper_effect)]}}
+            bootstrap_diffs = get_numpy().array(bootstrap_diffs)
+            bootstrap_effect_sizes = get_numpy().array(bootstrap_effect_sizes)
+            ci_lower_diff = get_numpy().percentile(bootstrap_diffs, 2.5)
+            ci_upper_diff = get_numpy().percentile(bootstrap_diffs, 97.5)
+            ci_lower_effect = get_numpy().percentile(bootstrap_effect_sizes, 2.5)
+            ci_upper_effect = get_numpy().percentile(bootstrap_effect_sizes, 97.5)
+            return {'n_bootstrap_samples': self.bootstrap_samples, 'mean_difference': {'bootstrap_mean': float(get_numpy().mean(bootstrap_diffs)), 'bootstrap_std': float(get_numpy().std(bootstrap_diffs)), 'confidence_interval_95': [float(ci_lower_diff), float(ci_upper_diff)]}, 'effect_size': {'bootstrap_mean': float(get_numpy().mean(bootstrap_effect_sizes)), 'bootstrap_std': float(get_numpy().std(bootstrap_effect_sizes)), 'confidence_interval_95': [float(ci_lower_effect), float(ci_upper_effect)]}}
         except Exception as e:
             logger.warning('Error in bootstrap analysis: %s', e)
             return {}
 
-    def _perform_sensitivity_analysis(self, control: np.ndarray, treatment: np.ndarray) -> dict[str, Any]:
+    def _perform_sensitivity_analysis(self, control: get_numpy().ndarray, treatment: get_numpy().ndarray) -> dict[str, Any]:
         """Perform sensitivity analysis by removing outliers"""
         try:
 
             def remove_outliers(data, multiplier=1.5):
-                q1 = np.percentile(data, 25)
-                q3 = np.percentile(data, 75)
+                q1 = get_numpy().percentile(data, 25)
+                q3 = get_numpy().percentile(data, 75)
                 iqr = q3 - q1
                 lower = q1 - multiplier * iqr
                 upper = q3 + multiplier * iqr
@@ -414,8 +417,8 @@ class AdvancedStatisticalValidator:
                 return {'error': 'Insufficient data after outlier removal'}
             original_effect = self._calculate_cohens_d(control, treatment)
             cleaned_effect = self._calculate_cohens_d(control_clean, treatment_clean)
-            _, original_p = stats.ttest_ind(treatment, control, equal_var=False)
-            _, cleaned_p = stats.ttest_ind(treatment_clean, control_clean, equal_var=False)
+            _, original_p = get_scipy_stats().ttest_ind(treatment, control, equal_var=False)
+            _, cleaned_p = get_scipy_stats().ttest_ind(treatment_clean, control_clean, equal_var=False)
             return {'outliers_removed': {'control': len(control) - len(control_clean), 'treatment': len(treatment) - len(treatment_clean), 'total': len(control) + len(treatment) - (len(control_clean) + len(treatment_clean))}, 'effect_size_comparison': {'original': float(original_effect), 'cleaned': float(cleaned_effect), 'difference': float(abs(original_effect - cleaned_effect)), 'robust_to_outliers': abs(original_effect - cleaned_effect) < 0.1}, 'p_value_comparison': {'original': float(original_p), 'cleaned': float(cleaned_p), 'robust_to_outliers': abs(original_p - cleaned_p) < 0.01}}
         except Exception as e:
             logger.warning('Error in sensitivity analysis: %s', e)

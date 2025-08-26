@@ -15,14 +15,29 @@
         "description": "API contract testing and MCP protocol validation",
         "frequency": 1,
         "success_rate": 0.90
+      },
+      {
+        "pattern_name": "pragmatic_testing_validation",
+        "description": "Validate testing problems exist with real incident data before building test infrastructure",
+        "frequency": 1,
+        "success_rate": 0.88
+      },
+      {
+        "pattern_name": "test_data_first_design",
+        "description": "Proper test data structure design eliminates complex test setup and assertion logic",
+        "frequency": 1,
+        "success_rate": 0.85
       }
     ],
     "project_specific_context": {
       "architecture_patterns": [
         "Real behavior testing with 87.5% validation success",
         "Comprehensive testcontainer infrastructure",
-        "Zero-mock policy for integration testing",
-        "Property-based testing for ML algorithms"
+        "Zero-mock policy for integration testing - Theory loses to practice",
+        "Property-based testing for ML algorithms",
+        "Pragmatic test validation - Test problems validated with real incident data",
+        "Test simplicity standards - Maximum 3 levels of test logic nesting",
+        "Data-first test design - Test data structures drive test architecture"
       ],
       "performance_baselines": {
         "test_execution_time_seconds": 120,

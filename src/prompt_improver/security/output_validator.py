@@ -7,13 +7,12 @@ system prompt leakage, API key exposure, and suspicious response patterns.
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
-from typing import List, Optional
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class OutputThreatType(str, Enum):
+class OutputThreatType(StrEnum):
     """Types of threats detected in output."""
 
     SYSTEM_PROMPT_LEAKAGE = "system_prompt_leakage"
@@ -40,7 +39,7 @@ class OutputValidationResult:
 class OutputValidator:
     """Validates MCP server outputs for security threats and data leakage."""
 
-    def __init__(self, max_response_length: int = 5000):
+    def __init__(self, max_response_length: int = 5000) -> None:
         """Initialize output validator.
 
         Args:

@@ -12,20 +12,29 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-import numpy as np
-try:
-    import networkx as nx
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn, get_torch
+
+if TYPE_CHECKING:
+    import numpy as np
     from sklearn.cluster import DBSCAN
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
+
+# ML imports with fallback
+try:
+    import networkx as nx
+    sklearn = get_sklearn()
+    DBSCAN = sklearn.cluster.DBSCAN
+    TfidfVectorizer = sklearn.feature_extraction.text.TfidfVectorizer
+    cosine_similarity = sklearn.metrics.pairwise.cosine_similarity
     GRAPH_ANALYSIS_AVAILABLE = True
 except ImportError:
     GRAPH_ANALYSIS_AVAILABLE = False
     warnings.warn('Graph analysis libraries not available. Install with: pip install networkx scikit-learn')
 try:
     import spacy
-    import torch
-    from transformers import AutoModel, AutoTokenizer
+    # Torch and transformers loaded lazily when needed
     SEMANTIC_ANALYSIS_AVAILABLE = True
 except ImportError:
     SEMANTIC_ANALYSIS_AVAILABLE = False
@@ -62,7 +71,7 @@ class StructuralElement:
     content: str
     position: int
     level: int = 0
-    semantic_embedding: np.ndarray | None = None
+    semantic_embedding: get_numpy().ndarray | None = None
     importance_score: float = 0.0
     quality_score: float = 0.0
     relationships: list[tuple[str, StructuralRelationType, float]] = field(default_factory=list)
@@ -266,13 +275,13 @@ class EnhancedStructuralAnalyzer:
             self.logger.warning('Semantic classification failed: %s', e)
             return StructuralElementType.PARAGRAPH
 
-    async def _get_semantic_embedding(self, text: str) -> np.ndarray | None:
+    async def _get_semantic_embedding(self, text: str) -> get_numpy().ndarray | None:
         """Get semantic embedding for text"""
         try:
             if not self.semantic_model or not self.tokenizer:
                 return None
             inputs = self.tokenizer(text, return_tensors='pt', truncation=True, max_length=512)
-            with torch.no_grad():
+            with get_torch().no_grad():
                 outputs = self.semantic_model(**inputs)
                 embedding = outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
             return embedding
@@ -344,7 +353,7 @@ class EnhancedStructuralAnalyzer:
                     element_ids.append(element.element_id)
             if not embeddings:
                 return {}
-            embeddings = np.array(embeddings)
+            embeddings = get_numpy().array(embeddings)
             similarity_matrix = cosine_similarity(embeddings)
             if GRAPH_ANALYSIS_AVAILABLE:
                 clustering = DBSCAN(eps=self.config.clustering_eps, min_samples=self.config.min_cluster_size, metric='cosine')
@@ -362,11 +371,11 @@ class EnhancedStructuralAnalyzer:
             self.logger.error('Semantic analysis failed: %s', e)
             return {}
 
-    def _calculate_semantic_coherence(self, similarity_matrix: np.ndarray) -> float:
+    def _calculate_semantic_coherence(self, similarity_matrix: get_numpy().ndarray) -> float:
         """Calculate overall semantic coherence score"""
         if similarity_matrix.size == 0:
             return 0.0
-        mask = ~np.eye(similarity_matrix.shape[0], dtype=bool)
+        mask = ~get_numpy().eye(similarity_matrix.shape[0], dtype=bool)
         mean_similarity = similarity_matrix[mask].mean()
         return float(mean_similarity)
 
@@ -379,7 +388,7 @@ class EnhancedStructuralAnalyzer:
         quality_dimensions['semantic_coherence'] = semantic_analysis.get('coherence_score', 0.0)
         quality_dimensions['structural_completeness'] = self._assess_completeness(elements)
         element_qualities = [elem.quality_score for elem in elements]
-        quality_dimensions['element_quality'] = np.mean(element_qualities) if element_qualities else 0.0
+        quality_dimensions['element_quality'] = get_numpy().mean(element_qualities) if element_qualities else 0.0
         if structural_graph:
             quality_dimensions['graph_connectivity'] = structural_graph.graph_metrics.get('connectivity', 0.0)
         else:
@@ -444,7 +453,7 @@ class EnhancedStructuralAnalyzer:
 
     async def _generate_structural_insights(self, elements: list[StructuralElement], structural_graph: StructuralGraph | None, semantic_analysis: dict[str, Any], discovered_patterns: list[dict[str, Any]]) -> dict[str, Any]:
         """Generate comprehensive structural insights"""
-        insights = {'structural_summary': {'total_elements': len(elements), 'element_distribution': self._count_element_types(elements), 'average_element_quality': np.mean([elem.quality_score for elem in elements]) if elements else 0.0, 'highest_importance_elements': [elem.element_id for elem in sorted(elements, key=lambda x: x.importance_score, reverse=True)[:3]]}, 'semantic_insights': {'coherence_level': semantic_analysis.get('coherence_score', 0.0), 'cluster_count': semantic_analysis.get('cluster_count', 0), 'semantic_organization': 'good' if semantic_analysis.get('coherence_score', 0) > 0.6 else 'needs_improvement'}, 'pattern_insights': {'patterns_discovered': len(discovered_patterns), 'pattern_types': [pattern.get('type', 'unknown') for pattern in discovered_patterns], 'pattern_confidence': np.mean([pattern.get('confidence', 0) for pattern in discovered_patterns]) if discovered_patterns else 0.0}, 'recommendations': self._generate_actionable_recommendations(elements, semantic_analysis, discovered_patterns)}
+        insights = {'structural_summary': {'total_elements': len(elements), 'element_distribution': self._count_element_types(elements), 'average_element_quality': get_numpy().mean([elem.quality_score for elem in elements]) if elements else 0.0, 'highest_importance_elements': [elem.element_id for elem in sorted(elements, key=lambda x: x.importance_score, reverse=True)[:3]]}, 'semantic_insights': {'coherence_level': semantic_analysis.get('coherence_score', 0.0), 'cluster_count': semantic_analysis.get('cluster_count', 0), 'semantic_organization': 'good' if semantic_analysis.get('coherence_score', 0) > 0.6 else 'needs_improvement'}, 'pattern_insights': {'patterns_discovered': len(discovered_patterns), 'pattern_types': [pattern.get('type', 'unknown') for pattern in discovered_patterns], 'pattern_confidence': get_numpy().mean([pattern.get('confidence', 0) for pattern in discovered_patterns]) if discovered_patterns else 0.0}, 'recommendations': self._generate_actionable_recommendations(elements, semantic_analysis, discovered_patterns)}
         return insights
 
     def _generate_actionable_recommendations(self, elements: list[StructuralElement], semantic_analysis: dict[str, Any], discovered_patterns: list[dict[str, Any]]) -> list[str]:
@@ -567,7 +576,7 @@ class GraphStructuralAnalyzer:
         for i, elem1 in enumerate(elements):
             for j, elem2 in enumerate(elements[i + 1:], i + 1):
                 if elem1.semantic_embedding is not None and elem2.semantic_embedding is not None:
-                    similarity = np.dot(elem1.semantic_embedding, elem2.semantic_embedding) / (np.linalg.norm(elem1.semantic_embedding) * np.linalg.norm(elem2.semantic_embedding))
+                    similarity = get_numpy().dot(elem1.semantic_embedding, elem2.semantic_embedding) / (get_numpy().linalg.norm(elem1.semantic_embedding) * get_numpy().linalg.norm(elem2.semantic_embedding))
                     if similarity >= self.config.similarity_threshold:
                         edges.append((elem1.element_id, elem2.element_id, StructuralRelationType.SEMANTIC_SIMILARITY, float(similarity)))
         return edges
@@ -584,12 +593,12 @@ class GraphStructuralAnalyzer:
             metrics['connectivity'] = len(largest_cc) / len(G.nodes)
         try:
             centrality = nx.degree_centrality(G)
-            metrics['centrality'] = np.mean(list(centrality.values()))
+            metrics['centrality'] = get_numpy().mean(list(centrality.values()))
         except:
             metrics['centrality'] = 0.0
         try:
             clustering = nx.clustering(G.to_undirected())
-            metrics['clustering'] = np.mean(list(clustering.values()))
+            metrics['clustering'] = get_numpy().mean(list(clustering.values()))
         except:
             metrics['clustering'] = 0.0
         return metrics
@@ -673,8 +682,8 @@ class StructuralPatternDiscoverer:
         patterns = []
         lengths = [len(elem.content) for elem in elements]
         if lengths:
-            avg_length = np.mean(lengths)
-            std_length = np.std(lengths)
+            avg_length = get_numpy().mean(lengths)
+            std_length = get_numpy().std(lengths)
             if std_length / avg_length < 0.5:
                 patterns.append({'type': 'consistent_length_pattern', 'confidence': 0.7, 'instances': len(elements), 'description': f'Consistent content length (avg: {avg_length:.1f} chars)'})
         return patterns
@@ -684,7 +693,7 @@ class StructuralPatternDiscoverer:
         patterns = []
         quality_scores = [elem.quality_score for elem in elements]
         if quality_scores:
-            avg_quality = np.mean(quality_scores)
+            avg_quality = get_numpy().mean(quality_scores)
             if avg_quality > 0.8:
                 patterns.append({'type': 'high_quality_pattern', 'confidence': 0.8, 'instances': len([q for q in quality_scores if q > 0.8]), 'description': 'Consistently high-quality structural elements'})
         return patterns

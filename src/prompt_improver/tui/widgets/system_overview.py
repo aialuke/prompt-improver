@@ -11,7 +11,7 @@ Enhanced with 2025 best practices for ML orchestrator integration:
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -20,14 +20,12 @@ from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 
-from prompt_improver.utils.datetime_utils import (
-    format_compact_timestamp,
-    format_date_only,
-    format_display_date,
-)
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
+)
+from prompt_improver.utils.datetime_utils import (
+    format_display_date,
 )
 
 
@@ -48,7 +46,7 @@ class SystemOverviewWidget(Static):
     last_update = reactive(datetime.now())
     update_interval = 5.0
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize SystemOverviewWidget with 2025 best practices.
 
         Args:
@@ -81,7 +79,7 @@ class SystemOverviewWidget(Static):
             else:
                 self.update_display()
         except Exception as e:
-            self.logger.error(f"Failed to mount SystemOverviewWidget: {e}")
+            self.logger.exception(f"Failed to mount SystemOverviewWidget: {e}")
             self.system_data = {"error": f"Mount error: {e!s}"}
             self.health_status = "error"
 
@@ -97,7 +95,7 @@ class SystemOverviewWidget(Static):
             self._update_health_status()
             self.update_display()
         except Exception as e:
-            self.logger.error(f"Failed to update system overview data: {e}")
+            self.logger.exception(f"Failed to update system overview data: {e}")
             self.system_data = {"error": str(e)}
             self.health_status = "error"
             self.update_display()
@@ -149,7 +147,7 @@ class SystemOverviewWidget(Static):
             content = Panel(table, title=f"System Overview {health_indicator}")
             self._safe_update_content(content)
         except Exception as e:
-            self.logger.error(f"Failed to update system overview display: {e}")
+            self.logger.exception(f"Failed to update system overview display: {e}")
             error_content = Panel(
                 f"[red]Display Error: {e!s}[/red]", title="System Overview"
             )
@@ -205,7 +203,7 @@ class SystemOverviewWidget(Static):
             return f"[yellow]{percentage}[/yellow]"
         return f"[red]{percentage}[/red]"
 
-    async def start_auto_refresh(self, interval: float = None) -> None:
+    async def start_auto_refresh(self, interval: float | None = None) -> None:
         """Start auto-refresh with configurable interval."""
         if interval:
             self.update_interval = interval
@@ -243,7 +241,7 @@ class SystemOverviewWidget(Static):
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            self.logger.error(f"Auto-refresh error: {e}")
+            self.logger.exception(f"Auto-refresh error: {e}")
             self.system_data = {"error": f"Auto-refresh error: {e!s}"}
             self.health_status = "error"
             self.update_display()

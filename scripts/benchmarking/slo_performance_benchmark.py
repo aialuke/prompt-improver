@@ -1,4 +1,4 @@
-"""SLO Performance Benchmark: UnifiedConnectionManager vs Legacy Redis
+"""SLO Performance Benchmark: UnifiedConnectionManager vs Legacy Redis.
 ====================================================================
 
 Performance benchmarking script to measure the improvements achieved by
@@ -14,20 +14,20 @@ Measures:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import statistics
 import time
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from prompt_improver.database.unified_connection_manager import (
     ManagerMode,
     create_security_context,
     get_unified_manager,
 )
-from prompt_improver.monitoring.slo.calculator import SLICalculator
 from prompt_improver.monitoring.slo.framework import (
     SLODefinition,
     SLOTarget,
@@ -95,7 +95,7 @@ class BenchmarkResults:
 class SLOPerformanceBenchmark:
     """Performance benchmark suite for SLO monitoring consolidation."""
 
-    def __init__(self, redis_url: str | None = None):
+    def __init__(self, redis_url: str | None = None) -> None:
         import os
         if redis_url is None:
             redis_url = os.getenv("REDIS_URL", "redis://redis:6379/7")
@@ -323,7 +323,7 @@ class SLOPerformanceBenchmark:
             return None
         logger.info("Benchmarking legacy approach for scenario: %s", scenario.name)
         redis_clients = []
-        for i in range(3):
+        for _i in range(3):
             try:
                 client = coredis.Redis.from_url(self.redis_url, decode_responses=True)
                 redis_clients.append(client)
@@ -414,10 +414,8 @@ class SLOPerformanceBenchmark:
                 error_count += batch_errors
         finally:
             for client in redis_clients:
-                try:
+                with contextlib.suppress(Exception):
                     await client.aclose()
-                except Exception:
-                    pass
         total_duration = time.time() - start_time
         final_memory = self._get_memory_usage()
         total_cache_ops = cache_operations["hits"] + cache_operations["misses"]
@@ -489,7 +487,7 @@ class SLOPerformanceBenchmark:
         connection_efficiency = (
             legacy_metrics.connection_count - unified_metrics.connection_count
         )
-        analysis = {
+        return {
             "comparison_available": True,
             "throughput_improvement_percent": throughput_improvement,
             "latency_improvement_percent": latency_improvement,
@@ -508,7 +506,6 @@ class SLOPerformanceBenchmark:
                 throughput_improvement
             ),
         }
-        return analysis
 
     def _classify_performance_improvement(self, improvement_percent: float) -> str:
         """Classify performance improvement level."""
@@ -581,7 +578,7 @@ class SLOPerformanceBenchmark:
                 "observability_statistics": await self.slo_observability.generate_observability_report(),
             }
         except Exception as e:
-            logger.error("Benchmark failed: %s", e)
+            logger.exception("Benchmark failed: %s", e)
             raise
         finally:
             await self.cleanup_benchmark_environment()
@@ -696,7 +693,7 @@ async def main():
     )
     print(f"Cache Effectiveness: {summary['cache_effectiveness'].upper()}")
     output_file = f"slo_benchmark_results_{int(time.time())}.json"
-    with open(output_file, "w") as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, default=str)
     print(f"Detailed results saved to: {output_file}")
     print("=" * 80)

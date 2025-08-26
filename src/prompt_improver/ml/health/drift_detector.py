@@ -14,9 +14,11 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
-import numpy as np
-from scipy import stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 from ...utils.datetime_utils import aware_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 logger = logging.getLogger(__name__)
 
 class DriftMetrics(BaseModel):
@@ -148,7 +150,7 @@ class ModelDriftDetector:
                 return False
             baseline_predictions = list(window.predictions)[:baseline_size]
             baseline_confidences = list(window.confidences)[:baseline_size]
-            baseline_stats = {'predictions': baseline_predictions, 'confidences': baseline_confidences, 'prediction_mean': np.mean(baseline_predictions), 'prediction_std': np.std(baseline_predictions), 'confidence_mean': np.mean(baseline_confidences), 'confidence_std': np.std(baseline_confidences), 'established_at': aware_utc_now(), 'sample_count': len(baseline_predictions)}
+            baseline_stats = {'predictions': baseline_predictions, 'confidences': baseline_confidences, 'prediction_mean': get_numpy().mean(baseline_predictions), 'prediction_std': get_numpy().std(baseline_predictions), 'confidence_mean': get_numpy().mean(baseline_confidences), 'confidence_std': get_numpy().std(baseline_confidences), 'established_at': aware_utc_now(), 'sample_count': len(baseline_predictions)}
             self._baseline_distributions[model_id] = baseline_stats
             logger.info('Established baseline for model {model_id} with %s samples', baseline_size)
             return True
@@ -158,7 +160,7 @@ class ModelDriftDetector:
 
     async def _calculate_drift_metrics(self, model_id: str, baseline_predictions: list[float], baseline_confidences: list[float], current_predictions: list[float], current_confidences: list[float]) -> DriftMetrics:
         """Calculate comprehensive drift metrics"""
-        ks_stat, ks_p_value = stats.ks_2samp(baseline_predictions, current_predictions)
+        ks_stat, ks_p_value = get_scipy_stats().ks_2samp(baseline_predictions, current_predictions)
         js_divergence = self._calculate_js_divergence(baseline_predictions, current_predictions)
         prediction_drift_score = self._calculate_distribution_shift(baseline_predictions, current_predictions)
         confidence_drift_score = self._calculate_distribution_shift(baseline_confidences, current_confidences)
@@ -177,12 +179,12 @@ class ModelDriftDetector:
     def _calculate_distribution_shift(self, baseline: list[float], current: list[float]) -> float:
         """Calculate distribution shift score between two distributions"""
         try:
-            baseline_arr = np.array(baseline)
-            current_arr = np.array(current)
-            baseline_mean = np.mean(baseline_arr)
-            baseline_std = np.std(baseline_arr)
-            current_mean = np.mean(current_arr)
-            current_std = np.std(current_arr)
+            baseline_arr = get_numpy().array(baseline)
+            current_arr = get_numpy().array(current)
+            baseline_mean = get_numpy().mean(baseline_arr)
+            baseline_std = get_numpy().std(baseline_arr)
+            current_mean = get_numpy().mean(current_arr)
+            current_std = get_numpy().std(current_arr)
             if baseline_std == 0 or current_std == 0:
                 return abs(baseline_mean - current_mean)
             mean_shift = abs(baseline_mean - current_mean) / baseline_std
@@ -196,16 +198,16 @@ class ModelDriftDetector:
         """Calculate Jensen-Shannon divergence between two distributions"""
         try:
             combined_data = baseline + current
-            bins = np.histogram_bin_edges(combined_data, bins=20)
-            baseline_hist, _ = np.histogram(baseline, bins=bins, density=True)
-            current_hist, _ = np.histogram(current, bins=bins, density=True)
-            baseline_hist = baseline_hist / np.sum(baseline_hist)
-            current_hist = current_hist / np.sum(current_hist)
+            bins = get_numpy().histogram_bin_edges(combined_data, bins=20)
+            baseline_hist, _ = get_numpy().histogram(baseline, bins=bins, density=True)
+            current_hist, _ = get_numpy().histogram(current, bins=bins, density=True)
+            baseline_hist = baseline_hist / get_numpy().sum(baseline_hist)
+            current_hist = current_hist / get_numpy().sum(current_hist)
             epsilon = 1e-10
             baseline_hist = baseline_hist + epsilon
             current_hist = current_hist + epsilon
             m = 0.5 * (baseline_hist + current_hist)
-            js_div = 0.5 * stats.entropy(baseline_hist, m) + 0.5 * stats.entropy(current_hist, m)
+            js_div = 0.5 * get_scipy_stats().entropy(baseline_hist, m) + 0.5 * get_scipy_stats().entropy(current_hist, m)
             return float(js_div)
         except Exception as e:
             logger.error('Failed to calculate JS divergence: %s', e)
@@ -220,7 +222,7 @@ class ModelDriftDetector:
             timestamps = [(h.timestamp - sorted_history[0].timestamp).total_seconds() for h in sorted_history]
             drift_scores = [h.prediction_drift_score for h in sorted_history]
             if len(timestamps) > 1:
-                slope, intercept, r_value, p_value, std_err = stats.linregress(timestamps, drift_scores)
+                slope, intercept, r_value, p_value, std_err = get_scipy_stats().linregress(timestamps, drift_scores)
                 if abs(slope) < 0.001:
                     trend = 'stable'
                 elif slope > 0:

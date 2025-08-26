@@ -15,9 +15,9 @@ Key Features:
 
 import asyncio
 import logging
-from typing import AsyncGenerator, Generator
-# unittest.mock eliminated - using real service integration only
+from collections.abc import AsyncGenerator, Generator
 
+# unittest.mock eliminated - using real service integration only
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
@@ -25,9 +25,11 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 from prompt_improver.api.app import create_test_app
-from prompt_improver.core.config import get_config
-from prompt_improver.core.di.container_orchestrator import get_container, initialize_container
-from prompt_improver.database import get_unified_manager
+from prompt_improver.core.di.container_orchestrator import (
+    get_container,
+    initialize_container,
+)
+from prompt_improver.database.composition import get_database_services
 from prompt_improver.monitoring.unified_monitoring_manager import get_monitoring_manager
 from prompt_improver.performance.monitoring.health.unified_health_system import (
     get_unified_health_monitor,
@@ -81,7 +83,7 @@ def real_api_app(
     api_container, api_database_manager, api_monitoring_manager, api_health_monitor
 ) -> FastAPI:
     """Create FastAPI app with real service integrations for testing.
-    
+
     This app uses:
     - Real database connections with test isolation
     - Real Redis cache with test key prefixes
@@ -95,7 +97,7 @@ def real_api_app(
 @pytest.fixture(scope="session")
 def real_api_client(real_api_app: FastAPI) -> Generator[TestClient, None, None]:
     """Create TestClient with real service integrations.
-    
+
     This client performs actual HTTP requests against real backend services
     rather than mocked responses. Provides comprehensive integration testing.
     """
@@ -169,12 +171,12 @@ def api_test_data():
 
 class APITestHelpers:
     """Helper utilities for API integration testing."""
-    
+
     @staticmethod
     async def wait_for_service_ready(client: TestClient, endpoint: str = "/health/readiness", timeout: int = 30):
         """Wait for service to be ready for testing."""
         import time
-        
+
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
@@ -185,24 +187,24 @@ class APITestHelpers:
                         return True
             except Exception as e:
                 logger.debug(f"Service not ready yet: {e}")
-            
+
             await asyncio.sleep(1)
-        
+
         raise TimeoutError(f"Service not ready after {timeout} seconds")
-    
+
     @staticmethod
     def assert_api_response_structure(response_data: dict, expected_fields: list[str]):
         """Assert API response contains expected fields."""
         for field in expected_fields:
             assert field in response_data, f"Missing expected field: {field}"
-    
+
     @staticmethod
     def assert_api_performance(response_time_ms: float, max_response_time_ms: float = 1000):
         """Assert API response time meets performance requirements."""
         assert response_time_ms <= max_response_time_ms, (
             f"API response time {response_time_ms}ms exceeds threshold {max_response_time_ms}ms"
         )
-    
+
     @staticmethod
     async def create_test_session_data(client: TestClient, session_id: str) -> dict:
         """Create test session data for analytics testing."""
@@ -215,7 +217,7 @@ class APITestHelpers:
             "total_iterations": 50,
             "successful_iterations": 45
         }
-    
+
     @staticmethod
     async def cleanup_test_data(db_manager, session_ids: list[str]):
         """Clean up test data after API tests."""
@@ -240,15 +242,15 @@ def websocket_test_client(real_api_app: FastAPI):
 async def api_performance_monitor():
     """Monitor API performance during testing."""
     import time
-    
+
     class PerformanceMonitor:
         def __init__(self):
             self.start_time = None
             self.metrics = []
-        
+
         def start_request(self):
             self.start_time = time.time()
-        
+
         def end_request(self, endpoint: str, status_code: int):
             if self.start_time:
                 duration_ms = (time.time() - self.start_time) * 1000
@@ -260,13 +262,13 @@ async def api_performance_monitor():
                 })
                 return duration_ms
             return None
-        
+
         def get_metrics(self):
             return self.metrics.copy()
-        
+
         def reset(self):
             self.metrics.clear()
-    
+
     return PerformanceMonitor()
 
 
@@ -288,23 +290,23 @@ async def api_circuit_breaker_tester():
         def __init__(self):
             self.failure_count = 0
             self.success_count = 0
-        
+
         async def simulate_service_failure(self, service_name: str, failure_duration: int = 5):
             """Simulate service failure for circuit breaker testing."""
             # This would integrate with actual service health systems
             logger.info(f"Simulating failure for {service_name} for {failure_duration}s")
-        
+
         async def verify_circuit_breaker_open(self, client: TestClient, endpoint: str):
             """Verify circuit breaker is open and returning fallback responses."""
             response = client.get(endpoint)
             # Circuit breaker should return 503 or fallback response
-            assert response.status_code in [503, 200], "Circuit breaker not functioning properly"
-        
+            assert response.status_code in {503, 200}, "Circuit breaker not functioning properly"
+
         async def verify_circuit_breaker_recovery(self, client: TestClient, endpoint: str):
             """Verify circuit breaker recovers when service is healthy."""
             response = client.get(endpoint)
             assert response.status_code == 200, "Circuit breaker not recovering properly"
-    
+
     return CircuitBreakerTester()
 
 

@@ -10,8 +10,9 @@ Each service is protocol-based and <500 lines following 2025 clean architecture 
 """
 
 from typing import Protocol, runtime_checkable
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from dataclasses import dataclass
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = [
@@ -33,9 +34,9 @@ class ReductionResult:
     reconstruction_error: float
     processing_time: float
     quality_score: float
-    transformed_data: np.ndarray
+    transformed_data: get_numpy().ndarray
     transformer: Any
-    feature_importance: Optional[np.ndarray] = None
+    feature_importance: Optional[get_numpy().ndarray] = None
     evaluation_metrics: Optional[Dict[str, float]] = None
 
 @dataclass
@@ -52,7 +53,7 @@ class EvaluationMetrics:
 class PreprocessingResult:
     """Result of data preprocessing operations."""
     status: str
-    features: np.ndarray
+    features: get_numpy().ndarray
     info: Dict[str, Any]
     original_shape: Tuple[int, int]
     final_shape: Tuple[int, int]
@@ -62,15 +63,15 @@ class PreprocessingResult:
 class ReductionProtocol(Protocol):
     """Protocol for dimensionality reduction implementations."""
     
-    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> 'ReductionProtocol':
+    def fit(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> 'ReductionProtocol':
         """Fit the reduction model to data."""
         ...
     
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Transform data to reduced dimensions."""
         ...
     
-    def fit_transform(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> np.ndarray:
+    def fit_transform(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Fit and transform data in one step."""
         ...
     
@@ -82,16 +83,16 @@ class ReductionProtocol(Protocol):
 class EvaluationProtocol(Protocol):
     """Protocol for reduction quality evaluation."""
     
-    def evaluate_quality(self, original: np.ndarray, reduced: np.ndarray, 
-                        labels: Optional[np.ndarray] = None) -> EvaluationMetrics:
+    def evaluate_quality(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray, 
+                        labels: Optional[get_numpy().ndarray] = None) -> EvaluationMetrics:
         """Evaluate quality of dimensionality reduction."""
         ...
     
-    def compute_variance_preservation(self, original: np.ndarray, reduced: np.ndarray) -> float:
+    def compute_variance_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray) -> float:
         """Compute variance preservation score."""
         ...
     
-    def assess_clustering_preservation(self, original: np.ndarray, reduced: np.ndarray) -> float:
+    def assess_clustering_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray) -> float:
         """Assess how well clustering structure is preserved."""
         ...
 
@@ -99,14 +100,14 @@ class EvaluationProtocol(Protocol):
 class PreprocessorProtocol(Protocol):
     """Protocol for data preprocessing operations."""
     
-    def preprocess(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> PreprocessingResult:
+    def preprocess(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> PreprocessingResult:
         """Preprocess data for dimensionality reduction."""
         ...
     
-    def validate_input(self, X: np.ndarray) -> Dict[str, Any]:
+    def validate_input(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Validate input data quality and characteristics."""
         ...
     
-    def scale_features(self, X: np.ndarray) -> np.ndarray:
+    def scale_features(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Scale features for optimal reduction performance."""
         ...

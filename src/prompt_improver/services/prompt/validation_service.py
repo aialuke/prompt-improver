@@ -11,14 +11,14 @@ Part of the PromptServiceFacade decomposition following Clean Architecture princ
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
 from datetime import datetime
-from uuid import UUID
+from typing import Any
 
-from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
+from prompt_improver.core.config.validation import ValidationResult
+from prompt_improver.shared.interfaces.protocols.application import (
     ValidationServiceProtocol,
 )
-from prompt_improver.core.config.validation import ValidationResult
+
 # Use standard exceptions - core.exceptions module was removed
 ValidationError = ValueError
 BusinessRuleViolationError = Exception
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class ValidationService(ValidationServiceProtocol):
     """Service for input validation and business rule checking."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.validation_rules = self._initialize_validation_rules()
         self.business_rules = self._initialize_business_rules()
         self.sanitization_patterns = self._initialize_sanitization_patterns()
@@ -37,8 +37,8 @@ class ValidationService(ValidationServiceProtocol):
     async def validate_prompt_input(
         self,
         prompt: str,
-        constraints: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Validate prompt input against constraints."""
         try:
             validation_result = {
@@ -85,22 +85,22 @@ class ValidationService(ValidationServiceProtocol):
             return validation_result
 
         except Exception as e:
-            logger.error(f"Error validating prompt input: {e}")
+            logger.exception(f"Error validating prompt input: {e}")
             raise ValidationError(f"Validation failed: {e}")
 
     async def check_business_rules(
         self,
         operation: str,
-        data: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        data: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> bool:
         """Check if an operation complies with business rules."""
         try:
             context = context or {}
-            
+
             # Get applicable business rules for operation
             applicable_rules = self.business_rules.get(operation, [])
-            
+
             for rule in applicable_rules:
                 rule_result = await self._evaluate_business_rule(rule, data, context)
                 if not rule_result["compliant"]:
@@ -112,13 +112,13 @@ class ValidationService(ValidationServiceProtocol):
             return True
 
         except Exception as e:
-            logger.error(f"Error checking business rules for {operation}: {e}")
+            logger.exception(f"Error checking business rules for {operation}: {e}")
             raise BusinessRuleViolationError(f"Business rule check failed: {e}")
 
     async def validate_improvement_session(
         self,
         session: Any  # ImprovementSession type
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate an improvement session."""
         try:
             validation_result = {
@@ -147,7 +147,7 @@ class ValidationService(ValidationServiceProtocol):
 
             # Update overall validity
             validation_result["valid"] = len(validation_result["violations"]) == 0
-            
+
             # Determine session health
             if validation_result["violations"]:
                 validation_result["session_health"] = "critical"
@@ -159,7 +159,7 @@ class ValidationService(ValidationServiceProtocol):
             return validation_result
 
         except Exception as e:
-            logger.error(f"Error validating improvement session: {e}")
+            logger.exception(f"Error validating improvement session: {e}")
             raise ValidationError(f"Session validation failed: {e}")
 
     async def sanitize_prompt_content(
@@ -170,7 +170,7 @@ class ValidationService(ValidationServiceProtocol):
         """Sanitize prompt content for safety."""
         try:
             sanitized_prompt = prompt
-            
+
             # Apply sanitization based on level
             if sanitization_level == "basic":
                 sanitized_prompt = await self._apply_basic_sanitization(sanitized_prompt)
@@ -185,14 +185,14 @@ class ValidationService(ValidationServiceProtocol):
             return sanitized_prompt
 
         except Exception as e:
-            logger.error(f"Error sanitizing prompt content: {e}")
+            logger.exception(f"Error sanitizing prompt content: {e}")
             return prompt  # Return original if sanitization fails
 
     async def _perform_basic_validation(
         self,
         prompt: str,
-        constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Perform basic validation checks."""
         result = {"violations": [], "warnings": []}
 
@@ -228,8 +228,8 @@ class ValidationService(ValidationServiceProtocol):
     async def _perform_content_validation(
         self,
         prompt: str,
-        constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Perform content-specific validation."""
         result = {"violations": [], "warnings": []}
 
@@ -264,8 +264,8 @@ class ValidationService(ValidationServiceProtocol):
     async def _perform_length_validation(
         self,
         prompt: str,
-        constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Perform length validation."""
         result = {"violations": []}
 
@@ -293,7 +293,7 @@ class ValidationService(ValidationServiceProtocol):
 
         return result
 
-    async def _perform_security_validation(self, prompt: str) -> Dict[str, Any]:
+    async def _perform_security_validation(self, prompt: str) -> dict[str, Any]:
         """Perform security-related validation."""
         result = {"violations": [], "warnings": []}
 
@@ -331,8 +331,8 @@ class ValidationService(ValidationServiceProtocol):
     async def _perform_format_validation(
         self,
         prompt: str,
-        constraints: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any]
+    ) -> dict[str, Any]:
         """Perform format validation."""
         result = {"violations": []}
 
@@ -358,10 +358,10 @@ class ValidationService(ValidationServiceProtocol):
 
     async def _evaluate_business_rule(
         self,
-        rule: Dict[str, Any],
-        data: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        rule: dict[str, Any],
+        data: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Evaluate a single business rule."""
         try:
             rule_type = rule.get("type")
@@ -369,20 +369,19 @@ class ValidationService(ValidationServiceProtocol):
 
             if rule_type == "rate_limit":
                 return await self._check_rate_limit_rule(data, context, rule_config)
-            elif rule_type == "user_permissions":
+            if rule_type == "user_permissions":
                 return await self._check_user_permissions_rule(data, context, rule_config)
-            elif rule_type == "content_policy":
+            if rule_type == "content_policy":
                 return await self._check_content_policy_rule(data, context, rule_config)
-            elif rule_type == "resource_limits":
+            if rule_type == "resource_limits":
                 return await self._check_resource_limits_rule(data, context, rule_config)
-            else:
-                return {"compliant": True, "message": "Unknown rule type"}
+            return {"compliant": True, "message": "Unknown rule type"}
 
         except Exception as e:
-            logger.error(f"Error evaluating business rule: {e}")
+            logger.exception(f"Error evaluating business rule: {e}")
             return {"compliant": False, "violation": f"Rule evaluation failed: {e}"}
 
-    async def _check_sensitive_content(self, prompt: str) -> Dict[str, Any]:
+    async def _check_sensitive_content(self, prompt: str) -> dict[str, Any]:
         """Check for sensitive information in prompt."""
         result = {"warnings": []}
 
@@ -409,52 +408,46 @@ class ValidationService(ValidationServiceProtocol):
         """Apply basic sanitization."""
         # Remove obvious script tags
         prompt = re.sub(r'<script[^>]*>.*?</script>', '', prompt, flags=re.IGNORECASE | re.DOTALL)
-        
+
         # Remove null bytes
-        prompt = prompt.replace('\x00', '')
-        
-        return prompt
+        return prompt.replace('\x00', '')
 
     async def _apply_standard_sanitization(self, prompt: str) -> str:
         """Apply standard sanitization."""
         prompt = await self._apply_basic_sanitization(prompt)
-        
+
         # Remove potential injection patterns
         for pattern in self.sanitization_patterns["standard"]:
             prompt = re.sub(pattern, '', prompt, flags=re.IGNORECASE)
-        
+
         # Normalize whitespace
-        prompt = re.sub(r'\s+', ' ', prompt).strip()
-        
-        return prompt
+        return re.sub(r'\s+', ' ', prompt).strip()
 
     async def _apply_strict_sanitization(self, prompt: str) -> str:
         """Apply strict sanitization."""
         prompt = await self._apply_standard_sanitization(prompt)
-        
+
         # Apply strict patterns
         for pattern in self.sanitization_patterns["strict"]:
             prompt = re.sub(pattern, '', prompt, flags=re.IGNORECASE)
-        
-        # Keep only alphanumeric, common punctuation, and whitespace
-        prompt = re.sub(r'[^\w\s.,!?;:()\[\]{}"\'-]', '', prompt)
-        
-        return prompt
 
-    def _calculate_validation_score(self, validation_result: Dict[str, Any]) -> float:
+        # Keep only alphanumeric, common punctuation, and whitespace
+        return re.sub(r'[^\w\s.,!?;:()\[\]{}"\'-]', '', prompt)
+
+    def _calculate_validation_score(self, validation_result: dict[str, Any]) -> float:
         """Calculate overall validation score."""
         violations = len(validation_result.get("violations", []))
         warnings = len(validation_result.get("warnings", []))
-        
+
         # Base score starts at 1.0
         score = 1.0
-        
+
         # Deduct for violations (more severe)
         score -= violations * 0.2
-        
+
         # Deduct for warnings (less severe)
         score -= warnings * 0.1
-        
+
         # Ensure score doesn't go below 0
         return max(0.0, score)
 
@@ -476,10 +469,10 @@ class ValidationService(ValidationServiceProtocol):
         except ET.ParseError:
             return False
 
-    async def _validate_session_integrity(self, session: Any) -> Dict[str, Any]:
+    async def _validate_session_integrity(self, session: Any) -> dict[str, Any]:
         """Validate session data integrity."""
         result = {"violations": []}
-        
+
         # Check required fields
         required_fields = ["id", "created_at"]
         for field in required_fields:
@@ -490,77 +483,71 @@ class ValidationService(ValidationServiceProtocol):
                     "severity": "error",
                     "field": field
                 })
-        
+
         return result
 
-    async def _validate_session_state(self, session: Any) -> Dict[str, Any]:
+    async def _validate_session_state(self, session: Any) -> dict[str, Any]:
         """Validate session state."""
-        result = {"violations": [], "warnings": []}
-        
+        return {"violations": [], "warnings": []}
+
         # Add session state validation logic here
         # This would check session status, workflow state, etc.
-        
-        return result
 
-    async def _validate_session_timing(self, session: Any) -> Dict[str, Any]:
+    async def _validate_session_timing(self, session: Any) -> dict[str, Any]:
         """Validate session timing."""
-        result = {"warnings": []}
-        
+        return {"warnings": []}
+
         # Add timing validation logic here
         # This would check for sessions running too long, expired sessions, etc.
-        
-        return result
 
-    async def _validate_session_resources(self, session: Any) -> Dict[str, Any]:
+    async def _validate_session_resources(self, session: Any) -> dict[str, Any]:
         """Validate session resource usage."""
-        result = {"violations": []}
-        
+        return {"violations": []}
+
         # Add resource validation logic here
         # This would check memory usage, execution time limits, etc.
-        
-        return result
 
     async def _check_rate_limit_rule(
         self,
-        data: Dict[str, Any],
-        context: Dict[str, Any],
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        context: dict[str, Any],
+        config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Check rate limiting business rule."""
         # Simplified rate limit check
         return {"compliant": True, "message": "Rate limit check passed"}
 
     async def _check_user_permissions_rule(
         self,
-        data: Dict[str, Any],
-        context: Dict[str, Any],
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        context: dict[str, Any],
+        config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Check user permissions business rule."""
         # Simplified permissions check
         return {"compliant": True, "message": "Permissions check passed"}
 
     async def _check_content_policy_rule(
         self,
-        data: Dict[str, Any],
-        context: Dict[str, Any],
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        context: dict[str, Any],
+        config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Check content policy business rule."""
         # Simplified content policy check
         return {"compliant": True, "message": "Content policy check passed"}
 
     async def _check_resource_limits_rule(
         self,
-        data: Dict[str, Any],
-        context: Dict[str, Any],
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        context: dict[str, Any],
+        config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Check resource limits business rule."""
         # Simplified resource limits check
         return {"compliant": True, "message": "Resource limits check passed"}
 
-    def _initialize_validation_rules(self) -> Dict[str, Any]:
+    def _initialize_validation_rules(self) -> dict[str, Any]:
         """Initialize validation rules configuration."""
         return {
             "default_max_length": 10000,
@@ -573,7 +560,7 @@ class ValidationService(ValidationServiceProtocol):
             ]
         }
 
-    def _initialize_business_rules(self) -> Dict[str, List[Dict[str, Any]]]:
+    def _initialize_business_rules(self) -> dict[str, list[dict[str, Any]]]:
         """Initialize business rules configuration."""
         return {
             "improve_prompt": [
@@ -587,7 +574,7 @@ class ValidationService(ValidationServiceProtocol):
             ]
         }
 
-    def _initialize_sanitization_patterns(self) -> Dict[str, List[str]]:
+    def _initialize_sanitization_patterns(self) -> dict[str, list[str]]:
         """Initialize sanitization patterns."""
         return {
             "standard": [
@@ -608,16 +595,16 @@ class ValidationService(ValidationServiceProtocol):
     # Configuration validation methods to break circular dependencies
     async def validate_startup_configuration(
         self,
-        environment: Optional[str] = None
+        environment: str | None = None
     ) -> ValidationResult:
         """Validate overall startup configuration integrity."""
         try:
-            from prompt_improver.core.config.validation import validate_configuration
             from prompt_improver.core.config.app_config import get_config
-            
+            from prompt_improver.core.config.validation import validate_configuration
+
             # Get the configuration to validate
             config = get_config()
-            
+
             # Override environment if specified
             if environment:
                 # Create a copy with overridden environment
@@ -625,10 +612,10 @@ class ValidationService(ValidationServiceProtocol):
                 config_dict["environment"] = environment
                 from prompt_improver.core.config.app_config import AppConfig
                 config = AppConfig(**config_dict)
-            
+
             # Use the comprehensive validation from validation.py
             is_valid, report = await validate_configuration(config)
-            
+
             return ValidationResult(
                 component="startup_configuration",
                 is_valid=is_valid,
@@ -642,9 +629,9 @@ class ValidationService(ValidationServiceProtocol):
                 },
                 critical=True
             )
-            
+
         except Exception as e:
-            logger.error(f"Error validating startup configuration: {e}")
+            logger.exception(f"Error validating startup configuration: {e}")
             return ValidationResult(
                 component="startup_configuration",
                 is_valid=False,
@@ -659,40 +646,41 @@ class ValidationService(ValidationServiceProtocol):
         """Validate database configuration and connectivity."""
         try:
             from prompt_improver.core.config.app_config import get_config
-            
+
             config = get_config()
             db_config = config.database
             issues = []
-            
+
             # Validate connection parameters
             if not db_config.postgres_host:
                 issues.append("Database host is required")
-                
+
             if db_config.postgres_port < 1 or db_config.postgres_port > 65535:
                 issues.append(f"Invalid database port: {db_config.postgres_port}")
-                
+
             if not db_config.postgres_database:
                 issues.append("Database name is required")
-                
+
             if not db_config.postgres_username:
                 issues.append("Database username is required")
-                
+
             # Validate pool settings
             if db_config.pool_min_size > db_config.pool_max_size:
                 issues.append(f"Pool min size ({db_config.pool_min_size}) exceeds max size ({db_config.pool_max_size})")
-                
+
             if db_config.pool_timeout <= 0:
                 issues.append("Pool timeout must be positive")
-            
+
             # Test connectivity if requested and basic config is valid
             connectivity_details = {}
             if test_connectivity and not issues:
                 try:
                     import asyncio
+
                     import asyncpg
-                    
+
                     database_url = db_config.get_database_url()
-                    
+
                     async def test_connection():
                         conn = None
                         try:
@@ -704,29 +692,29 @@ class ValidationService(ValidationServiceProtocol):
                         finally:
                             if conn:
                                 await conn.close()
-                    
+
                     start_time = asyncio.get_event_loop().time()
                     is_connected = await asyncio.wait_for(test_connection(), timeout=10.0)
                     response_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-                    
+
                     connectivity_details = {
                         "connectivity_test_passed": is_connected,
                         "response_time_ms": round(response_time_ms, 2)
                     }
-                    
+
                     if not is_connected:
                         issues.append("Database connectivity test failed")
-                        
+
                 except Exception as e:
                     connectivity_details = {
                         "connectivity_test_error": str(e),
                         "connectivity_test_passed": False
                     }
                     issues.append(f"Database connectivity test error: {e}")
-            
+
             is_valid = len(issues) == 0
             message = "Database configuration valid" if is_valid else f"Database configuration issues: {'; '.join(issues)}"
-            
+
             details = {
                 "host": db_config.postgres_host,
                 "port": db_config.postgres_port,
@@ -739,7 +727,7 @@ class ValidationService(ValidationServiceProtocol):
                 "issues": issues,
                 **connectivity_details
             }
-            
+
             return ValidationResult(
                 component="database_configuration",
                 is_valid=is_valid,
@@ -747,9 +735,9 @@ class ValidationService(ValidationServiceProtocol):
                 details=details,
                 critical=True
             )
-            
+
         except Exception as e:
-            logger.error(f"Error validating database configuration: {e}")
+            logger.exception(f"Error validating database configuration: {e}")
             return ValidationResult(
                 component="database_configuration",
                 is_valid=False,
@@ -759,57 +747,57 @@ class ValidationService(ValidationServiceProtocol):
 
     async def validate_security_configuration(
         self,
-        security_profile: Optional[str] = None
+        security_profile: str | None = None
     ) -> ValidationResult:
         """Validate security configuration and settings."""
         try:
             from prompt_improver.core.config.app_config import get_config
-            
+
             config = get_config()
             security_config = config.security
             issues = []
-            
+
             # Validate secret key
             if not security_config.secret_key:
                 issues.append("Secret key is required")
             elif len(security_config.secret_key) < 32:
                 issues.append(f"Secret key must be at least 32 characters, got {len(security_config.secret_key)}")
-                
+
             # Validate token settings
             if security_config.token_expiry_seconds <= 0:
                 issues.append("Token expiry must be positive")
-                
+
             if security_config.hash_rounds < 4 or security_config.hash_rounds > 20:
                 issues.append("Hash rounds must be between 4 and 20")
-                
+
             # Validate authentication settings
             auth_config = security_config.authentication
             if auth_config.api_key_length_bytes < 16:
                 issues.append("API key length must be at least 16 bytes")
-                
+
             if auth_config.max_failed_attempts_per_hour < 1:
                 issues.append("Max failed attempts must be at least 1")
-                
+
             # Validate rate limiting
             rate_config = security_config.rate_limiting
             if rate_config.basic_tier_rate_limit < 1:
                 issues.append("Basic tier rate limit must be at least 1")
-                
+
             if rate_config.basic_tier_burst_capacity < rate_config.basic_tier_rate_limit:
                 issues.append("Burst capacity must be >= rate limit")
-            
+
             # Validate against security profile if specified
             if security_profile:
                 current_profile = security_config.security_profile.value
                 if security_profile != current_profile:
                     issues.append(f"Security profile mismatch: expected {security_profile}, got {current_profile}")
-                
+
                 if security_profile == "production" and config.environment != "production":
                     issues.append("Production security profile should only be used in production environment")
-            
+
             is_valid = len(issues) == 0
             message = "Security configuration valid" if is_valid else f"Security configuration issues: {'; '.join(issues)}"
-            
+
             return ValidationResult(
                 component="security_configuration",
                 is_valid=is_valid,
@@ -827,9 +815,9 @@ class ValidationService(ValidationServiceProtocol):
                 },
                 critical=True
             )
-            
+
         except Exception as e:
-            logger.error(f"Error validating security configuration: {e}")
+            logger.exception(f"Error validating security configuration: {e}")
             return ValidationResult(
                 component="security_configuration",
                 is_valid=False,
@@ -844,34 +832,34 @@ class ValidationService(ValidationServiceProtocol):
         """Validate monitoring and observability configuration."""
         try:
             from prompt_improver.core.config.app_config import get_config
-            
+
             config = get_config()
             monitoring_config = config.monitoring
             issues = []
-            
+
             # Validate health check settings
             health_config = monitoring_config.health_checks
             if health_config.interval_seconds <= 0:
                 issues.append("Health check interval must be positive")
-                
+
             if health_config.timeout_seconds >= health_config.interval_seconds:
                 issues.append("Health check timeout should be less than interval")
-                
+
             # Validate metrics settings
-            metrics_config = monitoring_config.metrics  
+            metrics_config = monitoring_config.metrics
             if metrics_config.collection_interval_seconds <= 0:
                 issues.append("Metrics collection interval must be positive")
-                
+
             # Validate logging settings
             logging_config = monitoring_config.logging
             allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
             if logging_config.level not in allowed_levels:
                 issues.append(f"Invalid log level: {logging_config.level}")
-                
+
             allowed_formats = ["json", "text", "structured"]
             if logging_config.format not in allowed_formats:
                 issues.append(f"Invalid log format: {logging_config.format}")
-            
+
             # Perform connectivity tests if requested
             connectivity_details = {}
             if include_connectivity_tests:
@@ -882,10 +870,10 @@ class ValidationService(ValidationServiceProtocol):
                     "monitoring_endpoints_tested": 0,
                     "all_endpoints_healthy": True
                 }
-            
+
             is_valid = len(issues) == 0
             message = "Monitoring configuration valid" if is_valid else f"Monitoring configuration issues: {'; '.join(issues)}"
-            
+
             details = {
                 "health_check_interval": health_config.interval_seconds,
                 "health_check_timeout": health_config.timeout_seconds,
@@ -895,7 +883,7 @@ class ValidationService(ValidationServiceProtocol):
                 "issues": issues,
                 **connectivity_details
             }
-            
+
             return ValidationResult(
                 component="monitoring_configuration",
                 is_valid=is_valid,
@@ -903,9 +891,9 @@ class ValidationService(ValidationServiceProtocol):
                 details=details,
                 critical=False  # Monitoring config issues are not critical for core app
             )
-            
+
         except Exception as e:
-            logger.error(f"Error validating monitoring configuration: {e}")
+            logger.exception(f"Error validating monitoring configuration: {e}")
             return ValidationResult(
                 component="monitoring_configuration",
                 is_valid=False,

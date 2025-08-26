@@ -1,25 +1,22 @@
 """Statistical analysis engine for performance baselines and trend detection."""
 
-import asyncio
 import logging
-import math
 import statistics
-import time
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 from prompt_improver.performance.baseline.models import (
     BaselineComparison,
     BaselineMetrics,
-    MetricDefinition,
     PerformanceTrend,
     TrendDirection,
     get_metric_definition,
 )
 
 try:
-    import numpy as np
-    from scipy import stats
+    # import numpy as np  # Converted to lazy loading
+    # from scipy import stats  # Converted to lazy loading
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -59,7 +56,7 @@ class StatisticalAnalyzer:
         trend_minimum_samples: int = 10,
         anomaly_threshold: float = 2.0,
         enable_advanced_analysis: bool = True,
-    ):
+    ) -> None:
         """Initialize statistical analyzer.
 
         Args:
@@ -166,7 +163,7 @@ class StatisticalAnalyzer:
             and (len(current_values) > 1)
         ):
             try:
-                t_stat, p_value = stats.ttest_ind(baseline_values, current_values)
+                _t_stat, p_value = get_scipy_stats().ttest_ind(baseline_values, current_values)
             except Exception as e:
                 logger.debug(f"T-test failed for {metric_name}: {e}")
         baseline_var = (
@@ -323,7 +320,7 @@ class StatisticalAnalyzer:
         )
         if hist_std == 0:
             return anomalies
-        for i, value in enumerate(current_values):
+        for _i, value in enumerate(current_values):
             z_score = abs(value - hist_mean) / hist_std
             if z_score > self.anomaly_threshold:
                 anomaly = {
@@ -370,10 +367,7 @@ class StatisticalAnalyzer:
                 continue
             mean_a = statistics.mean(values_a)
             mean_b = statistics.mean(values_b)
-            if mean_a != 0:
-                change_percentage = (mean_b - mean_a) / mean_a * 100
-            else:
-                change_percentage = 0.0
+            change_percentage = (mean_b - mean_a) / mean_a * 100 if mean_a != 0 else 0.0
             is_significant = False
             if (
                 self.enable_advanced_analysis
@@ -381,7 +375,7 @@ class StatisticalAnalyzer:
                 and (len(values_b) > 1)
             ):
                 try:
-                    _, p_value = stats.ttest_ind(values_a, values_b)
+                    _, p_value = get_scipy_stats().ttest_ind(values_a, values_b)
                     is_significant = p_value < self.significance_threshold
                 except Exception:
                     pass

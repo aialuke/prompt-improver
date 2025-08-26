@@ -9,8 +9,10 @@ from typing import Any, Dict, List, Optional
 import warnings
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
-import numpy as np
-from scipy import stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy
 try:
     import random
     from deap import algorithms, base, creator, tools
@@ -136,8 +138,8 @@ class RuleOptimizer:
         optimization_data = []
         for data_point in historical_data:
             if all(key in data_point for key in ['score', 'context', 'timestamp']):
-                parameters = {'threshold': np.random.uniform(0.1, 0.9), 'weight': np.random.uniform(0.5, 1.0), 'complexity_factor': np.random.uniform(0.1, 1.0), 'context_sensitivity': np.random.uniform(0.0, 1.0)}
-                objectives = {'performance': data_point['score'], 'consistency': 1.0 - abs(data_point['score'] - 0.7), 'efficiency': 1.0 / (data_point.get('execution_time_ms', 100) / 100.0), 'robustness': np.random.uniform(0.5, 1.0)}
+                parameters = {'threshold': get_numpy().random.uniform(0.1, 0.9), 'weight': get_numpy().random.uniform(0.5, 1.0), 'complexity_factor': get_numpy().random.uniform(0.1, 1.0), 'context_sensitivity': get_numpy().random.uniform(0.0, 1.0)}
+                objectives = {'performance': data_point['score'], 'consistency': 1.0 - abs(data_point['score'] - 0.7), 'efficiency': 1.0 / (data_point.get('execution_time_ms', 100) / 100.0), 'robustness': get_numpy().random.uniform(0.5, 1.0)}
                 optimization_data.append({'parameters': parameters, 'objectives': objectives, 'feasible': objectives['performance'] > 0.3})
         return optimization_data
 
@@ -205,10 +207,10 @@ class RuleOptimizer:
         for ind, fit in zip(population, fitnesses, strict=False):
             ind.fitness.values = fit
         stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register('avg', np.mean, axis=0)
-        stats.register('std', np.std, axis=0)
-        stats.register('min', np.min, axis=0)
-        stats.register('max', np.max, axis=0)
+        get_scipy_stats().register('avg', get_numpy().mean, axis=0)
+        get_scipy_stats().register('std', get_numpy().std, axis=0)
+        get_scipy_stats().register('min', get_numpy().min, axis=0)
+        get_scipy_stats().register('max', get_numpy().max, axis=0)
         population, logbook = algorithms.eaMuPlusLambda(population, self.toolbox, mu=self.config.pareto_population_size, lambda_=self.config.pareto_population_size, cxpb=self.config.pareto_crossover_prob, mutpb=self.config.pareto_mutation_prob, ngen=self.config.pareto_generations, stats=stats, verbose=False)
         pareto_frontier = tools.sortNondominated(population, self.config.pareto_population_size, first_front_only=True)[0]
         pareto_solutions = []
@@ -221,16 +223,16 @@ class RuleOptimizer:
 
     def _evaluate_objectives(self, params: dict[str, float], optimization_data: list[dict[str, Any]]) -> dict[str, float]:
         """Evaluate objectives for given parameters"""
-        base_performance = np.mean([d['objectives']['performance'] for d in optimization_data])
+        base_performance = get_numpy().mean([d['objectives']['performance'] for d in optimization_data])
         performance = base_performance * (0.5 + 0.5 * params['weight']) * (0.8 + 0.2 * params['threshold'])
         consistency = 0.9 - abs(params['threshold'] - 0.7) * params['complexity_factor']
         efficiency = 1.0 - params['complexity_factor'] * 0.3
         robustness = params['context_sensitivity'] * 0.7 + 0.3
         noise_factor = 0.05
-        performance *= 1 + np.random.normal(0, noise_factor)
-        consistency *= 1 + np.random.normal(0, noise_factor)
-        efficiency *= 1 + np.random.normal(0, noise_factor)
-        robustness *= 1 + np.random.normal(0, noise_factor)
+        performance *= 1 + get_numpy().random.normal(0, noise_factor)
+        consistency *= 1 + get_numpy().random.normal(0, noise_factor)
+        efficiency *= 1 + get_numpy().random.normal(0, noise_factor)
+        robustness *= 1 + get_numpy().random.normal(0, noise_factor)
         return {'performance': max(0.0, min(1.0, performance)), 'consistency': max(0.0, min(1.0, consistency)), 'efficiency': max(0.0, min(1.0, efficiency)), 'robustness': max(0.0, min(1.0, robustness))}
 
     def _calculate_crowding_distance(self, individual, population) -> float:
@@ -278,8 +280,8 @@ class RuleOptimizer:
         """Calculate convergence metric from optimization statistics"""
         if not logbook:
             return 0.0
-        initial_avg = np.mean(logbook[0]['avg'])
-        final_avg = np.mean(logbook[-1]['avg'])
+        initial_avg = get_numpy().mean(logbook[0]['avg'])
+        final_avg = get_numpy().mean(logbook[-1]['avg'])
         convergence = (final_avg - initial_avg) / max(initial_avg, 0.001)
         return max(0.0, min(1.0, convergence))
 
@@ -310,12 +312,12 @@ class RuleOptimizer:
                 values1 = [sol.objectives[obj1] for sol in pareto_frontier]
                 values2 = [sol.objectives[obj2] for sol in pareto_frontier]
                 if len(set(values1)) > 1 and len(set(values2)) > 1:
-                    correlation, _ = stats.pearsonr(values1, values2)
+                    correlation, _ = get_scipy_stats().pearsonr(values1, values2)
                     trade_offs[f'{obj1}_vs_{obj2}'] = {'correlation': correlation, 'trade_off_strength': abs(correlation), 'conflicting': correlation < -0.3}
         ranges = {}
         for obj in objectives:
             values = [sol.objectives[obj] for sol in pareto_frontier]
-            ranges[obj] = {'min': min(values), 'max': max(values), 'range': max(values) - min(values), 'std': np.std(values)}
+            ranges[obj] = {'min': min(values), 'max': max(values), 'range': max(values) - min(values), 'std': get_numpy().std(values)}
         return {'objective_correlations': trade_offs, 'objective_ranges': ranges, 'frontier_size': len(pareto_frontier), 'feasible_solutions': len([sol for sol in pareto_frontier if sol.feasible])}
 
     async def _gaussian_process_optimization(self, rule_id: str, historical_data: list[dict[str, Any]]) -> GaussianProcessResult | None:
@@ -333,7 +335,7 @@ class RuleOptimizer:
             predicted_performance, uncertainty = self._predict_performance(gp_model, scaler, optimal_params)
             model_confidence = self._calculate_model_confidence(gp_model, X, y)
             if isinstance(optimal_params, dict):
-                expected_improvement = self._calculate_expected_improvement(gp_model, scaler, optimal_params, np.max(y))
+                expected_improvement = self._calculate_expected_improvement(gp_model, scaler, optimal_params, get_numpy().max(y))
             else:
                 expected_improvement = 0.0
             return GaussianProcessResult(rule_id=rule_id, optimal_parameters=optimal_params, predicted_performance=predicted_performance, uncertainty_estimate=uncertainty, acquisition_history=acquisition_history, model_confidence=model_confidence, expected_improvement=expected_improvement)
@@ -347,12 +349,12 @@ class RuleOptimizer:
         y = []
         for data_point in historical_data:
             if 'score' in data_point:
-                features = [np.random.uniform(0.1, 0.9), np.random.uniform(0.5, 1.0), np.random.uniform(0.1, 1.0), np.random.uniform(0.0, 1.0)]
+                features = [get_numpy().random.uniform(0.1, 0.9), get_numpy().random.uniform(0.5, 1.0), get_numpy().random.uniform(0.1, 1.0), get_numpy().random.uniform(0.0, 1.0)]
                 X.append(features)
                 y.append(data_point['score'])
-        return (np.array(X), np.array(y))
+        return (get_numpy().array(X), get_numpy().array(y))
 
-    def _fit_gaussian_process(self, X: np.ndarray, y: np.ndarray) -> tuple:
+    def _fit_gaussian_process(self, X: get_numpy().ndarray, y: get_numpy().ndarray) -> tuple:
         """Fit Gaussian process model"""
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
@@ -361,15 +363,15 @@ class RuleOptimizer:
         gp.fit(X_scaled, y)
         return (gp, scaler)
 
-    def _optimize_expected_improvement(self, gp_model, scaler, X_train: np.ndarray, y_train: np.ndarray) -> tuple:
+    def _optimize_expected_improvement(self, gp_model, scaler, X_train: get_numpy().ndarray, y_train: get_numpy().ndarray) -> tuple:
         """Optimize using Expected Improvement acquisition function"""
-        f_best = np.max(y_train)
+        f_best = get_numpy().max(y_train)
         bounds = [(0.1, 0.9), (0.5, 1.0), (0.1, 1.0), (0.0, 1.0)]
         best_ei = 0
         best_params = None
         acquisition_history = []
         for _ in range(self.config.gp_acquisition_samples):
-            candidate = [np.random.uniform(low, high) for low, high in bounds]
+            candidate = [get_numpy().random.uniform(low, high) for low, high in bounds]
             ei = self._calculate_expected_improvement(gp_model, scaler, candidate, f_best)
             acquisition_history.append({'parameters': {'threshold': candidate[0], 'weight': candidate[1], 'complexity_factor': candidate[2], 'context_sensitivity': candidate[3]}, 'expected_improvement': ei})
             if ei > best_ei:
@@ -382,9 +384,9 @@ class RuleOptimizer:
         """Predict performance and uncertainty for given parameters"""
         try:
             if isinstance(params, dict):
-                X_test = np.array([[params['threshold'], params['weight'], params['complexity_factor'], params['context_sensitivity']]])
+                X_test = get_numpy().array([[params['threshold'], params['weight'], params['complexity_factor'], params['context_sensitivity']]])
             else:
-                X_test = np.array([params]) if len(np.array(params).shape) == 1 else np.array(params)
+                X_test = get_numpy().array([params]) if len(get_numpy().array(params).shape) == 1 else get_numpy().array(params)
             X_test_scaled = scaler.transform(X_test)
             mean, std = gp_model.predict(X_test_scaled, return_std=True)
             return (float(mean[0]), float(std[0]))
@@ -398,21 +400,23 @@ class RuleOptimizer:
             candidate_list = [candidate['threshold'], candidate['weight'], candidate['complexity_factor'], candidate['context_sensitivity']]
         else:
             candidate_list = candidate
-        X_candidate = np.array([candidate_list]).reshape(1, -1)
+        X_candidate = get_numpy().array([candidate_list]).reshape(1, -1)
         X_candidate_scaled = scaler.transform(X_candidate)
         mean, std = gp_model.predict(X_candidate_scaled, return_std=True)
         if std[0] <= 0:
             return 0.0
         improvement = mean[0] - f_best - self.config.gp_exploration_weight
         z = improvement / std[0]
-        ei = improvement * stats.norm.cdf(z) + std[0] * stats.norm.pdf(z)
+        ei = improvement * get_scipy_stats().norm.cdf(z) + std[0] * get_scipy_stats().norm.pdf(z)
         return max(0.0, ei)
 
-    def _calculate_model_confidence(self, gp_model, X_train: np.ndarray, y_train: np.ndarray) -> float:
+    def _calculate_model_confidence(self, gp_model, X_train: get_numpy().ndarray, y_train: get_numpy().ndarray) -> float:
         """Calculate confidence in the GP model"""
         try:
             from sklearn.model_selection import cross_val_score
+            from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+            from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
             scores = cross_val_score(gp_model, X_train, y_train, cv=min(5, len(X_train)), scoring='r2')
-            return max(0.0, np.mean(scores))
+            return max(0.0, get_numpy().mean(scores))
         except Exception:
             return min(1.0, 1.0 / (1.0 + gp_model.kernel_.theta.std()))

@@ -10,15 +10,15 @@ Consolidates common error handling patterns:
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import Enum
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Any
 
 from prompt_improver.core.common.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
 
-class ErrorCategory(str, Enum):
+class ErrorCategory(StrEnum):
     """Categories of errors for consistent handling."""
 
     CONFIGURATION = "configuration"
@@ -55,7 +55,7 @@ class InitializationError(Exception):
         category: ErrorCategory,
         component: str,
         cause: Exception | None = None,
-    ):
+    ) -> None:
         super().__init__(message)
         self.category = category
         self.component = component
@@ -137,7 +137,7 @@ def handle_initialization_error(
             logger.info(f"Fallback successful for {context.component}")
             return result
         except Exception as fallback_error:
-            logger.error(f"Fallback failed for {context.component}: {fallback_error}")
+            logger.exception(f"Fallback failed for {context.component}: {fallback_error}")
     if context.critical:
         raise InitializationError(error_msg, context.category, context.component, error)
     return None
@@ -174,7 +174,7 @@ def safe_operation(
             f"{operation_name} failed in {component_name} [{category.value}]: {e}"
         )
         if log_errors:
-            logger.error(
+            logger.exception(
                 error_msg,
                 extra={
                     "error_category": category.value,
@@ -235,7 +235,7 @@ async def with_retry(
                 await asyncio.sleep(current_delay)
                 current_delay *= backoff_factor
             else:
-                logger.error(
+                logger.exception(
                     f"{operation_name} failed in {component_name} after {max_retries} retries: {e}"
                 )
     if last_exception is None:
@@ -255,7 +255,7 @@ class ErrorHandler:
         self,
         component_name: str,
         default_category: ErrorCategory = ErrorCategory.UNKNOWN,
-    ):
+    ) -> None:
         self.component_name = component_name
         self.default_category = default_category
         self.error_counts: dict[ErrorCategory, int] = {}
@@ -295,6 +295,7 @@ class ErrorHandler:
         if fallback_value is not None:
             return handle_initialization_error(error, context, lambda: fallback_value)
         handle_initialization_error(error, context)
+        return None
 
     def safe_execute(
         self,

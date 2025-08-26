@@ -25,7 +25,7 @@ import uuid
 
 from sqlmodel import SQLModel
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -50,6 +50,7 @@ from .ml_platform_integration import (
     create_ml_platform,
 )
 from .model_serving_infrastructure import ScalingStrategy, ServingConfig
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -404,14 +405,14 @@ class PerformanceValidator:
                 result.min_time_seconds = min(measurements)
                 result.max_time_seconds = max(measurements)
                 result.p50_time_seconds = statistics.median(measurements)
-                result.p95_time_seconds = np.percentile(measurements, 95)
-                result.p99_time_seconds = np.percentile(measurements, 99)
+                result.p95_time_seconds = get_numpy().percentile(measurements, 95)
+                result.p99_time_seconds = get_numpy().percentile(measurements, 99)
                 result.std_dev_seconds = statistics.stdev(measurements) if len(measurements) > 1 else 0.0
                 
                 # Calculate resource utilization
                 if resource_usage:
-                    result.avg_cpu_percent = np.mean([r["cpu"] for r in resource_usage])
-                    result.avg_memory_mb = np.mean([r["memory"] for r in resource_usage])
+                    result.avg_cpu_percent = get_numpy().mean([r["cpu"] for r in resource_usage])
+                    result.avg_memory_mb = get_numpy().mean([r["memory"] for r in resource_usage])
                     result.peak_memory_mb = max([r["memory"] for r in resource_usage])
             
             # Calculate improvement metrics
@@ -646,13 +647,13 @@ class PerformanceValidator:
         """Generate mock training data of specified size."""
         
         if size == "small":
-            return np.random.randn(100, 10)
+            return get_numpy().random.randn(100, 10)
         elif size == "medium":
-            return np.random.randn(1000, 50)
+            return get_numpy().random.randn(1000, 50)
         elif size == "large":
-            return np.random.randn(10000, 100)
+            return get_numpy().random.randn(10000, 100)
         else:
-            return np.random.randn(1000, 50)
+            return get_numpy().random.randn(1000, 50)
     
     def _get_cpu_usage(self) -> float:
         """Get current CPU usage percentage."""
@@ -721,7 +722,7 @@ class PerformanceValidator:
         ]
         
         if deployment_results:
-            avg_improvement = np.mean([r.improvement_percent for r in deployment_results])
+            avg_improvement = get_numpy().mean([r.improvement_percent for r in deployment_results])
             meets_target = all(r.meets_target for r in deployment_results)
             
             report.deployment_speed_validation = {
@@ -739,7 +740,7 @@ class PerformanceValidator:
         ]
         
         if throughput_results:
-            avg_throughput_factor = np.mean([r.throughput_factor for r in throughput_results])
+            avg_throughput_factor = get_numpy().mean([r.throughput_factor for r in throughput_results])
             meets_target = all(r.meets_target for r in throughput_results)
             
             report.experiment_throughput_validation = {
@@ -756,7 +757,7 @@ class PerformanceValidator:
             "experiment_throughput_achieved": report.experiment_throughput_validation.get("meets_target", False),
             "average_success_rate": report.overall_success_rate,
             "total_execution_time_minutes": sum([r.duration_seconds for r in report.benchmark_results]) / 60,
-            "resource_efficiency_score": np.mean([r.avg_cpu_percent + r.avg_memory_mb/100 for r in report.benchmark_results if r.avg_cpu_percent > 0])
+            "resource_efficiency_score": get_numpy().mean([r.avg_cpu_percent + r.avg_memory_mb/100 for r in report.benchmark_results if r.avg_cpu_percent > 0])
         }
         
         # Generate recommendations

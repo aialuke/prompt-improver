@@ -99,9 +99,7 @@ class SecurityContext:
             return False
         if self.max_operations and self.operations_count >= self.max_operations:
             return False
-        if not self.authenticated:
-            return False
-        return True
+        return self.authenticated
 
     def touch(self) -> None:
         """Update last used timestamp and increment operation count."""
@@ -291,7 +289,7 @@ async def create_security_context_from_auth_result(
         permissions_final = auth_result.audit_metadata.get("permissions", [])
         session_id_final = auth_result.session_id
         security_level_final = "basic"
-        if auth_result.rate_limit_tier in ["professional", "enterprise"]:
+        if auth_result.rate_limit_tier in {"professional", "enterprise"}:
             security_level_final = "enhanced"
         if auth_method_final == "api_key":
             security_level_final = (
@@ -462,7 +460,7 @@ async def create_security_context_from_security_manager(
             last_used=current_time,
         )
     except Exception as e:
-        logger.error(f"Failed to create security context from security manager: {e}")
+        logger.exception(f"Failed to create security context from security manager: {e}")
         return await create_security_context(
             agent_id=agent_id,
             tier="basic",

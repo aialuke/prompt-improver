@@ -4,13 +4,11 @@ Concrete interface classes that combine protocol definitions with
 implementation requirements for clean dependency injection.
 """
 
-from abc import ABC
 from typing import Protocol
 
 from prompt_improver.repositories.protocols import (
     AnalyticsRepositoryProtocol,
     AprioriRepositoryProtocol,
-    BaseRepositoryProtocol,
     HealthRepositoryProtocol,
     MLRepositoryProtocol,
     MonitoringRepositoryProtocol,

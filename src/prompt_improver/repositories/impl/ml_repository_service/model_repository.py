@@ -5,10 +5,9 @@ following repository pattern with protocol-based dependency injection.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, desc, select, update
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import MLModelPerformance
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 class ModelRepository(BaseRepository[MLModelPerformance]):
     """Repository for model performance and versioning management."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=MLModelPerformance,
             connection_manager=connection_manager,
@@ -48,7 +47,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 logger.info(f"Created model performance record {performance.id}")
                 return performance
             except Exception as e:
-                logger.error(f"Error creating model performance: {e}")
+                logger.exception(f"Error creating model performance: {e}")
                 raise
 
     async def get_model_performances(
@@ -113,7 +112,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting model performances: {e}")
+                logger.exception(f"Error getting model performances: {e}")
                 raise
 
     async def get_model_performance_by_id(
@@ -131,7 +130,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 result = await session.execute(query)
                 return list(result.scalars().all())
             except Exception as e:
-                logger.error(f"Error getting model performance by ID: {e}")
+                logger.exception(f"Error getting model performance by ID: {e}")
                 raise
 
     async def get_best_performing_models(
@@ -160,7 +159,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting best performing models: {e}")
+                logger.exception(f"Error getting best performing models: {e}")
                 raise
 
     async def get_latest_model_version(
@@ -179,7 +178,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting latest model version: {e}")
+                logger.exception(f"Error getting latest model version: {e}")
                 raise
 
     async def get_model_versions(
@@ -219,7 +218,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return versions
 
             except Exception as e:
-                logger.error(f"Error getting model versions: {e}")
+                logger.exception(f"Error getting model versions: {e}")
                 raise
 
     async def compare_model_performance(
@@ -284,7 +283,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return comparison
 
             except Exception as e:
-                logger.error(f"Error comparing model performance: {e}")
+                logger.exception(f"Error comparing model performance: {e}")
                 raise
 
     async def update_model_metrics(
@@ -321,7 +320,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return True
 
             except Exception as e:
-                logger.error(f"Error updating model metrics: {e}")
+                logger.exception(f"Error updating model metrics: {e}")
                 return False
 
     async def get_model_deployment_status(
@@ -362,7 +361,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 }
 
             except Exception as e:
-                logger.error(f"Error getting model deployment status: {e}")
+                logger.exception(f"Error getting model deployment status: {e}")
                 return {"status": "error", "error": str(e)}
 
     async def get_model_version_history(
@@ -390,7 +389,7 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
             ]
 
         except Exception as e:
-            logger.error(f"Error getting model version history: {e}")
+            logger.exception(f"Error getting model version history: {e}")
             raise
 
     async def archive_old_models(
@@ -431,5 +430,5 @@ class ModelRepository(BaseRepository[MLModelPerformance]):
                 return archived_count
 
             except Exception as e:
-                logger.error(f"Error archiving old models: {e}")
+                logger.exception(f"Error archiving old models: {e}")
                 raise

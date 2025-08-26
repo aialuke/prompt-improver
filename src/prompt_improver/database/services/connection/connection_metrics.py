@@ -8,10 +8,9 @@ Consolidates metrics from:
 This is the single source of truth for all connection-related metrics.
 """
 
-import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 
@@ -92,7 +91,6 @@ class ConnectionMetrics:
     # Cache metrics integration
     cache_l1_hits: int = 0
     cache_l2_hits: int = 0
-    cache_l3_hits: int = 0
     cache_total_requests: int = 0
     cache_hit_rate: float = 0.0
     cache_l1_size: int = 0
@@ -177,10 +175,7 @@ class ConnectionMetrics:
             return False
         if self.redis_blocked_clients > self.redis_connected_clients * 0.5:
             return False
-        if self.redis_rejected_connections > 0:
-            return False
-
-        return True
+        return not self.redis_rejected_connections > 0
 
     def get_efficiency_metrics(self) -> dict[str, float]:
         """Get connection efficiency and optimization metrics."""
@@ -216,7 +211,6 @@ class ConnectionMetrics:
         self.health_check_failures = 0
         self.cache_l1_hits = 0
         self.cache_l2_hits = 0
-        self.cache_l3_hits = 0
         self.cache_total_requests = 0
 
     def to_dict(self) -> dict[str, Any]:

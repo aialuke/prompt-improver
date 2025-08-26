@@ -1,4 +1,4 @@
-"""Core Setup Components
+"""Core Setup Components.
 
 System initialization, migration, and setup utilities.
 """

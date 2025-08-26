@@ -1,4 +1,4 @@
-"""API Services Facade - Reduces FastAPI App Module Coupling
+"""API Services Facade - Reduces FastAPI App Module Coupling.
 
 This facade provides unified API service coordination while reducing direct
 imports from 12 to 4 internal dependencies through lazy initialization.
@@ -6,13 +6,13 @@ imports from 12 to 4 internal dependencies through lazy initialization.
 Design:
 - Protocol-based interface for loose coupling
 - Lazy loading of API service integrations
-- Service lifecycle coordination  
+- Service lifecycle coordination
 - Health check and monitoring integration
 - Zero circular import dependencies
 """
 
 import logging
-from typing import Any, Dict, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -20,35 +20,35 @@ logger = logging.getLogger(__name__)
 @runtime_checkable
 class APIFacadeProtocol(Protocol):
     """Protocol for API services facade."""
-    
+
     def get_config(self) -> Any:
         """Get application configuration."""
         ...
-    
+
     async def get_container(self) -> Any:
         """Get dependency injection container."""
         ...
-    
+
     async def get_database_services(self) -> Any:
         """Get database services manager."""
         ...
-    
+
     async def get_monitoring_facade(self) -> Any:
         """Get unified monitoring facade."""
         ...
-    
+
     async def get_security_orchestrator(self) -> Any:
         """Get security orchestrator."""
         ...
-    
+
     def setup_telemetry(self, app: Any, service_name: str) -> None:
         """Setup OpenTelemetry instrumentation."""
         ...
-    
+
     async def initialize_all_services(self) -> None:
         """Initialize all API services."""
         ...
-    
+
     async def shutdown_all_services(self) -> None:
         """Shutdown all API services."""
         ...
@@ -56,12 +56,12 @@ class APIFacadeProtocol(Protocol):
 
 class APIFacade(APIFacadeProtocol):
     """API services facade with minimal coupling.
-    
+
     Reduces FastAPI app module coupling from 12 internal imports to 4.
     Provides unified interface for all API service coordination.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize facade with lazy loading."""
         self._config = None
         self._container = None
@@ -72,37 +72,43 @@ class APIFacade(APIFacadeProtocol):
         self._services_initialized = False
         logger.debug("APIFacade initialized with lazy loading")
 
-    def _ensure_config(self):
+    def _ensure_config(self) -> None:
         """Ensure configuration is loaded."""
         if self._config is None:
             # Only import when needed to reduce coupling
             from prompt_improver.core.config import get_config
             self._config = get_config()
 
-    async def _ensure_container(self):
+    async def _ensure_container(self) -> None:
         """Ensure DI container is available."""
         if self._container is None:
+            from prompt_improver.core.di.clean_container import (
+                initialize_clean_container,
+            )
             from prompt_improver.core.di.container_orchestrator import get_container
-            from prompt_improver.core.di.clean_container import initialize_clean_container
             await initialize_clean_container()
             self._container = await get_container()
 
-    async def _ensure_database_services(self):
+    async def _ensure_database_services(self) -> None:
         """Ensure database services are available."""
         if self._database_services is None:
             from prompt_improver.database import get_database_services
             self._database_services = await get_database_services()
 
-    async def _ensure_monitoring_facade(self):
+    async def _ensure_monitoring_facade(self) -> None:
         """Ensure monitoring facade is available."""
         if self._monitoring_facade is None:
-            from prompt_improver.monitoring.unified.facade import UnifiedMonitoringFacade
+            from prompt_improver.monitoring.unified.facade import (
+                UnifiedMonitoringFacade,
+            )
             self._monitoring_facade = UnifiedMonitoringFacade()
 
-    async def _ensure_security_orchestrator(self):
+    async def _ensure_security_orchestrator(self) -> None:
         """Ensure security orchestrator is available."""
         if self._security_orchestrator is None:
-            from prompt_improver.security.unified_security_orchestrator import get_security_orchestrator
+            from prompt_improver.security.unified_security_orchestrator import (
+                get_security_orchestrator,
+            )
             self._security_orchestrator = get_security_orchestrator()
 
     def get_config(self) -> Any:
@@ -133,7 +139,9 @@ class APIFacade(APIFacadeProtocol):
     async def get_health_monitor(self) -> Any:
         """Get unified health monitor."""
         if self._health_monitor is None:
-            from prompt_improver.performance.monitoring.health.unified_health_system import get_unified_health_monitor
+            from prompt_improver.performance.monitoring.health.unified_health_system import (
+                get_unified_health_monitor,
+            )
             self._health_monitor = get_unified_health_monitor()
         return self._health_monitor
 
@@ -141,12 +149,21 @@ class APIFacade(APIFacadeProtocol):
         """Setup OpenTelemetry instrumentation."""
         config = self.get_config()
         if config.monitoring.enable_tracing:
-            from prompt_improver.monitoring.opentelemetry.integration import setup_fastapi_telemetry
+            from prompt_improver.monitoring.opentelemetry.integration import (
+                setup_fastapi_telemetry,
+            )
             setup_fastapi_telemetry(app, service_name)
             logger.info(f"OpenTelemetry instrumentation enabled for {service_name}")
 
     def setup_error_handlers(self, app: Any) -> None:
         """Setup error handlers for the FastAPI app."""
+        from prompt_improver.core.exceptions import (
+            AuthenticationError,
+            AuthorizationError,
+            PromptImproverError,
+            RateLimitError,
+            ValidationError,
+        )
         from prompt_improver.services.error_handling.facade import (
             authentication_exception_handler,
             authorization_exception_handler,
@@ -155,17 +172,10 @@ class APIFacade(APIFacadeProtocol):
             rate_limit_exception_handler,
             validation_exception_handler,
         )
-        from prompt_improver.core.exceptions import (
-            AuthenticationError,
-            AuthorizationError,
-            PromptImproverError,
-            RateLimitError,
-            ValidationError,
-        )
-        
+
         # Add correlation middleware
-        app.add_middleware(lambda request, call_next: create_correlation_middleware()(request, call_next))
-        
+        app.add_middleware(create_correlation_middleware())
+
         # Add exception handlers
         app.add_exception_handler(ValidationError, validation_exception_handler)
         app.add_exception_handler(AuthenticationError, authentication_exception_handler)
@@ -186,10 +196,10 @@ class APIFacade(APIFacadeProtocol):
             )
 
     def setup_routers(self, app: Any) -> None:
-        """Setup API routers.""" 
+        """Setup API routers."""
         from prompt_improver.api import api_router
         from prompt_improver.api.health import health_router
-        
+
         app.include_router(health_router)  # Health checks at /health/*
         app.include_router(api_router)  # API endpoints at /api/v1/*
 
@@ -256,7 +266,7 @@ class APIFacade(APIFacadeProtocol):
                 logger.info("✓ DI container cleaned up")
 
         except Exception as e:
-            logger.error(f"Error during API services shutdown: {e}")
+            logger.exception(f"Error during API services shutdown: {e}")
 
         # Clear references
         self._container = None
@@ -286,7 +296,7 @@ class APIFacade(APIFacadeProtocol):
             "api_facade_status": "healthy",
             "services": {},
         }
-        
+
         try:
             if self._container:
                 container_health = await self._container.health_check_all()
@@ -317,7 +327,7 @@ _api_facade: APIFacade | None = None
 
 def get_api_facade() -> APIFacade:
     """Get global API facade instance.
-    
+
     Returns:
         APIFacade with lazy initialization and minimal coupling
     """
@@ -342,8 +352,8 @@ async def shutdown_api_facade() -> None:
 
 
 __all__ = [
-    "APIFacadeProtocol",
     "APIFacade",
+    "APIFacadeProtocol",
     "get_api_facade",
     "initialize_api_facade",
     "shutdown_api_facade",

@@ -1,5 +1,5 @@
 """Database package for APES (Adaptive Prompt Enhancement System)
-Modern SQLModel + SQLAlchemy 2.0 async implementation following 2025 best practices
+Modern SQLModel + SQLAlchemy 2.0 async implementation following 2025 best practices.
 
 Service Composition Architecture (New):
 Uses clean service composition with DatabaseServices replacing the monolithic
@@ -12,9 +12,6 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Removed core.protocols import that triggered massive DI chain
-# Database layer now uses its own protocol definitions
-from prompt_improver.database.protocols.database_config import DatabaseConfigProtocol
 from prompt_improver.database.composition import (
     DatabaseServices,
     create_database_services,
@@ -26,6 +23,7 @@ from prompt_improver.database.factories import (
     create_security_context,
     create_security_context_from_auth_result,
 )
+
 # Security integration imports removed to avoid circular imports
 # Import directly from security_integration module if needed
 from prompt_improver.database.models import (
@@ -39,7 +37,6 @@ from prompt_improver.database.models import (
 )
 from prompt_improver.database.types import (
     ConnectionMode,
-    HealthStatus,
     ManagerMode,
     PoolConfiguration,
     PoolState,
@@ -49,6 +46,10 @@ from prompt_improver.database.types import (
     SecurityValidationResult,
 )
 from prompt_improver.database.utils import scalar
+
+# Removed core.protocols import that triggered massive DI chain
+# Database layer now uses its own protocol definitions
+from prompt_improver.shared.interfaces.protocols.database import DatabaseConfigProtocol
 
 _global_services = None
 _global_config = None

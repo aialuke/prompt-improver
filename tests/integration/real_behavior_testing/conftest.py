@@ -7,24 +7,23 @@ All fixtures use real containers and services - no mocks or stubs.
 import asyncio
 import logging
 import os
-import pytest
 import uuid
-from typing import AsyncGenerator, Dict, Any
+from collections.abc import AsyncGenerator
+from typing import Any
+
+import pytest
 
 # Performance optimization - disable telemetry in tests
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 from tests.containers.postgres_container import PostgreSQLTestContainer
-from .containers.real_redis_container import RealRedisTestContainer
-from .containers.ml_test_container import MLTestContainer
-from .containers.network_simulator import NetworkSimulator
-from .performance.benchmark_suite import BenchmarkSuite
+from tests.integration.real_behavior_testing.containers.ml_test_container import MLTestContainer
+from tests.integration.real_behavior_testing.containers.network_simulator import NetworkSimulator
+from tests.integration.real_behavior_testing.containers.real_redis_container import RealRedisTestContainer
+from tests.integration.real_behavior_testing.performance.benchmark_suite import BenchmarkSuite
 
 logger = logging.getLogger(__name__)
-
-# Pytest configuration
-pytest_plugins = ["pytest_asyncio"]
 
 
 @pytest.fixture(scope="session")
@@ -43,20 +42,20 @@ async def postgres_container() -> AsyncGenerator[PostgreSQLTestContainer, None]:
         postgres_version="16",
         database_name=f"test_db_{uuid.uuid4().hex[:8]}",
     )
-    
+
     async with container:
         logger.info(f"PostgreSQL container started: {container.database_name}")
         yield container
 
 
-@pytest.fixture(scope="session") 
+@pytest.fixture(scope="session")
 async def redis_container() -> AsyncGenerator[RealRedisTestContainer, None]:
     """Session-scoped Redis testcontainer for cache testing."""
     container = RealRedisTestContainer(
         redis_version="7.2",
         port=None,  # Auto-assign port
     )
-    
+
     async with container:
         logger.info(f"Redis container started on port {container.get_port()}")
         yield container
@@ -69,7 +68,7 @@ async def ml_container() -> AsyncGenerator[MLTestContainer, None]:
         models_path="/tmp/test_models",
         enable_gpu=False,  # CPU-only for CI/CD compatibility
     )
-    
+
     async with container:
         logger.info("ML container started with test models")
         yield container
@@ -80,7 +79,7 @@ async def network_simulator() -> AsyncGenerator[NetworkSimulator, None]:
     """Function-scoped network failure simulator for retry testing."""
     simulator = NetworkSimulator()
     await simulator.start()
-    
+
     try:
         yield simulator
     finally:
@@ -93,11 +92,10 @@ async def benchmark_suite(
     redis_container: RealRedisTestContainer,
 ) -> BenchmarkSuite:
     """Performance benchmarking suite with real services."""
-    suite = BenchmarkSuite(
+    return BenchmarkSuite(
         postgres_container=postgres_container,
         redis_container=redis_container,
     )
-    return suite
 
 
 @pytest.fixture(scope="function")
@@ -120,29 +118,29 @@ async def clean_redis(redis_container: RealRedisTestContainer):
 def performance_tracker():
     """Track performance metrics during test execution."""
     metrics = {}
-    
-    def track(operation: str, duration_ms: float, target_ms: float = None):
+
+    def track(operation: str, duration_ms: float, target_ms: float | None = None):
         """Track operation performance."""
         metrics[operation] = {
             "duration_ms": duration_ms,
             "target_ms": target_ms,
             "passed": duration_ms < target_ms if target_ms else True,
         }
-        
+
         if target_ms and duration_ms >= target_ms:
             logger.warning(
                 f"Performance target missed: {operation} took {duration_ms:.2f}ms "
                 f"(target: {target_ms}ms)"
             )
-    
+
     return track
 
 
 @pytest.fixture(scope="function")
 async def error_injector():
     """Error injection utility for testing error handling services."""
-    from .utils.error_injection import ErrorInjector
-    
+    from tests.integration.real_behavior_testing.utils.error_injection import ErrorInjector
+
     injector = ErrorInjector()
     yield injector
     await injector.cleanup()
@@ -151,8 +149,8 @@ async def error_injector():
 @pytest.fixture(scope="function")
 def test_data_factory():
     """Factory for generating realistic test data scenarios."""
-    from .utils.test_data_factory import TestDataFactory
-    
+    from tests.integration.real_behavior_testing.utils.test_data_factory import TestDataFactory
+
     return TestDataFactory()
 
 
@@ -164,7 +162,7 @@ async def integrated_services(
     redis_container: RealRedisTestContainer,
     clean_database,
     clean_redis,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Integrated services setup for comprehensive testing."""
     return {
         "postgres": postgres_container,
@@ -176,17 +174,17 @@ async def integrated_services(
 
 @pytest.fixture(scope="function")
 async def ml_intelligence_setup(
-    integrated_services: Dict[str, Any],
+    integrated_services: dict[str, Any],
     ml_container: MLTestContainer,
     test_data_factory,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Setup for ML Intelligence Services testing."""
     # Create test data
     test_data = await test_data_factory.create_ml_test_dataset(
         size="small",  # 100 samples for fast tests
         domains=["general", "technical", "creative"],
     )
-    
+
     return {
         **integrated_services,
         "ml_container": ml_container,
@@ -194,18 +192,18 @@ async def ml_intelligence_setup(
     }
 
 
-@pytest.fixture(scope="function")  
+@pytest.fixture(scope="function")
 async def retry_testing_setup(
     network_simulator: NetworkSimulator,
     performance_tracker,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Setup for retry management services testing."""
     return {
         "network_simulator": network_simulator,
         "performance_tracker": performance_tracker,
         "failure_scenarios": [
             "connection_timeout",
-            "connection_refused", 
+            "connection_refused",
             "dns_resolution_failure",
             "intermittent_network_errors",
         ],
@@ -216,8 +214,8 @@ async def retry_testing_setup(
 async def error_handling_setup(
     error_injector,
     performance_tracker,
-    integrated_services: Dict[str, Any],
-) -> Dict[str, Any]:
+    integrated_services: dict[str, Any],
+) -> dict[str, Any]:
     """Setup for error handling services testing."""
     return {
         **integrated_services,

@@ -5,8 +5,6 @@ Tests real behavior without mocks to ensure successful integration.
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict
 
 import pytest
 
@@ -89,7 +87,7 @@ class TestPromptDataProtectionIntegration:
         for i, test_case in enumerate(test_cases):
             session_id = f"test_session_{i}_{uuid.uuid4()}"
             (
-                sanitized,
+                _sanitized,
                 summary,
             ) = await prompt_data_protection.sanitize_prompt_before_storage(
                 test_case["prompt"], session_id, user_consent=True
@@ -180,7 +178,7 @@ class TestPromptDataProtectionIntegration:
         session_id = f"gdpr_test_{uuid.uuid4()}"
         test_prompt = "Email: gdpr.test@example.com"
         (
-            sanitized_with_consent,
+            _sanitized_with_consent,
             summary_with_consent,
         ) = await prompt_data_protection.sanitize_prompt_before_storage(
             test_prompt, session_id, user_consent=True
@@ -188,7 +186,7 @@ class TestPromptDataProtectionIntegration:
         assert summary_with_consent["gdpr_compliant"] is True
         assert summary_with_consent["redactions_made"] == 1
         (
-            sanitized_without_consent,
+            _sanitized_without_consent,
             summary_without_consent,
         ) = await prompt_data_protection.sanitize_prompt_before_storage(
             test_prompt, f"{session_id}_no_consent", user_consent=False
@@ -231,7 +229,7 @@ class TestPromptDataProtectionIntegration:
         session_id = f"e2e_test_{uuid.uuid4()}"
         component_instance = loaded_component.instance
         assert component_instance is not None
-        sanitized, summary = await component_instance.sanitize_prompt_before_storage(
+        _sanitized, summary = await component_instance.sanitize_prompt_before_storage(
             test_prompt, session_id, user_consent=True
         )
         assert summary["redactions_made"] == 1

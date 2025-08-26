@@ -25,11 +25,13 @@ from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from ....core.utils.lazy_ml_loader import get_numpy
 
 from .context_feature_extractor import ContextFeatureExtractor
 from .domain_feature_extractor import DomainFeatureExtractor
 from .linguistic_feature_extractor import LinguisticFeatureExtractor
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +258,7 @@ class CompositeFeatureExtractor:
             
             # Create result
             result = {
-                'features': np.array(all_features),
+                'features': get_numpy().array(all_features),
                 'feature_names': all_feature_names,
                 'extractor_results': extractor_results,
                 'metadata': {
@@ -320,7 +322,7 @@ class CompositeFeatureExtractor:
             feature_names.extend([f"context_feature_{i}" for i in range(20)])
         
         return {
-            'features': np.array([0.5] * feature_count),
+            'features': get_numpy().array([0.5] * feature_count),
             'feature_names': feature_names,
             'extractor_results': {},
             'metadata': {
@@ -628,7 +630,7 @@ class CompositeFeatureExtractor:
 
     def _normalize_features(self, features: Any) -> list[float]:
         """Normalize features to list of floats."""
-        if isinstance(features, np.ndarray):
+        if isinstance(features, get_numpy().ndarray):
             return features.tolist()
         elif isinstance(features, list):
             return features
@@ -642,7 +644,7 @@ class CompositeFeatureExtractor:
                       context_data: dict[str, Any] | None) -> dict[str, Any]:
         """Create standardized result dictionary."""
         return {
-            'features': np.array(all_features),
+            'features': get_numpy().array(all_features),
             'feature_names': all_feature_names,
             'extractor_results': extractor_results,
             'metadata': {
@@ -691,12 +693,12 @@ class CompositeFeatureExtractor:
                 if output_path:
                     import json
                     import os
-
+                    
                     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
                     # Convert numpy arrays to lists for JSON serialization
                     serializable_result = {
-                        'features': result['features'].tolist() if isinstance(result['features'], np.ndarray) else result['features'],
+                        'features': result['features'].tolist() if isinstance(result['features'], get_numpy().ndarray) else result['features'],
                         'feature_names': result['feature_names'],
                         'metadata': result['metadata']
                     }

@@ -9,9 +9,8 @@ Migrated from mock-based testing to real behavior testing following 2025 best pr
 """
 
 import asyncio
-import logging
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -182,9 +181,7 @@ class TestBatchProcessing:
             batch_size=20, concurrency=4, dry_run=True, metrics_enabled=True
         )
         processor = BatchProcessor(config)
-        large_batch = []
-        for i in range(500):
-            large_batch.append({
+        large_batch = [{
                 "id": i,
                 "original": f"Complex prompt {i} with detailed context and multiple parameters",
                 "enhanced": f"Enhanced complex prompt {i} with improved clarity and structure",
@@ -195,7 +192,7 @@ class TestBatchProcessing:
                 },
                 "session_id": f"perf_session_{i % 20}",
                 "priority": i % 5,
-            })
+            } for i in range(500)]
         start_time = time.time()
         results = await processor.process_training_batch(large_batch)
         processing_time = (time.time() - start_time) * 1000

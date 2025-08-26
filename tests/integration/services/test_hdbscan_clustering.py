@@ -9,8 +9,7 @@ Migration from mock-based testing to real behavior testing based on research:
 - Validate clustering performance with production-like scenarios
 """
 
-import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import patch
 
 import numpy as np
@@ -26,8 +25,6 @@ from hypothesis.stateful import Bundle, RuleBasedStateMachine, invariant, rule
 from prompt_improver.database.models import PromptSession, RuleMetadata, RulePerformance
 from prompt_improver.services.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
-    FrequentPattern,
-    PatternCluster,
 )
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -38,11 +35,10 @@ class TestHDBSCANClusteringEnhancements:
     @pytest.fixture
     async def discovery_service(self, real_db_session):
         """Create AdvancedPatternDiscovery service with real database connection."""
-        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
-        
+        from prompt_improver.database import ManagerMode, create_database_services
+
         services = await create_database_services(ManagerMode.ASYNC_MODERN)
-        service = AdvancedPatternDiscovery(session_manager=services)
-        return service
+        return AdvancedPatternDiscovery(session_manager=services)
 
     @pytest.fixture
     async def real_performance_data(self, real_db_session):
@@ -76,10 +72,7 @@ class TestHDBSCANClusteringEnhancements:
                 updated_at=aware_utc_now(),
             ),
         ]
-        prompt_sessions = []
-        for i in range(60):
-            prompt_sessions.append(
-                PromptSession(
+        prompt_sessions = [PromptSession(
                     session_id=f"session_{i}",
                     original_prompt=f"Original prompt {i}",
                     improved_prompt=f"Improved prompt {i}",
@@ -89,8 +82,7 @@ class TestHDBSCANClusteringEnhancements:
                     confidence_level=0.9,
                     created_at=aware_utc_now() - timedelta(days=30, hours=i),
                     updated_at=aware_utc_now() - timedelta(days=30, hours=i),
-                )
-            )
+                ) for i in range(60)]
         performance_data = []
         base_time = aware_utc_now() - timedelta(days=30)
         for i in range(60):
@@ -269,11 +261,8 @@ class TestHDBSCANClusteringEnhancements:
         self, discovery_service, real_db_session, real_performance_data
     ):
         """Test HDBSCAN's outlier detection capabilities with real data containing outliers."""
-        outlier_data = []
         base_time = aware_utc_now() - timedelta(days=1)
-        for i in range(5):
-            outlier_data.append(
-                RulePerformance(
+        outlier_data = [RulePerformance(
                     rule_id=f"outlier_rule_{i}",
                     session_id=f"outlier_session_{i}",
                     effectiveness_score=0.98 + np.random.normal(0, 0.01),
@@ -282,8 +271,7 @@ class TestHDBSCANClusteringEnhancements:
                     context_relevance=0.99 + np.random.normal(0, 0.005),
                     created_at=base_time + timedelta(minutes=i),
                     updated_at=base_time + timedelta(minutes=i),
-                )
-            )
+                ) for i in range(5)]
         for performance in outlier_data:
             real_db_session.add(performance)
         await real_db_session.commit()
@@ -309,9 +297,10 @@ class HDBSCANStateMachine(RuleBasedStateMachine):
 
     def __init__(self):
         super().__init__()
-        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
         import asyncio
-        
+
+        from prompt_improver.database import ManagerMode, create_database_services
+
         # Create services in sync context
         loop = asyncio.get_event_loop()
         services = loop.run_until_complete(create_database_services(ManagerMode.ASYNC_MODERN))
@@ -362,8 +351,8 @@ class TestHDBSCANEdgeCases:
     @pytest.fixture
     async def minimal_discovery_service(self, real_db_session):
         """Create discovery service for minimal data testing."""
-        from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
-        
+        from prompt_improver.database import ManagerMode, create_database_services
+
         services = await create_database_services(ManagerMode.ASYNC_MODERN)
         return AdvancedPatternDiscovery(session_manager=services)
 
@@ -410,10 +399,7 @@ class TestHDBSCANEdgeCases:
         self, minimal_discovery_service, real_db_session
     ):
         """Test fallback behavior when HDBSCAN is not available using real data."""
-        fallback_data = []
-        for i in range(15):
-            fallback_data.append(
-                RulePerformance(
+        fallback_data = [RulePerformance(
                     rule_id=f"fallback_rule_{i}",
                     session_id=f"fallback_session_{i}",
                     effectiveness_score=0.8 + np.random.normal(0, 0.1),
@@ -422,8 +408,7 @@ class TestHDBSCANEdgeCases:
                     context_relevance=0.8 + np.random.uniform(-0.1, 0.1),
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(15)]
         for performance in fallback_data:
             real_db_session.add(performance)
         await real_db_session.commit()

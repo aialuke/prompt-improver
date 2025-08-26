@@ -240,7 +240,7 @@ class TestMCPFlow:
             assert "result" in ready_response
             ready_content = ready_response["result"]["contents"][0]["text"]
             ready_data = json.loads(ready_content)
-            assert ready_data["status"] in ["ready", "not ready"]
+            assert ready_data["status"] in {"ready", "not ready"}
             assert "db_connectivity" in ready_data
             assert "event_loop_latency_ms" in ready_data
             assert "timestamp" in ready_data

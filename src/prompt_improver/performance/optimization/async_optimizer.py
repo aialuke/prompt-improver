@@ -1,4 +1,4 @@
-"""Enhanced Async Optimization with 2025 Best Practices
+"""Enhanced Async Optimization with 2025 Best Practices.
 
 Advanced async optimizer implementing 2025 best practices:
 - Unified connection management with health monitoring
@@ -11,26 +11,27 @@ Advanced async optimizer implementing 2025 best practices:
 """
 
 import asyncio
-import json
 import logging
-import ssl
 import time
 import uuid
-from collections import defaultdict
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
-import aiohttp
 from opentelemetry import trace
 
 from prompt_improver.database.types import PoolConfiguration
 from prompt_improver.performance.optimization.performance_optimizer import (
     measure_mcp_operation,
 )
+
+if TYPE_CHECKING:
+    from prompt_improver.database.factories import (
+                SecurityContext,
+            )
 
 tracer = trace.get_tracer(__name__)
 try:
@@ -69,7 +70,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceOptimizationMode(Enum):
-    """Resource optimization modes"""
+    """Resource optimization modes."""
 
     MEMORY_OPTIMIZED = "memory_optimized"
     CPU_OPTIMIZED = "cpu_optimized"
@@ -79,7 +80,7 @@ class ResourceOptimizationMode(Enum):
 
 @dataclass
 class ResourceMetrics:
-    """Resource utilization metrics"""
+    """Resource utilization metrics."""
 
     cpu_percent: float
     memory_percent: float
@@ -162,7 +163,7 @@ else:
 class AsyncBatchProcessor:
     """Batches async operations for improved throughput."""
 
-    def __init__(self, config: AsyncOperationConfig):
+    def __init__(self, config: AsyncOperationConfig) -> None:
         self.config = config
         self._pending_operations: list[tuple[Callable, tuple, dict]] = []
         self._batch_lock = asyncio.Lock()
@@ -184,7 +185,7 @@ class AsyncBatchProcessor:
                 )
             return await future
 
-    async def _process_batch(self):
+    async def _process_batch(self) -> None:
         """Process a batch of operations concurrently."""
         if self._processing:
             return
@@ -199,7 +200,7 @@ class AsyncBatchProcessor:
                 ]
             semaphore = asyncio.Semaphore(self.config.max_concurrent_operations)
 
-            async def process_operation(operation, args, kwargs, future):
+            async def process_operation(operation, args, kwargs, future) -> None:
                 async with semaphore:
                     try:
                         result = await operation(*args, **kwargs)
@@ -244,7 +245,7 @@ class AsyncBatchProcessor:
 class AsyncTaskScheduler:
     """Optimized task scheduler for high-performance async operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._task_queue: asyncio.Queue = asyncio.Queue()
         self._worker_task_ids: list[str] = []
         self._running = False
@@ -307,13 +308,13 @@ class AsyncTaskScheduler:
         await self._task_queue.put(task_item)
         return future
 
-    async def _worker(self, worker_name: str):
+    async def _worker(self, worker_name: str) -> None:
         """Worker coroutine for processing tasks."""
         logger.debug(f"Started async worker: {worker_name}")
         while self._running:
             try:
                 task_item = await asyncio.wait_for(self._task_queue.get(), timeout=1.0)
-                priority, scheduled_time, operation, args, kwargs, future = task_item
+                _priority, _scheduled_time, operation, args, kwargs, future = task_item
                 try:
                     result = await operation(*args, **kwargs)
                     future.set_result(result)
@@ -324,25 +325,15 @@ class AsyncTaskScheduler:
             except TimeoutError:
                 continue
             except Exception as e:
-                logger.error(f"Worker {worker_name} error: {e}")
+                logger.exception(f"Worker {worker_name} error: {e}")
 
 
 class AsyncOptimizer:
     """Main async optimization coordinator."""
 
-    def __init__(self, config: AsyncOperationConfig | None = None):
+    def __init__(self, config: AsyncOperationConfig | None = None) -> None:
         self.config = config or AsyncOperationConfig()
         # Note: get_database_services now returns DatabaseServices (composition layer)
-        import asyncio
-
-        from prompt_improver.database import (
-            ManagerMode,
-            get_database_services,
-        )
-        from prompt_improver.database.factories import (
-            SecurityContext,
-            create_security_context,
-        )
 
         self.connection_manager = None  # Will be set in initialize()
         self.batch_processor = AsyncBatchProcessor(self.config)
@@ -601,7 +592,7 @@ class AsyncOptimizer:
             logger.warning(f"Failed to cache metrics for {metrics_key}: {e}")
             return False
 
-    async def invalidate_cache(self, pattern: str = None) -> int:
+    async def invalidate_cache(self, pattern: str | None = None) -> int:
         """Invalidate cached optimization data.
 
         Args:

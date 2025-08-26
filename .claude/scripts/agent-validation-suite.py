@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Agent Validation Suite - Comprehensive Agent Testing Framework
+"""Agent Validation Suite - Comprehensive Agent Testing Framework.
 
 This script validates all Claude Code agents with real project scenarios by:
 1. Testing each agent with representative tasks from the project
@@ -13,14 +13,12 @@ Usage: python agent-validation-suite.py [--agent AGENT] [--scenario SCENARIO] [-
 
 import asyncio
 import json
-import time
 import sys
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
-import subprocess
-import tempfile
+from typing import Any
 
 
 @dataclass
@@ -29,9 +27,9 @@ class ValidationScenario:
     name: str
     agent: str
     task_description: str
-    expected_tools: List[str]
-    expected_delegations: List[str]
-    success_criteria: List[str]
+    expected_tools: list[str]
+    expected_delegations: list[str]
+    success_criteria: list[str]
     complexity: str  # simple, medium, complex
     category: str    # database, ml, performance, security, infrastructure
 
@@ -43,24 +41,24 @@ class ValidationResult:
     agent: str
     success: bool
     duration_seconds: float
-    tools_used: List[str]
-    delegations_made: List[str]
-    boundary_violations: List[str]
+    tools_used: list[str]
+    delegations_made: list[str]
+    boundary_violations: list[str]
     quality_score: float  # 0-100
-    detailed_results: Dict[str, Any]
+    detailed_results: dict[str, Any]
     timestamp: datetime
 
 
 class AgentValidationSuite:
     """Comprehensive validation suite for Claude Code agents."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.results_file = Path(".claude/validation/results.jsonl")
         self.results_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Define validation scenarios
         self.scenarios = self._create_validation_scenarios()
-        
+
         # Agent role definitions for boundary validation
         self.agent_roles = {
             "database-specialist": {
@@ -90,10 +88,10 @@ class AgentValidationSuite:
             }
         }
 
-    def _create_validation_scenarios(self) -> List[ValidationScenario]:
+    def _create_validation_scenarios(self) -> list[ValidationScenario]:
         """Create comprehensive validation scenarios for all agents."""
         scenarios = []
-        
+
         # Database specialist scenarios
         scenarios.extend([
             ValidationScenario(
@@ -108,7 +106,7 @@ class AgentValidationSuite:
             ),
             ValidationScenario(
                 name="database_migration_design",
-                agent="database-specialist", 
+                agent="database-specialist",
                 task_description="Design database migration for new ML feature tracking",
                 expected_tools=["Read", "Write", "Bash"],
                 expected_delegations=[],
@@ -117,7 +115,7 @@ class AgentValidationSuite:
                 category="database"
             )
         ])
-        
+
         # ML orchestrator scenarios
         scenarios.extend([
             ValidationScenario(
@@ -141,7 +139,7 @@ class AgentValidationSuite:
                 category="ml"
             )
         ])
-        
+
         # Performance engineer scenarios
         scenarios.extend([
             ValidationScenario(
@@ -165,7 +163,7 @@ class AgentValidationSuite:
                 category="performance"
             )
         ])
-        
+
         # Security architect scenarios
         scenarios.extend([
             ValidationScenario(
@@ -189,7 +187,7 @@ class AgentValidationSuite:
                 category="security"
             )
         ])
-        
+
         # Infrastructure specialist scenarios
         scenarios.extend([
             ValidationScenario(
@@ -213,7 +211,7 @@ class AgentValidationSuite:
                 category="infrastructure"
             )
         ])
-        
+
         # Multi-agent collaboration scenarios
         scenarios.extend([
             ValidationScenario(
@@ -237,41 +235,41 @@ class AgentValidationSuite:
                 category="collaboration"
             )
         ])
-        
+
         return scenarios
 
     async def run_scenario(self, scenario: ValidationScenario, verbose: bool = False) -> ValidationResult:
         """Run a single validation scenario."""
         if verbose:
             print(f"🧪 Running scenario: {scenario.name} ({scenario.agent})")
-        
+
         start_time = time.time()
-        
+
         # Simulate agent invocation with task
         # In real implementation, this would invoke the actual agent
         result = await self._simulate_agent_task(scenario)
-        
+
         duration = time.time() - start_time
-        
+
         # Validate results
         validation_result = self._validate_scenario_result(scenario, result, duration)
-        
+
         if verbose:
             status = "✅ PASS" if validation_result.success else "❌ FAIL"
             print(f"   {status} Quality: {validation_result.quality_score:.1f}/100")
-        
+
         return validation_result
 
-    async def _simulate_agent_task(self, scenario: ValidationScenario) -> Dict[str, Any]:
+    async def _simulate_agent_task(self, scenario: ValidationScenario) -> dict[str, Any]:
         """Simulate agent task execution (placeholder for real agent invocation)."""
         # In a real implementation, this would:
         # 1. Invoke the specified agent with the task description
         # 2. Monitor tool usage and delegations
         # 3. Collect metrics and results
-        
+
         # For now, simulate realistic results based on scenario
         await asyncio.sleep(0.1)  # Simulate processing time
-        
+
         return {
             "tools_used": scenario.expected_tools[:2],  # Simulate partial tool usage
             "delegations_made": scenario.expected_delegations[:1] if scenario.expected_delegations else [],
@@ -281,17 +279,17 @@ class AgentValidationSuite:
             "errors": []
         }
 
-    def _validate_scenario_result(self, scenario: ValidationScenario, result: Dict[str, Any], duration: float) -> ValidationResult:
+    def _validate_scenario_result(self, scenario: ValidationScenario, result: dict[str, Any], duration: float) -> ValidationResult:
         """Validate scenario results against expectations."""
         success_score = 0
         max_score = 100
-        
+
         # Tool usage validation (25 points)
         tools_used = result.get("tools_used", [])
         expected_tools = scenario.expected_tools
         tool_score = len(set(tools_used) & set(expected_tools)) / len(expected_tools) * 25 if expected_tools else 25
         success_score += tool_score
-        
+
         # Delegation validation (25 points)
         delegations_made = result.get("delegations_made", [])
         expected_delegations = scenario.expected_delegations
@@ -300,25 +298,25 @@ class AgentValidationSuite:
         else:
             delegation_score = 25 if not delegations_made else 20  # Penalty for unexpected delegations
         success_score += delegation_score
-        
+
         # Boundary adherence (25 points)
         boundary_violations = result.get("boundary_violations", [])
         boundary_score = max(0, 25 - len(boundary_violations) * 5)
         success_score += boundary_score
-        
+
         # Task completion and quality (25 points)
         task_completed = result.get("task_completed", False)
         output_quality = result.get("output_quality", "poor")
         quality_map = {"excellent": 25, "good": 20, "fair": 15, "poor": 5}
         completion_score = quality_map.get(output_quality, 5) if task_completed else 0
         success_score += completion_score
-        
+
         # Performance penalty for slow execution
         if duration > 60:  # 1 minute threshold
             success_score -= min(20, (duration - 60) / 10)  # Penalty for slow execution
-        
+
         success_score = max(0, min(100, success_score))
-        
+
         return ValidationResult(
             scenario_name=scenario.name,
             agent=scenario.agent,
@@ -339,43 +337,43 @@ class AgentValidationSuite:
             timestamp=datetime.now()
         )
 
-    async def run_validation_suite(self, agent_filter: Optional[str] = None, verbose: bool = False) -> List[ValidationResult]:
+    async def run_validation_suite(self, agent_filter: str | None = None, verbose: bool = False) -> list[ValidationResult]:
         """Run the complete validation suite."""
         scenarios_to_run = self.scenarios
-        
+
         if agent_filter:
             scenarios_to_run = [s for s in scenarios_to_run if s.agent == agent_filter]
-        
+
         if verbose:
             print(f"🚀 Running {len(scenarios_to_run)} validation scenarios...")
-        
+
         results = []
         for scenario in scenarios_to_run:
             result = await self.run_scenario(scenario, verbose)
             results.append(result)
-            
+
             # Save result
             self._save_result(result)
-        
+
         return results
 
     def _save_result(self, result: ValidationResult) -> None:
         """Save validation result to file."""
         result_dict = asdict(result)
         result_dict['timestamp'] = result.timestamp.isoformat()
-        
-        with open(self.results_file, 'a') as f:
+
+        with open(self.results_file, 'a', encoding="utf-8") as f:
             f.write(json.dumps(result_dict) + '\n')
 
-    def generate_validation_report(self, results: List[ValidationResult]) -> Dict[str, Any]:
+    def generate_validation_report(self, results: list[ValidationResult]) -> dict[str, Any]:
         """Generate comprehensive validation report."""
         if not results:
             return {"status": "no_results", "message": "No validation results available"}
-        
+
         total_scenarios = len(results)
         successful_scenarios = sum(1 for r in results if r.success)
         success_rate = successful_scenarios / total_scenarios
-        
+
         # Aggregate by agent
         agent_performance = {}
         for result in results:
@@ -387,20 +385,20 @@ class AgentValidationSuite:
                     "avg_duration": 0,
                     "boundary_violations": 0
                 }
-            
+
             perf = agent_performance[result.agent]
             perf["scenarios"] += 1
             perf["successes"] += 1 if result.success else 0
             perf["total_quality"] += result.quality_score
             perf["avg_duration"] += result.duration_seconds
             perf["boundary_violations"] += len(result.boundary_violations)
-        
+
         # Calculate averages
         for agent, perf in agent_performance.items():
             perf["success_rate"] = perf["successes"] / perf["scenarios"]
             perf["avg_quality"] = perf["total_quality"] / perf["scenarios"]
-            perf["avg_duration"] = perf["avg_duration"] / perf["scenarios"]
-        
+            perf["avg_duration"] /= perf["scenarios"]
+
         # Identify issues
         issues = []
         for agent, perf in agent_performance.items():
@@ -410,7 +408,7 @@ class AgentValidationSuite:
                 issues.append(f"{agent}: Low quality score ({perf['avg_quality']:.1f}/100)")
             if perf["boundary_violations"] > 0:
                 issues.append(f"{agent}: {perf['boundary_violations']} boundary violations")
-        
+
         return {
             "validation_summary": {
                 "total_scenarios": total_scenarios,
@@ -434,23 +432,23 @@ class AgentValidationSuite:
             "validation_timestamp": datetime.now().isoformat()
         }
 
-    def format_report(self, report: Dict[str, Any]) -> str:
+    def format_report(self, report: dict[str, Any]) -> str:
         """Format validation report as text."""
         if report.get("status") == "no_results":
             return "📊 No validation results available"
-        
+
         lines = []
         lines.append("🧪 AGENT VALIDATION REPORT")
         lines.append("=" * 40)
-        
+
         summary = report["validation_summary"]
-        lines.append(f"📊 Overall Results:")
+        lines.append("📊 Overall Results:")
         lines.append(f"   Scenarios: {summary['total_scenarios']}")
         lines.append(f"   Success Rate: {summary['success_rate']:.1%}")
         lines.append(f"   Quality Score: {summary['overall_quality']:.1f}/100")
         lines.append(f"   Avg Duration: {summary['avg_duration']:.1f}s")
         lines.append("")
-        
+
         lines.append("🤖 Agent Performance:")
         for agent, perf in report["agent_performance"].items():
             lines.append(f"   {agent}:")
@@ -458,56 +456,55 @@ class AgentValidationSuite:
             lines.append(f"     Quality: {perf['avg_quality']:.1f}/100")
             lines.append(f"     Duration: {perf['avg_duration']:.1f}s")
         lines.append("")
-        
+
         if report["issues_identified"]:
             lines.append("⚠️ Issues Identified:")
-            for issue in report["issues_identified"]:
-                lines.append(f"   • {issue}")
+            lines.extend(f"   • {issue}" for issue in report["issues_identified"])
             lines.append("")
-        
+
         lines.append("📋 Scenario Details:")
         for scenario in report["scenario_results"]:
             status = "✅" if scenario["success"] else "❌"
             lines.append(f"   {status} {scenario['name']} ({scenario['agent']}): {scenario['quality']:.1f}/100")
-        
+
         return "\n".join(lines)
 
 
 async def main():
     """Main function for validation suite execution."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Agent Validation Suite")
     parser.add_argument("--agent", help="Validate specific agent only")
     parser.add_argument("--scenario", help="Run specific scenario only")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--output", help="Output file for report")
-    
+
     args = parser.parse_args()
-    
+
     suite = AgentValidationSuite()
-    
+
     if args.scenario:
         # Run specific scenario
         scenario = next((s for s in suite.scenarios if s.name == args.scenario), None)
         if not scenario:
             print(f"❌ Scenario '{args.scenario}' not found")
             sys.exit(1)
-        
+
         result = await suite.run_scenario(scenario, args.verbose)
         print(f"Scenario: {result.scenario_name}")
         print(f"Success: {result.success}")
         print(f"Quality: {result.quality_score:.1f}/100")
         print(f"Duration: {result.duration_seconds:.1f}s")
-    
+
     else:
         # Run validation suite
         results = await suite.run_validation_suite(args.agent, args.verbose)
         report = suite.generate_validation_report(results)
         formatted_report = suite.format_report(report)
-        
+
         if args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, 'w', encoding="utf-8") as f:
                 if args.output.endswith('.json'):
                     json.dump(report, f, indent=2, default=str)
                 else:

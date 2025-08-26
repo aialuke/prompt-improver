@@ -184,23 +184,24 @@ class OptimizationController:
     async def _enhanced_simulation_fallback(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Enhanced simulation fallback with realistic Bayesian characteristics."""
         import random
-        import numpy as np
+        from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+        # import numpy as np  # Converted to lazy loading
         await asyncio.sleep(0.1)
         base_score = parameters.get('expected_score', 0.85)
         noise_level = parameters.get('noise_level', 0.05)
-        score = np.random.normal(base_score, noise_level)
-        score = np.clip(score, 0.0, 1.0)
-        acquisition_value = np.random.exponential(0.1)
+        score = get_numpy().random.normal(base_score, noise_level)
+        score = get_numpy().clip(score, 0.0, 1.0)
+        acquisition_value = get_numpy().random.exponential(0.1)
         param_names = parameters.get('parameter_names', ['alpha', 'beta'])
         suggested_params = {}
         for param in param_names:
             if param == 'alpha':
-                suggested_params[param] = np.random.uniform(0.001, 0.1)
+                suggested_params[param] = get_numpy().random.uniform(0.001, 0.1)
             elif param == 'beta':
-                suggested_params[param] = np.random.uniform(0.01, 0.5)
+                suggested_params[param] = get_numpy().random.uniform(0.01, 0.5)
             else:
-                suggested_params[param] = np.random.uniform(0.0, 1.0)
-        return {'iteration': 1, 'score': float(score), 'acquisition_value': float(acquisition_value), 'parameters': suggested_params, 'uncertainty': float(np.random.uniform(0.02, 0.1)), 'method': 'enhanced_simulation', 'timestamp': datetime.now(timezone.utc)}
+                suggested_params[param] = get_numpy().random.uniform(0.0, 1.0)
+        return {'iteration': 1, 'score': float(score), 'acquisition_value': float(acquisition_value), 'parameters': suggested_params, 'uncertainty': float(get_numpy().random.uniform(0.02, 0.1)), 'method': 'enhanced_simulation', 'timestamp': datetime.now(timezone.utc)}
 
     async def _execute_evolutionary_optimization(self, workflow_id: str, parameters: dict[str, Any]) -> None:
         """Execute evolutionary optimization."""

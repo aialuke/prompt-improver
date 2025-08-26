@@ -6,16 +6,19 @@ metrics, health monitoring, and essential system utilities.
 
 import asyncio
 import logging
-import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
-from prompt_improver.core.di.protocols import CoreContainerProtocol, ContainerRegistryProtocol
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
-from prompt_improver.core.protocols.retry_protocols import MetricsRegistryProtocol
 from prompt_improver.core.services.datetime_service import DateTimeService
+from prompt_improver.shared.interfaces.protocols.core import (
+    ContainerRegistryProtocol,
+    CoreContainerProtocol,
+    MetricsRegistryProtocol,
+)
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -31,8 +34,8 @@ class ServiceLifetime(Enum):
 @dataclass
 class CoreServiceRegistration:
     """Core service registration information."""
-    interface: Type[Any]
-    implementation: Type[Any] | None
+    interface: type[Any]
+    implementation: type[Any] | None
     lifetime: ServiceLifetime
     factory: Callable[[], Any] | None = None
     initialized: bool = False
@@ -43,29 +46,29 @@ class CoreServiceRegistration:
 
 class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
     """Specialized DI container for core system services.
-    
+
     Manages essential system services including:
     - Configuration management
     - Metrics collection and registry
     - Health monitoring
     - DateTime services
     - Logging infrastructure
-    
+
     Follows clean architecture with protocol-based dependencies.
     """
 
-    def __init__(self, name: str = "core"):
+    def __init__(self, name: str = "core") -> None:
         """Initialize core services container.
-        
+
         Args:
             name: Container identifier for logging
         """
         self.name = name
         self.logger = logger.getChild(f"container.{name}")
-        self._services: dict[Type[Any], CoreServiceRegistration] = {}
+        self._services: dict[type[Any], CoreServiceRegistration] = {}
         self._lock = asyncio.Lock()
         self._initialized = False
-        self._initialization_order: list[Type[Any]] = []
+        self._initialization_order: list[type[Any]] = []
         self._register_default_services()
         self.logger.debug(f"Core container '{self.name}' initialized")
 
@@ -77,36 +80,36 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             DateTimeService,
             tags={"core", "datetime"}
         )
-        
+
         # Self-registration for dependency injection
         self.register_instance(CoreContainer, self, tags={"container", "core"})
-        
+
         # Metrics registry factory
         self.register_metrics_collector_factory()
-        
+
         # Health monitor factory
         self.register_health_monitor_factory()
-        
+
         # Configuration service factory
         self.register_config_service_factory()
-        
+
         # Logging infrastructure
         self.register_logging_service_factory()
-        
+
         # Feature flags service
         self.register_feature_flags_service_factory()
-        
+
         # External services config service
         self.register_external_services_config_factory()
 
     def register_singleton(
         self,
-        interface: Type[T],
-        implementation: Type[T],
+        interface: type[T],
+        implementation: type[T],
         tags: set[str] | None = None,
     ) -> None:
         """Register a singleton service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation: Concrete implementation class
@@ -118,18 +121,18 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             lifetime=ServiceLifetime.SINGLETON,
             tags=tags or set(),
         )
-        self.logger.debug(
-            f"Registered singleton: {interface.__name__} -> {implementation.__name__}"
-        )
+        interface_name = self._get_interface_name(interface)
+        impl_name = self._get_interface_name(implementation)
+        self.logger.debug(f"Registered singleton: {interface_name} -> {impl_name}")
 
     def register_transient(
         self,
-        interface: Type[T],
+        interface: type[T],
         implementation_or_factory: Any,
         tags: set[str] | None = None,
     ) -> None:
         """Register a transient service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation_or_factory: Implementation class or factory
@@ -142,39 +145,44 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             lifetime=ServiceLifetime.TRANSIENT,
             tags=tags or set(),
         )
-        self.logger.debug(f"Registered transient: {interface.__name__}")
+        interface_name = self._get_interface_name(interface)
+        self.logger.debug(f"Registered transient: {interface_name}")
 
     def register_factory(
         self,
-        interface: Type[T],
+        interface: type[T],
         factory: Any,
         tags: set[str] | None = None,
+        lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
     ) -> None:
         """Register a service factory.
-        
+
         Args:
             interface: Service interface/protocol
             factory: Factory function to create service
             tags: Optional tags for service categorization
+            lifetime: Service lifetime (singleton by default)
         """
         self._services[interface] = CoreServiceRegistration(
             interface=interface,
             implementation=None,
-            lifetime=ServiceLifetime.SINGLETON,
+            lifetime=lifetime,
             factory=factory,
+            initialized=False,  # Explicitly set for factory registrations
+            instance=None,  # Explicitly set for factory registrations
             tags=tags or set(),
         )
-        interface_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
+        interface_name = self._get_interface_name(interface)
         self.logger.debug(f"Registered factory: {interface_name}")
 
     def register_instance(
         self,
-        interface: Type[T],
+        interface: type[T],
         instance: T,
         tags: set[str] | None = None,
     ) -> None:
         """Register a pre-created service instance.
-        
+
         Args:
             interface: Service interface/protocol
             instance: Pre-created service instance
@@ -189,69 +197,75 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             tags=tags or set(),
         )
         self._services[interface] = registration
-        self.logger.debug(f"Registered instance: {interface.__name__}")
+        interface_name = self._get_interface_name(interface)
+        self.logger.debug(f"Registered instance: {interface_name}")
 
-    async def get(self, interface: Type[T]) -> T:
+    async def get(self, interface: type[T]) -> T:
         """Resolve service instance.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
-            
+
         Raises:
             KeyError: If service is not registered
         """
         async with self._lock:
             return await self._resolve_service(interface)
 
-    async def _resolve_service(self, interface: Type[T]) -> T:
+    async def _resolve_service(self, interface: type[T]) -> T:
         """Internal service resolution with lifecycle management.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
         """
-        if interface not in self._services:
-            raise KeyError(f"Service not registered: {interface.__name__}")
-            
-        registration = self._services[interface]
+        # Handle interface name for logging/error messages
+        interface_name = self._get_interface_name(interface)
         
+        if interface not in self._services:
+            raise KeyError(f"Service not registered: {interface_name}")
+
+        registration = self._services[interface]
+
         # Return existing singleton instance
-        if (registration.lifetime == ServiceLifetime.SINGLETON and 
+        if (registration.lifetime == ServiceLifetime.SINGLETON and
             registration.initialized and registration.instance is not None):
+            self.logger.debug(f"Returning cached singleton for {interface_name}")
             return registration.instance
-            
+
         # Create new instance
         if registration.factory:
             instance = await self._create_from_factory(registration.factory)
         elif registration.implementation:
             instance = await self._create_from_class(registration.implementation)
         else:
-            raise ValueError(f"No factory or implementation for {interface.__name__}")
-            
+            raise ValueError(f"No factory or implementation for {interface_name}")
+
         # Initialize if needed
         if hasattr(instance, "initialize") and asyncio.iscoroutinefunction(instance.initialize):
             await instance.initialize()
-            
+
         # Store singleton
         if registration.lifetime == ServiceLifetime.SINGLETON:
             registration.instance = instance
             registration.initialized = True
             self._initialization_order.append(interface)
-            
-        self.logger.debug(f"Resolved service: {interface.__name__}")
+            self.logger.debug(f"Cached new singleton instance for {interface_name}")
+
+        self.logger.debug(f"Resolved service: {interface_name}")
         return instance
 
     async def _create_from_factory(self, factory: Callable[[], Any]) -> Any:
         """Create service instance from factory.
-        
+
         Args:
             factory: Factory function
-            
+
         Returns:
             Service instance
         """
@@ -259,40 +273,90 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             return await factory()
         return factory()
 
-    async def _create_from_class(self, implementation: Type[Any]) -> Any:
-        """Create service instance from class constructor.
+    def _get_interface_name(self, interface: Any) -> str:
+        """Get a readable name for an interface, handling Union types and other special cases.
         
         Args:
-            implementation: Implementation class
+            interface: Interface type or annotation
             
+        Returns:
+            str: Readable interface name
+        """
+        if hasattr(interface, "__name__"):
+            return interface.__name__
+        
+        # Handle Union types (Python 3.10+ syntax like `logging.Logger | None`)
+        if hasattr(interface, "__args__"):
+            args_names = []
+            for arg in interface.__args__:
+                if hasattr(arg, "__name__"):
+                    args_names.append(arg.__name__)
+                else:
+                    args_names.append(str(arg))
+            return f"Union[{', '.join(args_names)}]"
+        
+        return str(interface)
+
+    def _is_optional_parameter(self, annotation: Any) -> tuple[bool, Any]:
+        """Check if parameter annotation is optional (Union with None).
+        
+        Args:
+            annotation: Parameter annotation
+            
+        Returns:
+            tuple: (is_optional, non_none_type_if_optional)
+        """
+        # Handle Union types with None (Optional)
+        if hasattr(annotation, "__args__"):
+            args = annotation.__args__
+            if len(args) == 2 and type(None) in args:
+                # This is Optional[T] or T | None
+                non_none_type = next(arg for arg in args if arg is not type(None))
+                return True, non_none_type
+        
+        return False, annotation
+
+    async def _create_from_class(self, implementation: type[Any]) -> Any:
+        """Create service instance from class constructor.
+
+        Args:
+            implementation: Implementation class
+
         Returns:
             Service instance
         """
         import inspect
-        
+
         sig = inspect.signature(implementation.__init__)
         kwargs = {}
-        
+
         for param_name, param in sig.parameters.items():
             if param_name == "self":
                 continue
+                
             if param.annotation != inspect.Parameter.empty:
+                # Check if this is an optional parameter
+                is_optional, actual_type = self._is_optional_parameter(param.annotation)
+                
                 try:
-                    dependency = await self._resolve_service(param.annotation)
+                    # Try to resolve the actual type (non-None part for optional parameters)
+                    dependency = await self._resolve_service(actual_type)
                     kwargs[param_name] = dependency
                 except KeyError:
-                    if param.default != inspect.Parameter.empty:
+                    # If optional or has default, skip this parameter
+                    if is_optional or param.default != inspect.Parameter.empty:
                         continue
+                    # If not optional and no default, re-raise the error
                     raise
-                    
+
         return implementation(**kwargs)
 
-    def is_registered(self, interface: Type[T]) -> bool:
+    def is_registered(self, interface: type[T]) -> bool:
         """Check if service is registered.
-        
+
         Args:
             interface: Service interface to check
-            
+
         Returns:
             True if registered, False otherwise
         """
@@ -302,11 +366,15 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """Register factory for metrics collector."""
         def create_metrics_collector() -> MetricsRegistryProtocol:
             try:
-                from prompt_improver.performance.monitoring.metrics_registry import MetricsRegistry
+                from prompt_improver.performance.monitoring.metrics_registry import (
+                    MetricsRegistry,
+                )
                 return MetricsRegistry()
             except ImportError:
                 # Fallback to no-op implementation
-                from prompt_improver.core.services.noop_metrics import NoOpMetricsRegistry
+                from prompt_improver.core.services.noop_metrics import (
+                    NoOpMetricsRegistry,
+                )
                 return NoOpMetricsRegistry()
 
         self.register_factory(
@@ -326,7 +394,9 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                 return get_unified_health_monitor()
             except ImportError:
                 # Fallback to basic health monitor
-                from prompt_improver.core.services.basic_health_monitor import BasicHealthMonitor
+                from prompt_improver.core.services.basic_health_monitor import (
+                    BasicHealthMonitor,
+                )
                 return BasicHealthMonitor()
 
         self.register_factory(
@@ -340,12 +410,21 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """Register factory for configuration service."""
         def create_config_service():
             try:
-                from prompt_improver.core.config_schema import ConfigService
-                return ConfigService()
+                from prompt_improver.core.config.unified_config import UnifiedConfig
+                return UnifiedConfig()
             except ImportError:
-                # Fallback to environment-based config
-                from prompt_improver.core.services.env_config_service import EnvConfigService
-                return EnvConfigService()
+                try:
+                    from prompt_improver.core.facades.minimal_config_facade import MinimalConfigFacade
+                    return MinimalConfigFacade()
+                except ImportError:
+                    # Simple fallback using dictionary
+                    import os
+                    return {
+                        'database_url': os.getenv('DATABASE_URL', 'postgresql://localhost/prompt_improver'),
+                        'redis_url': os.getenv('REDIS_URL', 'redis://localhost:6379'),
+                        'log_level': os.getenv('LOG_LEVEL', 'INFO'),
+                        'environment': os.getenv('ENVIRONMENT', 'development')
+                    }
 
         self.register_factory(
             "config_service",
@@ -358,12 +437,19 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """Register factory for logging service with structured logging."""
         def create_logging_service():
             try:
-                from prompt_improver.core.services.logging_service import LoggingService
+                from prompt_improver.core.common.logging_utils import LoggingService
                 return LoggingService()
             except ImportError:
                 # Fallback to basic logging
                 import logging
-                return logging.getLogger("prompt_improver")
+                logger = logging.getLogger("prompt_improver")
+                if not logger.handlers:
+                    handler = logging.StreamHandler()
+                    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                    handler.setFormatter(formatter)
+                    logger.addHandler(handler)
+                    logger.setLevel(logging.INFO)
+                return logger
 
         self.register_factory(
             "logging_service",
@@ -376,15 +462,27 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """Register factory for feature flags service."""
         def create_feature_flags_service():
             try:
-                from prompt_improver.core.feature_flags import FeatureFlagService
-                return FeatureFlagService()
+                from prompt_improver.core.feature_flags import FeatureFlagsManager
+                return FeatureFlagsManager()
             except ImportError:
-                # Fallback to no-op feature flags
-                from prompt_improver.core.services.noop_feature_flags import NoOpFeatureFlagService
-                return NoOpFeatureFlagService()
+                # Simple fallback feature flags
+                class SimpleFeatureFlags:
+                    def __init__(self):
+                        self.flags = {}
+                    
+                    def is_enabled(self, flag_name: str) -> bool:
+                        return self.flags.get(flag_name, False)
+                    
+                    def enable(self, flag_name: str):
+                        self.flags[flag_name] = True
+                    
+                    def disable(self, flag_name: str):
+                        self.flags[flag_name] = False
+                
+                return SimpleFeatureFlags()
 
         self.register_factory(
-            "feature_flags_service", 
+            "feature_flags_service",
             create_feature_flags_service,
             tags={"feature_flags", "core"}
         )
@@ -392,18 +490,26 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
 
     def register_external_services_config_factory(self, environment: str = "production") -> None:
         """Register factory for external services configuration.
-        
+
         Args:
             environment: Deployment environment (development, staging, production)
         """
         def create_external_services_config():
             try:
-                from prompt_improver.integrations.services_config import ExternalServicesConfigImpl
-                return ExternalServicesConfigImpl.from_environment(environment)
+                from prompt_improver.core.config.unified_config import UnifiedConfig
+                config = UnifiedConfig()
+                return config.get_external_services_config()
             except ImportError:
-                # Fallback to environment-based config
-                from prompt_improver.core.services.env_external_services_config import EnvExternalServicesConfig
-                return EnvExternalServicesConfig(environment)
+                # Simple fallback using environment variables
+                import os
+                return {
+                    'environment': environment,
+                    'database_url': os.getenv('DATABASE_URL', 'postgresql://localhost/prompt_improver'),
+                    'redis_url': os.getenv('REDIS_URL', 'redis://localhost:6379'),
+                    'ml_service_url': os.getenv('ML_SERVICE_URL', 'http://localhost:8001'),
+                    'monitoring_enabled': os.getenv('MONITORING_ENABLED', 'true').lower() == 'true',
+                    'metrics_port': int(os.getenv('METRICS_PORT', '9090')),
+                }
 
         self.register_factory(
             "external_services_config",
@@ -446,26 +552,27 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """Initialize all core services."""
         if self._initialized:
             return
-            
+
         self.logger.info(f"Initializing core container '{self.name}'")
-        
+
         # Initialize all registered services
         for interface in list(self._services.keys()):
             try:
                 await self.get(interface)
             except Exception as e:
-                self.logger.error(f"Failed to initialize {interface}: {e}")
+                self.logger.exception(f"Failed to initialize {interface}: {e}")
                 raise
-                
+
         self._initialized = True
         self.logger.info(f"Core container '{self.name}' initialization complete")
 
     async def shutdown(self) -> None:
         """Shutdown all core services gracefully."""
         self.logger.info(f"Shutting down core container '{self.name}'")
-        
+
         # Shutdown in reverse initialization order
         for interface in reversed(self._initialization_order):
+            interface_name = self._get_interface_name(interface)
             registration = self._services.get(interface)
             if registration and registration.instance:
                 try:
@@ -474,10 +581,10 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                             await registration.instance.shutdown()
                         else:
                             registration.instance.shutdown()
-                    self.logger.debug(f"Shutdown service: {interface.__name__}")
+                    self.logger.debug(f"Shutdown service: {interface_name}")
                 except Exception as e:
-                    self.logger.error(f"Error shutting down {interface.__name__}: {e}")
-                    
+                    self.logger.exception(f"Error shutting down {interface_name}: {e}")
+
         self._services.clear()
         self._initialization_order.clear()
         self._initialized = False
@@ -492,13 +599,13 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             "registered_services": len(self._services),
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             try:
                 if (registration.initialized and registration.instance and
                     hasattr(registration.instance, "health_check")):
-                    
+
                     health_check = registration.instance.health_check
                     if asyncio.iscoroutinefunction(health_check):
                         service_health = await health_check()
@@ -516,7 +623,7 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                     "error": str(e),
                 }
                 results["container_status"] = "degraded"
-                
+
         return results
 
     def get_registration_info(self) -> dict[str, Any]:
@@ -526,7 +633,7 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             "initialized": self._initialized,
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             info["services"][service_name] = {
@@ -536,8 +643,44 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                 "has_instance": registration.instance is not None,
                 "tags": list(registration.tags),
             }
-            
+
         return info
+
+    # ContainerRegistryProtocol implementation
+    def register_container(self, name: str, container: Any) -> None:
+        """Register a container with the registry.
+        
+        Args:
+            name: Container identifier
+            container: Container instance to register
+        """
+        # For now, core container doesn't maintain other containers
+        # This could be extended if needed for container orchestration
+        self.logger.debug(f"Container registration not implemented for core container: {name}")
+        
+    def get_container(self, name: str) -> Any:
+        """Get a container from the registry.
+        
+        Args:
+            name: Container identifier
+            
+        Returns:
+            Container instance
+            
+        Raises:
+            KeyError: If container not found
+        """
+        if name == self.name:
+            return self
+        raise KeyError(f"Container not found: {name}")
+        
+    def list_containers(self) -> list[str]:
+        """List all registered container names.
+        
+        Returns:
+            List of container names
+        """
+        return [self.name]
 
     @asynccontextmanager
     async def managed_lifecycle(self):
@@ -550,12 +693,12 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
 
 
 # Global core container instance
-_core_container: Optional[CoreContainer] = None
+_core_container: CoreContainer | None = None
 
 
 def get_core_container() -> CoreContainer:
     """Get the global core container instance.
-    
+
     Returns:
         CoreContainer: Global core container instance
     """

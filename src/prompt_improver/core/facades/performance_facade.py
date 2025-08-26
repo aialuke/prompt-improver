@@ -1,4 +1,4 @@
-"""Performance Systems Facade - Reduces Performance Baseline Module Coupling
+"""Performance Systems Facade - Reduces Performance Baseline Module Coupling.
 
 This facade provides unified performance system coordination while reducing
 direct imports from 12 to 2 internal dependencies through lazy initialization.
@@ -12,7 +12,7 @@ Design:
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -20,43 +20,43 @@ logger = logging.getLogger(__name__)
 @runtime_checkable
 class PerformanceFacadeProtocol(Protocol):
     """Protocol for performance systems facade."""
-    
+
     async def get_baseline_system(self) -> Any:
         """Get performance baseline system."""
         ...
-    
+
     async def get_baseline_collector(self) -> Any:
         """Get baseline collector."""
         ...
-    
+
     async def get_profiler(self) -> Any:
         """Get continuous profiler."""
         ...
-    
+
     async def get_regression_detector(self) -> Any:
         """Get regression detector."""
         ...
-    
+
     async def get_performance_dashboard(self) -> Any:
         """Get performance dashboard."""
         ...
-    
+
     async def record_operation(self, operation_name: str, response_time_ms: float, **kwargs) -> None:
         """Record operation performance."""
         ...
-    
+
     async def analyze_trends(self, hours: int = 24) -> dict[str, Any]:
         """Analyze performance trends."""
         ...
-    
+
     async def check_regressions(self) -> list[dict[str, Any]]:
         """Check for performance regressions."""
         ...
-    
+
     async def initialize_system(self) -> None:
         """Initialize performance system."""
         ...
-    
+
     async def shutdown_system(self) -> None:
         """Shutdown performance system."""
         ...
@@ -64,12 +64,12 @@ class PerformanceFacadeProtocol(Protocol):
 
 class PerformanceFacade(PerformanceFacadeProtocol):
     """Performance systems facade with minimal coupling.
-    
+
     Reduces performance baseline module coupling from 12 internal imports to 2.
     Provides unified interface for all performance system coordination.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize facade with lazy loading."""
         self._baseline_system = None
         self._baseline_collector = None
@@ -84,41 +84,49 @@ class PerformanceFacade(PerformanceFacadeProtocol):
         self._system_initialized = False
         logger.debug("PerformanceFacade initialized with lazy loading")
 
-    async def _ensure_baseline_system(self):
+    async def _ensure_baseline_system(self) -> None:
         """Ensure baseline system is available."""
         if self._baseline_system is None:
             # Only import when needed to reduce coupling
             from prompt_improver.performance.baseline import get_baseline_system
             self._baseline_system = get_baseline_system()
 
-    async def _ensure_baseline_collector(self):
+    async def _ensure_baseline_collector(self) -> None:
         """Ensure baseline collector is available."""
         if self._baseline_collector is None:
-            from prompt_improver.performance.baseline.baseline_collector import get_baseline_collector
+            from prompt_improver.performance.baseline.baseline_collector import (
+                get_baseline_collector,
+            )
             self._baseline_collector = get_baseline_collector()
 
-    async def _ensure_profiler(self):
+    async def _ensure_profiler(self) -> None:
         """Ensure profiler is available."""
         if self._profiler is None:
             from prompt_improver.performance.baseline.profiler import get_profiler
             self._profiler = get_profiler()
 
-    async def _ensure_regression_detector(self):
+    async def _ensure_regression_detector(self) -> None:
         """Ensure regression detector is available."""
         if self._regression_detector is None:
-            from prompt_improver.performance.baseline.regression_detector import get_regression_detector
+            from prompt_improver.performance.baseline.regression_detector import (
+                get_regression_detector,
+            )
             self._regression_detector = get_regression_detector()
 
-    async def _ensure_performance_dashboard(self):
+    async def _ensure_performance_dashboard(self) -> None:
         """Ensure performance dashboard is available."""
         if self._performance_dashboard is None:
-            from prompt_improver.performance.baseline.enhanced_dashboard_integration import get_performance_dashboard
+            from prompt_improver.performance.baseline.enhanced_dashboard_integration import (
+                get_performance_dashboard,
+            )
             self._performance_dashboard = get_performance_dashboard()
 
-    async def _ensure_background_manager(self):
+    async def _ensure_background_manager(self) -> None:
         """Ensure background task manager is available."""
         if self._background_manager is None:
-            from prompt_improver.performance.monitoring.health.background_manager import get_background_task_manager
+            from prompt_improver.performance.monitoring.health.background_manager import (
+                get_background_task_manager,
+            )
             self._background_manager = get_background_task_manager()
 
     async def get_baseline_system(self) -> Any:
@@ -149,28 +157,36 @@ class PerformanceFacade(PerformanceFacadeProtocol):
     async def get_load_testing_integration(self) -> Any:
         """Get load testing integration."""
         if self._load_testing_integration is None:
-            from prompt_improver.performance.baseline.load_testing_integration import get_load_testing_integration
+            from prompt_improver.performance.baseline.load_testing_integration import (
+                get_load_testing_integration,
+            )
             self._load_testing_integration = get_load_testing_integration()
         return self._load_testing_integration
 
     async def get_validation_suite(self) -> Any:
         """Get performance validation suite."""
         if self._validation_suite is None:
-            from prompt_improver.performance.baseline.performance_validation_suite import get_validation_suite
+            from prompt_improver.performance.baseline.performance_validation_suite import (
+                get_validation_suite,
+            )
             self._validation_suite = get_validation_suite()
         return self._validation_suite
 
     async def get_optimization_guide(self) -> Any:
         """Get production optimization guide."""
         if self._optimization_guide is None:
-            from prompt_improver.performance.baseline.production_optimization_guide import get_optimization_guide
+            from prompt_improver.performance.baseline.production_optimization_guide import (
+                get_optimization_guide,
+            )
             self._optimization_guide = get_optimization_guide()
         return self._optimization_guide
 
     async def get_statistical_analyzer(self) -> Any:
         """Get statistical analyzer."""
         if self._statistical_analyzer is None:
-            from prompt_improver.performance.baseline.statistical_analyzer import StatisticalAnalyzer
+            from prompt_improver.performance.baseline.statistical_analyzer import (
+                StatisticalAnalyzer,
+            )
             self._statistical_analyzer = StatisticalAnalyzer()
         return self._statistical_analyzer
 
@@ -207,7 +223,9 @@ class PerformanceFacade(PerformanceFacadeProtocol):
     async def run_load_test(self, config: dict[str, Any]) -> dict[str, Any]:
         """Run integrated load test."""
         load_testing = await self.get_load_testing_integration()
-        from prompt_improver.performance.baseline.load_testing_integration import LoadTestConfig
+        from prompt_improver.performance.baseline.load_testing_integration import (
+            LoadTestConfig,
+        )
         test_config = LoadTestConfig(**config)
         return await load_testing.run_load_test(test_config)
 
@@ -268,7 +286,7 @@ class PerformanceFacade(PerformanceFacadeProtocol):
                 logger.info("✓ Performance dashboard shut down")
 
         except Exception as e:
-            logger.error(f"Error during performance system shutdown: {e}")
+            logger.exception(f"Error during performance system shutdown: {e}")
 
         # Clear references
         self._baseline_system = None
@@ -315,7 +333,7 @@ _performance_facade: PerformanceFacade | None = None
 
 def get_performance_facade() -> PerformanceFacade:
     """Get global performance facade instance.
-    
+
     Returns:
         PerformanceFacade with lazy initialization and minimal coupling
     """
@@ -346,10 +364,10 @@ async def shutdown_performance_facade() -> None:
 
 
 __all__ = [
-    "PerformanceFacadeProtocol",
     "PerformanceFacade",
+    "PerformanceFacadeProtocol",
     "get_performance_facade",
     "initialize_performance_facade",
-    "start_performance_facade",
     "shutdown_performance_facade",
+    "start_performance_facade",
 ]

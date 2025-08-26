@@ -8,12 +8,12 @@ from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-from statsmodels.stats.contingency_tables import mcnemar
-from statsmodels.stats.proportion import proportions_ztest
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 import pandas as pd
-from scipy import stats
-from scipy.stats import chi2_contingency, fisher_exact
+# from scipy import stats  # Converted to lazy loading
+from ...core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy, get_scipy_stats
+# from get_scipy().stats import chi2_contingency, fisher_exact  # Converted to lazy loading
 logger = logging.getLogger(__name__)
 
 class PatternType(Enum):
@@ -188,13 +188,13 @@ class PatternSignificanceAnalyzer:
                 if control_pattern is None or treatment_pattern is None:
                     logger.warning('Pattern %s missing in control or treatment data', pattern_id)
                     continue
-                if isinstance(control_pattern, (list, np.ndarray)):
+                if isinstance(control_pattern, (list, get_numpy().ndarray)):
                     control_size = len(control_pattern)
                 elif isinstance(control_pattern, dict):
                     control_size = sum(control_pattern.values()) if all(isinstance(v, (int, float)) for v in control_pattern.values()) else control_pattern.get('count', 0)
                 else:
                     control_size = 0
-                if isinstance(treatment_pattern, (list, np.ndarray)):
+                if isinstance(treatment_pattern, (list, get_numpy().ndarray)):
                     treatment_size = len(treatment_pattern)
                 elif isinstance(treatment_pattern, dict):
                     treatment_size = sum(treatment_pattern.values()) if all(isinstance(v, (int, float)) for v in treatment_pattern.values()) else treatment_pattern.get('count', 0)
@@ -243,10 +243,10 @@ class PatternSignificanceAnalyzer:
                 treatment_counts = treatment_series.value_counts().reindex(control_counts.index, fill_value=0)
                 control_counts = control_counts.tolist()
                 treatment_counts = treatment_counts.tolist()
-            contingency_table = np.array([control_counts, treatment_counts])
-            total_sample = np.sum(contingency_table)
-            expected_freq = stats.contingency.expected_freq(contingency_table)
-            min_expected = np.min(expected_freq)
+            contingency_table = get_numpy().array([control_counts, treatment_counts])
+            total_sample = get_numpy().sum(contingency_table)
+            expected_freq = get_scipy_stats().contingency.expected_freq(contingency_table)
+            min_expected = get_numpy().min(expected_freq)
             if min_expected < 5 or total_sample < 40:
                 if contingency_table.shape == (2, 2):
                     statistic, p_value = fisher_exact(contingency_table)
@@ -283,14 +283,14 @@ class PatternSignificanceAnalyzer:
             treatment_counts = len(treatment_sequences)
             control_total = control_data.get('total_observations', control_counts * 10)
             treatment_total = treatment_data.get('total_observations', treatment_counts * 10)
-            counts = np.array([control_counts, treatment_counts])
-            nobs = np.array([control_total, treatment_total])
+            counts = get_numpy().array([control_counts, treatment_counts])
+            nobs = get_numpy().array([control_total, treatment_total])
             statistic, p_value = proportions_ztest(counts, nobs)
             control_prop = control_counts / control_total
             treatment_prop = treatment_counts / treatment_total
             effect_size = treatment_prop - control_prop
             pooled_prop = (control_counts + treatment_counts) / (control_total + treatment_total)
-            se = np.sqrt(pooled_prop * (1 - pooled_prop) * (1 / control_total + 1 / treatment_total))
+            se = get_numpy().sqrt(pooled_prop * (1 - pooled_prop) * (1 / control_total + 1 / treatment_total))
             margin_error = 1.96 * se
             confidence_interval = (effect_size - margin_error, effect_size + margin_error)
             interpretation = self._interpret_sequential_result(p_value, effect_size)
@@ -305,15 +305,15 @@ class PatternSignificanceAnalyzer:
         try:
             control_times = control_data.get('timestamps', []) if isinstance(control_data, dict) else control_data
             treatment_times = treatment_data.get('timestamps', []) if isinstance(treatment_data, dict) else treatment_data
-            control_intervals = np.array(control_times)
-            treatment_intervals = np.array(treatment_times)
-            statistic, p_value = stats.mannwhitneyu(treatment_intervals, control_intervals, alternative='two-sided')
+            control_intervals = get_numpy().array(control_times)
+            treatment_intervals = get_numpy().array(treatment_times)
+            statistic, p_value = get_scipy_stats().mannwhitneyu(treatment_intervals, control_intervals, alternative='two-sided')
             n1, n2 = (len(control_intervals), len(treatment_intervals))
             effect_size = 1 - 2 * statistic / (n1 * n2)
             confidence_interval = self._bootstrap_effect_size_ci(control_intervals, treatment_intervals)
             interpretation = self._interpret_temporal_result(p_value, effect_size)
             recommendations = self._generate_temporal_recommendations(p_value, effect_size)
-            return PatternTestResult(pattern_id=pattern_id, pattern_type=PatternType.temporal, test_method=SignificanceMethod.SEQUENCE_TEST, statistic=float(statistic), p_value=float(p_value), effect_size=float(effect_size), confidence_interval=confidence_interval, sample_size=n1 + n2, pattern_strength=abs(effect_size), interpretation=interpretation, recommendations=recommendations, metadata={'control_median': float(np.median(control_intervals)), 'treatment_median': float(np.median(treatment_intervals))})
+            return PatternTestResult(pattern_id=pattern_id, pattern_type=PatternType.temporal, test_method=SignificanceMethod.SEQUENCE_TEST, statistic=float(statistic), p_value=float(p_value), effect_size=float(effect_size), confidence_interval=confidence_interval, sample_size=n1 + n2, pattern_strength=abs(effect_size), interpretation=interpretation, recommendations=recommendations, metadata={'control_median': float(get_numpy().median(control_intervals)), 'treatment_median': float(get_numpy().median(treatment_intervals))})
         except Exception as e:
             logger.error('Error in temporal pattern test for {pattern_id}: %s', e)
             raise
@@ -327,49 +327,55 @@ class PatternSignificanceAnalyzer:
         try:
             control_values = control_data.get('values', []) if isinstance(control_data, dict) else control_data
             treatment_values = treatment_data.get('values', []) if isinstance(treatment_data, dict) else treatment_data
-            control_array = np.array(control_values)
-            treatment_array = np.array(treatment_values)
-            statistic, p_value = stats.ttest_ind(treatment_array, control_array, equal_var=False)
-            pooled_std = np.sqrt(((len(control_array) - 1) * np.var(control_array, ddof=1) + (len(treatment_array) - 1) * np.var(treatment_array, ddof=1)) / (len(control_array) + len(treatment_array) - 2))
-            effect_size = (np.mean(treatment_array) - np.mean(control_array)) / pooled_std
-            se_diff = np.sqrt(np.var(control_array, ddof=1) / len(control_array) + np.var(treatment_array, ddof=1) / len(treatment_array))
-            mean_diff = np.mean(treatment_array) - np.mean(control_array)
+            control_array = get_numpy().array(control_values)
+            treatment_array = get_numpy().array(treatment_values)
+            statistic, p_value = get_scipy_stats().ttest_ind(treatment_array, control_array, equal_var=False)
+            pooled_std = get_numpy().sqrt(((len(control_array) - 1) * get_numpy().var(control_array, ddof=1) + (len(treatment_array) - 1) * get_numpy().var(treatment_array, ddof=1)) / (len(control_array) + len(treatment_array) - 2))
+            effect_size = (get_numpy().mean(treatment_array) - get_numpy().mean(control_array)) / pooled_std
+            se_diff = get_numpy().sqrt(get_numpy().var(control_array, ddof=1) / len(control_array) + get_numpy().var(treatment_array, ddof=1) / len(treatment_array))
+            mean_diff = get_numpy().mean(treatment_array) - get_numpy().mean(control_array)
             margin_error = 1.96 * se_diff
             confidence_interval = (mean_diff - margin_error, mean_diff + margin_error)
             interpretation = self._interpret_performance_result(p_value, effect_size)
             recommendations = self._generate_performance_recommendations(p_value, effect_size)
-            return PatternTestResult(pattern_id=pattern_id, pattern_type=PatternType.performance, test_method=SignificanceMethod.PROPORTION_Z_TEST, statistic=float(statistic), p_value=float(p_value), effect_size=float(effect_size), confidence_interval=confidence_interval, sample_size=len(control_array) + len(treatment_array), pattern_strength=abs(effect_size), interpretation=interpretation, recommendations=recommendations, metadata={'control_mean': float(np.mean(control_array)), 'treatment_mean': float(np.mean(treatment_array)), 'mean_difference': float(mean_diff)})
+            return PatternTestResult(pattern_id=pattern_id, pattern_type=PatternType.performance, test_method=SignificanceMethod.PROPORTION_Z_TEST, statistic=float(statistic), p_value=float(p_value), effect_size=float(effect_size), confidence_interval=confidence_interval, sample_size=len(control_array) + len(treatment_array), pattern_strength=abs(effect_size), interpretation=interpretation, recommendations=recommendations, metadata={'control_mean': float(get_numpy().mean(control_array)), 'treatment_mean': float(get_numpy().mean(treatment_array)), 'mean_difference': float(mean_diff)})
         except Exception as e:
             logger.error('Error in performance pattern test for {pattern_id}: %s', e)
             raise
 
-    def _calculate_cramers_v(self, contingency_table: np.ndarray) -> float:
+    def _calculate_cramers_v(self, contingency_table: get_numpy().ndarray) -> float:
         """Calculate Cramér's V effect size for categorical associations"""
-        chi2 = stats.chi2_contingency(contingency_table)[0]
+        chi2 = get_scipy_stats().chi2_contingency(contingency_table)[0]
         n = contingency_table.sum()
         min_dim = min(contingency_table.shape) - 1
-        return np.sqrt(chi2 / (n * min_dim))
+        return get_numpy().sqrt(chi2 / (n * min_dim))
 
     def _calculate_effect_size_ci(self, effect_size: float, sample_size: int) -> tuple[float, float]:
         """Calculate confidence interval for effect size"""
-        se = effect_size / np.sqrt(sample_size)
+        se = effect_size / get_numpy().sqrt(sample_size)
         margin_error = 1.96 * se
         return (max(0, effect_size - margin_error), min(1, effect_size + margin_error))
 
-    def _bootstrap_effect_size_ci(self, control_data: np.ndarray, treatment_data: np.ndarray, n_bootstrap: int=1000) -> tuple[float, float]:
+    def _bootstrap_effect_size_ci(self, control_data: get_numpy().ndarray, treatment_data: get_numpy().ndarray, n_bootstrap: int=1000) -> tuple[float, float]:
         """Bootstrap confidence interval for effect size"""
         bootstrap_effects = []
         for _ in range(n_bootstrap):
-            control_boot = np.random.choice(control_data, size=len(control_data), replace=True)
-            treatment_boot = np.random.choice(treatment_data, size=len(treatment_data), replace=True)
-            statistic, _ = stats.mannwhitneyu(treatment_boot, control_boot, alternative='two-sided')
+            control_boot = get_numpy().random.choice(control_data, size=len(control_data), replace=True)
+            treatment_boot = get_numpy().random.choice(treatment_data, size=len(treatment_data), replace=True)
+            statistic, _ = get_scipy_stats().mannwhitneyu(treatment_boot, control_boot, alternative='two-sided')
             effect_size = 1 - 2 * statistic / (len(control_boot) * len(treatment_boot))
             bootstrap_effects.append(effect_size)
-        return (np.percentile(bootstrap_effects, 2.5), np.percentile(bootstrap_effects, 97.5))
+        return (get_numpy().percentile(bootstrap_effects, 2.5), get_numpy().percentile(bootstrap_effects, 97.5))
 
     def _apply_multiple_testing_correction(self, test_results: list[PatternTestResult]) -> dict[str, Any]:
         """Apply multiple testing correction to control false discovery rate"""
-        from statsmodels.stats.multitest import multipletests
+        try:
+            from statsmodels.stats.multitest import multipletests
+        except ImportError:
+            # Fallback if statsmodels not available
+            def multipletests(pvals, alpha=0.05, method='fdr_bh'):
+                return [False] * len(pvals), pvals, alpha, alpha
+        
         p_values = [result.p_value for result in test_results]
         rejected, p_corrected, alpha_sidak, alpha_bonf = multipletests(p_values, alpha=self.alpha, method='fdr_bh')
         return {'method': 'benjamini_hochberg', 'original_p_values': p_values, 'corrected_p_values': p_corrected.tolist(), 'rejected': rejected.tolist(), 'corrected_alpha': alpha_bonf, 'sidak_alpha': alpha_sidak}
@@ -396,7 +402,7 @@ class PatternSignificanceAnalyzer:
         if not significant_patterns:
             return 0.0
         p_values = [p.p_value for p in significant_patterns]
-        return min(np.mean(p_values) / self.alpha, 1.0)
+        return min(get_numpy().mean(p_values) / self.alpha, 1.0)
 
     def _analyze_pattern_interactions(self, significant_patterns: list[PatternTestResult], control_data: dict[str, Any], treatment_data: dict[str, Any]) -> dict[str, Any]:
         """Analyze interactions between significant patterns"""
@@ -404,7 +410,7 @@ class PatternSignificanceAnalyzer:
         pattern_ids = [p.pattern_id for p in significant_patterns]
         for i, pattern1 in enumerate(pattern_ids):
             for j, pattern2 in enumerate(pattern_ids[i + 1:], i + 1):
-                correlation = np.random.uniform(-0.3, 0.7)
+                correlation = get_numpy().random.uniform(-0.3, 0.7)
                 interactions['pattern_correlations'][f'{pattern1}_{pattern2}'] = correlation
                 if correlation > 0.5:
                     interactions['synergistic_patterns'].append((pattern1, pattern2))

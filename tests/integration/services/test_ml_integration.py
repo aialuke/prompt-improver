@@ -10,10 +10,7 @@ Migration from mock-based testing to real behavior testing based on research:
 - Test actual ML performance characteristics with real models
 """
 
-import asyncio
 import tempfile
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import mlflow
@@ -27,15 +24,11 @@ from hypothesis import (
     strategies as st,
 )
 from hypothesis.extra.numpy import arrays
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
 
 from prompt_improver.database.models import (
     MLModelPerformance,
     RuleMetadata,
-    RulePerformance,
 )
 from prompt_improver.services.ml_integration import MLModelService, get_ml_service
 
@@ -450,7 +443,7 @@ class TestMLModelContracts:
         )
         assert train_result["status"] == "success"
         model_id = train_result["model_id"]
-        for i, feature_vector in enumerate(features[:3]):
+        for _i, feature_vector in enumerate(features[:3]):
             if len(feature_vector) != 6:
                 feature_vector = (
                     feature_vector[:6]
@@ -769,7 +762,7 @@ class TestMLPerformanceCharacterization:
             random.seed(42)
             features = []
             effectiveness_scores = []
-            for i in range(data_size):
+            for _i in range(data_size):
                 base_feature = [0.8, 150, 1.0, 5, 0.7, 1.0]
                 varied_feature = [
                     base_feature[0] + random.uniform(-0.2, 0.2),
@@ -937,7 +930,7 @@ class TestMLMetamorphicProperties:
             )
             predictions.append(result)
         first_pred = predictions[0]
-        for i, pred in enumerate(predictions[1:], 1):
+        for _i, pred in enumerate(predictions[1:], 1):
             assert pred["prediction"] == first_pred["prediction"], (
                 f"Prediction mismatch: {pred['prediction']} != {first_pred['prediction']}"
             )
@@ -1215,7 +1208,7 @@ class TestMLMetamorphicProperties:
         threshold = 0.7
         boundary_data = sample_training_data.copy()
         modified_scores = []
-        for i, score in enumerate(boundary_data["effectiveness_scores"]):
+        for i, _score in enumerate(boundary_data["effectiveness_scores"]):
             if i % 2 == 0:
                 modified_scores.append(threshold - threshold_offset)
             else:

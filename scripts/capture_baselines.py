@@ -4,24 +4,18 @@ ML inference latency, and Redis operations to establish performance baselines.
 """
 
 import asyncio
-import gc
 import json
 import logging
 import os
 import statistics
 import sys
 import time
-import tracemalloc
-from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
-import asyncpg
-import numpy as np
-import pandas as pd
 import psutil
 
 project_root = Path(__file__).parent.parent
@@ -34,6 +28,7 @@ try:
     from prompt_improver.repositories.factory import get_ml_repository
     from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
     from prompt_improver.database.services.connection.postgres_pool_manager_facade import PostgreSQLPoolManager
+    from prompt_improver.database import get_session_context
 
     ml_repository = None
     connection_manager = None
@@ -791,10 +786,10 @@ if __name__ == "__main__":
     if sys.platform != "win32":
         try:
             import uvloop
-
             asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
         except ImportError:
             pass
+    
     result = asyncio.run(main())
     if result:
         print("\n🎯 Use this baseline for monitoring performance regressions")

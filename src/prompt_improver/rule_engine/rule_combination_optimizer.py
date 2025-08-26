@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from itertools import combinations
 from statistics import mean, stdev
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,7 @@ class RuleCombinationOptimizer:
     - Dynamic combination generation and testing
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession) -> None:
         """Initialize rule combination optimizer.
 
         Args:
@@ -259,7 +259,7 @@ class RuleCombinationOptimizer:
                     individual_scores={
                         rule.rule_id: rule.effectiveness_score for rule in rule_combo
                     },
-                    sample_size=min([rule.sample_size for rule in rule_combo]),
+                    sample_size=min(rule.sample_size for rule in rule_combo),
                     statistical_confidence=mean([
                         rule.confidence_level for rule in rule_combo
                     ]),
@@ -299,7 +299,7 @@ class RuleCombinationOptimizer:
             synergy_score = 0.0
             conflict_score = 0.0
             for i, rule1 in enumerate(combination.rule_ids):
-                for j, rule2 in enumerate(combination.rule_ids[i + 1 :], i + 1):
+                for _j, rule2 in enumerate(combination.rule_ids[i + 1 :], i + 1):
                     if (rule1, rule2) in synergy_dict:
                         synergy_score += synergy_dict[rule1, rule2]
                     if (rule1, rule2) in conflict_dict:
@@ -362,7 +362,7 @@ class RuleCombinationOptimizer:
         return sum(factors)
 
     async def get_combination_recommendations(
-        self, rule_ids: list[str], prompt_type: str = None
+        self, rule_ids: list[str], prompt_type: str | None = None
     ) -> list[dict[str, Any]]:
         """Get specific combination recommendations from historical data.
 

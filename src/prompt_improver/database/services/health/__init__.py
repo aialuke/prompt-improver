@@ -12,18 +12,30 @@ unified_connection_manager.py, implementing:
 Designed for production-ready health monitoring with sub-10ms response times.
 """
 
-from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitBreakerState
-from .health_checker import HealthChecker, HealthResult, HealthStatus
-from .health_manager import HealthManager, HealthManagerConfig, create_health_manager
+from prompt_improver.database.services.health.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerState,
+)
+from prompt_improver.database.services.health.health_checker import (
+    HealthChecker,
+    HealthResult,
+    HealthStatus,
+)
+from prompt_improver.database.services.health.health_manager import (
+    HealthManager,
+    HealthManagerConfig,
+    create_health_manager,
+)
 
 __all__ = [
-    "HealthManager",
-    "HealthManagerConfig",
-    "create_health_manager",
-    "HealthChecker",
-    "HealthResult",
-    "HealthStatus",
     "CircuitBreaker",
     "CircuitBreakerConfig",
     "CircuitBreakerState",
+    "HealthChecker",
+    "HealthManager",
+    "HealthManagerConfig",
+    "HealthResult",
+    "HealthStatus",
+    "create_health_manager",
 ]

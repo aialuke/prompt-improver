@@ -1,4 +1,4 @@
-"""Unified Performance System with Facade Pattern - Reduced Coupling Implementation
+"""Unified Performance System with Facade Pattern - Reduced Coupling Implementation.
 
 This is the modernized version of performance/baseline/__init__.py that uses facade patterns
 to reduce coupling from 12 to 2 internal imports while maintaining full functionality.
@@ -13,25 +13,28 @@ Key improvements:
 
 import asyncio
 import logging
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from prompt_improver.core.facades import get_performance_facade
-from prompt_improver.core.protocols.facade_protocols import PerformanceFacadeProtocol
+
+if TYPE_CHECKING:
+    from prompt_improver.shared.interfaces.protocols.monitoring import (
+        PerformanceFacadeProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 
 
 class UnifiedPerformanceManager:
     """Unified performance manager using facade pattern for loose coupling.
-    
+
     This manager provides the same interface as the original performance baseline system
     but with dramatically reduced coupling through facade patterns.
-    
+
     Coupling reduction: 12 → 2 internal imports (83% reduction)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the unified performance manager."""
         self._performance_facade: PerformanceFacadeProtocol = get_performance_facade()
         self._system_initialized = False
@@ -42,7 +45,7 @@ class UnifiedPerformanceManager:
         """Initialize performance system through facade."""
         if self._system_initialized:
             return
-            
+
         await self._performance_facade.initialize_system()
         self._system_initialized = True
         logger.info("UnifiedPerformanceManager system initialization complete")
@@ -51,10 +54,10 @@ class UnifiedPerformanceManager:
         """Start performance system through facade."""
         if not self._system_initialized:
             await self.initialize_system()
-            
+
         if self._system_running:
             return
-            
+
         await self._performance_facade.start_system()
         self._system_running = True
         logger.info("UnifiedPerformanceManager system started")
@@ -63,7 +66,7 @@ class UnifiedPerformanceManager:
         """Shutdown performance system through facade."""
         if not self._system_running:
             return
-            
+
         await self._performance_facade.shutdown_system()
         self._system_running = False
         self._system_initialized = False
@@ -139,7 +142,7 @@ class UnifiedPerformanceManager:
 class track_production_operation:
     """Context manager for tracking production operations with facade pattern."""
 
-    def __init__(self, operation_name: str, **metadata):
+    def __init__(self, operation_name: str, **metadata) -> None:
         """Initialize operation tracker."""
         self.operation_name = operation_name
         self.metadata = metadata
@@ -157,13 +160,13 @@ class track_production_operation:
         if self.start_time is not None:
             duration_ms = (time.time() - self.start_time) * 1000
             is_error = exc_type is not None
-            
+
             # Submit tracking task
             asyncio.create_task(
                 self._submit_tracking_task(duration_ms, is_error)
             )
 
-    async def _submit_tracking_task(self, duration_ms: float, is_error: bool):
+    async def _submit_tracking_task(self, duration_ms: float, is_error: bool) -> None:
         """Submit tracking task through facade."""
         await self._manager.record_operation(
             self.operation_name, duration_ms, is_error=is_error, **self.metadata
@@ -289,28 +292,26 @@ async def health_check() -> dict[str, Any]:
 __all__ = [
     # Manager class
     "UnifiedPerformanceManager",
-    "get_performance_manager",
-    "initialize_performance_manager",
-    "start_performance_manager",
-    "shutdown_performance_manager",
-    
-    # Context manager
-    "track_production_operation",
-    
-    # Convenience functions
-    "initialize_baseline_system",
-    "start_baseline_system", 
-    "stop_baseline_system",
-    "is_baseline_system_running",
-    "record_production_request",
-    "get_baseline_system",
-    "get_baseline_collector",
-    "get_profiler",
-    "get_regression_detector",
-    "get_performance_dashboard",
     "analyze_performance_trends",
     "check_for_regressions",
     "generate_performance_report",
+    "get_baseline_collector",
+    "get_baseline_system",
+    "get_performance_dashboard",
+    "get_performance_manager",
+    "get_profiler",
+    "get_regression_detector",
     "get_system_status",
     "health_check",
+    # Convenience functions
+    "initialize_baseline_system",
+    "initialize_performance_manager",
+    "is_baseline_system_running",
+    "record_production_request",
+    "shutdown_performance_manager",
+    "start_baseline_system",
+    "start_performance_manager",
+    "stop_baseline_system",
+    # Context manager
+    "track_production_operation",
 ]

@@ -9,13 +9,12 @@ import html
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
-from typing import List, Optional, Tuple
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class ThreatType(str, Enum):
+class ThreatType(StrEnum):
     """Types of security threats detected in input."""
 
     PROMPT_INJECTION = "prompt_injection"
@@ -43,7 +42,7 @@ class ValidationResult:
 class OWASP2025InputValidator:
     """OWASP 2025-compliant input validator for prompt injection prevention."""
 
-    def __init__(self, max_prompt_length: int = 10240):
+    def __init__(self, max_prompt_length: int = 10240) -> None:
         """Initialize OWASP input validator.
 
         Args:
@@ -114,9 +113,7 @@ class OWASP2025InputValidator:
         detected_words = []
         words = re.findall("\\b\\w+\\b", text.lower())
         for word in words:
-            for target in self.typoglycemia_targets:
-                if self._is_typoglycemia_variant(word, target):
-                    detected_words.append(f"{word} (variant of {target})")
+            detected_words.extend(f"{word} (variant of {target})" for target in self.typoglycemia_targets if self._is_typoglycemia_variant(word, target))
         return (len(detected_words) > 0, detected_words)
 
     def _is_typoglycemia_variant(self, word: str, target: str) -> bool:

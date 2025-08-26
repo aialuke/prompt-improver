@@ -1,10 +1,9 @@
-"""Training Services Module - Clean Architecture Implementation
+"""Training Services Module - Clean Architecture Implementation.
 
 Provides factory and initialization for decomposed training system services.
 Extracted from training_system_manager.py (2109 lines) as part of clean architecture refactoring.
 """
 
-from typing import Optional
 
 from prompt_improver.cli.services.training_metrics import TrainingMetrics
 from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator
@@ -21,7 +20,7 @@ from prompt_improver.cli.services.training_validator import TrainingValidator
 
 class TrainingServiceFactory:
     """Factory for creating training system services with dependency injection.
-    
+
     Implements Clean Architecture patterns:
     - Protocol-based dependency injection
     - Factory pattern for service creation
@@ -31,7 +30,7 @@ class TrainingServiceFactory:
 
     def create_validator(self) -> TrainingValidatorProtocol:
         """Create training validator service.
-        
+
         Returns:
             Configured training validator instance
         """
@@ -39,7 +38,7 @@ class TrainingServiceFactory:
 
     def create_metrics(self) -> TrainingMetricsProtocol:
         """Create training metrics service.
-        
+
         Returns:
             Configured training metrics instance
         """
@@ -47,7 +46,7 @@ class TrainingServiceFactory:
 
     def create_persistence(self) -> TrainingPersistenceProtocol:
         """Create training persistence service.
-        
+
         Returns:
             Configured training persistence instance
         """
@@ -56,18 +55,18 @@ class TrainingServiceFactory:
     def create_orchestrator(
         self,
         console=None,
-        validator: Optional[TrainingValidatorProtocol] = None,
-        metrics: Optional[TrainingMetricsProtocol] = None,
-        persistence: Optional[TrainingPersistenceProtocol] = None,
+        validator: TrainingValidatorProtocol | None = None,
+        metrics: TrainingMetricsProtocol | None = None,
+        persistence: TrainingPersistenceProtocol | None = None,
     ) -> TrainingOrchestratorProtocol:
         """Create training orchestrator service with dependencies.
-        
+
         Args:
             console: Rich console for output
             validator: Training validator service
-            metrics: Training metrics service  
+            metrics: Training metrics service
             persistence: Training persistence service
-            
+
         Returns:
             Configured training orchestrator instance
         """
@@ -88,10 +87,10 @@ class TrainingServiceFactory:
 
     def create_complete_training_system(self, console=None) -> TrainingOrchestratorProtocol:
         """Create complete training system with all dependencies.
-        
+
         Args:
             console: Rich console for output
-            
+
         Returns:
             Fully configured training orchestrator with all services
         """
@@ -99,15 +98,13 @@ class TrainingServiceFactory:
         validator = self.create_validator()
         metrics = self.create_metrics()
         persistence = self.create_persistence()
-        
-        orchestrator = self.create_orchestrator(
+
+        return self.create_orchestrator(
             console=console,
             validator=validator,
             metrics=metrics,
             persistence=persistence,
         )
-        
-        return orchestrator
 
 
 # Global factory instance for easy access
@@ -116,7 +113,7 @@ _training_service_factory = TrainingServiceFactory()
 
 def get_training_service_factory() -> TrainingServiceFactory:
     """Get the global training service factory instance.
-    
+
     Returns:
         Global training service factory
     """
@@ -125,10 +122,10 @@ def get_training_service_factory() -> TrainingServiceFactory:
 
 def create_training_system(console=None) -> TrainingOrchestratorProtocol:
     """Convenience function to create complete training system.
-    
+
     Args:
         console: Rich console for output
-        
+
     Returns:
         Fully configured training orchestrator
     """
@@ -138,7 +135,7 @@ def create_training_system(console=None) -> TrainingOrchestratorProtocol:
 # Individual service creation functions for backwards compatibility
 def create_training_validator() -> TrainingValidatorProtocol:
     """Create training validator service.
-    
+
     Returns:
         Training validator instance
     """
@@ -147,7 +144,7 @@ def create_training_validator() -> TrainingValidatorProtocol:
 
 def create_training_metrics() -> TrainingMetricsProtocol:
     """Create training metrics service.
-    
+
     Returns:
         Training metrics instance
     """
@@ -156,7 +153,7 @@ def create_training_metrics() -> TrainingMetricsProtocol:
 
 def create_training_persistence() -> TrainingPersistenceProtocol:
     """Create training persistence service.
-    
+
     Returns:
         Training persistence instance
     """
@@ -165,23 +162,23 @@ def create_training_persistence() -> TrainingPersistenceProtocol:
 
 # Export all classes and protocols for direct import
 __all__ = [
+    "TrainingMetrics",
+    "TrainingMetricsProtocol",
     # Main services
     "TrainingOrchestrator",
-    "TrainingValidator", 
-    "TrainingMetrics",
-    "TrainingPersistence",
     # Protocols
     "TrainingOrchestratorProtocol",
-    "TrainingValidatorProtocol",
-    "TrainingMetricsProtocol", 
+    "TrainingPersistence",
     "TrainingPersistenceProtocol",
-    "TrainingServiceFactoryProtocol",
     # Factory
     "TrainingServiceFactory",
-    "get_training_service_factory",
+    "TrainingServiceFactoryProtocol",
+    "TrainingValidator",
+    "TrainingValidatorProtocol",
+    "create_training_metrics",
+    "create_training_persistence",
     # Convenience functions
     "create_training_system",
     "create_training_validator",
-    "create_training_metrics",
-    "create_training_persistence",
+    "get_training_service_factory",
 ]

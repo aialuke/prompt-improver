@@ -7,9 +7,9 @@ works correctly in production-like conditions after legacy removal.
 
 import asyncio
 import logging
+import sys
 import time
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -200,7 +200,6 @@ async def test_profile_switching_scenario():
 async def test_error_recovery_scenario():
     """Test error recovery and resilience scenario"""
     print("\n=== Testing Error Recovery Scenario ===")
-    from src.prompt_improver.core.protocols.health_protocol import HealthStatus
     from src.prompt_improver.performance.monitoring.health.unified_health_system import (
         HealthCheckCategory,
         HealthCheckPluginConfig,
@@ -477,4 +476,4 @@ async def run_real_behavior_validation():
 
 if __name__ == "__main__":
     results = asyncio.run(run_real_behavior_validation())
-    exit(0 if results["validation_passed"] else 1)
+    sys.exit(0 if results["validation_passed"] else 1)

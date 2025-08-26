@@ -18,7 +18,7 @@ import functools
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any, Optional, TypeVar, Union
+from typing import TypeVar
 
 import pytest
 
@@ -32,8 +32,7 @@ def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
     Based on proven pattern from /tests/performance/test_response_time.py
     """
     try:
-        loop = asyncio.get_running_loop()
-        return loop
+        return asyncio.get_running_loop()
     except RuntimeError:
         try:
             loop = asyncio.get_event_loop()
@@ -60,7 +59,7 @@ def ensure_event_loop() -> asyncio.AbstractEventLoop:
     return loop
 
 
-def run_async_test(coro: Awaitable[T]) -> T:
+def run_async_test[T](coro: Awaitable[T]) -> T:
     """Run async test with standardized event loop handling.
 
     Consolidates 1,908 async test patterns across 298 files identified by SRE analysis.
@@ -73,7 +72,7 @@ def run_async_test(coro: Awaitable[T]) -> T:
         raise RuntimeError(f"Async test execution failed: {e}") from e
 
 
-def async_test_wrapper(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
+def async_test_wrapper[T](func: Callable[..., Awaitable[T]]) -> Callable[..., T]:
     """Decorator for async test functions using unified pattern.
 
     Consolidates duplicate async test decorators across development infrastructure.
@@ -142,7 +141,7 @@ class UnifiedPerformanceTimer:
         return (self.end_time - self.start_time) * 1000
 
 
-async def measure_async_performance(
+async def measure_async_performance[T](
     func: Callable[..., Awaitable[T]], *args, **kwargs
 ) -> tuple[T, float]:
     """Measure async function performance with unified timing.

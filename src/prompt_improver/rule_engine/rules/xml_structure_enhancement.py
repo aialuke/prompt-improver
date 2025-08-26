@@ -108,7 +108,7 @@ class XMLStructureRule(BasePromptRule):
     - Minimal attribute usage for optimal Claude performance
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = {
             "use_context_tags": True,
             "use_instruction_tags": True,
@@ -123,12 +123,12 @@ class XMLStructureRule(BasePromptRule):
         self.priority = 5
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "XML Structure Enhancement Rule",
             "type": "Structure",
@@ -145,7 +145,7 @@ class XMLStructureRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Check if prompt would benefit from XML structure"""
+        """Check if prompt would benefit from XML structure."""
         structure_metrics = self._analyze_structure_requirements(prompt)
         applies = (
             structure_metrics["complexity_score"] > 0.4
@@ -169,7 +169,7 @@ class XMLStructureRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply XML structure enhancement"""
+        """Apply XML structure enhancement."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -198,11 +198,11 @@ class XMLStructureRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction for XML structure"""
+        """Generate research-based LLM instruction for XML structure."""
         return "\n<instruction>\nApply XML structure using Anthropic optimization patterns:\n\n1. CORE TAGS (Anthropic Recommended):\n   - <context>: Background information and setting\n   - <instruction>: Main task or request\n   - <examples>: Sample inputs/outputs or demonstrations\n   - <thinking>: Reasoning process or analysis\n   - <response>: Final answer or output\n\n2. ORGANIZATION PRINCIPLES:\n   - Place context before instructions (critical information first)\n   - Group related information within appropriate tags\n   - Use clear, semantic tag names\n   - Maintain logical hierarchy\n\n3. ATTRIBUTE USAGE:\n   - Minimize attributes for optimal Claude performance\n   - Use only when necessary for clarity\n   - Prefer semantic tag names over attributes\n\n4. NESTED STRUCTURE:\n   - Allow nesting when content naturally groups\n   - Maintain consistent indentation\n   - Ensure proper tag closure\n\nFocus on clarity and logical organization that enhances understanding.\n</instruction>\n"
 
     def _analyze_structure_requirements(self, prompt: str) -> dict[str, Any]:
-        """Analyze prompt to determine XML structure requirements"""
+        """Analyze prompt to determine XML structure requirements."""
         words = prompt.split()
         word_count = len(words)
         xml_pattern = "<[^>]+>"
@@ -230,7 +230,7 @@ class XMLStructureRule(BasePromptRule):
         }
 
     def _calculate_complexity_score(self, prompt: str) -> float:
-        """Calculate prompt complexity to determine XML structure need"""
+        """Calculate prompt complexity to determine XML structure need."""
         words = prompt.lower().split()
         complexity_count = sum(1 for word in words if word in COMPLEXITY_INDICATORS)
         sentence_count = len(re.findall(r"[.!?]+", prompt))
@@ -248,17 +248,16 @@ class XMLStructureRule(BasePromptRule):
         sentence_complexity = min(0.3, sentence_count / 10)
         conjunction_complexity = conjunction_count / max(len(words), 1) * 3
         length_complexity = min(0.4, len(words) / 50)
-        total_complexity = min(
+        return min(
             1.0,
             base_complexity
             + sentence_complexity
             + conjunction_complexity
             + length_complexity,
         )
-        return total_complexity
 
     def _detect_content_sections(self, prompt: str) -> dict[str, str]:
-        """Detect different content sections in the prompt"""
+        """Detect different content sections in the prompt."""
         sections = {}
         prompt_lower = prompt.lower()
         sentences = re.split(r"[.!?]+", prompt)
@@ -312,7 +311,7 @@ class XMLStructureRule(BasePromptRule):
     def _recommend_tags(
         self, detected_sections: dict[str, str], complexity_score: float
     ) -> list[str]:
-        """Recommend appropriate XML tags based on content and complexity"""
+        """Recommend appropriate XML tags based on content and complexity."""
         recommended = []
         if "context" in detected_sections and self.config["use_context_tags"]:
             recommended.append("context")
@@ -333,7 +332,7 @@ class XMLStructureRule(BasePromptRule):
     def _apply_xml_structure(
         self, prompt: str, detected_sections: dict[str, str], metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Apply comprehensive XML structure based on detected sections"""
+        """Apply comprehensive XML structure based on detected sections."""
         structured_parts = []
         transformations = []
         tag_order = ["context", "examples", "instruction", "format", "constraints"]
@@ -375,7 +374,7 @@ class XMLStructureRule(BasePromptRule):
     def _apply_basic_xml_structure(
         self, prompt: str, metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Apply basic XML structure for prompts without clear sections"""
+        """Apply basic XML structure for prompts without clear sections."""
         if metrics.get("word_count", 0) < 30:
             return (prompt, [])
         transformations = []
@@ -418,7 +417,7 @@ class XMLStructureRule(BasePromptRule):
         return (structured_prompt, transformations)
 
     def _validate_xml_structure(self, structured_prompt: str) -> bool:
-        """Validate that the XML structure is well-formed"""
+        """Validate that the XML structure is well-formed."""
         try:
             tag_pattern = "<(\\w+)>"
             opening_tags = re.findall(tag_pattern, structured_prompt)
@@ -429,7 +428,7 @@ class XMLStructureRule(BasePromptRule):
             return False
 
     def _optimize_tag_hierarchy(self, sections: dict[str, str]) -> dict[str, str]:
-        """Optimize tag hierarchy based on Anthropic best practices"""
+        """Optimize tag hierarchy based on Anthropic best practices."""
         optimized_order = [
             "context",
             "examples",

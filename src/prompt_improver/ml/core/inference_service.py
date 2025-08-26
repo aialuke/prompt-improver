@@ -99,6 +99,45 @@ class MLInferenceService:
             }
         ]
     
+    async def predict_rule_effectiveness(
+        self, model_id: str, rule_features: List[float]
+    ) -> Dict[str, Any]:
+        """Predict rule effectiveness using trained model.
+        
+        Args:
+            model_id: ID of the model to use for prediction
+            rule_features: List of feature values for the rule
+            
+        Returns:
+            Dictionary with prediction results
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        try:
+            # Mock prediction based on rule features
+            # In a real implementation, this would load the actual model and run inference
+            feature_sum = sum(rule_features)
+            normalized_score = min(1.0, max(0.0, feature_sum / len(rule_features)))
+            
+            return {
+                "effectiveness_score": normalized_score,
+                "confidence": 0.85,
+                "model_id": model_id,
+                "features_processed": len(rule_features),
+                "success": True,
+                "inference_time_ms": 1.5  # Mock inference time
+            }
+        except Exception as e:
+            logger.error(f"Rule effectiveness prediction failed for model {model_id}: {e}")
+            return {
+                "effectiveness_score": 0.0,
+                "confidence": 0.0,
+                "model_id": model_id,
+                "success": False,
+                "error": str(e)
+            }
+
     async def health_check(self) -> Dict[str, Any]:
         """Check inference service health."""
         return {

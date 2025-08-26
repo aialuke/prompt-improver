@@ -4,7 +4,7 @@ Extends the existing health monitoring infrastructure to include ML pipeline com
 """
 
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
@@ -19,7 +19,7 @@ from prompt_improver.performance.monitoring.health.metrics import (
 class MLOrchestratorHealthChecker(HealthChecker):
     """Health checker for the main ML Pipeline Orchestrator."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ML orchestrator health checker."""
         super().__init__(name="ml_orchestrator")
         self.logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class MLOrchestratorHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds()
-            self.logger.error(f"ML orchestrator health check failed: {e}")
+            self.logger.exception(f"ML orchestrator health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -108,7 +108,7 @@ class MLOrchestratorHealthChecker(HealthChecker):
 class MLComponentRegistryHealthChecker(HealthChecker):
     """Health checker for the ML Component Registry."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the component registry health checker."""
         super().__init__(name="ml_component_registry")
         self.logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ class MLComponentRegistryHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds()
-            self.logger.error(f"Component registry health check failed: {e}")
+            self.logger.exception(f"Component registry health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -175,7 +175,7 @@ class MLComponentRegistryHealthChecker(HealthChecker):
 class MLResourceManagerHealthChecker(HealthChecker):
     """Health checker for the ML Resource Manager."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the resource manager health checker."""
         super().__init__(name="ml_resource_manager")
         self.logger = logging.getLogger(__name__)
@@ -237,7 +237,7 @@ class MLResourceManagerHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds()
-            self.logger.error(f"Resource manager health check failed: {e}")
+            self.logger.exception(f"Resource manager health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -251,7 +251,7 @@ class MLResourceManagerHealthChecker(HealthChecker):
 class MLWorkflowEngineHealthChecker(HealthChecker):
     """Health checker for the ML Workflow Execution Engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the workflow engine health checker."""
         super().__init__(name="ml_workflow_engine")
         self.logger = logging.getLogger(__name__)
@@ -312,7 +312,7 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds()
-            self.logger.error(f"Workflow engine health check failed: {e}")
+            self.logger.exception(f"Workflow engine health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -326,7 +326,7 @@ class MLWorkflowEngineHealthChecker(HealthChecker):
 class MLEventBusHealthChecker(HealthChecker):
     """Health checker for the ML Event Bus."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the event bus health checker."""
         super().__init__(name="ml_event_bus")
         self.logger = logging.getLogger(__name__)
@@ -385,7 +385,7 @@ class MLEventBusHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds()
-            self.logger.error(f"Event bus health check failed: {e}")
+            self.logger.exception(f"Event bus health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,

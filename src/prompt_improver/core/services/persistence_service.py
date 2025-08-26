@@ -1,4 +1,4 @@
-"""Persistence Service - Database persistence operations
+"""Persistence Service - Database persistence operations.
 
 Handles all database operations for:
 - Improvement sessions storage
@@ -12,7 +12,6 @@ Follows single responsibility principle for data persistence concerns.
 """
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,21 +21,14 @@ from prompt_improver.utils.datetime_utils import aware_utc_now
 
 if TYPE_CHECKING:
     from prompt_improver.database.models import (
-        ABExperiment,
-        ImprovementSession,
-        ImprovementSessionCreate,
-        MLModelPerformance,
-        RulePerformance,
-        RulePerformanceCreate,
         UserFeedback,
-        UserFeedbackCreate,
     )
 
 logger = logging.getLogger(__name__)
 
 
 class PersistenceService:
-    """Service focused on database persistence operations"""
+    """Service focused on database persistence operations."""
 
     async def store_session(
         self,
@@ -47,7 +39,7 @@ class PersistenceService:
         user_context: dict[str, Any] | None,
         db_session: AsyncSession,
     ) -> None:
-        """Store improvement session in database"""
+        """Store improvement session in database."""
         try:
             rule_ids = (
                 [rule.get("rule_id", "unknown") for rule in rules_applied]
@@ -69,13 +61,13 @@ class PersistenceService:
             db_session.add(ImprovementSession(**session_data.model_dump()))
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Error storing session: {e}")
+            logger.exception(f"Error storing session: {e}")
             await db_session.rollback()
 
     async def store_performance_metrics(
         self, performance_data: list[dict[str, Any]], db_session: AsyncSession
     ) -> None:
-        """Store rule performance metrics"""
+        """Store rule performance metrics."""
         try:
             from prompt_improver.database.models import (
                 RulePerformance,
@@ -94,7 +86,7 @@ class PersistenceService:
                 db_session.add(RulePerformance(**perf_record.model_dump()))
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Error storing performance metrics: {e}")
+            logger.exception(f"Error storing performance metrics: {e}")
             await db_session.rollback()
 
     async def store_user_feedback(
@@ -105,7 +97,7 @@ class PersistenceService:
         improvement_areas: list[str] | None,
         db_session: AsyncSession,
     ) -> "UserFeedback":
-        """Store user feedback"""
+        """Store user feedback."""
         try:
             from prompt_improver.database.models import (
                 ImprovementSession,
@@ -134,7 +126,7 @@ class PersistenceService:
             await db_session.refresh(feedback)
             return feedback
         except Exception as e:
-            logger.error(f"Error storing user feedback: {e}")
+            logger.exception(f"Error storing user feedback: {e}")
             await db_session.rollback()
             raise
 
@@ -157,7 +149,7 @@ class PersistenceService:
                 db_session.add(feedback)
                 await db_session.commit()
         except Exception as e:
-            logger.error(f"Failed to store optimization trigger: {e}")
+            logger.exception(f"Failed to store optimization trigger: {e}")
             await db_session.rollback()
 
     async def store_ml_optimization_results(
@@ -182,7 +174,7 @@ class PersistenceService:
             db_session.add(performance_record)
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Failed to store ML optimization results: {e}")
+            logger.exception(f"Failed to store ML optimization results: {e}")
             await db_session.rollback()
 
     async def create_ab_experiments_from_patterns(
@@ -211,7 +203,7 @@ class PersistenceService:
                     db_session.add(experiment)
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Failed to create A/B experiments: {e}")
+            logger.exception(f"Failed to create A/B experiments: {e}")
             await db_session.rollback()
 
     async def store_pattern_discovery_results(
@@ -224,13 +216,13 @@ class PersistenceService:
             )
             # Could extend this to store patterns in a dedicated table if needed
         except Exception as e:
-            logger.error(f"Failed to store pattern discovery results: {e}")
+            logger.exception(f"Failed to store pattern discovery results: {e}")
             await db_session.rollback()
 
     async def get_feedback_by_id(
         self, feedback_id: int, db_session: AsyncSession
     ) -> "UserFeedback | None":
-        """Get user feedback by ID"""
+        """Get user feedback by ID."""
         try:
             from prompt_improver.database.models import UserFeedback
 
@@ -238,13 +230,13 @@ class PersistenceService:
             result = await db_session.execute(stmt)
             return result.scalar_one_or_none()
         except Exception as e:
-            logger.error(f"Error retrieving feedback {feedback_id}: {e}")
+            logger.exception(f"Error retrieving feedback {feedback_id}: {e}")
             return None
 
     async def get_performance_data_for_optimization(
         self, db_session: AsyncSession
     ) -> list[tuple[Any, ...]]:
-        """Get performance data for ML optimization"""
+        """Get performance data for ML optimization."""
         try:
             from sqlalchemy import select
 
@@ -258,7 +250,7 @@ class PersistenceService:
             result = await db_session.execute(perf_stmt)
             return result.fetchall()
         except Exception as e:
-            logger.error(f"Error getting performance data: {e}")
+            logger.exception(f"Error getting performance data: {e}")
             return []
 
     async def bulk_store_performance_metrics(
@@ -267,7 +259,7 @@ class PersistenceService:
         db_session: AsyncSession,
         batch_size: int = 100,
     ) -> None:
-        """Store performance metrics in batches for better performance"""
+        """Store performance metrics in batches for better performance."""
         try:
             from prompt_improver.database.models import (
                 RulePerformance,
@@ -293,13 +285,13 @@ class PersistenceService:
 
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Error in bulk storing performance metrics: {e}")
+            logger.exception(f"Error in bulk storing performance metrics: {e}")
             await db_session.rollback()
 
     async def cleanup_old_sessions(
         self, db_session: AsyncSession, days_old: int = 90
     ) -> int:
-        """Clean up old improvement sessions"""
+        """Clean up old improvement sessions."""
         try:
             from datetime import timedelta
 
@@ -320,6 +312,6 @@ class PersistenceService:
             )
             return deleted_count
         except Exception as e:
-            logger.error(f"Error cleaning up old sessions: {e}")
+            logger.exception(f"Error cleaning up old sessions: {e}")
             await db_session.rollback()
             return 0

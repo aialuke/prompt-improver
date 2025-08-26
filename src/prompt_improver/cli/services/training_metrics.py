@@ -1,21 +1,20 @@
-"""Training Metrics Service - Clean Architecture Implementation
+"""Training Metrics Service - Clean Architecture Implementation.
 
 Implements performance monitoring, metrics collection, and analysis.
 Extracted from training_system_manager.py (2109 lines) as part of decomposition.
 """
 
 import logging
-import math
 import time
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.cli.services.training_protocols import TrainingMetricsProtocol
 
 
 class TrainingMetrics(TrainingMetricsProtocol):
     """Training metrics service implementing Clean Architecture patterns.
-    
+
     Responsibilities:
     - Performance monitoring and metrics collection
     - Resource usage tracking and analysis
@@ -23,17 +22,17 @@ class TrainingMetrics(TrainingMetricsProtocol):
     - System health metrics aggregation
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger("apes.training_metrics")
-        
+
         # Metrics collection state
-        self._metrics_history: List[Dict[str, Any]] = []
-        self._performance_baseline: Optional[Dict[str, float]] = None
+        self._metrics_history: list[dict[str, Any]] = []
+        self._performance_baseline: dict[str, float] | None = None
         self._collection_start_time: float = time.time()
 
-    async def get_resource_usage(self) -> Dict[str, float]:
+    async def get_resource_usage(self) -> dict[str, float]:
         """Get current system resource usage metrics.
-        
+
         Returns:
             Resource usage metrics including memory, CPU, and I/O
         """
@@ -41,11 +40,11 @@ class TrainingMetrics(TrainingMetricsProtocol):
             import psutil
 
             process = psutil.Process()
-            
+
             # Get detailed process metrics
             memory_info = process.memory_info()
             cpu_percent = process.cpu_percent()
-            
+
             # Get system-wide metrics for context
             system_memory = psutil.virtual_memory()
             system_cpu = psutil.cpu_percent()
@@ -92,9 +91,9 @@ class TrainingMetrics(TrainingMetricsProtocol):
                 "status": "psutil_not_available"
             }
 
-    async def get_detailed_training_metrics(self) -> Dict[str, Any]:
+    async def get_detailed_training_metrics(self) -> dict[str, Any]:
         """Get comprehensive training performance metrics.
-        
+
         Returns:
             Detailed training metrics including performance trends and analysis
         """
@@ -139,21 +138,21 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return performance_metrics
 
         except Exception as e:
-            self.logger.error(f"Failed to get detailed training metrics: {e}")
+            self.logger.exception(f"Failed to get detailed training metrics: {e}")
             return {
                 "error": str(e),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
 
-    async def get_current_performance_metrics(self) -> Dict[str, Any]:
+    async def get_current_performance_metrics(self) -> dict[str, Any]:
         """Get current performance metrics for checkpoint creation.
-        
+
         Returns:
             Current performance state for checkpointing
         """
         try:
             resource_usage = await self.get_resource_usage()
-            
+
             performance_metrics = {
                 "resource_usage": resource_usage,
                 "collection_timestamp": datetime.now(UTC).isoformat(),
@@ -180,19 +179,19 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return performance_metrics
 
         except Exception as e:
-            self.logger.error(f"Failed to get current performance metrics: {e}")
+            self.logger.exception(f"Failed to get current performance metrics: {e}")
             return {"error": str(e)}
 
-    async def get_performance_summary(self) -> Dict[str, Any]:
+    async def get_performance_summary(self) -> dict[str, Any]:
         """Get summarized performance metrics for status reporting.
-        
+
         Returns:
             Performance summary with key metrics and insights
         """
         try:
             # Get current metrics
             current_metrics = await self.get_detailed_training_metrics()
-            
+
             # Calculate summary statistics
             summary = {
                 "current_performance": {
@@ -220,17 +219,17 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return summary
 
         except Exception as e:
-            self.logger.error(f"Failed to get performance summary: {e}")
+            self.logger.exception(f"Failed to get performance summary: {e}")
             return {"error": str(e)}
 
     async def record_training_iteration(
-        self, 
-        iteration: int, 
-        metrics: Dict[str, float], 
+        self,
+        iteration: int,
+        metrics: dict[str, float],
         duration_seconds: float
     ) -> None:
         """Record metrics for a training iteration.
-        
+
         Args:
             iteration: Training iteration number
             metrics: Performance metrics for this iteration
@@ -246,7 +245,7 @@ class TrainingMetrics(TrainingMetricsProtocol):
             }
 
             self._metrics_history.append(iteration_metrics)
-            
+
             # Update performance baseline if this is significantly better
             if self._performance_baseline is None:
                 self._performance_baseline = metrics.copy()
@@ -256,9 +255,9 @@ class TrainingMetrics(TrainingMetricsProtocol):
             self.logger.debug(f"Recorded training iteration {iteration} metrics")
 
         except Exception as e:
-            self.logger.error(f"Failed to record training iteration metrics: {e}")
+            self.logger.exception(f"Failed to record training iteration metrics: {e}")
 
-    async def _calculate_performance_trends(self) -> Dict[str, Any]:
+    async def _calculate_performance_trends(self) -> dict[str, Any]:
         """Calculate performance trends from historical metrics."""
         if len(self._metrics_history) < 2:
             return {"status": "insufficient_data"}
@@ -308,10 +307,10 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return trends
 
         except Exception as e:
-            self.logger.error(f"Failed to calculate performance trends: {e}")
+            self.logger.exception(f"Failed to calculate performance trends: {e}")
             return {"error": str(e)}
 
-    async def _calculate_resource_efficiency(self, resource_usage: Dict[str, float]) -> Dict[str, Any]:
+    async def _calculate_resource_efficiency(self, resource_usage: dict[str, float]) -> dict[str, Any]:
         """Calculate resource efficiency metrics."""
         try:
             efficiency = {}
@@ -354,11 +353,11 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return efficiency
 
         except Exception as e:
-            self.logger.error(f"Failed to calculate resource efficiency: {e}")
+            self.logger.exception(f"Failed to calculate resource efficiency: {e}")
             return {"error": str(e)}
 
     async def _calculate_performance_health_score(
-        self, resource_usage: Dict[str, float], trends: Dict[str, Any]
+        self, resource_usage: dict[str, float], trends: dict[str, Any]
     ) -> float:
         """Calculate overall performance health score (0-1)."""
         try:
@@ -390,49 +389,44 @@ class TrainingMetrics(TrainingMetricsProtocol):
             return sum(score_components)
 
         except Exception as e:
-            self.logger.error(f"Failed to calculate performance health score: {e}")
+            self.logger.exception(f"Failed to calculate performance health score: {e}")
             return 0.0
 
     def _categorize_memory_usage(self, memory_mb: float) -> str:
         """Categorize memory usage level."""
         if memory_mb < 50:
             return "low"
-        elif memory_mb < 200:
+        if memory_mb < 200:
             return "moderate"
-        elif memory_mb < 500:
+        if memory_mb < 500:
             return "high"
-        else:
-            return "very_high"
+        return "very_high"
 
     def _categorize_cpu_usage(self, cpu_percent: float) -> str:
         """Categorize CPU usage level."""
         if cpu_percent < 10:
             return "low"
-        elif cpu_percent < 30:
+        if cpu_percent < 30:
             return "moderate"
-        elif cpu_percent < 70:
+        if cpu_percent < 70:
             return "high"
-        else:
-            return "very_high"
+        return "very_high"
 
-    def _analyze_recent_trend(self, recent_metrics: List[Dict[str, Any]]) -> Dict[str, str]:
+    def _analyze_recent_trend(self, recent_metrics: list[dict[str, Any]]) -> dict[str, str]:
         """Analyze recent performance trend."""
         if len(recent_metrics) < 3:
             return {"status": "insufficient_data"}
 
         try:
             # Extract memory values from recent metrics
-            memory_values = []
-            for entry in recent_metrics:
-                if "resource_usage" in entry:
-                    memory_values.append(entry["resource_usage"].get("memory_mb", 0))
+            memory_values = [entry["resource_usage"].get("memory_mb", 0) for entry in recent_metrics if "resource_usage" in entry]
 
             if len(memory_values) < 3:
                 return {"status": "insufficient_memory_data"}
 
             # Simple trend analysis
-            first_half = memory_values[:len(memory_values)//2]
-            second_half = memory_values[len(memory_values)//2:]
+            first_half = memory_values[:len(memory_values) // 2]
+            second_half = memory_values[len(memory_values) // 2:]
 
             first_avg = sum(first_half) / len(first_half)
             second_avg = sum(second_half) / len(second_half)
@@ -465,16 +459,16 @@ class TrainingMetrics(TrainingMetricsProtocol):
             if len(timestamps) < 2:
                 return 0.0
 
-            intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
+            intervals = [timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))]
             avg_interval = sum(intervals) / len(intervals)
-            
+
             return 1 / avg_interval if avg_interval > 0 else 0.0  # Frequency in Hz
 
         except Exception as e:
-            self.logger.error(f"Failed to calculate measurement frequency: {e}")
+            self.logger.exception(f"Failed to calculate measurement frequency: {e}")
             return 0.0
 
-    async def _generate_performance_insights(self) -> List[str]:
+    async def _generate_performance_insights(self) -> list[str]:
         """Generate performance insights from historical data."""
         insights = []
 
@@ -484,7 +478,7 @@ class TrainingMetrics(TrainingMetricsProtocol):
 
             # Analyze memory usage patterns
             recent_memory = [
-                entry["resource_usage"].get("memory_mb", 0) 
+                entry["resource_usage"].get("memory_mb", 0)
                 for entry in self._metrics_history[-20:]
                 if "resource_usage" in entry
             ]
@@ -492,16 +486,16 @@ class TrainingMetrics(TrainingMetricsProtocol):
             if recent_memory:
                 avg_memory = sum(recent_memory) / len(recent_memory)
                 max_memory = max(recent_memory)
-                
+
                 if max_memory > 1000:
                     insights.append(f"High memory usage detected (peak: {max_memory:.1f}MB)")
-                
+
                 if max_memory > avg_memory * 2:
                     insights.append("Memory usage shows high variability")
 
             # Analyze CPU usage patterns
             recent_cpu = [
-                entry["resource_usage"].get("cpu_percent", 0) 
+                entry["resource_usage"].get("cpu_percent", 0)
                 for entry in self._metrics_history[-20:]
                 if "resource_usage" in entry
             ]
@@ -519,11 +513,11 @@ class TrainingMetrics(TrainingMetricsProtocol):
                 insights.append("Low measurement frequency - consider more frequent monitoring")
 
         except Exception as e:
-            insights.append(f"Error generating insights: {str(e)}")
+            insights.append(f"Error generating insights: {e!s}")
 
         return insights if insights else ["No significant performance insights available"]
 
-    async def _generate_performance_recommendations(self, current_metrics: Dict[str, Any]) -> List[str]:
+    async def _generate_performance_recommendations(self, current_metrics: dict[str, Any]) -> list[str]:
         """Generate performance recommendations based on current metrics."""
         recommendations = []
 
@@ -539,7 +533,7 @@ class TrainingMetrics(TrainingMetricsProtocol):
             if efficiency.get("memory_efficiency") == "needs_optimization":
                 recommendations.append("Memory usage is high - investigate memory leaks or optimize data structures")
 
-            # CPU recommendations  
+            # CPU recommendations
             cpu_percent = resource_usage.get("cpu_percent", 0)
             if cpu_percent > 90:
                 recommendations.append("CPU usage is very high - consider reducing concurrent operations")
@@ -557,11 +551,11 @@ class TrainingMetrics(TrainingMetricsProtocol):
                 recommendations.append("High number of open files - ensure proper resource cleanup")
 
         except Exception as e:
-            recommendations.append(f"Error generating recommendations: {str(e)}")
+            recommendations.append(f"Error generating recommendations: {e!s}")
 
         return recommendations if recommendations else ["System performance appears optimal"]
 
-    async def _update_performance_baseline(self, new_metrics: Dict[str, float]) -> None:
+    async def _update_performance_baseline(self, new_metrics: dict[str, float]) -> None:
         """Update performance baseline with new metrics if they're significantly better."""
         try:
             if self._performance_baseline is None:
@@ -576,20 +570,19 @@ class TrainingMetrics(TrainingMetricsProtocol):
                     if key == "effectiveness_score":
                         if value > current_baseline:
                             self._performance_baseline[key] = value
-                    else:
-                        if value < current_baseline:
-                            self._performance_baseline[key] = value
+                    elif value < current_baseline:
+                        self._performance_baseline[key] = value
 
         except Exception as e:
-            self.logger.error(f"Failed to update performance baseline: {e}")
+            self.logger.exception(f"Failed to update performance baseline: {e}")
 
     # Utility methods for external access
-    def get_metrics_history(self, count: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_metrics_history(self, count: int | None = None) -> list[dict[str, Any]]:
         """Get metrics history for analysis.
-        
+
         Args:
             count: Number of recent entries to return, None for all
-            
+
         Returns:
             List of historical metrics entries
         """

@@ -17,16 +17,11 @@ Security Test Coverage:
 
 import asyncio
 import json
-import tempfile
-from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 
-import asyncpg
 import pytest
 
 from prompt_improver.core.config import AppConfig
-from prompt_improver.database import ManagerMode, get_database_services
 
 
 class Permission(Enum):

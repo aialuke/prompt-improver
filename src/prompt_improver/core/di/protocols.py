@@ -4,10 +4,9 @@ Defines the contract for domain-specific dependency injection containers
 with clean boundaries and protocol-based service registration.
 """
 
-import asyncio
 from abc import abstractmethod
 from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, Protocol, Type, TypeVar
+from typing import Any, AsyncContextManager, Protocol, TypeVar
 
 T = TypeVar("T")
 
@@ -143,7 +142,7 @@ class ContainerRegistryProtocol(Protocol):
     @abstractmethod
     def register_singleton(
         self,
-        interface: Type[T],
+        interface: type[T],
         implementation_or_factory: Any,
         tags: set[str] | None = None,
     ) -> None:
@@ -153,7 +152,7 @@ class ContainerRegistryProtocol(Protocol):
     @abstractmethod
     def register_transient(
         self,
-        interface: Type[T], 
+        interface: type[T],
         implementation_or_factory: Any,
         tags: set[str] | None = None,
     ) -> None:
@@ -163,7 +162,7 @@ class ContainerRegistryProtocol(Protocol):
     @abstractmethod
     def register_factory(
         self,
-        interface: Type[T],
+        interface: type[T],
         factory: Any,
         tags: set[str] | None = None,
     ) -> None:
@@ -171,28 +170,28 @@ class ContainerRegistryProtocol(Protocol):
         ...
 
     @abstractmethod
-    async def get(self, interface: Type[T]) -> T:
+    async def get(self, interface: type[T]) -> T:
         """Resolve service instance."""
         ...
 
     @abstractmethod
-    def is_registered(self, interface: Type[T]) -> bool:
+    def is_registered(self, interface: type[T]) -> bool:
         """Check if service is registered."""
         ...
 
 
 class MonitoringContainerProtocol(ContainerProtocol):
     """Protocol for monitoring services container.
-    
+
     Provides access to monitoring and observability services including:
     - Metrics collection and registry (OpenTelemetry)
-    - Health check systems and unified health monitoring  
+    - Health check systems and unified health monitoring
     - A/B testing and experimentation services
     - Performance monitoring and benchmarking
     - Alerting and notification systems
     - Distributed tracing and logging
     - Observability dashboards and visualization
-    
+
     Designed to eliminate circular dependencies through protocol-based interfaces.
     """
 
@@ -214,7 +213,7 @@ class MonitoringContainerProtocol(ContainerProtocol):
     @abstractmethod
     async def get_performance_monitor(self) -> Any:
         """Get performance monitor instance for benchmarking.
-        
+
         Note: Performance monitoring may have lazy loading to avoid
         circular dependencies with MCP server components.
         """
@@ -253,7 +252,7 @@ class MonitoringContainerProtocol(ContainerProtocol):
     @abstractmethod
     def register_performance_monitoring_factory(self) -> None:
         """Register factory for performance monitoring service.
-        
+
         Implementation should use lazy loading to avoid circular dependencies.
         """
         ...

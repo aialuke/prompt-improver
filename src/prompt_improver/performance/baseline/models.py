@@ -4,10 +4,10 @@ import statistics
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 try:
     PSUTIL_AVAILABLE = True
@@ -66,8 +66,7 @@ class MetricDefinition(BaseModel):
     def __post_init__(self):
         """Validate metric definition."""
         if (
-            self.metric_type == MetricType.THROUGHPUT
-            or self.metric_type == MetricType.AVAILABILITY
+            self.metric_type in {MetricType.THROUGHPUT, MetricType.AVAILABILITY}
         ):
             self.lower_is_better = False
 

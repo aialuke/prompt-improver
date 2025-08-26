@@ -6,7 +6,7 @@ maintaining strict architectural separation between MCP and ML components.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.events.ml_event_bus import (
     MLEvent,
@@ -26,7 +26,7 @@ class EventBasedMLHealthService(MLHealthInterface):
     architectural separation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
         self._check_counter = 0
 
@@ -68,7 +68,7 @@ class EventBasedMLHealthService(MLHealthInterface):
                 "check_timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to check model health for {model_id}: {e}")
+            self.logger.exception(f"Failed to check model health for {model_id}: {e}")
             return {
                 "check_id": check_id,
                 "model_id": model_id,
@@ -115,7 +115,7 @@ class EventBasedMLHealthService(MLHealthInterface):
                 "check_timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to check system health: {e}")
+            self.logger.exception(f"Failed to check system health: {e}")
             return {
                 "check_id": check_id,
                 "overall_status": "error",
@@ -184,7 +184,7 @@ class EventBasedMLHealthService(MLHealthInterface):
                 "check_timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to get performance metrics: {e}")
+            self.logger.exception(f"Failed to get performance metrics: {e}")
             return {
                 "request_id": request_id,
                 "error": str(e),
@@ -235,7 +235,7 @@ class EventBasedMLHealthService(MLHealthInterface):
                 "check_timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to check data drift for {model_id}: {e}")
+            self.logger.exception(f"Failed to check data drift for {model_id}: {e}")
             return {
                 "check_id": check_id,
                 "model_id": model_id,

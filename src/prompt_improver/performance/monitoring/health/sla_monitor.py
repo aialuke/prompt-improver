@@ -1,5 +1,5 @@
 """Service Level Agreement (SLA) Monitoring for Health Checks
-2025 Enterprise-grade SLA tracking and alerting
+2025 Enterprise-grade SLA tracking and alerting.
 """
 
 import logging
@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.config import get_config
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class SLAStatus(Enum):
-    """SLA compliance status"""
+    """SLA compliance status."""
 
     MEETING = "meeting"
     AT_RISK = "at_risk"
@@ -26,7 +26,7 @@ class SLAStatus(Enum):
 
 @dataclass
 class SLATarget:
-    """Definition of an SLA target"""
+    """Definition of an SLA target."""
 
     name: str
     description: str
@@ -60,7 +60,7 @@ class SLATarget:
 
 @dataclass
 class SLAConfiguration:
-    """Complete SLA configuration for a service"""
+    """Complete SLA configuration for a service."""
 
     service_name: str
     response_time_p50_ms: float = 100
@@ -88,20 +88,20 @@ class SLAConfiguration:
 
 
 class SLAMeasurement:
-    """Tracks measurements for a specific SLA target"""
+    """Tracks measurements for a specific SLA target."""
 
-    def __init__(self, target: SLATarget):
+    def __init__(self, target: SLATarget) -> None:
         self.target = target
         self.measurements = deque(maxlen=1000)
         self.last_alert_time: float | None = None
 
     def add_measurement(self, value: float, timestamp: float | None = None):
-        """Add a new measurement"""
+        """Add a new measurement."""
         timestamp = timestamp or time.time()
         self.measurements.append((timestamp, value))
 
     def get_current_value(self) -> float | None:
-        """Calculate current value within measurement window"""
+        """Calculate current value within measurement window."""
         if not self.measurements:
             return None
         current_time = time.time()
@@ -128,7 +128,7 @@ class SLAMeasurement:
         return statistics.mean(recent_values)
 
     def get_compliance_status(self) -> SLAStatus:
-        """Check if SLA is being met"""
+        """Check if SLA is being met."""
         current_value = self.get_current_value()
         if current_value is None:
             return SLAStatus.MEETING
@@ -153,7 +153,7 @@ class SLAMeasurement:
         return SLAStatus.MEETING
 
     def should_alert(self) -> bool:
-        """Check if we should send an alert"""
+        """Check if we should send an alert."""
         if not self.target.alert_on_breach:
             return False
         if self.get_compliance_status() != SLAStatus.BREACHING:
@@ -166,14 +166,14 @@ class SLAMeasurement:
 
 
 class SLAMonitor:
-    """Monitors SLA compliance for health checks"""
+    """Monitors SLA compliance for health checks."""
 
     def __init__(
         self,
         service_name: str,
         config: SLAConfiguration,
         on_sla_breach: Callable[[str, SLATarget, float], None] | None = None,
-    ):
+    ) -> None:
         self.service_name = service_name
         self.config = config
         self.on_sla_breach = on_sla_breach
@@ -185,8 +185,8 @@ class SLAMonitor:
         self._success_count = 0
         self._start_time = time.time()
 
-    def _initialize_standard_slas(self):
-        """Initialize standard SLA measurements"""
+    def _initialize_standard_slas(self) -> None:
+        """Initialize standard SLA measurements."""
         self.measurements["response_time_p50"] = SLAMeasurement(
             SLATarget(
                 name="response_time_p50",
@@ -234,7 +234,7 @@ class SLAMonitor:
         response_time_ms: float,
         custom_metrics: dict[str, float] | None = None,
     ):
-        """Record a health check result and update SLA metrics"""
+        """Record a health check result and update SLA metrics."""
         self._check_count += 1
         if success:
             self._success_count += 1
@@ -251,9 +251,9 @@ class SLAMonitor:
                     self.measurements[metric_name].add_measurement(value)
         self._check_sla_compliance()
 
-    def _check_sla_compliance(self):
-        """Check all SLAs and trigger alerts if needed"""
-        for name, measurement in self.measurements.items():
+    def _check_sla_compliance(self) -> None:
+        """Check all SLAs and trigger alerts if needed."""
+        for measurement in self.measurements.values():
             if measurement.should_alert():
                 current_value = measurement.get_current_value()
                 logger.warning(f"SLA breach detected for {self.service_name}")
@@ -264,7 +264,7 @@ class SLAMonitor:
                     )
 
     def get_sla_report(self) -> dict[str, Any]:
-        """Generate comprehensive SLA compliance report"""
+        """Generate comprehensive SLA compliance report."""
         report = {
             "service": self.service_name,
             "timestamp": time.time(),
@@ -297,7 +297,7 @@ class SLAMonitor:
         return report
 
     def get_sla_metrics_for_export(self) -> dict[str, float]:
-        """Get SLA metrics in format suitable for OpenTelemetry/Grafana"""
+        """Get SLA metrics in format suitable for OpenTelemetry/Grafana."""
         metrics = {}
         for name, measurement in self.measurements.items():
             current_value = measurement.get_current_value()
@@ -324,7 +324,7 @@ sla_monitors: dict[str, SLAMonitor] = {}
 def get_or_create_sla_monitor(
     service_name: str, config: SLAConfiguration | None = None
 ) -> SLAMonitor:
-    """Get or create an SLA monitor for a service"""
+    """Get or create an SLA monitor for a service."""
     if service_name not in sla_monitors:
         if config is None:
             config = SLAConfiguration(service_name=service_name)

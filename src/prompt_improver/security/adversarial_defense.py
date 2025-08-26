@@ -1,14 +1,19 @@
 """Real adversarial defense system for production use and integration testing."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    pass
+else:
+    from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 
 class AdversarialDefenseSystem:
     """Real adversarial defense system that implements multiple defense mechanisms."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.defense_methods = [
             "gaussian_noise",
             "input_validation",
@@ -51,12 +56,13 @@ class AdversarialDefenseSystem:
             return True
         return False
 
-    def apply_gaussian_noise_defense(self, input_data: np.ndarray) -> np.ndarray:
+    def apply_gaussian_noise_defense(self, input_data: "np.ndarray") -> "np.ndarray":
         """Apply Gaussian noise defense to input data."""
         if "gaussian_noise" not in self.active_defenses:
             return input_data
         config = self.defense_config["gaussian_noise"]
         sigma = config.get("sigma", 0.1)
+        np = get_numpy()
         rng = np.random.default_rng()
         noise = rng.normal(0, sigma, input_data.shape)
         defended_data = input_data + noise
@@ -71,8 +77,8 @@ class AdversarialDefenseSystem:
         return defended_data
 
     def apply_input_validation_defense(
-        self, input_data: np.ndarray, bounds: tuple = (-1.0, 1.0)
-    ) -> np.ndarray:
+        self, input_data: "np.ndarray", bounds: tuple = (-1.0, 1.0)
+    ) -> "np.ndarray":
         """Apply input validation defense by clipping values to bounds."""
         if "input_validation" not in self.active_defenses:
             return input_data
@@ -89,7 +95,7 @@ class AdversarialDefenseSystem:
         )
         return defended_data
 
-    def apply_input_preprocessing_defense(self, input_data: np.ndarray) -> np.ndarray:
+    def apply_input_preprocessing_defense(self, input_data: "np.ndarray") -> "np.ndarray":
         """Apply input preprocessing defense (normalization, filtering)."""
         if "input_preprocessing" not in self.active_defenses:
             return input_data
@@ -100,11 +106,11 @@ class AdversarialDefenseSystem:
                 for i in range(defended_data.shape[0]):
                     row_norm = np.linalg.norm(defended_data[i])
                     if row_norm > 0:
-                        defended_data[i] = defended_data[i] / row_norm
+                        defended_data[i] /= row_norm
             else:
                 norm = np.linalg.norm(defended_data)
                 if norm > 0:
-                    defended_data = defended_data / norm
+                    defended_data /= norm
         self._log_defense_application(
             "input_preprocessing",
             {
@@ -115,7 +121,7 @@ class AdversarialDefenseSystem:
         return defended_data
 
     def detect_adversarial_input(
-        self, input_data: np.ndarray, baseline_data: np.ndarray = None
+        self, input_data: "np.ndarray", baseline_data: "np.ndarray" = None
     ) -> dict[str, Any]:
         """Detect potential adversarial inputs using multiple detection methods."""
         detection_results = {
@@ -156,8 +162,8 @@ class AdversarialDefenseSystem:
         return detection_results
 
     def apply_ensemble_defense(
-        self, input_data: np.ndarray, model_predictions: list[np.ndarray]
-    ) -> np.ndarray:
+        self, input_data: "np.ndarray", model_predictions: list["np.ndarray"]
+    ) -> "np.ndarray":
         """Apply ensemble defense by combining multiple model predictions."""
         if (
             "ensemble_defense" not in self.active_defenses
@@ -171,7 +177,7 @@ class AdversarialDefenseSystem:
             deviation = np.linalg.norm(pred - median_pred)
             if deviation > 0.5:
                 weights[i] *= 0.5
-        weights = weights / np.sum(weights)
+        weights /= np.sum(weights)
         ensemble_prediction = np.average(predictions, axis=0, weights=weights)
         self._log_defense_application(
             "ensemble_defense",
@@ -228,7 +234,7 @@ class AdversarialDefenseSystem:
         )
         return True
 
-    def _log_defense_application(self, defense_type: str, details: dict[str, Any]):
+    def _log_defense_application(self, defense_type: str, details: dict[str, Any]) -> None:
         """Log defense application for monitoring and analysis."""
         log_entry = {
             "defense_type": defense_type,
@@ -244,21 +250,20 @@ class AdversarialDefenseSystem:
 class AdversarialAttackSimulator:
     """Simulates adversarial attacks for testing defense mechanisms."""
 
-    def __init__(self, epsilon: float = 0.1):
+    def __init__(self, epsilon: float = 0.1) -> None:
         self.epsilon = epsilon
         self.attack_methods = ["fgsm", "pgd", "c_w", "deepfool"]
 
     def generate_adversarial_examples(
-        self, clean_data: np.ndarray, labels: np.ndarray = None
-    ) -> np.ndarray:
+        self, clean_data: "np.ndarray", labels: "np.ndarray" = None
+    ) -> "np.ndarray":
         """Generate adversarial examples using FGSM-like perturbation."""
         if labels is None:
             labels = np.zeros(len(clean_data))
         rng = np.random.default_rng()
         perturbation = rng.uniform(-self.epsilon, self.epsilon, clean_data.shape)
         perturbation = np.clip(perturbation, -self.epsilon, self.epsilon)
-        adversarial_data = clean_data + perturbation
-        return adversarial_data
+        return clean_data + perturbation
 
 
 class RobustnessEvaluator:
@@ -273,7 +278,7 @@ class RobustnessEvaluator:
     - Enterprise security validation
     """
 
-    def __init__(self, config: dict = None):
+    def __init__(self, config: dict | None = None) -> None:
         """Initialize with 2025 security configuration."""
         self.config = config or {}
         self.attack_types = self.config.get(
@@ -388,9 +393,9 @@ class RobustnessEvaluator:
     async def _evaluate_robustness_async(
         self,
         model_data,
-        clean_data: np.ndarray,
-        adversarial_data: np.ndarray,
-        labels: np.ndarray,
+        clean_data: "np.ndarray",
+        adversarial_data: "np.ndarray",
+        labels: "np.ndarray",
         evaluation_mode: str,
     ) -> dict:
         """Async comprehensive robustness evaluation with 2025 security features."""
@@ -434,8 +439,8 @@ class RobustnessEvaluator:
         }
 
     async def _generate_adversarial_examples_async(
-        self, clean_data: np.ndarray, labels: np.ndarray
-    ) -> np.ndarray:
+        self, clean_data: "np.ndarray", labels: "np.ndarray"
+    ) -> "np.ndarray":
         """Generate adversarial examples using multiple attack methods."""
         import asyncio
 
@@ -447,7 +452,7 @@ class RobustnessEvaluator:
         await asyncio.sleep(0.01)
         return adversarial_data
 
-    async def _simulate_predictions_async(self, data: np.ndarray) -> np.ndarray:
+    async def _simulate_predictions_async(self, data: "np.ndarray") -> "np.ndarray":
         """Async simulation of model predictions for testing purposes."""
         import asyncio
 
@@ -460,10 +465,10 @@ class RobustnessEvaluator:
 
     async def _calculate_confidence_degradation_async(
         self,
-        clean_data: np.ndarray,
-        adversarial_data: np.ndarray,
-        clean_predictions: np.ndarray,
-        adversarial_predictions: np.ndarray,
+        clean_data: "np.ndarray",
+        adversarial_data: "np.ndarray",
+        clean_predictions: "np.ndarray",
+        adversarial_predictions: "np.ndarray",
     ) -> float:
         """Calculate confidence degradation between clean and adversarial predictions."""
         import asyncio
@@ -474,7 +479,7 @@ class RobustnessEvaluator:
         return max(0.0, clean_confidence - adversarial_confidence)
 
     def _calculate_perturbation_distance(
-        self, clean_data: np.ndarray, adversarial_data: np.ndarray
+        self, clean_data: "np.ndarray", adversarial_data: "np.ndarray"
     ) -> float:
         """Calculate average L2 perturbation distance."""
         if len(clean_data) == 0:
@@ -486,7 +491,7 @@ class RobustnessEvaluator:
         return float(np.mean(distances))
 
     async def _run_multi_attack_evaluation_async(
-        self, clean_data: np.ndarray, labels: np.ndarray
+        self, clean_data: "np.ndarray", labels: "np.ndarray"
     ) -> dict:
         """Run evaluation against multiple attack types."""
         results = {}
@@ -523,7 +528,7 @@ class RobustnessEvaluator:
         return results
 
     async def _analyze_threats_async(
-        self, clean_data: np.ndarray, adversarial_data: np.ndarray, labels: np.ndarray
+        self, clean_data: "np.ndarray", adversarial_data: "np.ndarray", labels: "np.ndarray"
     ) -> dict:
         """Analyze potential security threats and vulnerabilities."""
         import asyncio
@@ -547,7 +552,7 @@ class RobustnessEvaluator:
             else "non_compliant",
         }
 
-    def _simulate_predictions(self, data: np.ndarray) -> np.ndarray:
+    def _simulate_predictions(self, data: "np.ndarray") -> "np.ndarray":
         """Simulate model predictions for testing purposes."""
         predictions = []
         for sample in data:
@@ -555,7 +560,7 @@ class RobustnessEvaluator:
             predictions.append(pred)
         return np.array(predictions)
 
-    def _calculate_accuracy(self, predictions: np.ndarray, labels: np.ndarray) -> float:
+    def _calculate_accuracy(self, predictions: "np.ndarray", labels: "np.ndarray") -> float:
         """Calculate prediction accuracy."""
         if len(predictions) == 0:
             return 0.0
@@ -602,7 +607,7 @@ class RobustnessEvaluator:
             "threat_level": threat_analysis.get("threat_level", "unknown"),
             "nist_compliance": "compliant" if self.nist_compliance else "non_compliant",
             "overall_risk": "low"
-            if security_rating in ["excellent", "good"]
+            if security_rating in {"excellent", "good"}
             else "medium"
             if security_rating == "fair"
             else "high",

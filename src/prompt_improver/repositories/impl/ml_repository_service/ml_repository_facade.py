@@ -6,7 +6,7 @@ repositories following the facade pattern and maintaining backwards compatibilit
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -21,6 +21,21 @@ from prompt_improver.database.models import (
     TrainingSessionCreate,
     TrainingSessionUpdate,
 )
+from prompt_improver.repositories.impl.ml_repository_service.experiment_repository import (
+    ExperimentRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.inference_repository import (
+    InferenceRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.metrics_repository import (
+    MetricsRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.model_repository import (
+    ModelRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.training_repository import (
+    TrainingRepository,
+)
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
     GenerationSessionFilter,
     MLRepositoryProtocol,
@@ -30,11 +45,6 @@ from prompt_improver.repositories.protocols.ml_repository_protocol import (
     TrainingMetrics,
     TrainingSessionFilter,
 )
-from .experiment_repository import ExperimentRepository
-from .inference_repository import InferenceRepository
-from .metrics_repository import MetricsRepository
-from .model_repository import ModelRepository
-from .training_repository import TrainingRepository
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +52,16 @@ logger = logging.getLogger(__name__)
 class MLRepositoryFacade(MLRepositoryProtocol):
     """Unified ML repository facade coordinating specialized repositories."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         self.connection_manager = connection_manager
-        
+
         # Initialize specialized repositories
         self.model_repository = ModelRepository(connection_manager)
         self.training_repository = TrainingRepository(connection_manager)
         self.metrics_repository = MetricsRepository(connection_manager)
         self.experiment_repository = ExperimentRepository(connection_manager)
         self.inference_repository = InferenceRepository(connection_manager)
-        
+
         logger.info("ML Repository Facade initialized with specialized repositories")
 
     # Training Session Management - Delegate to TrainingRepository
@@ -195,12 +205,12 @@ class MLRepositoryFacade(MLRepositoryProtocol):
         # This method would need to be implemented in TrainingRepository
         # For now, we'll implement it directly here
         from prompt_improver.repositories.base_repository import BaseRepository
-        
+
         base_repo = BaseRepository(
             model_class=TrainingPrompt,
             connection_manager=self.connection_manager,
         )
-        
+
         async with base_repo.get_session() as session:
             try:
                 prompt = TrainingPrompt(**prompt_data)
@@ -210,7 +220,7 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 logger.info(f"Created training prompt {prompt.id}")
                 return prompt
             except Exception as e:
-                logger.error(f"Error creating training prompt: {e}")
+                logger.exception(f"Error creating training prompt: {e}")
                 raise
 
     async def get_training_prompts(
@@ -224,14 +234,15 @@ class MLRepositoryFacade(MLRepositoryProtocol):
     ) -> list[TrainingPrompt]:
         """Get training prompts with filters."""
         # Implement basic training prompts retrieval
-        from prompt_improver.repositories.base_repository import BaseRepository
         from sqlalchemy import and_, desc, select
-        
+
+        from prompt_improver.repositories.base_repository import BaseRepository
+
         base_repo = BaseRepository(
             model_class=TrainingPrompt,
             connection_manager=self.connection_manager,
         )
-        
+
         async with base_repo.get_session() as session:
             try:
                 query = select(TrainingPrompt)
@@ -256,7 +267,7 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting training prompts: {e}")
+                logger.exception(f"Error getting training prompts: {e}")
                 raise
 
     async def update_training_prompt(
@@ -266,14 +277,15 @@ class MLRepositoryFacade(MLRepositoryProtocol):
     ) -> TrainingPrompt | None:
         """Update training prompt."""
         # Implement basic training prompt update
-        from prompt_improver.repositories.base_repository import BaseRepository
         from sqlalchemy import select, update
-        
+
+        from prompt_improver.repositories.base_repository import BaseRepository
+
         base_repo = BaseRepository(
             model_class=TrainingPrompt,
             connection_manager=self.connection_manager,
         )
-        
+
         async with base_repo.get_session() as session:
             try:
                 query = (
@@ -293,7 +305,7 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 get_result = await session.execute(get_query)
                 return get_result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error updating training prompt: {e}")
+                logger.exception(f"Error updating training prompt: {e}")
                 raise
 
     async def deactivate_training_prompts(
@@ -301,14 +313,15 @@ class MLRepositoryFacade(MLRepositoryProtocol):
         prompt_ids: list[int],
     ) -> int:
         """Deactivate training prompts, returns count updated."""
-        from prompt_improver.repositories.base_repository import BaseRepository
         from sqlalchemy import update
-        
+
+        from prompt_improver.repositories.base_repository import BaseRepository
+
         base_repo = BaseRepository(
             model_class=TrainingPrompt,
             connection_manager=self.connection_manager,
         )
-        
+
         async with base_repo.get_session() as session:
             try:
                 query = (
@@ -321,7 +334,7 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 logger.info(f"Deactivated {result.rowcount} training prompts")
                 return result.rowcount
             except Exception as e:
-                logger.error(f"Error deactivating training prompts: {e}")
+                logger.exception(f"Error deactivating training prompts: {e}")
                 raise
 
     # Generation Session Management - Delegate to ExperimentRepository
@@ -547,47 +560,47 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 "total_repositories": 5,
                 "healthy_repositories": 0,
             }
-            
+
             # Test model repository
             try:
                 await self.model_repository.get_best_performing_models(limit=1)
                 health_status["repositories"]["model_repository"] = "healthy"
                 health_status["healthy_repositories"] += 1
             except Exception as e:
-                health_status["repositories"]["model_repository"] = f"unhealthy: {str(e)}"
-            
+                health_status["repositories"]["model_repository"] = f"unhealthy: {e!s}"
+
             # Test training repository
             try:
                 await self.training_repository.get_active_training_sessions()
                 health_status["repositories"]["training_repository"] = "healthy"
                 health_status["healthy_repositories"] += 1
             except Exception as e:
-                health_status["repositories"]["training_repository"] = f"unhealthy: {str(e)}"
-            
+                health_status["repositories"]["training_repository"] = f"unhealthy: {e!s}"
+
             # Test metrics repository
             try:
                 await self.metrics_repository.get_rule_performance_data(batch_size=1)
                 health_status["repositories"]["metrics_repository"] = "healthy"
                 health_status["healthy_repositories"] += 1
             except Exception as e:
-                health_status["repositories"]["metrics_repository"] = f"unhealthy: {str(e)}"
-            
+                health_status["repositories"]["metrics_repository"] = f"unhealthy: {e!s}"
+
             # Test experiment repository
             try:
                 await self.experiment_repository.get_active_generation_sessions()
                 health_status["repositories"]["experiment_repository"] = "healthy"
                 health_status["healthy_repositories"] += 1
             except Exception as e:
-                health_status["repositories"]["experiment_repository"] = f"unhealthy: {str(e)}"
-            
+                health_status["repositories"]["experiment_repository"] = f"unhealthy: {e!s}"
+
             # Test inference repository
             try:
                 await self.inference_repository.cleanup_expired_cache()
                 health_status["repositories"]["inference_repository"] = "healthy"
                 health_status["healthy_repositories"] += 1
             except Exception as e:
-                health_status["repositories"]["inference_repository"] = f"unhealthy: {str(e)}"
-            
+                health_status["repositories"]["inference_repository"] = f"unhealthy: {e!s}"
+
             # Update overall status
             if health_status["healthy_repositories"] == health_status["total_repositories"]:
                 health_status["facade_status"] = "healthy"
@@ -595,11 +608,11 @@ class MLRepositoryFacade(MLRepositoryProtocol):
                 health_status["facade_status"] = "degraded"
             else:
                 health_status["facade_status"] = "unhealthy"
-            
+
             return health_status
-            
+
         except Exception as e:
-            logger.error(f"Error checking repository health status: {e}")
+            logger.exception(f"Error checking repository health status: {e}")
             return {
                 "facade_status": "unhealthy",
                 "error": str(e),

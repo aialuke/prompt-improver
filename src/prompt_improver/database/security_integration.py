@@ -21,22 +21,17 @@ Security Integration Components:
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from prompt_improver.database.types import (
     ManagerMode,
-    RedisSecurityError,
-    SecurityPerformanceMetrics,
-    SecurityThreatScore,
     SecurityValidationResult,
 )
 from prompt_improver.database.factories import (
     SecurityContext,
     create_security_context,
-    create_security_context_from_auth_result,
 )
 from prompt_improver.database.composition import get_database_services
 
@@ -495,9 +490,6 @@ class UnifiedSecurityIntegration:
         self.enable_performance_monitoring = enable_performance_monitoring
         self.logger = logging.getLogger(f"{__name__}.UnifiedSecurityIntegration")
         # Import here to avoid circular imports
-        from prompt_improver.security.services import (
-            get_api_security_manager,
-        )
 
         # Map integration modes to security modes
         mode_mapping = {
@@ -532,6 +524,7 @@ class UnifiedSecurityIntegration:
             from prompt_improver.security.services import (
                 get_api_security_manager,
             )
+            from prompt_improver.core.domain.enums import SecurityMode
 
             self._security_manager = await get_api_security_manager()
 

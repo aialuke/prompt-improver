@@ -13,46 +13,43 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 if TYPE_CHECKING:
-    from prompt_improver.core.events.ml_event_bus import MLEventBus
     from prompt_improver.core.di.ml_container import MLServiceContainer
-    from prompt_improver.core.interfaces.ml_interface import (
-        MLAnalysisInterface,
-        MLHealthInterface,
-        MLModelInterface,
-        MLServiceInterface,
-        MLTrainingInterface,
-    )
-    from prompt_improver.core.protocols.ml_protocols import (
-        ComponentInvokerProtocol,
-        ComponentLoaderProtocol,
-        ComponentRegistryProtocol,
-        EventBusProtocol,
-        MLflowServiceProtocol,
-        MLPipelineFactoryProtocol,
-        ResourceManagerProtocol,
-        WorkflowEngineProtocol,
-    )
-    from prompt_improver.core.services.ml_service import EventBasedMLService
+    from prompt_improver.core.events.ml_event_bus import MLEventBus
 
 # Core non-ML imports - safe to import at module level
 from prompt_improver.core.di.core_container import CoreContainer, get_core_container
-from prompt_improver.core.di.database_container import DatabaseContainer, get_database_container
-from prompt_improver.core.di.protocols import ContainerFacadeProtocol, MonitoringContainerProtocol
-from prompt_improver.core.di.security_container import SecurityContainer, get_security_container
+from prompt_improver.core.di.database_container import (
+    DatabaseContainer,
+    get_database_container,
+)
+
+# from prompt_improver.shared.interfaces.protocols.core import ContainerFacadeProtocol, Any
+from prompt_improver.core.di.security_container import (
+    SecurityContainer,
+    get_security_container,
+)
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
-from prompt_improver.core.protocols.ml_protocols import (
+from prompt_improver.core.interfaces.ml_interface import (
+    MLAnalysisInterface,
+    MLHealthInterface,
+    MLModelInterface,
+    MLServiceInterface,
+    MLTrainingInterface,
+)
+from prompt_improver.core.services.ml_service import EventBasedMLService
+from prompt_improver.shared.interfaces.ab_testing import IABTestingService
+from prompt_improver.shared.interfaces.protocols.core import MetricsRegistryProtocol
+from prompt_improver.shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     DatabaseServiceProtocol,
     ExternalServicesConfigProtocol,
-    HealthMonitorProtocol,
+    MLflowServiceProtocol,
     ServiceConnectionInfo,
     ServiceStatus,
 )
-from prompt_improver.core.protocols.retry_protocols import MetricsRegistryProtocol
-from prompt_improver.shared.interfaces.ab_testing import IABTestingService
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -86,7 +83,7 @@ class ServiceRegistration:
 class CircularDependencyError(Exception):
     """Raised when circular dependencies are detected."""
 
-    def __init__(self, cycle: str):
+    def __init__(self, cycle: str) -> None:
         self.cycle = cycle
         super().__init__(f"Circular dependency detected: {cycle}")
 
@@ -94,7 +91,7 @@ class CircularDependencyError(Exception):
 class ServiceNotRegisteredError(Exception):
     """Raised when attempting to resolve unregistered service."""
 
-    def __init__(self, service_type: type[Any]):
+    def __init__(self, service_type: type[Any]) -> None:
         self.service_type = service_type
         super().__init__(f"Service not registered: {service_type.__name__}")
 
@@ -102,7 +99,7 @@ class ServiceNotRegisteredError(Exception):
 class ServiceInitializationError(Exception):
     """Raised when service initialization fails."""
 
-    def __init__(self, service_type: type[Any], original_error: Exception):
+    def __init__(self, service_type: type[Any], original_error: Exception) -> None:
         self.service_type = service_type
         self.original_error = original_error
         super().__init__(
@@ -114,12 +111,12 @@ class ResourceManagementError(Exception):
     """Raised when resource management operations fail."""
 
 
-class DIContainer(ContainerFacadeProtocol):
+class DIContainer:
     """Enhanced dependency injection container orchestrator with 2025 best practices.
 
     This orchestrator maintains the same interface as the original DIContainer god object
     but delegates to specialized domain containers following clean architecture principles.
-    
+
     Provides comprehensive service registration, resolution, and lifecycle management
     for ML Pipeline Orchestrator systems with async support, resource management,
     and factory patterns optimized for ML workloads.
@@ -133,7 +130,7 @@ class DIContainer(ContainerFacadeProtocol):
     - Delegation to specialized containers by domain
     """
 
-    def __init__(self, logger: logging.Logger | None = None, name: str = "orchestrator"):
+    def __init__(self, logger: logging.Logger | None = None, name: str = "orchestrator") -> None:
         """Initialize the container orchestrator.
 
         Args:
@@ -142,17 +139,18 @@ class DIContainer(ContainerFacadeProtocol):
         """
         self.name = name
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Initialize specialized containers
         self._core_container = get_core_container()
         self._security_container = get_security_container()
         self._database_container = get_database_container()
         self._monitoring_container = self._create_monitoring_container()
         self._ml_container = None  # Lazy-loaded to avoid torch dependencies
-        
+        self._cli_container = None  # Lazy-loaded for CLI services
+
         # Service routing maps
         self._domain_routing = self._build_domain_routing()
-        
+
         # Legacy interface support
         self._scoped_services: dict[str, dict[type[Any], Any]] = {}
         self._resources: set[Any] = set()
@@ -162,12 +160,12 @@ class DIContainer(ContainerFacadeProtocol):
         self._health_checks: dict[str, Callable[[], Any]] = {}
         self._resolution_times: dict[type[Any], float] = {}
         self._initialization_order: list[type[Any]] = []
-        
+
         self.logger.debug(f"Container orchestrator '{self.name}' initialized")
 
-    def _create_monitoring_container(self) -> MonitoringContainerProtocol:
+    def _create_monitoring_container(self) -> Any:
         """Create monitoring container with lazy loading to avoid circular dependencies.
-        
+
         This factory method delays the import of the concrete MonitoringContainer
         until needed, breaking the circular dependency chain.
         """
@@ -176,7 +174,7 @@ class DIContainer(ContainerFacadeProtocol):
 
     def _create_ml_container(self) -> Optional["MLServiceContainer"]:
         """Create ML container with lazy loading to avoid torch dependencies.
-        
+
         This factory method delays the import of ML services until needed,
         breaking the torch import chain. Returns None if torch is not available.
         """
@@ -190,27 +188,71 @@ class DIContainer(ContainerFacadeProtocol):
             self.logger.warning(f"ML container initialization failed: {e}")
             return None
 
+    def _create_cli_container(self) -> Optional["CLIContainer"]:
+        """Create CLI container with lazy loading.
+
+        This factory method delays the import of CLI container until needed,
+        following the pattern established for ML container.
+        """
+        try:
+            from prompt_improver.core.di.cli_container import CLIContainer
+            return CLIContainer()
+        except ImportError as e:
+            self.logger.exception(f"CLI container not available: {e}")
+            return None
+        except Exception as e:
+            self.logger.warning(f"CLI container initialization failed: {e}")
+            return None
+
     def _build_domain_routing(self) -> dict[type[Any], str]:
         """Build service type to container domain routing map.
-        
+
         Note: ML service types are handled by name-based routing since they're
         in TYPE_CHECKING blocks to avoid torch import chain.
+        CLI services follow the same pattern for consistency.
         """
+        # Import CLI protocols here to avoid circular imports
+        from prompt_improver.shared.interfaces.protocols.cli import (
+            CLIFacadeProtocol,
+            CLIOrchestratorProtocol,
+            CLIServiceProtocol,
+            ProgressServiceProtocol,
+            SessionServiceProtocol,
+            TrainingServiceProtocol,
+            WorkflowServiceProtocol,
+        )
+
         return {
             # Core services
             DateTimeServiceProtocol: "core",
-            
+
             # Database services
             DatabaseServiceProtocol: "database",
             CacheServiceProtocol: "database",
-            
+
+            # ML services (explicit routing to prevent keyword conflicts)
+            MLServiceInterface: "ml",
+            MLAnalysisInterface: "ml",
+            MLTrainingInterface: "ml",
+            MLHealthInterface: "ml",  # Explicit routing to prevent "health" keyword conflict
+            MLModelInterface: "ml",
+
             # Monitoring services
             MetricsRegistryProtocol: "monitoring",
             IABTestingService: "monitoring",
-            
+
+            # CLI services
+            CLIFacadeProtocol: "cli",
+            CLIServiceProtocol: "cli",
+            CLIOrchestratorProtocol: "cli",
+            WorkflowServiceProtocol: "cli",
+            ProgressServiceProtocol: "cli",
+            SessionServiceProtocol: "cli",
+            TrainingServiceProtocol: "cli",
+
             # External services configuration
             ExternalServicesConfigProtocol: "core",
-            
+
             # String-based services (legacy support)
             str: "core",  # Default for string-based service names
         }
@@ -221,27 +263,28 @@ class DIContainer(ContainerFacadeProtocol):
         domain = self._domain_routing.get(interface)
         if domain:
             return self._get_container_by_domain(domain)
-            
+
         # Check by service name pattern
         service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
-        
+
         if any(keyword in service_name.lower() for keyword in ["auth", "security", "crypto", "validation"]):
             return self._security_container
-        elif any(keyword in service_name.lower() for keyword in ["database", "cache", "repository", "session"]):
+        if any(keyword in service_name.lower() for keyword in ["database", "cache", "repository", "session"]):
             return self._database_container
-        elif any(keyword in service_name.lower() for keyword in ["metric", "health", "monitor", "alert", "trace"]):
+        if any(keyword in service_name.lower() for keyword in ["metric", "health", "monitor", "alert", "trace"]):
             return self._monitoring_container
-        elif any(keyword in service_name.lower() for keyword in ["ml", "model", "training", "workflow", "pipeline"]):
+        if any(keyword in service_name.lower() for keyword in ["ml", "model", "training", "workflow", "pipeline"]):
             return self.get_ml_container()
-        else:
-            # Default to core container
-            return self._core_container
+        # Default to core container
+        return self._core_container
 
     def _get_container_by_domain(self, domain: str) -> Any:
         """Get container by domain name."""
         if domain == "ml":
             return self.get_ml_container()
-        
+        if domain == "cli":
+            return self.get_cli_container()
+
         containers = {
             "core": self._core_container,
             "security": self._security_container,
@@ -250,6 +293,53 @@ class DIContainer(ContainerFacadeProtocol):
         }
         return containers.get(domain, self._core_container)
 
+    def _map_protocol_to_service_name(self, interface: type[Any]) -> str:
+        """Map protocol type to service name for ML and CLI containers.
+
+        This method provides the translation layer between protocol-based
+        service resolution and name-based container service storage.
+        """
+        # Check if it's already a string
+        if isinstance(interface, str):
+            return interface
+
+        interface_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
+
+        # CLI protocol mappings
+        cli_protocol_mappings = {
+            "CLIOrchestratorProtocol": "cli_orchestrator",
+            "WorkflowServiceProtocol": "workflow_service",
+            "ProgressServiceProtocol": "progress_service",
+            "SessionServiceProtocol": "session_service",
+            "TrainingServiceProtocol": "training_service",
+            "SignalHandlerProtocol": "signal_handler",
+            "BackgroundManagerProtocol": "background_manager",
+            "EmergencyServiceProtocol": "emergency_service",
+            "RuleValidationServiceProtocol": "rule_validation_service",
+            "ProcessServiceProtocol": "process_service",
+            "SystemStateReporterProtocol": "system_state_reporter",
+        }
+
+        # Check CLI mappings first
+        if interface_name in cli_protocol_mappings:
+            return cli_protocol_mappings[interface_name]
+
+        # ML protocol mappings (maintain existing behavior)
+        ml_protocol_mappings = {
+            "MLflowServiceProtocol": "mlflow_service",
+            "EventBusProtocol": "event_bus",
+            "WorkflowEngineProtocol": "workflow_engine",
+            "ResourceManagerProtocol": "resource_manager",
+            "DatabaseServiceProtocol": "database_service",
+            "CacheServiceProtocol": "cache_service",
+        }
+
+        if interface_name in ml_protocol_mappings:
+            return ml_protocol_mappings[interface_name]
+
+        # Default to the interface name
+        return interface_name
+
     # ContainerFacadeProtocol implementation
     def get_core_container(self) -> CoreContainer:
         """Get core services container."""
@@ -257,7 +347,7 @@ class DIContainer(ContainerFacadeProtocol):
 
     def get_ml_container(self) -> Optional["MLServiceContainer"]:
         """Get ML services container with lazy loading.
-        
+
         Returns:
             MLServiceContainer if torch is available, None otherwise
         """
@@ -273,9 +363,19 @@ class DIContainer(ContainerFacadeProtocol):
         """Get database services container."""
         return self._database_container
 
-    def get_monitoring_container(self) -> MonitoringContainerProtocol:
+    def get_monitoring_container(self) -> Any:
         """Get monitoring services container."""
         return self._monitoring_container
+
+    def get_cli_container(self) -> Optional["CLIContainer"]:
+        """Get CLI services container with lazy loading.
+
+        Returns:
+            CLIContainer if CLI services are available, None otherwise
+        """
+        if self._cli_container is None:
+            self._cli_container = self._create_cli_container()
+        return self._cli_container
 
     @asynccontextmanager
     async def managed_lifecycle(self):
@@ -293,15 +393,16 @@ class DIContainer(ContainerFacadeProtocol):
             "orchestrator_name": self.name,
             "containers": {},
         }
-        
+
         containers = {
             "core": self._core_container,
             "security": self._security_container,
             "database": self._database_container,
             "monitoring": self._monitoring_container,
             "ml": self._ml_container,
+            "cli": self._cli_container,
         }
-        
+
         for name, container in containers.items():
             try:
                 if hasattr(container, "health_check"):
@@ -312,7 +413,7 @@ class DIContainer(ContainerFacadeProtocol):
             except Exception as e:
                 results["containers"][name] = {"status": "unhealthy", "error": str(e)}
                 results["orchestrator_status"] = "degraded"
-                
+
         return results
 
     # Original DIContainer interface for backward compatibility
@@ -342,7 +443,7 @@ class DIContainer(ContainerFacadeProtocol):
             container.register_transient(interface, implementation, tags)
         else:
             # Fallback for ML container
-            container.register_factory(interface.__name__, lambda: implementation(), singleton=False)
+            container.register_factory(interface.__name__, implementation, singleton=False)
 
     def register_factory(
         self,
@@ -411,16 +512,17 @@ class DIContainer(ContainerFacadeProtocol):
     ) -> T:
         """Internal service resolution with enhanced lifecycle management."""
         container = self._get_container_for_service(interface)
-        
+
         try:
             if hasattr(container, "get"):
                 return await container.get(interface)
-            elif hasattr(container, "get_service"):
-                # ML container uses get_service
-                service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
-                return await container.get_service(service_name)
-            else:
-                raise ServiceNotRegisteredError(interface)
+            if hasattr(container, "get_service"):
+                # ML and CLI containers use get_service
+                service_name = self._map_protocol_to_service_name(interface)
+                if asyncio.iscoroutinefunction(container.get_service):
+                    return await container.get_service(service_name)
+                return container.get_service(service_name)
+            raise ServiceNotRegisteredError(interface)
         except KeyError:
             raise ServiceNotRegisteredError(interface)
 
@@ -492,20 +594,17 @@ class DIContainer(ContainerFacadeProtocol):
     def register_component_registry_factory(self, config: Any = None) -> None:
         """Register factory for ML component registry."""
         # These would need to be implemented based on the actual ML services
-        pass
 
     def register_component_loader_factory(self) -> None:
         """Register factory for ML component loader."""
-        pass
 
     def register_component_invoker_factory(self) -> None:
         """Register factory for ML component invoker with dependency injection."""
-        pass
 
     def register_ml_pipeline_factory(self) -> None:
         """Register factory for complete ML pipeline orchestrator with all dependencies."""
         self._ml_container.register_ml_pipeline_factory(
-            lambda services: self._create_ml_pipeline_orchestrator(services)
+            self._create_ml_pipeline_orchestrator
         )
 
     def register_ab_testing_service_factory(self) -> None:
@@ -518,23 +617,23 @@ class DIContainer(ContainerFacadeProtocol):
         self.logger.info(
             f"Registering ML pipeline services for {environment} environment"
         )
-        
+
         # Register external services config in core
         self.register_external_services_config_factory(environment)
-        
+
         # Register database and cache services
         config_placeholder = ServiceConnectionInfo(
             service_name="placeholder",
             connection_status=ServiceStatus.HEALTHY,
             connection_details={
-                "host": os.getenv("POSTGRES_HOST", "postgres"), 
+                "host": os.getenv("POSTGRES_HOST", "postgres"),
                 "port": 5432
             }
         )
         self.register_mlflow_service_factory(config_placeholder)
         self.register_cache_service_factory(config_placeholder)
         self.register_database_service_factory(config_placeholder)
-        
+
         # Register ML services
         self.register_event_bus_factory()
         self.register_component_loader_factory()
@@ -542,12 +641,12 @@ class DIContainer(ContainerFacadeProtocol):
         self.register_resource_manager_factory()
         self.register_component_registry_factory()
         self.register_component_invoker_factory()
-        
+
         # Register monitoring services
         self.register_health_monitor_factory()
         self.register_ab_testing_service_factory()
         self.register_ml_pipeline_factory()
-        
+
         self.logger.info("ML pipeline services registration complete")
 
     def register_ml_interfaces(self) -> None:
@@ -572,14 +671,16 @@ class DIContainer(ContainerFacadeProtocol):
         def create_ml_service_interface():
             return EventBasedMLService()
 
-        # Register all ML interfaces
-        for interface in [MLServiceInterface, MLAnalysisInterface, MLTrainingInterface, 
-                         MLHealthInterface, MLModelInterface]:
-            self._ml_container.register_factory(
-                interface.__name__,
-                create_ml_service_interface,
-                singleton=True
-            )
+        # Register all ML interfaces - ensure ML container is initialized
+        ml_container = self.get_ml_container()
+        if ml_container is not None:
+            for interface in [MLServiceInterface, MLAnalysisInterface, MLTrainingInterface,
+                             MLHealthInterface, MLModelInterface]:
+                ml_container.register_factory(
+                    interface.__name__,
+                    create_ml_service_interface,
+                    singleton=True
+                )
 
     # Helper methods for service creation
     async def _create_mlflow_service(self, config: ServiceConnectionInfo):
@@ -589,25 +690,33 @@ class DIContainer(ContainerFacadeProtocol):
         return service
 
     async def _create_event_bus(self, config: Any):
-        from prompt_improver.ml.orchestration.events.adaptive_event_bus import AdaptiveEventBus
+        from prompt_improver.ml.orchestration.events.adaptive_event_bus import (
+            AdaptiveEventBus,
+        )
         event_bus = AdaptiveEventBus(config)
         await event_bus.initialize()
         return event_bus
 
     async def _create_workflow_engine(self, config: Any):
-        from prompt_improver.ml.orchestration.core.workflow_execution_engine import WorkflowExecutionEngine
+        from prompt_improver.ml.orchestration.core.workflow_execution_engine import (
+            WorkflowExecutionEngine,
+        )
         engine = WorkflowExecutionEngine(config)
         await engine.initialize()
         return engine
 
     async def _create_resource_manager(self, config: Any):
-        from prompt_improver.ml.orchestration.core.resource_manager import ResourceManager
+        from prompt_improver.ml.orchestration.core.resource_manager import (
+            ResourceManager,
+        )
         manager = ResourceManager(config)
         await manager.initialize()
         return manager
 
     def _create_ml_pipeline_orchestrator(self, services: dict[str, Any]):
-        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
+        from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
+            MLPipelineOrchestrator,
+        )
         return MLPipelineOrchestrator(**services)
 
     # Health check methods for backward compatibility
@@ -652,7 +761,7 @@ class DIContainer(ContainerFacadeProtocol):
                         else:
                             service.cleanup()
                     except Exception as e:
-                        self.logger.error(f"Error cleaning up scoped service: {e}")
+                        self.logger.exception(f"Error cleaning up scoped service: {e}")
 
     def set_metrics_registry(self, metrics_registry: MetricsRegistryProtocol) -> None:
         """Set the metrics registry for performance tracking."""
@@ -668,11 +777,9 @@ class DIContainer(ContainerFacadeProtocol):
         return {
             "resolution_times": dict(self._resolution_times),
             "initialization_order": [t.__name__ for t in self._initialization_order],
-            "registered_services_count": sum([
-                len(getattr(container, "_services", {})) 
-                for container in [self._core_container, self._security_container, 
-                                self._database_container, self._monitoring_container]
-            ]),
+            "registered_services_count": sum(len(getattr(container, "_services", {}))
+                for container in [self._core_container, self._security_container,
+                                self._database_container, self._monitoring_container]),
             "scoped_contexts_count": len(self._scoped_services),
             "active_resources_count": len(self._resources),
         }
@@ -687,18 +794,18 @@ class DIContainer(ContainerFacadeProtocol):
             "orchestrator_name": self.name,
             "containers": {},
         }
-        
+
         containers = {
             "core": self._core_container,
             "security": self._security_container,
             "database": self._database_container,
             "monitoring": self._monitoring_container,
         }
-        
+
         for name, container in containers.items():
             if hasattr(container, "get_registration_info"):
                 info["containers"][name] = container.get_registration_info()
-                
+
         return info
 
     async def initialize(self) -> None:
@@ -709,23 +816,31 @@ class DIContainer(ContainerFacadeProtocol):
             self._database_container,
             self._monitoring_container,
         ]
-        
+
         for container in containers:
             if hasattr(container, "initialize"):
                 await container.initialize()
-                
+
         # Initialize ML container separately
-        if hasattr(self._ml_container, "initialize_all_services"):
+        if self._ml_container and hasattr(self._ml_container, "initialize_all_services"):
             await self._ml_container.initialize_all_services()
+
+        # Initialize CLI container separately
+        if self._cli_container and hasattr(self._cli_container, "initialize"):
+            await self._cli_container.initialize()
 
     async def shutdown(self):
         """Enhanced shutdown with comprehensive resource cleanup."""
         self.logger.info(f"Shutting down container orchestrator '{self.name}'")
-        
+
         # Shutdown ML container first
-        if hasattr(self._ml_container, "shutdown_all_services"):
+        if self._ml_container and hasattr(self._ml_container, "shutdown_all_services"):
             await self._ml_container.shutdown_all_services()
-            
+
+        # Shutdown CLI container
+        if self._cli_container and hasattr(self._cli_container, "shutdown"):
+            await self._cli_container.shutdown()
+
         # Shutdown other containers in reverse order
         containers = [
             self._monitoring_container,
@@ -733,11 +848,11 @@ class DIContainer(ContainerFacadeProtocol):
             self._security_container,
             self._core_container,
         ]
-        
+
         for container in containers:
             if hasattr(container, "shutdown"):
                 await container.shutdown()
-                
+
         # Clear local state
         self._scoped_services.clear()
         self._resources.clear()
@@ -745,7 +860,7 @@ class DIContainer(ContainerFacadeProtocol):
         self._resolution_times.clear()
         self._initialization_order.clear()
         self._health_checks.clear()
-        
+
         self.logger.info(f"Container orchestrator '{self.name}' shutdown complete")
 
 

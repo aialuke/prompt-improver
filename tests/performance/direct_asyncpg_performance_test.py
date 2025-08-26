@@ -11,16 +11,13 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List
 
 import asyncpg
 import numpy as np
 
 from prompt_improver.database.test_adapter import (
-    DatabaseTestAdapter,
-    TestConnectionConfig,
     benchmark_database_connection,
 )
 
@@ -92,7 +89,7 @@ class DirectAsyncPGPerformanceTest:
         times = []
         errors = 0
         start_total = time.perf_counter()
-        for i in range(iterations):
+        for _i in range(iterations):
             start_time = time.perf_counter()
             try:
                 async with benchmark_database_connection() as conn:
@@ -101,7 +98,7 @@ class DirectAsyncPGPerformanceTest:
                 execution_time_ms = (end_time - start_time) * 1000
                 times.append(execution_time_ms)
             except Exception as e:
-                logger.error("Error in {operation_name} iteration {i}: %s", e)
+                logger.exception("Error in {operation_name} iteration {i}: %s", e)
                 errors += 1
                 times.append(1000.0)
             await asyncio.sleep(0.001)
@@ -132,7 +129,7 @@ class DirectAsyncPGPerformanceTest:
         times = []
         errors = 0
         start_total = time.perf_counter()
-        for i in range(iterations):
+        for _i in range(iterations):
             start_time = time.perf_counter()
             try:
                 conn = await asyncpg.connect(self.database_url)
@@ -142,7 +139,7 @@ class DirectAsyncPGPerformanceTest:
                 connection_time_ms = (end_time - start_time) * 1000
                 times.append(connection_time_ms)
             except Exception as e:
-                logger.error("Connection error in iteration {i}: %s", e)
+                logger.exception("Connection error in iteration {i}: %s", e)
                 errors += 1
                 times.append(100.0)
             await asyncio.sleep(0.01)
@@ -177,7 +174,7 @@ class DirectAsyncPGPerformanceTest:
             errors = 0
             try:
                 conn = await asyncpg.connect(self.database_url)
-                for i in range(operations_per_connection):
+                for _i in range(operations_per_connection):
                     start_time = time.perf_counter()
                     try:
                         await conn.fetchval("SELECT pg_sleep(0.001), $1", worker_id)
@@ -188,7 +185,7 @@ class DirectAsyncPGPerformanceTest:
                         times.append(100.0)
                 await conn.close()
             except Exception as e:
-                logger.error("Worker {worker_id} failed: %s", e)
+                logger.exception("Worker {worker_id} failed: %s", e)
                 errors = operations_per_connection
                 times = [1000.0] * operations_per_connection
             return (times, errors)
@@ -257,7 +254,7 @@ class DirectAsyncPGPerformanceTest:
                 execution_time_ms = (end_time - start_time) * 1000
                 times.append(execution_time_ms)
             except Exception as e:
-                logger.error("MCP operation error in iteration {i}: %s", e)
+                logger.exception("MCP operation error in iteration {i}: %s", e)
                 errors += 1
                 times.append(500.0)
             await asyncio.sleep(0.001)
@@ -311,9 +308,7 @@ class DirectAsyncPGPerformanceTest:
                 "overall_success_rate": np.mean([
                     r.success_rate for r in results.values()
                 ]),
-                "total_throughput_ops_per_sec": sum([
-                    r.throughput_ops_per_sec for r in results.values()
-                ]),
+                "total_throughput_ops_per_sec": sum(r.throughput_ops_per_sec for r in results.values()),
                 "fastest_operation": min(
                     results.items(), key=lambda x: x[1].avg_time_ms
                 )[0],
@@ -330,7 +325,7 @@ class DirectAsyncPGPerformanceTest:
             },
         }
         report_file = Path("direct_asyncpg_performance_results.json")
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2)
         logger.info("📄 Performance results saved to %s", report_file)
 
@@ -352,7 +347,7 @@ async def main():
     avg_response_time = np.mean([r.avg_time_ms for r in results.values()])
     p95_response_time = np.mean([r.p95_time_ms for r in results.values()])
     overall_success_rate = np.mean([r.success_rate for r in results.values()])
-    total_throughput = sum([r.throughput_ops_per_sec for r in results.values()])
+    total_throughput = sum(r.throughput_ops_per_sec for r in results.values())
     print("\n" + "=" * 80)
     print("📊 PERFORMANCE SUMMARY")
     print("=" * 80)

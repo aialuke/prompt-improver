@@ -10,7 +10,7 @@ import logging
 import time
 import uuid
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any
 
 from prompt_improver.metrics.business_intelligence_metrics import (
     CostType,
@@ -704,6 +704,7 @@ def instrument_application_startup():
             logger.debug("Database modules not found")
         try:
             from prompt_improver.core.config import AppConfig
+            from prompt_improver.services.cache.l2_redis_service import RedisCache
 
             CacheInstrumentation.instrument_cache_class(RedisCache, CacheType.REDIS)
             logger.info("Instrumented RedisCache")

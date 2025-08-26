@@ -1,4 +1,4 @@
-"""Service Level Objective (SLO) and Service Level Agreement (SLA) Monitoring System
+"""Service Level Objective (SLO) and Service Level Agreement (SLA) Monitoring System.
 
 This module provides comprehensive SLO/SLA monitoring following Google SRE practices:
 - Configurable SLO targets with multi-window calculations

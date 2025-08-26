@@ -6,7 +6,7 @@ maintaining strict architectural separation between MCP and ML components.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.events.ml_event_bus import (
     MLEvent,
@@ -26,7 +26,7 @@ class EventBasedMLModelService(MLModelInterface):
     architectural separation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
         self._request_counter = 0
 
@@ -74,7 +74,7 @@ class EventBasedMLModelService(MLModelInterface):
             )
             return deployment_id
         except Exception as e:
-            self.logger.error(f"Failed to deploy model {model_id}: {e}")
+            self.logger.exception(f"Failed to deploy model {model_id}: {e}")
             raise
 
     async def update_model(
@@ -121,7 +121,7 @@ class EventBasedMLModelService(MLModelInterface):
             )
             return update_id
         except Exception as e:
-            self.logger.error(f"Failed to update model {model_id}: {e}")
+            self.logger.exception(f"Failed to update model {model_id}: {e}")
             raise
 
     async def scale_model(self, model_id: str, target_replicas: int) -> bool:
@@ -156,7 +156,7 @@ class EventBasedMLModelService(MLModelInterface):
             )
             return True
         except Exception as e:
-            self.logger.error(f"Failed to scale model {model_id}: {e}")
+            self.logger.exception(f"Failed to scale model {model_id}: {e}")
             return False
 
     async def get_model_status(self, model_id: str) -> dict[str, Any]:
@@ -254,7 +254,7 @@ class EventBasedMLModelService(MLModelInterface):
             )
             return True
         except Exception as e:
-            self.logger.error(f"Failed to undeploy model {model_id}: {e}")
+            self.logger.exception(f"Failed to undeploy model {model_id}: {e}")
             return False
 
     async def get_model_logs(self, model_id: str, lines: int = 100) -> list[str]:
@@ -308,5 +308,5 @@ class EventBasedMLModelService(MLModelInterface):
             )
             return endpoint_url
         except Exception as e:
-            self.logger.error(f"Failed to create endpoint for model {model_id}: {e}")
+            self.logger.exception(f"Failed to create endpoint for model {model_id}: {e}")
             raise

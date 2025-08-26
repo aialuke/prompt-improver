@@ -6,7 +6,7 @@ import logging
 import time
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     from opentelemetry import metrics, trace
@@ -147,7 +147,7 @@ def health_check_span(
         span.set_attribute("service.name", provider.service_name)
         try:
             from middleware.correlation_context import get_correlation_id
-
+            import os
             correlation_id = get_correlation_id()
             if correlation_id:
                 span.set_attribute("correlation.id", correlation_id)

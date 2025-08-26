@@ -15,7 +15,7 @@ class AutoMLStatusWidget(Static):
 
     automl_data = reactive({})
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize the AutoML Status Widget.
 
         Args:

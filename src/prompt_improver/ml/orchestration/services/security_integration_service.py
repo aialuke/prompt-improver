@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
-from ....core.protocols.ml_protocols import EventBusProtocol
+from ....shared.interfaces.protocols.ml import EventBusProtocol
 from ....security.input_sanitization import InputSanitizer
 from ....security.memory_guard import MemoryGuard
 from ..core.orchestrator_service_protocols import SecurityIntegrationServiceProtocol

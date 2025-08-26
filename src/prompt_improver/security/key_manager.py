@@ -19,7 +19,7 @@ import secrets
 import time
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -62,7 +62,7 @@ class AuditEvent(Enum):
 class SecurityAuditLogger:
     """Enhanced security audit logging for compliance (2025)."""
 
-    def __init__(self, component_name: str = "UnifiedKeyService"):
+    def __init__(self, component_name: str = "UnifiedKeyService") -> None:
         self.component_name = component_name
         self.logger = logging.getLogger(f"{__name__}.{component_name}.Audit")
 
@@ -81,9 +81,9 @@ class SecurityAuditLogger:
             "details": details,
             "compliance": "NIST-SP-800-57",
         }
-        if event in [AuditEvent.SECURITY_VIOLATION]:
+        if event in {AuditEvent.SECURITY_VIOLATION}:
             self.logger.error(f"SECURITY_AUDIT: {audit_entry}")
-        elif event in [AuditEvent.KEY_GENERATED, AuditEvent.KEY_ROTATED]:
+        elif event in {AuditEvent.KEY_GENERATED, AuditEvent.KEY_ROTATED}:
             self.logger.info(f"SECURITY_AUDIT: {audit_entry}")
         else:
             self.logger.debug(f"SECURITY_AUDIT: {audit_entry}")
@@ -104,7 +104,7 @@ class KeyRotationConfig:
         zero_trust_mode: bool = True,
         hsm_ready: bool = False,
         compliance_mode: str = "NIST-SP-800-57",
-    ):
+    ) -> None:
         self.rotation_interval_hours = rotation_interval_hours
         self.max_key_age_hours = max_key_age_hours
         self.key_version_limit = key_version_limit
@@ -117,7 +117,7 @@ class KeyRotationConfig:
         self.compliance_mode = compliance_mode
         self._apply_security_level_defaults()
 
-    def _apply_security_level_defaults(self):
+    def _apply_security_level_defaults(self) -> None:
         """Apply security level-specific defaults (2025 standards)."""
         if self.security_level == SecurityLevel.CRITICAL:
             self.rotation_interval_hours = min(self.rotation_interval_hours, 6)
@@ -145,7 +145,7 @@ class KeyInfo:
         version: int = 1,
         security_level: SecurityLevel = SecurityLevel.enhanced,
         derivation_method: KeyDerivationMethod = KeyDerivationMethod.scrypt,
-    ):
+    ) -> None:
         self.key = key
         self.key_id = key_id
         self.created_at = created_at
@@ -237,7 +237,7 @@ class SecureKeyService:
     - Cloud KMS integration readiness
     """
 
-    def __init__(self, config: KeyRotationConfig | None = None):
+    def __init__(self, config: KeyRotationConfig | None = None) -> None:
         self.config = config or KeyRotationConfig()
         self.keys: dict[str, KeyInfo] = {}
         self.current_key_id: str | None = None
@@ -255,9 +255,9 @@ class SecureKeyService:
         self._generate_new_key()
 
     def run_orchestrated_analysis(
-        self, operation: str, parameters: dict = None
+        self, operation: str, parameters: dict | None = None
     ) -> dict[str, Any]:
-        """Synchronous orchestrator-compatible interface for testing and simple operations"""
+        """Synchronous orchestrator-compatible interface for testing and simple operations."""
         parameters = parameters or {}
         try:
             if operation == "get_key":
@@ -354,7 +354,7 @@ class SecureKeyService:
     async def run_orchestrated_analysis_async(
         self, config: dict[str, Any]
     ) -> dict[str, Any]:
-        """Orchestrator-compatible interface for secure key management (2025 pattern)
+        """Orchestrator-compatible interface for secure key management (2025 pattern).
 
         Args:
             config: Orchestrator configuration containing:
@@ -430,7 +430,7 @@ class SecureKeyService:
                 },
             }
         except Exception as e:
-            self.logger.error(f"Orchestrated key management failed: {e}")
+            self.logger.exception(f"Orchestrated key management failed: {e}")
             return {
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "operation_failed": True},
@@ -644,10 +644,9 @@ class SecureKeyService:
         timestamp = str(int(time.time()))
         random_component = secrets.token_hex(8)
         key_hash = hashlib.sha256(key_bytes).hexdigest()[:8]
-        key_id = f"key_{timestamp}_{random_component}_{key_hash}"
-        return key_id
+        return f"key_{timestamp}_{random_component}_{key_hash}"
 
-    def _perform_zero_trust_checks(self):
+    def _perform_zero_trust_checks(self) -> None:
         """Perform Zero Trust security verification (2025 standard)."""
         now = aware_utc_now()
         if (now - self.last_security_audit).total_seconds() > 3600:
@@ -658,11 +657,11 @@ class SecureKeyService:
                 self._log_security_violation("Key integrity verification failed")
                 raise RuntimeError("Key integrity verification failed")
 
-    def _perform_security_audit(self):
+    def _perform_security_audit(self) -> None:
         """Perform comprehensive security audit."""
         self.last_security_audit = aware_utc_now()
         expired_count = 0
-        for _, key_info in self.keys.items():
+        for key_info in self.keys.values():
             if key_info.is_expired(self.config.max_key_age_hours):
                 expired_count += 1
         suspicious_patterns = self._analyze_access_patterns()
@@ -697,11 +696,9 @@ class SecureKeyService:
         recent_accesses = [
             t for t in access_times if (aware_utc_now() - t).total_seconds() < 60
         ]
-        if len(recent_accesses) > 10:
-            return True
-        return False
+        return len(recent_accesses) > 10
 
-    def _track_key_access(self, key_id: str):
+    def _track_key_access(self, key_id: str) -> None:
         """Track key access patterns for security analysis."""
         if key_id not in self.key_access_patterns:
             self.key_access_patterns[key_id] = []
@@ -727,7 +724,7 @@ class SecureKeyService:
                     })
         return suspicious_patterns
 
-    def _log_security_violation(self, message: str):
+    def _log_security_violation(self, message: str) -> None:
         """Log security violation for compliance and monitoring."""
         violation = {
             "timestamp": aware_utc_now().isoformat(),
@@ -776,7 +773,7 @@ class UnifiedKeyService:
     in a single, unified interface.
     """
 
-    def __init__(self, config: KeyRotationConfig | None = None):
+    def __init__(self, config: KeyRotationConfig | None = None) -> None:
         """Initialize unified key manager with both key management and encryption capabilities.
 
         Args:
@@ -934,7 +931,7 @@ class UnifiedKeyService:
         return self.decrypt(encrypted_data, key_id).decode("utf-8")
 
     def run_orchestrated_analysis(
-        self, operation: str, parameters: dict = None
+        self, operation: str, parameters: dict | None = None
     ) -> dict[str, Any]:
         """Unified orchestrator-compatible interface combining key management and encryption."""
         parameters = parameters or {}

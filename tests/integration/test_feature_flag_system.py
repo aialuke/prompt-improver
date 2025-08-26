@@ -10,18 +10,15 @@ Comprehensive tests for the feature flag system covering:
 - Performance and thread safety
 """
 
-import asyncio
-import json
 import os
 import tempfile
+
 # threading import removed - converted to asyncio patterns
 import time
 import unittest
 from pathlib import Path
-from typing import Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 import yaml
 
 from prompt_improver.core.feature_flag_init import (
@@ -30,12 +27,7 @@ from prompt_improver.core.feature_flag_init import (
 )
 from prompt_improver.core.feature_flags import (
     EvaluationContext,
-    EvaluationResult,
-    FeatureFlagDefinition,
     FeatureFlagManager,
-    FlagState,
-    RolloutConfig,
-    RolloutStrategy,
 )
 
 
@@ -104,7 +96,7 @@ class TestFeatureFlagIntegration(unittest.TestCase):
                 },
             },
         }
-        with open(self.config_path, "w") as f:
+        with open(self.config_path, "w", encoding="utf-8") as f:
             yaml.dump(self.test_config, f)
 
     def tearDown(self):
@@ -194,7 +186,7 @@ class TestFeatureFlagIntegration(unittest.TestCase):
         initial_result = manager.evaluate_flag("phase1_config_externalization", context)
         modified_config = self.test_config.copy()
         modified_config["flags"]["phase1_config_externalization"]["state"] = "enabled"
-        with open(self.config_path, "w") as f:
+        with open(self.config_path, "w", encoding="utf-8") as f:
             yaml.dump(modified_config, f)
         manager.reload_configuration()
         new_result = manager.evaluate_flag("phase1_config_externalization", context)
@@ -239,7 +231,7 @@ class TestFeatureFlagIntegration(unittest.TestCase):
             "variants": {"on": True, "off": False},
         }
         disabled_config_path = Path(self.temp_dir) / "disabled_config.yaml"
-        with open(disabled_config_path, "w") as f:
+        with open(disabled_config_path, "w", encoding="utf-8") as f:
             yaml.dump(disabled_config, f)
         manager = FeatureFlagManager(disabled_config_path, watch_files=False)
         context = EvaluationContext(user_id="test_user", environment="test")
@@ -251,7 +243,7 @@ class TestFeatureFlagIntegration(unittest.TestCase):
     async def test_concurrent_evaluations(self):
         """Test async concurrency with concurrent evaluations."""
         import asyncio
-        
+
         manager = FeatureFlagManager(self.config_path, watch_files=False)
         await manager.async_init()
         results = []
@@ -294,7 +286,7 @@ class TestFeatureFlagIntegration(unittest.TestCase):
                 }
             }
         }
-        with open(invalid_config_path, "w") as f:
+        with open(invalid_config_path, "w", encoding="utf-8") as f:
             yaml.dump(invalid_config, f)
         manager = FeatureFlagManager(invalid_config_path, watch_files=False)
         all_flags = manager.get_all_flags()
@@ -339,7 +331,7 @@ class TestFeatureFlagInitialization(unittest.TestCase):
             },
         }
         for filename, config in configs.items():
-            with open(self.config_dir / filename, "w") as f:
+            with open(self.config_dir / filename, "w", encoding="utf-8") as f:
                 yaml.dump(config, f)
 
     def tearDown(self):
@@ -393,7 +385,7 @@ class TestFeatureFlagPerformance(unittest.TestCase):
                 },
             }
         config = {"version": "1.0.0", "flags": flags}
-        with open(self.config_path, "w") as f:
+        with open(self.config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
     def tearDown(self):
@@ -429,7 +421,7 @@ class TestFeatureFlagPerformance(unittest.TestCase):
     async def test_concurrent_performance(self):
         """Test performance under concurrent async load."""
         import asyncio
-        
+
         manager = FeatureFlagManager(self.config_path, watch_files=False)
         await manager.async_init()
         results = []

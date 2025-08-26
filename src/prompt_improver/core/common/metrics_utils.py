@@ -4,17 +4,27 @@ Consolidates the pattern: self.metrics_registry = get_metrics_registry()
 Found in 15+ files across the codebase.
 """
 
-from functools import lru_cache
-from typing import Any, Dict, Optional
+import asyncio
+from typing import Any
 
 from prompt_improver.core.common.logging_utils import LoggerMixin, get_logger
+from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.services.cache.cache_factory import CacheFactory
 
 logger = get_logger(__name__)
 
 
-@lru_cache(maxsize=1)
+def get_metrics_cache():
+    """Get optimized metrics cache using singleton factory pattern.
+
+    Resolves performance issues by using CacheFactory singleton
+    instead of creating new instances per call.
+    """
+    return CacheFactory.get_utility_cache()
+
+
 def get_metrics_safely():
-    """Safely get metrics registry with fallback handling.
+    """Safely get metrics registry with fallback handling using unified cache.
 
     Consolidates the common pattern:
     try:
@@ -25,6 +35,58 @@ def get_metrics_safely():
     Returns:
         Metrics registry instance or None on failure
     """
+    cache_key = "util:metrics:registry"
+    cache = get_metrics_cache()
+
+    # Try to run in existing event loop or create new one
+    try:
+        loop = asyncio.get_running_loop()
+        # Create task for async cache operation
+        task = asyncio.create_task(_get_metrics_cached(cache_key, cache))
+        # Run in current loop context with shorter timeout
+        return asyncio.run_coroutine_threadsafe(task, loop).result(timeout=1.0)
+    except RuntimeError:
+        # No event loop, create one with timeout
+        try:
+            async def run_with_timeout():
+                return await asyncio.wait_for(
+                    _get_metrics_cached(cache_key, cache),
+                    timeout=1.0
+                )
+            return asyncio.run(run_with_timeout())
+        except Exception as e:
+            logger.warning(f"Async cache operation failed: {e}")
+            return _load_metrics_direct()
+    except Exception as e:
+        logger.warning(f"Cache operation failed: {e}")
+        # Fallback to direct execution
+        return _load_metrics_direct()
+
+
+async def _get_metrics_cached(cache_key: str, cache: CacheFacade) -> Any | None:
+    """Get metrics registry from cache or load if not cached."""
+    try:
+        # Try cache first
+        cached_result = await cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        # Cache miss - load metrics and cache result
+        result = _load_metrics_direct()
+
+        # Only cache non-None results
+        if result is not None:
+            # Cache for 4 hours with shorter L1 TTL for performance
+            await cache.set(cache_key, result, l2_ttl=14400, l1_ttl=3600)
+
+        return result
+    except Exception as e:
+        logger.exception(f"Metrics cache operation failed: {e}")
+        return _load_metrics_direct()
+
+
+def _load_metrics_direct() -> Any | None:
+    """Load metrics registry directly without caching."""
     try:
         from prompt_improver.performance.monitoring.metrics_registry import (
             get_metrics_registry,
@@ -110,7 +172,7 @@ class MetricsMixin(LoggerMixin):
             self.logger.debug(f"Metric {metric_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error(f"Failed to record metric {metric_name}: {e}")
+            self.logger.exception(f"Failed to record metric {metric_name}: {e}")
             return False
 
     def increment_counter(
@@ -143,7 +205,7 @@ class MetricsMixin(LoggerMixin):
             self.logger.debug(f"Counter {counter_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error(f"Failed to increment counter {counter_name}: {e}")
+            self.logger.exception(f"Failed to increment counter {counter_name}: {e}")
             return False
 
     def observe_histogram(
@@ -173,7 +235,7 @@ class MetricsMixin(LoggerMixin):
             self.logger.debug(f"Histogram {histogram_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error(f"Failed to observe histogram {histogram_name}: {e}")
+            self.logger.exception(f"Failed to observe histogram {histogram_name}: {e}")
             return False
 
     def set_gauge(
@@ -203,7 +265,7 @@ class MetricsMixin(LoggerMixin):
             self.logger.debug(f"Gauge {gauge_name} not found in registry")
             return False
         except Exception as e:
-            self.logger.error(f"Failed to set gauge {gauge_name}: {e}")
+            self.logger.exception(f"Failed to set gauge {gauge_name}: {e}")
             return False
 
 
@@ -218,7 +280,7 @@ def create_metrics_context(prefix: str = ""):
     """
 
     class MetricsContext:
-        def __init__(self, prefix: str):
+        def __init__(self, prefix: str) -> None:
             self.prefix = prefix
             self.registry = get_metrics_safely()
             self.available = self.registry is not None
@@ -229,7 +291,7 @@ def create_metrics_context(prefix: str = ""):
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
 
-        def record(self, name: str, value: Any, labels: dict[str, str] | None = None):
+        def record(self, name: str, value: Any, labels: dict[str, str] | None = None) -> bool | None:
             """Record a metric with optional prefix."""
             if not self.available:
                 return False
@@ -254,7 +316,7 @@ def create_metrics_context(prefix: str = ""):
                     return True
                 return False
             except Exception as e:
-                logger.error(f"Failed to record metric {full_name}: {e}")
+                logger.exception(f"Failed to record metric {full_name}: {e}")
                 return False
 
     return MetricsContext(prefix)

@@ -15,20 +15,20 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, case, func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.models import TrainingIteration, TrainingSession
-from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.database.query_optimizer import execute_optimized_query
 from prompt_improver.utils.datetime_utils import naive_utc_now
 
 logger = logging.getLogger(__name__)
 
 
 class TimeGranularity(Enum):
-    """Time granularity for analytics queries"""
+    """Time granularity for analytics queries."""
 
     HOUR = "hour"
     DAY = "day"
@@ -37,7 +37,7 @@ class TimeGranularity(Enum):
 
 
 class MetricType(Enum):
-    """Types of metrics for analytics"""
+    """Types of metrics for analytics."""
 
     PERFORMANCE = "performance"
     EFFICIENCY = "efficiency"
@@ -48,7 +48,7 @@ class MetricType(Enum):
 
 @dataclass
 class TimeSeriesPoint:
-    """Single point in time series data"""
+    """Single point in time series data."""
 
     timestamp: datetime
     value: float
@@ -57,7 +57,7 @@ class TimeSeriesPoint:
 
 @dataclass
 class AnalyticsQueryResult:
-    """Result of analytics query with metadata"""
+    """Result of analytics query with metadata."""
 
     data: list[dict[str, Any]]
     total_count: int
@@ -68,7 +68,7 @@ class AnalyticsQueryResult:
 
 @dataclass
 class TrendAnalysisResult:
-    """Result of trend analysis query"""
+    """Result of trend analysis query."""
 
     time_series: list[TimeSeriesPoint]
     trend_direction: str
@@ -88,7 +88,7 @@ class AnalyticsQueryInterface:
     - Query result caching for dashboard performance
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession) -> None:
         self.db_session = db_session
         self.logger = logging.getLogger(__name__)
         self.default_cache_ttl = 300
@@ -170,7 +170,7 @@ class AnalyticsQueryInterface:
                 seasonal_patterns=trend_stats["seasonal_patterns"],
             )
         except Exception as e:
-            self.logger.error(f"Error getting performance trends: {e}")
+            self.logger.exception(f"Error getting performance trends: {e}")
             raise
 
     async def get_dashboard_metrics(
@@ -222,7 +222,7 @@ class AnalyticsQueryInterface:
                 )
             return dashboard_data
         except Exception as e:
-            self.logger.error(f"Error getting dashboard metrics: {e}")
+            self.logger.exception(f"Error getting dashboard metrics: {e}")
             raise
 
     async def get_session_comparison_data(
@@ -364,7 +364,7 @@ class AnalyticsQueryInterface:
                 "query_timestamp": naive_utc_now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Error getting session comparison data: {e}")
+            self.logger.exception(f"Error getting session comparison data: {e}")
             raise
 
     async def get_performance_distribution_analysis(
@@ -395,16 +395,14 @@ class AnalyticsQueryInterface:
                 },
                 cache_ttl=self.trend_cache_ttl,
             )
-            histogram = []
-            for row in result:
-                histogram.append({
+            histogram = [{
                     "bucket": row.bucket,
                     "frequency": row.frequency,
                     "min_value": float(row.min_val) if row.min_val else 0.0,
                     "max_value": float(row.max_val) if row.max_val else 0.0,
                     "avg_value": float(row.avg_val) if row.avg_val else 0.0,
                     "probability": float(row.probability) if row.probability else 0.0,
-                })
+                } for row in result]
             stats_query = text(
                 "\n                SELECT\n                    count(*) AS total_sessions,\n                    avg(current_performance) AS mean_performance,\n                    stddev(current_performance) AS std_performance,\n                    percentile_cont(0.25) WITHIN GROUP (ORDER BY current_performance) AS q25,\n                    percentile_cont(0.5) WITHIN GROUP (ORDER BY current_performance) AS median,\n                    percentile_cont(0.75) WITHIN GROUP (ORDER BY current_performance) AS q75,\n                    percentile_cont(0.9) WITHIN GROUP (ORDER BY current_performance) AS p90,\n                    percentile_cont(0.95) WITHIN GROUP (ORDER BY current_performance) AS p95\n                FROM training_sessions\n                WHERE started_at >= :start_date\n                    AND started_at <= :end_date\n                    AND current_performance IS NOT NULL\n                    AND status = 'completed'\n            "
             )
@@ -451,7 +449,7 @@ class AnalyticsQueryInterface:
                 },
             }
         except Exception as e:
-            self.logger.error(f"Error getting performance distribution analysis: {e}")
+            self.logger.exception(f"Error getting performance distribution analysis: {e}")
             raise
 
     async def get_correlation_analysis(
@@ -544,11 +542,11 @@ class AnalyticsQueryInterface:
                 },
             }
         except Exception as e:
-            self.logger.error(f"Error getting correlation analysis: {e}")
+            self.logger.exception(f"Error getting correlation analysis: {e}")
             raise
 
     def _get_time_truncation_expression(self, granularity: TimeGranularity):
-        """Get SQL expression for time truncation based on granularity"""
+        """Get SQL expression for time truncation based on granularity."""
         if granularity == TimeGranularity.HOUR:
             return func.date_trunc("hour", TrainingSession.started_at)
         if granularity == TimeGranularity.DAY:
@@ -560,7 +558,7 @@ class AnalyticsQueryInterface:
         return func.date_trunc("day", TrainingSession.started_at)
 
     def _get_metric_expression(self, metric_type: MetricType):
-        """Get SQL expression for metric calculation"""
+        """Get SQL expression for metric calculation."""
         if metric_type == MetricType.PERFORMANCE:
             return TrainingSession.current_performance
         if metric_type == MetricType.EFFICIENCY:
@@ -579,7 +577,7 @@ class AnalyticsQueryInterface:
         return TrainingSession.current_performance
 
     async def _calculate_trend_statistics(self, values: list[float]) -> dict[str, Any]:
-        """Calculate trend statistics from time series values"""
+        """Calculate trend statistics from time series values."""
         try:
             if len(values) < 2:
                 return {
@@ -615,7 +613,7 @@ class AnalyticsQueryInterface:
                 "seasonal_patterns": {},
             }
         except Exception as e:
-            self.logger.error(f"Error calculating trend statistics: {e}")
+            self.logger.exception(f"Error calculating trend statistics: {e}")
             return {
                 "direction": "stable",
                 "strength": 0.0,
@@ -626,7 +624,7 @@ class AnalyticsQueryInterface:
     async def _get_session_summary_metrics(
         self, start_time: datetime, end_time: datetime
     ) -> dict[str, Any]:
-        """Get session summary metrics for dashboard"""
+        """Get session summary metrics for dashboard."""
         try:
             query = select(
                 func.count().label("total_sessions"),
@@ -678,7 +676,7 @@ class AnalyticsQueryInterface:
                 "avg_duration_hours": 0.0,
             }
         except Exception as e:
-            self.logger.error(f"Error getting session summary metrics: {e}")
+            self.logger.exception(f"Error getting session summary metrics: {e}")
             return {
                 "total_sessions": 0,
                 "completed_sessions": 0,
@@ -690,7 +688,7 @@ class AnalyticsQueryInterface:
     async def _get_performance_metrics(
         self, start_time: datetime, end_time: datetime
     ) -> dict[str, Any]:
-        """Get performance metrics for dashboard"""
+        """Get performance metrics for dashboard."""
         try:
             query = select(
                 func.avg(TrainingSession.current_performance).label("avg_performance"),
@@ -741,7 +739,7 @@ class AnalyticsQueryInterface:
                 "performance_std": 0.0,
             }
         except Exception as e:
-            self.logger.error(f"Error getting performance metrics: {e}")
+            self.logger.exception(f"Error getting performance metrics: {e}")
             return {
                 "avg_performance": 0.0,
                 "max_performance": 0.0,
@@ -753,7 +751,7 @@ class AnalyticsQueryInterface:
     async def _get_efficiency_metrics(
         self, start_time: datetime, end_time: datetime
     ) -> dict[str, Any]:
-        """Get efficiency metrics for dashboard"""
+        """Get efficiency metrics for dashboard."""
         try:
             query = select(
                 func.avg(
@@ -800,7 +798,7 @@ class AnalyticsQueryInterface:
                 "avg_training_hours": 0.0,
             }
         except Exception as e:
-            self.logger.error(f"Error getting efficiency metrics: {e}")
+            self.logger.exception(f"Error getting efficiency metrics: {e}")
             return {
                 "avg_efficiency": 0.0,
                 "avg_iterations": 0.0,
@@ -810,7 +808,7 @@ class AnalyticsQueryInterface:
     async def _get_error_metrics(
         self, start_time: datetime, end_time: datetime
     ) -> dict[str, Any]:
-        """Get error metrics for dashboard"""
+        """Get error metrics for dashboard."""
         try:
             session_query = select(
                 func.count().label("total_sessions"),
@@ -884,7 +882,7 @@ class AnalyticsQueryInterface:
                 "total_failed_iterations": failed_iterations,
             }
         except Exception as e:
-            self.logger.error(f"Error getting error metrics: {e}")
+            self.logger.exception(f"Error getting error metrics: {e}")
             return {
                 "session_error_rate": 0.0,
                 "iteration_error_rate": 0.0,
@@ -895,7 +893,7 @@ class AnalyticsQueryInterface:
     async def _get_resource_utilization_metrics(
         self, start_time: datetime, end_time: datetime
     ) -> dict[str, Any]:
-        """Get resource utilization metrics for dashboard"""
+        """Get resource utilization metrics for dashboard."""
         try:
             return {
                 "avg_memory_usage_mb": 0.0,
@@ -904,7 +902,7 @@ class AnalyticsQueryInterface:
                 "total_compute_hours": 0.0,
             }
         except Exception as e:
-            self.logger.error(f"Error getting resource utilization metrics: {e}")
+            self.logger.exception(f"Error getting resource utilization metrics: {e}")
             return {
                 "avg_memory_usage_mb": 0.0,
                 "peak_memory_usage_mb": 0.0,
@@ -915,7 +913,7 @@ class AnalyticsQueryInterface:
     def _calculate_period_changes(
         self, current: dict[str, Any], previous: dict[str, Any]
     ) -> dict[str, Any]:
-        """Calculate period-over-period changes"""
+        """Calculate period-over-period changes."""
         try:
             changes = {}
             if "session_summary" in current and "session_summary" in previous:
@@ -936,5 +934,5 @@ class AnalyticsQueryInterface:
                 )
             return changes
         except Exception as e:
-            self.logger.error(f"Error calculating period changes: {e}")
+            self.logger.exception(f"Error calculating period changes: {e}")
             return {}

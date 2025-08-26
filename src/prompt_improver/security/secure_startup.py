@@ -136,7 +136,7 @@ def initialize_secure_environment() -> None:
         enforce_secure_configuration(strict_mode=strict_mode)
         logger.info("✅ Secure environment initialization completed")
     except SecureStartupError as e:
-        logger.error("❌ Secure environment initialization failed")
+        logger.exception("❌ Secure environment initialization failed")
         if strict_mode:
             sys.exit(1)
 

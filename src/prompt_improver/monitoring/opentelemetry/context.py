@@ -1,4 +1,4 @@
-"""OpenTelemetry Context Propagation for Distributed Tracing
+"""OpenTelemetry Context Propagation for Distributed Tracing.
 ========================================================
 
 Provides context propagation utilities for maintaining trace context
@@ -11,7 +11,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 try:
     from opentelemetry import (
@@ -71,7 +71,7 @@ class ContextKeys:
 class CorrelationContext:
     """Manages correlation context across async operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._context_vars: dict[str, Any] = {}
 
     def set(self, key: str, value: Any) -> None:
@@ -170,7 +170,7 @@ def set_session_id(session_id: str) -> None:
     _correlation_context.set(ContextKeys.SESSION_ID, session_id)
 
 
-def propagate_context(func: Callable[..., T]) -> Callable[..., T]:
+def propagate_context[T](func: Callable[..., T]) -> Callable[..., T]:
     """Decorator to propagate context across async operations."""
 
     @functools.wraps(func)
@@ -261,7 +261,7 @@ def context_scope(
         _correlation_context = old_context
 
 
-def propagate_context(func: Callable[P, T]) -> Callable[P, T]:
+def propagate_context[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     """Decorator to propagate context across async operations."""
 
     @functools.wraps(func)
@@ -355,7 +355,7 @@ def create_child_context(operation_name: str, **context_updates: Any) -> Any:
     return parent_ctx
 
 
-async def run_with_context(
+async def run_with_context[T](
     coro: Awaitable[T],
     context: Context | None = None,
     correlation_context: CorrelationContext | None = None,

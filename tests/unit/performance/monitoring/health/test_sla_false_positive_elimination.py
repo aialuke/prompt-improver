@@ -3,10 +3,7 @@ Test SLA Monitor False Positive Elimination - 2025 Best Practices
 Comprehensive testing to ensure SLA violations are accurate and not false positives
 """
 
-import statistics
 import time
-from datetime import datetime, timedelta
-from typing import List
 
 import pytest
 
@@ -16,7 +13,6 @@ from prompt_improver.performance.monitoring.health.sla_monitor import (
     SLAMonitor,
     SLAStatus,
     SLATarget,
-    get_or_create_sla_monitor,
 )
 
 
@@ -275,7 +271,7 @@ class TestSLAFalsePositiveElimination:
             assert pattern in metrics, f"Missing metric: {pattern}"
         status = metrics["sla_response_time_p50_status"]
         assert isinstance(status, (int, float))
-        assert status in [0, 1, 2], f"Invalid status value: {status}"
+        assert status in {0, 1, 2}, f"Invalid status value: {status}"
         compliance_ratio = metrics["sla_response_time_p50_compliance_ratio"]
         assert 0 <= compliance_ratio <= 1, (
             f"Invalid compliance ratio: {compliance_ratio}"
@@ -335,10 +331,10 @@ def test_comprehensive_real_world_scenario():
     assert report["total_checks"] == 120
     assert report["overall_availability"] > 0.99
     for sla_name, sla_data in report["sla_targets"].items():
-        assert sla_data["status"] in [
+        assert sla_data["status"] in {
             SLAStatus.MEETING.value,
             SLAStatus.AT_RISK.value,
-        ], f"SLA {sla_name} has unexpected status: {sla_data['status']}"
+        }, f"SLA {sla_name} has unexpected status: {sla_data['status']}"
         assert sla_data["current_value"] is not None, f"SLA {sla_name} has None value"
 
 

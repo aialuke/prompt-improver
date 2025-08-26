@@ -15,7 +15,6 @@ Key Features:
 """
 
 import asyncio
-import inspect
 import json
 import logging
 import os
@@ -23,12 +22,11 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, get_type_hints
+from typing import Any, get_type_hints
 
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -39,9 +37,6 @@ from prompt_improver.ml.core.ml_integration import MLModelService
 from prompt_improver.ml.core.training_data_loader import TrainingDataLoader
 from prompt_improver.ml.learning.features.composite_feature_extractor import (
     CompositeFeatureExtractor,
-)
-from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
-    MLPipelineOrchestrator,
 )
 
 # Import actual ML components for type testing
@@ -122,8 +117,6 @@ class TypeSafetyRealTestSuite:
 
             # Test type safety in real ML training workflow
             from prompt_improver.ml.types import (
-                FeatureType,
-                MLModelType,
                 TrainingDataType,
             )
 
@@ -168,7 +161,7 @@ class TypeSafetyRealTestSuite:
                     type_errors_prevented += 1
                     logger.info("✅ %s predictions properly typed", model_name)
 
-                logger.info("Model {model_name} accuracy: %s", accuracy:.3f)
+                logger.info("Model %s accuracy: %.3f", model_name, accuracy)
 
             # Test custom ML type validation
             training_data = TrainingDataType(
@@ -250,7 +243,7 @@ class TypeSafetyRealTestSuite:
                 }
                 training_records.append(record)
 
-            with open(real_data_file, "w") as f:
+            with open(real_data_file, "w", encoding="utf-8") as f:
                 for record in training_records:
                     f.write(json.dumps(record) + "\n")
 
@@ -360,7 +353,7 @@ class TypeSafetyRealTestSuite:
             type_errors_prevented = 0
 
             # Test feature extraction with type validation
-            for i, text in enumerate(text_samples):
+            for _i, text in enumerate(text_samples):
                 features = await extractor.extract_text_features(text)
 
                 # Validate feature types
@@ -580,7 +573,7 @@ def process_features(features: List[float]) -> Dict[str, float]:
     """Process a list of features and return metrics."""
     if not features:
         return {}
-    
+
     return {
         "mean": np.mean(features),
         "std": np.std(features),
@@ -605,7 +598,7 @@ accuracy = train_model(X, y)
 
             # Write test code to file
             test_file = self.temp_dir / "type_test.py"
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write(test_code)
 
             # Run pyright type checking
@@ -777,7 +770,7 @@ accuracy = train_model(X, y)
 
             for py_file in python_files[:10]:  # Sample first 10 files
                 try:
-                    with open(py_file) as f:
+                    with open(py_file, encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for type annotations
@@ -809,8 +802,8 @@ accuracy = train_model(X, y)
             type_coverage = typed_functions / max(1, total_functions)
             file_coverage = files_with_types / max(1, len(python_files[:10]))
 
-            logger.info("✅ Type coverage: %s", type_coverage:.1%)
-            logger.info("✅ File coverage: %s", file_coverage:.1%)
+            logger.info("✅ Type coverage: %.1f%%", type_coverage * 100)
+            logger.info("✅ File coverage: %.1f%%", file_coverage * 100)
 
             execution_time = time.time() - test_start
 

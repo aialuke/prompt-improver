@@ -38,7 +38,7 @@ class RuleEngine:
     Manages rule prioritization, confidence thresholds, and result aggregation.
     """
 
-    def __init__(self, min_confidence: float = 0.0):
+    def __init__(self, min_confidence: float = 0.0) -> None:
         """Initialize the rule engine.
 
         Args:
@@ -87,7 +87,7 @@ class RuleEngine:
             except Exception:
                 continue
         if applied_rules:
-            total_confidence = total_confidence / len(applied_rules)
+            total_confidence /= len(applied_rules)
         return RuleEngineResult(
             improved_prompt=current_prompt,
             applied_rules=applied_rules,

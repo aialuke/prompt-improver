@@ -62,7 +62,7 @@ class ConfigurationLogger:
         log_level: str = "INFO",
         enable_file_logging: bool = True,
         log_file_path: str | None = None,
-    ):
+    ) -> None:
         """Initialize configuration logger.
 
         Args:
@@ -306,13 +306,13 @@ class ConfigurationLogger:
             )
             report["timeline"].append(asdict(event))
         if output_file:
-            Path(output_file).write_text(json.dumps(report, indent=2, default=str))
+            Path(output_file).write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
             self.logger.info(f"Configuration report saved to: {output_file}")
         return report
 
     def get_error_summary(self) -> list[ConfigurationEvent]:
         """Get summary of all error events."""
-        return [event for event in self.events if event.level in ["ERROR", "WARNING"]]
+        return [event for event in self.events if event.level in {"ERROR", "WARNING"}]
 
     def clear_events(self) -> None:
         """Clear stored events (useful for testing or memory management)."""
@@ -331,7 +331,7 @@ class ColoredFormatter(logging.Formatter):
         "RESET": "\x1b[0m",
     }
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the formatter."""
         super().__init__(*args, **kwargs)
 

@@ -4,11 +4,9 @@ This script runs pytest with detailed timing information and generates
 performance reports to identify slow tests and optimization opportunities.
 """
 
-import json
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 
 def run_pytest_with_profiling():

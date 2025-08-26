@@ -1,4 +1,4 @@
-"""Batch Capacity Calculator for A/B Testing Framework."
+"""Batch Capacity Calculator for A/B Testing Framework.".
 
 This script helps estimate:
 1. Batch data processing throughput
@@ -10,18 +10,12 @@ Based on your AdvancedABTestingFramework configuration and ML infrastructure.
 """
 
 import argparse
-import asyncio
 import logging
-import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from scipy import stats
-from scipy.stats import norm, ttest_ind
+from scipy.stats import norm
 
 
 @dataclass
@@ -76,7 +70,7 @@ class BatchCapacityCalculator:
         self,
         batch_config: BatchConfig | None = None,
         stats_config: StatisticalConfig | None = None,
-    ):
+    ) -> None:
         self.batch_config = batch_config or BatchConfig()
         self.stats_config = stats_config or StatisticalConfig()
         self.logger = logging.getLogger(__name__)

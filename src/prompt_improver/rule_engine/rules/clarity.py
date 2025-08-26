@@ -7,13 +7,10 @@ Based on research synthesis from:
 """
 
 import re
-from typing import Any
 
 # Heavy ML import moved to TYPE_CHECKING for lazy loading
-from typing import TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
 from prompt_improver.rule_engine.base import (
     BasePromptRule,
     RuleCheckResult,
@@ -91,7 +88,7 @@ class ClarityRule(BasePromptRule):
     - Configurable parameters
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._llm_transformer = None
         self.config = {
             "min_clarity_score": 0.7,
@@ -109,17 +106,19 @@ class ClarityRule(BasePromptRule):
     def _get_llm_transformer(self):
         """Lazy load LLM transformer when needed."""
         if self._llm_transformer is None:
-            from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
+            from prompt_improver.ml.preprocessing.llm_transformer import (
+                LLMTransformerService,
+            )
             self._llm_transformer = LLMTransformerService()
         return self._llm_transformer
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "Clarity Enhancement Rule",
             "type": "Fundamental",
@@ -136,7 +135,7 @@ class ClarityRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Enhanced check using research-validated clarity metrics"""
+        """Enhanced check using research-validated clarity metrics."""
         clarity_metrics = self._calculate_clarity_metrics(prompt)
         clarity_score = clarity_metrics["overall_score"]
         applies = clarity_score < self.config["min_clarity_score"]
@@ -155,7 +154,7 @@ class ClarityRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply research-validated clarity enhancements"""
+        """Apply research-validated clarity enhancements."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -193,11 +192,11 @@ class ClarityRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction"""
+        """Generate research-based LLM instruction."""
         return "\n<instruction>\nEnhance the prompt's clarity using research-validated patterns:\n\n1. SPECIFICITY (OpenAI Research):\n   - Replace vague terms with concrete, specific language\n   - Add measurable constraints and explicit requirements\n   - Include who, what, when, where, why details\n\n2. XML STRUCTURE (Anthropic Guidelines):\n   - Organize complex prompts with XML tags\n   - Use <context>, <instruction>, <examples>, <output_format> tags\n   - Place critical context before instructions\n\n3. SUCCESS CRITERIA (AWS Best Practices):\n   - Define what constitutes successful completion\n   - Include measurable outcomes and evaluation criteria\n   - Specify format, length, and quality requirements\n\n4. HEDGE WORD REMOVAL:\n   - Remove uncertainty words (maybe, perhaps, might)\n   - Use direct, authoritative language\n   - Make instructions clear and actionable\n\nFocus on making every instruction explicit, measurable, and unambiguous.\n</instruction>\n"
 
     def _calculate_clarity_metrics(self, prompt: str) -> dict[str, Any]:
-        """Calculate comprehensive clarity metrics based on research"""
+        """Calculate comprehensive clarity metrics based on research."""
         words = re.sub("[^\\w\\s]", "", prompt.lower()).split()
         sentences = re.split(r"[.!?]+", prompt)
         vague_words = [word for word in VAGUE_WORDS if word in words]
@@ -243,7 +242,7 @@ class ClarityRule(BasePromptRule):
         }
 
     def _apply_xml_structure(self, prompt: str) -> tuple[str, list[dict]]:
-        """Apply Anthropic XML structure patterns"""
+        """Apply Anthropic XML structure patterns."""
         if len(prompt.split()) < 20:
             return (prompt, [])
         context_parts = []
@@ -278,7 +277,7 @@ class ClarityRule(BasePromptRule):
         return (prompt, [])
 
     def _enhance_specificity(self, prompt: str) -> tuple[str, list[dict]]:
-        """Apply OpenAI specificity patterns"""
+        """Apply OpenAI specificity patterns."""
         improvements = []
         enhanced_prompt = prompt
         vague_quantifiers = {
@@ -302,7 +301,7 @@ class ClarityRule(BasePromptRule):
         return (enhanced_prompt, improvements)
 
     def _add_success_criteria(self, prompt: str) -> tuple[str, list[dict]]:
-        """Add success criteria using AWS best practices"""
+        """Add success criteria using AWS best practices."""
         if any(
             pattern.lower() in prompt.lower() for pattern in SUCCESS_CRITERIA_PATTERNS
         ):
@@ -320,7 +319,7 @@ class ClarityRule(BasePromptRule):
         )
 
     def _replace_vague_language(self, prompt: str) -> tuple[str, list[dict]]:
-        """Replace vague language with specific alternatives"""
+        """Replace vague language with specific alternatives."""
         improvements = []
         enhanced_prompt = prompt
         specific_replacements = {
@@ -347,7 +346,7 @@ class ClarityRule(BasePromptRule):
         return (enhanced_prompt, improvements)
 
     def _fallback_clarity_improvement(self, prompt: str, vague_words: list) -> dict:
-        """Enhanced fallback method with research patterns"""
+        """Enhanced fallback method with research patterns."""
         improved_prompt = prompt
         transformations = []
         simple_replacements = {

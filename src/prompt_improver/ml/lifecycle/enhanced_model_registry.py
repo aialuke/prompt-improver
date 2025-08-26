@@ -24,11 +24,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import mlflow
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from prompt_improver.ml.types import features, hyper_parameters, labels, model_config
 from prompt_improver.performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 from prompt_improver.utils.datetime_utils import aware_utc_now
 from prompt_improver.utils.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
 logger = logging.getLogger(__name__)
 
 class ModelStatus(Enum):
@@ -490,7 +491,7 @@ class EnhancedModelRegistry:
             with mlflow.start_run(experiment_id=experiment_id) as run:
                 model_info = None
                 if metadata.model_format == ModelFormat.SKLEARN:
-                    model_info = mlflow.sklearn.log_model(model, artifact_path='model', registered_model_name=model_name)
+                    model_info = mlflow.get_sklearn().log_model(model, artifact_path='model', registered_model_name=model_name)
                 elif metadata.model_format == ModelFormat.PYTORCH:
                     model_info = mlflow.pytorch.log_model(model, artifact_path='model', registered_model_name=model_name)
                 elif metadata.model_format == ModelFormat.TENSORFLOW:

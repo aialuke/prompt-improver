@@ -13,24 +13,41 @@ Performance targets: <200ms facade operations, <100ms individual services.
 """
 
 import asyncio
+import contextlib
 import logging
-import pytest
 import time
-from typing import Any, Dict, List
-from datetime import datetime, timezone
+from typing import Any
 
+import pytest
+from tests.integration.real_behavior_testing.containers.ml_test_container import (
+    MLTestContainer,
+)
+
+from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
+    AdvancedPatternDiscovery,
+)
+from prompt_improver.ml.services.intelligence.batch_processing_service import (
+    BatchProcessingService,
+)
+from prompt_improver.ml.services.intelligence.circuit_breaker_service import (
+    MLCircuitBreakerService,
+)
 from prompt_improver.ml.services.intelligence.facade import (
     MLIntelligenceServiceFacade,
     create_ml_intelligence_service_facade,
 )
-from prompt_improver.ml.services.intelligence.circuit_breaker_service import MLCircuitBreakerService
-from prompt_improver.ml.services.intelligence.rule_analysis_service import RuleAnalysisService
-from prompt_improver.ml.services.intelligence.pattern_discovery_service import PatternDiscoveryService
-from prompt_improver.ml.services.intelligence.prediction_service import MLPredictionService
-from prompt_improver.ml.services.intelligence.batch_processing_service import BatchProcessingService
-from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import AdvancedPatternDiscovery
-from prompt_improver.repositories.impl.ml_repository_service.ml_repository_facade import MLRepositoryFacade
-from tests.integration.real_behavior_testing.containers.ml_test_container import MLTestContainer, MLTestDataset
+from prompt_improver.ml.services.intelligence.pattern_discovery_service import (
+    PatternDiscoveryService,
+)
+from prompt_improver.ml.services.intelligence.prediction_service import (
+    MLPredictionService,
+)
+from prompt_improver.ml.services.intelligence.rule_analysis_service import (
+    RuleAnalysisService,
+)
+from prompt_improver.repositories.impl.ml_repository_service.ml_repository_facade import (
+    MLRepositoryFacade,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +67,12 @@ async def ml_repository_facade(integrated_services):
 @pytest.fixture
 async def advanced_pattern_discovery(ml_container: MLTestContainer):
     """Create advanced pattern discovery component with real ML container."""
-    pattern_discovery = AdvancedPatternDiscovery(
+    return AdvancedPatternDiscovery(
         clustering_min_samples=3,
         clustering_min_cluster_size=5,
         feature_extraction_method="tfidf",
         enable_caching=True
     )
-    return pattern_discovery
 
 
 @pytest.fixture
@@ -82,13 +98,13 @@ async def test_rule_data(ml_repository_facade: MLRepositoryFacade, test_data_fac
         session_count_per_rule=50,
         domains=["general", "technical", "creative"]
     )
-    
+
     # Store in repository
     for rule_id, sessions in rule_data["sessions_by_rule"].items():
         await ml_repository_facade.store_rule_sessions(rule_id, sessions)
-    
+
     yield rule_data
-    
+
     # Cleanup
     for rule_id in rule_data["rule_ids"]:
         await ml_repository_facade.delete_rule_data(rule_id)
@@ -96,19 +112,19 @@ async def test_rule_data(ml_repository_facade: MLRepositoryFacade, test_data_fac
 
 class TestMLCircuitBreakerService:
     """Test ML Circuit Breaker Service with real failure scenarios."""
-    
+
     async def test_circuit_breaker_initialization(self):
         """Test circuit breaker service initialization."""
         service = MLCircuitBreakerService()
-        
+
         # Test setup
         components = ["rule_analysis", "pattern_discovery", "predictions"]
         await service.setup_circuit_breakers(components)
-        
+
         # Verify circuit breakers were created
         states = await service.get_all_states()
         assert len(states) == len(components)
-        
+
         for component in components:
             assert component in states
             assert not states[component].is_open
@@ -118,13 +134,13 @@ class TestMLCircuitBreakerService:
         """Test circuit breaker failure tracking with real errors."""
         service = MLCircuitBreakerService()
         await service.setup_circuit_breakers(["test_component"])
-        
+
         async def failing_operation():
             raise RuntimeError("Simulated ML failure")
-        
+
         # Execute operations that will fail
         failure_count = 0
-        for i in range(10):  # Exceed failure threshold
+        for _i in range(10):  # Exceed failure threshold
             try:
                 await service.execute_with_circuit_breaker(
                     operation=failing_operation,
@@ -132,11 +148,11 @@ class TestMLCircuitBreakerService:
                 )
             except Exception:
                 failure_count += 1
-        
+
         # Verify circuit breaker opened
         states = await service.get_all_states()
         test_state = states["test_component"]
-        
+
         assert failure_count > 0
         assert test_state.failure_count >= 5  # Default threshold
         # Circuit may or may not be open depending on timing and threshold
@@ -145,72 +161,70 @@ class TestMLCircuitBreakerService:
         """Test circuit breaker recovery mechanism."""
         service = MLCircuitBreakerService()
         await service.setup_circuit_breakers(["recovery_test"])
-        
+
         # Force circuit open by failing operations
         async def always_fail():
             raise RuntimeError("Force failure")
-        
+
         for _ in range(6):  # Exceed threshold
-            try:
+            with contextlib.suppress(Exception):
                 await service.execute_with_circuit_breaker(
                     operation=always_fail,
                     component_name="recovery_test"
                 )
-            except Exception:
-                pass
-        
+
         # Test successful operation
         async def always_succeed():
             return "success"
-        
+
         start_time = time.perf_counter()
         result = await service.execute_with_circuit_breaker(
             operation=always_succeed,
             component_name="recovery_test"
         )
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         performance_tracker("circuit_breaker_recovery", duration, 10.0)
         assert result == "success" or isinstance(result, Exception)  # Circuit may still be open
 
 
 class TestRuleAnalysisService:
     """Test Rule Analysis Service with real rule processing."""
-    
+
     async def test_rule_intelligence_processing(
         self,
         ml_repository_facade: MLRepositoryFacade,
         advanced_pattern_discovery: AdvancedPatternDiscovery,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
         performance_tracker,
     ):
         """Test rule intelligence processing with real data."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["rule_analysis"])
-        
+
         service = RuleAnalysisService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker,
             pattern_discovery=advanced_pattern_discovery
         )
-        
+
         # Test processing specific rules
         rule_ids = test_rule_data["rule_ids"][:5]  # Test subset for performance
-        
+
         start_time = time.perf_counter()
         result = await service.process_rule_intelligence(rule_ids)
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate performance target
         performance_tracker("rule_intelligence_processing", duration, 100.0)
-        
+
         # Validate results
         assert result.success
         assert "rule_intelligence" in result.data
         assert "characteristics" in result.data
         assert result.confidence > 0.0
         assert result.processing_time_ms > 0
-        
+
         # Validate rule-specific analysis
         rule_intelligence = result.data["rule_intelligence"]
         for rule_id in rule_ids:
@@ -224,31 +238,31 @@ class TestRuleAnalysisService:
         self,
         ml_repository_facade: MLRepositoryFacade,
         advanced_pattern_discovery: AdvancedPatternDiscovery,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
         performance_tracker,
     ):
         """Test rule combination intelligence analysis."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["rule_analysis"])
-        
+
         service = RuleAnalysisService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker,
             pattern_discovery=advanced_pattern_discovery
         )
-        
+
         start_time = time.perf_counter()
         result = await service.process_combination_intelligence()
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate performance target
         performance_tracker("combination_intelligence", duration, 150.0)
-        
+
         # Validate results
         assert result.success
         assert "combination_intelligence" in result.data
         assert result.confidence >= 0.0
-        
+
         # Validate combination analysis
         combination_data = result.data["combination_intelligence"]
         assert "effective_combinations" in combination_data
@@ -263,18 +277,18 @@ class TestRuleAnalysisService:
         """Test rule analysis service error handling."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["rule_analysis"])
-        
+
         service = RuleAnalysisService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker,
             pattern_discovery=advanced_pattern_discovery
         )
-        
+
         # Test with invalid rule IDs
         invalid_rule_ids = ["invalid_rule_1", "invalid_rule_2"]
-        
+
         result = await service.process_rule_intelligence(invalid_rule_ids)
-        
+
         # Should handle gracefully, not crash
         assert isinstance(result, object)  # Result object returned
         # May succeed with empty data or fail gracefully
@@ -282,7 +296,7 @@ class TestRuleAnalysisService:
 
 class TestPatternDiscoveryService:
     """Test Pattern Discovery Service with real pattern analysis."""
-    
+
     async def test_pattern_discovery_with_real_data(
         self,
         ml_container: MLTestContainer,
@@ -293,21 +307,21 @@ class TestPatternDiscoveryService:
         """Test pattern discovery with real ML container data."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["pattern_discovery"])
-        
+
         service = PatternDiscoveryService(
             pattern_discovery=advanced_pattern_discovery,
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Get test dataset from ML container
         test_dataset = ml_container.get_test_dataset("small")
         assert test_dataset is not None
-        
+
         # Prepare batch data (simulate repository data format)
         batch_data = []
         for i, (prompt, improvement, context) in enumerate(
-            zip(test_dataset.prompts[:50], test_dataset.improvements[:50], test_dataset.contexts[:50])
+            zip(test_dataset.prompts[:50], test_dataset.improvements[:50], test_dataset.contexts[:50], strict=False)
         ):
             batch_data.append({
                 "session_id": f"test_session_{i:03d}",
@@ -316,21 +330,21 @@ class TestPatternDiscoveryService:
                 "context": context,
                 "effectiveness_score": 0.7 + (i % 3) * 0.1,  # Vary scores
             })
-        
+
         start_time = time.perf_counter()
         result = await service.discover_patterns(batch_data)
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate performance target
         performance_tracker("pattern_discovery", duration, 200.0)
-        
+
         # Validate results
         assert result.success
         assert "patterns" in result.data
         assert "insights" in result.data
         assert result.confidence >= 0.0
         assert result.processing_time_ms > 0
-        
+
         # Validate discovered patterns
         patterns = result.data["patterns"]
         assert isinstance(patterns, list)
@@ -349,13 +363,13 @@ class TestPatternDiscoveryService:
         """Test pattern discovery caching for performance improvement."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["pattern_discovery"])
-        
+
         service = PatternDiscoveryService(
             pattern_discovery=advanced_pattern_discovery,
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Get consistent test data
         test_dataset = ml_container.get_test_dataset("small")
         batch_data = [
@@ -368,24 +382,24 @@ class TestPatternDiscoveryService:
             }
             for i in range(30)
         ]
-        
+
         # First run (cache miss)
         start_time = time.perf_counter()
         first_result = await service.discover_patterns(batch_data)
         first_duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Second run (cache hit potential)
         start_time = time.perf_counter()
         second_result = await service.discover_patterns(batch_data)
         second_duration = (time.perf_counter() - start_time) * 1000
-        
+
         performance_tracker("pattern_discovery_first_run", first_duration, 200.0)
         performance_tracker("pattern_discovery_cached_run", second_duration, 100.0)
-        
+
         # Both should succeed
         assert first_result.success
         assert second_result.success
-        
+
         # Second run should be faster (cache hit) or similar (cache miss is acceptable)
         cache_performance_improvement = first_duration > second_duration * 1.2  # 20% improvement threshold
         logger.info(f"Cache performance: first={first_duration:.2f}ms, second={second_duration:.2f}ms, improved={cache_performance_improvement}")
@@ -399,16 +413,16 @@ class TestPatternDiscoveryService:
         """Test pattern discovery cache statistics."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["pattern_discovery"])
-        
+
         service = PatternDiscoveryService(
             pattern_discovery=advanced_pattern_discovery,
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Get cache statistics
         cache_stats = await service.get_cache_statistics()
-        
+
         # Validate cache statistics structure
         assert isinstance(cache_stats, dict)
         assert "cache_enabled" in cache_stats
@@ -419,7 +433,7 @@ class TestPatternDiscoveryService:
 
 class TestMLPredictionService:
     """Test ML Prediction Service with real prediction scenarios."""
-    
+
     async def test_ml_predictions_with_confidence(
         self,
         ml_repository_facade: MLRepositoryFacade,
@@ -428,12 +442,12 @@ class TestMLPredictionService:
         """Test ML predictions with confidence scoring."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["predictions"])
-        
+
         service = MLPredictionService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Prepare prediction data
         prediction_data = {
             "characteristics": {
@@ -457,21 +471,21 @@ class TestMLPredictionService:
                 "avg_effectiveness": 0.78,
             },
         }
-        
+
         start_time = time.perf_counter()
         result = await service.generate_predictions_with_confidence(prediction_data)
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate performance target
         performance_tracker("ml_predictions", duration, 50.0)
-        
+
         # Validate results
         assert result.success
         assert "predictions" in result.data
         assert "confidence_analysis" in result.data
         assert result.confidence > 0.0
         assert result.processing_time_ms > 0
-        
+
         # Validate predictions structure
         predictions = result.data["predictions"]
         assert isinstance(predictions, list)
@@ -486,17 +500,17 @@ class TestMLPredictionService:
         """Test ML prediction service error handling."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["predictions"])
-        
+
         service = MLPredictionService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Test with invalid prediction data
         invalid_data = {"invalid": "data"}
-        
+
         result = await service.generate_predictions_with_confidence(invalid_data)
-        
+
         # Should handle gracefully
         assert isinstance(result, object)
         # May succeed with default predictions or fail gracefully
@@ -504,7 +518,7 @@ class TestMLPredictionService:
 
 class TestBatchProcessingService:
     """Test Batch Processing Service with real batch operations."""
-    
+
     async def test_batch_processing_performance(
         self,
         ml_repository_facade: MLRepositoryFacade,
@@ -514,31 +528,31 @@ class TestBatchProcessingService:
         """Test batch processing performance with realistic batch sizes."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["batch_processing"])
-        
+
         service = BatchProcessingService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Create batch data
         batch_data = await test_data_factory.create_batch_processing_data(
             batch_size=100,
             operation_types=["rule_analysis", "pattern_discovery", "prediction"]
         )
-        
+
         start_time = time.perf_counter()
         result = await service.process_batch(batch_data, batch_size=25)
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate performance target (batch processing can be slower)
         performance_tracker("batch_processing", duration, 500.0)
-        
+
         # Validate results
         assert result.success
         assert "batch_results" in result.data
         assert "processing_summary" in result.data
         assert result.processing_time_ms > 0
-        
+
         # Validate batch processing summary
         summary = result.data["processing_summary"]
         assert "total_items" in summary
@@ -552,15 +566,15 @@ class TestBatchProcessingService:
         """Test batch processing status tracking."""
         circuit_breaker = MLCircuitBreakerService()
         await circuit_breaker.setup_circuit_breakers(["batch_processing"])
-        
+
         service = BatchProcessingService(
             ml_repository=ml_repository_facade,
             circuit_breaker_service=circuit_breaker
         )
-        
+
         # Get processing status
         status = await service.get_processing_status()
-        
+
         # Validate status structure
         assert isinstance(status, dict)
         assert "is_processing" in status
@@ -570,16 +584,16 @@ class TestBatchProcessingService:
 
 class TestMLIntelligenceServiceFacade:
     """Test ML Intelligence Service Facade integration and coordination."""
-    
+
     async def test_complete_intelligence_processing_pipeline(
         self,
         ml_intelligence_facade: MLIntelligenceServiceFacade,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
         performance_tracker,
     ):
         """Test complete intelligence processing pipeline with all services."""
         rule_ids = test_rule_data["rule_ids"][:3]  # Small subset for comprehensive test
-        
+
         start_time = time.perf_counter()
         result = await ml_intelligence_facade.run_intelligence_processing(
             rule_ids=rule_ids,
@@ -588,15 +602,15 @@ class TestMLIntelligenceServiceFacade:
             batch_size=25
         )
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate facade performance target
         performance_tracker("facade_intelligence_processing", duration, 200.0)
-        
+
         # Validate comprehensive results
         assert result.success
         assert result.confidence > 0.0
         assert result.processing_time_ms > 0
-        
+
         # Validate all processing phases
         intelligence_data = result.data
         assert "rule_intelligence" in intelligence_data
@@ -604,7 +618,7 @@ class TestMLIntelligenceServiceFacade:
         assert "pattern_insights" in intelligence_data
         assert "predictions" in intelligence_data
         assert "processing_metadata" in intelligence_data
-        
+
         # Validate processing metadata
         metadata = intelligence_data["processing_metadata"]
         assert "started_at" in metadata
@@ -612,12 +626,12 @@ class TestMLIntelligenceServiceFacade:
         assert "total_elapsed_ms" in metadata
         assert "successful_phases" in metadata
         assert "coordination_overhead_ms" in metadata
-        
+
         # Validate coordination efficiency (overhead should be minimal)
         coordination_overhead = metadata["coordination_overhead_ms"]
         total_time = metadata["total_elapsed_ms"]
         overhead_percentage = (coordination_overhead / total_time) * 100
-        
+
         # Coordination overhead should be < 20% of total time
         assert overhead_percentage < 20.0, f"High coordination overhead: {overhead_percentage:.1f}%"
 
@@ -627,7 +641,7 @@ class TestMLIntelligenceServiceFacade:
     ):
         """Test facade service health monitoring."""
         health_status = await ml_intelligence_facade.get_service_health()
-        
+
         # Validate health status structure
         assert isinstance(health_status, dict)
         assert "overall_status" in health_status
@@ -636,13 +650,13 @@ class TestMLIntelligenceServiceFacade:
         assert "pattern_cache" in health_status
         assert "facade_info" in health_status
         assert "timestamp" in health_status
-        
+
         # Validate health status values
-        assert health_status["overall_status"] in ["healthy", "degraded", "unhealthy"]
-        
+        assert health_status["overall_status"] in {"healthy", "degraded", "unhealthy"}
+
         # Validate circuit breaker status
         circuit_breakers = health_status["circuit_breakers"]
-        for component, state in circuit_breakers.items():
+        for state in circuit_breakers.values():
             assert "is_open" in state
             assert "failure_count" in state
             assert "component_name" in state
@@ -650,7 +664,7 @@ class TestMLIntelligenceServiceFacade:
     async def test_facade_processing_metrics(
         self,
         ml_intelligence_facade: MLIntelligenceServiceFacade,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
     ):
         """Test facade processing metrics collection."""
         # Run some operations to generate metrics
@@ -660,23 +674,23 @@ class TestMLIntelligenceServiceFacade:
             enable_predictions=True,
             batch_size=10
         )
-        
+
         # Get processing metrics
         metrics = await ml_intelligence_facade.get_processing_metrics()
-        
+
         # Validate metrics structure
         assert isinstance(metrics, dict)
         assert "facade_metrics" in metrics
         assert "service_health" in metrics
         assert "timestamp" in metrics
-        
+
         # Validate facade metrics
         facade_metrics = metrics["facade_metrics"]
         assert "total_operations" in facade_metrics
         assert "successful_operations" in facade_metrics
         assert "failed_operations" in facade_metrics
         assert "success_rate" in facade_metrics
-        
+
         # Success rate should be between 0 and 1
         assert 0.0 <= facade_metrics["success_rate"] <= 1.0
 
@@ -687,25 +701,25 @@ class TestMLIntelligenceServiceFacade:
         """Test facade background processing capability."""
         # Test background processing start/stop
         await ml_intelligence_facade.start_background_processing()
-        
+
         # Wait briefly for background task to initialize
         await asyncio.sleep(0.1)
-        
+
         health_status = await ml_intelligence_facade.get_service_health()
         facade_info = health_status["facade_info"]
-        
+
         # Should indicate background processing is running
         assert facade_info["is_background_running"]
-        
+
         # Stop background processing
         await ml_intelligence_facade.stop_background_processing()
-        
+
         # Wait briefly for background task to stop
         await asyncio.sleep(0.1)
-        
+
         health_status = await ml_intelligence_facade.get_service_health()
         facade_info = health_status["facade_info"]
-        
+
         # Should indicate background processing is stopped
         assert not facade_info["is_background_running"]
 
@@ -717,19 +731,19 @@ class TestMLIntelligenceServiceFacade:
         """Test facade error handling and recovery mechanisms."""
         # Test with invalid rule IDs to trigger error handling
         invalid_rule_ids = ["invalid_rule_1", "invalid_rule_2"]
-        
+
         result = await ml_intelligence_facade.run_intelligence_processing(
             rule_ids=invalid_rule_ids,
             enable_patterns=True,
             enable_predictions=True,
             batch_size=10
         )
-        
+
         # Facade should handle errors gracefully
         assert isinstance(result, object)  # Result object returned
         assert hasattr(result, 'success')
         assert hasattr(result, 'processing_time_ms')
-        
+
         # Even if processing fails, facade should provide useful error information
         if not result.success:
             assert hasattr(result, 'error_message')
@@ -738,18 +752,18 @@ class TestMLIntelligenceServiceFacade:
 
 class TestIntegratedMLIntelligenceWorkflow:
     """Test complete integrated ML intelligence workflow scenarios."""
-    
+
     async def test_end_to_end_intelligence_processing(
         self,
         ml_intelligence_facade: MLIntelligenceServiceFacade,
         ml_container: MLTestContainer,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
         performance_tracker,
     ):
         """Test end-to-end intelligence processing with real data flow."""
         # Create comprehensive test scenario
         rule_ids = test_rule_data["rule_ids"][:5]
-        
+
         # Run complete intelligence processing
         start_time = time.perf_counter()
         result = await ml_intelligence_facade.run_intelligence_processing(
@@ -759,17 +773,17 @@ class TestIntegratedMLIntelligenceWorkflow:
             batch_size=30
         )
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Validate end-to-end performance
         performance_tracker("end_to_end_intelligence", duration, 300.0)  # Comprehensive processing target
-        
+
         # Validate comprehensive result
         assert result.success or result.data  # Should have data even if partially successful
-        
+
         # Get health status after processing
         health_status = await ml_intelligence_facade.get_service_health()
-        assert health_status["overall_status"] in ["healthy", "degraded"]  # Should not be unhealthy
-        
+        assert health_status["overall_status"] in {"healthy", "degraded"}  # Should not be unhealthy
+
         # Get processing metrics
         metrics = await ml_intelligence_facade.get_processing_metrics()
         assert metrics["facade_metrics"]["total_operations"] > 0
@@ -777,15 +791,15 @@ class TestIntegratedMLIntelligenceWorkflow:
     async def test_performance_targets_validation(
         self,
         ml_intelligence_facade: MLIntelligenceServiceFacade,
-        test_rule_data: Dict[str, Any],
+        test_rule_data: dict[str, Any],
         performance_tracker,
     ):
         """Validate all ML Intelligence Services meet performance targets."""
         performance_results = {}
-        
+
         # Test individual service performance through facade
         rule_ids = test_rule_data["rule_ids"][:3]
-        
+
         # Test rule intelligence (target: <100ms)
         start_time = time.perf_counter()
         rule_result = await ml_intelligence_facade._rule_analysis_service.process_rule_intelligence(rule_ids)
@@ -796,7 +810,7 @@ class TestIntegratedMLIntelligenceWorkflow:
             "met": rule_duration < 100.0
         }
         performance_tracker("rule_intelligence_target", rule_duration, 100.0)
-        
+
         # Test combination intelligence (target: <150ms)
         start_time = time.perf_counter()
         combo_result = await ml_intelligence_facade._rule_analysis_service.process_combination_intelligence()
@@ -807,7 +821,7 @@ class TestIntegratedMLIntelligenceWorkflow:
             "met": combo_duration < 150.0
         }
         performance_tracker("combination_intelligence_target", combo_duration, 150.0)
-        
+
         # Test facade coordination (target: <200ms)
         start_time = time.perf_counter()
         facade_result = await ml_intelligence_facade.run_intelligence_processing(
@@ -823,17 +837,17 @@ class TestIntegratedMLIntelligenceWorkflow:
             "met": facade_duration < 200.0
         }
         performance_tracker("facade_coordination_target", facade_duration, 200.0)
-        
+
         # Validate overall performance
         total_targets_met = sum(1 for result in performance_results.values() if result["met"])
         total_targets = len(performance_results)
         performance_percentage = (total_targets_met / total_targets) * 100
-        
+
         logger.info(f"Performance targets met: {total_targets_met}/{total_targets} ({performance_percentage:.1f}%)")
         logger.info("Performance results:")
         for service, result in performance_results.items():
             status = "✓" if result["met"] else "✗"
             logger.info(f"  {status} {service}: {result['duration_ms']:.2f}ms (target: {result['target_ms']}ms)")
-        
+
         # Should meet at least 80% of performance targets
         assert performance_percentage >= 80.0, f"Performance targets not met: {performance_percentage:.1f}%"

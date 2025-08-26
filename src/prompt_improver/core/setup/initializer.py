@@ -3,6 +3,7 @@ Implements Task 1: Installation Automation from Phase 2.
 """
 
 import asyncio
+import contextlib
 import os
 import subprocess
 from datetime import datetime
@@ -21,23 +22,19 @@ from rich.progress import (
 from sqlalchemy import func, select
 
 from prompt_improver.core.config import AppConfig
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.factories.ml_pipeline_factory import (
-    MLPipelineOrchestratorFactory,
-)
 
 
 class APESInitializer:
-    """Comprehensive system initialization following production patterns"""
+    """Comprehensive system initialization following production patterns."""
 
-    def __init__(self, console: Console | None = None):
+    def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
         self.data_dir = None
 
     async def initialize_system(
         self, data_dir: Path | None = None, force: bool = False
     ) -> dict[str, Any]:
-        """Complete APES setup following research-validated best practices"""
+        """Complete APES setup following research-validated best practices."""
         if data_dir is None:
             data_dir = Path.home() / ".local" / "share" / "apes"
         self.data_dir = Path(data_dir).expanduser().resolve()
@@ -131,7 +128,7 @@ class APESInitializer:
         return initialization_results
 
     async def create_directory_structure(self, force: bool = False):
-        """Create XDG-compliant directory structure"""
+        """Create XDG-compliant directory structure."""
         if self.data_dir is None:
             self.data_dir = Path.home() / ".local" / "share" / "apes"
         if self.data_dir.exists() and (not force):
@@ -157,7 +154,7 @@ class APESInitializer:
         )
 
     async def setup_postgresql_cluster(self):
-        """Initialize local PostgreSQL cluster if needed"""
+        """Initialize local PostgreSQL cluster if needed."""
         try:
             import shutil
 
@@ -218,7 +215,7 @@ class APESInitializer:
         self.console.print("  📡 PostgreSQL setup completed", style="dim")
 
     async def apply_performance_optimizations(self):
-        """Apply PostgreSQL performance optimizations"""
+        """Apply PostgreSQL performance optimizations."""
         try:
             async with get_session() as session:
                 optimizations = [
@@ -227,10 +224,8 @@ class APESInitializer:
                     "SET log_min_duration_statement = 1000",
                 ]
                 for optimization in optimizations:
-                    try:
+                    with contextlib.suppress(Exception):
                         await session.execute(optimization)
-                    except Exception:
-                        pass
                 self.console.print(
                     "  ⚡ Applied performance optimizations", style="dim"
                 )
@@ -240,7 +235,7 @@ class APESInitializer:
             )
 
     async def create_production_configs(self):
-        """Generate environment-specific configuration files"""
+        """Generate environment-specific configuration files."""
         config_dir = self.data_dir / "config"
         db_config = {
             "database": {
@@ -317,7 +312,7 @@ class APESInitializer:
         )
 
     async def create_database_schema(self):
-        """Initialize database schema using existing schema.sql"""
+        """Initialize database schema using existing schema.sql."""
         project_root = Path(__file__).parent.parent.parent.parent
         schema_file = project_root / "database" / "schema.sql"
         if not schema_file.exists():
@@ -347,7 +342,7 @@ class APESInitializer:
             raise
 
     async def seed_baseline_rules(self):
-        """Load rule configurations from YAML into database"""
+        """Load rule configurations from YAML into database."""
         config_file = self.data_dir / "config" / "rule_config.yaml"
         if not config_file.exists():
             self.console.print(
@@ -356,7 +351,7 @@ class APESInitializer:
             return
         try:
             async with get_session() as session:
-                with open(config_file) as f:
+                with open(config_file, encoding="utf-8") as f:
                     config = yaml.safe_load(f)
                 import json
 
@@ -417,7 +412,7 @@ class APESInitializer:
             raise
 
     async def generate_initial_training_data(self):
-        """Bootstrap with enhanced synthetic training data using research-driven generator"""
+        """Bootstrap with enhanced synthetic training data using research-driven generator."""
         try:
             async with get_session() as session:
                 from prompt_improver.database.models import TrainingPrompt
@@ -473,10 +468,10 @@ class APESInitializer:
             )
 
     async def setup_mcp_server(self):
-        """Configure MCP server for stdio transport"""
+        """Configure MCP server for stdio transport."""
         mcp_server_path = Path(__file__).parent.parent / "mcp_server" / "mcp_server.py"
         if mcp_server_path.exists():
-            Path(mcp_server_path).chmod(493)
+            Path(mcp_server_path).chmod(0o755)
             self.console.print(
                 "  🔧 MCP server configured for stdio transport", style="dim"
             )
@@ -486,7 +481,7 @@ class APESInitializer:
             )
 
     async def verify_system_health(self) -> dict[str, Any]:
-        """Test system integration and performance validation"""
+        """Test system integration and performance validation."""
         health_results = {
             "database_connection": False,
             "mcp_performance": None,

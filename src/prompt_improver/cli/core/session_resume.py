@@ -5,16 +5,17 @@ Implements session state detection, workflow reconstruction, and resume coordina
 import asyncio
 import logging
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select, text, update
 
 from prompt_improver.cli.core.progress_preservation import ProgressService
-from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator as TrainingService
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
+from prompt_improver.cli.services.training_orchestrator import (
+    TrainingOrchestrator as TrainingService,
+)
 from prompt_improver.database.models import TrainingSession
 
 
@@ -71,7 +72,7 @@ class SessionService:
     - Comprehensive resume coordination and monitoring
     """
 
-    def __init__(self, backup_dir: Path | None = None):
+    def __init__(self, backup_dir: Path | None = None) -> None:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./session_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -94,20 +95,17 @@ class SessionService:
                     result = await db_session.execute(select(TrainingSession))
                     all_sessions = result.scalars().all()
                     cutoff_time = datetime.now(UTC) - timedelta(minutes=30)
-                    sessions = []
-                    for session in all_sessions:
-                        if session.status in ["running", "interrupted"] or (
+                    sessions = [session for session in all_sessions if session.status in {"running", "interrupted"} or (
                             session.status == "running"
                             and session.last_activity_at < cutoff_time
-                        ):
-                            sessions.append(session)
+                        )]
                 interrupted_sessions = []
                 for session in sessions:
                     context = await self._analyze_session_state(session)
-                    if context.detected_state in [
+                    if context.detected_state in {
                         SessionState.INTERRUPTED,
                         SessionState.RECOVERABLE,
-                    ]:
+                    }:
                         interrupted_sessions.append(context)
                         self.detected_sessions[session.session_id] = context
                         self.logger.info(
@@ -118,7 +116,7 @@ class SessionService:
                 )
                 return interrupted_sessions
             except Exception as e:
-                self.logger.error(f"Failed to detect interrupted sessions: {e}")
+                self.logger.exception(f"Failed to detect interrupted sessions: {e}")
                 return []
 
     async def _analyze_session_state(
@@ -154,7 +152,7 @@ class SessionService:
                 recovery_confidence=recovery_confidence,
             )
         except Exception as e:
-            self.logger.error(f"Failed to analyze session {session.session_id}: {e}")
+            self.logger.exception(f"Failed to analyze session {session.session_id}: {e}")
             return SessionResumeContext(
                 session_id=session.session_id,
                 detected_state=SessionState.UNRECOVERABLE,
@@ -218,7 +216,7 @@ class SessionService:
             return "none"
         if state == SessionState.CORRUPTED or integrity < 0.6:
             return "partial_recovery"
-        if state in [SessionState.INTERRUPTED, SessionState.RECOVERABLE]:
+        if state in {SessionState.INTERRUPTED, SessionState.RECOVERABLE}:
             if session_age.total_seconds() > 86400:
                 return "partial_recovery"
             if integrity > 0.8:
@@ -423,7 +421,7 @@ class SessionService:
                 )
                 return workflow_state
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to reconstruct workflow state for {session_id}: {e}"
             )
             return None
@@ -513,7 +511,7 @@ class SessionService:
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
                 self.resume_history.append(error_result)
-                self.logger.error(f"Resume operation failed for {session_id}: {e}")
+                self.logger.exception(f"Resume operation failed for {session_id}: {e}")
                 return error_result
 
     async def _verify_resume_integrity(

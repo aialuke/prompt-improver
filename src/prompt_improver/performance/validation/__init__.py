@@ -1,4 +1,4 @@
-"""Performance Validation Components
+"""Performance Validation Components.
 
 Tools for validating performance targets and benchmarking system capabilities.
 """

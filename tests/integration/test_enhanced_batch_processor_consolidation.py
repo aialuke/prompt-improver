@@ -62,8 +62,8 @@ async def test_enhanced_batch_processor_features():
         # Verify enhanced initialization
         assert processor.config.processing_mode == ProcessingMode.LOCAL
         assert processor.config.partition_strategy == PartitionStrategy.ROUND_ROBIN
-        assert processor.config.enable_circuit_breaker == True
-        assert processor.config.enable_dead_letter_queue == True
+        assert processor.config.enable_circuit_breaker
+        assert processor.config.enable_dead_letter_queue
 
         # Test circuit breaker exists
         assert processor.circuit_breaker is not None
@@ -146,7 +146,7 @@ async def test_enhanced_batch_processor_features():
         return True
 
     except Exception as e:
-        logger.error("❌ Enhanced BatchProcessor test failed: %s", e)
+        logger.exception("❌ Enhanced BatchProcessor test failed: %s", e)
         return False
 
 
@@ -181,12 +181,12 @@ async def test_new_config_system():
         assert processor.config.max_attempts == 5
         assert processor.config.base_delay == 2.0
         assert processor.config.max_delay == 120.0
-        assert processor.config.dry_run == True
-        assert processor.config.jitter == False
+        assert processor.config.dry_run
+        assert not processor.config.jitter
         assert processor.config.concurrency == 4
         assert processor.config.timeout == 45000
-        assert processor.config.enable_circuit_breaker == True
-        assert processor.config.enable_dead_letter_queue == True
+        assert processor.config.enable_circuit_breaker
+        assert processor.config.enable_dead_letter_queue
 
         # Test methods still work
         test_cases = [{"id": i} for i in range(20)]
@@ -205,7 +205,7 @@ async def test_new_config_system():
         return True
 
     except Exception as e:
-        logger.error("❌ New config system test failed: %s", e)
+        logger.exception("❌ New config system test failed: %s", e)
         return False
 
 
@@ -271,8 +271,8 @@ async def test_performance_improvements():
         assert "partitions" in enhanced_result
         assert enhanced_result["partitions"] >= 1
 
-        logger.info("Enhanced processor time: %ss", enhanced_time:.3f)
-        logger.info("Basic processor time: %ss", basic_time:.3f)
+        logger.info("Enhanced processor time: %.3fs", enhanced_time)
+        logger.info("Basic processor time: %.3fs", basic_time)
         logger.info(
             f"Enhanced processor partitions: {enhanced_result.get('partitions', 1)}"
         )
@@ -281,7 +281,7 @@ async def test_performance_improvements():
         return True
 
     except Exception as e:
-        logger.error("❌ Performance improvement test failed: %s", e)
+        logger.exception("❌ Performance improvement test failed: %s", e)
         return False
 
 
@@ -318,7 +318,7 @@ async def test_old_batch_processor_removed():
         return True
 
     except Exception as e:
-        logger.error("❌ Old batch processor removal test failed: %s", e)
+        logger.exception("❌ Old batch processor removal test failed: %s", e)
         return False
 
 

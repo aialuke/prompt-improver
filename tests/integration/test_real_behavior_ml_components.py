@@ -6,15 +6,10 @@ metrics collection, real PostgreSQL database, and genuine data flow.
 Follows 2025 best practices with no mocking of core functionality.
 """
 
-import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime
 
-import numpy as np
-import pytest
-from opentelemetry import metrics, trace
 from tests.conftest import requires_otel, requires_real_db, requires_sklearn
 
 from prompt_improver.ml.failure_analyzer import FailureAnalyzer
@@ -203,13 +198,13 @@ class TestRealBehaviorMLComponents:
             assert "analysis" in result
             assert result["analysis"]["confidence_score"] >= 0.0
             assert "classification" in result
-            assert result["classification"]["predicted_class"] in [
+            assert result["classification"]["predicted_class"] in {
                 "timeout",
                 "connection",
                 "system",
                 "error",
                 "warning",
-            ]
+            }
             cached_result = await redis.get(f"ml_result:{result['scenario_id']}")
             assert cached_result is not None
             cached_data = json.loads(cached_result)
@@ -245,7 +240,7 @@ class TestRealBehaviorMLComponents:
             "context": {"test": True, "iterations": 100},
         }
         start_time = datetime.utcnow()
-        for i in range(10):
+        for _i in range(10):
             analysis_result = await analyzer.analyze_failure(test_data)
             features = [0.5, 100, 0.5, 3, analysis_result["confidence_score"]]
             classification_result = await classifier.classify(features)

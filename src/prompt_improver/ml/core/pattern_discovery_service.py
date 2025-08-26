@@ -9,7 +9,8 @@ import logging
 import time
 from typing import Any, Dict, List
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -279,7 +280,7 @@ class MLPatternDiscoveryService(PatternDiscoveryServiceProtocol):
             discovered_patterns = []
             for pattern_key, pattern_data in rule_patterns.items():
                 if pattern_data["count"] >= min_support:
-                    avg_effectiveness = np.mean(pattern_data["effectiveness_scores"])
+                    avg_effectiveness = get_numpy().mean(pattern_data["effectiveness_scores"])
                     if avg_effectiveness >= min_effectiveness:
                         discovered_patterns.append({
                             "parameters": pattern_data["parameters"],
@@ -338,7 +339,7 @@ class MLPatternDiscoveryService(PatternDiscoveryServiceProtocol):
 
             recommendations = []
             if context_performance:
-                avg_performance = np.mean([
+                avg_performance = get_numpy().mean([
                     row.improvement_score for row in context_performance
                 ])
                 recommendations.append({
@@ -659,7 +660,7 @@ class MLPatternDiscoveryService(PatternDiscoveryServiceProtocol):
             scores.append(consistency_score)
 
             # Return average quality score
-            return float(np.mean(scores)) if scores else 0.0
+            return float(get_numpy().mean(scores)) if scores else 0.0
 
         except Exception:
             return 0.0

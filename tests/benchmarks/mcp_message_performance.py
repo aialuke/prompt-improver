@@ -18,9 +18,8 @@ import os
 import statistics
 import sys
 import time
-import timeit
 import tracemalloc
-from typing import Any, Dict, List
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
@@ -118,7 +117,7 @@ def benchmark_message_validation(
     # Time measurement with high precision
     times = []
 
-    for i in range(5):  # 5 runs for statistical accuracy
+    for _i in range(5):  # 5 runs for statistical accuracy
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -162,7 +161,7 @@ def benchmark_message_validation(
     except Exception:
         pass
 
-    current, peak = tracemalloc.get_traced_memory()
+    _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
     memory_mb = peak / (1024 * 1024)
@@ -186,7 +185,7 @@ def benchmark_json_encoding(
     print(f"🚀 Benchmarking {name} JSON encoding ({iterations:,} iterations)...")
 
     times = []
-    for i in range(3):
+    for _i in range(3):
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -321,7 +320,7 @@ def main():
 
     results["msgspec_encoding"] = benchmark_json_encoding(
         "msgspec.json.encode()",
-        lambda obj: msgspec.json.encode(obj),
+        msgspec.json.encode,
         PROMPT_ENHANCEMENT_PAYLOAD,
     )
 
@@ -429,7 +428,7 @@ def main():
 
     # Save results
     benchmark_results = {
-        "timestamp": time.strftime(f"%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
         "performance_results": results,
         "production_simulation": production_results,
         "improvement_factors": {
@@ -457,7 +456,7 @@ def main():
         results_file = os.path.join(
             os.path.dirname(__file__), "mcp_performance_results.json"
         )
-        with open(results_file, "w") as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(benchmark_results, f, indent=2, default=str)
         print(f"\n📁 Results saved to: {results_file}")
     except Exception as e:

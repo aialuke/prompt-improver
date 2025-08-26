@@ -1,4 +1,4 @@
-"""Intelligent Rule Selector - Architecturally Corrected Version
+"""Intelligent Rule Selector - Architecturally Corrected Version.
 
 Phase 4 Enhancement: Uses pre-computed ML intelligence from database
 Maintains strict MCP-ML architectural separation:
@@ -14,17 +14,13 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.database import (
-    ManagerMode,
-    create_security_context,
-    get_database_services,
-)
 from prompt_improver.rule_engine.models import PromptCharacteristics
+from prompt_improver.services.cache.cache_factory import CacheFactory
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +65,9 @@ class IntelligentRuleSelector:
     - Maintains <200ms SLA through optimized caching
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession) -> None:
         """Initialize with database session only - NO ML components."""
+        super().__init__()
         self.db_session = db_session
         self.scoring_weights = {
             "effectiveness": 0.35,
@@ -84,7 +81,8 @@ class IntelligentRuleSelector:
         self.effectiveness_threshold = 0.6
         self.cache_hit_rate_target = 0.95
         self._cache_stats = {"hits": 0, "misses": 0}
-        self.cache = None
+        # Use CacheFactory for optimized rule effectiveness caching (singleton pattern)
+        self.cache = CacheFactory.get_rule_cache()
 
     async def select_optimal_rules(
         self,

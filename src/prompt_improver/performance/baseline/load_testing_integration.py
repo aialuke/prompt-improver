@@ -10,9 +10,9 @@ import statistics
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.performance.baseline.baseline_collector import BaselineCollector
 from prompt_improver.performance.baseline.models import BaselineMetrics
@@ -61,7 +61,7 @@ class LoadTestConfig:
 class LoadTestingIntegration:
     """Integration between load testing and baseline collection."""
 
-    def __init__(self, collector: BaselineCollector | None = None):
+    def __init__(self, collector: BaselineCollector | None = None) -> None:
         self.collector = collector or BaselineCollector()
         self.active_tests: dict[str, dict] = {}
         self.test_results: list[dict] = []
@@ -130,7 +130,7 @@ class LoadTestingIntegration:
                 baselines.append(baseline)
                 await asyncio.sleep(15)
             except Exception as e:
-                logger.error(f"Error collecting baseline during load test: {e}")
+                logger.exception(f"Error collecting baseline during load test: {e}")
         return baselines
 
     def _determine_test_phase(self, baselines: list[BaselineMetrics]) -> str:
@@ -326,7 +326,7 @@ class LoadTestingIntegration:
         config: LoadTestConfig,
     ) -> dict[str, Any]:
         """Analyze load test results with baseline data."""
-        analysis = {
+        return {
             "load_performance": self._analyze_load_performance(load_results),
             "system_performance": self._analyze_system_performance(baseline_results),
             "correlation_analysis": self._analyze_load_system_correlation(
@@ -339,7 +339,6 @@ class LoadTestingIntegration:
                 load_results, baseline_results, config
             ),
         }
-        return analysis
 
     def _analyze_load_performance(self, load_results: dict[str, Any]) -> dict[str, Any]:
         """Analyze load test performance metrics."""
@@ -568,7 +567,7 @@ class LoadTestingIntegration:
             success_rates.append(analysis["success_rate"])
             avg_response_times.append(analysis["avg_response_time_ms"])
         max_sustainable_rps = 0
-        for i, (rps, success_rate, response_time) in enumerate(
+        for _i, (rps, success_rate, response_time) in enumerate(
             zip(rps_levels, success_rates, avg_response_times, strict=False)
         ):
             if success_rate >= 95 and response_time <= 200:

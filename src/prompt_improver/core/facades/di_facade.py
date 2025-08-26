@@ -1,4 +1,4 @@
-"""Dependency Injection Facade - Reduces Container Orchestrator Coupling
+"""Dependency Injection Facade - Reduces Container Orchestrator Coupling.
 
 This facade provides a simplified interface to the container orchestrator
 while reducing direct imports from 12 to 2 internal dependencies.
@@ -22,31 +22,31 @@ T = TypeVar("T")
 @runtime_checkable
 class DIFacadeProtocol(Protocol):
     """Protocol for dependency injection facade."""
-    
+
     async def get_service(self, service_type: type[T]) -> T:
         """Get service instance by type."""
         ...
-    
+
     async def get_core_service(self, service_name: str) -> Any:
         """Get core service by name."""
         ...
-    
+
     async def get_ml_service(self, service_name: str) -> Any:
         """Get ML service by name."""
         ...
-    
+
     async def get_database_service(self, service_type: type[T]) -> T:
         """Get database service by type."""
         ...
-    
+
     async def get_security_service(self, service_type: type[T]) -> T:
         """Get security service by type."""
         ...
-    
+
     async def initialize(self) -> None:
         """Initialize all container services."""
         ...
-    
+
     async def shutdown(self) -> None:
         """Shutdown all container services."""
         ...
@@ -54,12 +54,12 @@ class DIFacadeProtocol(Protocol):
 
 class DIFacade(DIFacadeProtocol):
     """Dependency injection facade with minimal coupling.
-    
+
     Reduces container orchestrator coupling from 12 internal imports to 2.
     Provides unified interface for service resolution across all domains.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize facade with lazy loading."""
         self._container = None
         self._initialized = False
@@ -70,17 +70,17 @@ class DIFacade(DIFacadeProtocol):
         self._monitoring_container = None
         logger.debug("DIFacade initialized with lazy loading")
 
-    async def _ensure_container(self):
+    async def _ensure_container(self) -> None:
         """Ensure container is initialized (lazy loading)."""
         if self._container is None:
             # Only import when needed to reduce coupling
             from prompt_improver.core.di.container_orchestrator import get_container
             self._container = await get_container()
 
-    async def _ensure_domain_container(self, domain: str):
+    async def _ensure_domain_container(self, domain: str) -> None:
         """Ensure domain-specific container is available."""
         await self._ensure_container()
-        
+
         if domain == "core" and self._core_container is None:
             self._core_container = self._container.get_core_container()
         elif domain == "ml" and self._ml_container is None:
@@ -131,7 +131,7 @@ class DIFacade(DIFacadeProtocol):
         """Initialize all container services."""
         if self._initialized:
             return
-            
+
         await self._ensure_container()
         await self._container.initialize()
         self._initialized = True
@@ -141,10 +141,10 @@ class DIFacade(DIFacadeProtocol):
         """Shutdown all container services."""
         if not self._initialized:
             return
-            
+
         if self._container:
             await self._container.shutdown()
-        
+
         self._container = None
         self._core_container = None
         self._ml_container = None
@@ -166,7 +166,7 @@ _di_facade: DIFacade | None = None
 
 def get_di_facade() -> DIFacade:
     """Get global DI facade instance.
-    
+
     Returns:
         DIFacade with lazy initialization and minimal coupling
     """
@@ -191,8 +191,8 @@ async def shutdown_di_facade() -> None:
 
 
 __all__ = [
+    "DIFacade",
     "DIFacadeProtocol",
-    "DIFacade", 
     "get_di_facade",
     "initialize_di_facade",
     "shutdown_di_facade",

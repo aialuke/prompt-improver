@@ -1,4 +1,4 @@
-"""Comprehensive Dependency Analysis Tool for Prompt Improver
+"""Comprehensive Dependency Analysis Tool for Prompt Improver.
 
 Analyzes circular dependencies, architectural violations, and coupling issues
 in the codebase to enable systematic refactoring.
@@ -14,13 +14,12 @@ Features:
 import argparse
 import ast
 import json
-import os
 import sys
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 try:
     import matplotlib.pyplot as plt
@@ -34,7 +33,7 @@ except ImportError:
 
 @dataclass
 class DependencyMetrics:
-    """Metrics for dependency analysis"""
+    """Metrics for dependency analysis."""
 
     total_modules: int
     total_dependencies: int
@@ -45,7 +44,7 @@ class DependencyMetrics:
 
 
 class ArchitecturalLayers:
-    """Define the expected architectural layers for compliance checking"""
+    """Define the expected architectural layers for compliance checking."""
 
     LAYERS = {
         "infrastructure": ["database", "cache", "security", "utils"],
@@ -66,9 +65,9 @@ class ArchitecturalLayers:
 
 
 class DependencyAnalyzer:
-    """Main dependency analysis engine"""
+    """Main dependency analysis engine."""
 
-    def __init__(self, src_path: Path):
+    def __init__(self, src_path: Path) -> None:
         self.src_path = src_path
         self.dependencies: dict[str, set[str]] = defaultdict(set)
         self.reverse_dependencies: dict[str, set[str]] = defaultdict(set)
@@ -77,7 +76,7 @@ class DependencyAnalyzer:
         self._classify_modules()
 
     def _extract_imports(self, file_path: Path) -> list[str]:
-        """Extract all prompt_improver imports from a Python file"""
+        """Extract all prompt_improver imports from a Python file."""
         try:
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
@@ -85,9 +84,7 @@ class DependencyAnalyzer:
             imports = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name.startswith("prompt_improver"):
-                            imports.append(alias.name)
+                    imports.extend(alias.name for alias in node.names if alias.name.startswith("prompt_improver"))
                 elif isinstance(node, ast.ImportFrom):
                     if node.module and node.module.startswith("prompt_improver"):
                         imports.append(node.module)
@@ -96,8 +93,8 @@ class DependencyAnalyzer:
             print(f"Warning: Error parsing {file_path}: {e}")
             return []
 
-    def _build_dependency_graph(self):
-        """Build comprehensive dependency graph"""
+    def _build_dependency_graph(self) -> None:
+        """Build comprehensive dependency graph."""
         for py_file in self.src_path.rglob("*.py"):
             if py_file.name == "__init__.py":
                 continue
@@ -113,9 +110,9 @@ class DependencyAnalyzer:
             except ValueError:
                 continue
 
-    def _classify_modules(self):
-        """Classify modules into architectural layers"""
-        for module in self.dependencies.keys():
+    def _classify_modules(self) -> None:
+        """Classify modules into architectural layers."""
+        for module in self.dependencies:
             parts = module.split(".")
             if len(parts) >= 2:
                 module_category = parts[1] if len(parts) > 1 else parts[0]
@@ -127,7 +124,7 @@ class DependencyAnalyzer:
                     self.module_to_layer[module] = "unknown"
 
     def detect_circular_dependencies(self) -> list[list[str]]:
-        """Detect all circular dependencies using strongly connected components"""
+        """Detect all circular dependencies using strongly connected components."""
         G = nx.DiGraph()
         for module, deps in self.dependencies.items():
             for dep in deps:
@@ -145,7 +142,7 @@ class DependencyAnalyzer:
         return cycles
 
     def find_architectural_violations(self) -> list[dict[str, Any]]:
-        """Find dependencies that violate architectural layers"""
+        """Find dependencies that violate architectural layers."""
         violations = []
         for module, deps in self.dependencies.items():
             module_layer = self.module_to_layer.get(module, "unknown")
@@ -168,7 +165,7 @@ class DependencyAnalyzer:
         return violations
 
     def _calculate_violation_severity(self, from_layer: str, to_layer: str) -> str:
-        """Calculate severity of architectural violation"""
+        """Calculate severity of architectural violation."""
         layer_order = [
             "infrastructure",
             "core",
@@ -191,7 +188,7 @@ class DependencyAnalyzer:
     def identify_high_coupling_modules(
         self, threshold: int = 10
     ) -> list[tuple[str, int]]:
-        """Identify modules with high coupling (too many dependencies)"""
+        """Identify modules with high coupling (too many dependencies)."""
         high_coupling = []
         for module, deps in self.dependencies.items():
             dep_count = len(deps)
@@ -200,7 +197,7 @@ class DependencyAnalyzer:
         return sorted(high_coupling, key=lambda x: x[1], reverse=True)
 
     def identify_interface_opportunities(self) -> list[dict[str, Any]]:
-        """Identify opportunities for interface abstraction"""
+        """Identify opportunities for interface abstraction."""
         opportunities = []
         for module, dependents in self.reverse_dependencies.items():
             if len(dependents) >= 3:
@@ -214,7 +211,7 @@ class DependencyAnalyzer:
         return sorted(opportunities, key=lambda x: x["dependent_count"], reverse=True)
 
     def analyze(self) -> DependencyMetrics:
-        """Perform comprehensive dependency analysis"""
+        """Perform comprehensive dependency analysis."""
         circular_deps = self.detect_circular_dependencies()
         architectural_violations = self.find_architectural_violations()
         high_coupling = self.identify_high_coupling_modules()
@@ -229,7 +226,7 @@ class DependencyAnalyzer:
         )
 
     def generate_dependency_graph(self, output_path: Path, max_nodes: int = 50):
-        """Generate visual dependency graph"""
+        """Generate visual dependency graph."""
         if not HAS_VISUALIZATION:
             print("Skipping graph generation: visualization libraries not available")
             return
@@ -275,11 +272,11 @@ class DependencyAnalyzer:
 
 
 class RefactoringRecommendations:
-    """Generate specific refactoring recommendations"""
+    """Generate specific refactoring recommendations."""
 
     @staticmethod
     def generate_recommendations(metrics: DependencyMetrics) -> dict[str, list[str]]:
-        """Generate actionable refactoring recommendations"""
+        """Generate actionable refactoring recommendations."""
         recommendations = {"immediate": [], "short_term": [], "long_term": []}
         if metrics.circular_dependencies:
             recommendations["immediate"].extend([
@@ -306,7 +303,7 @@ class RefactoringRecommendations:
 
 
 def main():
-    """Main entry point for dependency analysis"""
+    """Main entry point for dependency analysis."""
     parser = argparse.ArgumentParser(description="Analyze codebase dependencies")
     parser.add_argument(
         "--src-path",
@@ -338,12 +335,12 @@ def main():
             "recommendations": recommendations,
         }
         output_file = args.output_dir / f"dependency_analysis_{timestamp}.json"
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         print(f"JSON report saved to: {output_file}")
     else:
         output_file = args.output_dir / f"dependency_analysis_{timestamp}.txt"
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write("DEPENDENCY ANALYSIS REPORT\n")
             f.write(f"Generated: {timestamp}\n")
             f.write("=" * 50 + "\n\n")

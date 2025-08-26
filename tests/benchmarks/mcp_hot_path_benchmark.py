@@ -93,7 +93,7 @@ def benchmark_hot_path_performance():
     # Time the hot path operations
     times = []
 
-    for run in range(5):  # 5 runs for statistical accuracy
+    for _run in range(5):  # 5 runs for statistical accuracy
         start_time = time.perf_counter()
 
         for i in range(iterations):
@@ -225,7 +225,7 @@ def compare_with_baseline():
     print("\n📋 Standard json module:")
     json_times = []
 
-    for run in range(3):
+    for _run in range(3):
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -255,7 +255,7 @@ def compare_with_baseline():
     print("\n⚡ msgspec module:")
     msgspec_times = []
 
-    for run in range(3):
+    for _run in range(3):
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -364,11 +364,11 @@ async def main():
         results = {
             "hot_path_performance": hot_path_results,
             "comparison_with_json": comparison_results,
-            "timestamp": time.strftime(f"%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
         }
 
         results_file = os.path.join(os.path.dirname(__file__), "hot_path_results.json")
-        with open(results_file, "w") as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         print(f"\n📁 Results saved to: {results_file}")
     except Exception as e:

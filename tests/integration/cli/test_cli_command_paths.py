@@ -9,9 +9,8 @@ Migrated from mock-based testing to real behavior testing following 2025 best pr
 - Test actual CLI behavior rather than implementation details
 """
 
-import asyncio
+import contextlib
 import json
-import os
 import tempfile
 import time
 from pathlib import Path
@@ -107,8 +106,8 @@ class TestCLICommandPaths:
         monkeypatch.setenv("HOME", str(self.home_dir))
         monkeypatch.setenv("APES_HOME", str(self.temp_dir))
         # Use real database service through context injection
-        result = self.runner.invoke(app, [command] + args)
-        assert result.exit_code in [0, 1, 2]
+        result = self.runner.invoke(app, [command, *args])
+        assert result.exit_code in {0, 1, 2}
         if result.exit_code == 0:
             output_lower = result.stdout.lower()
             assert any(
@@ -139,7 +138,7 @@ class TestCLICommandPaths:
     ):
         """Test CLI command error handling paths with real behavior."""
         monkeypatch.setenv("HOME", str(self.home_dir))
-        result = self.runner.invoke(app, [command] + args)
+        result = self.runner.invoke(app, [command, *args])
         if result.exit_code == 0:
             total_output = result.stdout + getattr(result, "stderr", "")
             assert len(total_output) > 0, (
@@ -154,8 +153,8 @@ class TestCLICommandPaths:
         """Test dry-run modes for CLI commands with real behavior."""
         monkeypatch.setenv("HOME", str(self.home_dir))
         # Use real database service - CLI should handle database appropriately
-        result = self.runner.invoke(app, [command] + dry_run_args)
-        assert result.exit_code in [0, 1]
+        result = self.runner.invoke(app, [command, *dry_run_args])
+        assert result.exit_code in {0, 1}
         if result.exit_code == 0:
             output_lower = result.stdout.lower()
             dry_run_indicators = ["dry run", "would", "simulation", "preview"]
@@ -173,8 +172,8 @@ class TestCLICommandPaths:
             mock_process = AsyncMock()
             mock_process.pid = 12345
             mock_popen.return_value = mock_process
-            result = self.runner.invoke(app, [command] + background_args)
-        assert result.exit_code in [0, 1]
+            result = self.runner.invoke(app, [command, *background_args])
+        assert result.exit_code in {0, 1}
         if result.exit_code == 0:
             output_lower = result.stdout.lower()
             background_indicators = ["background", "pid", "started", "daemon"]
@@ -218,8 +217,8 @@ class TestCLICommandPaths:
         monkeypatch.setenv("HOME", str(self.home_dir))
         with patch("prompt_improver.cli.os.kill") as mock_kill:
             mock_kill.side_effect = ProcessLookupError("Process not found")
-            result = self.runner.invoke(app, [command] + timeout_args)
-        assert result.exit_code in [0, 1], "Timeout handling should be graceful"
+            result = self.runner.invoke(app, [command, *timeout_args])
+        assert result.exit_code in {0, 1}, "Timeout handling should be graceful"
         assert len(result.stdout) > 0, "Timeout commands should produce output"
 
     @pytest.mark.parametrize(
@@ -236,8 +235,8 @@ class TestCLICommandPaths:
         monkeypatch.setenv("HOME", str(self.home_dir))
         # Test both normal and verbose modes with real database
         result_normal = self.runner.invoke(app, [command])
-        result_verbose = self.runner.invoke(app, [command] + verbose_args)
-        assert result_verbose.exit_code in [0, 1]
+        result_verbose = self.runner.invoke(app, [command, *verbose_args])
+        assert result_verbose.exit_code in {0, 1}
         if result_normal.exit_code == 0 and result_verbose.exit_code == 0:
             assert len(result_verbose.stdout) >= len(result_normal.stdout), (
                 "Verbose mode should produce equal or more output"
@@ -250,7 +249,7 @@ class TestCLICommandPaths:
         monkeypatch.setenv("POSTGRES_HOST", "invalid_host")
         monkeypatch.setenv("POSTGRES_PORT", "99999")
         result = self.runner.invoke(app, ["status"])
-        assert result.exit_code in [0, 1], (
+        assert result.exit_code in {0, 1}, (
             "Database errors should be handled gracefully"
         )
         total_output = result.stdout + getattr(result, "stderr", "")
@@ -265,16 +264,14 @@ class TestCLICommandPaths:
             readonly_dir.chmod(292)
             monkeypatch.setenv("APES_HOME", str(readonly_dir))
             result = self.runner.invoke(app, ["start"])
-            assert result.exit_code in [0, 1], (
+            assert result.exit_code in {0, 1}, (
                 "File system errors should be handled gracefully"
             )
         except (OSError, PermissionError):
             pytest.skip("Cannot test file permission restrictions on this system")
         finally:
-            try:
+            with contextlib.suppress(OSError, PermissionError):
                 readonly_dir.chmod(493)
-            except (OSError, PermissionError):
-                pass
 
     @pytest.mark.parametrize(
         "command,json_args",
@@ -284,8 +281,8 @@ class TestCLICommandPaths:
         """Test JSON output format for CLI commands with real behavior."""
         monkeypatch.setenv("HOME", str(self.home_dir))
         # Test JSON output with real database
-        result = self.runner.invoke(app, [command] + json_args)
-        assert result.exit_code in [0, 1]
+        result = self.runner.invoke(app, [command, *json_args])
+        assert result.exit_code in {0, 1}
         if result.exit_code == 0:
             json_indicators = ["{", "}", "[", "]", '"']
             assert any(indicator in result.stdout for indicator in json_indicators), (
@@ -303,7 +300,7 @@ class TestCLICommandPaths:
         with patch("prompt_improver.cli.subprocess.run") as mock_run:
             mock_run.side_effect = KeyboardInterrupt("User interrupted")
             result = self.runner.invoke(app, ["start"])
-        assert result.exit_code in [0, 1, 130], (
+        assert result.exit_code in {0, 1, 130}, (
             "Interrupts should be handled gracefully"
         )
 
@@ -328,8 +325,8 @@ class TestCLICommandPaths:
             else:
                 real_export_args.append(arg)
         # Test export with real database and file paths
-        result = self.runner.invoke(app, [command] + real_export_args)
-        assert result.exit_code in [0, 1], (
+        result = self.runner.invoke(app, [command, *real_export_args])
+        assert result.exit_code in {0, 1}, (
             "Export commands should handle paths correctly"
         )
         if result.exit_code == 0:
@@ -393,7 +390,7 @@ class TestCLICommandPaths:
         result = self.runner.invoke(app, ["status"])
         end_time = time.time()
         execution_time = end_time - start_time
-        assert result.exit_code in [0, 1], "Status command should complete"
+        assert result.exit_code in {0, 1}, "Status command should complete"
         assert execution_time < 30.0, (
             f"Status command should complete in <30s, took {execution_time:.2f}s"
         )
@@ -408,6 +405,6 @@ class TestCLICommandPaths:
     )
     def test_cli_basic_commands_real_behavior(self, command, args, expected):
         """Test basic CLI commands with real behavior (migrated from test_cli_commands.py)."""
-        result = self.runner.invoke(app, [command] + args)
+        result = self.runner.invoke(app, [command, *args])
         assert result.exit_code == 0
         assert expected in result.output

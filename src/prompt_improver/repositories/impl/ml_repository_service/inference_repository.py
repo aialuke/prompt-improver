@@ -6,11 +6,10 @@ following repository pattern with protocol-based dependency injection.
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 class InferenceRepository(BaseRepository[SyntheticDataSample]):
     """Repository for inference operations and synthetic data management."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=SyntheticDataSample,
             connection_manager=connection_manager,
@@ -53,7 +52,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 logger.info(f"Created {len(samples)} synthetic data samples")
                 return samples
             except Exception as e:
-                logger.error(f"Error creating synthetic data samples: {e}")
+                logger.exception(f"Error creating synthetic data samples: {e}")
                 raise
 
     async def get_synthetic_data_samples(
@@ -97,7 +96,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting synthetic data samples: {e}")
+                logger.exception(f"Error getting synthetic data samples: {e}")
                 raise
 
     async def update_synthetic_data_sample(
@@ -127,7 +126,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 get_result = await session.execute(get_query)
                 return get_result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error updating synthetic data sample: {e}")
+                logger.exception(f"Error updating synthetic data sample: {e}")
                 raise
 
     async def archive_synthetic_samples(
@@ -147,7 +146,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 logger.info(f"Archived {result.rowcount} synthetic samples")
                 return result.rowcount
             except Exception as e:
-                logger.error(f"Error archiving synthetic samples: {e}")
+                logger.exception(f"Error archiving synthetic samples: {e}")
                 raise
 
     async def get_sample_quality_distribution(
@@ -192,7 +191,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 stats = result.first()
 
                 total = stats.total_samples or 0
-                
+
                 return {
                     "session_id": session_id,
                     "batch_id": batch_id,
@@ -219,7 +218,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 }
 
             except Exception as e:
-                logger.error(f"Error getting sample quality distribution: {e}")
+                logger.exception(f"Error getting sample quality distribution: {e}")
                 raise
 
     # Batch Inference Operations
@@ -230,33 +229,33 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
         """Process ML predictions for batch of data."""
         try:
             predictions = []
-            
+
             for item in batch_data:
                 # Generate prediction based on rule performance data
                 effectiveness_ratio = item.get("effectiveness_ratio", 0.0)
                 confidence_score = item.get("confidence_score", 0.0)
                 usage_count = item.get("usage_count", 0)
-                
+
                 # Simple prediction algorithm (would be replaced with actual ML model)
                 predicted_effectiveness = min(1.0, effectiveness_ratio * 1.1)
                 prediction_confidence = min(1.0, confidence_score + (usage_count / 100.0) * 0.1)
-                
+
                 prediction = {
                     "rule_id": item.get("rule_id"),
                     "predicted_effectiveness": predicted_effectiveness,
                     "prediction_confidence": prediction_confidence,
                     "model_version": "simple_heuristic_v1.0",
                     "features_used": ["effectiveness_ratio", "confidence_score", "usage_count"],
-                    "prediction_timestamp": datetime.now(timezone.utc).isoformat(),
+                    "prediction_timestamp": datetime.now(UTC).isoformat(),
                 }
-                
+
                 predictions.append(prediction)
-            
+
             logger.info(f"Generated {len(predictions)} ML predictions")
             return predictions
-            
+
         except Exception as e:
-            logger.error(f"Error processing ML predictions batch: {e}")
+            logger.exception(f"Error processing ML predictions batch: {e}")
             return []
 
     async def get_batch_inference_status(
@@ -279,7 +278,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
 
                 total = stats.total_samples or 0
                 processed = stats.processed_samples or 0
-                
+
                 return {
                     "batch_id": batch_id,
                     "total_samples": total,
@@ -291,7 +290,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 }
 
             except Exception as e:
-                logger.error(f"Error getting batch inference status: {e}")
+                logger.exception(f"Error getting batch inference status: {e}")
                 raise
 
     # Intelligence Processing and Caching
@@ -303,21 +302,19 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
         async with self.get_session() as session:
             try:
                 from prompt_improver.database.models import PromptSession
-                
+
                 query = (
                     select(PromptSession)
                     .where(PromptSession.user_context.is_not(None))
                     .order_by(desc(PromptSession.created_at))
                     .limit(batch_size)
                 )
-                
+
                 result = await session.execute(query)
                 sessions = result.scalars().all()
-                
+
                 # Convert to dict format expected by intelligence processor
-                characteristics_data = []
-                for session in sessions:
-                    characteristics_data.append({
+                characteristics_data = [{
                         "session_id": session.session_id,
                         "original_prompt": session.original_prompt,
                         "improved_prompt": session.improved_prompt,
@@ -326,13 +323,13 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                         "confidence_level": session.confidence_level or 0.0,
                         "user_context": session.user_context or {},
                         "created_at": session.created_at,
-                    })
-                
+                    } for session in sessions]
+
                 logger.info(f"Retrieved {len(characteristics_data)} prompt characteristics")
                 return characteristics_data
-                
+
             except Exception as e:
-                logger.error(f"Error getting prompt characteristics batch: {e}")
+                logger.exception(f"Error getting prompt characteristics batch: {e}")
                 raise
 
     async def cache_rule_intelligence(
@@ -341,7 +338,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
         """Cache rule intelligence results with upsert logic."""
         if not intelligence_data:
             return
-            
+
         async with self.get_session() as session:
             try:
                 cached_count = 0
@@ -349,10 +346,10 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     # Generate cache key
                     rule_id = intel_item["rule_id"]
                     cache_key = f"{rule_id}_general_analysis"
-                    
+
                     # Convert intelligence data to cache format
                     intelligence_dict = intel_item.get("intelligence_data", {})
-                    
+
                     # Create or update cache entry
                     cache_entry = RuleIntelligenceCache(
                         cache_key=cache_key,
@@ -370,33 +367,33 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                         optimization_recommendations=intel_item.get("usage_recommendations", []),
                         performance_trend="stable",
                         prompt_characteristics_hash="general",
-                        expires_at=datetime.now(timezone.utc) + timedelta(hours=12),
+                        expires_at=datetime.now(UTC) + timedelta(hours=12),
                     )
-                    
+
                     # Upsert logic
                     existing_query = select(RuleIntelligenceCache).where(
                         RuleIntelligenceCache.cache_key == cache_key
                     )
                     existing_result = await session.execute(existing_query)
                     existing_entry = existing_result.scalar_one_or_none()
-                    
+
                     if existing_entry:
                         # Update existing entry
                         for field, value in cache_entry.__dict__.items():
                             if not field.startswith('_') and field != 'id':
                                 setattr(existing_entry, field, value)
-                        existing_entry.updated_at = datetime.now(timezone.utc)
+                        existing_entry.updated_at = datetime.now(UTC)
                     else:
                         # Create new entry
                         session.add(cache_entry)
-                    
+
                     cached_count += 1
-                
+
                 await session.commit()
                 logger.info(f"Cached {cached_count} rule intelligence entries")
-                
+
             except Exception as e:
-                logger.error(f"Error caching rule intelligence: {e}")
+                logger.exception(f"Error caching rule intelligence: {e}")
                 raise
 
     async def cache_combination_intelligence(
@@ -405,20 +402,20 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
         """Cache rule combination intelligence results."""
         if not combination_data:
             return
-            
+
         async with self.get_session() as session:
             try:
                 # For now, log the combination intelligence
                 # In a full implementation, this would store to a dedicated table
                 logger.info(f"Caching {len(combination_data)} rule combination intelligence entries")
-                
+
                 for combo in combination_data:
                     rule_combo = combo.get("rule_combination", [])
                     synergy_score = combo.get("synergy_score", 0.0)
                     logger.debug(f"Cached combination {rule_combo} with synergy {synergy_score}")
-                
+
             except Exception as e:
-                logger.error(f"Error caching combination intelligence: {e}")
+                logger.exception(f"Error caching combination intelligence: {e}")
                 raise
 
     async def cache_pattern_discovery(
@@ -448,14 +445,14 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     validation_results={},
                     actionable_recommendations=pattern_data.get("actionable_recommendations", []),
                 )
-                
+
                 session.add(pattern_entry)
                 await session.commit()
-                
+
                 logger.info(f"Cached pattern discovery results: {pattern_entry.discovery_run_id}")
-                
+
             except Exception as e:
-                logger.error(f"Error caching pattern discovery: {e}")
+                logger.exception(f"Error caching pattern discovery: {e}")
                 raise
 
     async def cleanup_expired_cache(self) -> dict[str, Any]:
@@ -463,22 +460,22 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
         async with self.get_session() as session:
             try:
                 from sqlalchemy import delete
-                
+
                 # Delete expired cache entries
                 delete_query = delete(RuleIntelligenceCache).where(
-                    RuleIntelligenceCache.expires_at < datetime.now(timezone.utc)
+                    RuleIntelligenceCache.expires_at < datetime.now(UTC)
                 )
-                
+
                 result = await session.execute(delete_query)
                 await session.commit()
-                
+
                 cleaned_count = result.rowcount
                 logger.info(f"Cleaned up {cleaned_count} expired cache entries")
-                
+
                 return {"cache_cleaned": cleaned_count}
-                
+
             except Exception as e:
-                logger.error(f"Error cleaning up expired cache: {e}")
+                logger.exception(f"Error cleaning up expired cache: {e}")
                 return {"cache_cleaned": 0}
 
     # Data Quality and Validation
@@ -496,17 +493,17 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                 )
                 result = await session.execute(query)
                 sample = result.scalar_one_or_none()
-                
+
                 if not sample:
                     return {"error": "Sample not found", "sample_id": sample_id}
-                
+
                 # Default quality thresholds
                 thresholds = quality_thresholds or {
                     "min_quality_score": 0.6,
                     "max_generation_time_ms": 10000,
                     "min_content_length": 10,
                 }
-                
+
                 validation_results = {
                     "sample_id": sample_id,
                     "quality_score": sample.quality_score or 0.0,
@@ -515,7 +512,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     "validations": {},
                     "overall_valid": True,
                 }
-                
+
                 # Quality score validation
                 quality_valid = (sample.quality_score or 0) >= thresholds["min_quality_score"]
                 validation_results["validations"]["quality_score"] = {
@@ -523,7 +520,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     "threshold": thresholds["min_quality_score"],
                     "actual": sample.quality_score or 0.0,
                 }
-                
+
                 # Generation time validation
                 time_valid = (sample.generation_time_ms or 0) <= thresholds["max_generation_time_ms"]
                 validation_results["validations"]["generation_time"] = {
@@ -531,7 +528,7 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     "threshold": thresholds["max_generation_time_ms"],
                     "actual": sample.generation_time_ms or 0,
                 }
-                
+
                 # Content length validation
                 content_length = len(sample.synthetic_data or "")
                 length_valid = content_length >= thresholds["min_content_length"]
@@ -540,16 +537,16 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     "threshold": thresholds["min_content_length"],
                     "actual": content_length,
                 }
-                
+
                 # Overall validation
                 validation_results["overall_valid"] = all([
                     quality_valid, time_valid, length_valid
                 ])
-                
+
                 return validation_results
-                
+
             except Exception as e:
-                logger.error(f"Error validating sample quality: {e}")
+                logger.exception(f"Error validating sample quality: {e}")
                 raise
 
     async def get_data_quality_report(
@@ -562,26 +559,26 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
             try:
                 query = select(SyntheticDataSample)
                 conditions = []
-                
+
                 if session_id:
                     conditions.append(SyntheticDataSample.session_id == session_id)
                 if batch_id:
                     conditions.append(SyntheticDataSample.batch_id == batch_id)
-                
+
                 if conditions:
                     query = query.where(and_(*conditions))
-                
+
                 result = await session.execute(query)
                 samples = result.scalars().all()
-                
+
                 if not samples:
                     return {"error": "No samples found", "session_id": session_id, "batch_id": batch_id}
-                
+
                 # Calculate quality metrics
                 quality_scores = [s.quality_score for s in samples if s.quality_score is not None]
                 generation_times = [s.generation_time_ms for s in samples if s.generation_time_ms is not None]
                 content_lengths = [len(s.synthetic_data or "") for s in samples]
-                
+
                 report = {
                     "session_id": session_id,
                     "batch_id": batch_id,
@@ -605,17 +602,17 @@ class InferenceRepository(BaseRepository[SyntheticDataSample]):
                     },
                     "status_distribution": {},
                 }
-                
+
                 # Status distribution
                 status_counts = {}
                 for sample in samples:
                     status = sample.status or "unknown"
                     status_counts[status] = status_counts.get(status, 0) + 1
-                
+
                 report["status_distribution"] = status_counts
-                
+
                 return report
-                
+
             except Exception as e:
-                logger.error(f"Error getting data quality report: {e}")
+                logger.exception(f"Error getting data quality report: {e}")
                 raise

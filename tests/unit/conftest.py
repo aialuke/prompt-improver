@@ -8,17 +8,17 @@ Tests in this category should run in <100ms and have no external dependencies.
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
 
 # Disable all external services for unit tests
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["REDIS_URL"] = "redis://mock-redis:6379"
 os.environ["DATABASE_URL"] = "postgresql://mock:mock@mock:5432/mock"
+
 
 # Mock external dependencies at module level
 @pytest.fixture(autouse=True)
@@ -35,6 +35,7 @@ def mock_external_dependencies():
             'meter': mock_meter
         }
 
+
 @pytest.fixture
 def mock_database_session():
     """Mock database session for unit tests."""
@@ -47,6 +48,7 @@ def mock_database_session():
     session.query = MagicMock()
     return session
 
+
 @pytest.fixture
 def mock_redis_client():
     """Mock Redis client for unit tests."""
@@ -58,6 +60,7 @@ def mock_redis_client():
     client.expire = AsyncMock(return_value=True)
     return client
 
+
 @pytest.fixture
 def mock_datetime_service():
     """Mock datetime service for consistent testing."""
@@ -67,10 +70,12 @@ def mock_datetime_service():
     service.utc_now.return_value = fixed_time
     return service
 
+
 @pytest.fixture
 def sample_prompt():
     """Sample prompt data for testing."""
     return "Fix this issue with the code"
+
 
 @pytest.fixture
 def sample_improvement_result():
@@ -86,6 +91,7 @@ def sample_improvement_result():
         }
     }
 
+
 @pytest.fixture
 def mock_ml_service():
     """Mock ML service for unit tests."""
@@ -94,6 +100,7 @@ def mock_ml_service():
     service.train = AsyncMock(return_value={"status": "success"})
     service.evaluate = AsyncMock(return_value={"accuracy": 0.92})
     return service
+
 
 @pytest.fixture
 def mock_rule_engine():
@@ -106,6 +113,7 @@ def mock_rule_engine():
     })
     return engine
 
+
 # Performance timing for unit tests
 @pytest.fixture(autouse=True)
 def unit_test_performance_check(request):
@@ -117,6 +125,7 @@ def unit_test_performance_check(request):
         duration = (end_time - start_time) * 1000
         if duration > 100:
             pytest.fail(f"Unit test {request.node.name} took {duration:.2f}ms (should be <100ms)")
+
 
 # Logging configuration for unit tests
 logging.getLogger().setLevel(logging.CRITICAL)  # Suppress all logging in unit tests

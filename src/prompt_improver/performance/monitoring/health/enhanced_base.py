@@ -1,11 +1,11 @@
 """Enhanced Base Health Checker with 2025 features
-Integrates circuit breaker, SLA monitoring, structured logging, and OpenTelemetry
+Integrates circuit breaker, SLA monitoring, structured logging, and OpenTelemetry.
 """
 
 import logging
 import time
 from abc import abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class EnhancedHealthChecker(HealthChecker):
-    """Enhanced health checker with 2025 observability features"""
+    """Enhanced health checker with 2025 observability features."""
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class EnhancedHealthChecker(HealthChecker):
         circuit_breaker_config: CircuitBreakerConfig | None = None,
         sla_config: SLAConfiguration | None = None,
         enable_telemetry: bool = True,
-    ):
+    ) -> None:
         super().__init__(component_name)
         self.logger = StructuredLogger(f"health.{component_name}")
         self.circuit_breaker = circuit_breaker_registry.get_or_create(
@@ -52,7 +52,7 @@ class EnhancedHealthChecker(HealthChecker):
             self.telemetry_context = TelemetryContext(component_name)
 
     async def check(self) -> HealthResult:
-        """Enhanced health check with all 2025 features"""
+        """Enhanced health check with all 2025 features."""
         start_time = time.time()
         span_context = (
             self.telemetry_context.span("health_check")
@@ -125,10 +125,10 @@ class EnhancedHealthChecker(HealthChecker):
 
     @abstractmethod
     async def _execute_health_check(self) -> HealthResult:
-        """Actual health check implementation to be provided by subclasses"""
+        """Actual health check implementation to be provided by subclasses."""
 
     def _get_sla_summary(self) -> dict[str, Any]:
-        """Get summarized SLA compliance status"""
+        """Get summarized SLA compliance status."""
         report = self.sla_monitor.get_sla_report()
         return {
             "overall_status": report.get("overall_status"),
@@ -142,7 +142,7 @@ class EnhancedHealthChecker(HealthChecker):
 
     @staticmethod
     def _null_context():
-        """Null context manager for when telemetry is disabled"""
+        """Null context manager for when telemetry is disabled."""
 
         class NullContext:
             async def __aenter__(self):
@@ -154,7 +154,7 @@ class EnhancedHealthChecker(HealthChecker):
         return NullContext()
 
     def get_enhanced_status(self) -> dict[str, Any]:
-        """Get comprehensive status including all monitoring data"""
+        """Get comprehensive status including all monitoring data."""
         return {
             "component": self.name,
             "circuit_breaker": self.circuit_breaker.get_metrics(),
@@ -169,7 +169,7 @@ def create_enhanced_health_checker(
     circuit_breaker_config: CircuitBreakerConfig | None = None,
     sla_config: SLAConfiguration | None = None,
 ) -> EnhancedHealthChecker:
-    """Factory function to create enhanced health checker with custom implementation"""
+    """Factory function to create enhanced health checker with custom implementation."""
 
     class CustomHealthChecker(EnhancedHealthChecker):
         async def _execute_health_check(self) -> HealthResult:

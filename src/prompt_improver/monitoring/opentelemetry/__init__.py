@@ -1,4 +1,4 @@
-"""OpenTelemetry Integration for Prompt Improver
+"""OpenTelemetry Integration for Prompt Improver.
 ============================================
 
 Comprehensive distributed tracing, metrics, and observability infrastructure

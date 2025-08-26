@@ -12,11 +12,12 @@ unified_connection_manager.py, implementing:
 Designed for production distributed systems with sub-5ms lock operations.
 """
 
-from .lock_manager import (
+from prompt_improver.database.services.locking.lock_manager import (
     DistributedLockManager,
     LockConfig,
     LockInfo,
     create_lock_manager,
+    create_lock_manager_legacy,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "LockConfig",
     "LockInfo",
     "create_lock_manager",
+    "create_lock_manager_legacy",
 ]

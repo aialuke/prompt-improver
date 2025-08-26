@@ -15,7 +15,6 @@ Key Features:
 """
 
 import asyncio
-import json
 import logging
 import os
 import pickle
@@ -25,20 +24,18 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-import joblib
+# import joblib  # Migrated to unified cache architecture
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+
+# Unified cache architecture imports
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 
-from prompt_improver.ml.core.ml_integration import MLIntegration
-from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
-    MLPipelineOrchestrator,
-)
+from prompt_improver.ml.core.ml_integration import MLModelService
 
 sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
 logger = logging.getLogger(__name__)
@@ -154,20 +151,30 @@ class RealMLModelGenerator:
                 "version": "1.0.0",
             },
         }
-        joblib.dump(model_package, output_path)
+        # Serialize using pickle for unified cache architecture
+        model_data = pickle.dumps(model_package)
+
+        # Write to file for backward compatibility with file-based tests
+        with open(output_path, 'wb') as f:
+            f.write(model_data)
         file_size = output_path.stat().st_size if output_path.exists() else 0
         return {
             "file_path": str(output_path),
             "file_size_mb": file_size / (1024 * 1024),
-            "serialization_format": "joblib",
+            "serialization_format": "pickle_unified_cache",
         }
 
     def load_and_validate_model(
         self, model_path: Path, test_data: tuple[np.ndarray, np.ndarray]
     ) -> dict[str, Any]:
-        """Load model from disk and validate it works correctly."""
+        """Load model from disk and validate it works correctly using unified cache architecture."""
         load_start = time.time()
-        model_package = joblib.load(model_path)
+
+        # Load using pickle for unified cache architecture
+        with open(model_path, 'rb') as f:
+            model_data = f.read()
+        model_package = pickle.loads(model_data)
+
         model = model_package["model"]
         metadata = model_package["metadata"]
         load_time = time.time() - load_start
@@ -229,8 +236,8 @@ class MLPlatformRealDeploymentSuite:
     async def _setup_ml_platform(self):
         """Setup ML platform for testing."""
         try:
-            self.ml_integration = MLIntegration()
-            await self.ml_integration.initialize()
+            self.ml_integration = MLModelService()
+            # MLModelService doesn't have initialize method, it's ready on instantiation
             logger.info("✅ ML platform initialized")
         except Exception as e:
             logger.warning("ML platform setup failed: %s", e)
@@ -319,7 +326,7 @@ class MLPlatformRealDeploymentSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Model training pipeline failed: %s", e)
+            logger.exception("❌ Model training pipeline failed: %s", e)
         self.results.append(result)
 
     async def _test_model_serialization_deployment(self):
@@ -332,9 +339,9 @@ class MLPlatformRealDeploymentSuite:
                 self.model_generator.train_model(X, y, "random_forest")
             deployment_results = {}
             total_deployed = 0
-            for model_id, model_info in self.model_generator.model_registry.items():
+            for model_id in self.model_generator.model_registry:
                 logger.info("Deploying model %s...", model_id)
-                model_path = self.temp_dir / f"{model_id}.joblib"
+                model_path = self.temp_dir / f"{model_id}.pkl"
                 serialization_result = self.model_generator.serialize_model(
                     model_id, model_path
                 )
@@ -408,7 +415,7 @@ class MLPlatformRealDeploymentSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Model serialization and deployment failed: %s", e)
+            logger.exception("❌ Model serialization and deployment failed: %s", e)
         self.results.append(result)
 
     async def _test_model_version_management(self):
@@ -489,7 +496,7 @@ class MLPlatformRealDeploymentSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Model version management failed: %s", e)
+            logger.exception("❌ Model version management failed: %s", e)
         self.results.append(result)
 
     async def _test_production_model_serving(self):
@@ -500,7 +507,7 @@ class MLPlatformRealDeploymentSuite:
             if not self.model_generator.model_registry:
                 X, y = self.model_generator.generate_training_dataset(2000)
                 self.model_generator.train_model(X, y, "random_forest")
-            model_id = list(self.model_generator.model_registry.keys())[0]
+            model_id = next(iter(self.model_generator.model_registry.keys()))
             model_info = self.model_generator.model_registry[model_id]
             model = model_info["model"]
             batch_sizes = [1, 10, 100, 1000]
@@ -583,7 +590,7 @@ class MLPlatformRealDeploymentSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Production model serving failed: %s", e)
+            logger.exception("❌ Production model serving failed: %s", e)
         self.results.append(result)
 
     async def _test_model_performance_monitoring(self):
@@ -679,7 +686,7 @@ class MLPlatformRealDeploymentSuite:
                 "success": training_result["metrics"]["test_accuracy"] > 0.6,
             }
             step_start = time.time()
-            model_path = self.temp_dir / f"{training_result['model_id']}_e2e.joblib"
+            model_path = self.temp_dir / f"{training_result['model_id']}_e2e.pkl"
             serialization_result = self.model_generator.serialize_model(
                 training_result["model_id"], model_path
             )
@@ -749,7 +756,7 @@ class MLPlatformRealDeploymentSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ End-to-end ML workflow failed: %s", e)
+            logger.exception("❌ End-to-end ML workflow failed: %s", e)
         self.results.append(result)
 
     def _get_memory_usage(self) -> float:

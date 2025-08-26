@@ -1,4 +1,4 @@
-"""Performance Regression Detection System
+"""Performance Regression Detection System.
 
 This module provides automated performance regression detection and monitoring
 for validation operations. It tracks performance trends, alerts on degradation,
@@ -12,19 +12,24 @@ Key Features:
 5. Intelligent baseline adaptation
 """
 
+import argparse
 import asyncio
 import json
 import logging
 import statistics
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import aiofiles
-import numpy as np
-from scipy import stats
+
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
+
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +138,7 @@ class PerformanceTrend:
 class PerformanceRegressionDetector:
     """Advanced performance regression detection system."""
 
-    def __init__(self, data_dir: Path | None = None):
+    def __init__(self, data_dir: Path | None = None) -> None:
         self.data_dir = data_dir or Path("performance_data")
         self.data_dir.mkdir(exist_ok=True)
 
@@ -266,7 +271,7 @@ class PerformanceRegressionDetector:
 
         # Statistical significance test (t-test)
         try:
-            t_stat, p_value = stats.ttest_ind(recent_latencies, baseline_latencies)
+            t_stat, p_value = get_scipy_stats().ttest_ind(recent_latencies, baseline_latencies)
             confidence = 1 - p_value
         except Exception:
             confidence = 0.5  # Fallback
@@ -341,7 +346,7 @@ class PerformanceRegressionDetector:
 
         # Statistical significance test
         try:
-            t_stat, p_value = stats.ttest_ind(recent_memory, baseline_memory)
+            t_stat, p_value = get_scipy_stats().ttest_ind(recent_memory, baseline_memory)
             confidence = 1 - p_value
         except Exception:
             confidence = 0.5
@@ -416,7 +421,7 @@ class PerformanceRegressionDetector:
             return None
 
         try:
-            t_stat, p_value = stats.ttest_ind(
+            t_stat, p_value = get_scipy_stats().ttest_ind(
                 recent_success_rates, baseline_success_rates
             )
             confidence = 1 - p_value
@@ -495,12 +500,12 @@ class PerformanceRegressionDetector:
         y_values = values
 
         # Linear regression
-        slope, intercept, r_value, p_value, std_err = stats.linregress(x_days, y_values)
+        slope, intercept, r_value, _p_value, std_err = get_scipy_stats().linregress(x_days, y_values)
         r_squared = r_value**2
 
         # Calculate confidence interval for slope
         alpha = 1 - self.confidence_level
-        t_critical = stats.t.ppf(1 - alpha / 2, len(values) - 2)
+        t_critical = get_scipy_stats().t.ppf(1 - alpha / 2, len(values) - 2)
         confidence_interval = (
             slope - t_critical * std_err,
             slope + t_critical * std_err,
@@ -678,8 +683,8 @@ class PerformanceRegressionDetector:
             "latency_stats": {
                 "mean_us": statistics.mean(latencies),
                 "median_us": statistics.median(latencies),
-                "p95_us": np.percentile(latencies, 95) if latencies else 0,
-                "p99_us": np.percentile(latencies, 99) if latencies else 0,
+                "p95_us": get_numpy().percentile(latencies, 95) if latencies else 0,
+                "p99_us": get_numpy().percentile(latencies, 99) if latencies else 0,
                 "min_us": min(latencies),
                 "max_us": max(latencies),
                 "std_us": statistics.stdev(latencies) if len(latencies) > 1 else 0,
@@ -826,7 +831,7 @@ class PerformanceRegressionDetector:
                 f"Loaded performance history for {len(self.performance_history)} operations"
             )
         except Exception as e:
-            logger.error(f"Failed to load performance history: {e}")
+            logger.exception(f"Failed to load performance history: {e}")
 
     async def _save_performance_history(self) -> None:
         """Save performance history to disk."""
@@ -842,7 +847,7 @@ class PerformanceRegressionDetector:
             async with aiofiles.open(history_file, "w") as f:
                 await f.write(json.dumps(data, indent=2))
         except Exception as e:
-            logger.error(f"Failed to save performance history: {e}")
+            logger.exception(f"Failed to save performance history: {e}")
 
     async def _load_alerts_history(self) -> None:
         """Load alerts history from disk."""
@@ -874,7 +879,7 @@ class PerformanceRegressionDetector:
 
             logger.info(f"Loaded {len(self.alerts_history)} alerts from history")
         except Exception as e:
-            logger.error(f"Failed to load alerts history: {e}")
+            logger.exception(f"Failed to load alerts history: {e}")
 
     async def _save_alerts_history(self) -> None:
         """Save alerts history to disk."""
@@ -894,7 +899,7 @@ class PerformanceRegressionDetector:
             async with aiofiles.open(alerts_file, "w") as f:
                 await f.write(json.dumps(alerts_data, indent=2))
         except Exception as e:
-            logger.error(f"Failed to save alerts history: {e}")
+            logger.exception(f"Failed to save alerts history: {e}")
 
 
 # Factory function
@@ -923,17 +928,14 @@ async def run_ci_regression_check(data_dir: str | None = None) -> int:
     print(json.dumps(report, indent=2))
 
     # Return appropriate exit code
-    if report["overall_status"] in ["CRITICAL", "HIGH"]:
+    if report["overall_status"] in {"CRITICAL", "HIGH"}:
         return 2
-    if report["overall_status"] in ["MEDIUM", "LOW"]:
+    if report["overall_status"] in {"MEDIUM", "LOW"}:
         return 1
     return 0
 
 
 if __name__ == "__main__":
-    import argparse
-    import sys
-
     parser = argparse.ArgumentParser(description="Performance Regression Detection")
     parser.add_argument("--data-dir", type=str, help="Performance data directory")
     parser.add_argument(

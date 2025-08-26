@@ -3,7 +3,6 @@
 Following 2025 best practices for automated documentation generation.
 """
 
-import os
 import sys
 from pathlib import Path
 

@@ -7,14 +7,14 @@ following the clean architecture principle of shared types between components.
 import statistics
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 class RedisHealthStatus(Enum):
     """Redis health status levels."""
-    
+
     HEALTHY = "healthy"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -23,7 +23,7 @@ class RedisHealthStatus(Enum):
 
 class RedisRole(Enum):
     """Redis server roles."""
-    
+
     MASTER = "master"
     SLAVE = "slave"
     REPLICA = "replica"
@@ -33,7 +33,7 @@ class RedisRole(Enum):
 @dataclass
 class MemoryMetrics:
     """Redis memory usage metrics."""
-    
+
     used_memory: int = 0
     used_memory_human: str = "0B"
     used_memory_rss: int = 0
@@ -48,15 +48,13 @@ class MemoryMetrics:
     maxmemory_policy: str = "noeviction"
     memory_usage_percentage: float = 0.0
     fragmentation_bytes: int = 0
-    
+
     def is_healthy(self) -> bool:
         """Check if memory metrics indicate healthy state."""
         if self.maxmemory > 0 and self.memory_usage_percentage > 85.0:
             return False
-        if self.mem_fragmentation_ratio > 3.0:
-            return False
-        return True
-    
+        return not self.mem_fragmentation_ratio > 3.0
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on memory metrics."""
         if not self.is_healthy():
@@ -71,7 +69,7 @@ class MemoryMetrics:
 @dataclass
 class PerformanceMetrics:
     """Redis performance metrics."""
-    
+
     ops_per_sec: float = 0.0
     instantaneous_ops_per_sec: int = 0
     total_commands_processed: int = 0
@@ -82,18 +80,18 @@ class PerformanceMetrics:
     evicted_keys: int = 0
     rejected_connections: int = 0
     total_connections_received: int = 0
-    latency_samples: List[float] = field(default_factory=list)
+    latency_samples: list[float] = field(default_factory=list)
     avg_latency_ms: float = 0.0
     p50_latency_ms: float = 0.0
     p95_latency_ms: float = 0.0
     p99_latency_ms: float = 0.0
     max_latency_ms: float = 0.0
-    
+
     def calculate_hit_rate(self):
         """Calculate cache hit rate."""
         total = self.keyspace_hits + self.keyspace_misses
         self.hit_rate = self.keyspace_hits / total * 100 if total > 0 else 0.0
-    
+
     def add_latency_sample(self, latency_ms: float):
         """Add a latency sample and update percentiles."""
         self.latency_samples.append(latency_ms)
@@ -107,15 +105,13 @@ class PerformanceMetrics:
             self.p95_latency_ms = sorted_samples[int(n * 0.95)]
             self.p99_latency_ms = sorted_samples[int(n * 0.99)]
             self.max_latency_ms = max(sorted_samples)
-    
+
     def is_healthy(self) -> bool:
         """Check if performance metrics indicate healthy state."""
         if self.hit_rate < 50.0:
             return False
-        if self.p95_latency_ms > 500.0:
-            return False
-        return True
-    
+        return not self.p95_latency_ms > 500.0
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on performance metrics."""
         if not self.is_healthy():
@@ -130,7 +126,7 @@ class PerformanceMetrics:
 @dataclass
 class PersistenceMetrics:
     """Redis persistence health metrics."""
-    
+
     rdb_changes_since_last_save: int = 0
     rdb_bgsave_in_progress: bool = False
     rdb_last_save_time: int = 0
@@ -151,13 +147,13 @@ class PersistenceMetrics:
     aof_pending_bio_fsync: int = 0
     aof_delayed_fsync: int = 0
     last_save_age_minutes: float = 0.0
-    
+
     def update_last_save_age(self):
         """Update the age of last save operation."""
         if self.rdb_last_save_time > 0:
             current_time = time.time()
             self.last_save_age_minutes = (current_time - self.rdb_last_save_time) / 60.0
-    
+
     def is_healthy(self) -> bool:
         """Check if persistence metrics indicate healthy state."""
         self.update_last_save_age()
@@ -166,12 +162,8 @@ class PersistenceMetrics:
             and self.rdb_changes_since_last_save > 1000
         ):
             return False
-        if self.rdb_last_bgsave_status != "ok" or (
-            self.aof_enabled and self.aof_last_bgrewrite_status != "ok"
-        ):
-            return False
-        return True
-    
+        return not (self.rdb_last_bgsave_status != "ok" or (self.aof_enabled and self.aof_last_bgrewrite_status != "ok"))
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on persistence metrics."""
         if not self.is_healthy():
@@ -189,7 +181,7 @@ class PersistenceMetrics:
 @dataclass
 class ReplicationMetrics:
     """Redis replication metrics."""
-    
+
     role: RedisRole = RedisRole.STANDALONE
     connected_slaves: int = 0
     master_replid: str = ""
@@ -200,7 +192,7 @@ class ReplicationMetrics:
     repl_backlog_size: int = 0
     repl_backlog_first_byte_offset: int = 0
     repl_backlog_histlen: int = 0
-    slave_info: List[Dict[str, Any]] = field(default_factory=list)
+    slave_info: list[dict[str, Any]] = field(default_factory=list)
     master_host: str = ""
     master_port: int = 0
     master_link_status: str = "up"
@@ -211,7 +203,7 @@ class ReplicationMetrics:
     slave_read_only: bool = True
     replication_lag_bytes: int = 0
     replication_lag_seconds: float = 0.0
-    
+
     def calculate_replication_lag(self):
         """Calculate replication lag metrics."""
         if self.role == RedisRole.SLAVE and self.master_repl_offset > 0:
@@ -220,7 +212,7 @@ class ReplicationMetrics:
             )
             if self.master_last_io_seconds_ago >= 0:
                 self.replication_lag_seconds = float(self.master_last_io_seconds_ago)
-    
+
     def is_healthy(self) -> bool:
         """Check if replication metrics indicate healthy state."""
         if self.role == RedisRole.SLAVE:
@@ -231,7 +223,7 @@ class ReplicationMetrics:
             if self.master_last_io_seconds_ago > 60:
                 return False
         return True
-    
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on replication metrics."""
         if not self.is_healthy():
@@ -247,7 +239,7 @@ class ReplicationMetrics:
 @dataclass
 class ConnectionMetrics:
     """Redis client connection metrics."""
-    
+
     connected_clients: int = 0
     client_recent_max_input_buffer: int = 0
     client_recent_max_output_buffer: int = 0
@@ -259,14 +251,14 @@ class ConnectionMetrics:
     maxclients: int = 10000
     connection_utilization: float = 0.0
     connections_per_second: float = 0.0
-    
+
     def calculate_utilization(self):
         """Calculate connection pool utilization."""
         if self.maxclients > 0:
             self.connection_utilization = (
                 self.connected_clients / self.maxclients * 100.0
             )
-    
+
     def is_healthy(self) -> bool:
         """Check if connection metrics indicate healthy state."""
         self.calculate_utilization()
@@ -274,10 +266,8 @@ class ConnectionMetrics:
             return False
         if self.blocked_clients > self.connected_clients * 0.5:
             return False
-        if self.rejected_connections > 0:
-            return False
-        return True
-    
+        return not self.rejected_connections > 0
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on connection metrics."""
         if not self.is_healthy():
@@ -292,13 +282,13 @@ class ConnectionMetrics:
 @dataclass
 class KeyspaceInfo:
     """Keyspace database information."""
-    
+
     db_id: int
     keys: int = 0
     expires: int = 0
     avg_ttl: float = 0.0
     memory_usage_mb: float = 0.0
-    
+
     def get_expiry_ratio(self) -> float:
         """Get ratio of keys with expiration."""
         return self.expires / self.keys * 100.0 if self.keys > 0 else 0.0
@@ -307,24 +297,21 @@ class KeyspaceInfo:
 @dataclass
 class KeyspaceMetrics:
     """Redis keyspace analytics."""
-    
-    databases: Dict[int, KeyspaceInfo] = field(default_factory=dict)
+
+    databases: dict[int, KeyspaceInfo] = field(default_factory=dict)
     total_keys: int = 0
-    sample_key_memory: Dict[str, float] = field(default_factory=dict)
-    large_keys: List[Tuple[str, int]] = field(default_factory=list)
-    key_distribution: Dict[str, int] = field(default_factory=dict)
-    
+    sample_key_memory: dict[str, float] = field(default_factory=dict)
+    large_keys: list[tuple[str, int]] = field(default_factory=list)
+    key_distribution: dict[str, int] = field(default_factory=dict)
+
     def calculate_totals(self):
         """Calculate total metrics from all databases."""
         self.total_keys = sum(db.keys for db in self.databases.values())
-    
+
     def is_healthy(self) -> bool:
         """Check if keyspace metrics indicate healthy state."""
-        for _, size in self.large_keys:
-            if size > 100 * 1024 * 1024:  # 100MB
-                return False
-        return True
-    
+        return all(size <= 100 * 1024 * 1024 for _, size in self.large_keys)
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on keyspace metrics."""
         if not self.is_healthy():
@@ -338,19 +325,19 @@ class KeyspaceMetrics:
 @dataclass
 class SlowLogEntry:
     """Redis slow log entry."""
-    
+
     id: int
     timestamp: int
     duration_microseconds: int
-    command: List[str]
+    command: list[str]
     client_ip: str = ""
     client_name: str = ""
-    
+
     @property
     def duration_ms(self) -> float:
         """Get duration in milliseconds."""
         return self.duration_microseconds / 1000.0
-    
+
     @property
     def command_str(self) -> str:
         """Get command as string."""
@@ -360,15 +347,15 @@ class SlowLogEntry:
 @dataclass
 class SlowLogMetrics:
     """Redis slow log analysis."""
-    
-    entries: List[SlowLogEntry] = field(default_factory=list)
+
+    entries: list[SlowLogEntry] = field(default_factory=list)
     slowlog_len: int = 0
     slowlog_max_len: int = 128
     avg_duration_ms: float = 0.0
     max_duration_ms: float = 0.0
-    command_frequency: Dict[str, int] = field(default_factory=dict)
+    command_frequency: dict[str, int] = field(default_factory=dict)
     recent_slow_commands: int = 0
-    
+
     def analyze_entries(self):
         """Analyze slow log entries."""
         if not self.entries:
@@ -385,15 +372,13 @@ class SlowLogMetrics:
         self.recent_slow_commands = sum(
             1 for entry in self.entries if entry.timestamp >= five_minutes_ago
         )
-    
+
     def is_healthy(self) -> bool:
         """Check if slow log metrics indicate healthy state."""
         if self.recent_slow_commands > 10:
             return False
-        if self.max_duration_ms > 1000.0:
-            return False
-        return True
-    
+        return not self.max_duration_ms > 1000.0
+
     def get_status(self) -> RedisHealthStatus:
         """Get health status based on slow log metrics."""
         if not self.is_healthy():
@@ -408,7 +393,7 @@ class SlowLogMetrics:
 @dataclass
 class RedisHealthSummary:
     """Comprehensive Redis health summary."""
-    
+
     overall_status: RedisHealthStatus
     memory_status: RedisHealthStatus
     performance_status: RedisHealthStatus
@@ -419,9 +404,9 @@ class RedisHealthSummary:
     slowlog_status: RedisHealthStatus
     check_duration_ms: float
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
-    error: Optional[str] = None
-    recommendations: List[str] = field(default_factory=list)
-    
+    error: str | None = None
+    recommendations: list[str] = field(default_factory=list)
+
     def get_health_percentage(self) -> float:
         """Calculate overall health percentage."""
         statuses = [
@@ -433,14 +418,14 @@ class RedisHealthSummary:
             self.keyspace_status,
             self.slowlog_status,
         ]
-        
+
         healthy_count = sum(1 for status in statuses if status == RedisHealthStatus.HEALTHY)
         return (healthy_count / len(statuses)) * 100.0
-    
-    def get_critical_issues(self) -> List[str]:
+
+    def get_critical_issues(self) -> list[str]:
         """Get list of critical issues."""
         issues = []
-        
+
         status_map = {
             "memory": self.memory_status,
             "performance": self.performance_status,
@@ -450,11 +435,11 @@ class RedisHealthSummary:
             "keyspace": self.keyspace_status,
             "slowlog": self.slowlog_status,
         }
-        
+
         for component, status in status_map.items():
             if status == RedisHealthStatus.CRITICAL:
                 issues.append(f"{component} status is critical")
             elif status == RedisHealthStatus.FAILED:
                 issues.append(f"{component} check failed")
-        
+
         return issues

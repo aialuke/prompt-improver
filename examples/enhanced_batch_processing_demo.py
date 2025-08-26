@@ -8,7 +8,7 @@ import asyncio
 import json
 import random
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from prompt_improver.ml.optimization.batch import (
     ChunkingStrategy,
@@ -20,7 +20,7 @@ from prompt_improver.ml.optimization.batch import (
 def generate_sample_data(num_records: int, file_path: str):
     """Generate sample ML training data."""
     print(f"Generating {num_records:,} sample records...")
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         for i in range(num_records):
             record = {
                 "id": f"sample_{i}",
@@ -201,7 +201,7 @@ async def demo_adaptive_processing():
     print("=" * 60)
     data_file = "demo_data_mixed.jsonl"
     print("Generating mixed dataset with varying record sizes...")
-    with open(data_file, "w") as f:
+    with open(data_file, "w", encoding="utf-8") as f:
         for i in range(10000):
             if i % 100 == 0:
                 text = " ".join([f"word{j}" for j in range(1000)])

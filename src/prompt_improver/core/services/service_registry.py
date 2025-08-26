@@ -1,4 +1,4 @@
-"""Service Registry Pattern for Circular Import Resolution (2025 Best Practice)
+"""Service Registry Pattern for Circular Import Resolution (2025 Best Practice).
 
 This module implements a modern service registry pattern that eliminates circular imports
 by providing centralized service discovery and lazy instantiation.
@@ -11,20 +11,20 @@ Key Features:
 - Thread-safe singleton management
 """
 
-import asyncio
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
-from typing import Any, Dict, Optional, ParamSpec, TypeVar
+from typing import Any, Optional, ParamSpec, TypeVar
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
 class ServiceScope(Enum):
-    """Service lifecycle scopes"""
+    """Service lifecycle scopes."""
 
     SINGLETON = "singleton"
     TRANSIENT = "transient"
@@ -33,7 +33,7 @@ class ServiceScope(Enum):
 
 @dataclass
 class ServiceDefinition:
-    """Service definition with metadata"""
+    """Service definition with metadata."""
 
     factory: Callable[[], Any]
     scope: ServiceScope
@@ -53,10 +53,10 @@ class ServiceRegistry:
     """
 
     _instance: Optional["ServiceRegistry"] = None
-    _lock = asyncio.Lock()
+    _lock = threading.Lock()
 
     def __new__(cls) -> "ServiceRegistry":
-        """Singleton pattern - async lock handled in async_init"""
+        """Singleton pattern - async lock handled in async_init."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
@@ -64,18 +64,18 @@ class ServiceRegistry:
 
     @classmethod
     async def get_instance(cls) -> "ServiceRegistry":
-        """Get singleton instance with async initialization"""
+        """Get singleton instance with async initialization."""
         if cls._instance is None:
-            async with cls._lock:
+            with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls()
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not getattr(self, "_initialized", False):
             self._services: dict[str, ServiceDefinition] = {}
             self._instances: dict[str, Any] = {}
-            self._initialization_lock = asyncio.Lock()
+            self._initialization_lock = threading.Lock()
             self._initialized = True
             logger.info("Service registry initialized")
 
@@ -133,7 +133,7 @@ class ServiceRegistry:
     def _create_instance(
         self, service_name: str, service_def: ServiceDefinition
     ) -> Any:
-        """Create service instance with dependency injection"""
+        """Create service instance with dependency injection."""
         try:
             dependencies = {}
             for dep_name in service_def.dependencies:
@@ -145,15 +145,15 @@ class ServiceRegistry:
             logger.debug(f"Created instance for service: {service_name}")
             return instance
         except Exception as e:
-            logger.error(f"Failed to create instance for service '{service_name}': {e}")
+            logger.exception(f"Failed to create instance for service '{service_name}': {e}")
             raise
 
     def is_registered(self, service_name: str) -> bool:
-        """Check if service is registered"""
+        """Check if service is registered."""
         return service_name in self._services
 
     def clear(self) -> None:
-        """Clear all services (mainly for testing)"""
+        """Clear all services (mainly for testing)."""
         self._services.clear()
         self._instances.clear()
         logger.debug("Service registry cleared")
@@ -162,18 +162,18 @@ class ServiceRegistry:
 _registry = ServiceRegistry()
 
 
-def register_service(
+def register_service[T](
     name: str,
     factory: Callable[[], T],
     scope: ServiceScope = ServiceScope.SINGLETON,
     dependencies: list[str] | None = None,
 ) -> None:
-    """Register a service with the global registry"""
+    """Register a service with the global registry."""
     _registry.register(name, factory, scope, dependencies)
 
 
 def get_service(name: str) -> Any:
-    """Get service from the global registry"""
+    """Get service from the global registry."""
     return _registry.get(name)
 
 
@@ -204,60 +204,60 @@ def service_provider(
 
 
 def register_analytics_service(factory: Callable[[], Any]) -> None:
-    """Register analytics service"""
+    """Register analytics service."""
     register_service("analytics", factory, ServiceScope.SINGLETON)
 
 
 def register_real_time_analytics_service(factory: Callable[[], Any]) -> None:
-    """Register real-time analytics service"""
+    """Register real-time analytics service."""
     register_service("real_time_analytics", factory, ServiceScope.SINGLETON)
 
 
 def get_analytics_service() -> Any:
-    """Get analytics service"""
+    """Get analytics service."""
     return get_service("analytics")
 
 
 def get_real_time_analytics_service() -> Any:
-    """Get real-time analytics service"""
+    """Get real-time analytics service."""
     return get_service("real_time_analytics")
 
 
 def register_database_health_service(factory: Callable[[], Any]) -> None:
-    """Register database health service for connectivity validation"""
+    """Register database health service for connectivity validation."""
     register_service("database_health", factory, ServiceScope.SINGLETON)
 
 
 def get_database_health_service() -> Any:
-    """Get database health service for connectivity validation"""
+    """Get database health service for connectivity validation."""
     return get_service("database_health")
 
 
 def register_mcp_service_factory(factory: Callable[[], Any]) -> None:
-    """Register MCP service factory for lifecycle management"""
+    """Register MCP service factory for lifecycle management."""
     register_service("mcp_service_factory", factory, ServiceScope.SINGLETON)
 
 
 def register_mcp_server_factory(factory: Callable[[], Any]) -> None:
-    """Register MCP server factory for lifecycle management"""
+    """Register MCP server factory for lifecycle management."""
     register_service("mcp_server_factory", factory, ServiceScope.SINGLETON)
 
 
 def register_mcp_lifecycle_manager(factory: Callable[[], Any]) -> None:
-    """Register MCP lifecycle manager for server management"""
+    """Register MCP lifecycle manager for server management."""
     register_service("mcp_lifecycle_manager", factory, ServiceScope.SINGLETON)
 
 
 def get_mcp_service_factory() -> Any:
-    """Get MCP service factory for lifecycle management"""
+    """Get MCP service factory for lifecycle management."""
     return get_service("mcp_service_factory")
 
 
 def get_mcp_server_factory() -> Any:
-    """Get MCP server factory for lifecycle management"""
+    """Get MCP server factory for lifecycle management."""
     return get_service("mcp_server_factory")
 
 
 def get_mcp_lifecycle_manager() -> Any:
-    """Get MCP lifecycle manager for server management"""
+    """Get MCP lifecycle manager for server management."""
     return get_service("mcp_lifecycle_manager")

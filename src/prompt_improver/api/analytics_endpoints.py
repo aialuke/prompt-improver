@@ -4,7 +4,7 @@ Provides REST API endpoints for session analytics, performance trends, and dashb
 Key Features (2025 Standards):
 - Unified analytics service facade for all operations
 - Real-time analytics data streaming
-- Optimized query performance with caching  
+- Optimized query performance with caching
 - Role-based access control
 - WebSocket support for live updates
 - Comprehensive error handling and monitoring
@@ -12,9 +12,9 @@ Key Features (2025 Standards):
 """
 
 import logging
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -26,16 +26,18 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from prompt_improver.core.events.ml_event_bus import MLEventBus, get_ml_event_bus
 from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisInterface,
     request_ml_analysis_via_events,
 )
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
+from prompt_improver.database import (
+    DatabaseServices,
+    ManagerMode,
+    create_database_services,
+    get_database_services,
 )
 from prompt_improver.repositories.factory import get_analytics_repository
 from prompt_improver.repositories.protocols.analytics_repository_protocol import (
@@ -48,7 +50,9 @@ logger = logging.getLogger(__name__)
 
 
 # Import shared WebSocket connection manager
-from .websocket_manager import websocket_manager as connection_manager
+from prompt_improver.api.websocket_manager import (
+    websocket_manager as connection_manager,
+)
 
 
 class UserRole(Enum):
@@ -90,7 +94,7 @@ analytics_router = APIRouter(prefix="/api/v1/analytics", tags=["analytics-dashbo
 
 
 class TimeRangeRequest(BaseModel):
-    """Time range for analytics queries"""
+    """Time range for analytics queries."""
 
     start_date: datetime | None = None
     end_date: datetime | None = None
@@ -98,7 +102,7 @@ class TimeRangeRequest(BaseModel):
 
 
 class TrendAnalysisRequest(BaseModel):
-    """Request for trend analysis"""
+    """Request for trend analysis."""
 
     time_range: TimeRangeRequest
     granularity: TimeGranularity = TimeGranularity.DAY
@@ -107,7 +111,7 @@ class TrendAnalysisRequest(BaseModel):
 
 
 class SessionComparisonRequest(BaseModel):
-    """Request for session comparison"""
+    """Request for session comparison."""
 
     session_a_id: str
     session_b_id: str
@@ -116,7 +120,7 @@ class SessionComparisonRequest(BaseModel):
 
 
 class DashboardMetricsResponse(BaseModel):
-    """Response for dashboard metrics"""
+    """Response for dashboard metrics."""
 
     current_period: dict[str, Any]
     time_range: dict[str, Any]
@@ -126,7 +130,7 @@ class DashboardMetricsResponse(BaseModel):
 
 
 class TrendAnalysisResponse(BaseModel):
-    """Response for trend analysis"""
+    """Response for trend analysis."""
 
     time_series: list[dict[str, Any]]
     trend_direction: str
@@ -137,7 +141,7 @@ class TrendAnalysisResponse(BaseModel):
 
 
 class SessionComparisonResponse(BaseModel):
-    """Response for session comparison"""
+    """Response for session comparison."""
 
     session_a_id: str
     session_b_id: str
@@ -162,23 +166,23 @@ async def get_analytics_database_services() -> DatabaseServices:
 async def get_analytics_repository_dep(
     db_manager: DatabaseServices = Depends(get_analytics_database_services),
 ) -> AnalyticsRepositoryProtocol:
-    """Get analytics repository with database services"""
+    """Get analytics repository with database services."""
     return await get_analytics_repository(db_manager)
 
 
 async def get_unified_analytics_service(
     db_manager: DatabaseServices = Depends(get_analytics_database_services),
 ):
-    """Get unified analytics service facade - modern 2025 pattern"""
+    """Get unified analytics service facade - modern 2025 pattern."""
     from prompt_improver.analytics import create_analytics_service
-    
+
     # Get database session from services
     async with db_manager.get_session() as session:
         return await create_analytics_service(session, config={"performance_mode": True})
 
 
 async def get_ml_analysis_interface() -> MLAnalysisInterface:
-    """Get ML analysis interface via dependency injection"""
+    """Get ML analysis interface via dependency injection."""
     from prompt_improver.core.di.container_orchestrator import get_container
 
     container = await get_container()
@@ -186,12 +190,12 @@ async def get_ml_analysis_interface() -> MLAnalysisInterface:
 
 
 async def get_event_bus() -> MLEventBus:
-    """Get ML event bus for direct communication"""
+    """Get ML event bus for direct communication."""
     return await get_ml_event_bus()
 
 
 async def get_current_user_role() -> UserRole:
-    """Get current user role for local development"""
+    """Get current user role for local development."""
     return UserRole.ANALYST
 
 
@@ -215,7 +219,7 @@ async def get_dashboard_metrics(
             changes=None,
         )
     except Exception as e:
-        logger.error(f"Error getting dashboard metrics: {e}")
+        logger.exception(f"Error getting dashboard metrics: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to retrieve dashboard metrics"
         )
@@ -249,13 +253,11 @@ async def analyze_performance_trends(
             end_date=request.time_range.end_date,
             rule_ids=None,  # Map session_ids to rule_ids if needed
         )
-        time_series_data: list[dict[str, Any]] = []
-        for point in result.data_points:
-            time_series_data.append({
+        time_series_data: list[dict[str, Any]] = [{
                 "timestamp": point.timestamp.isoformat(),
                 "value": point.value,
                 "metadata": point.metadata or {},
-            })
+            } for point in result.data_points]
         return TrendAnalysisResponse(
             time_series=time_series_data,
             trend_direction=result.trend_direction,
@@ -271,7 +273,7 @@ async def analyze_performance_trends(
             },
         )
     except Exception as e:
-        logger.error(f"Error analyzing trends: {e}")
+        logger.exception(f"Error analyzing trends: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to analyze performance trends"
         )
@@ -305,7 +307,7 @@ async def compare_sessions(request: SessionComparisonRequest):
             recommendations=[f"Request ID: {analysis_request_id}"],
         )
     except Exception as e:
-        logger.error(f"Error requesting session comparison: {e}")
+        logger.exception(f"Error requesting session comparison: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to request session comparison"
         )
@@ -358,7 +360,7 @@ async def get_session_summary(
             },
         }
     except Exception as e:
-        logger.error(f"Error requesting session summary: {e}")
+        logger.exception(f"Error requesting session summary: {e}")
         raise HTTPException(status_code=500, detail="Failed to request session summary")
 
 
@@ -387,7 +389,7 @@ async def export_session_report(
             "note": "Export requested via event bus - check status with request_id",
         })
     except Exception as e:
-        logger.error(f"Error requesting session report export: {e}")
+        logger.exception(f"Error requesting session report export: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to request session report export"
         )
@@ -417,7 +419,7 @@ async def get_performance_distribution(
         }
         return JSONResponse(result)
     except Exception as e:
-        logger.error(f"Error getting performance distribution: {e}")
+        logger.exception(f"Error getting performance distribution: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to retrieve performance distribution"
         )
@@ -441,7 +443,7 @@ async def get_correlation_analysis(
         result = await analytics.get_satisfaction_correlation(start_date, end_date)
         return JSONResponse(result)
     except Exception as e:
-        logger.error(f"Error getting correlation analysis: {e}")
+        logger.exception(f"Error getting correlation analysis: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to retrieve correlation analysis"
         )
@@ -506,7 +508,7 @@ async def websocket_dashboard_endpoint(
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                logger.error(f"Error in dashboard WebSocket: {e}")
+                logger.exception(f"Error in dashboard WebSocket: {e}")
                 await connection_manager.send_to_connection(
                     websocket,
                     {
@@ -518,7 +520,7 @@ async def websocket_dashboard_endpoint(
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        logger.error(f"Dashboard WebSocket connection error: {e}")
+        logger.exception(f"Dashboard WebSocket connection error: {e}")
     finally:
         await connection_manager.disconnect(websocket)
 
@@ -567,17 +569,17 @@ async def websocket_session_endpoint(
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                logger.error(f"Error in session WebSocket: {e}")
+                logger.exception(f"Error in session WebSocket: {e}")
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        logger.error(f"Session WebSocket connection error: {e}")
+        logger.exception(f"Session WebSocket connection error: {e}")
     finally:
         await connection_manager.disconnect(websocket)
 
 
 async def broadcast_dashboard_updates():
-    """Background task to broadcast dashboard updates to all connected clients"""
+    """Background task to broadcast dashboard updates to all connected clients."""
     try:
         dashboard_data = {
             "status": "placeholder",
@@ -592,11 +594,11 @@ async def broadcast_dashboard_updates():
             },
         )
     except Exception as e:
-        logger.error(f"Error broadcasting dashboard updates: {e}")
+        logger.exception(f"Error broadcasting dashboard updates: {e}")
 
 
 async def broadcast_session_update(session_id: str, update_data: dict[str, Any]):
-    """Broadcast session update to all connected clients monitoring this session"""
+    """Broadcast session update to all connected clients monitoring this session."""
     try:
         session_group_id = f"session_{session_id}"
         await connection_manager.broadcast_to_group(
@@ -609,15 +611,15 @@ async def broadcast_session_update(session_id: str, update_data: dict[str, Any])
             },
         )
     except Exception as e:
-        logger.error(f"Error broadcasting session update: {e}")
+        logger.exception(f"Error broadcasting session update: {e}")
 
 
 @analytics_router.get("/unified/performance")
 async def get_unified_performance_metrics(
-    analytics_service = Depends(get_unified_analytics_service),
+    analytics_service=Depends(get_unified_analytics_service),
 ) -> JSONResponse:
-    """Get performance metrics using the new unified analytics service
-    
+    """Get performance metrics using the new unified analytics service.
+
     Demonstrates the new unified service pattern with significant performance improvements:
     - 114x throughput improvement (114,809 events/second)
     - <1ms response times (50-200x improvement)
@@ -630,18 +632,18 @@ async def get_unified_performance_metrics(
             "include_anomalies": True,
             "time_window_hours": 24
         })
-        
+
         # Generate insights using unified service
         insights = await analytics_service.generate_insights("performance_optimization", {
             "performance_data": perf_data
         })
-        
+
         return JSONResponse({
             "status": "success",
             "service_type": "unified_analytics_v2",
             "performance_improvements": {
                 "throughput": "114x faster (114,809 events/sec)",
-                "response_time": "<1ms (50-200x improvement)", 
+                "response_time": "<1ms (50-200x improvement)",
                 "memory_usage": "60% reduction",
                 "error_rate": "<0.01%"
             },
@@ -650,7 +652,7 @@ async def get_unified_performance_metrics(
             "timestamp": datetime.now(UTC).isoformat(),
         })
     except Exception as e:
-        logger.error(f"Unified analytics service error: {e}")
+        logger.exception(f"Unified analytics service error: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to retrieve unified performance metrics"
         )
@@ -658,16 +660,16 @@ async def get_unified_performance_metrics(
 
 @analytics_router.get("/health")
 async def analytics_health_check(
-    analytics_service = Depends(get_unified_analytics_service),
+    analytics_service=Depends(get_unified_analytics_service),
 ) -> JSONResponse:
-    """Health check for analytics service - now using unified service"""
+    """Health check for analytics service - now using unified service."""
     try:
         # Test unified service health
         health_data = await analytics_service.collect_data("health_check", {
             "timestamp": datetime.now(UTC).isoformat(),
             "service_version": "2.0.0"
         })
-        
+
         health_status: dict[str, Any] = {
             "status": "healthy",
             "service_type": "unified_analytics_v2",
@@ -677,7 +679,7 @@ async def analytics_health_check(
                 "data_collection_component": "operational",
                 "performance_analytics_component": "operational",
                 "ab_testing_component": "operational",
-                "session_analytics_component": "operational", 
+                "session_analytics_component": "operational",
                 "ml_analytics_component": "operational",
                 "websocket_connections": connection_manager.get_connection_count(),
             },
@@ -690,7 +692,7 @@ async def analytics_health_check(
         }
         return JSONResponse(health_status)
     except Exception as e:
-        logger.error(f"Analytics health check failed: {e}")
+        logger.exception(f"Analytics health check failed: {e}")
         return JSONResponse(
             {
                 "status": "unhealthy",
@@ -704,7 +706,7 @@ async def analytics_health_check(
 
 @analytics_router.get("/dashboard/config")
 async def get_dashboard_config() -> JSONResponse:
-    """Get dashboard configuration for frontend initialization"""
+    """Get dashboard configuration for frontend initialization."""
     try:
         config: dict[str, Any] = {
             "dashboard_settings": {
@@ -738,7 +740,7 @@ async def get_dashboard_config() -> JSONResponse:
         }
         return JSONResponse({"status": "success", "config": config})
     except Exception as e:
-        logger.error(f"Error getting dashboard config: {e}")
+        logger.exception(f"Error getting dashboard config: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to retrieve dashboard configuration"
         )

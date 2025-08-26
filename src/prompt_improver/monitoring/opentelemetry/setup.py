@@ -1,4 +1,4 @@
-"""Core OpenTelemetry Setup and Configuration Module
+"""Core OpenTelemetry Setup and Configuration Module.
 ================================================
 
 Production-ready OpenTelemetry SDK initialization with:
@@ -14,7 +14,6 @@ import os
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Union
 
 try:
     from opentelemetry import metrics, trace
@@ -71,18 +70,18 @@ class _NoOpSpan:
     def __exit__(self, *args):
         pass
 
-    def set_attribute(self, *args, **kwargs):
+    def set_attribute(self, *args, **kwargs) -> None:
         pass
 
-    def set_status(self, *args, **kwargs):
+    def set_status(self, *args, **kwargs) -> None:
         pass
 
 
 class _NoOpInstrument:
-    def add(self, *args, **kwargs):
+    def add(self, *args, **kwargs) -> None:
         pass
 
-    def record(self, *args, **kwargs):
+    def record(self, *args, **kwargs) -> None:
         pass
 
 
@@ -195,7 +194,7 @@ class TelemetryConfig:
 class TelemetryServiceFacade:
     """Production-ready OpenTelemetry facade with async support."""
 
-    def __init__(self, config: TelemetryConfig | None = None):
+    def __init__(self, config: TelemetryConfig | None = None) -> None:
         self.config = config or TelemetryConfig.from_environment()
         self._tracer_provider: TracerProvider | None = None
         self._meter_provider: MeterProvider | None = None
@@ -218,7 +217,7 @@ class TelemetryServiceFacade:
             self._initialized = True
             logger.info("OpenTelemetry initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenTelemetry: {e}")
+            logger.exception(f"Failed to initialize OpenTelemetry: {e}")
             raise
 
     def _setup_resource(self):
@@ -368,7 +367,7 @@ class TelemetryServiceFacade:
                 self._meter_provider.shutdown(timeout_millis / 1000)
             logger.info("OpenTelemetry shutdown completed")
         except Exception as e:
-            logger.error(f"Error during OpenTelemetry shutdown: {e}")
+            logger.exception(f"Error during OpenTelemetry shutdown: {e}")
         finally:
             self._initialized = False
 

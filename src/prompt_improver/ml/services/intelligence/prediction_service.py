@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 
 from prompt_improver.ml.services.intelligence.protocols.intelligence_service_protocols import (
     MLPredictionServiceProtocol,
@@ -21,6 +21,7 @@ from prompt_improver.ml.services.intelligence.protocols.intelligence_service_pro
 )
 from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
 from prompt_improver.performance.monitoring.metrics_registry import (
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
     StandardMetrics,
     get_metrics_registry,
 )
@@ -237,7 +238,7 @@ class MLPredictionService:
             base_effectiveness += 0.15  # High domain relevance helps
         
         # Add some realistic variance
-        variance = np.random.normal(0, 0.05)
+        variance = get_numpy().random.normal(0, 0.05)
         effectiveness = max(0.0, min(1.0, base_effectiveness + variance))
         
         return {
@@ -417,11 +418,11 @@ class MLPredictionService:
         
         return {
             "mean_confidence": sum(confidences) / len(confidences),
-            "std_confidence": np.std(confidences) if len(confidences) > 1 else 0.0,
+            "std_confidence": get_numpy().std(confidences) if len(confidences) > 1 else 0.0,
             "min_confidence": min(confidences),
             "max_confidence": max(confidences),
             "mean_accuracy": sum(accuracies) / len(accuracies),
-            "confidence_stability": 1.0 - (np.std(confidences) / max(sum(confidences) / len(confidences), 0.1)),
+            "confidence_stability": 1.0 - (get_numpy().std(confidences) / max(sum(confidences) / len(confidences), 0.1)),
             "prediction_count": len(prediction_data)
         }
     

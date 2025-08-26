@@ -5,20 +5,14 @@ following the adapter pattern for dependency injection architecture.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from prompt_improver.core.protocols.ml_protocols import (
-    CacheServiceProtocol,
-    DatabaseServiceProtocol,
-    EventBusProtocol,
-    HealthMonitorProtocol,
-    MLflowServiceProtocol,
-    ResourceManagerProtocol,
+from prompt_improver.shared.interfaces.protocols.ml import (
     ServiceStatus,
-    WorkflowEngineProtocol,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,7 +21,7 @@ logger = logging.getLogger(__name__)
 class MLflowServiceAdapter:
     """Adapter for MLflow service interactions."""
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize MLflow adapter."""
         self.config = config or {}
         self.tracking_uri = self.config.get(
@@ -49,10 +43,8 @@ class MLflowServiceAdapter:
             import mlflow
 
             mlflow.set_tracking_uri(self.tracking_uri)
-            try:
+            with contextlib.suppress(Exception):
                 mlflow.create_experiment(self.experiment_name)
-            except Exception:
-                pass
             mlflow.set_experiment(self.experiment_name)
             self._client = mlflow
             self._is_initialized = True
@@ -75,16 +67,16 @@ class MLflowServiceAdapter:
                     {"info": type("MockInfo", (), {"run_id": "mock_run_123"})()},
                 )()
 
-            def log_params(self, params):
+            def log_params(self, params) -> None:
                 pass
 
-            def log_metrics(self, metrics):
+            def log_metrics(self, metrics) -> None:
                 pass
 
-            def log_artifact(self, artifact_path):
+            def log_artifact(self, artifact_path) -> None:
                 pass
 
-            def end_run(self):
+            def end_run(self) -> None:
                 pass
 
         return MockMLflow()
@@ -101,7 +93,7 @@ class MLflowServiceAdapter:
                 logger.info(f"Logged experiment with run ID: {run_id}")
                 return run_id
         except Exception as e:
-            logger.error(f"Failed to log experiment: {e}")
+            logger.exception(f"Failed to log experiment: {e}")
             return f"mock_run_{datetime.now().isoformat()}"
 
     async def log_model(
@@ -115,7 +107,7 @@ class MLflowServiceAdapter:
             logger.info(f"Logged model: {model_name}")
             return model_uri
         except Exception as e:
-            logger.error(f"Failed to log model: {e}")
+            logger.exception(f"Failed to log model: {e}")
             return f"mock_model_{model_name}"
 
     async def get_model_metadata(self, model_id: str) -> dict[str, Any]:
@@ -153,7 +145,7 @@ class MLflowServiceAdapter:
                 return ServiceStatus.HEALTHY
             return ServiceStatus.UNHEALTHY
         except Exception as e:
-            logger.error(f"MLflow health check failed: {e}")
+            logger.exception(f"MLflow health check failed: {e}")
             return ServiceStatus.ERROR
 
     async def shutdown(self) -> None:
@@ -164,109 +156,78 @@ class MLflowServiceAdapter:
 
 
 class CacheServiceAdapter:
-    """Adapter for cache service (Redis) interactions."""
+    """Adapter for cache service using unified CacheFacade architecture."""
 
-    def __init__(self, config: dict[str, Any] | None = None):
-        """Initialize cache adapter."""
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
+        """Initialize cache adapter with CacheFacade."""
         self.config = config or {}
-        self.host = self.config.get(
-            "host", os.getenv("REDIS_HOST", "redis.external.service")
-        )
-        self.port = self.config.get("port", int(os.getenv("REDIS_PORT", "6379")))
-        self.db = self.config.get("db", int(os.getenv("REDIS_DB", "0")))
-        self._redis = None
+        self._cache_facade = None
         self._is_initialized = False
-        logger.debug(f"Cache adapter initialized for {self.host}:{self.port}")
+        logger.debug("Cache adapter initialized using CacheFacade")
 
     async def initialize(self) -> None:
-        """Initialize Redis connection."""
+        """Initialize cache facade."""
         if self._is_initialized:
             return
         try:
-            import redis.asyncio as redis
-
-            self._redis = redis.Redis(
-                host=self.host, port=self.port, db=self.db, decode_responses=True
-            )
-            await self._redis.ping()
+            from prompt_improver.services.cache.cache_facade import CacheFacade
+            # Create cache facade with L2 Redis enabled
+            self._cache_facade = CacheFacade(enable_l2=True)
+            await self._cache_facade.initialize()
             self._is_initialized = True
-            logger.info(f"Cache service initialized: {self.host}:{self.port}")
-        except ImportError:
-            logger.warning("Redis not installed, using mock cache")
-            self._redis = self._create_mock_cache()
-            self._is_initialized = True
+            logger.info("Cache service initialized with CacheFacade")
         except Exception as e:
-            logger.warning(f"Redis connection failed, using mock cache: {e}")
-            self._redis = self._create_mock_cache()
+            logger.warning(f"Cache facade initialization failed: {e}")
+            self._cache_facade = None
             self._is_initialized = True
-
-    def _create_mock_cache(self):
-        """Create mock cache for development."""
-
-        class MockRedis:
-            def __init__(self):
-                self._data = {}
-
-            async def ping(self):
-                return True
-
-            async def get(self, key):
-                return self._data.get(key)
-
-            async def set(self, key, value, ex=None):
-                self._data[key] = value
-                return True
-
-            async def delete(self, key):
-                return self._data.pop(key, None) is not None
-
-            async def exists(self, key):
-                return key in self._data
-
-            async def close(self):
-                pass
-
-        return MockRedis()
 
     async def get(self, key: str) -> Any | None:
-        """Get value by key."""
+        """Get value by key using CacheFacade."""
         await self.initialize()
+        if not self._cache_facade:
+            return None
         try:
-            value = await self._redis.get(key)
+            value = await self._cache_facade.get(key)
             logger.debug(f"Cache GET {key}: {'HIT' if value else 'MISS'}")
             return value
         except Exception as e:
-            logger.error(f"Cache GET failed for {key}: {e}")
+            logger.exception(f"Cache GET failed for {key}: {e}")
             return None
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
-        """Set key-value with optional TTL."""
+        """Set key-value with optional TTL using CacheFacade."""
         await self.initialize()
+        if not self._cache_facade:
+            return
         try:
-            await self._redis.set(key, value, ex=ttl)
+            await self._cache_facade.set(key, value, ttl=ttl)
             logger.debug(f"Cache SET {key} (TTL: {ttl})")
         except Exception as e:
-            logger.error(f"Cache SET failed for {key}: {e}")
+            logger.exception(f"Cache SET failed for {key}: {e}")
 
     async def delete(self, key: str) -> bool:
-        """Delete key and return success status."""
+        """Delete key and return success status using CacheFacade."""
         await self.initialize()
+        if not self._cache_facade:
+            return False
         try:
-            result = await self._redis.delete(key)
-            logger.debug(f"Cache DELETE {key}: {bool(result)}")
-            return bool(result)
+            await self._cache_facade.delete(key)
+            logger.debug(f"Cache DELETE {key}: True")
+            return True
         except Exception as e:
-            logger.error(f"Cache DELETE failed for {key}: {e}")
+            logger.exception(f"Cache DELETE failed for {key}: {e}")
             return False
 
     async def exists(self, key: str) -> bool:
-        """Check if key exists."""
+        """Check if key exists using CacheFacade."""
         await self.initialize()
+        if not self._cache_facade:
+            return False
         try:
-            result = await self._redis.exists(key)
-            return bool(result)
+            result = await self._cache_facade.get(key)
+            return result is not None
         except Exception as e:
-            logger.error(f"Cache EXISTS failed for {key}: {e}")
+            logger.exception(f"Cache EXISTS failed for {key}: {e}")
             return False
 
     async def health_check(self) -> ServiceStatus:
@@ -277,21 +238,22 @@ class CacheServiceAdapter:
             await self._redis.ping()
             return ServiceStatus.HEALTHY
         except Exception as e:
-            logger.error(f"Cache health check failed: {e}")
+            logger.exception(f"Cache health check failed: {e}")
             return ServiceStatus.ERROR
 
     async def shutdown(self) -> None:
         """Shutdown cache service."""
-        if self._is_initialized and hasattr(self._redis, "close"):
-            await self._redis.close()
+        if self._is_initialized and self._cache_facade:
+            await self._cache_facade.shutdown()
             logger.info("Cache service shutdown")
             self._is_initialized = False
+            self._cache_facade = None
 
 
 class DatabaseServiceAdapter:
     """Adapter for database service interactions."""
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize database adapter."""
         self.config = config or {}
         self.connection_string = (
@@ -339,7 +301,7 @@ class DatabaseServiceAdapter:
                     },
                 )()
 
-            async def close(self):
+            async def close(self) -> None:
                 pass
 
         return MockPool()
@@ -363,7 +325,7 @@ class DatabaseServiceAdapter:
                 logger.debug(f"Query executed: {len(results)} rows returned")
                 return results
         except Exception as e:
-            logger.error(f"Query execution failed: {e}")
+            logger.exception(f"Query execution failed: {e}")
             return []
 
     async def execute_transaction(
@@ -386,7 +348,7 @@ class DatabaseServiceAdapter:
                             await conn.execute(query)
                 logger.info(f"Transaction completed: {len(queries)} queries")
         except Exception as e:
-            logger.error(f"Transaction failed: {e}")
+            logger.exception(f"Transaction failed: {e}")
             raise
 
     async def health_check(self) -> ServiceStatus:
@@ -398,7 +360,7 @@ class DatabaseServiceAdapter:
                 await conn.fetch("SELECT 1")
                 return ServiceStatus.HEALTHY
         except Exception as e:
-            logger.error(f"Database health check failed: {e}")
+            logger.exception(f"Database health check failed: {e}")
             return ServiceStatus.ERROR
 
     async def get_connection_pool_stats(self) -> dict[str, Any]:
@@ -424,7 +386,7 @@ class DatabaseServiceAdapter:
 class SimpleEventBusAdapter:
     """Simple event bus adapter for ML pipeline."""
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize event bus adapter."""
         self.config = config or {}
         self._subscribers = {}
@@ -448,7 +410,7 @@ class SimpleEventBusAdapter:
                         handler(event_data)
                     logger.debug(f"Event {event_type} delivered to {subscription_id}")
                 except Exception as e:
-                    logger.error(f"Event handler failed for {event_type}: {e}")
+                    logger.exception(f"Event handler failed for {event_type}: {e}")
 
     async def subscribe(self, event_type: str, handler: Any) -> str:
         """Subscribe to event type and return subscription ID."""
@@ -462,7 +424,7 @@ class SimpleEventBusAdapter:
 
     async def unsubscribe(self, subscription_id: str) -> None:
         """Unsubscribe from events."""
-        for event_type, subscribers in self._subscribers.items():
+        for subscribers in self._subscribers.values():
             if subscription_id in subscribers:
                 del subscribers[subscription_id]
                 logger.info(f"Unsubscribed: {subscription_id}")
@@ -507,11 +469,11 @@ def create_workflow_engine(config: dict[str, Any] | None = None) -> Any:
     """Create workflow engine adapter (simplified)."""
 
     class SimpleWorkflowEngine:
-        def __init__(self, config):
+        def __init__(self, config) -> None:
             self.config = config
             self._is_initialized = False
 
-        async def initialize(self):
+        async def initialize(self) -> None:
             self._is_initialized = True
             logger.info("Workflow engine initialized")
 
@@ -540,7 +502,7 @@ def create_workflow_engine(config: dict[str, Any] | None = None) -> Any:
                 else ServiceStatus.UNHEALTHY
             )
 
-        async def shutdown(self):
+        async def shutdown(self) -> None:
             logger.info("Workflow engine shutdown")
             self._is_initialized = False
 
@@ -558,12 +520,12 @@ def create_health_monitor(config: dict[str, Any] | None = None) -> Any:
     """Create health monitor adapter (simplified)."""
 
     class SimpleHealthMonitor:
-        def __init__(self, config):
+        def __init__(self, config) -> None:
             self.config = config
             self._health_checks = {}
             self._is_initialized = False
 
-        async def initialize(self):
+        async def initialize(self) -> None:
             self._is_initialized = True
             logger.info("Health monitor initialized")
 
@@ -601,7 +563,7 @@ def create_health_monitor(config: dict[str, Any] | None = None) -> Any:
                 else ServiceStatus.UNHEALTHY
             )
 
-        async def shutdown(self):
+        async def shutdown(self) -> None:
             self._health_checks.clear()
             logger.info("Health monitor shutdown")
             self._is_initialized = False

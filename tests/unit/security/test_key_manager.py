@@ -15,18 +15,13 @@ Security Test Coverage:
 - Memory safety and key cleanup verification
 """
 
-import asyncio
 import json
-import os
-import tempfile
 import time
-from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 from cryptography.fernet import Fernet
 
-from prompt_improver.security.key_manager import UnifiedKeyManager, get_key_manager
+from prompt_improver.security.key_manager import UnifiedKeyManager
 
 
 class TestUnifiedKeyManager:
@@ -83,7 +78,7 @@ class TestUnifiedKeyManager:
 
     def test_key_versioning_and_cleanup(self, key_manager):
         """Test key versioning and old key cleanup"""
-        v1_key, v1_id = key_manager.get_current_key()
+        v1_key, _v1_id = key_manager.get_current_key()
         v2_id = key_manager.rotate_key()
         v2_key, _ = key_manager.get_current_key()
         v3_id = key_manager.rotate_key()
@@ -251,11 +246,11 @@ class TestUnifiedKeyManagerEncryption:
     def test_decryption_with_wrong_key(self, fernet_manager):
         """Test decryption fails appropriately with wrong key"""
         test_data = "Secret message for wrong key test"
-        encrypted_data, correct_key_id = fernet_manager.encrypt(
+        encrypted_data, _correct_key_id = fernet_manager.encrypt(
             test_data.encode("utf-8")
         )
         fernet_manager.key_manager.rotate_key()
-        new_key, new_key_id = fernet_manager.key_manager.get_current_key()
+        _new_key, new_key_id = fernet_manager.key_manager.get_current_key()
         try:
             decrypted_data = fernet_manager.decrypt(encrypted_data, new_key_id)
             assert decrypted_data.decode("utf-8") != test_data
@@ -270,7 +265,7 @@ class TestUnifiedKeyManagerEncryption:
             b"\x00\x01\x02\x03",
             b"string_instead_of_bytes",
         ]
-        test_data, key_id = fernet_manager.encrypt(b"test")
+        _test_data, key_id = fernet_manager.encrypt(b"test")
         for invalid_data in invalid_data_cases:
             try:
                 result = fernet_manager.decrypt(invalid_data, key_id)
@@ -448,7 +443,7 @@ class TestKeyManagerPerformance:
         key_manager = UnifiedKeyManager()
         start_time = time.time()
         keys_created = []
-        for i in range(50):
+        for _i in range(50):
             key_id = key_manager.rotate_key()
             key, retrieved_key_id = key_manager.get_current_key()
             assert isinstance(key, bytes)

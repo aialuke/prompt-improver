@@ -1,4 +1,4 @@
-"""Enhanced Real-Time Monitor - 2025 Edition
+"""Enhanced Real-Time Monitor - 2025 Edition.
 
 Advanced real-time monitoring with 2025 best practices:
 - OpenTelemetry integration for distributed tracing
@@ -10,17 +10,6 @@ Advanced real-time monitoring with 2025 best practices:
 - Custom metrics and dashboards
 """
 
-import asyncio
-import logging
-import statistics
-import time
-import uuid
-from collections import defaultdict, deque
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional, Union
 
 try:
     from opentelemetry import metrics, trace

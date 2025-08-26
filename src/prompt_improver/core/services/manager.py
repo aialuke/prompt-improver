@@ -10,44 +10,42 @@ import signal
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+
+# Heavy ML imports moved to TYPE_CHECKING and lazy loading
+from typing import Any
 
 from rich.console import Console
 
-# Heavy ML imports moved to TYPE_CHECKING and lazy loading
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from prompt_improver.core.di.ml_container import MLServiceContainer
-    from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineOrchestratorFactory
-    from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
-    from prompt_improver.performance.monitoring.health.background_manager import TaskPriority
 
 def _get_ml_components():
     """Lazy load ML components when needed with graceful degradation."""
     components = {}
-    
+
     # Optional ML container
     try:
         from prompt_improver.core.di.ml_container import MLServiceContainer
         components['MLServiceContainer'] = MLServiceContainer
     except ImportError:
         components['MLServiceContainer'] = None
-    
+
     # Optional ML pipeline factory
     try:
-        from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineOrchestratorFactory
+        from prompt_improver.core.factories.ml_pipeline_factory import (
+            MLPipelineOrchestratorFactory,
+        )
         components['MLPipelineOrchestratorFactory'] = MLPipelineOrchestratorFactory
     except ImportError:
         components['MLPipelineOrchestratorFactory'] = None
-    
+
     # Optional ML protocols
     try:
-        from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
+        from prompt_improver.shared.interfaces.protocols.ml import (
+            ServiceContainerProtocol,
+        )
         components['ServiceContainerProtocol'] = ServiceContainerProtocol
     except ImportError:
         components['ServiceContainerProtocol'] = None
-    
+
     # Optional background task manager (this was loading 41 ML modules!)
     try:
         from prompt_improver.performance.monitoring.health.background_manager import (
@@ -59,8 +57,13 @@ def _get_ml_components():
     except ImportError:
         components['TaskPriority'] = None
         components['get_background_task_manager'] = None
-    
+
     return components
+
+
+from prompt_improver.performance.monitoring.health.background_manager import (
+    TaskPriority,
+)
 from prompt_improver.utils.subprocess_security import ensure_running
 
 # Optional psutil import
@@ -73,7 +76,7 @@ except ImportError:
 
     # Mock psutil functionality for basic operation
     class MockProcess:
-        def __init__(self):
+        def __init__(self) -> None:
             pass
 
         def memory_info(self):
@@ -91,7 +94,7 @@ except ImportError:
             return MockProcess()
 
         @staticmethod
-        def pid_exists(pid):
+        def pid_exists(pid) -> bool | None:
             try:
                 os.kill(pid, 0)
                 return True
@@ -147,11 +150,11 @@ class OrchestrationService:
     """
 
     def __init__(
-        self, 
-        console: Optional[Console] = None, 
+        self,
+        console: Console | None = None,
         event_bus=None,
-        health_application_service: Optional[Any] = None
-    ):
+        health_application_service: Any | None = None
+    ) -> None:
         self.console = console or Console()
         self.data_dir = Path.home() / ".local" / "share" / "apes"
         self.pid_file = self.data_dir / "apes.pid"
@@ -163,7 +166,7 @@ class OrchestrationService:
         self.event_bus = event_bus
         self._is_initialized = False
         self._service_status = "stopped"
-        
+
         # Dependency injection - health application service
         self.health_application_service = health_application_service
 
@@ -174,7 +177,7 @@ class OrchestrationService:
         self.setup_logging()
 
     def setup_logging(self):
-        """Setup structured logging for service management"""
+        """Setup structured logging for service management."""
         # Ensure log directory exists
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -207,7 +210,7 @@ class OrchestrationService:
         return await self.start_background_service(detach=detach)
 
     async def start_background_service(self, detach: bool = True) -> dict[str, Any]:
-        """Start APES as background daemon with monitoring"""
+        """Start APES as background daemon with monitoring."""
         service_results = {
             "pid": None,
             "status": "failed",
@@ -280,7 +283,7 @@ class OrchestrationService:
                 await self.run_monitoring_loop()
 
         except Exception as e:
-            self.logger.error(f"Failed to start background service: {e}")
+            self.logger.exception(f"Failed to start background service: {e}")
             service_results["error"] = str(e)
             self._service_status = "failed"
             self.console.print(f"❌ Failed to start service: {e}", style="red")
@@ -293,7 +296,7 @@ class OrchestrationService:
         return service_results
 
     async def create_daemon_process(self) -> int:
-        """Create daemon process using double-fork pattern"""
+        """Create daemon process using double-fork pattern."""
         try:
             # First fork
             pid = os.fork()
@@ -333,7 +336,7 @@ class OrchestrationService:
         return os.getpid()
 
     async def write_pid_file(self, pid: int):
-        """Write PID file for process management"""
+        """Write PID file for process management."""
         self.pid_file.parent.mkdir(parents=True, exist_ok=True)
 
         pid_data = {
@@ -348,9 +351,9 @@ class OrchestrationService:
         self.logger.info(f"PID file written: {self.pid_file} (PID: {pid})")
 
     async def setup_signal_handlers(self):
-        """Setup signal handlers for graceful shutdown"""
+        """Setup signal handlers for graceful shutdown."""
 
-        def signal_handler(signum, frame):
+        def signal_handler(signum, frame) -> None:
             self.logger.info(f"Received signal {signum}, initiating shutdown")
             self.shutdown_event.set()
 
@@ -358,23 +361,22 @@ class OrchestrationService:
         signal.signal(signal.SIGINT, signal_handler)
 
     async def start_postgresql_if_needed(self) -> str:
-        """Check and start PostgreSQL if needed"""
+        """Check and start PostgreSQL if needed."""
         try:
             # Use health application service for database connectivity check
             if self.health_application_service:
                 health_check = await self.health_application_service.perform_comprehensive_health_check(
                     include_detailed_metrics=False
                 )
-                
+
                 if health_check.get("status") == "success":
                     health_data = health_check.get("data", {})
                     db_status = health_data.get("components", {}).get("basic", {}).get("status")
-                    
+
                     if db_status == "healthy":
                         self.logger.info("PostgreSQL connection verified via health service")
                         return "connected"
-                    else:
-                        self.logger.warning(f"Database health check failed: {db_status}")
+                    self.logger.warning(f"Database health check failed: {db_status}")
                 else:
                     self.logger.warning("Health application service check failed")
             else:
@@ -410,11 +412,11 @@ class OrchestrationService:
                 return "failed_to_start"
 
             except Exception as e:
-                self.logger.error(f"Failed to start PostgreSQL: {e}")
+                self.logger.exception(f"Failed to start PostgreSQL: {e}")
                 return "failed_to_start"
 
     async def start_mcp_server(self):
-        """Start MCP server component"""
+        """Start MCP server component."""
         try:
             # Import and initialize MCP server
 
@@ -422,11 +424,11 @@ class OrchestrationService:
             self.logger.info("MCP server initialized")
 
         except Exception as e:
-            self.logger.error(f"Failed to start MCP server: {e}")
+            self.logger.exception(f"Failed to start MCP server: {e}")
             raise
 
     async def initialize_performance_monitoring(self):
-        """Initialize performance monitoring"""
+        """Initialize performance monitoring."""
         self.logger.info("Performance monitoring initialized")
 
         # Create monitoring task using enhanced task management
@@ -449,7 +451,7 @@ class OrchestrationService:
         )
 
     async def verify_service_health(self) -> dict[str, Any]:
-        """Verify service health and performance using unified health monitor"""
+        """Verify service health and performance using unified health monitor."""
         try:
             # Optional ML health monitoring - graceful degradation
             try:
@@ -498,7 +500,7 @@ class OrchestrationService:
             return health_status
 
         except Exception as e:
-            self.logger.error(f"Health service check failed: {e}")
+            self.logger.exception(f"Health service check failed: {e}")
             # Fallback to basic health status
             return {
                 "database_connection": False,
@@ -510,14 +512,14 @@ class OrchestrationService:
             }
 
     async def optimize_performance_settings(self):
-        """Optimize performance settings when degradation detected"""
+        """Optimize performance settings when degradation detected."""
         self.logger.info("Applying performance optimizations")
 
         try:
             if self.health_application_service:
                 # Use health service to diagnose issues and get optimization recommendations
                 diagnostic_result = await self.health_application_service.diagnose_system_issues()
-                
+
                 if diagnostic_result.get("status") == "success":
                     recommendations = diagnostic_result.get("data", {}).get("remediation_plan", [])
                     self.logger.info(f"Applied {len(recommendations)} performance optimizations via health service")
@@ -529,10 +531,10 @@ class OrchestrationService:
             self.logger.info("Performance optimization attempt completed")
 
         except Exception as e:
-            self.logger.error(f"Failed to apply optimizations: {e}")
+            self.logger.exception(f"Failed to apply optimizations: {e}")
 
     async def monitor_service_health_background(self, alert_threshold_ms: int = 250):
-        """Background service monitoring with alerting using unified health service"""
+        """Background service monitoring with alerting using unified health service."""
         self.logger.info(
             f"Starting background health monitoring (threshold: {alert_threshold_ms}ms)"
         )
@@ -607,11 +609,11 @@ class OrchestrationService:
                 await asyncio.sleep(30)  # 30-second monitoring interval
 
             except Exception as e:
-                self.logger.error(f"Monitoring cycle failed: {e}")
+                self.logger.exception(f"Monitoring cycle failed: {e}")
                 await asyncio.sleep(60)  # Longer delay on error
 
     async def collect_performance_metrics(self) -> dict[str, Any]:
-        """Collect current performance metrics using health application service"""
+        """Collect current performance metrics using health application service."""
         metrics = {
             "timestamp": datetime.now().isoformat(),
             "avg_response_time": 0,
@@ -626,23 +628,23 @@ class OrchestrationService:
                 health_check = await self.health_application_service.perform_comprehensive_health_check(
                     include_detailed_metrics=True
                 )
-                
+
                 if health_check.get("status") == "success":
                     health_data = health_check.get("data", {})
                     detailed_metrics = health_data.get("metrics", {})
-                    
+
                     # Extract metrics with fallback values
                     metrics["database_connections"] = detailed_metrics.get("database_connections", {}).get("active", 0)
                     metrics["avg_response_time"] = detailed_metrics.get("response_times", {}).get("avg_ms", 0)
                     metrics["memory_usage_mb"] = detailed_metrics.get("memory_usage", 0)
                     metrics["cpu_usage_percent"] = detailed_metrics.get("cpu_usage", 0)
-                    
+
                     self.logger.debug("Performance metrics collected via health application service")
                 else:
                     self.logger.warning("Failed to collect metrics via health application service")
             else:
                 self.logger.warning("Health application service not available for metrics collection")
-                
+
                 # Basic system metrics fallback using psutil
                 try:
                     process = psutil.process()
@@ -652,19 +654,19 @@ class OrchestrationService:
                     pass  # Use default values
 
         except Exception as e:
-            self.logger.error(f"Failed to collect metrics: {e}")
+            self.logger.exception(f"Failed to collect metrics: {e}")
 
         return metrics
 
     async def send_performance_alert(self, message: str):
-        """Send performance alert"""
+        """Send performance alert."""
         self.logger.warning(f"PERFORMANCE ALERT: {message}")
 
         # In a full implementation, this could send notifications
         # For now, just log the alert
 
     async def optimize_connection_pool(self):
-        """Optimize database connection pool using health application service"""
+        """Optimize database connection pool using health application service."""
         self.logger.info("Optimizing database connection pool")
 
         try:
@@ -673,14 +675,14 @@ class OrchestrationService:
                 diagnostic_result = await self.health_application_service.diagnose_system_issues(
                     component_filter=["database", "connection_pool"]
                 )
-                
+
                 if diagnostic_result.get("status") == "success":
                     remediation_actions = diagnostic_result.get("data", {}).get("remediation_plan", [])
                     connection_actions = [
-                        action for action in remediation_actions 
+                        action for action in remediation_actions
                         if "connection" in action.get("description", "").lower()
                     ]
-                    
+
                     self.logger.info(f"Applied {len(connection_actions)} connection pool optimizations")
                 else:
                     self.logger.warning("Unable to optimize connection pool via health service")
@@ -688,15 +690,15 @@ class OrchestrationService:
                 self.logger.warning("Health application service not available for connection pool optimization")
 
         except Exception as e:
-            self.logger.error(f"Connection pool optimization failed: {e}")
+            self.logger.exception(f"Connection pool optimization failed: {e}")
 
     async def log_performance_metrics(self, metrics: dict[str, Any]):
-        """Log performance metrics in structured format"""
+        """Log performance metrics in structured format."""
         # Log metrics as JSON for easy parsing
         self.logger.info(f"METRICS: {json.dumps(metrics)}")
 
     async def run_monitoring_loop(self):
-        """Main monitoring loop for daemon mode"""
+        """Main monitoring loop for daemon mode."""
         self.logger.info("Starting daemon monitoring loop")
 
         try:
@@ -704,13 +706,13 @@ class OrchestrationService:
             await self.shutdown_event.wait()
 
         except Exception as e:
-            self.logger.error(f"Monitoring loop error: {e}")
+            self.logger.exception(f"Monitoring loop error: {e}")
 
         finally:
             await self.shutdown_service()
 
     async def shutdown_service(self):
-        """Graceful service shutdown with orchestrator integration"""
+        """Graceful service shutdown with orchestrator integration."""
         self.logger.info("Initiating graceful shutdown")
 
         # Emit service stopping event for orchestrator
@@ -724,7 +726,7 @@ class OrchestrationService:
             if self.pid_file.exists():
                 self.pid_file.unlink()
 
-            # Cleanup health application service resources  
+            # Cleanup health application service resources
             if self.health_application_service:
                 try:
                     await self.health_application_service.cleanup()
@@ -741,13 +743,13 @@ class OrchestrationService:
             await self._emit_service_event("service.stopped", {"status": "stopped"})
 
         except Exception as e:
-            self.logger.error(f"Shutdown error: {e}")
+            self.logger.exception(f"Shutdown error: {e}")
             await self._emit_service_event(
                 "service.failed", {"error": str(e), "during": "shutdown"}
             )
 
     def stop_service(self, timeout: int = 30) -> dict[str, Any]:
-        """Stop running APES service"""
+        """Stop running APES service."""
         if not self.pid_file.exists():
             return {"status": "not_running", "message": "No PID file found"}
 
@@ -789,7 +791,7 @@ class OrchestrationService:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    async def _emit_service_event(self, event_type: str, data: dict):
+    async def _emit_service_event(self, event_type: str, data: dict) -> None:
         """Emit service event to orchestrator event bus.
 
         Implements 2025 best practice for event-driven service integration.
@@ -838,7 +840,7 @@ class OrchestrationService:
                 self.logger.warning(f"Failed to emit service event {event_type}: {e}")
 
     def get_service_status(self) -> dict[str, Any]:
-        """Get current service status with enhanced orchestrator integration"""
+        """Get current service status with enhanced orchestrator integration."""
         status = {
             "running": False,
             "pid": None,

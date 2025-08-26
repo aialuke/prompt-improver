@@ -9,12 +9,10 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
-
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
+    from prompt_improver.shared.interfaces.protocols.mcp import (
+        MCPServerProtocol as APESMCPServer,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +117,7 @@ async def _get_rule_status_impl(server: "APESMCPServer") -> dict[str, Any]:
             else []
         )
 
-        active_rules = []
-        for rule in rules_list:
-            if isinstance(rule, dict) and rule.get("active", False):
-                active_rules.append(rule)
+        active_rules = [rule for rule in rules_list if isinstance(rule, dict) and rule.get("active", False)]
 
         return {
             "rule_effectiveness": rule_stats,
@@ -421,7 +416,7 @@ async def _get_session_history_impl(
             "timestamp": time.time(),
         }
     except Exception as e:
-        logger.error(f"Failed to get session history for '{session_id}': {e}")
+        logger.exception(f"Failed to get session history for '{session_id}': {e}")
         return {
             "session_id": session_id,
             "error": str(e),
@@ -442,7 +437,7 @@ async def _get_rule_category_performance_impl(
             from sqlalchemy import text
 
             query = text("""
-                SELECT 
+                SELECT
                     COUNT(DISTINCT rp.rule_id) as total_rules,
                     COUNT(rp.id) as total_applications,
                     AVG(rp.improvement_score) as avg_improvement_score,
@@ -492,7 +487,7 @@ async def _get_rule_category_performance_impl(
 
             # Get top performing rules in this category
             top_rules_query = text("""
-                SELECT 
+                SELECT
                     rm.rule_id,
                     rm.name,
                     COUNT(rp.id) as applications,
@@ -522,15 +517,13 @@ async def _get_rule_category_performance_impl(
             )
 
             top_rules_result = await session.execute(top_rules_query, params)
-            top_rules = []
 
-            for rule_row in top_rules_result.fetchall():
-                top_rules.append({
+            top_rules = [{
                     "rule_id": rule_row[0],
                     "name": rule_row[1],
                     "applications": int(rule_row[2]),
                     "avg_improvement_score": float(rule_row[3]) if rule_row[3] else 0.0,
-                })
+                } for rule_row in top_rules_result.fetchall()]
 
             processing_time = (time.time() - start_time) * 1000
 
@@ -544,7 +537,7 @@ async def _get_rule_category_performance_impl(
             }
 
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Failed to get rule category performance for '{rule_category}': {e}"
         )
         return {
@@ -583,7 +576,7 @@ async def _get_hierarchical_metrics_impl(
                 "timestamp": time.time(),
             }
 
-        elif path_parts[0] == "errors":
+        if path_parts[0] == "errors":
             error_data = {}
             if hasattr(server.services.security_stack, "get_error_metrics"):
                 error_data = server.services.security_stack.get_error_metrics()
@@ -598,7 +591,7 @@ async def _get_hierarchical_metrics_impl(
                 "timestamp": time.time(),
             }
 
-        elif path_parts[0] == "sessions":
+        if path_parts[0] == "sessions":
             cache_stats = server.services.session_store.get_stats()
             session_metrics = {
                 "active_sessions": cache_stats.get("l1_cache_size", 0),
@@ -627,7 +620,7 @@ async def _get_hierarchical_metrics_impl(
         }
 
     except Exception as e:
-        logger.error(f"Failed to get hierarchical metrics for '{metric_type}': {e}")
+        logger.exception(f"Failed to get hierarchical metrics for '{metric_type}': {e}")
         return {
             "metric_type": metric_type,
             "error": str(e),

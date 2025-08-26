@@ -16,7 +16,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -114,17 +114,16 @@ class CacheMetrics:
 
     l1_hits: int = 0
     l2_hits: int = 0
-    l3_hits: int = 0
     total_requests: int = 0
     response_times: deque = field(default_factory=lambda: deque(maxlen=1000))
-    operation_stats: Dict[str, OperationStats] = field(
+    operation_stats: dict[str, OperationStats] = field(
         default_factory=lambda: defaultdict(OperationStats)
     )
 
     @property
     def hit_rate(self) -> float:
         """Calculate overall cache hit rate."""
-        total_hits = self.l1_hits + self.l2_hits + self.l3_hits
+        total_hits = self.l1_hits + self.l2_hits
         return (
             (total_hits / self.total_requests * 100) if self.total_requests > 0 else 0.0
         )
@@ -212,7 +211,7 @@ class MetricsCollector:
     - Performance aggregation with statistical analysis
     """
 
-    def __init__(self, service_name: str = "unified_connection_manager"):
+    def __init__(self, service_name: str = "unified_connection_manager") -> None:
         self.service_name = service_name
         self.cache_metrics = CacheMetrics()
         self.connection_metrics = ConnectionMetrics()
@@ -235,13 +234,13 @@ class MetricsCollector:
         level: str,
         duration_ms: float,
         status: str = "success",
-        security_context: Optional[Any] = None,
+        security_context: Any | None = None,
     ) -> None:
         """Record a cache operation with OpenTelemetry integration.
 
         Args:
             operation: Operation type (get, set, delete, exists)
-            level: Cache level (l1, l2, l3, miss)
+            level: Cache level (l1, l2, miss)
             duration_ms: Operation duration in milliseconds
             status: Operation status (success, error, not_found)
             security_context: Optional security context for tracking
@@ -264,8 +263,6 @@ class MetricsCollector:
                 self.cache_metrics.l1_hits += 1
             elif level == "l2":
                 self.cache_metrics.l2_hits += 1
-            elif level == "l3":
-                self.cache_metrics.l3_hits += 1
         else:
             op_stats.error_count += 1
 
@@ -302,7 +299,7 @@ class MetricsCollector:
             )
 
     def record_connection_event(
-        self, event_type: str, duration_ms: Optional[float] = None, success: bool = True
+        self, event_type: str, duration_ms: float | None = None, success: bool = True
     ) -> None:
         """Record a connection pool event.
 
@@ -326,7 +323,7 @@ class MetricsCollector:
             else:
                 self.connection_metrics.queries_failed += 1
                 self.connection_metrics.connection_failures += 1
-        elif event_type in ["checkout", "checkin"]:
+        elif event_type in {"checkout", "checkin"}:
             # Pool utilization will be calculated in properties
             pass
 
@@ -365,7 +362,7 @@ class MetricsCollector:
         operation_type: str,
         duration_ms: float,
         success: bool = True,
-        security_context: Optional[Any] = None,
+        security_context: Any | None = None,
     ) -> None:
         """Record a security operation.
 
@@ -412,7 +409,7 @@ class MetricsCollector:
         self.connection_metrics.pool_size = pool_size
         self.connection_metrics.max_pool_size = max_pool_size
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics."""
         operation_summaries = {}
         for op_name, stats in self.cache_metrics.operation_stats.items():
@@ -433,13 +430,12 @@ class MetricsCollector:
             "total_requests": self.cache_metrics.total_requests,
             "l1_hits": self.cache_metrics.l1_hits,
             "l2_hits": self.cache_metrics.l2_hits,
-            "l3_hits": self.cache_metrics.l3_hits,
             "avg_response_time_ms": self.cache_metrics.avg_response_time,
             "operations": operation_summaries,
             "response_time_samples": len(self.cache_metrics.response_times),
         }
 
-    def get_connection_stats(self) -> Dict[str, Any]:
+    def get_connection_stats(self) -> dict[str, Any]:
         """Get comprehensive connection pool statistics."""
         return {
             "active_connections": self.connection_metrics.active_connections,
@@ -458,7 +454,7 @@ class MetricsCollector:
             "response_time_samples": len(self.connection_metrics.response_times),
         }
 
-    def get_security_stats(self) -> Dict[str, Any]:
+    def get_security_stats(self) -> dict[str, Any]:
         """Get comprehensive security operation statistics."""
         return {
             "authentication_operations": self.security_metrics.authentication_operations,
@@ -483,16 +479,13 @@ class MetricsCollector:
             "audit_events_logged": self.security_metrics.audit_events_logged,
         }
 
-    def get_performance_summary(self) -> Dict[str, Any]:
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get comprehensive performance summary."""
         uptime_seconds = (datetime.now(UTC) - self.started_at).total_seconds()
 
         # Calculate recent performance metrics
-        recent_performance = []
         cutoff_time = time.time() - 300  # Last 5 minutes
-        for event in self.performance_window:
-            if event["timestamp"] > cutoff_time:
-                recent_performance.append(event)
+        recent_performance = [event for event in self.performance_window if event["timestamp"] > cutoff_time]
 
         recent_avg_duration = 0.0
         recent_success_rate = 0.0
@@ -530,7 +523,7 @@ class MetricsCollector:
         self.last_metrics_update = time.time()
         logger.info(f"Metrics reset for {self.service_name}")
 
-    def export_metrics_for_telemetry(self) -> Dict[str, Any]:
+    def export_metrics_for_telemetry(self) -> dict[str, Any]:
         """Export metrics in a format suitable for external telemetry systems."""
         return {
             "timestamp": datetime.now(UTC).isoformat(),

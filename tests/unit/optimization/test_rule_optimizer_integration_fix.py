@@ -5,8 +5,6 @@ This test verifies that the optimize_rule method works correctly with proper
 performance_data parameter and validates the integration with other components.
 """
 
-import asyncio
-from typing import Any, Dict, List
 
 import pytest
 
@@ -85,7 +83,7 @@ class TestRuleOptimizerIntegrationFix:
         assert "rule_id" in result
         assert result["rule_id"] == rule_id
         assert "status" in result
-        assert result["status"] in ["optimized", "insufficient_data"]
+        assert result["status"] in {"optimized", "insufficient_data"}
 
     @pytest.mark.asyncio
     async def test_optimize_rule_with_insufficient_data(self, rule_optimizer):

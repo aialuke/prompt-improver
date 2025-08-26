@@ -1,4 +1,4 @@
-"""Enhanced Background Task Manager - 2025 Edition
+"""Enhanced Background Task Manager - 2025 Edition.
 
 Advanced background task management with 2025 best practices:
 - Priority-based task scheduling
@@ -14,12 +14,10 @@ import heapq
 import logging
 import time
 import uuid
-import weakref
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +47,7 @@ class TaskStatus:
 class EnhancedBackgroundTaskManager:
     """Enhanced background task manager with 2025 best practices."""
 
-    def __init__(self, max_concurrent_tasks: int = 10):
+    def __init__(self, max_concurrent_tasks: int = 10) -> None:
         self.max_concurrent_tasks = max_concurrent_tasks
         self._tasks: dict[str, TaskStatus] = {}
         self._running_tasks: set[str] = set()
@@ -97,7 +95,7 @@ class EnhancedBackgroundTaskManager:
                 return True
             return False
 
-    async def _process_queue(self):
+    async def _process_queue(self) -> None:
         """Process queued tasks."""
         if self._shutdown or len(self._running_tasks) >= self.max_concurrent_tasks:
             return

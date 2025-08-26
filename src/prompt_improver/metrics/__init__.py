@@ -1,4 +1,4 @@
-"""Comprehensive Business Metrics Package for Prompt Improver
+"""Comprehensive Business Metrics Package for Prompt Improver.
 
 Provides unified metrics collection, business intelligence tracking,
 and performance monitoring using OpenTelemetry patterns.

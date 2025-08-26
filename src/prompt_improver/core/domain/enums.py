@@ -4,7 +4,7 @@ These enums represent domain-specific states and configurations
 that are used across the application.
 """
 
-from enum import Enum, auto
+from enum import Enum
 
 
 class SessionStatus(Enum):
@@ -64,15 +64,15 @@ class ValidationLevel(Enum):
 class CacheLevel(Enum):
     """Cache levels for multi-level caching."""
     L1 = "l1_memory"
-    L2 = "l2_redis" 
-    L3 = "l3_database"
+    L2 = "l2_redis"
+    # L3 removed in 2025 clean architecture - only L1/L2 supported
 
 
 class SecurityLevel(Enum):
     """Security levels for operations."""
     PUBLIC = "public"
     AUTHENTICATED = "authenticated"
-    AUTHORIZED = "authorized" 
+    AUTHORIZED = "authorized"
     ADMIN = "admin"
 
 

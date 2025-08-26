@@ -1,0 +1,39 @@
+{
+  "total_files_analyzed": 607,
+  "circular_dependencies_found": [],
+  "protocol_consolidation_violations": [],
+  "clean_architecture_violations": [
+    "Architecture violation: application(metrics.application_instrumentation) \u2192 presentation(api)",
+    "Architecture violation: infrastructure(mcp_server.ml_data_collector) \u2192 repository(repositories.protocols.analytics_repository_protocol)",
+    "Architecture violation: infrastructure(mcp_server.ml_data_collector) \u2192 repository(repositories.protocols.user_feedback_repository_protocol)",
+    "Architecture violation: infrastructure(mcp_server.ml_data_collector) \u2192 repository(repositories.protocols.ml_repository_protocol)",
+    "Architecture violation: infrastructure(mcp_server.ml_data_collector) \u2192 repository(repositories.factory)",
+    "Architecture violation: infrastructure(services.error_handling.facade) \u2192 domain(core.domain.enums)",
+    "Architecture violation: infrastructure(services.error_handling.validation_error_service) \u2192 domain(core.domain.enums)",
+    "Architecture violation: infrastructure(services.prompt.facade) \u2192 domain(core.domain.types)",
+    "Architecture violation: infrastructure(services.prompt.facade) \u2192 application(shared.interfaces.protocols.application)",
+    "Architecture violation: infrastructure(services.prompt.prompt_analysis_service) \u2192 application(shared.interfaces.protocols.application)",
+    "Architecture violation: infrastructure(services.prompt.validation_service) \u2192 application(shared.interfaces.protocols.application)",
+    "Architecture violation: infrastructure(performance.monitoring.health.checkers) \u2192 repository(repositories.protocols.health_repository_protocol)",
+    "Architecture violation: application(application.services.training_application_service) \u2192 presentation(cli.services.training_orchestrator)",
+    "Architecture violation: application(application.services.training_application_service) \u2192 presentation(cli.core.enhanced_workflow_manager)",
+    "Architecture violation: infrastructure(ml.services.intelligence.facade) \u2192 repository(repositories.protocols.ml_repository_protocol)",
+    "Architecture violation: infrastructure(ml.services.intelligence.pattern_discovery_service) \u2192 repository(repositories.protocols.ml_repository_protocol)",
+    "Architecture violation: infrastructure(ml.services.intelligence.batch_processing_service) \u2192 repository(repositories.protocols.ml_repository_protocol)",
+    "Architecture violation: infrastructure(security.services.security_service_facade) \u2192 application(shared.interfaces.protocols.application)",
+    "Architecture violation: infrastructure(core.di.database_container) \u2192 repository(repositories.impl.repository_factory)",
+    "Architecture violation: infrastructure(core.services.startup) \u2192 presentation(core.services.cli_service_factory)",
+    "Architecture violation: infrastructure(core.services.security) \u2192 domain(core.domain.enums)",
+    "Architecture violation: infrastructure(core.services.__init__) \u2192 presentation(core.services.cli_service_factory)",
+    "Architecture violation: infrastructure(core.protocols.ml_repository.ml_repository_protocols) \u2192 domain(core.domain.types)"
+  ],
+  "analysis_status": "VIOLATIONS_FOUND",
+  "performance_metrics": {
+    "total_analysis_time": 1.0219149589538574,
+    "graph_build_time": 1.0203399658203125,
+    "circular_detection_time": 0.00029087066650390625,
+    "protocol_validation_time": 2.2172927856445312e-05,
+    "architecture_validation_time": 0.0012619495391845703,
+    "files_per_second": 593.9828893603737
+  }
+}

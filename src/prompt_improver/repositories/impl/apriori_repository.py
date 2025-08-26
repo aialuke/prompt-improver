@@ -7,10 +7,9 @@ patterns and DatabaseServices for database operations.
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, or_, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, desc, or_, select, update
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -41,7 +40,7 @@ class AprioriRepository(
 ):
     """Apriori repository implementation with comprehensive pattern mining operations."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=AprioriAssociationRule,
             connection_manager=connection_manager,
@@ -63,7 +62,7 @@ class AprioriRepository(
                 logger.info(f"Created association rule {rule.id}")
                 return rule
             except Exception as e:
-                logger.error(f"Error creating association rule: {e}")
+                logger.exception(f"Error creating association rule: {e}")
                 raise
 
     async def get_association_rules(
@@ -106,15 +105,9 @@ class AprioriRepository(
                         )
                     if filters.antecedents_contains:
                         # Use PostgreSQL array contains operator
-                        for item in filters.antecedents_contains:
-                            conditions.append(
-                                AprioriAssociationRule.antecedents.contains([item])
-                            )
+                        conditions.extend(AprioriAssociationRule.antecedents.contains([item]) for item in filters.antecedents_contains)
                     if filters.consequents_contains:
-                        for item in filters.consequents_contains:
-                            conditions.append(
-                                AprioriAssociationRule.consequents.contains([item])
-                            )
+                        conditions.extend(AprioriAssociationRule.consequents.contains([item]) for item in filters.consequents_contains)
 
                     if conditions:
                         query = query.where(and_(*conditions))
@@ -134,7 +127,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting association rules: {e}")
+                logger.exception(f"Error getting association rules: {e}")
                 raise
 
     async def get_association_rule_by_id(
@@ -155,16 +148,10 @@ class AprioriRepository(
                 conditions = []
 
                 if antecedents:
-                    for item in antecedents:
-                        conditions.append(
-                            AprioriAssociationRule.antecedents.contains([item])
-                        )
+                    conditions.extend(AprioriAssociationRule.antecedents.contains([item]) for item in antecedents)
 
                 if consequents:
-                    for item in consequents:
-                        conditions.append(
-                            AprioriAssociationRule.consequents.contains([item])
-                        )
+                    conditions.extend(AprioriAssociationRule.consequents.contains([item]) for item in consequents)
 
                 if conditions:
                     query = query.where(or_(*conditions))
@@ -173,7 +160,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting rules by pattern: {e}")
+                logger.exception(f"Error getting rules by pattern: {e}")
                 raise
 
     async def update_association_rule(
@@ -203,7 +190,7 @@ class AprioriRepository(
                 logger.info(f"Created frequent itemset {itemset.id}")
                 return itemset
             except Exception as e:
-                logger.error(f"Error creating frequent itemset: {e}")
+                logger.exception(f"Error creating frequent itemset: {e}")
                 raise
 
     async def get_frequent_itemsets(
@@ -242,7 +229,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting frequent itemsets: {e}")
+                logger.exception(f"Error getting frequent itemsets: {e}")
                 raise
 
     async def get_itemset_analysis(
@@ -305,7 +292,7 @@ class AprioriRepository(
                 )
 
             except Exception as e:
-                logger.error(f"Error getting itemset analysis: {e}")
+                logger.exception(f"Error getting itemset analysis: {e}")
                 raise
 
     async def get_itemsets_by_length(
@@ -336,7 +323,7 @@ class AprioriRepository(
                 logger.info(f"Created pattern discovery {discovery.discovery_run_id}")
                 return discovery
             except Exception as e:
-                logger.error(f"Error creating pattern discovery: {e}")
+                logger.exception(f"Error creating pattern discovery: {e}")
                 raise
 
     async def get_pattern_discoveries(
@@ -399,7 +386,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting pattern discoveries: {e}")
+                logger.exception(f"Error getting pattern discoveries: {e}")
                 raise
 
     async def get_pattern_discovery_by_id(
@@ -415,7 +402,7 @@ class AprioriRepository(
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting pattern discovery by ID: {e}")
+                logger.exception(f"Error getting pattern discovery by ID: {e}")
                 raise
 
     async def update_pattern_discovery(
@@ -439,7 +426,7 @@ class AprioriRepository(
                 await session.commit()
                 return await self.get_pattern_discovery_by_id(discovery_run_id)
             except Exception as e:
-                logger.error(f"Error updating pattern discovery: {e}")
+                logger.exception(f"Error updating pattern discovery: {e}")
                 raise
 
     async def get_discovery_results_summary(
@@ -503,7 +490,7 @@ class AprioriRepository(
                 }
 
             except Exception as e:
-                logger.error(f"Error getting discovery results summary: {e}")
+                logger.exception(f"Error getting discovery results summary: {e}")
                 raise
 
     # Advanced Pattern Results Implementation
@@ -523,7 +510,7 @@ class AprioriRepository(
                 )
                 return results
             except Exception as e:
-                logger.error(f"Error creating advanced pattern results: {e}")
+                logger.exception(f"Error creating advanced pattern results: {e}")
                 raise
 
     async def get_advanced_pattern_results(
@@ -539,7 +526,7 @@ class AprioriRepository(
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting advanced pattern results: {e}")
+                logger.exception(f"Error getting advanced pattern results: {e}")
                 raise
 
     async def get_all_advanced_results(
@@ -576,7 +563,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting all advanced results: {e}")
+                logger.exception(f"Error getting all advanced results: {e}")
                 raise
 
     # Pattern Evaluation and Validation Implementation
@@ -594,7 +581,7 @@ class AprioriRepository(
                 logger.info(f"Created pattern evaluation {evaluation.id}")
                 return evaluation
             except Exception as e:
-                logger.error(f"Error creating pattern evaluation: {e}")
+                logger.exception(f"Error creating pattern evaluation: {e}")
                 raise
 
     async def get_pattern_evaluations(
@@ -637,7 +624,7 @@ class AprioriRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting pattern evaluations: {e}")
+                logger.exception(f"Error getting pattern evaluations: {e}")
                 raise
 
     async def update_pattern_evaluation(
@@ -667,7 +654,7 @@ class AprioriRepository(
                 get_result = await session.execute(get_query)
                 return get_result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error updating pattern evaluation: {e}")
+                logger.exception(f"Error updating pattern evaluation: {e}")
                 raise
 
     # Analytics and Insights Implementation
@@ -728,7 +715,7 @@ class AprioriRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error getting pattern insights: {e}")
+            logger.exception(f"Error getting pattern insights: {e}")
             raise
 
     async def get_pattern_trends(
@@ -745,15 +732,17 @@ class AprioriRepository(
                 "algorithm_performance": [],
             }
         except Exception as e:
-            logger.error(f"Error getting pattern trends: {e}")
+            logger.exception(f"Error getting pattern trends: {e}")
             raise
 
     async def get_rule_effectiveness_comparison(
         self,
         rule_ids: list[int],
-        metrics: list[str] = ["support", "confidence", "lift"],
+        metrics: list[str] | None = None,
     ) -> dict[str, dict[str, float]]:
         """Compare effectiveness metrics between rules."""
+        if metrics is None:
+            metrics = ["support", "confidence", "lift"]
         async with self.get_session() as session:
             try:
                 query = select(AprioriAssociationRule).where(
@@ -773,7 +762,7 @@ class AprioriRepository(
                 return comparison
 
             except Exception as e:
-                logger.error(f"Error comparing rule effectiveness: {e}")
+                logger.exception(f"Error comparing rule effectiveness: {e}")
                 raise
 
     async def get_top_patterns_by_metric(
@@ -815,7 +804,7 @@ class AprioriRepository(
                 ]
 
             except Exception as e:
-                logger.error(f"Error getting top patterns by metric: {e}")
+                logger.exception(f"Error getting top patterns by metric: {e}")
                 raise
 
     # Bulk Operations and Analytics Implementation
@@ -858,7 +847,7 @@ class AprioriRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error running Apriori analysis: {e}")
+            logger.exception(f"Error running Apriori analysis: {e}")
             raise
 
     async def run_pattern_discovery(
@@ -883,7 +872,7 @@ class AprioriRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error running pattern discovery: {e}")
+            logger.exception(f"Error running pattern discovery: {e}")
             raise
 
     async def cleanup_old_discoveries(
@@ -914,7 +903,7 @@ class AprioriRepository(
                 return deleted_count
 
             except Exception as e:
-                logger.error(f"Error cleaning up old discoveries: {e}")
+                logger.exception(f"Error cleaning up old discoveries: {e}")
                 raise
 
     async def export_patterns(
@@ -938,5 +927,5 @@ class AprioriRepository(
             raise ValueError(f"Unsupported format: {format_type}")
 
         except Exception as e:
-            logger.error(f"Error exporting patterns: {e}")
+            logger.exception(f"Error exporting patterns: {e}")
             raise

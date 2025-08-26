@@ -1,1 +1,1 @@
-"""Shared abstractions and common components"""
+"""Shared abstractions and common components."""

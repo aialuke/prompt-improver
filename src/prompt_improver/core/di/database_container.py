@@ -7,23 +7,16 @@ caching, repository patterns, and data access layer services.
 import asyncio
 import logging
 import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from prompt_improver.core.di.protocols import (
     ContainerRegistryProtocol,
     DatabaseContainerProtocol,
 )
-
-if TYPE_CHECKING:
-    from prompt_improver.core.protocols.ml_protocols import (
-        CacheServiceProtocol,
-        DatabaseServiceProtocol,
-        ServiceConnectionInfo,
-        ServiceStatus,
-    )
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -32,7 +25,7 @@ logger = logging.getLogger(__name__)
 def _get_ml_protocols():
     """Lazy import ML protocols to avoid torch dependencies."""
     try:
-        from prompt_improver.core.protocols.ml_protocols import (
+        from prompt_improver.shared.interfaces.protocols.ml import (
             CacheServiceProtocol,
             DatabaseServiceProtocol,
             ServiceConnectionInfo,
@@ -54,8 +47,8 @@ class ServiceLifetime(Enum):
 @dataclass
 class DatabaseServiceRegistration:
     """Database service registration information."""
-    interface: Type[Any]
-    implementation: Type[Any] | None
+    interface: type[Any]
+    implementation: type[Any] | None
     lifetime: ServiceLifetime
     factory: Callable[[], Any] | None = None
     initialized: bool = False
@@ -66,29 +59,29 @@ class DatabaseServiceRegistration:
 
 class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
     """Specialized DI container for database services.
-    
+
     Manages database-related services including:
     - PostgreSQL connection management and pooling
     - Redis cache service integration
     - Repository pattern implementations
     - Session management and transactions
     - Connection health monitoring
-    
+
     Follows clean architecture with protocol-based dependencies.
     """
 
-    def __init__(self, name: str = "database"):
+    def __init__(self, name: str = "database") -> None:
         """Initialize database services container.
-        
+
         Args:
             name: Container identifier for logging
         """
         self.name = name
         self.logger = logger.getChild(f"container.{name}")
-        self._services: dict[Type[Any], DatabaseServiceRegistration] = {}
+        self._services: dict[type[Any], DatabaseServiceRegistration] = {}
         self._lock = asyncio.Lock()
         self._initialized = False
-        self._initialization_order: list[Type[Any]] = []
+        self._initialization_order: list[type[Any]] = []
         self._register_default_services()
         self.logger.debug(f"Database container '{self.name}' initialized")
 
@@ -96,36 +89,36 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Register default database services."""
         # Self-registration for dependency injection
         self.register_instance(DatabaseContainer, self, tags={"container", "database"})
-        
+
         # Database service factory (PostgreSQL)
         self.register_database_service_factory()
-        
+
         # Cache service factory (Redis)
         self.register_cache_service_factory()
-        
+
         # Connection manager factory
         self.register_connection_manager_factory()
-        
+
         # Session manager factory
         self.register_session_manager_factory()
-        
+
         # Repository factory
         self.register_repository_factory()
-        
+
         # Migration service factory
         self.register_migration_service_factory()
-        
+
         # Transaction manager factory
         self.register_transaction_manager_factory()
 
     def register_singleton(
         self,
-        interface: Type[T],
-        implementation: Type[T],
+        interface: type[T],
+        implementation: type[T],
         tags: set[str] | None = None,
     ) -> None:
         """Register a singleton service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation: Concrete implementation class
@@ -143,12 +136,12 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
 
     def register_transient(
         self,
-        interface: Type[T],
+        interface: type[T],
         implementation_or_factory: Any,
         tags: set[str] | None = None,
     ) -> None:
         """Register a transient service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation_or_factory: Implementation class or factory
@@ -165,12 +158,12 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
 
     def register_factory(
         self,
-        interface: Type[T],
+        interface: type[T],
         factory: Any,
         tags: set[str] | None = None,
     ) -> None:
         """Register a service factory.
-        
+
         Args:
             interface: Service interface/protocol
             factory: Factory function to create service
@@ -188,12 +181,12 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
 
     def register_instance(
         self,
-        interface: Type[T],
+        interface: type[T],
         instance: T,
         tags: set[str] | None = None,
     ) -> None:
         """Register a pre-created service instance.
-        
+
         Args:
             interface: Service interface/protocol
             instance: Pre-created service instance
@@ -210,40 +203,40 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         self._services[interface] = registration
         self.logger.debug(f"Registered instance: {interface.__name__}")
 
-    async def get(self, interface: Type[T]) -> T:
+    async def get(self, interface: type[T]) -> T:
         """Resolve service instance.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
-            
+
         Raises:
             KeyError: If service is not registered
         """
         async with self._lock:
             return await self._resolve_service(interface)
 
-    async def _resolve_service(self, interface: Type[T]) -> T:
+    async def _resolve_service(self, interface: type[T]) -> T:
         """Internal service resolution with lifecycle management.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
         """
         if interface not in self._services:
             raise KeyError(f"Database service not registered: {interface.__name__}")
-            
+
         registration = self._services[interface]
-        
+
         # Return existing singleton instance
-        if (registration.lifetime == ServiceLifetime.SINGLETON and 
+        if (registration.lifetime == ServiceLifetime.SINGLETON and
             registration.initialized and registration.instance is not None):
             return registration.instance
-            
+
         # Create new instance
         if registration.factory:
             instance = await self._create_from_factory(registration.factory)
@@ -251,26 +244,26 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
             instance = await self._create_from_class(registration.implementation)
         else:
             raise ValueError(f"No factory or implementation for {interface.__name__}")
-            
+
         # Initialize if needed
         if hasattr(instance, "initialize") and asyncio.iscoroutinefunction(instance.initialize):
             await instance.initialize()
-            
+
         # Store singleton
         if registration.lifetime == ServiceLifetime.SINGLETON:
             registration.instance = instance
             registration.initialized = True
             self._initialization_order.append(interface)
-            
+
         self.logger.debug(f"Resolved database service: {interface.__name__}")
         return instance
 
     async def _create_from_factory(self, factory: Callable[[], Any]) -> Any:
         """Create service instance from factory.
-        
+
         Args:
             factory: Factory function
-            
+
         Returns:
             Service instance
         """
@@ -278,20 +271,20 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
             return await factory()
         return factory()
 
-    async def _create_from_class(self, implementation: Type[Any]) -> Any:
+    async def _create_from_class(self, implementation: type[Any]) -> Any:
         """Create service instance from class constructor.
-        
+
         Args:
             implementation: Implementation class
-            
+
         Returns:
             Service instance
         """
         import inspect
-        
+
         sig = inspect.signature(implementation.__init__)
         kwargs = {}
-        
+
         for param_name, param in sig.parameters.items():
             if param_name == "self":
                 continue
@@ -303,15 +296,15 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     if param.default != inspect.Parameter.empty:
                         continue
                     raise
-                    
+
         return implementation(**kwargs)
 
-    def is_registered(self, interface: Type[T]) -> bool:
+    def is_registered(self, interface: type[T]) -> bool:
         """Check if service is registered.
-        
+
         Args:
             interface: Service interface to check
-            
+
         Returns:
             True if registered, False otherwise
         """
@@ -320,7 +313,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
     # Database service factory methods
     def register_database_service_factory(self, config: Any = None) -> None:
         """Register factory for PostgreSQL database service with connection pooling.
-        
+
         Args:
             config: PostgreSQL service connection configuration
         """
@@ -336,8 +329,8 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                         "port": int(os.getenv("POSTGRES_PORT", "5432"))
                     }
                 }
-            
-            CacheServiceProtocol, DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
+
+            _CacheServiceProtocol, _DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
             return ServiceConnectionInfo(
                 service_name="postgresql",
                 connection_status=ServiceStatus.HEALTHY,
@@ -346,22 +339,26 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     "port": int(os.getenv("POSTGRES_PORT", "5432"))
                 }
             )
-        
+
         if config is None:
             config = _get_config()
 
         async def create_database_service():
             try:
-                from prompt_improver.integrations.postgresql_service import PostgreSQLService
+                from prompt_improver.integrations.postgresql_service import (
+                    PostgreSQLService,
+                )
                 service = PostgreSQLService(config)
                 await service.initialize()
                 return service
             except ImportError:
                 # Fallback to mock database service for testing
-                from prompt_improver.database.services.mock_database_service import MockDatabaseService
+                from prompt_improver.database.services.mock_database_service import (
+                    MockDatabaseService,
+                )
                 return MockDatabaseService()
 
-        async def cleanup_database_service(service):
+        async def cleanup_database_service(service) -> None:
             if hasattr(service, "shutdown"):
                 await service.shutdown()
 
@@ -381,7 +378,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
 
     def register_cache_service_factory(self, config: Any = None) -> None:
         """Register factory for Redis cache service with connection pooling.
-        
+
         Args:
             config: Redis service connection configuration
         """
@@ -397,8 +394,8 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                         "port": int(os.getenv("REDIS_PORT", "6379"))
                     }
                 }
-            
-            CacheServiceProtocol, DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
+
+            _CacheServiceProtocol, _DatabaseServiceProtocol, ServiceConnectionInfo, ServiceStatus = protocols
             return ServiceConnectionInfo(
                 service_name="redis",
                 connection_status=ServiceStatus.HEALTHY,
@@ -407,7 +404,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     "port": int(os.getenv("REDIS_PORT", "6379"))
                 }
             )
-        
+
         if config is None:
             config = _get_cache_config()
 
@@ -419,10 +416,12 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 return service
             except ImportError:
                 # Fallback to memory cache service
-                from prompt_improver.services.cache.l1_cache_service import L1CacheService as MemoryCacheService
+                from prompt_improver.services.cache.l1_cache_service import (
+                    L1CacheService as MemoryCacheService,
+                )
                 return MemoryCacheService()
 
-        async def cleanup_cache_service(service):
+        async def cleanup_cache_service(service) -> None:
             if hasattr(service, "shutdown"):
                 await service.shutdown()
 
@@ -450,7 +449,9 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 return PostgreSQLPoolManagerFacade()
             except ImportError:
                 # Fallback to basic connection manager
-                from prompt_improver.database.services.connection.basic_connection_manager import BasicConnectionManager
+                from prompt_improver.database.services.connection.basic_connection_manager import (
+                    BasicConnectionManager,
+                )
                 return BasicConnectionManager()
 
         self.register_factory(
@@ -464,12 +465,18 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Register factory for database session manager."""
         def create_session_manager():
             try:
-                from prompt_improver.database.registry import SessionManagerProtocol
-                from prompt_improver.database.services.session_manager import DatabaseSessionManager
+                from prompt_improver.database.services.session_manager import (
+                    DatabaseSessionManager,
+                )
+                from prompt_improver.shared.interfaces.protocols.database import (
+                    SessionManagerProtocol,
+                )
                 return DatabaseSessionManager()
             except ImportError:
                 # Fallback to basic session manager
-                from prompt_improver.database.services.basic_session_manager import BasicSessionManager
+                from prompt_improver.database.services.basic_session_manager import (
+                    BasicSessionManager,
+                )
                 return BasicSessionManager()
 
         self.register_factory(
@@ -483,11 +490,15 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Register factory for repository pattern implementations."""
         def create_repository_factory():
             try:
-                from prompt_improver.repositories.impl.repository_factory import RepositoryFactory
+                from prompt_improver.repositories.impl.repository_factory import (
+                    RepositoryFactory,
+                )
                 return RepositoryFactory()
             except ImportError:
                 # Fallback to basic repository factory
-                from prompt_improver.database.services.basic_repository_factory import BasicRepositoryFactory
+                from prompt_improver.database.services.basic_repository_factory import (
+                    BasicRepositoryFactory,
+                )
                 return BasicRepositoryFactory()
 
         self.register_factory(
@@ -501,11 +512,15 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Register factory for database migration service."""
         def create_migration_service():
             try:
-                from prompt_improver.database.services.migration_service import MigrationService
+                from prompt_improver.database.services.migration_service import (
+                    MigrationService,
+                )
                 return MigrationService()
             except ImportError:
                 # Fallback to no-op migration service
-                from prompt_improver.database.services.noop_migration_service import NoOpMigrationService
+                from prompt_improver.database.services.noop_migration_service import (
+                    NoOpMigrationService,
+                )
                 return NoOpMigrationService()
 
         self.register_factory(
@@ -519,11 +534,15 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Register factory for transaction manager."""
         def create_transaction_manager():
             try:
-                from prompt_improver.database.services.transaction_manager import TransactionManager
+                from prompt_improver.database.services.transaction_manager import (
+                    TransactionManager,
+                )
                 return TransactionManager()
             except ImportError:
                 # Fallback to basic transaction manager
-                from prompt_improver.database.services.basic_transaction_manager import BasicTransactionManager
+                from prompt_improver.database.services.basic_transaction_manager import (
+                    BasicTransactionManager,
+                )
                 return BasicTransactionManager()
 
         self.register_factory(
@@ -575,24 +594,24 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
         """Initialize all database services."""
         if self._initialized:
             return
-            
+
         self.logger.info(f"Initializing database container '{self.name}'")
-        
+
         # Initialize all registered services
         for interface in list(self._services.keys()):
             try:
                 await self.get(interface)
             except Exception as e:
-                self.logger.error(f"Failed to initialize {interface}: {e}")
+                self.logger.exception(f"Failed to initialize {interface}: {e}")
                 raise
-                
+
         self._initialized = True
         self.logger.info(f"Database container '{self.name}' initialization complete")
 
     async def shutdown(self) -> None:
         """Shutdown all database services gracefully."""
         self.logger.info(f"Shutting down database container '{self.name}'")
-        
+
         # Shutdown in reverse initialization order
         for interface in reversed(self._initialization_order):
             registration = self._services.get(interface)
@@ -605,8 +624,8 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                             registration.instance.shutdown()
                     self.logger.debug(f"Shutdown service: {interface.__name__}")
                 except Exception as e:
-                    self.logger.error(f"Error shutting down {interface.__name__}: {e}")
-                    
+                    self.logger.exception(f"Error shutting down {interface.__name__}: {e}")
+
         self._services.clear()
         self._initialization_order.clear()
         self._initialized = False
@@ -621,13 +640,13 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
             "registered_services": len(self._services),
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             try:
                 if (registration.initialized and registration.instance and
                     hasattr(registration.instance, "health_check")):
-                    
+
                     health_check = registration.instance.health_check
                     if asyncio.iscoroutinefunction(health_check):
                         service_health = await health_check()
@@ -645,7 +664,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                     "error": str(e),
                 }
                 results["container_status"] = "degraded"
-                
+
         return results
 
     def get_registration_info(self) -> dict[str, Any]:
@@ -655,7 +674,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
             "initialized": self._initialized,
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             info["services"][service_name] = {
@@ -665,7 +684,7 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 "has_instance": registration.instance is not None,
                 "tags": list(registration.tags),
             }
-            
+
         return info
 
     @asynccontextmanager
@@ -679,12 +698,12 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
 
 
 # Global database container instance
-_database_container: Optional[DatabaseContainer] = None
+_database_container: DatabaseContainer | None = None
 
 
 def get_database_container() -> DatabaseContainer:
     """Get the global database container instance.
-    
+
     Returns:
         DatabaseContainer: Global database container instance
     """

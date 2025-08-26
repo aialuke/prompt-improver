@@ -16,11 +16,12 @@ import logging
 import time
 import warnings
 from collections import deque
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 try:
     import redis.asyncio as redis
@@ -33,7 +34,7 @@ try:
 
     REDIS_AVAILABLE = True
 except ImportError:
-    warnings.warn("Redis not available. Install with: pip install redis")
+    warnings.warn("Redis not available. Install with: pip install redis", stacklevel=2)
     REDIS_AVAILABLE = False
     # Mock classes for type hints
     Redis = Any
@@ -76,10 +77,10 @@ class SentinelConfig:
     """Redis Sentinel configuration."""
 
     # Sentinel connection settings
-    sentinel_hosts: List[Tuple[str, int]]
+    sentinel_hosts: list[tuple[str, int]]
     service_name: str = "mymaster"
     socket_timeout: float = 0.5
-    password: Optional[str] = None
+    password: str | None = None
 
     # Master/replica settings
     master_timeout: float = 2.0
@@ -99,7 +100,7 @@ class SentinelConfig:
 
     @classmethod
     def for_environment(
-        cls, env: str, sentinels: List[Tuple[str, int]] = None
+        cls, env: str, sentinels: list[tuple[str, int]] | None = None
     ) -> "SentinelConfig":
         """Create Sentinel configuration optimized for environment."""
         default_sentinels = sentinels or [
@@ -146,8 +147,8 @@ class SentinelInfo:
     is_available: bool = True
     last_check: datetime = field(default_factory=lambda: datetime.now(UTC))
     response_time_ms: float = 0.0
-    runid: Optional[str] = None
-    flags: Set[str] = field(default_factory=set)
+    runid: str | None = None
+    flags: set[str] = field(default_factory=set)
     pending_commands: int = 0
 
     @property
@@ -163,8 +164,8 @@ class MasterInfo:
     name: str
     host: str
     port: int
-    runid: Optional[str] = None
-    flags: Set[str] = field(default_factory=set)
+    runid: str | None = None
+    flags: set[str] = field(default_factory=set)
     last_ping: datetime = field(default_factory=lambda: datetime.now(UTC))
     num_slaves: int = 0
     num_other_sentinels: int = 0
@@ -189,11 +190,11 @@ class FailoverEventInfo:
 
     event_type: FailoverEvent
     service_name: str
-    old_master: Optional[str] = None
-    new_master: Optional[str] = None
-    sentinel: Optional[str] = None
+    old_master: str | None = None
+    new_master: str | None = None
+    sentinel: str | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class SentinelManager:
@@ -208,7 +209,7 @@ class SentinelManager:
     - Quorum management and split-brain prevention
     """
 
-    def __init__(self, config: SentinelConfig, service_name: str = "sentinel_manager"):
+    def __init__(self, config: SentinelConfig, service_name: str = "sentinel_manager") -> None:
         if not REDIS_AVAILABLE:
             raise ImportError(
                 "Redis package not available. Install with: pip install redis"
@@ -218,9 +219,9 @@ class SentinelManager:
         self.service_name = service_name
 
         # Sentinel connections
-        self._sentinel_client: Optional[Sentinel] = None
-        self._master_client: Optional[Redis] = None
-        self._replica_clients: Dict[str, Redis] = {}
+        self._sentinel_client: Sentinel | None = None
+        self._master_client: Redis | None = None
+        self._replica_clients: dict[str, Redis] = {}
 
         # State management
         self._state = SentinelState.INITIALIZING
@@ -228,9 +229,9 @@ class SentinelManager:
         self._initialization_lock = asyncio.Lock()
 
         # Sentinel tracking
-        self._sentinel_info: Dict[str, SentinelInfo] = {}
-        self._master_info: Optional[MasterInfo] = None
-        self._current_master_address: Optional[Tuple[str, int]] = None
+        self._sentinel_info: dict[str, SentinelInfo] = {}
+        self._master_info: MasterInfo | None = None
+        self._current_master_address: tuple[str, int] | None = None
 
         # Failover tracking
         self._failover_events = deque(maxlen=100)
@@ -242,11 +243,11 @@ class SentinelManager:
         self._operation_history = deque(maxlen=500)
 
         # Background tasks
-        self._monitor_task: Optional[asyncio.Task] = None
-        self._health_check_task: Optional[asyncio.Task] = None
+        self._monitor_task: asyncio.Task | None = None
+        self._health_check_task: asyncio.Task | None = None
 
         # Event callbacks
-        self._failover_callbacks: List[callable] = []
+        self._failover_callbacks: list[callable] = []
 
         logger.info(f"SentinelManager initialized: {service_name}")
         logger.info(f"Sentinels: {[f'{h}:{p}' for h, p in config.sentinel_hosts]}")
@@ -276,7 +277,7 @@ class SentinelManager:
                 return True
 
             except Exception as e:
-                logger.error(f"Failed to initialize SentinelManager: {e}")
+                logger.exception(f"Failed to initialize SentinelManager: {e}")
                 self._state = SentinelState.UNAVAILABLE
                 raise
 
@@ -330,7 +331,7 @@ class SentinelManager:
                 )
 
         except Exception as e:
-            logger.error(f"Failed to discover master: {e}")
+            logger.exception(f"Failed to discover master: {e}")
             raise
 
     async def _discover_sentinels(self) -> None:
@@ -380,7 +381,7 @@ class SentinelManager:
             f"Sentinels discovered: {available_count}/{len(self.config.sentinel_hosts)} available"
         )
 
-    async def _get_master_info(self) -> Optional[MasterInfo]:
+    async def _get_master_info(self) -> MasterInfo | None:
         """Get detailed information about the current master."""
         if not self._sentinel_client or not self._current_master_address:
             return None
@@ -412,7 +413,7 @@ class SentinelManager:
                     value = master_info_raw[i + 1].decode("utf-8")
                     info_dict[key] = value
 
-                master_info = MasterInfo(
+                return MasterInfo(
                     name=self.config.service_name,
                     host=self._current_master_address[0],
                     port=self._current_master_address[1],
@@ -425,10 +426,8 @@ class SentinelManager:
                     down_after_period=int(info_dict.get("down-after-milliseconds", 0)),
                 )
 
-                return master_info
-
         except Exception as e:
-            logger.error(f"Failed to get master info: {e}")
+            logger.exception(f"Failed to get master info: {e}")
 
         return None
 
@@ -459,10 +458,10 @@ class SentinelManager:
             # Handle potential failover
             await self._handle_master_failure(e)
 
-            logger.error(f"Master connection error: {e}")
+            logger.exception(f"Master connection error: {e}")
             raise
 
-    async def get_replica_connection(self, readonly: bool = True) -> Optional[Redis]:
+    async def get_replica_connection(self, readonly: bool = True) -> Redis | None:
         """Get connection to a replica for read operations."""
         if not self._is_initialized:
             await self.initialize()
@@ -483,7 +482,7 @@ class SentinelManager:
             return replica_client
 
         except Exception as e:
-            logger.error(f"Failed to get replica connection: {e}")
+            logger.exception(f"Failed to get replica connection: {e}")
             return None
 
     async def _handle_master_failure(self, error: Exception) -> None:
@@ -537,7 +536,7 @@ class SentinelManager:
             self._state = SentinelState.MONITORING
 
         except Exception as e:
-            logger.error(f"Failed to handle master failure: {e}")
+            logger.exception(f"Failed to handle master failure: {e}")
             self._state = SentinelState.DEGRADED
 
     async def add_failover_callback(self, callback: callable) -> None:
@@ -553,7 +552,7 @@ class SentinelManager:
                 else:
                     callback(event)
             except Exception as e:
-                logger.error(f"Failover callback error: {e}")
+                logger.exception(f"Failover callback error: {e}")
 
     async def force_failover(self) -> bool:
         """Force a failover to promote a replica to master."""
@@ -590,11 +589,11 @@ class SentinelManager:
                 return True
 
         except Exception as e:
-            logger.error(f"Failed to force failover: {e}")
+            logger.exception(f"Failed to force failover: {e}")
 
         return False
 
-    async def get_sentinel_status(self) -> Dict[str, Any]:
+    async def get_sentinel_status(self) -> dict[str, Any]:
         """Get comprehensive Sentinel status."""
         available_sentinels = sum(
             1 for info in self._sentinel_info.values() if info.is_available
@@ -607,7 +606,7 @@ class SentinelManager:
         elif available_sentinels < (total_sentinels / 2):
             quorum_status = "degraded"
 
-        status = {
+        return {
             "service": self.service_name,
             "state": self._state.value,
             "sentinel_service": self.config.service_name,
@@ -638,9 +637,7 @@ class SentinelManager:
             "metrics": self.metrics.to_dict(),
         }
 
-        return status
-
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Comprehensive health check of Sentinel manager."""
         start_time = time.time()
 
@@ -693,7 +690,7 @@ class SentinelManager:
         except Exception as e:
             health_info["status"] = "unhealthy"
             health_info["error"] = str(e)
-            logger.error(f"Sentinel health check failed: {e}")
+            logger.exception(f"Sentinel health check failed: {e}")
 
         health_info["response_time_ms"] = (time.time() - start_time) * 1000
         return health_info
@@ -731,30 +728,29 @@ class SentinelManager:
                 available_sentinels = sum(
                     1 for info in self._sentinel_info.values() if info.is_available
                 )
-                if available_sentinels < self.config.quorum:
-                    if not any(
-                        e.event_type == FailoverEvent.QUORUM_LOST
-                        for e in [
-                            e
-                            for e in self._failover_events
-                            if (datetime.now(UTC) - e.timestamp).seconds < 60
-                        ]
-                    ):
-                        event = FailoverEventInfo(
-                            event_type=FailoverEvent.QUORUM_LOST,
-                            service_name=self.config.service_name,
-                            details={
-                                "available": available_sentinels,
-                                "required": self.config.quorum,
-                            },
-                        )
-                        self._failover_events.append(event)
-                        logger.error(
-                            f"Quorum lost: {available_sentinels}/{self.config.quorum}"
-                        )
+                if available_sentinels < self.config.quorum and not any(
+                    e.event_type == FailoverEvent.QUORUM_LOST
+                    for e in [
+                        e
+                        for e in self._failover_events
+                        if (datetime.now(UTC) - e.timestamp).seconds < 60
+                    ]
+                ):
+                    event = FailoverEventInfo(
+                        event_type=FailoverEvent.QUORUM_LOST,
+                        service_name=self.config.service_name,
+                        details={
+                            "available": available_sentinels,
+                            "required": self.config.quorum,
+                        },
+                    )
+                    self._failover_events.append(event)
+                    logger.error(
+                        f"Quorum lost: {available_sentinels}/{self.config.quorum}"
+                    )
 
             except Exception as e:
-                logger.error(f"Monitor loop error: {e}")
+                logger.exception(f"Monitor loop error: {e}")
 
     async def _health_check_loop(self) -> None:
         """Background health check loop."""
@@ -763,7 +759,7 @@ class SentinelManager:
                 await asyncio.sleep(self.config.health_check_interval)
                 await self.health_check()
             except Exception as e:
-                logger.error(f"Health check loop error: {e}")
+                logger.exception(f"Health check loop error: {e}")
 
     async def _update_sentinel_info(self) -> None:
         """Update information about all Sentinels."""
@@ -793,17 +789,13 @@ class SentinelManager:
             # Cancel background tasks
             if self._monitor_task:
                 self._monitor_task.cancel()
-                try:
+                with suppress(asyncio.CancelledError):
                     await self._monitor_task
-                except asyncio.CancelledError:
-                    pass
 
             if self._health_check_task:
                 self._health_check_task.cancel()
-                try:
+                with suppress(asyncio.CancelledError):
                     await self._health_check_task
-                except asyncio.CancelledError:
-                    pass
 
             # Close connections
             if self._master_client:
@@ -826,7 +818,7 @@ class SentinelManager:
             logger.info(f"SentinelManager shutdown complete: {self.service_name}")
 
         except Exception as e:
-            logger.error(f"Error during SentinelManager shutdown: {e}")
+            logger.exception(f"Error during SentinelManager shutdown: {e}")
 
     def __repr__(self) -> str:
         return (

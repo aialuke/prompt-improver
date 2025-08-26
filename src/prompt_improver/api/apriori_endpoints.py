@@ -6,23 +6,13 @@ prompt improvement insights.
 """
 
 import logging
-import uuid
-from datetime import datetime
-from typing import Annotated, Any
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.protocols.ml_protocols import (
-    ComponentFactoryProtocol,
-    ComponentRegistryProtocol,
-    ComponentSpec,
-)
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
-from prompt_improver.application.protocols.application_service_protocols import (
+from prompt_improver.database.composition import DatabaseServices
+from prompt_improver.database import get_database_services, create_database_services, ManagerMode
+from prompt_improver.shared.interfaces.protocols.application import (
     AprioriApplicationServiceProtocol,
     PatternApplicationServiceProtocol,
 )
@@ -303,6 +293,7 @@ async def get_discovery_runs(
     """
     try:
         from prompt_improver.repositories.protocols.apriori_repository_protocol import PatternDiscoveryFilter
+        from prompt_improver.ml.types import PatternDiscoveryResponse
 
         # Create filter from parameters
         filters = (

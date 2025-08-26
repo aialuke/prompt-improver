@@ -8,7 +8,7 @@ Defines the interface for prompt-specific data access operations, including:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -16,8 +16,8 @@ from pydantic import BaseModel
 from prompt_improver.core.domain.types import (
     ABExperimentData,
     DiscoveredPatternData,
-    ImprovementSessionData,
     ImprovementSessionCreateData,
+    ImprovementSessionData,
 )
 
 

@@ -4,9 +4,7 @@ Demonstrates proper testing methodology that prevents false positives
 """
 
 import asyncio
-import time
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -40,7 +38,7 @@ class Test2025BestPracticesHealthCheckers:
         """
         checker = EnhancedMLServiceHealthChecker()
         result = await checker.check()
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
+        assert result.status in {HealthStatus.WARNING, HealthStatus.FAILED}
         assert result.response_time_ms >= 0
         if result.status == HealthStatus.WARNING:
             assert result.details.get("fallback_mode") is True
@@ -75,7 +73,7 @@ class Test2025BestPracticesHealthCheckers:
             raise RuntimeError(f"Service failure #{call_count}")
 
         with patch.object(checker, "_execute_health_check", mock_failing_service):
-            for i in range(5):
+            for _i in range(5):
                 result = await checker.check()
                 assert result.status == HealthStatus.FAILED
             assert call_count <= 4
@@ -136,7 +134,7 @@ class Test2025BestPracticesHealthCheckers:
         Should track and report SLA compliance accurately
         """
         checker = EnhancedMLServiceHealthChecker()
-        for i in range(10):
+        for _i in range(10):
             await checker.check()
             await asyncio.sleep(0.01)
         sla_report = checker.sla_monitor.get_sla_report()
@@ -185,11 +183,11 @@ class Test2025BestPracticesHealthCheckers:
             try:
                 result = await checker.check()
                 assert isinstance(result, HealthResult)
-                assert result.status in [
+                assert result.status in {
                     HealthStatus.HEALTHY,
                     HealthStatus.WARNING,
                     HealthStatus.FAILED,
-                ]
+                }
                 assert result.response_time_ms >= 0
                 assert result.component == checker.name
             except Exception as e:

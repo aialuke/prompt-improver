@@ -11,7 +11,7 @@ import statistics
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import aiofiles
 
@@ -64,13 +64,13 @@ class PerformanceValidationResult:
 class PerformanceValidator:
     """Comprehensive performance validation system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.benchmark = None  # Will be initialized async
         self.optimizer = get_performance_optimizer()
         self.monitor = get_unified_health_monitor()
         self.target_response_time_ms = 200
-        
-    async def _ensure_benchmark_initialized(self):
+
+    async def _ensure_benchmark_initialized(self) -> None:
         """Ensure benchmark is initialized using factory pattern."""
         if self.benchmark is None:
             self.benchmark = await create_performance_benchmark()
@@ -120,7 +120,7 @@ class PerformanceValidator:
                 if not isinstance(result, dict) or "improved_prompt" not in result:
                     errors += 1
             except Exception as e:
-                logger.error(f"MCP operation failed: {e}")
+                logger.exception(f"MCP operation failed: {e}")
                 errors += 1
                 response_times.append(self.target_response_time_ms * 2)
         return self._create_validation_result(
@@ -145,7 +145,7 @@ class PerformanceValidator:
             ManagerMode.ASYNC_MODERN
         )
 
-        for i in range(sample_count):
+        for _i in range(sample_count):
             start_time = time.perf_counter()
             try:
                 # Test using the clean composition pattern
@@ -159,7 +159,7 @@ class PerformanceValidator:
                 response_time = (time.perf_counter() - start_time) * 1000
                 response_times.append(response_time)
             except Exception as e:
-                logger.error(f"Database operation failed: {e}")
+                logger.exception(f"Database operation failed: {e}")
                 errors += 1
                 response_times.append(100)
 
@@ -219,7 +219,7 @@ class PerformanceValidator:
                 response_time = (time.perf_counter() - start_time) * 1000
                 response_times.append(response_time)
             except Exception as e:
-                logger.error(f"Cache operation failed: {e}")
+                logger.exception(f"Cache operation failed: {e}")
                 errors += 1
                 response_times.append(50)
 
@@ -269,7 +269,7 @@ class PerformanceValidator:
                 response_time = (time.perf_counter() - start_time) * 1000
                 response_times.append(response_time)
             except Exception as e:
-                logger.error(f"End-to-end workflow failed: {e}")
+                logger.exception(f"End-to-end workflow failed: {e}")
                 errors += 1
                 response_times.append(self.target_response_time_ms * 1.5)
         return self._create_validation_result(
@@ -303,7 +303,7 @@ class PerformanceValidator:
                 success = isinstance(result, dict) and "improved_prompt" in result
                 return (response_time, success)
             except Exception as e:
-                logger.error(f"Concurrent operation {operation_id} failed: {e}")
+                logger.exception(f"Concurrent operation {operation_id} failed: {e}")
                 return (self.target_response_time_ms * 2, False)
 
         tasks = [single_operation(i) for i in range(sample_count)]
@@ -378,7 +378,7 @@ class PerformanceValidator:
 
     async def _generate_validation_report(
         self, validation_results: dict[str, PerformanceValidationResult]
-    ):
+    ) -> None:
         """Generate comprehensive validation report."""
         report = {
             "validation_timestamp": datetime.now(UTC).isoformat(),

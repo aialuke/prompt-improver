@@ -1,4 +1,4 @@
-"""Gradual Tightening Script for APES Code Quality
+"""Gradual Tightening Script for APES Code Quality.
 
 This script implements a systematic approach to gradually tighten linting rules,
 following best practices for large codebases with incremental improvement.
@@ -71,7 +71,7 @@ TIGHTENING_STAGES = {
 class GradualTightening:
     """Implements gradual tightening of linting rules."""
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path) -> None:
         self.project_root = project_root
         self.pyproject_path = project_root / "pyproject.toml"
         self.metrics_path = project_root / "reports" / "tightening_metrics.json"
@@ -116,7 +116,7 @@ class GradualTightening:
                     for excluded in [".venv", "__pycache__", ".git", "node_modules"]
                 )
             ]
-            metrics = {
+            return {
                 "timestamp": datetime.now().isoformat(),
                 "total_issues": len(issues),
                 "total_files": len(python_files),
@@ -126,7 +126,6 @@ class GradualTightening:
                 else 0,
                 "detailed_issues": issues[:50],
             }
-            return metrics
         except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as e:
             print(f"❌ Error collecting metrics: {e}")
             return {

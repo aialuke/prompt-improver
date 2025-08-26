@@ -1,4 +1,4 @@
-"""Unified Benchmarking Framework for Redis Consolidation
+"""Unified Benchmarking Framework for Redis Consolidation.
 =====================================================
 
 Performance benchmarking to validate 8.4x improvement claims
@@ -13,7 +13,7 @@ import statistics
 import sys
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from prompt_improver.database.unified_connection_manager import (
     ManagerMode,
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class PerformanceBenchmark:
     """Base class for performance benchmarks."""
 
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str) -> None:
         self.name = name
         self.description = description
         self.results = {}
@@ -46,7 +46,7 @@ class PerformanceBenchmark:
 class CacheHitRateBenchmark(PerformanceBenchmark):
     """Benchmark cache hit rates under realistic access patterns."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             "cache_hit_rate", "Tests cache hit rate with 80/20 access pattern"
         )
@@ -113,9 +113,9 @@ class CacheHitRateBenchmark(PerformanceBenchmark):
 class ResponseTimeBenchmark(PerformanceBenchmark):
     """Benchmark response times across different cache levels."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
-            "response_time", "Tests response times for L1, L2, and L3 operations"
+            "response_time", "Tests response times for L1 and L2 operations"
         )
         self.iterations = 1000
 
@@ -185,7 +185,7 @@ class ResponseTimeBenchmark(PerformanceBenchmark):
 class ThroughputBenchmark(PerformanceBenchmark):
     """Benchmark maximum throughput under concurrent load."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("throughput", "Tests maximum sustainable throughput")
         self.duration_seconds = 10
         self.concurrent_workers = 50
@@ -210,11 +210,7 @@ class ThroughputBenchmark(PerformanceBenchmark):
     async def run(self, unified_manager) -> dict[str, Any]:
         """Run throughput benchmark."""
         stop_event = asyncio.Event()
-        workers = []
-        for i in range(self.concurrent_workers):
-            workers.append(
-                asyncio.create_task(self.worker(i, unified_manager, stop_event))
-            )
+        workers = [asyncio.create_task(self.worker(i, unified_manager, stop_event)) for i in range(self.concurrent_workers)]
         start_time = time.perf_counter()
         await asyncio.sleep(self.duration_seconds)
         stop_event.set()
@@ -241,7 +237,7 @@ class ThroughputBenchmark(PerformanceBenchmark):
 class CacheWarmingBenchmark(PerformanceBenchmark):
     """Benchmark cache warming effectiveness."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             "cache_warming", "Tests intelligent cache warming effectiveness"
         )
@@ -306,7 +302,7 @@ class CacheWarmingBenchmark(PerformanceBenchmark):
 class UnifiedBenchmarkFramework:
     """Main benchmarking framework."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.benchmarks = [
             CacheHitRateBenchmark(),
             ResponseTimeBenchmark(),
@@ -424,7 +420,7 @@ class UnifiedBenchmarkFramework:
             },
         }
         report_path = "unified_benchmark_report.json"
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         print("\nPerformance Improvements:")
         print(

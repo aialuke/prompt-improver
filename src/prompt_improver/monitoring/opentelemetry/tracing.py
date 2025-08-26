@@ -1,11 +1,10 @@
-"""OpenTelemetry Tracing Utilities for Async Operations
+"""OpenTelemetry Tracing Utilities for Async Operations.
 ===================================================
 
 Provides decorators and utilities for instrumenting async operations with
 distributed tracing, following 2025 best practices for Python applications.
 """
 
-import asyncio
 import functools
 import inspect
 import logging
@@ -13,7 +12,7 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, contextmanager
-from typing import Any, Concatenate, Dict, Optional, ParamSpec, TypeVar, Union, overload
+from typing import Any, ParamSpec, TypeVar
 
 from prompt_improver.monitoring.opentelemetry.setup import get_tracer
 from prompt_improver.performance.monitoring.health.background_manager import (
@@ -331,7 +330,7 @@ def with_extracted_context(carrier: dict[str, str]):
     return decorator
 
 
-async def propagate_context_async(coro: Awaitable[T], context: Any | None = None) -> T:
+async def propagate_context_async[T](coro: Awaitable[T], context: Any | None = None) -> T:
     """Run a coroutine with propagated trace context."""
     if not OTEL_AVAILABLE:
         return await coro
@@ -404,9 +403,7 @@ def _is_safe_to_capture(name: str, value: Any) -> bool:
                 return False
         except (TypeError, AttributeError):
             pass
-    if not isinstance(value, (str, int, float, bool, list, dict, tuple, type(None))):
-        return False
-    return True
+    return isinstance(value, (str, int, float, bool, list, dict, tuple, type(None)))
 
 
 class SpanKind:

@@ -8,7 +8,7 @@ Defines the interface for health check operations, including:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -264,7 +264,7 @@ class HealthRepositoryProtocol(Protocol):
 
     # Advanced Monitoring
     async def setup_health_monitoring(
-        self, check_interval_seconds: int = 60, alert_thresholds: dict[str, Any] = None
+        self, check_interval_seconds: int = 60, alert_thresholds: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Setup continuous health monitoring."""
         ...

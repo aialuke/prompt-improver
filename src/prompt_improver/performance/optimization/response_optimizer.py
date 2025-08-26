@@ -14,7 +14,7 @@ import time
 import zlib
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 import lz4.frame
 import msgspec.json
@@ -22,6 +22,7 @@ import msgspec.json
 from prompt_improver.performance.optimization.performance_optimizer import (
     measure_mcp_operation,
 )
+
 try:
     import brotli
 
@@ -52,14 +53,14 @@ class CompressionResult:
 
     @property
     def size_reduction_percent(self) -> float:
-        """Calculate size reduction percentage"""
+        """Calculate size reduction percentage."""
         if self.original_size == 0:
             return 0.0
         return (self.original_size - self.compressed_size) / self.original_size * 100
 
     @property
     def size_reduction_bytes(self) -> int:
-        """Calculate size reduction in bytes"""
+        """Calculate size reduction in bytes."""
         return self.original_size - self.compressed_size
 
     @property
@@ -71,7 +72,7 @@ class CompressionResult:
 class FastJSONSerializer:
     """High-performance JSON serialization with msgspec."""
 
-    def __init__(self, use_msgspec: bool = True):
+    def __init__(self, use_msgspec: bool = True) -> None:
         self.use_msgspec = use_msgspec
         if self.use_msgspec:
             logger.info("Using msgspec for high-performance JSON serialization")
@@ -104,7 +105,7 @@ class FastJSONSerializer:
 class EnhancedResponseCompressor:
     """Enhanced multi-algorithm response compression with 2025 best practices."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.algorithms = {
             "gzip": self._compress_gzip,
             "deflate": self._compress_deflate,
@@ -212,7 +213,7 @@ class EnhancedResponseCompressor:
             return "binary"
 
     def _get_adaptive_min_size(self, content_type: str | None, data_size: int) -> int:
-        """Get adaptive minimum compression size based on content type - 2025 best practice"""
+        """Get adaptive minimum compression size based on content type - 2025 best practice."""
         if content_type is None:
             return 50
         adaptive_thresholds = {
@@ -238,13 +239,13 @@ class EnhancedResponseCompressor:
     def _should_force_compression(
         self, content_type: str | None, data_size: int
     ) -> bool:
-        """Determine if compression should be forced regardless of size - 2025 enhancement"""
-        if content_type in [
+        """Determine if compression should be forced regardless of size - 2025 enhancement."""
+        if content_type in {
             "application/json",
             "text/html",
             "text/css",
             "application/xml",
-        ]:
+        }:
             return data_size > 20
         return False
 
@@ -281,7 +282,7 @@ class EnhancedResponseCompressor:
 class EnhancedPayloadOptimizer:
     """Enhanced payload optimizer with content-aware optimization and 2025 best practices."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.json_serializer = FastJSONSerializer()
         self.compressor = EnhancedResponseCompressor()
         self.content_optimizers = {
@@ -354,8 +355,8 @@ class EnhancedPayloadOptimizer:
         return stream_chunks()
 
     def _detect_content_type_from_data(self, data: Any) -> str:
-        """Detect content type from data structure"""
-        if isinstance(data, dict) or isinstance(data, (list, tuple)):
+        """Detect content type from data structure."""
+        if isinstance(data, (dict, list, tuple)):
             return "application/json"
         if isinstance(data, str):
             if data.strip().startswith("<"):
@@ -364,11 +365,11 @@ class EnhancedPayloadOptimizer:
         return "application/json"
 
     def _optimize_json_content(self, data: Any) -> Any:
-        """Optimize JSON content for better compression"""
+        """Optimize JSON content for better compression."""
         if isinstance(data, dict):
             optimized = {}
             for key, value in data.items():
-                if value is not None and value != [] and (value != {}):
+                if value is not None and value not in ([], {}):
                     if isinstance(value, (dict, list)):
                         optimized_value = self._optimize_json_content(value)
                         if optimized_value:
@@ -383,7 +384,7 @@ class EnhancedPayloadOptimizer:
         return data
 
     def _optimize_html_content(self, data: Any) -> Any:
-        """Optimize HTML content (basic minification)"""
+        """Optimize HTML content (basic minification)."""
         if isinstance(data, str):
             import re
 
@@ -393,7 +394,7 @@ class EnhancedPayloadOptimizer:
         return data
 
     def _optimize_css_content(self, data: Any) -> Any:
-        """Optimize CSS content (basic minification)"""
+        """Optimize CSS content (basic minification)."""
         if isinstance(data, str):
             import re
 
@@ -403,7 +404,7 @@ class EnhancedPayloadOptimizer:
         return data
 
     def _optimize_js_content(self, data: Any) -> Any:
-        """Optimize JavaScript content (basic minification)"""
+        """Optimize JavaScript content (basic minification)."""
         if isinstance(data, str):
             import re
 
@@ -413,14 +414,14 @@ class EnhancedPayloadOptimizer:
         return data
 
     def _optimize_generic_content(self, data: Any) -> Any:
-        """Generic content optimization"""
+        """Generic content optimization."""
         return data
 
 
 class ResponseOptimizer:
     """Enhanced response optimization coordinator with 2025 best practices."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.payload_optimizer = EnhancedPayloadOptimizer()
         self._optimization_stats = {
             "total_responses": 0,
@@ -459,7 +460,7 @@ class ResponseOptimizer:
                 })
                 return optimized
             except Exception as e:
-                logger.error(f"Response optimization failed: {e}")
+                logger.exception(f"Response optimization failed: {e}")
                 return {
                     "data": self.payload_optimizer.json_serializer.serialize(
                         response_data
@@ -471,7 +472,7 @@ class ResponseOptimizer:
 
     def _update_stats(
         self, optimized_response: dict[str, Any], optimization_time: float
-    ):
+    ) -> None:
         """Update optimization statistics."""
         self._optimization_stats["total_responses"] += 1
         self._optimization_stats["total_optimization_time_ms"] += optimization_time

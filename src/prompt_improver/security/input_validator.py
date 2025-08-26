@@ -5,18 +5,22 @@ Provides schema-based validation with security-first design for 2025 standards.
 
 import hashlib
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
+
+# import numpy as np  # Converted to lazy loading
 from pydantic import BaseModel, Field
 
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 from prompt_improver.security.input_sanitization import InputSanitizer
 
 
 class ValidationError(Exception):
     """Raised when input validation fails."""
 
-    def __init__(self, message: str, field: str = None, value: Any = None):
+    def __init__(self, message: str, field: str | None = None, value: Any = None) -> None:
         self.message = message
         self.field = field
         self.value = value
@@ -67,8 +71,9 @@ class ValidationSchema(BaseModel):
 class InputValidator:
     """Comprehensive input validator for ML context learning system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.sanitizer = InputSanitizer()
+        self._numpy_types_resolved = False
         self.schemas = {
             "user_id": ValidationSchema(
                 min_length=3,
@@ -92,12 +97,13 @@ class InputValidator:
             "numpy_array": ValidationSchema(
                 max_array_size=100 * 1024 * 1024,
                 max_array_elements=1000000,
-                allowed_dtypes=[np.float32, np.float64, np.int32, np.int64],
-                allowed_types=[np.ndarray],
+                # Note: dtypes and types will be resolved lazily when needed
+                allowed_dtypes=None,  # Will be set to numpy dtypes when first used
+                allowed_types=[],  # Will be set to [np.ndarray] when first used
                 required=True,
             ),
             "ml_features": ValidationSchema(
-                allowed_types=[list, np.ndarray],
+                allowed_types=[list],  # np.ndarray will be added lazily when needed
                 max_array_elements=10000,
                 required=True,
                 custom_validator=self._validate_ml_features,
@@ -116,8 +122,26 @@ class InputValidator:
             ),
         }
 
+    def _ensure_numpy_types_resolved(self) -> None:
+        """Lazily resolve numpy types when first needed."""
+        if not self._numpy_types_resolved:
+            np = get_numpy()
+
+            # Update numpy_array schema with actual numpy types
+            if "numpy_array" in self.schemas:
+                self.schemas["numpy_array"].allowed_dtypes = [
+                    np.float32, np.float64, np.int32, np.int64
+                ]
+                self.schemas["numpy_array"].allowed_types = [np.ndarray]
+
+            # Update ml_features schema to include numpy array type
+            if "ml_features" in self.schemas:
+                self.schemas["ml_features"].allowed_types.append(np.ndarray)
+
+            self._numpy_types_resolved = True
+
     def validate_input(
-        self, field_name: str, value: Any, schema_name: str = None
+        self, field_name: str, value: Any, schema_name: str | None = None
     ) -> Any:
         """Validate single input field against schema.
 
@@ -132,6 +156,9 @@ class InputValidator:
         Raises:
             ValidationError: If validation fails
         """
+        # Ensure numpy types are resolved if needed
+        self._ensure_numpy_types_resolved()
+
         schema_key = schema_name or field_name
         if schema_key not in self.schemas:
             raise ValidationError(
@@ -157,7 +184,7 @@ class InputValidator:
             value = self._validate_string(field_name, value, schema)
         elif isinstance(value, (int, float)):
             self._validate_numeric(field_name, value, schema)
-        elif isinstance(value, np.ndarray):
+        elif hasattr(value, 'dtype') and hasattr(value, 'shape') and str(type(value)).startswith('<class \'numpy.'):
             self._validate_numpy_array(field_name, value, schema)
         elif isinstance(value, dict):
             value = self._validate_dict(field_name, value, schema)
@@ -179,7 +206,7 @@ class InputValidator:
         return value
 
     def validate_multiple(
-        self, data: dict[str, Any], field_schemas: dict[str, str] = None
+        self, data: dict[str, Any], field_schemas: dict[str, str] | None = None
     ) -> dict[str, Any]:
         """Validate multiple fields at once.
 
@@ -238,13 +265,13 @@ class InputValidator:
                 field_name,
                 value,
             )
-        if field_name in ["context_data", "prompt", "description"]:
+        if field_name in {"context_data", "prompt", "description"}:
             value = self.sanitizer.sanitize_html_input(value)
         return value
 
     def _validate_numeric(
         self, field_name: str, value: int | float, schema: ValidationSchema
-    ):
+    ) -> None:
         """Validate numeric value against schema."""
         if schema.min_value is not None and value < schema.min_value:
             raise ValidationError(
@@ -259,14 +286,14 @@ class InputValidator:
                 value,
             )
         if isinstance(value, float):
-            if np.isnan(value) or np.isinf(value):
+            if get_numpy().isnan(value) or get_numpy().isinf(value):
                 raise ValidationError(
                     f"Field {field_name} cannot be NaN or infinite", field_name, value
                 )
 
     def _validate_numpy_array(
-        self, field_name: str, value: np.ndarray, schema: ValidationSchema
-    ):
+        self, field_name: str, value: "np.ndarray", schema: ValidationSchema
+    ) -> None:
         """Validate numpy array against schema."""
         if schema.max_array_size and value.nbytes > schema.max_array_size:
             raise ValidationError(
@@ -312,7 +339,7 @@ class InputValidator:
                 value,
             )
         sanitized = []
-        for i, item in enumerate(value):
+        for _i, item in enumerate(value):
             if isinstance(item, str):
                 sanitized.append(self.sanitizer.sanitize_html_input(item))
             else:
@@ -338,15 +365,15 @@ class InputValidator:
                 return False
         return True
 
-    def _validate_ml_features(self, features: list | np.ndarray) -> bool:
+    def _validate_ml_features(self, features: "list | np.ndarray") -> bool:
         """Custom validator for ML features."""
-        if isinstance(features, np.ndarray):
+        if hasattr(features, 'dtype') and hasattr(features, 'shape') and str(type(features)).startswith('<class \'numpy.'):
             return self.sanitizer.validate_ml_input_data(features)
         if isinstance(features, list):
             for feature in features:
                 if not isinstance(feature, (int, float)):
                     return False
-                if np.isnan(feature) or np.isinf(feature):
+                if get_numpy().isnan(feature) or get_numpy().isinf(feature):
                     return False
                 if abs(feature) > 1000000.0:
                     return False

@@ -6,10 +6,9 @@ and experiment tracking following repository pattern with protocol-based depende
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 class ExperimentRepository(BaseRepository[GenerationSession]):
     """Repository for experiment tracking and A/B testing operations."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=GenerationSession,
             connection_manager=connection_manager,
@@ -52,7 +51,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 logger.info(f"Created generation session {generation_session.id}")
                 return generation_session
             except Exception as e:
-                logger.error(f"Error creating generation session: {e}")
+                logger.exception(f"Error creating generation session: {e}")
                 raise
 
     async def get_generation_sessions(
@@ -117,7 +116,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting generation sessions: {e}")
+                logger.exception(f"Error getting generation sessions: {e}")
                 raise
 
     async def get_generation_session_by_id(
@@ -133,7 +132,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting generation session by ID: {e}")
+                logger.exception(f"Error getting generation session by ID: {e}")
                 raise
 
     async def update_generation_session(
@@ -157,7 +156,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 await session.commit()
                 return await self.get_generation_session_by_id(session_id)
             except Exception as e:
-                logger.error(f"Error updating generation session: {e}")
+                logger.exception(f"Error updating generation session: {e}")
                 raise
 
     async def get_active_generation_sessions(self) -> list[GenerationSession]:
@@ -170,7 +169,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 result = await session.execute(query)
                 return list(result.scalars().all())
             except Exception as e:
-                logger.error(f"Error getting active generation sessions: {e}")
+                logger.exception(f"Error getting active generation sessions: {e}")
                 raise
 
     # Generation Batch Management
@@ -189,7 +188,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 logger.info(f"Created generation batch {batch.id}")
                 return batch
             except Exception as e:
-                logger.error(f"Error creating generation batch: {e}")
+                logger.exception(f"Error creating generation batch: {e}")
                 raise
 
     async def get_generation_batches(
@@ -211,7 +210,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 result = await session.execute(query)
                 return list(result.scalars().all())
             except Exception as e:
-                logger.error(f"Error getting generation batches: {e}")
+                logger.exception(f"Error getting generation batches: {e}")
                 raise
 
     async def update_generation_batch(
@@ -241,7 +240,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 get_result = await session.execute(get_query)
                 return get_result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error updating generation batch: {e}")
+                logger.exception(f"Error updating generation batch: {e}")
                 raise
 
     async def get_batch_completion_status(
@@ -268,7 +267,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 total = stats.total_batches or 0
                 completed = stats.completed_batches or 0
                 failed = stats.failed_batches or 0
-                
+
                 completion_rate = completed / total if total > 0 else 0.0
                 failure_rate = failed / total if total > 0 else 0.0
 
@@ -284,7 +283,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 }
 
             except Exception as e:
-                logger.error(f"Error getting batch completion status: {e}")
+                logger.exception(f"Error getting batch completion status: {e}")
                 raise
 
     # Generation Method Performance
@@ -324,7 +323,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting generation method performance: {e}")
+                logger.exception(f"Error getting generation method performance: {e}")
                 raise
 
     async def create_method_performance_record(
@@ -341,7 +340,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 logger.info(f"Created method performance record {performance.id}")
                 return performance
             except Exception as e:
-                logger.error(f"Error creating method performance record: {e}")
+                logger.exception(f"Error creating method performance record: {e}")
                 raise
 
     async def get_method_performance_comparison(
@@ -354,7 +353,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
         async with self.get_session() as session:
             try:
                 comparison_data = {}
-                
+
                 for method_name in method_names:
                     query = select(
                         func.avg(GenerationMethodPerformance.avg_quality_score).label("avg_quality"),
@@ -362,34 +361,34 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         func.avg(GenerationMethodPerformance.success_rate).label("avg_success_rate"),
                         func.count(GenerationMethodPerformance.id).label("sample_count"),
                     ).where(GenerationMethodPerformance.method_name == method_name)
-                    
+
                     if date_from:
                         query = query.where(GenerationMethodPerformance.created_at >= date_from)
                     if date_to:
                         query = query.where(GenerationMethodPerformance.created_at <= date_to)
-                    
+
                     result = await session.execute(query)
                     stats = result.first()
-                    
+
                     comparison_data[method_name] = {
                         "avg_quality_score": float(stats.avg_quality or 0),
                         "avg_generation_time_ms": float(stats.avg_time or 0),
                         "avg_success_rate": float(stats.avg_success_rate or 0),
                         "sample_count": stats.sample_count or 0,
                         "efficiency_score": (
-                            stats.avg_quality / (stats.avg_time / 1000) 
-                            if stats.avg_quality and stats.avg_time 
+                            stats.avg_quality / (stats.avg_time / 1000)
+                            if stats.avg_quality and stats.avg_time
                             else 0.0
                         ),
                     }
-                
+
                 # Determine best method by efficiency
                 best_method = max(
                     comparison_data.items(),
                     key=lambda x: x[1]["efficiency_score"],
                     default=(None, None)
                 )[0]
-                
+
                 return {
                     "method_comparison": comparison_data,
                     "best_method": best_method,
@@ -398,9 +397,9 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         "to": date_to.isoformat() if date_to else None,
                     },
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting method performance comparison: {e}")
+                logger.exception(f"Error getting method performance comparison: {e}")
                 raise
 
     # A/B Testing and Experiment Management
@@ -418,7 +417,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 session_data["metadata"] = session_data.get("metadata", {})
                 session_data["metadata"]["test_type"] = "ab_test"
                 session_data["metadata"]["test_variants"] = test_config.get("variants", [])
-                
+
                 generation_session = GenerationSession(**session_data)
                 session.add(generation_session)
                 await session.commit()
@@ -426,7 +425,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 logger.info(f"Created A/B test session {generation_session.id}")
                 return generation_session
             except Exception as e:
-                logger.error(f"Error creating A/B test session: {e}")
+                logger.exception(f"Error creating A/B test session: {e}")
                 raise
 
     async def get_ab_test_results(
@@ -440,16 +439,16 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                 test_session = await self.get_generation_session_by_id(test_session_id)
                 if not test_session or test_session.session_type != "ab_test":
                     return {"error": "A/B test session not found"}
-                
+
                 # Get batches for this test
                 batches = await self.get_generation_batches(test_session_id)
-                
+
                 # Group results by variant
                 variant_results = {}
                 for batch in batches:
                     batch_metadata = batch.metadata or {}
                     variant = batch_metadata.get("test_variant", "default")
-                    
+
                     if variant not in variant_results:
                         variant_results[variant] = {
                             "total_samples": 0,
@@ -458,26 +457,26 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                             "success_count": 0,
                             "batch_count": 0,
                         }
-                    
+
                     variant_data = variant_results[variant]
                     variant_data["total_samples"] += batch.samples_generated or 0
                     variant_data["batch_count"] += 1
-                    
+
                     if batch.avg_quality_score:
                         variant_data["avg_quality"] = (
-                            (variant_data["avg_quality"] * (variant_data["batch_count"] - 1) + 
+                            (variant_data["avg_quality"] * (variant_data["batch_count"] - 1) +
                              batch.avg_quality_score) / variant_data["batch_count"]
                         )
-                    
+
                     if batch.generation_time_ms:
                         variant_data["avg_generation_time"] = (
-                            (variant_data["avg_generation_time"] * (variant_data["batch_count"] - 1) + 
+                            (variant_data["avg_generation_time"] * (variant_data["batch_count"] - 1) +
                              batch.generation_time_ms) / variant_data["batch_count"]
                         )
-                    
+
                     if batch.status == "completed":
                         variant_data["success_count"] += 1
-                
+
                 # Calculate statistical significance (simplified)
                 total_variants = len(variant_results)
                 if total_variants >= 2:
@@ -485,7 +484,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         variant_results.items(),
                         key=lambda x: x[1]["avg_quality"]
                     )[0]
-                    
+
                     return {
                         "test_session_id": test_session_id,
                         "variant_results": variant_results,
@@ -494,16 +493,16 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         "test_status": test_session.status,
                         "statistical_significance": "moderate",  # Placeholder
                     }
-                
+
                 return {
                     "test_session_id": test_session_id,
                     "variant_results": variant_results,
                     "total_variants": total_variants,
                     "test_status": test_session.status,
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting A/B test results: {e}")
+                logger.exception(f"Error getting A/B test results: {e}")
                 raise
 
     async def get_experiment_summary(
@@ -523,7 +522,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                     .label("completed_experiments"),
                     func.avg(GenerationSession.quality_threshold).label("avg_quality_threshold"),
                 ).group_by(GenerationSession.session_type)
-                
+
                 conditions = []
                 if experiment_type:
                     conditions.append(GenerationSession.session_type == experiment_type)
@@ -531,13 +530,13 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                     conditions.append(GenerationSession.created_at >= date_from)
                 if date_to:
                     conditions.append(GenerationSession.created_at <= date_to)
-                
+
                 if conditions:
                     query = query.where(and_(*conditions))
-                
+
                 result = await session.execute(query)
                 summary_data = {}
-                
+
                 for row in result:
                     summary_data[row.session_type or "default"] = {
                         "total_experiments": row.total_experiments or 0,
@@ -548,7 +547,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         ),
                         "avg_quality_threshold": float(row.avg_quality_threshold or 0),
                     }
-                
+
                 return {
                     "experiment_summary": summary_data,
                     "filter_criteria": {
@@ -557,7 +556,7 @@ class ExperimentRepository(BaseRepository[GenerationSession]):
                         "date_to": date_to.isoformat() if date_to else None,
                     },
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting experiment summary: {e}")
+                logger.exception(f"Error getting experiment summary: {e}")
                 raise

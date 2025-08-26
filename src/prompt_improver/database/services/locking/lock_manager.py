@@ -16,12 +16,12 @@ import asyncio
 import logging
 import time
 import uuid
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Any, AsyncIterator, Dict, Optional, Set
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
+from typing import Any
 
-from prompt_improver.core.protocols.cache_protocol import CacheLockProtocol
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class LockInfo:
     acquired_at: float
     timeout_seconds: int
     expires_at: float
-    owner_context: Optional[str] = None
+    owner_context: str | None = None
 
     @property
     def is_expired(self) -> bool:
@@ -119,18 +119,18 @@ class DistributedLockManager:
     """
 
     def __init__(
-        self, redis_client, config: Optional[LockConfig] = None, security_context=None
-    ):
-        self.redis_client = redis_client
+        self, l2_redis_service: L2RedisService, config: LockConfig | None = None, security_context=None
+    ) -> None:
+        self._l2_redis = l2_redis_service
         self.config = config or LockConfig()
         self.security_context = security_context
 
         # Active locks tracking
-        self._active_locks: Dict[str, LockInfo] = {}
+        self._active_locks: dict[str, LockInfo] = {}
         self._lock_tracking_enabled = True
 
         # Cleanup task
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
         self._cleanup_interval = 30.0  # seconds
         self._shutdown_event = asyncio.Event()
 
@@ -141,22 +141,7 @@ class DistributedLockManager:
         self.total_releases = 0
         self.total_extensions = 0
 
-        # Lua scripts for atomic operations
-        self._release_script = """
-            if redis.call("get", KEYS[1]) == ARGV[1] then
-                return redis.call("del", KEYS[1])
-            else
-                return 0
-            end
-        """
-
-        self._extend_script = """
-            if redis.call("get", KEYS[1]) == ARGV[1] then
-                return redis.call("expire", KEYS[1], ARGV[2])
-            else
-                return 0
-            end
-        """
+        # Lua scripts are now embedded in L2RedisService for reusability
 
         logger.info(
             f"DistributedLockManager initialized with timeout={self.config.default_timeout_seconds}s"
@@ -179,13 +164,11 @@ class DistributedLockManager:
         if self._cleanup_task and not self._cleanup_task.done():
             try:
                 await asyncio.wait_for(self._cleanup_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Cleanup task did not stop gracefully")
                 self._cleanup_task.cancel()
-                try:
+                with suppress(asyncio.CancelledError):
                     await self._cleanup_task
-                except asyncio.CancelledError:
-                    pass
 
         logger.info("Stopped distributed lock cleanup task")
 
@@ -200,13 +183,13 @@ class DistributedLockManager:
                         self._shutdown_event.wait(), timeout=self._cleanup_interval
                     )
                     break  # Shutdown requested
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue  # Normal timeout, continue cleanup
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in lock cleanup loop: {e}")
+                logger.exception(f"Error in lock cleanup loop: {e}")
                 await asyncio.sleep(min(self._cleanup_interval, 10.0))
 
     async def _cleanup_expired_locks(self) -> None:
@@ -248,8 +231,8 @@ class DistributedLockManager:
         )
 
     async def acquire_lock(
-        self, key: str, timeout: Optional[int] = None, retry: bool = True
-    ) -> Optional[str]:
+        self, key: str, timeout: int | None = None, retry: bool = True
+    ) -> str | None:
         """Acquire distributed lock with retry logic.
 
         Args:
@@ -260,8 +243,8 @@ class DistributedLockManager:
         Returns:
             Lock token if acquired, None if failed
         """
-        if not self.redis_client:
-            logger.error("Redis client not available for lock acquisition")
+        if not self._l2_redis or not self._l2_redis.is_available():
+            logger.error("L2 Redis service not available for lock acquisition")
             return None
 
         timeout = timeout or self.config.default_timeout_seconds
@@ -278,9 +261,9 @@ class DistributedLockManager:
                 token = self._generate_token()
                 lock_key = self._generate_lock_key(key)
 
-                # Attempt to acquire lock with Redis SET NX EX
-                acquired = await self.redis_client.set(
-                    lock_key, token, nx=True, ex=timeout
+                # Attempt to acquire lock with Redis SET NX EX through L2RedisService
+                acquired = await self._l2_redis.lock_acquire(
+                    lock_key, token, timeout
                 )
 
                 if acquired:
@@ -327,7 +310,7 @@ class DistributedLockManager:
                     )
 
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Lock acquisition error for '{key}' attempt {attempt + 1}: {e}"
                 )
                 if attempt < max_attempts - 1:
@@ -363,16 +346,16 @@ class DistributedLockManager:
         Returns:
             True if successfully released, False otherwise
         """
-        if not self.redis_client:
-            logger.error("Redis client not available for lock release")
+        if not self._l2_redis or not self._l2_redis.is_available():
+            logger.error("L2 Redis service not available for lock release")
             return False
 
         try:
             lock_key = self._generate_lock_key(key)
 
-            # Use Lua script for atomic release
-            result = await self.redis_client.eval(
-                self._release_script, 1, lock_key, token
+            # Use Lua script for atomic release through L2RedisService
+            result = await self._l2_redis.lock_release(
+                lock_key, token
             )
 
             released = bool(result)
@@ -422,7 +405,7 @@ class DistributedLockManager:
             return released
 
         except Exception as e:
-            logger.error(f"Lock release error for '{key}': {e}")
+            logger.exception(f"Lock release error for '{key}': {e}")
 
             if OPENTELEMETRY_AVAILABLE and lock_operations_counter:
                 lock_operations_counter.add(
@@ -446,8 +429,8 @@ class DistributedLockManager:
         Returns:
             True if successfully extended, False otherwise
         """
-        if not self.redis_client:
-            logger.error("Redis client not available for lock extension")
+        if not self._l2_redis or not self._l2_redis.is_available():
+            logger.error("L2 Redis service not available for lock extension")
             return False
 
         timeout = self._validate_timeout(timeout)
@@ -455,9 +438,9 @@ class DistributedLockManager:
         try:
             lock_key = self._generate_lock_key(key)
 
-            # Use Lua script for atomic extension
-            result = await self.redis_client.eval(
-                self._extend_script, 1, lock_key, token, timeout
+            # Use Lua script for atomic extension through L2RedisService
+            result = await self._l2_redis.lock_extend(
+                lock_key, token, timeout
             )
 
             extended = bool(result)
@@ -489,7 +472,7 @@ class DistributedLockManager:
             return extended
 
         except Exception as e:
-            logger.error(f"Lock extension error for '{key}': {e}")
+            logger.exception(f"Lock extension error for '{key}': {e}")
 
             if OPENTELEMETRY_AVAILABLE and lock_operations_counter:
                 lock_operations_counter.add(
@@ -504,8 +487,8 @@ class DistributedLockManager:
 
     @asynccontextmanager
     async def acquire_lock_context(
-        self, key: str, timeout: Optional[int] = None, retry: bool = True
-    ) -> AsyncIterator[Optional[str]]:
+        self, key: str, timeout: int | None = None, retry: bool = True
+    ) -> AsyncIterator[str | None]:
         """Context manager for automatic lock acquisition and release.
 
         Args:
@@ -523,15 +506,15 @@ class DistributedLockManager:
             if token:
                 await self.release_lock(key, token)
 
-    def get_active_locks(self) -> Dict[str, LockInfo]:
+    def get_active_locks(self) -> dict[str, LockInfo]:
         """Get information about all active locks."""
         return dict(self._active_locks)
 
-    def get_lock_info(self, key: str) -> Optional[LockInfo]:
+    def get_lock_info(self, key: str) -> LockInfo | None:
         """Get information about a specific lock."""
         return self._active_locks.get(key)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive lock manager statistics."""
         current_time = time.time()
 
@@ -553,7 +536,7 @@ class DistributedLockManager:
 
         return {
             "manager": {
-                "redis_available": self.redis_client is not None,
+                "redis_available": self._l2_redis is not None and self._l2_redis.is_available(),
                 "cleanup_task_running": self._cleanup_task is not None
                 and not self._cleanup_task.done(),
                 "lock_tracking_enabled": self._lock_tracking_enabled,
@@ -614,17 +597,58 @@ class DistributedLockManager:
 
 # Convenience function for creating lock managers
 def create_lock_manager(
-    redis_client,
+    l2_redis_service: L2RedisService,
     default_timeout_seconds: int = 30,
     retry_attempts: int = 3,
     enable_metrics: bool = True,
     **kwargs,
 ) -> DistributedLockManager:
-    """Create a distributed lock manager with simple configuration."""
+    """Create a distributed lock manager with simple configuration.
+
+    Args:
+        l2_redis_service: L2RedisService instance for distributed locking
+        default_timeout_seconds: Default lock timeout
+        retry_attempts: Number of retry attempts for lock acquisition
+        enable_metrics: Enable OpenTelemetry metrics
+        **kwargs: Additional LockConfig parameters
+
+    Returns:
+        Configured DistributedLockManager instance
+    """
     config = LockConfig(
         default_timeout_seconds=default_timeout_seconds,
         retry_attempts=retry_attempts,
         enable_metrics=enable_metrics,
         **kwargs,
     )
-    return DistributedLockManager(redis_client, config)
+    return DistributedLockManager(l2_redis_service, config)
+
+
+# Legacy factory function for backward compatibility during migration
+def create_lock_manager_legacy(
+    redis_client,
+    default_timeout_seconds: int = 30,
+    retry_attempts: int = 3,
+    enable_metrics: bool = True,
+    **kwargs,
+) -> DistributedLockManager:
+    """Legacy factory function for backward compatibility.
+
+    DEPRECATED: Use create_lock_manager with L2RedisService instead.
+    This function creates a temporary L2RedisService wrapper.
+    """
+    logger.warning(
+        "create_lock_manager_legacy is deprecated. "
+        "Migrate to create_lock_manager with L2RedisService."
+    )
+
+    # Create temporary L2RedisService for legacy support
+    l2_redis_service = L2RedisService()
+
+    config = LockConfig(
+        default_timeout_seconds=default_timeout_seconds,
+        retry_attempts=retry_attempts,
+        enable_metrics=enable_metrics,
+        **kwargs,
+    )
+    return DistributedLockManager(l2_redis_service, config)

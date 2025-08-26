@@ -10,13 +10,16 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-import asyncpg
-
-from prompt_improver.database.services.connection.connection_metrics import ConnectionMetrics
+from prompt_improver.database.services.connection.connection_metrics import (
+    ConnectionMetrics,
+)
 from prompt_improver.services.cache.cache_facade import CacheFacade as CacheManager
+
+if TYPE_CHECKING:
+    import asyncpg
+    from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 
 class PoolState(Enum):
@@ -121,37 +124,37 @@ class ConnectionInfo:
 
 class PoolSharedContext:
     """Shared context for coordinating pool manager components.
-    
+
     Contains shared state and provides coordination mechanisms between
     ConnectionPoolCore, PoolScalingManager, and PoolMonitoringService.
     """
-    
+
     def __init__(
         self,
         db_config: DatabaseConfig,
         pool_config: PoolConfiguration,
         service_name: str = "postgres_pool_manager",
-        cache_manager: Optional[CacheManager] = None,
-    ):
+        cache_manager: CacheManager | None = None,
+    ) -> None:
         # Configuration
         self.db_config = db_config
         self.pool_config = pool_config
         self.service_name = service_name
         self.cache_manager = cache_manager
-        
+
         # Core engine components (managed by ConnectionPoolCore)
-        self.async_engine: Optional[AsyncEngine] = None
-        self.async_session_factory: Optional[async_sessionmaker] = None
-        self.pg_pools: Dict[str, asyncpg.Pool] = {}
-        
+        self.async_engine: AsyncEngine | None = None
+        self.async_session_factory: async_sessionmaker | None = None
+        self.pg_pools: dict[str, asyncpg.Pool] = {}
+
         # Initialization state
         self.is_initialized = False
         self.initialization_lock = asyncio.Lock()
-        
+
         # Pool state management
         self.pool_state = PoolState.INITIALIZING
         self.health_status = HealthStatus.UNKNOWN
-        
+
         # Scaling configuration and state
         self.min_pool_size = pool_config.pool_size
         self.max_pool_size = min(pool_config.pool_size * 5, 100)
@@ -160,22 +163,22 @@ class PoolSharedContext:
         self.scale_down_threshold = 0.3
         self.scale_cooldown_seconds = 60
         self.last_scale_time = 0
-        
+
         # Circuit breaker state
         self.circuit_breaker_threshold = 5
         self.circuit_breaker_failures = 0
         self.circuit_breaker_last_failure = 0
         self.circuit_breaker_timeout = 60
-        
+
         # Metrics and monitoring
         self.metrics = ConnectionMetrics()
         self.performance_window = deque(maxlen=100)
-        self.connection_registry: Dict[str, ConnectionInfo] = {}
+        self.connection_registry: dict[str, ConnectionInfo] = {}
         self.connection_id_counter = 0
-        
+
         # Background task handles (managed by components)
-        self.background_tasks: Dict[str, Optional[asyncio.Task]] = {}
-    
+        self.background_tasks: dict[str, asyncio.Task | None] = {}
+
     def record_performance_event(
         self, event_type: str, duration_ms: float, success: bool
     ) -> None:
@@ -187,7 +190,7 @@ class PoolSharedContext:
             "success": success,
         }
         self.performance_window.append(event)
-    
+
     def is_circuit_breaker_open(self) -> bool:
         """Check if circuit breaker is open."""
         if not self.pool_config.enable_circuit_breaker:
@@ -195,30 +198,25 @@ class PoolSharedContext:
 
         if self.circuit_breaker_failures >= self.circuit_breaker_threshold:
             # Check if enough time has passed to attempt half-open
-            if (
-                time.time() - self.circuit_breaker_last_failure
-                > self.circuit_breaker_timeout
-            ):
-                return False
-            return True
+            return not time.time() - self.circuit_breaker_last_failure > self.circuit_breaker_timeout
 
         return False
-    
+
     def record_circuit_breaker_failure(self, error: Exception) -> None:
         """Record a circuit breaker failure."""
         self.circuit_breaker_failures += 1
         self.circuit_breaker_last_failure = time.time()
-        
+
         # Update health status on repeated failures
         if self.circuit_breaker_failures >= self.circuit_breaker_threshold * 2:
             self.health_status = HealthStatus.UNHEALTHY
             self.pool_state = PoolState.UNHEALTHY
-    
+
     def reset_circuit_breaker(self) -> None:
         """Reset circuit breaker after successful operations."""
         if self.circuit_breaker_failures > 0:
             self.circuit_breaker_failures = max(0, self.circuit_breaker_failures - 1)
-    
+
     def update_pool_utilization(self) -> None:
         """Update pool utilization metrics."""
         total_pool_size = self.pool_config.pool_size + self.pool_config.max_overflow
@@ -226,66 +224,66 @@ class PoolSharedContext:
             self.metrics.pool_utilization = (
                 self.metrics.active_connections / total_pool_size * 100
             )
-    
+
     def register_connection(self) -> str:
         """Register a new connection and return its ID."""
         self.connection_id_counter += 1
         connection_id = f"{self.service_name}_conn_{self.connection_id_counter}"
-        
+
         info = ConnectionInfo(
             connection_id=connection_id,
             created_at=datetime.now(UTC),
             pool_name="primary",
         )
-        
+
         self.connection_registry[connection_id] = info
         return connection_id
-    
+
     def update_connection(self, connection_id: str, operation: str) -> None:
         """Update connection registry on operations."""
         if connection_id in self.connection_registry:
             conn_info = self.connection_registry[connection_id]
             conn_info.last_used = datetime.now(UTC)
-            
+
             if operation == "checkout":
                 conn_info.query_count += 1
-    
+
     def unregister_connection(self, connection_id: str) -> None:
         """Unregister a connection from the registry."""
         if connection_id in self.connection_registry:
             del self.connection_registry[connection_id]
-    
+
     def should_scale_up(self) -> bool:
         """Determine if pool should scale up based on current state."""
         if time.time() - self.last_scale_time < self.scale_cooldown_seconds:
             return False
-        
+
         utilization = self.metrics.pool_utilization / 100.0
         return (
             utilization > self.scale_up_threshold
             and self.current_pool_size < self.max_pool_size
         )
-    
+
     def should_scale_down(self) -> bool:
         """Determine if pool should scale down based on current state."""
         if time.time() - self.last_scale_time < self.scale_cooldown_seconds:
             return False
-        
+
         utilization = self.metrics.pool_utilization / 100.0
         return (
             utilization < self.scale_down_threshold
             and self.current_pool_size > self.min_pool_size
             and self.metrics.avg_response_time_ms < 50
         )
-    
+
     def record_scale_event(self, new_size: int) -> None:
         """Record a scaling event."""
         self.current_pool_size = new_size
         self.pool_config.pool_size = new_size
         self.last_scale_time = time.time()
         self.metrics.last_scale_event = datetime.now(UTC)
-    
-    def get_context_stats(self) -> Dict[str, Any]:
+
+    def get_context_stats(self) -> dict[str, Any]:
         """Get shared context statistics."""
         return {
             "service": self.service_name,

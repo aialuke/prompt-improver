@@ -5,10 +5,12 @@ multi-level cache infrastructure for optimal performance.
 """
 
 # MIGRATION: Performance cache facade moved to unified services/cache/
+from prompt_improver.performance.caching.repository_cache import (
+    RepositoryCacheDecorator,
+)
 from prompt_improver.services.cache.cache_facade import (
     CacheFacade as PerformanceCacheFacade,
 )
-from .repository_cache import RepositoryCacheDecorator
 
 __all__ = [
     "PerformanceCacheFacade",

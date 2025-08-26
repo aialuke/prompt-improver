@@ -221,7 +221,7 @@ class ContextCacheManagerIntegrationTest:
                 if not result:
                     all_passed = False
             except Exception as e:
-                logger.error("Test {test_method.__name__} failed with exception: %s", e)
+                logger.exception("Test {test_method.__name__} failed with exception: %s", e)
                 all_passed = False
         logger.info("=" * 60)
         logger.info("🏁 Test Summary")

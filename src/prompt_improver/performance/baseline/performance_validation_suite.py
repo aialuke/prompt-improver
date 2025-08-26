@@ -11,8 +11,8 @@ import statistics
 import time
 import tracemalloc
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import psutil
 
@@ -68,7 +68,7 @@ class PerformanceValidationSuite:
     optimization recommendations for production deployment.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.collector = BaselineCollector()
         self.analyzer = StatisticalAnalyzer()
         self.detector = RegressionDetector()
@@ -107,7 +107,7 @@ class PerformanceValidationSuite:
             logger.info("Performance validation suite completed successfully")
             return report
         except Exception as e:
-            logger.error(f"Performance validation failed: {e}")
+            logger.exception(f"Performance validation failed: {e}")
             raise
 
     async def _validate_baseline_collection(self) -> PerformanceValidationResult:
@@ -125,7 +125,7 @@ class PerformanceValidationSuite:
                 end_time = time.time()
                 duration_ms = (end_time - start_time) * 1000
                 durations.append(duration_ms)
-                current, peak = tracemalloc.get_traced_memory()
+                _current, peak = tracemalloc.get_traced_memory()
                 memory_usage.append(peak / 1024 / 1024)
                 tracemalloc.stop()
                 end_cpu = psutil.cpu_percent()
@@ -133,7 +133,7 @@ class PerformanceValidationSuite:
                 await asyncio.sleep(0.1)
             except Exception as e:
                 tracemalloc.stop()
-                logger.error(f"Collection test {i} failed: {e}")
+                logger.exception(f"Collection test {i} failed: {e}")
                 durations.append(1000.0)
         avg_duration = statistics.mean(durations)
         max_duration = max(durations)
@@ -198,12 +198,12 @@ class PerformanceValidationSuite:
                 end_time = time.time()
                 duration_ms = (end_time - start_time) * 1000
                 durations.append(duration_ms)
-                current, peak = tracemalloc.get_traced_memory()
+                _current, peak = tracemalloc.get_traced_memory()
                 memory_usage.append(peak / 1024 / 1024)
                 tracemalloc.stop()
             except Exception as e:
                 tracemalloc.stop()
-                logger.error(f"Analysis test {i} failed: {e}")
+                logger.exception(f"Analysis test {i} failed: {e}")
                 durations.append(1000.0)
         avg_duration = statistics.mean(durations)
         avg_memory = statistics.mean(memory_usage)
@@ -267,7 +267,7 @@ class PerformanceValidationSuite:
                 duration_ms = (end_time - start_time) * 1000
                 durations.append(duration_ms)
             except Exception as e:
-                logger.error(f"Detection test {i} failed: {e}")
+                logger.exception(f"Detection test {i} failed: {e}")
                 durations.append(1000.0)
         avg_duration = statistics.mean(durations)
         target = self.performance_targets["regression_detection"]
@@ -309,7 +309,7 @@ class PerformanceValidationSuite:
                 duration_ms = (end_time - start_time) * 1000
                 durations.append(duration_ms)
             except Exception as e:
-                logger.error(f"Dashboard test {i} failed: {e}")
+                logger.exception(f"Dashboard test {i} failed: {e}")
                 durations.append(1000.0)
         avg_duration = statistics.mean(durations)
         target = self.performance_targets["dashboard_update"]
@@ -345,7 +345,7 @@ class PerformanceValidationSuite:
             end_time = time.time()
             duration_ms = (end_time - start_time) * 1000
         except Exception as e:
-            logger.error(f"Integration test failed: {e}")
+            logger.exception(f"Integration test failed: {e}")
             duration_ms = 1000.0
         target = 300.0
         meets_target = duration_ms <= target
@@ -427,7 +427,7 @@ class PerformanceValidationSuite:
                 max_memory = max(max_memory, current_memory)
                 await asyncio.sleep(1)
             except Exception as e:
-                logger.error(f"Memory test collection failed: {e}")
+                logger.exception(f"Memory test collection failed: {e}")
         tracemalloc.stop()
         memory_growth = max_memory - initial_memory
         collections_per_mb = collections / max(memory_growth, 1)
@@ -525,7 +525,7 @@ class PerformanceValidationSuite:
         upper = sorted_values[int(index) + 1]
         return lower + (upper - lower) * (index - int(index))
 
-    def export_validation_report(self, filename: str = None) -> str:
+    def export_validation_report(self, filename: str | None = None) -> str:
         """Export validation results to JSON file."""
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -560,12 +560,12 @@ class PerformanceValidationSuite:
             },
         }
         try:
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 json.dump(report_data, f, indent=2, default=str)
             logger.info(f"Validation report exported to {filename}")
             return filename
         except Exception as e:
-            logger.error(f"Failed to export validation report: {e}")
+            logger.exception(f"Failed to export validation report: {e}")
             return ""
 
 

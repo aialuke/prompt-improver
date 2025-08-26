@@ -1,4 +1,4 @@
-"""Database service for synthetic data generation tracking (Week 6)
+"""Database service for synthetic data generation tracking (Week 6).
 
 Provides comprehensive database operations for generation metadata,
 performance tracking, and analytics with bulk operations support.
@@ -7,33 +7,33 @@ performance tracking, and analytics with bulk operations support.
 import logging
 import uuid
 from datetime import timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...services.error_handling.facade import handle_repository_errors
+from prompt_improver.services.error_handling.facade import handle_repository_errors
+
 # Use standard exceptions for compatibility (common module removed)
 DatabaseError = Exception
 ValidationError = ValueError
-from ...utils.datetime_utils import naive_utc_now
-from ..models import (
-    GenerationAnalytics,
+from prompt_improver.database.models import (
     GenerationBatch,
     GenerationMethodPerformance,
     GenerationQualityAssessment,
     GenerationSession,
     SyntheticDataSample,
 )
+from prompt_improver.utils.datetime_utils import naive_utc_now
 
 logger = logging.getLogger(__name__)
 
 
 class GenerationDatabaseService:
-    """Database service for generation metadata and analytics"""
+    """Database service for generation metadata and analytics."""
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession) -> None:
         self.db_session = db_session
 
     @handle_repository_errors
@@ -48,7 +48,7 @@ class GenerationDatabaseService:
         focus_areas: list[str] | None = None,
         quality_threshold: float = 0.7,
     ) -> GenerationSession:
-        """Create a new generation session"""
+        """Create a new generation session."""
         # Input validation
         if target_samples <= 0:
             raise ValidationError(
@@ -57,14 +57,14 @@ class GenerationDatabaseService:
                 value=target_samples,
                 validation_rule="positive_integer"
             )
-        
+
         if not generation_method.strip():
             raise ValidationError(
                 "Generation method cannot be empty",
                 field="generation_method",
                 value=generation_method
             )
-        
+
         if quality_threshold < 0 or quality_threshold > 1:
             raise ValidationError(
                 "Quality threshold must be between 0 and 1",
@@ -72,7 +72,7 @@ class GenerationDatabaseService:
                 value=quality_threshold,
                 validation_rule="range_0_to_1"
             )
-        
+
         try:
             session = GenerationSession(
                 session_id=str(uuid.uuid4()),
@@ -89,12 +89,12 @@ class GenerationDatabaseService:
             self.db_session.add(session)
             await self.db_session.commit()
             await self.db_session.refresh(session)
-            
+
             logger.info(
                 f"Created generation session {session.session_id} for {target_samples} samples"
             )
             return session
-            
+
         except SQLAlchemyError as exc:
             await self.db_session.rollback()
             raise DatabaseError(
@@ -111,7 +111,7 @@ class GenerationDatabaseService:
         error_message: str | None = None,
         final_sample_count: int | None = None,
     ) -> None:
-        """Update session status and completion info"""
+        """Update session status and completion info."""
         # Input validation
         if not session_id.strip():
             raise ValidationError(
@@ -119,14 +119,14 @@ class GenerationDatabaseService:
                 field="session_id",
                 value=session_id
             )
-        
+
         if not status.strip():
             raise ValidationError(
                 "Status cannot be empty",
                 field="status",
                 value=status
             )
-        
+
         valid_statuses = ["running", "completed", "failed", "cancelled", "paused"]
         if status not in valid_statuses:
             raise ValidationError(
@@ -135,33 +135,33 @@ class GenerationDatabaseService:
                 value=status,
                 validation_rule="enum_status"
             )
-        
+
         try:
             result = await self.db_session.execute(
                 select(GenerationSession).where(GenerationSession.session_id == session_id)
             )
             session = result.scalar_one_or_none()
-            
+
             if not session:
                 raise ValidationError(
-                    f"Generation session not found",
+                    "Generation session not found",
                     field="session_id",
                     value=session_id,
                     validation_rule="exists"
                 )
-            
+
             session.status = status
             session.updated_at = naive_utc_now()
-            
-            if status in ["completed", "failed", "cancelled"]:
+
+            if status in {"completed", "failed", "cancelled"}:
                 session.completed_at = naive_utc_now()
                 if session.started_at:
                     duration = (session.completed_at - session.started_at).total_seconds()
                     session.total_duration_seconds = duration
-            
+
             if error_message:
                 session.error_message = error_message
-            
+
             if final_sample_count is not None:
                 if final_sample_count < 0:
                     raise ValidationError(
@@ -171,10 +171,10 @@ class GenerationDatabaseService:
                         validation_rule="non_negative"
                     )
                 session.final_sample_count = final_sample_count
-                
+
             await self.db_session.commit()
             logger.info(f"Updated session {session_id} status to {status}")
-            
+
         except SQLAlchemyError as exc:
             await self.db_session.rollback()
             raise DatabaseError(
@@ -192,7 +192,7 @@ class GenerationDatabaseService:
         generation_method: str,
         samples_requested: int,
     ) -> GenerationBatch:
-        """Create a new generation batch"""
+        """Create a new generation batch."""
         batch = GenerationBatch(
             batch_id=str(uuid.uuid4()),
             session_id=session_id,
@@ -220,7 +220,7 @@ class GenerationDatabaseService:
         diversity_score: float | None = None,
         batch_metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Update batch performance metrics"""
+        """Update batch performance metrics."""
         result = await self.db_session.execute(
             select(GenerationBatch).where(GenerationBatch.batch_id == batch_id)
         )
@@ -249,7 +249,7 @@ class GenerationDatabaseService:
     async def bulk_insert_samples(
         self, session_id: str, batch_id: str, samples_data: list[dict[str, Any]]
     ) -> list[str]:
-        """Bulk insert synthetic data samples"""
+        """Bulk insert synthetic data samples."""
         sample_ids = []
         samples = []
         for sample_data in samples_data:
@@ -278,7 +278,7 @@ class GenerationDatabaseService:
     async def archive_old_samples(
         self, days_old: int = 30, batch_size: int = 1000
     ) -> int:
-        """Archive old samples to manage storage (data lifecycle management)"""
+        """Archive old samples to manage storage (data lifecycle management)."""
         cutoff_date = naive_utc_now() - timedelta(days=days_old)
         total_archived = 0
         while True:
@@ -320,7 +320,7 @@ class GenerationDatabaseService:
         batch_size: int | None = None,
         configuration: dict[str, Any] | None = None,
     ) -> None:
-        """Record performance metrics for a generation method"""
+        """Record performance metrics for a generation method."""
         performance = GenerationMethodPerformance(
             method_name=method_name,
             session_id=session_id,
@@ -340,7 +340,7 @@ class GenerationDatabaseService:
     async def get_method_performance_history(
         self, method_name: str, days_back: int = 30, limit: int = 100
     ) -> list[GenerationMethodPerformance]:
-        """Get recent performance history for a method"""
+        """Get recent performance history for a method."""
         cutoff_date = naive_utc_now() - timedelta(days=days_back)
         result = await self.db_session.execute(
             select(GenerationMethodPerformance)
@@ -367,7 +367,7 @@ class GenerationDatabaseService:
         assessment_results: dict[str, Any] | None = None,
         recommendations: list[str] | None = None,
     ) -> GenerationQualityAssessment:
-        """Record quality assessment results"""
+        """Record quality assessment results."""
         assessment = GenerationQualityAssessment(
             assessment_id=str(uuid.uuid4()),
             session_id=session_id,
@@ -386,7 +386,7 @@ class GenerationDatabaseService:
         return assessment
 
     async def get_generation_statistics(self, days_back: int = 7) -> dict[str, Any]:
-        """Get comprehensive generation statistics"""
+        """Get comprehensive generation statistics."""
         cutoff_date = naive_utc_now() - timedelta(days=days_back)
         session_stats = await self.db_session.execute(
             select(
@@ -432,7 +432,7 @@ class GenerationDatabaseService:
         }
 
     async def cleanup_old_data(self, days_to_keep: int = 90) -> dict[str, int]:
-        """Clean up old generation data (data lifecycle management)"""
+        """Clean up old generation data (data lifecycle management)."""
         cutoff_date = naive_utc_now() - timedelta(days=days_to_keep)
         cleanup_stats = {}
         result = await self.db_session.execute(

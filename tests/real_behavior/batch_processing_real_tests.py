@@ -23,7 +23,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from test_batch_processor_performance import (
@@ -197,8 +197,8 @@ class BatchProcessingRealTestSuite:
             logger.info(
                 f"   Throughput: {metrics.throughput_items_per_sec:.0f} items/sec"
             )
-            logger.info("   Memory Peak: %sMB", metrics.memory_peak_mb:.1f)
-            logger.info("   Speedup: %sx", speedup:.1f)
+            logger.info("   Memory Peak: %.1fMB", metrics.memory_peak_mb)
+            logger.info("   Speedup: %.1fx", speedup)
 
         except Exception as e:
             result = BatchProcessingRealResult(
@@ -211,7 +211,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Large dataset test failed: %s", e)
+            logger.exception("❌ Large dataset test failed: %s", e)
 
         self.results.append(result)
 
@@ -312,7 +312,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Memory efficiency test failed: %s", e)
+            logger.exception("❌ Memory efficiency test failed: %s", e)
 
         self.results.append(result)
 
@@ -403,7 +403,7 @@ class BatchProcessingRealTestSuite:
             logger.info(
                 f"✅ Streaming test: {metrics.items_processed:,} records, {metrics.throughput_items_per_sec:.0f} items/sec"
             )
-            logger.info("   Processing latency: %ss", stream_time - stream_duration:.1f)
+            logger.info("   Processing latency: %.1fs", stream_time - stream_duration)
 
         except Exception as e:
             result = BatchProcessingRealResult(
@@ -416,7 +416,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Streaming test failed: %s", e)
+            logger.exception("❌ Streaming test failed: %s", e)
 
         self.results.append(result)
 
@@ -522,7 +522,7 @@ class BatchProcessingRealTestSuite:
             logger.info(
                 f"✅ Concurrent test: {successful_jobs}/{num_concurrent_jobs} jobs, {total_processed:,} total records"
             )
-            logger.info("   Total throughput: %s items/sec", total_throughput:.0f)
+            logger.info("   Total throughput: %.0f items/sec", total_throughput)
 
         except Exception as e:
             result = BatchProcessingRealResult(
@@ -535,7 +535,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Concurrent processing test failed: %s", e)
+            logger.exception("❌ Concurrent processing test failed: %s", e)
 
         self.results.append(result)
 
@@ -624,7 +624,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Error recovery test failed: %s", e)
+            logger.exception("❌ Error recovery test failed: %s", e)
 
         self.results.append(result)
 
@@ -713,7 +713,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Performance validation failed: %s", e)
+            logger.exception("❌ Performance validation failed: %s", e)
 
         self.results.append(result)
 
@@ -748,7 +748,7 @@ class BatchProcessingRealTestSuite:
 
                     await asyncio.sleep(1.0)  # 1 second intervals
 
-                logger.info("Production workload generated %s records", total_records:,)
+                logger.info("Production workload generated %d records", total_records)
 
             # Configure for production load
             config = StreamingBatchConfig(
@@ -817,7 +817,7 @@ class BatchProcessingRealTestSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error("❌ Production load test failed: %s", e)
+            logger.exception("❌ Production load test failed: %s", e)
 
         self.results.append(result)
 

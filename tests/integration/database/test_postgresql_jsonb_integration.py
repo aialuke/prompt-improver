@@ -5,17 +5,16 @@ Tests serialization, storage, and retrieval of metrics data.
 
 import asyncio
 import json
+import sys
 import time
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from src.prompt_improver.metrics.api_metrics import (
     APIUsageMetric,
     AuthenticationMethod,
-    AuthenticationMetric,
     EndpointCategory,
     HTTPMethod,
-    RateLimitMetric,
     UserJourneyMetric,
     UserJourneyStage,
 )
@@ -373,4 +372,4 @@ async def main():
 
 if __name__ == "__main__":
     success = asyncio.run(main())
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)

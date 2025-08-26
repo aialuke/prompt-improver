@@ -13,15 +13,16 @@ Designed for production messaging with high-throughput pub/sub operations.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Union
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
+from typing import Any
 
-from prompt_improver.core.protocols.cache_protocol import CacheSubscriptionProtocol
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +88,11 @@ class PubSubConfig:
 class SubscriptionInfo:
     """Information about an active subscription."""
 
-    channels: List[str]
-    patterns: List[str]
+    channels: list[str]
+    patterns: list[str]
     connection: Any
     created_at: float
-    last_message_at: Optional[float] = None
+    last_message_at: float | None = None
     message_count: int = 0
     subscriber_id: str = ""
 
@@ -121,34 +122,34 @@ class PubSubManager:
     """
 
     def __init__(
-        self, redis_client, config: Optional[PubSubConfig] = None, security_context=None
-    ):
-        self.redis_client = redis_client
+        self, l2_redis_service: L2RedisService, config: PubSubConfig | None = None, security_context=None
+    ) -> None:
+        self.l2_redis_service = l2_redis_service
         self.config = config or PubSubConfig()
         self.security_context = security_context
 
         # Connection management
-        self._pubsub_connections: Dict[str, Any] = {}
-        self._connection_pool: List[Any] = []
+        self._pubsub_connections: dict[str, Any] = {}
+        self._connection_pool: list[Any] = []
 
         # Subscription tracking
-        self._subscriptions: Dict[str, SubscriptionInfo] = {}  # subscriber_id -> info
-        self._channel_subscribers: Dict[str, Set[str]] = defaultdict(
+        self._subscriptions: dict[str, SubscriptionInfo] = {}  # subscriber_id -> info
+        self._channel_subscribers: dict[str, set[str]] = defaultdict(
             set
         )  # channel -> subscriber_ids
-        self._pattern_subscribers: Dict[str, Set[str]] = defaultdict(
+        self._pattern_subscribers: dict[str, set[str]] = defaultdict(
             set
         )  # pattern -> subscriber_ids
 
         # Message handlers
-        self._message_handlers: Dict[str, List[MessageHandler]] = defaultdict(list)
-        self._async_message_handlers: Dict[str, List[AsyncMessageHandler]] = (
+        self._message_handlers: dict[str, list[MessageHandler]] = defaultdict(list)
+        self._async_message_handlers: dict[str, list[AsyncMessageHandler]] = (
             defaultdict(list)
         )
-        self._message_filters: Dict[str, List[MessageFilter]] = defaultdict(list)
+        self._message_filters: dict[str, list[MessageFilter]] = defaultdict(list)
 
         # Background tasks
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
         self._shutdown_event = asyncio.Event()
 
         # Performance metrics
@@ -160,7 +161,7 @@ class PubSubManager:
         self.failed_operations = 0
 
         logger.info(
-            f"PubSubManager initialized with max_connections={self.config.max_connections}"
+            f"PubSubManager initialized with max_connections={self.config.max_connections}, using L2RedisService"
         )
 
     async def start_cleanup_task(self) -> None:
@@ -180,13 +181,11 @@ class PubSubManager:
         if self._cleanup_task and not self._cleanup_task.done():
             try:
                 await asyncio.wait_for(self._cleanup_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Pub/sub cleanup task did not stop gracefully")
                 self._cleanup_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._cleanup_task
-                except asyncio.CancelledError:
-                    pass
 
         logger.info("Stopped pub/sub cleanup task")
 
@@ -202,13 +201,13 @@ class PubSubManager:
                         timeout=self.config.auto_cleanup_inactive_seconds,
                     )
                     break  # Shutdown requested
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue  # Normal timeout, continue cleanup
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in pub/sub cleanup loop: {e}")
+                logger.exception(f"Error in pub/sub cleanup loop: {e}")
                 await asyncio.sleep(30.0)  # Back off on error
 
     async def _cleanup_inactive_subscriptions(self) -> None:
@@ -226,22 +225,21 @@ class PubSubManager:
         if inactive_ids:
             logger.info(f"Cleaned up {len(inactive_ids)} inactive subscriptions")
 
-    def _serialize_message(self, message: Any) -> Union[str, bytes]:
+    def _serialize_message(self, message: Any) -> str | bytes:
         """Serialize message for publishing."""
         if isinstance(message, (str, bytes)):
             return message
 
         if self.config.auto_serialize_json:
             try:
-                serialized = json.dumps(message, default=str)
-                return serialized
+                return json.dumps(message, default=str)
             except (TypeError, ValueError) as e:
                 logger.warning(f"Failed to serialize message as JSON: {e}")
                 return str(message)
 
         return str(message)
 
-    def _deserialize_message(self, message: Union[str, bytes]) -> Any:
+    def _deserialize_message(self, message: str | bytes) -> Any:
         """Deserialize received message."""
         if isinstance(message, bytes):
             message = message.decode("utf-8")
@@ -254,7 +252,7 @@ class PubSubManager:
 
         return message
 
-    def _validate_message_size(self, message: Union[str, bytes]) -> bool:
+    def _validate_message_size(self, message: str | bytes) -> bool:
         """Validate message size against limits."""
         size = len(message.encode("utf-8") if isinstance(message, str) else message)
         return size <= self.config.max_message_size_bytes
@@ -275,7 +273,7 @@ class PubSubManager:
         Returns:
             Number of subscribers that received the message
         """
-        if not self.redis_client:
+        if not self.l2_redis_service.is_available():
             logger.error("Redis client not available for publishing")
             return 0
 
@@ -291,8 +289,8 @@ class PubSubManager:
                 self.failed_operations += 1
                 return 0
 
-            # Publish to Redis
-            subscriber_count = await self.redis_client.publish(
+            # Publish to Redis via L2RedisService
+            subscriber_count = await self.l2_redis_service.publish(
                 channel, serialized_message
             )
 
@@ -332,7 +330,7 @@ class PubSubManager:
             return subscriber_count
 
         except Exception as e:
-            logger.error(f"Failed to publish to channel {channel}: {e}")
+            logger.exception(f"Failed to publish to channel {channel}: {e}")
             self.failed_operations += 1
 
             if OPENTELEMETRY_AVAILABLE and pubsub_operations_counter:
@@ -347,7 +345,7 @@ class PubSubManager:
 
             return 0
 
-    async def publish_many(self, channel_messages: Dict[str, Any]) -> Dict[str, int]:
+    async def publish_many(self, channel_messages: dict[str, Any]) -> dict[str, int]:
         """Publish messages to multiple channels efficiently.
 
         Args:
@@ -360,8 +358,9 @@ class PubSubManager:
 
         # Use Redis pipeline for efficiency if available
         try:
-            if hasattr(self.redis_client, "pipeline"):
-                pipe = self.redis_client.pipeline()
+            pipeline = self.l2_redis_service.get_pipeline()
+            if pipeline:
+                pipe = pipeline
 
                 for channel, message in channel_messages.items():
                     serialized_message = self._serialize_message(message)
@@ -394,15 +393,15 @@ class PubSubManager:
             return results
 
         except Exception as e:
-            logger.error(f"Failed to publish batch messages: {e}")
+            logger.exception(f"Failed to publish batch messages: {e}")
             self.failed_operations += 1
 
             # Return zero counts for all channels
-            return {channel: 0 for channel in channel_messages.keys()}
+            return dict.fromkeys(channel_messages.keys(), 0)
 
     async def subscribe(
-        self, channels: List[str], patterns: Optional[List[str]] = None
-    ) -> Optional[str]:
+        self, channels: list[str], patterns: list[str] | None = None
+    ) -> str | None:
         """Subscribe to channels and/or patterns.
 
         Args:
@@ -412,7 +411,7 @@ class PubSubManager:
         Returns:
             Subscriber ID if successful, None if failed
         """
-        if not self.redis_client:
+        if not self.l2_redis_service.is_available():
             logger.error("Redis client not available for subscription")
             return None
 
@@ -420,7 +419,10 @@ class PubSubManager:
 
         try:
             # Create new pubsub connection
-            pubsub = self.redis_client.pubsub()
+            pubsub = self.l2_redis_service.get_pubsub()
+            if not pubsub:
+                logger.error("Failed to create pubsub connection")
+                return None
 
             # Subscribe to channels
             if channels:
@@ -468,7 +470,7 @@ class PubSubManager:
             return subscriber_id
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Failed to subscribe to channels={channels}, patterns={patterns}: {e}"
             )
             self.failed_operations += 1
@@ -487,7 +489,7 @@ class PubSubManager:
             return None
 
     async def unsubscribe(
-        self, subscriber_id: str, channels: Optional[List[str]] = None
+        self, subscriber_id: str, channels: list[str] | None = None
     ) -> bool:
         """Unsubscribe from channels.
 
@@ -548,7 +550,7 @@ class PubSubManager:
             return True
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Failed to unsubscribe {subscriber_id} from channels={channels}: {e}"
             )
             self.failed_operations += 1
@@ -592,8 +594,8 @@ class PubSubManager:
         del self._subscriptions[subscriber_id]
 
     async def listen(
-        self, subscriber_id: str, timeout: Optional[float] = None
-    ) -> AsyncIterator[Dict[str, Any]]:
+        self, subscriber_id: str, timeout: float | None = None
+    ) -> AsyncIterator[dict[str, Any]]:
         """Listen for messages on a subscription.
 
         Args:
@@ -624,12 +626,12 @@ class PubSubManager:
                         continue
 
                     # Skip subscription confirmation messages
-                    if message["type"] in [
+                    if message["type"] in {
                         "subscribe",
                         "psubscribe",
                         "unsubscribe",
                         "punsubscribe",
-                    ]:
+                    }:
                         continue
 
                     # Update subscription stats
@@ -643,21 +645,21 @@ class PubSubManager:
 
                     yield message
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Timeout is expected, just continue
                     continue
 
                 except Exception as e:
-                    logger.error(f"Error receiving message for {subscriber_id}: {e}")
+                    logger.exception(f"Error receiving message for {subscriber_id}: {e}")
                     break
 
         except asyncio.CancelledError:
             pass  # Expected when cleaning up
         except Exception as e:
-            logger.error(f"Unexpected error in listen loop for {subscriber_id}: {e}")
+            logger.exception(f"Unexpected error in listen loop for {subscriber_id}: {e}")
 
     def add_message_handler(
-        self, channel: str, handler: Union[MessageHandler, AsyncMessageHandler]
+        self, channel: str, handler: MessageHandler | AsyncMessageHandler
     ) -> None:
         """Add message handler for a channel.
 
@@ -673,7 +675,7 @@ class PubSubManager:
         logger.debug(f"Added message handler for channel {channel}")
 
     def remove_message_handler(
-        self, channel: str, handler: Union[MessageHandler, AsyncMessageHandler]
+        self, channel: str, handler: MessageHandler | AsyncMessageHandler
     ) -> bool:
         """Remove message handler for a channel.
 
@@ -703,7 +705,7 @@ class PubSubManager:
         self._message_filters[channel].append(filter_func)
         logger.debug(f"Added message filter for channel {channel}")
 
-    def get_subscription_info(self, subscriber_id: str) -> Optional[SubscriptionInfo]:
+    def get_subscription_info(self, subscriber_id: str) -> SubscriptionInfo | None:
         """Get information about a subscription.
 
         Args:
@@ -714,7 +716,7 @@ class PubSubManager:
         """
         return self._subscriptions.get(subscriber_id)
 
-    def get_channel_subscribers(self, channel: str) -> Set[str]:
+    def get_channel_subscribers(self, channel: str) -> set[str]:
         """Get subscriber IDs for a channel.
 
         Args:
@@ -725,7 +727,7 @@ class PubSubManager:
         """
         return self._channel_subscribers.get(channel, set()).copy()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive pub/sub manager statistics."""
         active_subscriptions = len(self._subscriptions)
         total_channels = len(self._channel_subscribers)
@@ -742,7 +744,7 @@ class PubSubManager:
 
         return {
             "manager": {
-                "redis_available": self.redis_client is not None,
+                "redis_available": self.l2_redis_service.is_available(),
                 "cleanup_task_running": self._cleanup_task is not None
                 and not self._cleanup_task.done(),
             },
@@ -805,7 +807,7 @@ class PubSubManager:
 
 # Convenience function for creating pub/sub managers
 def create_pubsub_manager(
-    redis_client,
+    l2_redis_service: L2RedisService,
     max_connections: int = 10,
     auto_serialize_json: bool = True,
     enable_pattern_matching: bool = True,
@@ -818,4 +820,4 @@ def create_pubsub_manager(
         enable_pattern_matching=enable_pattern_matching,
         **kwargs,
     )
-    return PubSubManager(redis_client, config)
+    return PubSubManager(l2_redis_service, config)

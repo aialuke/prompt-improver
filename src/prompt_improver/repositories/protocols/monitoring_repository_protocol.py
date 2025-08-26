@@ -5,21 +5,21 @@ infrastructure implementation details. Supports metrics collection and health mo
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
-from enum import Enum
+from enum import StrEnum
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Health status enumeration."""
     HEALTHY = "healthy"
-    DEGRADED = "degraded" 
+    DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
 
 
-class MetricType(str, Enum):
+class MetricType(StrEnum):
     """Metric type enumeration."""
     COUNTER = "counter"
     GAUGE = "gauge"
@@ -29,7 +29,7 @@ class MetricType(str, Enum):
 
 class HealthCheckResult(BaseModel):
     """Domain model for health check results."""
-    
+
     check_name: str
     status: HealthStatus
     message: str | None = None
@@ -41,7 +41,7 @@ class HealthCheckResult(BaseModel):
 
 class MetricData(BaseModel):
     """Domain model for metric data."""
-    
+
     metric_name: str
     metric_type: MetricType
     value: float
@@ -53,7 +53,7 @@ class MetricData(BaseModel):
 
 class PerformanceMetrics(BaseModel):
     """Domain model for performance metrics."""
-    
+
     component_name: str
     response_time_ms: float
     throughput_rps: float
@@ -67,7 +67,7 @@ class PerformanceMetrics(BaseModel):
 
 class SystemHealthSummary(BaseModel):
     """Domain model for system health summary."""
-    
+
     overall_status: HealthStatus
     component_count: int
     healthy_components: int
@@ -80,7 +80,7 @@ class SystemHealthSummary(BaseModel):
 
 class AlertData(BaseModel):
     """Domain model for alert data."""
-    
+
     alert_id: str
     alert_name: str
     severity: str  # critical, warning, info
@@ -92,7 +92,7 @@ class AlertData(BaseModel):
     tags: dict[str, str] | None = None
 
 
-@runtime_checkable  
+@runtime_checkable
 class MonitoringRepositoryProtocol(Protocol):
     """Protocol for monitoring data operations without infrastructure coupling."""
 
@@ -102,7 +102,7 @@ class MonitoringRepositoryProtocol(Protocol):
         ...
 
     async def get_current_health_status(
-        self, 
+        self,
         component_name: str | None = None
     ) -> dict[str, HealthCheckResult]:
         """Get current health status for components."""
@@ -166,7 +166,7 @@ class MonitoringRepositoryProtocol(Protocol):
 
     # Performance Metrics
     async def store_performance_metrics(
-        self, 
+        self,
         performance_data: PerformanceMetrics
     ) -> bool:
         """Store performance metrics for a component."""
@@ -215,7 +215,7 @@ class MonitoringRepositoryProtocol(Protocol):
         ...
 
     async def resolve_alert(
-        self, 
+        self,
         alert_id: str,
         resolved_at: datetime | None = None
     ) -> bool:
@@ -256,7 +256,7 @@ class MonitoringRepositoryProtocol(Protocol):
         self,
         component_name: str,
         metric_name: str,
-        percentiles: list[float] = [50.0, 90.0, 95.0, 99.0],
+        percentiles: list[float] | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None
     ) -> dict[float, float]:

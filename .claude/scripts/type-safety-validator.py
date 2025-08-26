@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Type Safety Validator - Claude Code Pre-Tool Hook
+"""Type Safety Validator - Claude Code Pre-Tool Hook.
 
 This script enforces type safety and import validation by:
 1. Checking for missing type annotations on functions and methods
@@ -14,7 +14,7 @@ Based on 2025 Python typing standards and Clean Architecture principles
 import json
 import re
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 EXIT_SUCCESS = 0
 EXIT_VIOLATION = 1
@@ -70,7 +70,7 @@ def extract_code_content(tool_data: dict[str, Any]) -> tuple[str | None, str | N
     file_path: str | None = None
     code_content: str | None = None
 
-    if tool_name in ["Write", "Edit", "MultiEdit"]:
+    if tool_name in {"Write", "Edit", "MultiEdit"}:
         if "file_path" in tool_data.get("tool", {}).get("parameters", {}):
             file_path = tool_data["tool"]["parameters"]["file_path"]
 
@@ -95,7 +95,7 @@ def should_skip_validation(file_path: str | None) -> bool:
     """Check if file should skip type validation."""
     if not file_path:
         return False
-    
+
     skip_patterns = [
         r"/tests?/",
         r"conftest\.py",
@@ -105,12 +105,8 @@ def should_skip_validation(file_path: str | None) -> bool:
         r"\.yml$",
         r"\.yaml$",
     ]
-    
-    for pattern in skip_patterns:
-        if re.search(pattern, file_path):
-            return True
-    
-    return False
+
+    return any(re.search(pattern, file_path) for pattern in skip_patterns)
 
 
 def find_missing_type_annotations(code_content: str) -> list[tuple[int, str]]:
@@ -123,17 +119,15 @@ def find_missing_type_annotations(code_content: str) -> list[tuple[int, str]]:
 
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
-        
+
         # Skip test functions, private methods, and special methods
-        if (stripped.startswith("def test_") or 
-            stripped.startswith("def _") or
-            stripped.startswith("def __")):
+        if (stripped.startswith(("def test_", "def _", "def __"))):
             continue
-            
+
         # Check for functions without return type annotations
         if re.match(r"def\s+\w+\([^)]*\)\s*:", stripped):
             violations.append((i, stripped))
-        
+
         # Check for parameters without type annotations
         func_match = re.match(r"def\s+(\w+)\(([^)]*)\)", stripped)
         if func_match:
@@ -153,9 +147,7 @@ def find_any_type_violations(code_content: str) -> list[tuple[int, str]]:
     lines = code_content.split("\n")
 
     for i, line in enumerate(lines, 1):
-        for pattern in ANY_TYPE_PATTERNS:
-            if re.search(pattern, line):
-                violations.append((i, line.strip()))
+        violations.extend((i, line.strip()) for pattern in ANY_TYPE_PATTERNS if re.search(pattern, line))
 
     return violations
 
@@ -170,14 +162,14 @@ def find_error_handling_violations(code_content: str) -> list[tuple[int, str]]:
 
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
-        
+
         # Bare except clauses
         if re.match(r"except\s*:", stripped):
             violations.append((i, "Bare except clause: " + stripped))
-        
+
         # Empty except blocks with just pass
         if stripped == "pass" and i > 1:
-            prev_line = lines[i-2].strip() if i > 1 else ""
+            prev_line = lines[i - 2].strip() if i > 1 else ""
             if prev_line.startswith("except"):
                 violations.append((i, "Empty except block: " + prev_line))
 
@@ -191,26 +183,26 @@ def analyze_import_organization(code_content: str) -> list[str]:
 
     issues: list[str] = []
     lines = code_content.split("\n")
-    
+
     imports = []
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         if stripped.startswith(("import ", "from ")):
             imports.append((i, stripped))
-    
+
     # Check for imports not at top of file (excluding test files)
     if imports and imports[0][0] > 10:  # Allow some docstring/comments
         issues.append(f"Imports should be at top of file (first import at line {imports[0][0]})")
-    
+
     # Check for circular import patterns
     module_imports = []
-    for line_num, import_line in imports:
+    for _line_num, import_line in imports:
         if "prompt_improver" in import_line:
             module_imports.append(import_line)
-    
+
     if len(module_imports) > 5:
         issues.append("High number of internal imports - consider reducing coupling")
-    
+
     return issues
 
 
@@ -222,10 +214,10 @@ def format_violation_message(violation_type: str, violations: list[tuple[int, st
     message = f"\n🔍 {violation_type} ISSUE DETECTED:\n"
     for line_num, line_content in violations[:3]:  # Show first 3 violations
         message += f"   Line {line_num}: {line_content}\n"
-    
+
     if len(violations) > 3:
         message += f"   ... and {len(violations) - 3} more issues\n"
-    
+
     message += f"\n💡 GUIDANCE: {guidance}\n"
     return message
 
@@ -278,24 +270,24 @@ def main() -> None:
     # 4. Check import organization
     import_issues = analyze_import_organization(code_content)
     if import_issues:
-        message = f"\n🔍 IMPORT ORGANIZATION ISSUES:\n"
+        message = "\n🔍 IMPORT ORGANIZATION ISSUES:\n"
         for issue in import_issues:
             message += f"   {issue}\n"
-        message += f"\n💡 GUIDANCE: Organize imports at the top of files and minimize coupling.\n"
+        message += "\n💡 GUIDANCE: Organize imports at the top of files and minimize coupling.\n"
         all_issues.append(message)
 
     # Output issues but don't block (educational mode)
     if all_issues:
-        print("\n" + "="*60, file=sys.stderr)
+        print("\n" + "=" * 60, file=sys.stderr)
         print("🔍 TYPE SAFETY & CODE QUALITY GUIDANCE", file=sys.stderr)
-        print("="*60, file=sys.stderr)
-        
+        print("=" * 60, file=sys.stderr)
+
         for issue in all_issues:
             print(issue, file=sys.stderr)
-        
-        print("="*60, file=sys.stderr)
+
+        print("=" * 60, file=sys.stderr)
         print("💡 Consider these improvements for better type safety", file=sys.stderr)
-        print("="*60 + "\n", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
 
     # Always allow (educational mode)
     sys.exit(EXIT_SUCCESS)

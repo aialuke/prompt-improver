@@ -14,19 +14,36 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn, get_sklearn_metrics
+
+if TYPE_CHECKING:
+    from sklearn.cluster import KMeans
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import cross_val_score
+    from sklearn.neighbors import NearestNeighbors
+    from sklearn.metrics import adjusted_rand_score
+    import numpy as np
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return (
+            sklearn.cluster.KMeans,
+            sklearn.linear_model.LogisticRegression,
+            sklearn.model_selection.cross_val_score,
+            sklearn.neighbors.NearestNeighbors
+        )
+    
+    KMeans, LogisticRegression, cross_val_score, NearestNeighbors = _get_sklearn_imports()
 
 from . import EvaluationProtocol, EvaluationMetrics
 
 logger = logging.getLogger(__name__)
 
-# Optional ML imports with fallbacks
+# Check sklearn availability
 try:
-    from sklearn.cluster import KMeans
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import adjusted_rand_score
-    from sklearn.model_selection import cross_val_score
-    from sklearn.neighbors import NearestNeighbors
+    get_sklearn()
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -60,8 +77,8 @@ class ReductionEvaluatorService:
         logger.info(f"ReductionEvaluatorService initialized with weights: variance={self.variance_weight:.2f}, "
                    f"clustering={self.clustering_weight:.2f}, classification={self.classification_weight:.2f}")
 
-    def evaluate_quality(self, original: np.ndarray, reduced: np.ndarray, 
-                        labels: Optional[np.ndarray] = None) -> EvaluationMetrics:
+    def evaluate_quality(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray, 
+                        labels: Optional[get_numpy().ndarray] = None) -> EvaluationMetrics:
         """Evaluate comprehensive quality of dimensionality reduction."""
         start_time = time.time()
         
@@ -107,7 +124,7 @@ class ReductionEvaluatorService:
             logger.error(f"Evaluation failed: {e}")
             return self._basic_evaluation(original, reduced, start_time)
 
-    def compute_variance_preservation(self, original: np.ndarray, reduced: np.ndarray) -> float:
+    def compute_variance_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray) -> float:
         """Compute how much variance is preserved in the reduction."""
         try:
             if original.size == 0 or reduced.size == 0:
@@ -118,8 +135,8 @@ class ReductionEvaluatorService:
                 return 0.0
             
             # Calculate total variance preservation
-            original_var = np.sum(np.var(original, axis=0))
-            reduced_var = np.sum(np.var(reduced, axis=0))
+            original_var = get_numpy().sum(get_numpy().var(original, axis=0))
+            reduced_var = get_numpy().sum(get_numpy().var(reduced, axis=0))
             
             if original_var == 0:
                 return 1.0 if reduced_var == 0 else 0.0
@@ -131,7 +148,7 @@ class ReductionEvaluatorService:
             logger.warning(f"Variance preservation calculation failed: {e}")
             return 0.5
 
-    def assess_clustering_preservation(self, original: np.ndarray, reduced: np.ndarray) -> float:
+    def assess_clustering_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray) -> float:
         """Assess how well clustering structure is preserved."""
         if not SKLEARN_AVAILABLE or original.shape[0] < 10:
             return 0.5
@@ -160,10 +177,10 @@ class ReductionEvaluatorService:
             logger.warning(f"Clustering preservation assessment failed: {e}")
             return 0.5
 
-    def _assess_classification_preservation(self, original: np.ndarray, reduced: np.ndarray, 
-                                          labels: np.ndarray) -> float:
+    def _assess_classification_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray, 
+                                          labels: get_numpy().ndarray) -> float:
         """Assess how well classification performance is preserved."""
-        if not SKLEARN_AVAILABLE or len(np.unique(labels)) < 2:
+        if not SKLEARN_AVAILABLE or len(get_numpy().unique(labels)) < 2:
             return 0.5
         
         try:
@@ -172,11 +189,11 @@ class ReductionEvaluatorService:
             
             # Performance on original data
             scores_orig = cross_val_score(clf, original, labels, cv=3, scoring="accuracy")
-            orig_score = np.mean(scores_orig)
+            orig_score = get_numpy().mean(scores_orig)
             
             # Performance on reduced data  
             scores_reduced = cross_val_score(clf, reduced, labels, cv=3, scoring="accuracy")
-            reduced_score = np.mean(scores_reduced)
+            reduced_score = get_numpy().mean(scores_reduced)
             
             # Calculate preservation ratio
             if orig_score == 0:
@@ -189,7 +206,7 @@ class ReductionEvaluatorService:
             logger.warning(f"Classification preservation assessment failed: {e}")
             return 0.5
 
-    def _assess_neighborhood_preservation(self, original: np.ndarray, reduced: np.ndarray) -> float:
+    def _assess_neighborhood_preservation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray) -> float:
         """Assess how well local neighborhood structure is preserved."""
         if not SKLEARN_AVAILABLE:
             return 0.5
@@ -211,7 +228,7 @@ class ReductionEvaluatorService:
             
             # Sample points for efficiency on large datasets
             sample_size = min(100, n_samples)
-            sample_indices = np.random.choice(n_samples, sample_size, replace=False)
+            sample_indices = get_numpy().random.choice(n_samples, sample_size, replace=False)
             
             # Get neighborhoods for sampled points
             neighbors_orig = nn_orig.kneighbors(
@@ -228,7 +245,7 @@ class ReductionEvaluatorService:
                 overlap = len(set(neighbors_orig[i]) & set(neighbors_reduced[i]))
                 preservation_scores.append(overlap / k)
             
-            return float(np.mean(preservation_scores))
+            return float(get_numpy().mean(preservation_scores))
             
         except Exception as e:
             logger.warning(f"Neighborhood preservation assessment failed: {e}")
@@ -257,19 +274,19 @@ class ReductionEvaluatorService:
             weights.append(0.2)
             
             # Normalize weights
-            weights = np.array(weights)
+            weights = get_numpy().array(weights)
             weights = weights / weights.sum()
             
             # Compute weighted average
-            overall_score = np.average(score_components, weights=weights)
+            overall_score = get_numpy().average(score_components, weights=weights)
             
-            return float(np.clip(overall_score, 0.0, 1.0))
+            return float(get_numpy().clip(overall_score, 0.0, 1.0))
             
         except Exception as e:
             logger.warning(f"Overall quality computation failed: {e}")
             return 0.5
 
-    def _basic_evaluation(self, original: np.ndarray, reduced: np.ndarray, start_time: float) -> EvaluationMetrics:
+    def _basic_evaluation(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray, start_time: float) -> EvaluationMetrics:
         """Provide basic evaluation when advanced metrics are unavailable."""
         variance_preservation = self.compute_variance_preservation(original, reduced)
         processing_time = time.time() - start_time
@@ -283,8 +300,8 @@ class ReductionEvaluatorService:
             processing_time=processing_time
         )
 
-    def compare_methods(self, original: np.ndarray, reduced_results: Dict[str, np.ndarray],
-                       labels: Optional[np.ndarray] = None) -> Dict[str, EvaluationMetrics]:
+    def compare_methods(self, original: get_numpy().ndarray, reduced_results: Dict[str, get_numpy().ndarray],
+                       labels: Optional[get_numpy().ndarray] = None) -> Dict[str, EvaluationMetrics]:
         """Compare multiple dimensionality reduction methods."""
         results = {}
         
@@ -309,8 +326,8 @@ class ReductionEvaluatorService:
         
         return best_method[0], best_method[1]
 
-    def generate_evaluation_report(self, original: np.ndarray, reduced: np.ndarray,
-                                 labels: Optional[np.ndarray] = None, method_name: str = "Unknown") -> Dict[str, Any]:
+    def generate_evaluation_report(self, original: get_numpy().ndarray, reduced: get_numpy().ndarray,
+                                 labels: Optional[get_numpy().ndarray] = None, method_name: str = "Unknown") -> Dict[str, Any]:
         """Generate comprehensive evaluation report."""
         metrics = self.evaluate_quality(original, reduced, labels)
         

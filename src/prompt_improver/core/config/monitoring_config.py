@@ -1,4 +1,4 @@
-"""Monitoring and Observability Configuration Module
+"""Monitoring and Observability Configuration Module.
 
 Configuration for metrics collection, health checks, OpenTelemetry,
 and system observability with environment-specific settings.

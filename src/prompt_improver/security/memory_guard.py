@@ -13,19 +13,23 @@ import gc
 import logging
 import resource
 import time
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
+
+# import numpy as np  # Converted to lazy loading
 from pydantic import BaseModel, Field
 
-try:
-    import psutil
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
-    PSUTIL_AVAILABLE = True
+try:
+    import psutil  # pylint: disable=unused-import
+    psutil_available = True
 except ImportError:
-    PSUTIL_AVAILABLE = False
+    psutil_available = False
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +42,22 @@ class MemoryThreatLevel(Enum):
     HIGH = 3
     CRITICAL = 4
 
-    def __lt__(self, other):
+    def __lt__(self, other: "MemoryThreatLevel") -> bool:
         if self.__class__ is other.__class__:
             return self.value < other.value
         return NotImplemented
 
-    def __le__(self, other):
+    def __le__(self, other: "MemoryThreatLevel") -> bool:
         if self.__class__ is other.__class__:
             return self.value <= other.value
         return NotImplemented
 
-    def __gt__(self, other):
+    def __gt__(self, other: "MemoryThreatLevel") -> bool:
         if self.__class__ is other.__class__:
             return self.value > other.value
         return NotImplemented
 
-    def __ge__(self, other):
+    def __ge__(self, other: "MemoryThreatLevel") -> bool:
         if self.__class__ is other.__class__:
             return self.value >= other.value
         return NotImplemented
@@ -101,8 +105,9 @@ class MemoryGuard:
         self,
         max_memory_mb: int = 500,
         max_buffer_size: int = 100 * 1024 * 1024,
-        event_bus=None,
-    ):
+        event_bus: Any = None,
+    ) -> None:
+        super().__init__()
         self.max_memory_mb = max_memory_mb
         self.max_buffer_size = max_buffer_size  # 100MB default
         self.event_bus = event_bus
@@ -123,12 +128,12 @@ class MemoryGuard:
             "gc_forced": 0,
         }
 
-    def set_event_bus(self, event_bus):
+    def set_event_bus(self, event_bus: Any) -> None:
         """Set event bus for memory event emission."""
         self.event_bus = event_bus
         logger.info("Event bus integrated with MemoryGuard for resource monitoring")
 
-    async def _emit_memory_event(self, event: MemoryEvent):
+    async def _emit_memory_event(self, event: MemoryEvent) -> None:
         """Emit memory event for monitoring and alerting."""
         self.memory_events.append(event)
 
@@ -163,10 +168,10 @@ class MemoryGuard:
                 )
                 await self.event_bus.emit(ml_event)
             except Exception as e:
-                logger.error(f"Failed to emit memory event: {e}")
+                logger.exception(f"Failed to emit memory event: {e}")
 
         # Log memory events
-        if event.threat_level in [MemoryThreatLevel.HIGH, MemoryThreatLevel.CRITICAL]:
+        if event.threat_level in {MemoryThreatLevel.HIGH, MemoryThreatLevel.CRITICAL}:
             logger.error(
                 f"MEMORY ALERT: {event.event_type} - {event.threat_level.name.lower()} - Usage: {event.memory_usage_mb:.1f}MB"
             )
@@ -226,7 +231,7 @@ class MemoryGuard:
         return memory_stats
 
     async def check_memory_usage_async(
-        self, operation_name: str = "unknown", component_name: str = None
+        self, operation_name: str = "unknown", component_name: str | None = None
     ) -> ResourceStats:
         """Async memory usage check with event emission."""
         stats = self.get_resource_stats()
@@ -249,12 +254,12 @@ class MemoryGuard:
 
         return stats
 
-    def monitor_operation_async(self, operation_name: str, component_name: str = None):
+    def monitor_operation_async(self, operation_name: str, component_name: str | None = None):
         """Async context manager for monitoring memory during operations."""
-        return AsyncMemoryMonitor(self, operation_name, component_name)
+        return AsyncMemoryMonitor(self, operation_name, component_name or "")
 
     def validate_buffer_size(
-        self, data: bytes | np.ndarray | Any, operation: str = "unknown"
+        self, data: "bytes | np.ndarray[Any, Any] | Any", operation: str = "unknown"
     ) -> bool:
         """Validate buffer size before operations to prevent overflow.
 
@@ -285,8 +290,8 @@ class MemoryGuard:
         return True
 
     def safe_frombuffer(
-        self, buffer: bytes, dtype: np.dtype, count: int = -1
-    ) -> np.ndarray:
+        self, buffer: bytes, dtype: "np.dtype[Any]", count: int = -1
+    ) -> "np.ndarray[Any, Any]":
         """Safely create numpy array from buffer with validation.
 
         Args:
@@ -305,7 +310,7 @@ class MemoryGuard:
         self.validate_buffer_size(buffer, f"frombuffer with dtype {dtype}")
 
         # Validate buffer size matches dtype requirements
-        dtype_size = np.dtype(dtype).itemsize
+        dtype_size = get_numpy().dtype(dtype).itemsize
         if len(buffer) % dtype_size != 0:
             raise ValueError(
                 f"Buffer size {len(buffer)} not divisible by dtype size {dtype_size}"
@@ -335,14 +340,14 @@ class MemoryGuard:
 
         # Create array safely
         try:
-            return np.frombuffer(
+            return get_numpy().frombuffer(
                 buffer[: actual_count * dtype_size], dtype=dtype, count=actual_count
             )
         except Exception as e:
-            self.logger.error(f"Failed to create array from buffer: {e}")
+            self.logger.exception(f"Failed to create array from buffer: {e}")
             raise
 
-    def safe_tobytes(self, array: np.ndarray) -> bytes:
+    def safe_tobytes(self, array: "np.ndarray[Any, Any]") -> bytes:
         """Safely convert numpy array to bytes with validation.
 
         Args:
@@ -359,7 +364,7 @@ class MemoryGuard:
         try:
             return array.tobytes()
         except Exception as e:
-            self.logger.error(f"Failed to convert array to bytes: {e}")
+            self.logger.exception(f"Failed to convert array to bytes: {e}")
             raise
 
     def monitor_operation(self, operation_name: str):
@@ -408,7 +413,7 @@ class MemoryGuard:
         return freed_mb
 
     async def validate_ml_operation_memory(
-        self, data: Any, operation_name: str, component_name: str = None
+        self, data: Any, operation_name: str, component_name: str | None = None
     ) -> bool:
         """Validate memory requirements for ML operations with 2025 best practices.
 
@@ -424,18 +429,18 @@ class MemoryGuard:
             MemoryError: If memory requirements exceed limits
         """
         # Check current memory state
-        stats = await self.check_memory_usage_async(operation_name, component_name)
+        await self.check_memory_usage_async(operation_name, component_name)
 
         # Validate buffer size
         try:
             self.validate_buffer_size(data, operation_name)
-        except MemoryError as e:
+        except MemoryError:
             self._monitoring_stats["memory_errors"] += 1
             await self._emit_memory_event(
                 MemoryEvent(
                     event_type="memory_validation_failed",
                     threat_level=MemoryThreatLevel.CRITICAL,
-                    memory_usage_mb=stats.current_memory_mb,
+                    memory_usage_mb=self.get_resource_stats().current_memory_mb,
                     operation_name=operation_name,
                     component_name=component_name,
                 )
@@ -443,12 +448,13 @@ class MemoryGuard:
             raise
 
         # Check for ML-specific memory patterns
-        if isinstance(data, np.ndarray):
+        if hasattr(data, 'dtype') and hasattr(data, 'shape') and str(type(data)).startswith('<class \'numpy.'):
             # Check for memory-intensive operations
             data_size_mb = data.nbytes / 1024 / 1024
             if data_size_mb > 100:  # Large arrays
-                if stats.usage_percent > 70:
-                    error_msg = f"Large array operation {operation_name} would risk memory exhaustion: {data_size_mb:.1f}MB array with {stats.usage_percent:.1f}% memory usage"
+                current_stats = self.get_resource_stats()
+                if current_stats.usage_percent > 70:
+                    error_msg = f"Large array operation {operation_name} would risk memory exhaustion: {data_size_mb:.1f}MB array with {current_stats.usage_percent:.1f}% memory usage"
                     self.logger.error(error_msg)
                     self._monitoring_stats["memory_errors"] += 1
 
@@ -456,7 +462,7 @@ class MemoryGuard:
                         MemoryEvent(
                             event_type="large_array_risk",
                             threat_level=MemoryThreatLevel.HIGH,
-                            memory_usage_mb=stats.current_memory_mb,
+                            memory_usage_mb=current_stats.current_memory_mb,
                             operation_name=operation_name,
                             component_name=component_name,
                         )
@@ -468,9 +474,10 @@ class MemoryGuard:
 
     def _get_memory_usage(self) -> float:
         """Get current memory usage in MB."""
-        if PSUTIL_AVAILABLE:
+        if psutil_available:
             try:
-                process = psutil.process()
+                import psutil
+                process = psutil.Process()
                 return process.memory_info().rss / 1024 / 1024  # Convert to MB
             except Exception:
                 pass
@@ -487,7 +494,7 @@ class MemoryGuard:
         """Get size of data in bytes."""
         if isinstance(data, bytes):
             return len(data)
-        if isinstance(data, np.ndarray):
+        if hasattr(data, 'dtype') and hasattr(data, 'shape') and str(type(data)).startswith('<class \'numpy.'):
             return data.nbytes
         if hasattr(data, "__sizeof__"):
             return data.__sizeof__()
@@ -499,8 +506,9 @@ class AsyncMemoryMonitor:
     """Async context manager for monitoring memory usage during operations."""
 
     def __init__(
-        self, memory_guard: MemoryGuard, operation_name: str, component_name: str = None
-    ):
+        self, memory_guard: MemoryGuard, operation_name: str, component_name: str | None = None
+    ) -> None:
+        super().__init__()
         self.guard = memory_guard
         self.operation_name = operation_name
         self.component_name = component_name
@@ -509,7 +517,7 @@ class AsyncMemoryMonitor:
         self.operation_id = f"{operation_name}_{int(time.time() * 1000)}"
 
     async def __aenter__(self):
-        self.start_memory = self.guard._get_memory_usage()
+        self.start_memory = self.guard._get_memory_usage()  # pylint: disable=protected-access
         self.start_time = time.time()
 
         # Register active operation
@@ -520,7 +528,7 @@ class AsyncMemoryMonitor:
         )
 
         # Emit start event
-        await self.guard._emit_memory_event(
+        await self.guard._emit_memory_event(  # pylint: disable=protected-access
             MemoryEvent(
                 event_type="operation_started",
                 threat_level=MemoryThreatLevel.LOW,
@@ -532,15 +540,20 @@ class AsyncMemoryMonitor:
 
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        end_memory = self.guard._get_memory_usage()
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,  # pylint: disable=unused-argument
+        exc_val: BaseException | None,  # pylint: disable=unused-argument
+        exc_tb: object | None  # pylint: disable=unused-argument
+    ) -> bool | None:
+        end_memory = self.guard._get_memory_usage()  # pylint: disable=protected-access
         end_time = time.time()
 
         # Remove from active operations
         self.guard.active_operations.pop(self.operation_id, None)
 
-        memory_delta = end_memory - self.start_memory
-        time_delta = end_time - self.start_time
+        memory_delta = end_memory - (self.start_memory or 0.0)
+        time_delta = end_time - (self.start_time or 0.0)
 
         # Determine threat level based on memory delta
         if memory_delta > 100:  # 100MB increase
@@ -560,14 +573,14 @@ class AsyncMemoryMonitor:
         self.guard.logger.log(
             level,
             f"Completed async {self.operation_name} - Memory: {end_memory:.1f}MB "
-            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
+            + f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
         )
 
         # Update peak memory
         self.guard.peak_memory = max(self.guard.peak_memory, end_memory)
 
         # Emit completion event
-        await self.guard._emit_memory_event(
+        await self.guard._emit_memory_event(  # pylint: disable=protected-access
             MemoryEvent(
                 event_type="operation_completed",
                 threat_level=threat_level,
@@ -584,38 +597,46 @@ class AsyncMemoryMonitor:
                 f"cleanup_{self.operation_name}"
             )
 
+        return None  # Explicit return for context manager
+
 
 class MemoryMonitor:
     """Context manager for monitoring memory usage during operations."""
 
-    def __init__(self, memory_guard: MemoryGuard, operation_name: str):
+    def __init__(self, memory_guard: MemoryGuard, operation_name: str) -> None:
+        super().__init__()
         self.guard = memory_guard
         self.operation_name = operation_name
         self.start_memory = None
         self.start_time = None
 
     def __enter__(self):
-        self.start_memory = self.guard._get_memory_usage()
+        self.start_memory = self.guard._get_memory_usage()  # pylint: disable=protected-access
         self.start_time = time.time()
         self.guard.logger.debug(
             f"Starting {self.operation_name} - Memory: {self.start_memory:.1f}MB"
         )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,  # pylint: disable=unused-argument
+        exc_val: BaseException | None,  # pylint: disable=unused-argument
+        exc_tb: object | None  # pylint: disable=unused-argument
+    ) -> bool | None:
         import time
 
-        end_memory = self.guard._get_memory_usage()
+        end_memory = self.guard._get_memory_usage()  # pylint: disable=protected-access
         end_time = time.time()
 
-        memory_delta = end_memory - self.start_memory
-        time_delta = end_time - self.start_time
+        memory_delta = end_memory - (self.start_memory or 0.0)
+        time_delta = end_time - (self.start_time or 0.0)
 
         level = logging.INFO if memory_delta > 10 else logging.DEBUG
         self.guard.logger.log(
             level,
             f"Completed {self.operation_name} - Memory: {end_memory:.1f}MB "
-            f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
+            + f"(Δ{memory_delta:+.1f}MB) in {time_delta:.2f}s",
         )
 
         # Update peak memory
@@ -624,6 +645,8 @@ class MemoryMonitor:
         # Force cleanup if memory delta is significant
         if memory_delta > 50:  # 50MB threshold
             self.guard.force_garbage_collection()
+
+        return None  # Explicit return for context manager
 
 
 # Global memory guard instance

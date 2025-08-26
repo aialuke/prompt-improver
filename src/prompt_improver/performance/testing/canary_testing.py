@@ -11,20 +11,18 @@ Advanced canary deployment with 2025 best practices:
 """
 
 import asyncio
-import json
 import statistics
 import uuid
 from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 from rich.console import Console
 
-from prompt_improver.core.config import AppConfig
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
@@ -440,6 +438,7 @@ class EnhancedCanaryTestingService:
         import time
 
         import psutil
+        from prompt_improver.services.cache.l2_redis_service import redis_client
 
         start_time = time.time()
         request_times = []

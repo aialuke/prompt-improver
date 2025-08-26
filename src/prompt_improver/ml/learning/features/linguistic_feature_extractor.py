@@ -19,9 +19,11 @@ from typing import Any, Dict, List, Optional, Set, Union
 import uuid
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from ....core.utils.lazy_ml_loader import get_numpy
 from ....security.input_sanitization import InputSanitizer
 from .english_nltk_manager import get_english_nltk_manager
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 try:
     import aiofiles
     ASYNC_SUPPORT = True
@@ -251,7 +253,7 @@ class LinguisticFeatureExtractor:
     async def _compute_linguistic_features_async(self, text: str, correlation_id: str) -> list[float]:
         """Compute linguistic features asynchronously."""
         if self.config.deterministic:
-            np.random.seed(42)
+            get_numpy().random.seed(42)
         if self.linguistic_analyzer:
             return await self._extract_with_analyzer_async(text, correlation_id)
         else:

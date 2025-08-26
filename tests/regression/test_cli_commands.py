@@ -4,9 +4,8 @@ Following 2025 best practices: real behavior testing without mocks.
 Enhanced with comprehensive real CLI testing using Typer CliRunner.
 """
 
-import asyncio
+import contextlib
 import json
-import os
 import tempfile
 import time
 from pathlib import Path
@@ -49,7 +48,7 @@ class TestLogsRegression:
         """Test basic logs command with real file operations."""
         monkeypatch.setenv("HOME", str(self.temp_dir))
         result = self.runner.invoke(app, ["logs", "--lines", "10"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert any(
             keyword in result.stdout
             for keyword in ["Viewing logs", "Log directory not found", "apes.log"]
@@ -59,9 +58,9 @@ class TestLogsRegression:
         """Test log level filtering with real files."""
         monkeypatch.setenv("HOME", str(self.temp_dir))
         result = self.runner.invoke(app, ["logs", "--level", "INFO", "--lines", "50"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         result = self.runner.invoke(app, ["logs", "--level", "ERROR", "--lines", "50"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     def test_logs_component_filtering(self, monkeypatch):
         """Test component-specific log filtering with real files."""
@@ -70,7 +69,7 @@ class TestLogsRegression:
             f.write("2024-01-15 10:00:00 INFO MCP service started\n")
         monkeypatch.setenv("HOME", str(self.temp_dir))
         result = self.runner.invoke(app, ["logs", "--component", "mcp"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert any(
             keyword in result.stdout
             for keyword in ["Viewing logs", "Log file not found"]
@@ -80,7 +79,7 @@ class TestLogsRegression:
         """Test behavior when log directory doesn't exist - real scenario."""
         with self.runner.isolated_filesystem():
             result = self.runner.invoke(app, ["logs"])
-            assert result.exit_code in [0, 1]
+            assert result.exit_code in {0, 1}
             assert any(
                 keyword in result.stdout
                 for keyword in [
@@ -102,9 +101,9 @@ class TestLogsRegression:
         """Test lines parameter with real file operations."""
         monkeypatch.setenv("HOME", str(self.temp_dir))
         result = self.runner.invoke(app, ["logs", "--lines", "5"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         result = self.runner.invoke(app, ["logs", "--lines", "1000"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     def test_logs_output_verification(self, monkeypatch):
         """Test that real logs command produces appropriate output."""
@@ -136,7 +135,7 @@ class TestLogsRegression:
         start_time = time.time()
         result = self.runner.invoke(app, ["logs", "--lines", str(min(line_count, 100))])
         end_time = time.time()
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert end_time - start_time < 10.0
         assert len(result.stdout) > 0
 
@@ -150,11 +149,9 @@ class TestLogsRegression:
             pytest.skip("Cannot test permission restrictions on this system")
         monkeypatch.setenv("HOME", str(restricted_dir))
         result = self.runner.invoke(app, ["logs"])
-        assert result.exit_code in [0, 1]
-        try:
+        assert result.exit_code in {0, 1}
+        with contextlib.suppress(OSError, PermissionError):
             restricted_dir.chmod(493)
-        except (OSError, PermissionError):
-            pass
 
 
 class TestHealthRegression:
@@ -168,7 +165,7 @@ class TestHealthRegression:
     async def test_health_basic_functionality(self):
         """Test basic health check with real components."""
         result = self.runner.invoke(app, ["health"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert any(
             keyword in result.stdout
             for keyword in [
@@ -183,7 +180,7 @@ class TestHealthRegression:
     def test_health_json_output(self):
         """Test health check with JSON output format using real behavior."""
         result = self.runner.invoke(app, ["health", "--json"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         if result.exit_code == 0:
             try:
                 json.loads(result.stdout)
@@ -195,13 +192,13 @@ class TestHealthRegression:
     def test_health_detailed_mode(self):
         """Test health check with detailed diagnostics using real system."""
         result = self.runner.invoke(app, ["health", "--detailed"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert len(result.stdout) > 0
 
     def test_health_error_scenarios(self):
         """Test health check real error handling."""
         result = self.runner.invoke(app, ["health", "--invalid-option"])
-        assert result.exit_code in [0, 1, 2]
+        assert result.exit_code in {0, 1, 2}
         total_output = len(result.stdout) + len(getattr(result, "stderr", ""))
 
     def test_health_help_output(self):
@@ -217,7 +214,7 @@ class TestHealthRegression:
         result = self.runner.invoke(app, ["health"])
         end_time = time.time()
         assert end_time - start_time < 30.0
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
 
 class TestAlertsRegression:
@@ -230,7 +227,7 @@ class TestAlertsRegression:
     def test_alerts_basic_functionality(self):
         """Test basic alerts command with real behavior."""
         result = self.runner.invoke(app, ["alerts"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         assert any(
             keyword in result.stdout
             for keyword in ["APES Alert", "alerts", "status", "No alerts", "failed"]
@@ -239,14 +236,14 @@ class TestAlertsRegression:
     def test_alerts_severity_filtering(self):
         """Test alerts with severity filtering using real implementation."""
         result = self.runner.invoke(app, ["alerts", "--severity", "critical"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
         result = self.runner.invoke(app, ["alerts", "--severity", "warning"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     def test_alerts_time_period(self):
         """Test alerts with different time periods using real behavior."""
         result = self.runner.invoke(app, ["alerts", "--hours", "48"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     def test_alerts_help_functionality(self):
         """Test alerts command help with real CLI."""
@@ -257,7 +254,7 @@ class TestAlertsRegression:
     def test_alerts_invalid_severity(self):
         """Test alerts command with invalid severity - real error handling."""
         result = self.runner.invoke(app, ["alerts", "--severity", "invalid"])
-        assert result.exit_code in [0, 1, 2]
+        assert result.exit_code in {0, 1, 2}
         assert len(result.stdout) > 0
 
     def test_alerts_performance(self):
@@ -266,7 +263,7 @@ class TestAlertsRegression:
         result = self.runner.invoke(app, ["alerts"])
         end_time = time.time()
         assert end_time - start_time < 30.0
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     def test_alerts_output_format(self):
         """Test alerts output format with real data."""
@@ -305,12 +302,12 @@ class TestCLIIntegration:
     def test_cli_invalid_command(self):
         """Test CLI with invalid command - real error handling."""
         result = self.runner.invoke(app, ["nonexistent-command"])
-        assert result.exit_code in [0, 1, 2]
+        assert result.exit_code in {0, 1, 2}
 
     def test_cli_version_info(self):
         """Test CLI version information if available."""
         result = self.runner.invoke(app, ["--version"])
-        assert result.exit_code in [0, 2]
+        assert result.exit_code in {0, 2}
 
     @pytest.mark.parametrize("command", ["logs", "health", "alerts"])
     def test_cli_command_help(self, command):
@@ -325,7 +322,7 @@ class TestCLIIntegration:
         commands = [["health"], ["alerts", "--help"], ["logs", "--help"]]
         for cmd in commands:
             result = self.runner.invoke(app, cmd)
-            assert result.exit_code in [0, 1, 2]
+            assert result.exit_code in {0, 1, 2}
             assert len(result.stdout) > 0
 
     def test_cli_stdio_handling(self):
@@ -338,7 +335,7 @@ class TestCLIIntegration:
         """Test CLI behavior with different environment variables."""
         monkeypatch.setenv("APES_DEBUG", "true")
         result = self.runner.invoke(app, ["health"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code in {0, 1}
 
     async def test_cli_concurrent_execution(self):
         """Test CLI behavior under concurrent execution scenarios."""

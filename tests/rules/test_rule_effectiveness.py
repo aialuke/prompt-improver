@@ -4,11 +4,13 @@ import time
 
 import pytest
 
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.rule_engine.base import BasePromptRule
+from prompt_improver.services.prompt.facade import (
+    PromptServiceFacade as PromptImprovementService,
+)
 
 fixture_file = os.path.join(os.path.dirname(__file__), "../fixtures/prompts.json")
-with open(fixture_file) as f:
+with open(fixture_file, encoding="utf-8") as f:
     fixtures = json.load(f)
 prompt_service = PromptImprovementService()
 rule_classes = BasePromptRule.__subclasses__()
@@ -42,7 +44,7 @@ def test_rule_effectiveness(test_prompt):
 
 def log_results(test_prompt, delta_clarity, delta_specificity, total_time):
     report_file = f"reports/rule_effectiveness_{time.strftime('%Y%m%d')}.html"
-    with open(report_file, "a") as report:
+    with open(report_file, "a", encoding="utf-8") as report:
         report.write("<tr>\n")
         report.write(f"<td>{test_prompt['id']}</td>\n")
         report.write(f"<td>{test_prompt['category']}</td>\n")
@@ -53,11 +55,15 @@ def log_results(test_prompt, delta_clarity, delta_specificity, total_time):
         report.write("</tr>\n")
 
 
-pytest_configure = lambda config: open(
-    f"reports/rule_effectiveness_{time.strftime('%Y%m%d')}.html", "w"
+def pytest_configure(config):
+    return open(
+    f"reports/rule_effectiveness_{time.strftime('%Y%m%d')}.html", "w", encoding="utf-8"
 ).write(
     "<table><th>ID</th><th>Category</th><th>Description</th><th>Δ Clarity</th><th>Δ Specificity</th><th>Time</th>"
 )
-pytest_unconfigure = lambda config: open(
-    f"reports/rule_effectiveness_{time.strftime('%Y%m%d')}.html", "a"
+
+
+def pytest_unconfigure(config):
+    return open(
+    f"reports/rule_effectiveness_{time.strftime('%Y%m%d')}.html", "a", encoding="utf-8"
 ).write("</table>")

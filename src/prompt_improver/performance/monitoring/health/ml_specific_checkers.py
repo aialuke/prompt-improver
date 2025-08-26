@@ -1,10 +1,10 @@
 """ML-Specific Health Checkers for 2025 ML Pipeline Monitoring
-Provides comprehensive health monitoring for ML models, data quality, training, and performance
+Provides comprehensive health monitoring for ML models, data quality, training, and performance.
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class MLModelHealthChecker(HealthChecker):
     """Health checker for ML model lifecycle and deployment status."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ML model health checker."""
         super().__init__(name="ml_models")
         self.logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class MLModelHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds() * 1000
-            self.logger.error(f"ML model health check failed: {e}")
+            self.logger.exception(f"ML model health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -152,7 +152,7 @@ class MLModelHealthChecker(HealthChecker):
 class MLDataQualityChecker(HealthChecker):
     """Health checker for ML data quality and pipeline integrity."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ML data quality health checker."""
         super().__init__(name="ml_data_quality")
         self.logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ class MLDataQualityChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds() * 1000
-            self.logger.error(f"ML data quality health check failed: {e}")
+            self.logger.exception(f"ML data quality health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -266,7 +266,7 @@ class MLDataQualityChecker(HealthChecker):
 class MLTrainingHealthChecker(HealthChecker):
     """Health checker for ML training processes and optimization."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ML training health checker."""
         super().__init__(name="ml_training")
         self.logger = logging.getLogger(__name__)
@@ -313,7 +313,7 @@ class MLTrainingHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds() * 1000
-            self.logger.error(f"ML training health check failed: {e}")
+            self.logger.exception(f"ML training health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -336,8 +336,7 @@ class MLTrainingHealthChecker(HealthChecker):
             for component in optimization_components:
                 try:
                     if (
-                        component == "RuleOptimizer"
-                        or component == "ClusteringOptimizer"
+                        component in {"RuleOptimizer", "ClusteringOptimizer"}
                     ):
                         available_components.append(component)
                 except ImportError:
@@ -373,9 +372,7 @@ class MLTrainingHealthChecker(HealthChecker):
             for component in learning_components:
                 try:
                     if (
-                        component == "ContextLearner"
-                        or component == "InsightGenerationEngine"
-                        or component == "FailureModeAnalyzer"
+                        component in {"ContextLearner", "InsightGenerationEngine", "FailureModeAnalyzer"}
                     ):
                         available_components.append(component)
                 except ImportError:
@@ -392,7 +389,7 @@ class MLTrainingHealthChecker(HealthChecker):
 class MLPerformanceHealthChecker(HealthChecker):
     """Health checker for ML performance monitoring and evaluation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ML performance health checker."""
         super().__init__(name="ml_performance")
         self.logger = logging.getLogger(__name__)
@@ -441,7 +438,7 @@ class MLPerformanceHealthChecker(HealthChecker):
         except Exception as e:
             end_time = datetime.now(UTC)
             response_time = (end_time - start_time).total_seconds() * 1000
-            self.logger.error(f"ML performance health check failed: {e}")
+            self.logger.exception(f"ML performance health check failed: {e}")
             return HealthResult(
                 status=HealthStatus.FAILED,
                 component=self.name,
@@ -463,9 +460,7 @@ class MLPerformanceHealthChecker(HealthChecker):
             for component in evaluation_components:
                 try:
                     if (
-                        component == "CausalInferenceAnalyzer"
-                        or component == "AdvancedStatisticalValidator"
-                        or component == "PatternSignificanceAnalyzer"
+                        component in {"CausalInferenceAnalyzer", "AdvancedStatisticalValidator", "PatternSignificanceAnalyzer"}
                     ):
                         available_components.append(component)
                 except ImportError:

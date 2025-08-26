@@ -10,8 +10,9 @@ Each service is protocol-based and <500 lines following 2025 clean architecture 
 """
 
 from typing import Protocol, runtime_checkable
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from dataclasses import dataclass
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = [
@@ -28,8 +29,8 @@ __all__ = [
 @dataclass
 class ClusteringResult:
     """Result of clustering operation."""
-    cluster_labels: np.ndarray
-    cluster_centers: Optional[np.ndarray]
+    cluster_labels: get_numpy().ndarray
+    cluster_centers: Optional[get_numpy().ndarray]
     n_clusters: int
     silhouette_score: float
     algorithm_used: str
@@ -65,22 +66,22 @@ class OptimizationResult:
 class ClusteringPreprocessingResult:
     """Result of clustering preprocessing operations."""
     status: str
-    features: np.ndarray
+    features: get_numpy().ndarray
     info: Dict[str, Any]
     original_shape: Tuple[int, int]
     final_shape: Tuple[int, int]
     preprocessing_time: float
-    feature_importance: Optional[np.ndarray] = None
+    feature_importance: Optional[get_numpy().ndarray] = None
 
 @runtime_checkable
 class ClusteringAlgorithmProtocol(Protocol):
     """Protocol for clustering algorithm implementations."""
     
-    def fit_predict(self, X: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> np.ndarray:
+    def fit_predict(self, X: get_numpy().ndarray, sample_weights: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Fit clustering model and predict cluster labels."""
         ...
     
-    def get_cluster_centers(self, X: np.ndarray, labels: np.ndarray) -> Optional[np.ndarray]:
+    def get_cluster_centers(self, X: get_numpy().ndarray, labels: get_numpy().ndarray) -> Optional[get_numpy().ndarray]:
         """Compute cluster centers from features and labels."""
         ...
     
@@ -92,12 +93,12 @@ class ClusteringAlgorithmProtocol(Protocol):
 class ParameterOptimizationProtocol(Protocol):
     """Protocol for clustering parameter optimization."""
     
-    def optimize_parameters(self, X: np.ndarray, param_grid: Dict[str, List[Any]], 
-                          labels: Optional[np.ndarray] = None) -> OptimizationResult:
+    def optimize_parameters(self, X: get_numpy().ndarray, param_grid: Dict[str, List[Any]], 
+                          labels: Optional[get_numpy().ndarray] = None) -> OptimizationResult:
         """Optimize clustering parameters using grid search."""
         ...
     
-    def get_adaptive_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+    def get_adaptive_parameters(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Get adaptive parameters based on data characteristics."""
         ...
     
@@ -109,16 +110,16 @@ class ParameterOptimizationProtocol(Protocol):
 class ClusteringEvaluationProtocol(Protocol):
     """Protocol for clustering quality evaluation."""
     
-    def assess_clustering_quality(self, X: np.ndarray, labels: np.ndarray, 
-                                probabilities: Optional[np.ndarray] = None) -> ClusteringMetrics:
+    def assess_clustering_quality(self, X: get_numpy().ndarray, labels: get_numpy().ndarray, 
+                                probabilities: Optional[get_numpy().ndarray] = None) -> ClusteringMetrics:
         """Assess comprehensive clustering quality."""
         ...
     
-    def compute_stability_score(self, X: np.ndarray, labels: np.ndarray) -> float:
+    def compute_stability_score(self, X: get_numpy().ndarray, labels: get_numpy().ndarray) -> float:
         """Compute cluster stability score."""
         ...
     
-    def evaluate_clustering_success(self, X: np.ndarray, metrics: ClusteringMetrics) -> Tuple[str, str]:
+    def evaluate_clustering_success(self, X: get_numpy().ndarray, metrics: ClusteringMetrics) -> Tuple[str, str]:
         """Evaluate if clustering was successful."""
         ...
 
@@ -126,15 +127,15 @@ class ClusteringEvaluationProtocol(Protocol):
 class ClusteringPreprocessorProtocol(Protocol):
     """Protocol for clustering preprocessing operations."""
     
-    def preprocess_features(self, X: np.ndarray, labels: Optional[np.ndarray] = None) -> ClusteringPreprocessingResult:
+    def preprocess_features(self, X: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None) -> ClusteringPreprocessingResult:
         """Preprocess features for optimal clustering."""
         ...
     
-    def validate_inputs(self, X: np.ndarray, labels: Optional[np.ndarray] = None, 
-                       sample_weights: Optional[np.ndarray] = None) -> Dict[str, Any]:
+    def validate_inputs(self, X: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None, 
+                       sample_weights: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Validate input data for clustering."""
         ...
     
-    def apply_dimensionality_reduction(self, X: np.ndarray) -> np.ndarray:
+    def apply_dimensionality_reduction(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Apply UMAP dimensionality reduction for clustering."""
         ...

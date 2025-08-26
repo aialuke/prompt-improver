@@ -3,7 +3,6 @@
 import logging
 import os
 import re
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +33,7 @@ class SecurityConfigValidator:
         Returns:
             Tuple of (is_valid, list_of_issues)
         """
-        issues = []
-        for var in self.REQUIRED_ENV_VARS:
-            if not os.getenv(var):
-                issues.append(f"Required environment variable {var} is not set")
+        issues = [f"Required environment variable {var} is not set" for var in self.REQUIRED_ENV_VARS if not os.getenv(var)]
         password = os.getenv("POSTGRES_PASSWORD")
         if password:
             password_issues = self._validate_password_strength(password)
@@ -54,12 +50,12 @@ class SecurityConfigValidator:
         issues = []
         if len(password) < 12:
             issues.append("Database password should be at least 12 characters long")
-        if password in [
+        if password in {
             "password",
             "admin",
             "apes_secure_password_2024",
             "YOUR_SECURE_PASSWORD_HERE",
-        ]:
+        }:
             issues.append("Database password is using a known weak/default password")
         has_upper = bool(re.search(r"[A-Z]", password))
         has_lower = bool(re.search(r"[a-z]", password))
@@ -132,5 +128,4 @@ def generate_secure_env_template() -> str:
     """Generate a secure .env template with strong passwords."""
     validator = SecurityConfigValidator()
     secure_password = validator.generate_secure_password()
-    template = f"# Secure Database Configuration\n# Generated on {__import__('datetime').datetime.now().isoformat()}\n# NEVER commit this file to version control\n\n# Database Configuration - REQUIRED\nPOSTGRES_HOST=your_database_host\nPOSTGRES_PORT=5432\nPOSTGRES_DATABASE=apes_production\nPOSTGRES_USERNAME=apes_user\nPOSTGRES_PASSWORD={secure_password}\n\n# Alternative: Use full DATABASE_URL (without embedded credentials in code)\n# DATABASE_URL=postgresql+asyncpg://apes_user:{secure_password}@your_database_host:5432/apes_production\n\n# Development Mode\nDEVELOPMENT_MODE=true\nLOG_LEVEL=INFO\n\n# Database Pool Settings\nDB_POOL_MIN_SIZE=4\nDB_POOL_MAX_SIZE=16\nDB_POOL_TIMEOUT=10\n\n# Performance Monitoring\nENABLE_PERFORMANCE_MONITORING=true\nSLOW_QUERY_THRESHOLD=1000\n\n# MCP Configuration\nMCP_POSTGRES_ENABLED=true\n\n# Test Configuration\nTEST_DB_NAME=apes_test\n"
-    return template
+    return f"# Secure Database Configuration\n# Generated on {__import__('datetime').datetime.now().isoformat()}\n# NEVER commit this file to version control\n\n# Database Configuration - REQUIRED\nPOSTGRES_HOST=your_database_host\nPOSTGRES_PORT=5432\nPOSTGRES_DATABASE=apes_production\nPOSTGRES_USERNAME=apes_user\nPOSTGRES_PASSWORD={secure_password}\n\n# Alternative: Use full DATABASE_URL (without embedded credentials in code)\n# DATABASE_URL=postgresql+asyncpg://apes_user:{secure_password}@your_database_host:5432/apes_production\n\n# Development Mode\nDEVELOPMENT_MODE=true\nLOG_LEVEL=INFO\n\n# Database Pool Settings\nDB_POOL_MIN_SIZE=4\nDB_POOL_MAX_SIZE=16\nDB_POOL_TIMEOUT=10\n\n# Performance Monitoring\nENABLE_PERFORMANCE_MONITORING=true\nSLOW_QUERY_THRESHOLD=1000\n\n# MCP Configuration\nMCP_POSTGRES_ENABLED=true\n\n# Test Configuration\nTEST_DB_NAME=apes_test\n"

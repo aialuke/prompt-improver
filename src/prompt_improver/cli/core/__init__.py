@@ -1,11 +1,10 @@
-"""CLI Core Module - Signal Handler Integration and Shared Components
+"""CLI Core Module - Signal Handler Integration and Shared Components.
 
 Provides shared signal handler integration for all CLI components.
 Implements 2025 best practices for coordinated signal handling.
 """
 
 import asyncio
-from typing import Optional
 
 from rich.console import Console
 
@@ -21,8 +20,10 @@ from prompt_improver.cli.core.signal_handler import (
     ShutdownReason,
 )
 from prompt_improver.cli.core.system_state_reporter import SystemStateReporter
-from prompt_improver.cli.services.training_orchestrator import TrainingOrchestrator as TrainingService
 from prompt_improver.cli.core.unified_process_manager import ProcessService
+from prompt_improver.cli.services.training_orchestrator import (
+    TrainingOrchestrator as TrainingService,
+)
 from prompt_improver.performance.monitoring.health.background_manager import (
     get_background_task_manager,
 )
@@ -60,13 +61,13 @@ def get_background_manager():
 class SignalAwareComponent:
     """Base class for CLI components that need signal handling integration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.signal_handler = get_shared_signal_handler()
         self.background_manager = get_background_manager()
         self._shutdown_priority = 10
         self._register_signal_handlers()
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register component-specific signal handlers."""
         self.signal_handler.register_shutdown_handler(
             f"{self.__class__.__name__}_shutdown", self.graceful_shutdown
@@ -99,7 +100,7 @@ __all__ = [
     "AsyncSignalHandler",
     "CLIOrchestrator",
     "EmergencyService",
-    "WorkflowService",
+    "ProcessService",
     "ProgressService",
     "RuleValidationService",
     "SessionService",
@@ -108,7 +109,7 @@ __all__ = [
     "SignalAwareComponent",
     "SystemStateReporter",
     "TrainingService",
-    "ProcessService",
+    "WorkflowService",
     "get_background_manager",
     "get_shared_signal_handler",
 ]

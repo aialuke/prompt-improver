@@ -1,4 +1,4 @@
-"""Performance Optimization Components
+"""Performance Optimization Components.
 
 Tools for optimizing async operations, response times, and batch processing.
 Note: OptimizationValidator has been moved to ml.optimization.validation for enhanced 2025 features.

@@ -18,13 +18,8 @@ Integration Test Coverage:
 
 import asyncio
 import hashlib
-import json
-import os
 import secrets
-import tempfile
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import patch
+from typing import Any
 
 import numpy as np
 import pytest
@@ -465,9 +460,7 @@ class TestAdversarialRobustnessIntegration:
         token = auth_result["token"]
         test_data = np.random.rand(50, 10)
 
-        # Using real models instead of mocksword_123!", Permission.RUN_ADVERSARIAL_TESTS
-        )
-        token = auth_result["token"]
+        # Using real models instead of mocks
 
         class VulnerableModel:
             def predict(self, X):
@@ -594,13 +587,10 @@ class TestCrossComponentSecurityValidation:
         )
         assert "result" in private_result
 
-        # Using real models instead of mocksword: str):
-            await asyncio.sleep(0.001)
-            return security_orchestrator.auth_service.authenticate_user(
-                username, password
-            )
-
-        result = await async_authenticate("ml_engineer", "secure_password_123!")
+        # Using real models instead of mocks - test direct authentication
+        result = security_orchestrator.auth_service.authenticate_user(
+            "ml_engineer", "secure_password_123!"
+        )
         assert result is not None
         assert result["username"] == "ml_engineer"
 
@@ -645,7 +635,7 @@ class TestSecurityPerformance:
         import time
 
         start_time = time.time()
-        for i in range(100):
+        for _i in range(100):
             result = security_orchestrator.authenticate_and_authorize(
                 "ml_engineer", "secure_password_123!", Permission.READ_MODELS
             )

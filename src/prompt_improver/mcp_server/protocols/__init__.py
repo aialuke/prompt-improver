@@ -7,14 +7,14 @@ Following the existing pattern of 113+ protocol files in the codebase,
 this provides clean separation of concerns and dependency injection patterns.
 """
 
-from .server_protocols import (
+from prompt_improver.mcp_server.protocols.server_protocols import (
     MCPServerProtocol,
-    ServerServicesProtocol,
     ServerConfigProtocol,
+    ServerServicesProtocol,
 )
 
 __all__ = [
     "MCPServerProtocol",
-    "ServerServicesProtocol", 
     "ServerConfigProtocol",
+    "ServerServicesProtocol",
 ]

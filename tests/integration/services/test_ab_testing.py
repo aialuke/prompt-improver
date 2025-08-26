@@ -4,14 +4,11 @@ Uses real database operations and authentic statistical computations following 2
 No mocking of core functionality - tests real behavior patterns.
 """
 
-import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Dict
 
 import numpy as np
 import pytest
 from hypothesis import (
-    assume,
     given,
     settings,
     strategies as st,
@@ -28,8 +25,6 @@ from prompt_improver.performance.testing.ab_testing_service import (
     ModernABConfig,
     ModernABTestingService as ABTestingService,
     StatisticalMethod,
-    StatisticalResult,
-    TestStatus,
 )
 
 
@@ -252,11 +247,11 @@ class TestModernABTestingFramework:
                 "sprt_statistic" in early_stop_result
                 or "log_likelihood_ratio" in early_stop_result
             )
-            assert early_stop_result["reason"] in [
+            assert early_stop_result["reason"] in {
                 "efficacy",
                 "futility",
                 "strong_evidence",
-            ]
+            }
         if "upper_boundary" in early_stop_result:
             assert early_stop_result["upper_boundary"] > 0
         if "lower_boundary" in early_stop_result:

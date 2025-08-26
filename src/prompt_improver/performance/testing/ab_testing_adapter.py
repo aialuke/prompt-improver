@@ -1,4 +1,4 @@
-"""A/B Testing Service Adapter
+"""A/B Testing Service Adapter.
 
 Adapter pattern implementation that wraps the concrete ModernABTestingService
 to implement the IABTestingService interface. This provides clean separation
@@ -6,7 +6,7 @@ between the performance layer implementation and the core service interface.
 """
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +25,7 @@ class ModernABTestingServiceAdapter(IABTestingService):
     and enabling dependency injection without layering violations.
     """
 
-    def __init__(self, config: ModernABConfig | None = None):
+    def __init__(self, config: ModernABConfig | None = None) -> None:
         """Initialize the adapter with underlying A/B testing service.
 
         Args:
@@ -42,7 +42,7 @@ class ModernABTestingServiceAdapter(IABTestingService):
         control_rule_ids: list[str],
         treatment_rule_ids: list[str],
         success_metric: str = "conversion_rate",
-        metadata: Dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a new A/B experiment via the underlying service."""
         return await self._service.create_experiment(
@@ -61,7 +61,7 @@ class ModernABTestingServiceAdapter(IABTestingService):
         db_session: AsyncSession,
         experiment_id: str,
         current_time: datetime | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform statistical analysis via the underlying service."""
         result = await self._service.analyze_experiment(
             db_session=db_session,
@@ -72,14 +72,13 @@ class ModernABTestingServiceAdapter(IABTestingService):
         # Convert the StatisticalResult model to dictionary if needed
         if hasattr(result, "model_dump"):
             return result.model_dump()
-        elif hasattr(result, "__dict__"):
+        if hasattr(result, "__dict__"):
             return result.__dict__
-        else:
-            return result
+        return result
 
     async def check_early_stopping(
         self, experiment_id: str, look_number: int, db_session: AsyncSession
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check early stopping via the underlying service."""
         return await self._service.check_early_stopping(
             experiment_id=experiment_id,
@@ -97,7 +96,7 @@ class ModernABTestingServiceAdapter(IABTestingService):
             db_session=db_session,
         )
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Run orchestrated analysis via the underlying service."""
         return await self._service.run_orchestrated_analysis(config)
 

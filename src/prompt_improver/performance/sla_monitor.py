@@ -5,27 +5,23 @@ and automatic performance optimization triggers.
 """
 
 import logging
+import os
 import statistics
 import time
 from collections import deque
 from collections.abc import Callable
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-import coredis
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
-from prompt_improver.database import (
-    ManagerMode,
-    create_security_context,
-    get_database_services,
-)
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
 
 logger = logging.getLogger(__name__)
 
 
-class SLAStatus(str, Enum):
+class SLAStatus(StrEnum):
     """SLA compliance status levels."""
 
     HEALTHY = "healthy"
@@ -80,7 +76,7 @@ class SLAMonitor:
         compliance_target: float = 0.95,
         redis_url: str | None = None,
         agent_id: str = "sla_monitor",
-    ):
+    ) -> None:
         """Initialize SLA monitor with DatabaseServices integration.
 
         Args:
@@ -93,9 +89,8 @@ class SLAMonitor:
         self.compliance_target = compliance_target
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/5")
         self.agent_id = agent_id
-        self._unified_manager = None
-        self._redis_client = None
-        self._use_unified_manager = True
+        self._l2_redis = L2RedisService()
+        self._use_l2_redis = True
         self._response_times = deque(maxlen=1000)
         self._request_history = deque(maxlen=100)
         self._current_metrics = SLAMetrics()
@@ -107,21 +102,17 @@ class SLAMonitor:
         self._monitoring_task = None
         self._monitoring_enabled = True
 
-    async def get_redis_client(self) -> coredis.Redis:
-        """Get Redis client for distributed metrics via DatabaseServices exclusively."""
-        if self._unified_manager is None:
-            self._unified_manager = await get_database_services(ManagerMode.HIGH_AVAILABILITY)
-            if not self._initialized:
-                await self._unified_manager.initialize()
-        if (
-            self._unified_manager
-            and hasattr(self._unified_manager, "cache.redis_client")
-            and self._unified_manager.cache.redis_client
-        ):
-            return self._unified_manager.cache.redis_client
-        raise RuntimeError(
-            "Redis client not available via DatabaseServices - ensure Redis is configured and running"
-        )
+    async def _ensure_redis_connection(self) -> bool:
+        """Ensure L2RedisService connection is available.
+
+        Returns:
+            True if Redis connection is available, False otherwise
+        """
+        try:
+            return await self._l2_redis.ping()
+        except Exception as e:
+            logger.warning(f"L2RedisService connection failed: {e}")
+            return False
 
     async def record_request(
         self,
@@ -219,11 +210,11 @@ class SLAMonitor:
             request_metrics: Latest request metrics
         """
         current_status = self._current_metrics.current_status
-        if current_status in [
+        if current_status in {
             SLAStatus.WARNING,
             SLAStatus.CRITICAL,
             SLAStatus.DEGRADED,
-        ]:
+        }:
             await self._trigger_alerts(current_status, request_metrics)
         if request_metrics.response_time_ms > self.sla_target_ms:
             logger.warning(
@@ -231,13 +222,16 @@ class SLAMonitor:
             )
 
     async def _store_metrics_in_redis(self, request_metrics: RequestMetrics) -> None:
-        """Store metrics in Redis for distributed monitoring.
+        """Store metrics in Redis for distributed monitoring via L2RedisService.
 
         Args:
             request_metrics: Request metrics to store
         """
         try:
-            redis = await self.get_redis_client()
+            if not await self._ensure_redis_connection():
+                return
+
+            # Store individual request as JSON object with TTL
             request_key = f"sla:request:{request_metrics.request_id}"
             request_data = {
                 "endpoint": request_metrics.endpoint,
@@ -246,25 +240,25 @@ class SLAMonitor:
                 "agent_type": request_metrics.agent_type,
                 "timestamp": request_metrics.timestamp,
             }
-            await redis.hset(request_key, mapping=request_data)
-            await redis.expire(request_key, self.monitoring_window_seconds)
+            await self._l2_redis.set(request_key, request_data, ttl_seconds=self.monitoring_window_seconds)
+
+            # Store current SLA metrics as JSON object
             metrics_key = "sla:metrics:current"
-            await redis.hset(
-                metrics_key,
-                mapping={
-                    "total_requests": self._current_metrics.total_requests,
-                    "successful_requests": self._current_metrics.successful_requests,
-                    "failed_requests": self._current_metrics.failed_requests,
-                    "avg_response_time_ms": self._current_metrics.avg_response_time_ms,
-                    "p95_response_time_ms": self._current_metrics.p95_response_time_ms,
-                    "sla_violations": self._current_metrics.sla_violations,
-                    "sla_compliance_rate": self._current_metrics.sla_compliance_rate,
-                    "current_status": self._current_metrics.current_status.value,
-                    "last_updated": self._current_metrics.last_updated,
-                },
-            )
+            metrics_data = {
+                "total_requests": self._current_metrics.total_requests,
+                "successful_requests": self._current_metrics.successful_requests,
+                "failed_requests": self._current_metrics.failed_requests,
+                "avg_response_time_ms": self._current_metrics.avg_response_time_ms,
+                "p95_response_time_ms": self._current_metrics.p95_response_time_ms,
+                "sla_violations": self._current_metrics.sla_violations,
+                "sla_compliance_rate": self._current_metrics.sla_compliance_rate,
+                "current_status": self._current_metrics.current_status.value,
+                "last_updated": self._current_metrics.last_updated,
+            }
+            await self._l2_redis.set(metrics_key, metrics_data, ttl_seconds=self.monitoring_window_seconds)
+
         except Exception as e:
-            logger.warning(f"Failed to store SLA metrics in Redis: {e}")
+            logger.warning(f"Failed to store SLA metrics via L2RedisService: {e}")
 
     async def _trigger_alerts(
         self, status: SLAStatus, request_metrics: RequestMetrics
@@ -287,7 +281,7 @@ class SLAMonitor:
             try:
                 await callback(alert_data)
             except Exception as e:
-                logger.error(f"Alert callback failed: {e}")
+                logger.exception(f"Alert callback failed: {e}")
 
     def register_alert_callback(self, callback: Callable) -> None:
         """Register callback for SLA alerts.
@@ -339,32 +333,26 @@ class SLAMonitor:
             stats["avg_time"] /= max(1, stats["count"])
         for stats in agent_stats.values():
             stats["avg_time"] /= max(1, stats["count"])
-        unified_performance = {}
-        if self._use_unified_manager and self._unified_manager:
+        l2_redis_performance = {}
+        if self._use_l2_redis and self._l2_redis:
             try:
-                unified_stats = (
-                    self._unified_manager.get_cache_stats()
-                    if hasattr(self._unified_manager, "get_cache_stats")
-                    else {}
-                )
-                unified_performance = {
+                l2_stats = self._l2_redis.get_stats()
+                l2_redis_performance = {
                     "enabled": True,
-                    "healthy": self._unified_manager.is_healthy()
-                    if hasattr(self._unified_manager, "is_healthy")
-                    else True,
-                    "performance_improvement": "8.4x via connection pooling optimization",
-                    "connection_pool_health": self._unified_manager.is_healthy()
-                    if hasattr(self._unified_manager, "is_healthy")
-                    else True,
-                    "mode": "HIGH_AVAILABILITY",
-                    "cache_optimization": "L1/L2 cache enabled for frequently accessed SLA metrics",
+                    "healthy": l2_stats["health_status"] == "healthy",
+                    "performance_improvement": "Optimized via L2RedisService <10ms operations",
+                    "connection_health": l2_stats["currently_connected"],
+                    "success_rate": l2_stats["success_rate"],
+                    "avg_response_time_ms": l2_stats["avg_response_time_ms"],
+                    "mode": "UNIFIED_CACHE_ARCHITECTURE",
+                    "cache_optimization": "L2 Redis cache for distributed SLA metrics",
                 }
             except Exception as e:
-                unified_performance = {"enabled": True, "error": str(e)}
+                l2_redis_performance = {"enabled": True, "error": str(e)}
         else:
-            unified_performance = {
+            l2_redis_performance = {
                 "enabled": False,
-                "reason": "Using direct Redis connection",
+                "reason": "L2RedisService disabled",
             }
         return {
             "current_metrics": {
@@ -395,7 +383,7 @@ class SLAMonitor:
                 "overall_status": metrics.current_status.value,
                 "recommendations": self._generate_recommendations(metrics),
             },
-            "unified_connection_manager": unified_performance,
+            "l2_redis_service": l2_redis_performance,
         }
 
     def _generate_recommendations(self, metrics: SLAMetrics) -> list[str]:
@@ -436,10 +424,10 @@ class SLAMonitor:
         self._request_history.clear()
         self._current_metrics = SLAMetrics()
         try:
-            redis = await self.get_redis_client()
-            await redis.delete("sla:metrics:current")
+            if await self._ensure_redis_connection():
+                await self._l2_redis.delete("sla:metrics:current")
         except Exception as e:
-            logger.warning(f"Failed to reset Redis metrics: {e}")
+            logger.warning(f"Failed to reset Redis metrics via L2RedisService: {e}")
 
     async def health_check(self) -> dict[str, Any]:
         """Health check for SLA monitoring system with DatabaseServices integration.
@@ -458,39 +446,33 @@ class SLAMonitor:
                 f"SLA compliance critically low: {metrics.sla_compliance_rate:.2f}"
             )
         try:
-            redis = await self.get_redis_client()
-            await redis.ping()
-            redis_healthy = True
+            redis_healthy = await self._ensure_redis_connection()
+            if not redis_healthy:
+                health_issues.append("L2RedisService connection failed")
         except Exception:
             redis_healthy = False
-            health_issues.append("Redis connection failed")
-        unified_health = {}
-        if self._use_unified_manager and self._unified_manager:
+            health_issues.append("L2RedisService ping failed")
+        l2_redis_health = {}
+        if self._use_l2_redis and self._l2_redis:
             try:
-                unified_stats = (
-                    self._unified_manager.get_cache_stats()
-                    if hasattr(self._unified_manager, "get_cache_stats")
-                    else {}
-                )
-                unified_health = {
+                l2_stats = self._l2_redis.get_stats()
+                l2_redis_health = {
                     "enabled": True,
-                    "healthy": self._unified_manager.is_healthy()
-                    if hasattr(self._unified_manager, "is_healthy")
-                    else True,
-                    "performance_improvement": "8.4x via connection pooling optimization",
-                    "connection_pool_health": self._unified_manager.is_healthy()
-                    if hasattr(self._unified_manager, "is_healthy")
-                    else True,
+                    "healthy": l2_stats["health_status"] == "healthy",
+                    "performance_improvement": "Optimized via L2RedisService <10ms operations",
+                    "connection_health": l2_stats["currently_connected"],
+                    "success_rate": l2_stats["success_rate"],
+                    "avg_response_time_ms": l2_stats["avg_response_time_ms"],
                 }
-                if not unified_health["healthy"]:
-                    health_issues.append("DatabaseServices unhealthy")
+                if not l2_redis_health["healthy"]:
+                    health_issues.append("L2RedisService unhealthy")
             except Exception as e:
-                unified_health = {"enabled": True, "error": str(e)}
-                health_issues.append(f"DatabaseServices error: {e!s}")
+                l2_redis_health = {"enabled": True, "error": str(e)}
+                health_issues.append(f"L2RedisService error: {e!s}")
         else:
-            unified_health = {
+            l2_redis_health = {
                 "enabled": False,
-                "reason": "Using direct Redis connection",
+                "reason": "L2RedisService disabled",
             }
         overall_status = "healthy" if not health_issues else "degraded"
         return {
@@ -501,11 +483,11 @@ class SLAMonitor:
             "p95_response_time_ms": metrics.p95_response_time_ms,
             "redis_connected": redis_healthy,
             "monitoring_enabled": self._monitoring_enabled,
-            "unified_connection_manager": unified_health,
+            "l2_redis_service": l2_redis_health,
             "performance_enhancements": {
-                "connection_pooling": unified_health.get("enabled", False),
-                "cache_optimization": unified_health.get("enabled", False),
-                "performance_improvement": unified_health.get(
+                "l2_redis_enabled": l2_redis_health.get("enabled", False),
+                "cache_optimization": l2_redis_health.get("enabled", False),
+                "performance_improvement": l2_redis_health.get(
                     "performance_improvement", "N/A"
                 ),
             },

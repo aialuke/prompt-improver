@@ -5,14 +5,13 @@ Implements emergency operations triggered by signals: checkpoint creation, statu
 import json
 import logging
 import os
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 import psutil
 
 from prompt_improver.cli.core.progress_preservation import ProgressService
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import TrainingSession
 
 if TYPE_CHECKING:
@@ -30,7 +29,7 @@ class EmergencyService:
     - CoreDis-aware resource monitoring
     """
 
-    def __init__(self, backup_dir: Path | None = None):
+    def __init__(self, backup_dir: Path | None = None) -> None:
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./emergency_backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -103,7 +102,7 @@ class EmergencyService:
             self.logger.info(f"Emergency checkpoint created: {checkpoint_id}")
             return result
         except Exception as e:
-            self.logger.error(f"Failed to create emergency checkpoint: {e}")
+            self.logger.exception(f"Failed to create emergency checkpoint: {e}")
             return {"status": "error", "error": str(e), "checkpoint_id": None}
 
     async def generate_status_report(self, context: "SignalContext") -> dict[str, Any]:
@@ -152,7 +151,7 @@ class EmergencyService:
             self.logger.info(f"Status report generated: {report_id}")
             return status_report
         except Exception as e:
-            self.logger.error(f"Failed to generate status report: {e}")
+            self.logger.exception(f"Failed to generate status report: {e}")
             return {"status": "error", "error": str(e), "report_id": None}
 
     async def reload_configuration(self, context: "SignalContext") -> dict[str, Any]:
@@ -193,7 +192,7 @@ class EmergencyService:
             self.logger.info(f"Configuration reloaded: {reload_id}")
             return reload_report
         except Exception as e:
-            self.logger.error(f"Failed to reload configuration: {e}")
+            self.logger.exception(f"Failed to reload configuration: {e}")
             return {"status": "error", "error": str(e), "reload_id": None}
 
     async def _gather_system_state(self) -> dict[str, Any]:
@@ -224,9 +223,7 @@ class EmergencyService:
                     select(TrainingSession).where(text("status = 'running'"))
                 )
                 active_sessions = result.scalars().all()
-                sessions_data = []
-                for session in active_sessions:
-                    sessions_data.append({
+                sessions_data = [{
                         "session_id": session.session_id,
                         "started_at": session.started_at.isoformat()
                         if session.started_at
@@ -234,7 +231,7 @@ class EmergencyService:
                         "max_iterations": session.max_iterations,
                         "current_iteration": session.current_iteration,
                         "status": session.status,
-                    })
+                    } for session in active_sessions]
                 return {
                     "active_sessions": len(sessions_data),
                     "sessions": sessions_data,

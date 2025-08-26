@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import asyncpg
 from sqlalchemy import text
@@ -63,7 +63,7 @@ async def wait_for_postgres_async(
             return True
         except (asyncpg.PostgresError, OSError) as e:
             if attempt == max_retries - 1:
-                logger.error(f"PostgreSQL not ready after {max_retries} attempts: {e}")
+                logger.exception(f"PostgreSQL not ready after {max_retries} attempts: {e}")
                 return False
             await asyncio.sleep(retry_delay)
     return False
@@ -95,7 +95,7 @@ def wait_for_postgres_sync(
         loop.close()
         return result
     except Exception as e:
-        logger.error(f"Failed to check PostgreSQL readiness: {e}")
+        logger.exception(f"Failed to check PostgreSQL readiness: {e}")
         return False
 
 
@@ -144,7 +144,7 @@ async def ensure_test_database_exists(
         await conn.close()
         return True
     except Exception as e:
-        logger.error(f"Failed to ensure test database exists: {e}")
+        logger.exception(f"Failed to ensure test database exists: {e}")
         return False
 
 
@@ -280,7 +280,7 @@ async def _cleanup_test_database_docker_fallback(test_db_name: str, user: str) -
         logger.error(f"Create command stdout: {create_result.stdout}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error in Docker exec cleanup: {e}")
+        logger.exception(f"Unexpected error in Docker exec cleanup: {e}")
         return False
 
 
@@ -293,7 +293,6 @@ async def reflection_based_cleanup(conn):
     """
     try:
         from sqlalchemy import MetaData, text
-        from sqlalchemy.engine import reflection
 
         reflected_metadata = MetaData()
         await conn.run_sync(reflected_metadata.reflect)
@@ -403,14 +402,14 @@ async def create_test_engine_with_retry(
                                     "Successfully created tables after nuclear cleanup"
                                 )
                     except Exception as nuclear_error:
-                        logger.error(f"Nuclear cleanup failed: {nuclear_error}")
+                        logger.exception(f"Nuclear cleanup failed: {nuclear_error}")
                         raise table_error
                 else:
                     raise
             return engine
         except Exception as e:
             if attempt == max_retries - 1:
-                logger.error(
+                logger.exception(
                     f"Failed to create engine after {max_retries} attempts: {e}"
                 )
                 raise
@@ -461,6 +460,6 @@ async def _create_tables_individually(conn):
             if "already exists" in str(table_error).lower():
                 logger.debug(f"Table {table.name} already exists, skipping")
             else:
-                logger.error(f"Failed to create table {table.name}: {table_error}")
+                logger.exception(f"Failed to create table {table.name}: {table_error}")
                 raise
     logger.info("Successfully created all tables and indexes individually")

@@ -13,14 +13,18 @@ Designed for production monitoring with <10ms health check response times.
 """
 
 import asyncio
+import contextlib
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
-from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-from .health_checker import (
+from prompt_improver.database.services.health.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+)
+from prompt_improver.database.services.health.health_checker import (
     AggregatedHealthResult,
     CacheHealthChecker,
     DatabaseHealthChecker,
@@ -83,29 +87,29 @@ class HealthManager:
 
     def __init__(
         self,
-        config: Optional[HealthManagerConfig] = None,
+        config: HealthManagerConfig | None = None,
         service_name: str = "health_manager",
-    ):
+    ) -> None:
         self.config = config or HealthManagerConfig()
         self.service_name = service_name
 
         # Component tracking
-        self._health_checkers: Dict[str, HealthChecker] = {}
-        self._circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self._health_checkers: dict[str, HealthChecker] = {}
+        self._circuit_breakers: dict[str, CircuitBreaker] = {}
 
         # State management
-        self._last_check_results: Dict[str, HealthResult] = {}
-        self._last_aggregated_result: Optional[AggregatedHealthResult] = None
-        self._last_full_check_time: Optional[datetime] = None
+        self._last_check_results: dict[str, HealthResult] = {}
+        self._last_aggregated_result: AggregatedHealthResult | None = None
+        self._last_full_check_time: datetime | None = None
 
         # Background monitoring
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: asyncio.Task | None = None
         self._is_monitoring = False
         self._shutdown_event = asyncio.Event()
 
         # Failure tracking
-        self._consecutive_failures: Dict[str, int] = {}
-        self._component_recovery_times: Dict[str, datetime] = {}
+        self._consecutive_failures: dict[str, int] = {}
+        self._component_recovery_times: dict[str, datetime] = {}
 
         # Performance metrics
         self.total_checks = 0
@@ -176,7 +180,7 @@ class HealthManager:
 
     async def check_component_health(
         self, component_name: str, use_circuit_breaker: bool = True
-    ) -> Optional[HealthResult]:
+    ) -> HealthResult | None:
         """Check health of a specific component."""
         if component_name not in self._health_checkers:
             logger.error(
@@ -246,7 +250,7 @@ class HealthManager:
             return result
 
         except Exception as e:
-            logger.error(f"Health check failed for {component_name}: {e}")
+            logger.exception(f"Health check failed for {component_name}: {e}")
 
             error_result = HealthResult(
                 component=component_name,
@@ -281,7 +285,7 @@ class HealthManager:
             )
 
         start_time = time.time()
-        component_results: Dict[str, HealthResult] = {}
+        component_results: dict[str, HealthResult] = {}
 
         if parallel and len(self._health_checkers) > 1:
             # Execute health checks in parallel with concurrency limit
@@ -294,7 +298,7 @@ class HealthManager:
 
             # Create tasks for parallel execution
             tasks = [
-                check_with_semaphore(name) for name in self._health_checkers.keys()
+                check_with_semaphore(name) for name in self._health_checkers
             ]
 
             # Wait for all checks to complete
@@ -310,7 +314,7 @@ class HealthManager:
 
         else:
             # Sequential execution
-            for name in self._health_checkers.keys():
+            for name in self._health_checkers:
                 result = await self.check_component_health(name)
                 if result:
                     component_results[name] = result
@@ -340,7 +344,7 @@ class HealthManager:
         return aggregated_result
 
     def _calculate_overall_status(
-        self, component_results: Dict[str, HealthResult]
+        self, component_results: dict[str, HealthResult]
     ) -> HealthStatus:
         """Calculate overall health status from component results."""
         if not component_results:
@@ -379,7 +383,7 @@ class HealthManager:
 
         return HealthStatus.UNKNOWN
 
-    def get_cached_result(self, component_name: str) -> Optional[HealthResult]:
+    def get_cached_result(self, component_name: str) -> HealthResult | None:
         """Get cached health result for a component."""
         result = self._last_check_results.get(component_name)
 
@@ -388,7 +392,7 @@ class HealthManager:
 
         return None
 
-    def get_last_aggregated_result(self) -> Optional[AggregatedHealthResult]:
+    def get_last_aggregated_result(self) -> AggregatedHealthResult | None:
         """Get the last aggregated health check result."""
         if self._last_aggregated_result and self._last_full_check_time:
             age_seconds = (
@@ -434,13 +438,11 @@ class HealthManager:
         if self._monitoring_task:
             try:
                 await asyncio.wait_for(self._monitoring_task, timeout=10.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Background monitoring task did not stop gracefully")
                 self._monitoring_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._monitoring_task
-                except asyncio.CancelledError:
-                    pass
 
         logger.info("Background health monitoring stopped")
 
@@ -463,7 +465,7 @@ class HealthManager:
                         self._shutdown_event.wait(), timeout=interval
                     )
                     break  # Shutdown requested
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Normal timeout, continue with health check
 
                 # Perform health check
@@ -472,12 +474,12 @@ class HealthManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Background monitoring error: {e}")
+                logger.exception(f"Background monitoring error: {e}")
                 await asyncio.sleep(min(interval * 2, 60))  # Back off on error
 
         logger.debug("Background monitoring loop exited")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive health manager statistics."""
         circuit_breaker_stats = {}
         if self.config.enable_circuit_breakers:

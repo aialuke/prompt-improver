@@ -6,13 +6,13 @@ from user data to prevent prompt injection attacks according to OWASP 2025 guide
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class PromptRole(str, Enum):
+class PromptRole(StrEnum):
     """Roles for structured prompt components."""
 
     SYSTEM = "system"
@@ -33,7 +33,7 @@ class StructuredPromptComponent:
 class StructuredPromptBuilder:
     """Builder for creating secure structured prompts with clear separation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize structured prompt builder."""
         self.components: list[StructuredPromptComponent] = []
         self.security_rules_enabled = True

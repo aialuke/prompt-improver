@@ -10,13 +10,9 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
-    ImprovementSessionCreate,
     UserFeedbackCreate,
 )
 from prompt_improver.performance.monitoring.health.background_manager import (
@@ -343,6 +339,7 @@ class MCPMLDataCollector:
             # Create ImprovementSession directly using the database connection
             # Since there's no direct create method in analytics repo, we'll use the base repo functionality
             from prompt_improver.database.models import ImprovementSession
+            from prompt_improver.database.composition import DatabaseServices
 
             improvement_session = ImprovementSession(
                 session_id=data.session_id,

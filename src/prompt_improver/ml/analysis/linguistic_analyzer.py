@@ -6,18 +6,20 @@ complexity metrics, and readability assessment.
 """
 import asyncio
 from dataclasses import dataclass, field
-from functools import lru_cache
 import logging
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 import nltk
+import hashlib
+import json
 from prompt_improver.core.config.textstat import get_textstat_wrapper
+from prompt_improver.services.cache.cache_facade import CacheFacade
 from ..models.model_manager import ModelManager, get_lightweight_ner_pipeline, get_memory_optimized_config, get_ultra_lightweight_ner_pipeline, model_config
 from ..learning.features.english_nltk_manager import get_english_nltk_manager
 from .dependency_parser import DependencyParser
 from .ner_extractor import NERExtractor
 try:
-    from transformers import auto_model_for_token_classification, auto_tokenizer, pipeline, set_seed
+    # from transformers import auto_model_for_token_classification, auto_tokenizer, pipeline, set_seed  # Converted to lazy loading
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     pipeline = None
@@ -81,14 +83,20 @@ class LinguisticFeatures:
 class LinguisticAnalyzer:
     """Advanced linguistic analysis for prompt quality assessment."""
 
-    def __init__(self, config: LinguisticConfig | None=None):
+    def __init__(self, config: LinguisticConfig | None=None, cache_facade: CacheFacade | None=None):
         """Initialize the linguistic analyzer with configuration."""
         self.config = config or LinguisticConfig()
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
+        # Initialize ML-specific cache with 4-hour TTL for stable results
+        self._cache = cache_facade or CacheFacade(
+            l1_max_size=1000,  # Preserve original cache size
+            l2_default_ttl=14400,  # 4 hours for ML results
+            enable_l2=True,  # Use L2 for persistence across restarts
+        )
         if TRANSFORMERS_AVAILABLE and set_seed:
             set_seed(42)
-        import numpy as np
-        np.random.seed(42)
+        # import numpy as np  # Converted to lazy loading
+        get_numpy().random.seed(42)
         self.ner_extractor = None
         self.dependency_parser = None
         self.transformers_pipeline = None
@@ -398,12 +406,66 @@ class LinguisticAnalyzer:
         confidence = analysis_count / max_analyses
         return confidence
 
-    @lru_cache(maxsize=1000)
+    def _generate_ml_cache_key(self, text: str) -> str:
+        """Generate ML-specific cache key including instance configuration.
+        
+        Cache key pattern: ml:linguistic:{text_hash}:{config_hash}
+        """
+        # Include relevant config that affects analysis results
+        config_elements = [
+            str(self.config.enable_ner),
+            str(self.config.enable_dependency_parsing), 
+            str(self.config.enable_readability),
+            str(self.config.enable_complexity_metrics),
+            str(self.config.enable_prompt_segmentation),
+            str(self.config.use_transformers_ner),
+            str(self.config.use_lightweight_models),
+            str(self.config.use_ultra_lightweight_models)
+        ]
+        config_hash = hashlib.md5('|'.join(config_elements).encode()).hexdigest()[:8]
+        
+        # Hash text content for cache key
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()[:12]
+        
+        return f"ml:linguistic:{text_hash}:{config_hash}"
+
+    async def analyze_cached_async(self, text: str) -> LinguisticFeatures:
+        """Async cached version of analyze method using unified cache."""
+        if not self.config.enable_caching:
+            return await self.analyze_async(text)
+            
+        cache_key = self._generate_ml_cache_key(text)
+        
+        # Try to get from unified cache first
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            self.logger.debug(f"Linguistic analysis cache hit for key: {cache_key}")
+            return cached_result
+            
+        # Cache miss - perform analysis and cache result
+        result = await self.analyze_async(text)
+        
+        # Cache with ML-specific TTL (4 hours)
+        await self._cache.set(
+            key=cache_key,
+            value=result,
+            l2_ttl=14400,  # 4 hours
+            l1_ttl=3600    # 1 hour for L1 
+        )
+        
+        self.logger.debug(f"Linguistic analysis cached with key: {cache_key}")
+        return result
+
     def analyze_cached(self, text: str) -> LinguisticFeatures:
-        """Cached version of analyze method."""
-        if self.config.enable_caching:
+        """Cached version of analyze method using unified cache infrastructure."""
+        if not self.config.enable_caching:
             return self.analyze(text)
-        return self.analyze(text)
+            
+        try:
+            loop = asyncio.get_running_loop()
+            return asyncio.run_coroutine_threadsafe(self.analyze_cached_async(text), loop).result()
+        except RuntimeError:
+            return asyncio.run(self.analyze_cached_async(text))
 
     def cleanup(self):
         """Explicitly cleanup resources."""
@@ -424,6 +486,8 @@ class LinguisticAnalyzer:
             if self.model_manager:
                 memory_info['model_mb'] = self.model_manager.get_memory_usage()
             import psutil
+            from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+            from prompt_improver.core.utils.lazy_ml_loader import get_transformers_components
             process = psutil.process()
             memory_info['total_mb'] = process.memory_info().rss / 1024 / 1024
         except Exception as e:
@@ -483,11 +547,14 @@ def get_memory_optimized_config(target_memory_mb: int) -> LinguisticConfig:
     config.max_memory_threshold_mb = target_memory_mb
     return config
 
-def create_test_analyzer() -> LinguisticAnalyzer:
+def create_test_analyzer(cache_facade: CacheFacade | None = None) -> LinguisticAnalyzer:
     """Create a LinguisticAnalyzer instance optimized for testing.
 
+    Args:
+        cache_facade: Optional cache facade for testing
+        
     Returns:
         LinguisticAnalyzer with lightweight configuration
     """
     config = get_lightweight_config()
-    return LinguisticAnalyzer(config)
+    return LinguisticAnalyzer(config, cache_facade)

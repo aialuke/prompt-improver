@@ -19,9 +19,7 @@ Testing best practices applied from 2025 research:
 - Real performance validation within expected bounds
 """
 
-import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pytest
@@ -111,7 +109,7 @@ def gaussian_process_data():
     np.random.seed(123)
     n_samples = 15
     gp_data = []
-    for i in range(n_samples):
+    for _i in range(n_samples):
         params = {
             "threshold": np.random.uniform(0.1, 0.9),
             "weight": np.random.uniform(0.5, 1.0),
@@ -236,7 +234,7 @@ class TestMultiObjectiveOptimization:
                 objectives_differ = any(
                     first_solution.objectives.get(obj_name, 0)
                     != second_solution.objectives.get(obj_name, 0)
-                    for obj_name in first_solution.objectives.keys()
+                    for obj_name in first_solution.objectives
                 )
                 assert objectives_differ
 
@@ -391,9 +389,7 @@ class TestMultiObjectiveOptimization:
             for key in expected_keys:
                 if key in gp_result:
                     if (
-                        key == "predicted_performance"
-                        or key == "uncertainty_estimate"
-                        or key == "model_confidence"
+                        key in {"predicted_performance", "uncertainty_estimate", "model_confidence"}
                     ):
                         assert 0.0 <= gp_result[key] <= 1.0
                     elif key == "expected_improvement":
@@ -492,7 +488,7 @@ class TestMultiObjectiveOptimization:
             rule_id, performance_data, insufficient_mo_data
         )
         assert "rule_id" in result
-        assert result["status"] in ["optimized", "insufficient_data"]
+        assert result["status"] in {"optimized", "insufficient_data"}
         if "multi_objective_optimization" in result:
             mo_result = result["multi_objective_optimization"]
             assert mo_result is None or isinstance(mo_result, dict)
@@ -719,15 +715,13 @@ class TestMultiObjectiveIntegration:
     @pytest.mark.asyncio
     async def test_multiobjective_scalability(self, rule_optimizer_mo):
         """Test scalability with larger datasets using real algorithms."""
-        large_data = []
         np.random.seed(456)
-        for i in range(60):
-            large_data.append({
+        large_data = [{
                 "score": 0.5 + 0.4 * np.random.random(),
                 "context": f"context_{i % 10}",
                 "timestamp": datetime.now().isoformat(),
                 "execution_time_ms": 50 + np.random.randint(0, 100),
-            })
+            } for i in range(60)]
         rule_id = "rule_scalability_test"
         performance_data = {
             rule_id: {"total_applications": len(large_data), "avg_improvement": 0.75}

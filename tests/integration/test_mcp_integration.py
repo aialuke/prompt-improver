@@ -26,7 +26,9 @@ class TestMCPIntegration:
 
     async def test_end_to_end_prompt_improvement(self, test_db_session):
         """Test complete prompt improvement workflow with real components following 2025 best practices."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -54,7 +56,9 @@ class TestMCPIntegration:
     @pytest.mark.performance
     async def test_performance_requirement_compliance(self, test_db_session):
         """Verify <200ms performance requirement using real service implementation."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         test_prompts = [
             "Simple prompt",
@@ -65,7 +69,7 @@ class TestMCPIntegration:
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
         )
-        for i, prompt in enumerate(test_prompts):
+        for _i, prompt in enumerate(test_prompts):
             start_time = asyncio.get_event_loop().time()
             result = await service.improve_prompt(
                 prompt=prompt,
@@ -134,7 +138,7 @@ class TestDatabaseIntegration:
         stored_rule = result.scalar_one_or_none()
         assert stored_rule is not None
         assert stored_rule.rule_name == "Integration Test Rule"
-        assert stored_rule.default_parameters["test"] == True
+        assert stored_rule.default_parameters["test"]
         assert stored_rule.default_parameters["confidence_threshold"] == 0.8
         assert stored_rule.parameter_constraints["weight"]["max"] == 2.0
 
@@ -173,7 +177,9 @@ class TestServiceIntegration:
         self, test_db_session, sample_rule_metadata
     ):
         """Test prompt improvement service with real database interactions and real service behavior following 2025 best practices."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         for rule in sample_rule_metadata:
             test_db_session.add(rule)
@@ -285,7 +291,9 @@ class TestEndToEndWorkflow:
     ):
         """Test complete prompt improvement workflow using real services following 2025 best practices."""
         from prompt_improver.services.analytics import AnalyticsService
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         for rule in sample_rule_metadata:
             test_db_session.add(rule)
@@ -556,7 +564,7 @@ class TestDatabaseConstraintValidation:
         test_db_session.add(invalid_perf)
         try:
             await test_db_session.commit()
-            assert False, "Expected IntegrityError but none was raised"
+            raise AssertionError("Expected IntegrityError but none was raised")
         except IntegrityError as e:
             error_msg = str(e)
             assert (
@@ -866,7 +874,9 @@ class TestRealServiceErrorHandling:
 
     async def test_prompt_improvement_service_error_handling(self, test_db_session):
         """Test error handling in PromptImprovementService with real database operations."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -937,7 +947,9 @@ class TestRealServiceErrorHandling:
 
     async def test_database_connection_error_handling(self, test_db_session):
         """Test service behavior with database connection issues."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -958,7 +970,9 @@ class TestRealServiceErrorHandling:
         """Test concurrent operations with real services."""
         import asyncio
 
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -966,13 +980,12 @@ class TestRealServiceErrorHandling:
 
         async def improve_prompt_task(prompt_id: int):
             try:
-                result = await service.improve_prompt(
+                return await service.improve_prompt(
                     prompt=f"Concurrent test prompt {prompt_id}",
                     user_context={"domain": "concurrent_test"},
                     session_id=f"concurrent_test_{prompt_id}",
                     db_session=test_db_session,
                 )
-                return result
             except Exception as e:
                 return {"error": str(e)}
 
@@ -989,7 +1002,9 @@ class TestRealServiceErrorHandling:
 
     async def test_edge_case_prompt_types(self, test_db_session):
         """Test real service behavior with edge case prompt types."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -1023,7 +1038,9 @@ class TestRealServiceErrorHandling:
         import asyncio
         import time
 
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -1083,7 +1100,9 @@ class TestRealServiceErrorHandling:
 
         import psutil
 
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024
@@ -1116,7 +1135,9 @@ class TestRealBehaviorValidation:
     async def test_real_vs_mock_behavior_comparison(self, test_db_session):
         """Compare real service behavior against expected patterns to validate migration success."""
         from prompt_improver.services.analytics import AnalyticsService
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -1157,7 +1178,9 @@ class TestRealBehaviorValidation:
     async def test_migration_completeness_validation(self, test_db_session):
         """Validate that the migration from mocks to real behavior is complete and effective."""
         from prompt_improver.services.analytics import AnalyticsService
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -1193,7 +1216,9 @@ class TestRealBehaviorValidation:
 
     async def test_2025_best_practices_compliance(self, test_db_session):
         """Validate that the migrated tests follow 2025 testing best practices."""
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
@@ -1215,8 +1240,10 @@ class TestRealBehaviorValidation:
 
     async def test_real_data_persistence_validation(self, test_db_session):
         """Validate that real database operations persist data correctly."""
-        from prompt_improver.database.models import RuleMetadata, RulePerformance
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+        from prompt_improver.database.models import RuleMetadata
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
+        )
 
         test_rule = RuleMetadata(
             rule_id="persistence_test_rule",
@@ -1254,4 +1281,4 @@ class TestRealBehaviorValidation:
         stored_rule = result_query.scalar_one_or_none()
         assert stored_rule is not None
         assert stored_rule.rule_name == "Persistence Test Rule"
-        assert stored_rule.enabled == True
+        assert stored_rule.enabled

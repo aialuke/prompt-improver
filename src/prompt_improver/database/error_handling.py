@@ -7,7 +7,7 @@ integrated with the unified retry manager.
 import asyncio
 import logging
 from enum import Enum
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import asyncpg
 
@@ -168,7 +168,6 @@ def create_database_error_classifier():
 
     def classify_for_retry(error: Exception):
         """Classify database error for retry manager."""
-        from prompt_improver.core.services.resilience.retry_service_facade import RetryServiceFacade as RetryManager
 
         category, _ = DatabaseErrorClassifier.classify_error(error)
         category_mapping = {
@@ -184,9 +183,6 @@ def create_database_error_classifier():
 
 def get_default_database_retry_config():
     """Get default retry configuration for database operations."""
-    from prompt_improver.core.services.resilience.retry_service_facade import (
-        RetryServiceFacade as RetryManager,
-    )
 
     return RetryConfig(
         max_attempts=3,
@@ -213,7 +209,7 @@ def get_default_database_retry_config():
 async def execute_with_database_retry(operation, operation_name: str):
     """Execute database operation with unified retry logic."""
     from prompt_improver.core.services.resilience.retry_service_facade import get_retry_service as get_retry_manager
-
+    from prompt_improver.core.domain.enums import RetryableErrorType
     retry_manager = get_retry_manager()
     config = get_default_database_retry_config()
     config.operation_name = operation_name

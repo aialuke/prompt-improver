@@ -310,6 +310,8 @@ class DatabasePerformanceMonitor:
         from datetime import timedelta
         from prompt_improver.database.services.optional_registry import get_optional_services_registry
         from prompt_improver.database.protocols.events import EventType
+        import logging
+        logger = logging.getLogger(__name__)
 
         registry = get_optional_services_registry()
         current_time = datetime.now(UTC)

@@ -1,18 +1,18 @@
-"""Security Configuration Module
+"""Security Configuration Module.
 
 Unified security configuration consolidating all security-related settings
 with environment-specific profiles and comprehensive validation.
 """
 
 import os
-from enum import Enum
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
-class SecurityProfile(str, Enum):
+class SecurityProfile(StrEnum):
     """Security profiles for different deployment scenarios."""
 
     DEVELOPMENT = "development"
@@ -22,7 +22,7 @@ class SecurityProfile(str, Enum):
     HIGH_SECURITY = "high_security"
 
 
-class AuthenticationMode(str, Enum):
+class AuthenticationMode(StrEnum):
     """Authentication modes supported by unified manager."""
 
     API_KEY_ONLY = "api_key_only"
@@ -201,7 +201,7 @@ class SecurityConfig(BaseSettings):
             raise ValueError("secret_key is required")
         if len(v) < 32:
             raise ValueError(f"secret_key must be at least 32 characters long, got {len(v)}")
-        
+
         # Check for development keys in production
         env = os.getenv("ENVIRONMENT", "development").lower()
         if ("dev-secret-key" in v.lower() or "development" in v.lower()) and env == "production":
@@ -216,17 +216,17 @@ class SecurityConfig(BaseSettings):
             self.validation.min_threat_score_to_block = 0.9
             self.rate_limiting.basic_tier_rate_limit = 1000
             self.cryptography.auto_key_rotation_enabled = False
-            
+
         elif self.security_profile == SecurityProfile.TESTING:
             self.authentication.max_failed_attempts_per_hour = 50
             self.validation.min_threat_score_to_block = 0.8
             self.rate_limiting.basic_tier_rate_limit = 300
-            
+
         elif self.security_profile == SecurityProfile.STAGING:
             self.authentication.max_failed_attempts_per_hour = 20
             self.validation.min_threat_score_to_block = 0.75
             self.rate_limiting.basic_tier_rate_limit = 120
-            
+
         elif self.security_profile == SecurityProfile.HIGH_SECURITY:
             self.authentication.max_failed_attempts_per_hour = 5
             self.authentication.lockout_duration_minutes = 60

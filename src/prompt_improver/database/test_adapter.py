@@ -12,16 +12,17 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.config import AppConfig
+import os
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
 )
+from prompt_improver.database.composition import DatabaseServices
 
 logger = logging.getLogger(__name__)
 

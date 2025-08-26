@@ -12,15 +12,19 @@ from prompt_improver.mcp_server.middleware import (
     SecurityMiddlewareAdapter,
     create_mcp_server_security_middleware,
 )
-from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
 from prompt_improver.security.output_validator import OutputValidator
+from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
 from prompt_improver.security.unified.security_service_facade import (
     get_security_service_facade,
 )
+
 # Legacy imports removed - now using modern SecurityServiceFacade
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer, ServerServicesProtocol as ServerServices
+    from prompt_improver.shared.interfaces.protocols.mcp import (
+        MCPServerProtocol as APESMCPServer,
+        ServerServicesProtocol as ServerServices,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +53,12 @@ async def create_security_services(config: AppConfig) -> dict[str, Any]:
     try:
         # Initialize unified security facade
         security_facade = await get_security_service_facade()
-        
+
         # Get individual components from facade for backward compatibility
         authentication_component = await security_facade.authentication
-        authorization_component = await security_facade.authorization 
+        authorization_component = await security_facade.authorization
         validation_component = await security_facade.validation
-        
+
         # Security stack functionality is now provided by SecurityServiceFacade
         # No separate security stack needed
 
@@ -69,7 +73,7 @@ async def create_security_services(config: AppConfig) -> dict[str, Any]:
         logger.info("Unified security components initialized successfully via facade")
         logger.info("- SecurityServiceFacade: All security operations consolidated")
         logger.info("- Authentication component: Fail-secure authentication active")
-        logger.info("- Authorization component: Role-based access control active") 
+        logger.info("- Authorization component: Role-based access control active")
         logger.info("- Validation component: OWASP 2025 compliance enabled")
         logger.info("- SecurityServiceFacade: Integrated security components active")
         logger.info("- Input/Output validators: Content security enabled")
@@ -87,7 +91,7 @@ async def create_security_services(config: AppConfig) -> dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Failed to initialize unified security components: {e}")
+        logger.exception(f"Failed to initialize unified security components: {e}")
         raise RuntimeError(f"Security initialization failed: {e}")
 
 
@@ -148,7 +152,7 @@ async def validate_security_status(services: "ServerServices") -> dict[str, Any]
         return validation_result
 
     except Exception as e:
-        logger.error(f"Security validation failed: {e}")
+        logger.exception(f"Security validation failed: {e}")
         return {
             "overall_status": "error",
             "error": str(e),

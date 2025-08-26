@@ -5,13 +5,13 @@ Provides sanitized error logging that prevents exposure of sensitive information
 
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 
 class SecureLogger:
     """Secure logging wrapper that prevents information leakage."""
 
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger) -> None:
         self.logger = logger
         self.sensitive_patterns = [
             "password[^\\s]*[\\s=:]+[^\\s]+",
@@ -101,7 +101,7 @@ class SecureLogger:
         """
         safe_details = {}
         for key, value in details.items():
-            if key.lower() in ["password", "token", "key", "secret", "credential"]:
+            if key.lower() in {"password", "token", "key", "secret", "credential"}:
                 safe_details[key] = "[REDACTED]"
             elif isinstance(value, str):
                 safe_details[key] = self.sanitize_message(value)
@@ -120,10 +120,7 @@ class SecureLogger:
             operation: Operation being measured
             metrics: Performance metrics dictionary
         """
-        safe_metrics = {}
-        for key, value in metrics.items():
-            if isinstance(value, (int, float)) and key.lower() not in ["id", "hash"]:
-                safe_metrics[key] = value
+        safe_metrics = {key: value for key, value in metrics.items() if isinstance(value, (int, float)) and key.lower() not in {"id", "hash"}}
         if safe_metrics:
             self.logger.info(f"Performance - {operation}: {safe_metrics}")
 

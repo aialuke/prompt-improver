@@ -14,11 +14,15 @@ import math
 import re
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
+
+# import numpy as np  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +68,9 @@ class ValidationResult:
         is_valid: bool,
         sanitized_value: Any = None,
         threat_level: SecurityThreatLevel = SecurityThreatLevel.LOW,
-        threats_detected: list[str] = None,
+        threats_detected: list[str] | None = None,
         message: str = "",
-    ):
+    ) -> None:
         self.is_valid = is_valid
         self.sanitized_value = sanitized_value
         self.threat_level = threat_level
@@ -103,7 +107,7 @@ class InputSanitizer:
     - Event-driven security alerts
     """
 
-    def __init__(self, event_bus=None):
+    def __init__(self, event_bus=None) -> None:
         self.event_bus = event_bus
         self.security_events: list[SecurityEvent] = []
         self._validation_stats = {
@@ -177,7 +181,7 @@ class InputSanitizer:
         self.event_bus = event_bus
         logger.info("Event bus integrated with InputSanitizer for security monitoring")
 
-    async def _emit_security_event(self, event: SecurityEvent):
+    async def _emit_security_event(self, event: SecurityEvent) -> None:
         """Emit security event for monitoring and alerting."""
         self.security_events.append(event)
         if self.event_bus:
@@ -189,10 +193,10 @@ class InputSanitizer:
 
                 if "prompt_injection" in event.threats_detected:
                     event_type = EventType.PROMPT_INJECTION_DETECTED
-                elif event.threat_level in [
+                elif event.threat_level in {
                     SecurityThreatLevel.HIGH,
                     SecurityThreatLevel.CRITICAL,
-                ]:
+                }:
                     event_type = EventType.INPUT_VALIDATION_FAILED
                 else:
                     event_type = EventType.SECURITY_ALERT
@@ -213,11 +217,11 @@ class InputSanitizer:
                 )
                 await self.event_bus.emit(ml_event)
             except Exception as e:
-                logger.error(f"Failed to emit security event: {e}")
-        if event.threat_level in [
+                logger.exception(f"Failed to emit security event: {e}")
+        if event.threat_level in {
             SecurityThreatLevel.HIGH,
             SecurityThreatLevel.CRITICAL,
-        ]:
+        }:
             logger.error(
                 f"SECURITY ALERT: {event.event_type} - {event.threat_level.name.lower()} - Threats: {event.threats_detected}"
             )
@@ -239,7 +243,7 @@ class InputSanitizer:
                 e
                 for e in self.security_events
                 if e.threat_level
-                in [SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL]
+                in {SecurityThreatLevel.HIGH, SecurityThreatLevel.CRITICAL}
             ]),
         }
 
@@ -253,7 +257,7 @@ class InputSanitizer:
         return sanitized.strip()
 
     async def validate_input_async(
-        self, input_data: Any, context: dict[str, Any] = None
+        self, input_data: Any, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Comprehensive async input validation with 2025 security best practices.
 
@@ -282,7 +286,7 @@ class InputSanitizer:
                 result = await self._validate_list_input(input_data, threats_detected)
                 if not result.is_valid:
                     threat_level = result.threat_level
-            elif isinstance(input_data, np.ndarray):
+            elif hasattr(input_data, 'dtype') and hasattr(input_data, 'shape') and str(type(input_data)).startswith('<class \'numpy.'):
                 result = await self._validate_numpy_input(input_data, threats_detected)
                 if not result.is_valid:
                     threat_level = result.threat_level
@@ -314,7 +318,7 @@ class InputSanitizer:
                 )
             return result
         except Exception as e:
-            logger.error(f"Input validation error: {e}")
+            logger.exception(f"Input validation error: {e}")
             return ValidationResult(
                 is_valid=False,
                 threat_level=SecurityThreatLevel.HIGH,
@@ -464,19 +468,19 @@ class InputSanitizer:
         )
 
     async def _validate_numpy_input(
-        self, data: np.ndarray, threats_detected: list[str]
+        self, data: "np.ndarray", threats_detected: list[str]
     ) -> ValidationResult:
         """Validate numpy array input for ML safety."""
         threat_level = SecurityThreatLevel.LOW
-        if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+        if get_numpy().any(get_numpy().isnan(data)) or get_numpy().any(get_numpy().isinf(data)):
             threats_detected.append("invalid_numeric_data")
             threat_level = SecurityThreatLevel.MEDIUM
-        if np.any(np.abs(data) > 10000000000.0):
+        if get_numpy().any(get_numpy().abs(data) > 10000000000.0):
             threats_detected.append("extreme_values")
             threat_level = SecurityThreatLevel.MEDIUM
         if data.size > 0:
-            data_std = np.std(data)
-            data_mean = np.mean(data)
+            data_std = get_numpy().std(data)
+            data_mean = get_numpy().mean(data)
             if data_std > 1000 or abs(data_mean) > 1000:
                 threats_detected.append("suspicious_data_distribution")
                 threat_level = SecurityThreatLevel.MEDIUM
@@ -492,25 +496,18 @@ class InputSanitizer:
     def validate_ml_input_data(self, data: Any) -> bool:
         """Validate ML input data for safety and consistency."""
         try:
-            if isinstance(data, np.ndarray):
-                if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+            if hasattr(data, 'dtype') and hasattr(data, 'shape') and str(type(data)).startswith('<class \'numpy.'):
+                if get_numpy().any(get_numpy().isnan(data)) or get_numpy().any(get_numpy().isinf(data)):
                     return False
-                if np.any(np.abs(data) > 10000000000.0):
-                    return False
-                return True
+                return not get_numpy().any(get_numpy().abs(data) > 10000000000.0)
             if isinstance(data, (list, tuple)):
                 if len(data) == 0:
                     return False
-                for item in data:
-                    if not self.validate_ml_input_data(item):
-                        return False
-                return True
+                return all(self.validate_ml_input_data(item) for item in data)
             if isinstance(data, (int, float)):
                 if math.isnan(data) or math.isinf(data):
                     return False
-                if abs(data) > 10000000000.0:
-                    return False
-                return True
+                return not abs(data) > 10000000000.0
             if isinstance(data, dict):
                 for key, value in data.items():
                     if not isinstance(key, str) or not self.validate_ml_input_data(
@@ -522,7 +519,7 @@ class InputSanitizer:
         except Exception:
             return False
 
-    def validate_privacy_parameters(self, epsilon: float, delta: float = None) -> bool:
+    def validate_privacy_parameters(self, epsilon: float, delta: float | None = None) -> bool:
         """Validate differential privacy parameters."""
         if not isinstance(epsilon, (int, float)) or epsilon <= 0 or epsilon > 10:
             return False
@@ -538,8 +535,7 @@ class InputSanitizer:
         sanitized = re.sub("\\.\\.\\/|\\.\\.\\\\", "", file_path)
         sanitized = sanitized.replace("\x00", "")
         sanitized = sanitized.strip()
-        sanitized = re.sub(r"[^a-zA-Z0-9._/-]", "", sanitized)
-        return sanitized
+        return re.sub(r"[^a-zA-Z0-9._/-]", "", sanitized)
 
     def validate_email(self, email: str) -> bool:
         """Validate email format."""
@@ -548,17 +544,13 @@ class InputSanitizer:
         email_pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
         if not re.match(email_pattern, email):
             return False
-        if len(email) > 254:
-            return False
-        return True
+        return not len(email) > 254
 
     def validate_username(self, username: str) -> bool:
         """Validate username format."""
         if not isinstance(username, str):
             return False
-        if not re.match(r"^[a-zA-Z0-9_-]{3,50}$", username):
-            return False
-        return True
+        return re.match(r"^[a-zA-Z0-9_-]{3,50}$", username)
 
     def validate_password_strength(self, password: str) -> dict[str, bool | list[str]]:
         """Validate password strength and return detailed feedback."""

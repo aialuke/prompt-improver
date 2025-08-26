@@ -1,4 +1,4 @@
-"""Shared types and data structures"""
+"""Shared types and data structures."""
 
 from prompt_improver.shared.types.core import (
     APIRequest,
@@ -38,6 +38,8 @@ __all__ = [
     "CacheEntry",
     "ConfigDict",
     "ConnectionParams",
+    # Signal handling types
+    "EmergencyOperation",
     "ErrorContext",
     "EventHandler",
     "HeadersDict",
@@ -45,15 +47,13 @@ __all__ = [
     "HealthStatus",
     "MetricPoint",
     "MetricsDict",
+    "OperationResult",
     "QueryParams",
     "RedisConnectionParams",
     "SecurityContext",
-    "SyncCallback",
-    "ValidationError",
-    # Signal handling types
-    "EmergencyOperation",
-    "OperationResult",
     "ShutdownReason",
     "SignalContext",
     "SignalOperation",
+    "SyncCallback",
+    "ValidationError",
 ]

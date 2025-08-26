@@ -5,9 +5,9 @@ Provides detailed health status for all system components.
 import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from prompt_improver.shared.types import HealthStatus
@@ -37,7 +37,7 @@ router = APIRouter()
 class HealthChecker:
     """Health check service for monitoring system components."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.start_time = time.time()
         self.version = "1.0.0"
 
@@ -58,7 +58,7 @@ class HealthChecker:
                 details={"query_time": response_time, "connection_pool": "available"},
             )
         except Exception as e:
-            logger.error(f"Database health check failed: {e}")
+            logger.exception(f"Database health check failed: {e}")
             return ComponentHealth(
                 status=HealthStatus.UNHEALTHY,
                 response_time=time.time() - start_time,
@@ -100,7 +100,7 @@ class HealthChecker:
                 details={"ping_time": response_time, "read_write_test": "passed"},
             )
         except Exception as e:
-            logger.error(f"Redis health check failed: {e}")
+            logger.exception(f"Redis health check failed: {e}")
             return ComponentHealth(
                 status=HealthStatus.UNHEALTHY,
                 response_time=time.time() - start_time,
@@ -120,7 +120,7 @@ class HealthChecker:
                 details={"models_loaded": 1, "model_check_time": response_time},
             )
         except Exception as e:
-            logger.error(f"ML models health check failed: {e}")
+            logger.exception(f"ML models health check failed: {e}")
             return ComponentHealth(
                 status=HealthStatus.DEGRADED,
                 response_time=time.time() - start_time,
@@ -140,7 +140,7 @@ class HealthChecker:
                 details={"external_apis": "available"},
             )
         except Exception as e:
-            logger.error(f"External services health check failed: {e}")
+            logger.exception(f"External services health check failed: {e}")
             return ComponentHealth(
                 status=HealthStatus.DEGRADED,
                 response_time=time.time() - start_time,
@@ -210,7 +210,7 @@ async def health_check():
 async def readiness_check():
     """Kubernetes readiness probe endpoint."""
     health = await health_checker.get_overall_health()
-    if health.status in [HealthStatus.HEALTHY, HealthStatus.DEGRADED]:
+    if health.status in {HealthStatus.HEALTHY, HealthStatus.DEGRADED}:
         return {"status": "ready"}
     raise HTTPException(status_code=503, detail="Service not ready")
 

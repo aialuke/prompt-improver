@@ -10,14 +10,13 @@ This module provides centralized credential management with:
 """
 
 import hashlib
-import json
 import logging
 import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +333,7 @@ async def migrate_hardcoded_credential(old_value: str, credential_name: str) -> 
 
 if __name__ == "__main__":
     import asyncio
+    from prompt_improver.security.credential_manager import CredentialManager
 
     async def test_credential_manager():
         """Test the credential manager functionality."""

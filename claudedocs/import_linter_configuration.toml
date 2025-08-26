@@ -1,0 +1,282 @@
+# Import-Linter Configuration for Circular Import Prevention
+# Add this to pyproject.toml to enforce architectural boundaries
+
+[tool.importlinter]
+root_package = "prompt_improver"
+include_external_packages = true
+
+# ===================================================================
+# Test Infrastructure Domain Boundaries (Post-Decomposition)
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Test fixture domain layer boundaries"
+type = "layers"
+layers = [
+    # Business layer - can import from application and foundation
+    "tests.fixtures.business",
+    # Application layer - can import from foundation only  
+    "tests.fixtures.application",
+    # Foundation layer - no internal dependencies
+    "tests.fixtures.foundation",
+]
+
+[[tool.importlinter.contracts]]
+name = "Test helper module isolation"
+type = "independence"
+modules = [
+    "tests.services",
+    "tests.containers", 
+    "tests.utils",
+    "tests.database_helpers",
+    "tests.real_ml"
+]
+
+# ===================================================================  
+# Core Application Architecture Boundaries
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Clean Architecture layers"
+type = "layers"
+layers = [
+    # Presentation Layer
+    "prompt_improver.api",
+    "prompt_improver.cli", 
+    "prompt_improver.tui",
+    "prompt_improver.mcp_server",
+    
+    # Application Layer
+    "prompt_improver.application",
+    
+    # Domain Layer
+    "prompt_improver.rule_engine",
+    "prompt_improver.ml",
+    
+    # Infrastructure Layer
+    "prompt_improver.database",
+    "prompt_improver.services",
+    "prompt_improver.repositories",
+    "prompt_improver.cache",
+    "prompt_improver.monitoring",
+    "prompt_improver.performance",
+    "prompt_improver.security",
+    
+    # Core Layer (foundation)
+    "prompt_improver.core",
+    "prompt_improver.shared",
+]
+
+# ===================================================================
+# Protocol-Based Dependency Injection Enforcement  
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Protocol-based database access"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.application",
+    "prompt_improver.api", 
+    "prompt_improver.cli",
+    "prompt_improver.ml",
+    "tests.fixtures.application",
+    "tests.fixtures.business"
+]
+forbidden_modules = [
+    "prompt_improver.database.models",
+    "prompt_improver.database.services.connection",
+    "sqlalchemy.orm.session"
+]
+allow_indirect = false
+
+[[tool.importlinter.contracts]]
+name = "Repository pattern enforcement"
+type = "forbidden"  
+source_modules = [
+    "prompt_improver.application",
+    "prompt_improver.api",
+    "prompt_improver.ml"
+]
+forbidden_modules = [
+    "prompt_improver.database",
+]
+ignore_imports = [
+    "prompt_improver.database.protocols",
+    "prompt_improver.repositories.protocols",
+    "prompt_improver.shared.interfaces.protocols.database"
+]
+
+# ===================================================================
+# Security Architecture Boundaries
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Security service isolation"  
+type = "layers"
+layers = [
+    "prompt_improver.api",
+    "prompt_improver.application",
+    "prompt_improver.security.services",
+    "prompt_improver.security",
+]
+
+[[tool.importlinter.contracts]]
+name = "Direct crypto library prevention"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.api",
+    "prompt_improver.application", 
+    "prompt_improver.ml"
+]
+forbidden_modules = [
+    "cryptography.fernet",
+    "hashlib",
+    "secrets"
+]
+ignore_imports = [
+    "prompt_improver.security.services.security_service_facade"
+]
+
+# ===================================================================
+# ML Pipeline Architecture Boundaries
+# ===================================================================
+
+[[tool.importlinter.contracts]]  
+name = "ML orchestration boundaries"
+type = "layers"
+layers = [
+    "prompt_improver.ml.orchestration.coordinators",
+    "prompt_improver.ml.orchestration.services", 
+    "prompt_improver.ml.orchestration.core",
+    "prompt_improver.ml.core"
+]
+
+[[tool.importlinter.contracts]]
+name = "ML service independence"
+type = "independence" 
+modules = [
+    "prompt_improver.ml.analysis",
+    "prompt_improver.ml.clustering", 
+    "prompt_improver.ml.dimensionality",
+    "prompt_improver.ml.evaluation",
+    "prompt_improver.ml.learning",
+    "prompt_improver.ml.optimization",
+    "prompt_improver.ml.preprocessing"
+]
+
+# ===================================================================
+# Performance & Monitoring Boundaries
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Monitoring layer isolation"
+type = "independence"
+modules = [
+    "prompt_improver.monitoring.opentelemetry",
+    "prompt_improver.monitoring.metrics", 
+    "prompt_improver.monitoring.unified",
+    "prompt_improver.monitoring.redis",
+    "prompt_improver.monitoring.slo"
+]
+
+[[tool.importlinter.contracts]]
+name = "Performance optimization boundaries"
+type = "layers"  
+layers = [
+    "prompt_improver.performance.validation",
+    "prompt_improver.performance.monitoring",
+    "prompt_improver.performance.optimization", 
+    "prompt_improver.performance.caching"
+]
+
+# ===================================================================
+# Cache Architecture Boundaries  
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Cache service layer isolation"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.application",
+    "prompt_improver.api",
+    "prompt_improver.ml"
+]
+forbidden_modules = [
+    "redis",
+    "coredis"
+]
+ignore_imports = [
+    "prompt_improver.services.cache.cache_facade"
+]
+
+# ===================================================================
+# Circular Import Detection (Critical)
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Prevent test infrastructure cycles"
+type = "forbidden"
+source_modules = [
+    "tests.services",
+    "tests.containers",
+    "tests.utils", 
+    "tests.database_helpers",
+    "tests.real_ml"
+]
+forbidden_modules = [
+    "tests.conftest"
+]
+
+[[tool.importlinter.contracts]]
+name = "Prevent core framework cycles"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.core"
+]
+forbidden_modules = [
+    "prompt_improver.api",
+    "prompt_improver.application",
+    "prompt_improver.ml",
+    "prompt_improver.database",
+    "prompt_improver.services"
+]
+
+# ===================================================================
+# God Object Prevention
+# ===================================================================
+
+[[tool.importlinter.contracts]]
+name = "Prevent facade god object dependencies" 
+type = "forbidden"
+source_modules = [
+    "prompt_improver.api",
+    "prompt_improver.application"
+]
+forbidden_modules = [
+    # Prevent bypassing facades
+    "prompt_improver.ml.core.ml_integration",
+    "prompt_improver.database.services.connection.postgres_pool_manager",  
+    "prompt_improver.monitoring.unified.monitoring_orchestrator_service"
+]
+ignore_imports = [
+    # Allow facade access only
+    "prompt_improver.ml.core.facade",
+    "prompt_improver.database.composition", 
+    "prompt_improver.monitoring.unified.facade"
+]
+
+# ===================================================================
+# Configuration & Validation
+# ===================================================================
+
+[tool.importlinter.output]
+verbose = true
+
+# Custom contract types (if needed)
+[tool.importlinter.plugins]
+# Enable custom contract types for advanced patterns
+include = [
+    "importlinter.contracts.layers",
+    "importlinter.contracts.forbidden", 
+    "importlinter.contracts.independence"
+]

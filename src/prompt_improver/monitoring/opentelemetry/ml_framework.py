@@ -1,4 +1,4 @@
-"""OpenTelemetry ML Monitoring Framework
+"""OpenTelemetry ML Monitoring Framework.
 ====================================
 
 Comprehensive ML-specific monitoring using OpenTelemetry standards.

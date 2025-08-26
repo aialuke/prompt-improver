@@ -5,15 +5,13 @@ ensuring consistent patterns for database access, transaction management,
 and query building across all domains.
 """
 
-from abc import ABC, abstractmethod
 try:
     from contextlib import AsyncContextManager
 except ImportError:
     # Python 3.13+ compatibility
     from typing import AsyncContextManager
-from typing import Any, Generic, Optional, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 from sqlmodel import SQLModel

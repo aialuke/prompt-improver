@@ -20,8 +20,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import uuid
 import psutil
 from sqlmodel import SQLModel, Field as Field
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ...monitoring.opentelemetry.metrics import get_ml_metrics
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 def create_production_model_server(model_registry=None):
     """Create production model server with default configuration."""

@@ -1,13 +1,13 @@
-"""Repository interfaces following clean architecture patterns"""
+"""Repository interfaces following clean architecture patterns."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
 
 class IRepository(Generic[T], ABC):
-    """Generic repository interface following repository pattern
+    """Generic repository interface following repository pattern.
 
     Provides abstraction over data persistence to enable testing
     and switching between different storage implementations.
@@ -15,7 +15,7 @@ class IRepository(Generic[T], ABC):
 
     @abstractmethod
     async def get_by_id(self, id: str) -> T | None:
-        """Get entity by ID
+        """Get entity by ID.
 
         Args:
             id: Entity identifier
@@ -27,7 +27,7 @@ class IRepository(Generic[T], ABC):
 
     @abstractmethod
     async def save(self, entity: T) -> T:
-        """Save entity
+        """Save entity.
 
         Args:
             entity: Entity to save
@@ -39,7 +39,7 @@ class IRepository(Generic[T], ABC):
 
     @abstractmethod
     async def delete(self, id: str) -> bool:
-        """Delete entity by ID
+        """Delete entity by ID.
 
         Args:
             id: Entity identifier
@@ -51,7 +51,7 @@ class IRepository(Generic[T], ABC):
 
     @abstractmethod
     async def list_all(self, limit: int | None = None, offset: int = 0) -> list[T]:
-        """List all entities with pagination
+        """List all entities with pagination.
 
         Args:
             limit: Maximum number of entities to return
@@ -64,14 +64,14 @@ class IRepository(Generic[T], ABC):
 
 
 class IPromptRepository(IRepository, ABC):
-    """Repository interface specifically for prompts
+    """Repository interface specifically for prompts.
 
     Extends generic repository with prompt-specific operations.
     """
 
     @abstractmethod
     async def find_by_user(self, user_id: str) -> list[Any]:
-        """Find prompts by user ID
+        """Find prompts by user ID.
 
         Args:
             user_id: User identifier
@@ -83,7 +83,7 @@ class IPromptRepository(IRepository, ABC):
 
     @abstractmethod
     async def find_by_content_hash(self, content_hash: str) -> Any | None:
-        """Find prompt by content hash for deduplication
+        """Find prompt by content hash for deduplication.
 
         Args:
             content_hash: Hash of prompt content
@@ -95,7 +95,7 @@ class IPromptRepository(IRepository, ABC):
 
     @abstractmethod
     async def search_by_content(self, search_term: str, limit: int = 10) -> list[Any]:
-        """Search prompts by content
+        """Search prompts by content.
 
         Args:
             search_term: Term to search for in prompt content
@@ -108,11 +108,11 @@ class IPromptRepository(IRepository, ABC):
 
 
 class ISessionRepository(IRepository, ABC):
-    """Repository interface for improvement sessions"""
+    """Repository interface for improvement sessions."""
 
     @abstractmethod
     async def find_by_user(self, user_id: str) -> list[Any]:
-        """Find sessions by user ID
+        """Find sessions by user ID.
 
         Args:
             user_id: User identifier
@@ -124,7 +124,7 @@ class ISessionRepository(IRepository, ABC):
 
     @abstractmethod
     async def find_active_sessions(self) -> list[Any]:
-        """Find currently active sessions
+        """Find currently active sessions.
 
         Returns:
             List of active sessions
@@ -133,13 +133,13 @@ class ISessionRepository(IRepository, ABC):
 
 
 class IMetricsRepository(IRepository, ABC):
-    """Repository interface for metrics and analytics data"""
+    """Repository interface for metrics and analytics data."""
 
     @abstractmethod
     async def save_metric(
         self, metric_name: str, value: float, tags: dict[str, str]
     ) -> None:
-        """Save a metric value
+        """Save a metric value.
 
         Args:
             metric_name: Name of the metric
@@ -155,7 +155,7 @@ class IMetricsRepository(IRepository, ABC):
         start_time: str | None = None,
         end_time: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Get metrics by name within time range
+        """Get metrics by name within time range.
 
         Args:
             metric_name: Name of metric to retrieve

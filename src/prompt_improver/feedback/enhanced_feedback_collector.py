@@ -13,26 +13,20 @@ import time
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-import coredis
 from fastapi import BackgroundTasks
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
 from prompt_improver.utils.datetime_utils import aware_utc_now
-
-from ..database import (
-    ManagerMode,
-    create_security_context,
-    get_database_services,
-)
 
 logger = logging.getLogger(__name__)
 
 
-class FeedbackType(str, Enum):
+class FeedbackType(StrEnum):
     """Types of feedback that can be collected."""
 
     PROMPT_ENHANCEMENT = "prompt_enhancement"
@@ -42,7 +36,7 @@ class FeedbackType(str, Enum):
     ERROR_REPORT = "error_report"
 
 
-class AnonymizationLevel(str, Enum):
+class AnonymizationLevel(StrEnum):
     """Levels of data anonymization."""
 
     NONE = "none"
@@ -92,7 +86,7 @@ class AnonymizedFeedback:
 class PIIDetector:
     """Advanced PII detection and removal system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize PII detection patterns."""
         self.email_pattern = re.compile(
             "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
@@ -178,10 +172,10 @@ class PIIDetector:
             detection_metadata["replacements_made"] += len(
                 self.ssn_pattern.findall(text)
             )
-        if anonymization_level in [
+        if anonymization_level in {
             AnonymizationLevel.ADVANCED,
             AnonymizationLevel.FULL,
-        ]:
+        }:
             if self.ip_pattern.search(anonymized_text):
                 detection_metadata["pii_detected"].append("ip_address")
                 anonymized_text = self.ip_pattern.sub("[IP_ADDRESS]", anonymized_text)
@@ -196,7 +190,7 @@ class PIIDetector:
                 )
         if anonymization_level == AnonymizationLevel.FULL:
             words = anonymized_text.lower().split()
-            for i, word in enumerate(words):
+            for _i, word in enumerate(words):
                 clean_word = re.sub("[^\\w]", "", word)
                 if (
                     clean_word in self.common_names["first_names"]
@@ -230,7 +224,7 @@ class EnhancedFeedbackCollector:
         db_session: AsyncSession,
         redis_url: str | None = None,
         agent_id: str = "enhanced_feedback_collector",
-    ):
+    ) -> None:
         """Initialize enhanced feedback collector with DatabaseServices integration.
 
         Args:
@@ -241,9 +235,7 @@ class EnhancedFeedbackCollector:
         self.db_session = db_session
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/4")
         self.agent_id = agent_id
-        self._database_services = None
-        self._redis_client = None
-        self._use_database_services = True
+        self._l2_redis = L2RedisService()
         self.pii_detector = PIIDetector()
         self.default_anonymization_level = AnonymizationLevel.ADVANCED
         self.success_rate_target = 0.95
@@ -258,21 +250,6 @@ class EnhancedFeedbackCollector:
         self.retry_delay_seconds = 1.0
         self.feedback_queue_key = "feedback:queue"
         self.failed_feedback_key = "feedback:failed"
-
-    async def get_redis_client(self) -> coredis.Redis:
-        """Get Redis client for feedback queuing via DatabaseServices exclusively."""
-        if self._database_services is None:
-            self._database_services = await get_database_services(
-                ManagerMode.HIGH_AVAILABILITY
-            )
-
-        # Access Redis through the cache manager's redis client
-        if hasattr(self._database_services.cache, "redis_client"):
-            return self._database_services.cache.redis_client
-
-        raise RuntimeError(
-            "Redis client not available via DatabaseServices - ensure Redis is configured and running"
-        )
 
     async def collect_feedback(
         self,
@@ -356,7 +333,7 @@ class EnhancedFeedbackCollector:
                 logger.error(f"Feedback processing failed: {feedback_data.feedback_id}")
         except Exception as e:
             self._feedback_stats["failed_storage"] += 1
-            logger.error(
+            logger.exception(
                 f"Feedback processing error for {feedback_data.feedback_id}: {e}"
             )
             await self._queue_failed_feedback(feedback_data)
@@ -386,7 +363,7 @@ class EnhancedFeedbackCollector:
             anonymized_comments = None
             comments_metadata = {}
             if feedback_data.user_comments:
-                anonymized_comments, comments_metadata = (
+                _anonymized_comments, comments_metadata = (
                     self.pii_detector.detect_and_remove_pii(
                         feedback_data.user_comments, feedback_data.anonymization_level
                     )
@@ -408,7 +385,7 @@ class EnhancedFeedbackCollector:
             )
             if total_pii_detected > 0:
                 self._feedback_stats["pii_detections"] += 1
-            anonymized_feedback = AnonymizedFeedback(
+            return AnonymizedFeedback(
                 feedback_id=feedback_data.feedback_id,
                 feedback_type=feedback_data.feedback_type,
                 session_hash=session_hash,
@@ -429,10 +406,9 @@ class EnhancedFeedbackCollector:
                     "anonymization_level": feedback_data.anonymization_level.value,
                 },
             )
-            return anonymized_feedback
         except Exception as e:
             self._feedback_stats["anonymization_errors"] += 1
-            logger.error(f"Anonymization error for {feedback_data.feedback_id}: {e}")
+            logger.exception(f"Anonymization error for {feedback_data.feedback_id}: {e}")
             raise
 
     def _extract_prompt_structure(self, prompt: str) -> dict[str, Any]:
@@ -453,16 +429,16 @@ class EnhancedFeedbackCollector:
             "question_count": prompt.count("?"),
             "exclamation_count": prompt.count("!"),
             "has_imperatives": any(
-                word.lower() in ["write", "create", "make", "generate"]
+                word.lower() in {"write", "create", "make", "generate"}
                 for word in words[:5]
             ),
             "has_context": any(
-                word.lower() in ["given", "considering", "assuming"] for word in words
+                word.lower() in {"given", "considering", "assuming"} for word in words
             ),
             "complexity_indicators": sum(
                 1
                 for word in words
-                if word.lower() in ["complex", "detailed", "comprehensive"]
+                if word.lower() in {"complex", "detailed", "comprehensive"}
             ),
             "length_category": "short"
             if len(words) < 20
@@ -528,7 +504,7 @@ class EnhancedFeedbackCollector:
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(self.retry_delay_seconds * 2**attempt)
                 else:
-                    logger.error(
+                    logger.exception(
                         f"All storage attempts failed for {feedback_data.feedback_id}"
                     )
                     return False
@@ -599,19 +575,18 @@ class EnhancedFeedbackCollector:
             feedback_data: Failed feedback data
         """
         try:
-            redis = await self.get_redis_client()
             feedback_json = {
                 "feedback_id": feedback_data.feedback_id,
                 "data": asdict(feedback_data),
                 "failed_at": time.time(),
                 "retry_count": 0,
             }
-            await redis.lpush(self.failed_feedback_key, str(feedback_json))
+            await self._l2_redis.lpush(self.failed_feedback_key, str(feedback_json))
             logger.info(
                 f"Queued failed feedback for retry: {feedback_data.feedback_id}"
             )
         except Exception as e:
-            logger.error(f"Failed to queue feedback for retry: {e}")
+            logger.exception(f"Failed to queue feedback for retry: {e}")
 
     async def retry_failed_feedback(self, max_items: int = 100) -> int:
         """Retry processing failed feedback items.
@@ -623,10 +598,9 @@ class EnhancedFeedbackCollector:
             Number of items successfully retried
         """
         try:
-            redis = await self.get_redis_client()
             retried_count = 0
             for _ in range(max_items):
-                failed_item = await redis.rpop(self.failed_feedback_key)
+                failed_item = await self._l2_redis.rpop(self.failed_feedback_key)
                 if not failed_item:
                     break
                 try:
@@ -638,18 +612,18 @@ class EnhancedFeedbackCollector:
                     await self._process_feedback_async(feedback_data)
                     retried_count += 1
                 except Exception as e:
-                    logger.error(f"Failed to retry feedback item: {e}")
+                    logger.exception(f"Failed to retry feedback item: {e}")
                     retry_count = feedback_json.get("retry_count", 0)
                     if retry_count < self.max_retries:
                         feedback_json["retry_count"] = retry_count + 1
-                        await redis.lpush(self.failed_feedback_key, str(feedback_json))
+                        await self._l2_redis.lpush(self.failed_feedback_key, str(feedback_json))
             if retried_count > 0:
                 logger.info(
                     f"Successfully retried {retried_count} failed feedback items"
                 )
             return retried_count
         except Exception as e:
-            logger.error(f"Error during failed feedback retry: {e}")
+            logger.exception(f"Error during failed feedback retry: {e}")
             return 0
 
     def get_feedback_statistics(self) -> dict[str, Any]:
@@ -678,30 +652,21 @@ class EnhancedFeedbackCollector:
             "anonymization_errors": self._feedback_stats["anonymization_errors"],
             "collection_method": "background_tasks",
         }
-        if self._use_database_services and self._database_services:
-            try:
-                cache_stats = (
-                    self._database_services.cache.get_stats()
-                    if hasattr(self._database_services.cache, "get_stats")
-                    else {}
-                )
-                base_stats["database_services"] = {
-                    "enabled": True,
-                    "healthy": True,  # Health check will be done in async health_check method
-                    "performance_improvement": "Multi-level cache with connection pooling",
-                    "cache_health": cache_stats.get("health", "unknown"),
-                    "mode": "HIGH_AVAILABILITY",
-                    "cache_optimization": "L1/L2/L3 multi-level caching for feedback data",
-                }
-            except Exception as e:
-                base_stats["database_services"] = {
-                    "enabled": True,
-                    "error": str(e),
-                }
-        else:
-            base_stats["database_services"] = {
-                "enabled": False,
-                "reason": "Using direct Redis connection",
+        try:
+            l2_stats = self._l2_redis.get_stats()
+            base_stats["l2_redis_service"] = {
+                "enabled": True,
+                "healthy": l2_stats.get("health_status", "unknown"),
+                "performance_improvement": "Unified L2 Redis caching via L2RedisService",
+                "total_operations": l2_stats.get("total_operations", 0),
+                "success_rate": l2_stats.get("success_rate", 0),
+                "avg_response_time_ms": l2_stats.get("avg_response_time_ms", 0),
+                "cache_optimization": "Queue operations integrated with L2 caching strategy",
+            }
+        except Exception as e:
+            base_stats["l2_redis_service"] = {
+                "enabled": True,
+                "error": str(e),
             }
         return base_stats
 
@@ -712,15 +677,14 @@ class EnhancedFeedbackCollector:
             Queue status information
         """
         try:
-            redis = await self.get_redis_client()
-            failed_queue_length = await redis.llen(self.failed_feedback_key)
+            failed_queue_length = await self._l2_redis.llen(self.failed_feedback_key)
             return {
                 "failed_queue_length": failed_queue_length,
                 "queue_healthy": failed_queue_length < 100,
                 "redis_connected": True,
             }
         except Exception as e:
-            logger.error(f"Error getting queue status: {e}")
+            logger.exception(f"Error getting queue status: {e}")
             return {
                 "failed_queue_length": -1,
                 "queue_healthy": False,
@@ -749,21 +713,21 @@ class EnhancedFeedbackCollector:
             health_issues.append("Redis connection failed")
         if stats["anonymization_errors"] > stats["total_collected"] * 0.05:
             health_issues.append("High anonymization error rate")
-        services_health = stats.get("database_services", {})
+        services_health = stats.get("l2_redis_service", {})
         if services_health.get("enabled", False) and (
-            not services_health.get("healthy", True)
+            services_health.get("healthy") != "healthy"
         ):
-            health_issues.append("DatabaseServices unhealthy")
+            health_issues.append("L2RedisService unhealthy")
         overall_status = "healthy" if not health_issues else "degraded"
         return {
             "status": overall_status,
             "issues": health_issues,
             "statistics": stats,
             "queue_status": queue_status,
-            "database_services": services_health,
+            "l2_redis_service": services_health,
             "performance_enhancements": {
-                "connection_pooling": services_health.get("enabled", False),
-                "cache_optimization": services_health.get("enabled", False),
+                "unified_cache_architecture": services_health.get("enabled", False),
+                "queue_integration": services_health.get("enabled", False),
                 "performance_improvement": services_health.get(
                     "performance_improvement", "N/A"
                 ),

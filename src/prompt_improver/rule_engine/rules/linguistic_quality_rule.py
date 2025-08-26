@@ -5,7 +5,7 @@ readability, syntactic complexity, entity richness, and structural clarity.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from prompt_improver.rule_engine.base import (
     BasePromptRule,
@@ -13,16 +13,10 @@ from prompt_improver.rule_engine.base import (
     TransformationResult,
 )
 
-if TYPE_CHECKING:
-    from prompt_improver.ml.analysis.linguistic_analyzer import (
-        LinguisticAnalyzer,
-        LinguisticConfig,
-    )
-
 
 class _MinimalLinguisticAnalyzer:
     """Minimal fallback analyzer when ML components are not available."""
-    
+
     def analyze(self, text: str) -> dict:
         """Provide basic text analysis without ML dependencies."""
         return {
@@ -49,7 +43,7 @@ class LinguisticQualityRule(BasePromptRule):
     - Technical term appropriateness
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the linguistic quality rule."""
         self.logger = logging.getLogger(__name__)
         self._linguistic_analyzer = None  # Lazy initialization
@@ -98,7 +92,7 @@ class LinguisticQualityRule(BasePromptRule):
             "version": "1.0.0",
         }
 
-    def check(self, prompt: str, context: dict[str, Any] = None) -> RuleCheckResult:
+    def check(self, prompt: str, context: dict[str, Any] | None = None) -> RuleCheckResult:
         """Check if linguistic analysis should be applied to this prompt.
 
         Args:
@@ -117,7 +111,7 @@ class LinguisticQualityRule(BasePromptRule):
         )
 
     def apply(
-        self, prompt: str, context: dict[str, Any] = None
+        self, prompt: str, context: dict[str, Any] | None = None
     ) -> TransformationResult:
         """Apply linguistic analysis and generate improvement suggestions.
 
@@ -160,13 +154,11 @@ class LinguisticQualityRule(BasePromptRule):
                 },
             )
             improved_prompt = self._create_improved_prompt(prompt, suggestions)
-            transformations = []
-            for suggestion in suggestions:
-                transformations.append({
+            transformations = [{
                     "type": "linguistic_improvement",
                     "description": suggestion,
                     "confidence": 0.8,
-                })
+                } for suggestion in suggestions]
             return TransformationResult(
                 success=True,
                 improved_prompt=improved_prompt,
@@ -174,7 +166,7 @@ class LinguisticQualityRule(BasePromptRule):
                 transformations=transformations,
             )
         except Exception as e:
-            self.logger.error(f"Linguistic quality analysis failed: {e}")
+            self.logger.exception(f"Linguistic quality analysis failed: {e}")
             return TransformationResult(
                 success=False,
                 improved_prompt=prompt,
@@ -326,7 +318,7 @@ class LinguisticQualityRule(BasePromptRule):
                 improved_prompt += f"# {i}. {suggestion}\n"
         return improved_prompt
 
-    def evaluate(self, prompt: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def evaluate(self, prompt: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Evaluate prompt using real linguistic analysis (for testing compatibility).
 
         Args:
@@ -391,7 +383,7 @@ class LinguisticQualityRule(BasePromptRule):
                 },
             }
         except Exception as e:
-            self.logger.error(f"Linguistic quality evaluation failed: {e}")
+            self.logger.exception(f"Linguistic quality evaluation failed: {e}")
             return {
                 "score": 0.0,
                 "confidence": 0.0,

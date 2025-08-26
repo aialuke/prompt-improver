@@ -10,20 +10,13 @@ This module tests the health check functionality including:
 
 import asyncio
 import time
-from typing import Any, Dict
 
 import pytest
 import pytest_asyncio
 
-from prompt_improver.database import get_session
 from prompt_improver.mcp_server.server import APESMCPServer
-from prompt_improver.ml.optimization.batch.unified_batch_processor import (
-    BatchProcessorConfig,
-    UnifiedBatchProcessor,
-)
 from prompt_improver.performance.monitoring.health.background_manager import (
     EnhancedBackgroundTaskManager,
-    get_background_task_manager,
 )
 
 
@@ -65,7 +58,7 @@ class TestHealthEndpoints:
     async def test_health_ready_success(self, mcp_server):
         """Test successful health/ready endpoint with real database behavior."""
         result = await mcp_server._health_ready_impl()
-        assert result["status"] in ["ready", "not_ready", "error"]
+        assert result["status"] in {"ready", "not_ready", "error"}
         assert "timestamp" in result
         if result["status"] == "error":
             assert "error" in result
@@ -100,7 +93,7 @@ class TestHealthEndpoints:
         assert response_time < 5000
         assert "timestamp" in result
         assert "status" in result
-        assert result["status"] in ["ready", "not_ready", "error"]
+        assert result["status"] in {"ready", "not_ready", "error"}
 
     @pytest.mark.asyncio
     async def test_health_ready_structure_validation(self, mcp_server):
@@ -124,7 +117,7 @@ class TestHealthEndpoints:
         assert "timestamp" in result
         assert result["queue_size"] >= 0
         assert isinstance(result["queue_size"], int)
-        assert result["status"] in ["idle", "active", "error"]
+        assert result["status"] in {"idle", "active", "error"}
         if "processor_config" in result:
             config = result["processor_config"]
             assert isinstance(config, dict)

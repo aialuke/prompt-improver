@@ -14,9 +14,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypedDict
-
-from prompt_improver.shared.types import HealthStatus
+from typing import TypedDict
 
 
 class ManagerMode(Enum):
@@ -81,8 +79,6 @@ class CacheMetrics(TypedDict):
     l1_misses: int
     l2_hits: int
     l2_misses: int
-    l3_hits: int
-    l3_misses: int
     total_operations: int
     hit_ratio: float
 
@@ -237,7 +233,7 @@ class SecurityThreatScore:
 
     level: str = "low"
     score: float = 0.0
-    factors: List[str] = field(default_factory=list)
+    factors: list[str] = field(default_factory=list)
     last_updated: float = field(default_factory=time.time)
 
 
@@ -249,10 +245,10 @@ class SecurityValidationResult:
     validation_method: str = "none"
     validation_timestamp: float = field(default_factory=time.time)
     validation_duration_ms: float = 0.0
-    security_incidents: List[str] = field(default_factory=list)
+    security_incidents: list[str] = field(default_factory=list)
     rate_limit_status: str = "unknown"
     encryption_required: bool = False
-    audit_trail_id: Optional[str] = None
+    audit_trail_id: str | None = None
 
 
 @dataclass
@@ -270,5 +266,3 @@ class SecurityPerformanceMetrics:
 # Security exceptions moved from unified_connection_manager
 class RedisSecurityError(Exception):
     """Redis security operation error."""
-
-    pass

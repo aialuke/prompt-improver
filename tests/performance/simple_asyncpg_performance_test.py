@@ -207,7 +207,7 @@ class SimpleAsyncPGPerformanceTest:
             times = []
             try:
                 conn = await asyncpg.connect(self.database_url)
-                for i in range(operations_per_worker):
+                for _i in range(operations_per_worker):
                     start_time = time.perf_counter()
                     await conn.fetchval("SELECT pg_sleep(0.001), $1", worker_id)
                     end_time = time.perf_counter()
@@ -233,7 +233,7 @@ async def main():
     """Run the simple performance test."""
     test = SimpleAsyncPGPerformanceTest()
     results = await test.run_performance_test()
-    with open("simple_performance_results.txt", "w") as f:
+    with open("simple_performance_results.txt", "w", encoding="utf-8") as f:
         f.write(f"AsyncPG Performance Test Results - {datetime.now()}\n")
         f.write("=" * 50 + "\n")
         f.write(f"Overall Average: {results['overall_avg_ms']:.2f}ms\n")

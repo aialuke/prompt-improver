@@ -11,14 +11,18 @@ This package implements the PromptServiceFacade pattern, decomposing the origina
 All services follow Clean Architecture principles with protocol-based dependency injection.
 """
 
-from .facade import PromptServiceFacade
-from .prompt_analysis_service import PromptAnalysisService
-from .rule_application_service import RuleApplicationService
-from .validation_service import ValidationService
+from prompt_improver.services.prompt.facade import PromptServiceFacade
+from prompt_improver.services.prompt.prompt_analysis_service import (
+    PromptAnalysisService,
+)
+from prompt_improver.services.prompt.rule_application_service import (
+    RuleApplicationService,
+)
+from prompt_improver.services.prompt.validation_service import ValidationService
 
 __all__ = [
-    "PromptServiceFacade",
     "PromptAnalysisService",
+    "PromptServiceFacade",
     "RuleApplicationService",
     "ValidationService",
 ]

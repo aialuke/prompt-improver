@@ -1,4 +1,4 @@
-"""FastAPI Application Factory for Real API Testing
+"""FastAPI Application Factory for Real API Testing.
 
 Production-ready FastAPI application with real service integrations,
 comprehensive health checks, and observability features.
@@ -14,7 +14,6 @@ Key Features:
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,14 +21,9 @@ from fastapi.responses import JSONResponse
 
 from prompt_improver.api import api_router
 from prompt_improver.api.health import health_router
-from prompt_improver.services.error_handling.facade import (
-    authentication_exception_handler,
-    authorization_exception_handler,
-    create_correlation_middleware,
-    prompt_improver_exception_handler,
-    rate_limit_exception_handler,
-    validation_exception_handler,
-)
+from prompt_improver.core.config import get_config
+from prompt_improver.core.di.clean_container import initialize_clean_container
+from prompt_improver.core.di.container_orchestrator import get_container
 from prompt_improver.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -37,12 +31,7 @@ from prompt_improver.core.exceptions import (
     RateLimitError,
     ValidationError,
 )
-from prompt_improver.core.config import get_config
-from prompt_improver.core.di.container_orchestrator import get_container
-from prompt_improver.core.di.clean_container import initialize_clean_container
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
+from prompt_improver.database.composition import get_database_services
 from prompt_improver.monitoring.opentelemetry.integration import setup_fastapi_telemetry
 from prompt_improver.monitoring.unified.facade import UnifiedMonitoringFacade
 from prompt_improver.performance.monitoring.health.unified_health_system import (
@@ -50,6 +39,14 @@ from prompt_improver.performance.monitoring.health.unified_health_system import 
 )
 from prompt_improver.security.unified_security_orchestrator import (
     get_security_orchestrator,
+)
+from prompt_improver.services.error_handling.facade import (
+    authentication_exception_handler,
+    authorization_exception_handler,
+    create_correlation_middleware,
+    prompt_improver_exception_handler,
+    rate_limit_exception_handler,
+    validation_exception_handler,
 )
 
 logger = logging.getLogger(__name__)
@@ -101,7 +98,7 @@ async def lifespan(app: FastAPI):
         yield
 
     except Exception as e:
-        logger.error(f"Application startup failed: {e}")
+        logger.exception(f"Application startup failed: {e}")
         raise
     finally:
         # Shutdown sequence
@@ -129,7 +126,7 @@ async def lifespan(app: FastAPI):
                 logger.info("DI container cleaned up")
 
         except Exception as e:
-            logger.error(f"Error during shutdown: {e}")
+            logger.exception(f"Error during shutdown: {e}")
 
         logger.info("FastAPI application shutdown completed")
 
@@ -138,9 +135,9 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     """Global exception handler for unhandled exceptions."""
     import uuid
     from datetime import UTC, datetime
-    
+
     correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
-    
+
     logger.error(
         f"Unhandled exception: {exc}",
         exc_info=True,
@@ -189,15 +186,15 @@ def create_app(
     )
 
     # Add correlation middleware first
-    app.add_middleware(lambda request, call_next: create_correlation_middleware()(request, call_next))
-    
+    app.add_middleware(create_correlation_middleware())
+
     # Add specific exception handlers
     app.add_exception_handler(ValidationError, validation_exception_handler)
     app.add_exception_handler(AuthenticationError, authentication_exception_handler)
     app.add_exception_handler(AuthorizationError, authorization_exception_handler)
     app.add_exception_handler(RateLimitError, rate_limit_exception_handler)
     app.add_exception_handler(PromptImproverError, prompt_improver_exception_handler)
-    
+
     # Add global exception handler for unhandled exceptions
     app.add_exception_handler(Exception, global_exception_handler)
 

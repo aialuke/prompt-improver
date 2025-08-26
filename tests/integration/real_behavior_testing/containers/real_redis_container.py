@@ -8,19 +8,19 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any
 
 import redis.asyncio as redis
 from testcontainers.redis import RedisContainer
-from typing import Union
 
 logger = logging.getLogger(__name__)
 
 
 class RealRedisTestContainer:
     """Real Redis testcontainer for comprehensive cache testing.
-    
+
     Provides authentic Redis behavior for testing:
     - Multi-level caching strategies (L2 Redis layer)
     - Redis-based services and session management
@@ -32,13 +32,13 @@ class RealRedisTestContainer:
     def __init__(
         self,
         redis_version: str = "7.2",
-        port: Optional[int] = None,
+        port: int | None = None,
         max_memory: str = "256mb",
         max_memory_policy: str = "allkeys-lru",
         enable_persistence: bool = False,
     ):
         """Initialize Redis testcontainer.
-        
+
         Args:
             redis_version: Redis version to use
             port: Container port (auto-assigned if None)
@@ -51,10 +51,10 @@ class RealRedisTestContainer:
         self.max_memory = max_memory
         self.max_memory_policy = max_memory_policy
         self.enable_persistence = enable_persistence
-        
-        self._container: Optional[RedisContainer] = None
-        self._redis_client: Optional[redis.Redis] = None
-        self._connection_url: Optional[str] = None
+
+        self._container: RedisContainer | None = None
+        self._redis_client: redis.Redis | None = None
+        self._connection_url: str | None = None
         self._container_id = str(uuid.uuid4())[:8]
 
     async def start(self) -> "RealRedisTestContainer":
@@ -64,7 +64,7 @@ class RealRedisTestContainer:
             self._container = RedisContainer(
                 image=f"redis:{self.redis_version}"
             )
-            
+
             # Configure Redis for testing
             redis_config = [
                 f"maxmemory {self.max_memory}",
@@ -72,31 +72,31 @@ class RealRedisTestContainer:
                 "timeout 30",  # Connection timeout
                 "tcp-keepalive 60",  # Keep connections alive
             ]
-            
+
             # Disable persistence for faster tests unless explicitly enabled
             if not self.enable_persistence:
                 redis_config.extend([
                     "save ''",  # Disable RDB snapshots
                     "appendonly no"  # Disable AOF
                 ])
-            
+
             # Apply configuration
             for config_line in redis_config:
                 self._container = self._container.with_command(
                     f'sh -c "echo \"{config_line}\" >> /usr/local/etc/redis/redis.conf && redis-server /usr/local/etc/redis/redis.conf"'
                 )
-            
+
             if self.port:
                 self._container = self._container.with_bind_ports(6379, self.port)
-            
+
             self._container.start()
-            
+
             # Get connection details
             host = self._container.get_container_host_ip()
             port = self._container.get_exposed_port(6379)
-            
+
             self._connection_url = f"redis://{host}:{port}"
-            
+
             # Create Redis client with connection pooling
             self._redis_client = redis.from_url(
                 self._connection_url,
@@ -108,22 +108,22 @@ class RealRedisTestContainer:
                 socket_connect_timeout=5.0,
                 health_check_interval=30,
             )
-            
+
             # Wait for Redis to be ready
             await self._wait_for_readiness()
-            
+
             # Configure Redis runtime settings
             await self._configure_redis_instance()
-            
+
             logger.info(
                 f"Redis testcontainer started: {self._container_id} "
                 f"(version {self.redis_version}, port {port})"
             )
-            
+
             return self
-            
+
         except Exception as e:
-            logger.error(f"Failed to start Redis testcontainer: {e}")
+            logger.exception(f"Failed to start Redis testcontainer: {e}")
             await self.stop()
             raise
 
@@ -133,13 +133,13 @@ class RealRedisTestContainer:
             if self._redis_client:
                 await self._redis_client.close()
                 self._redis_client = None
-                
+
             if self._container:
                 self._container.stop()
                 self._container = None
-                
+
             logger.info(f"Redis testcontainer stopped: {self._container_id}")
-            
+
         except Exception as e:
             logger.warning(f"Error stopping Redis testcontainer: {e}")
 
@@ -166,17 +166,17 @@ class RealRedisTestContainer:
                 "client-output-buffer-limit": "replica 256mb 64mb 60",
                 "client-output-buffer-limit": "pubsub 32mb 8mb 60",
             }
-            
+
             for key, value in config_updates.items():
                 try:
                     await self._redis_client.config_set(key, value)
                 except Exception as e:
                     logger.debug(f"Could not set Redis config {key}={value}: {e}")
-            
+
             logger.debug(f"Redis instance configured for container: {self._container_id}")
-            
+
         except Exception as e:
-            logger.error(f"Failed to configure Redis instance: {e}")
+            logger.exception(f"Failed to configure Redis instance: {e}")
             raise
 
     @asynccontextmanager
@@ -184,7 +184,7 @@ class RealRedisTestContainer:
         """Get Redis client with proper cleanup."""
         if not self._redis_client:
             raise RuntimeError("Container not started. Call start() first.")
-        
+
         try:
             yield self._redis_client
         finally:
@@ -198,7 +198,7 @@ class RealRedisTestContainer:
 
     async def flush_db(self, db: int = 0) -> None:
         """Flush specific Redis database.
-        
+
         Args:
             db: Database number to flush
         """
@@ -206,12 +206,12 @@ class RealRedisTestContainer:
             await client.select(db)
             await client.flushdb()
 
-    async def get_info(self) -> Dict[str, Any]:
+    async def get_info(self) -> dict[str, Any]:
         """Get Redis instance information."""
         async with self.get_client() as client:
             return await client.info()
 
-    async def get_memory_usage(self) -> Dict[str, Any]:
+    async def get_memory_usage(self) -> dict[str, Any]:
         """Get Redis memory usage statistics."""
         info = await self.get_info()
         return {
@@ -224,7 +224,7 @@ class RealRedisTestContainer:
             "maxmemory_policy": info.get("maxmemory_policy", "unknown"),
         }
 
-    async def get_connection_stats(self) -> Dict[str, Any]:
+    async def get_connection_stats(self) -> dict[str, Any]:
         """Get Redis connection statistics."""
         info = await self.get_info()
         return {
@@ -239,14 +239,14 @@ class RealRedisTestContainer:
         operation_count: int = 1000,
         key_size: int = 100,
         value_size: int = 1000
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Test Redis performance with various operations.
-        
+
         Args:
             operation_count: Number of operations to perform
             key_size: Size of keys in bytes
             value_size: Size of values in bytes
-            
+
         Returns:
             Performance test results
         """
@@ -257,28 +257,28 @@ class RealRedisTestContainer:
                 key = f"perf_test_key_{i:05d}_{'x' * (key_size - 20)}"
                 value = f"perf_test_value_{i:05d}_{'y' * (value_size - 25)}"
                 test_data[key] = value
-            
+
             # Test SET operations
             set_start = time.perf_counter()
             for key, value in test_data.items():
                 await client.set(key, value)
             set_duration = time.perf_counter() - set_start
-            
+
             # Test GET operations
             get_start = time.perf_counter()
-            for key in test_data.keys():
+            for key in test_data:
                 await client.get(key)
             get_duration = time.perf_counter() - get_start
-            
+
             # Test MGET operations (batch)
             keys_list = list(test_data.keys())
             mget_start = time.perf_counter()
             await client.mget(keys_list)
             mget_duration = time.perf_counter() - mget_start
-            
+
             # Clean up test data
             await client.delete(*test_data.keys())
-            
+
             return {
                 "operation_count": operation_count,
                 "key_size_bytes": key_size,
@@ -300,12 +300,12 @@ class RealRedisTestContainer:
                 },
             }
 
-    async def test_connection_pooling(self, concurrent_connections: int = 20) -> Dict[str, Any]:
+    async def test_connection_pooling(self, concurrent_connections: int = 20) -> dict[str, Any]:
         """Test Redis connection pooling behavior.
-        
+
         Args:
             concurrent_connections: Number of concurrent connections to test
-            
+
         Returns:
             Connection pooling test results
         """
@@ -318,13 +318,13 @@ class RealRedisTestContainer:
                 value = await client.get(key)
                 await client.delete(key)
                 return time.perf_counter() - start_time
-        
+
         # Test concurrent connections
         start_time = time.perf_counter()
         tasks = [make_request(i) for i in range(concurrent_connections)]
         request_times = await asyncio.gather(*tasks)
         total_time = time.perf_counter() - start_time
-        
+
         return {
             "concurrent_connections": concurrent_connections,
             "total_time_ms": total_time * 1000,
@@ -346,11 +346,11 @@ class RealRedisTestContainer:
             raise RuntimeError("Container not started. Call start() first.")
         return self._container.get_exposed_port(6379)
 
-    def get_connection_info(self) -> Dict[str, Any]:
+    def get_connection_info(self) -> dict[str, Any]:
         """Get connection information."""
         if not self._container:
             raise RuntimeError("Container not started. Call start() first.")
-            
+
         return {
             "host": self._container.get_container_host_ip(),
             "port": self.get_port(),
@@ -359,34 +359,34 @@ class RealRedisTestContainer:
             "version": self.redis_version,
         }
 
-    async def create_test_data(self, key_patterns: List[str], data_size: str = "small") -> Dict[str, Any]:
+    async def create_test_data(self, key_patterns: list[str], data_size: str = "small") -> dict[str, Any]:
         """Create test data for various testing scenarios.
-        
+
         Args:
             key_patterns: List of key patterns to create
             data_size: Size of test data ("small", "medium", "large")
-            
+
         Returns:
             Test data creation results
         """
         size_config = {
             "small": {"count": 100, "value_size": 100},
-            "medium": {"count": 1000, "value_size": 1000}, 
+            "medium": {"count": 1000, "value_size": 1000},
             "large": {"count": 10000, "value_size": 10000},
         }
-        
+
         config = size_config.get(data_size, size_config["small"])
-        
+
         async with self.get_client() as client:
             created_keys = []
-            
+
             for pattern in key_patterns:
                 for i in range(config["count"]):
                     key = f"{pattern}:{i:05d}"
                     value = f"test_data_{pattern}_{i:05d}_{'x' * (config['value_size'] - 30)}"
                     await client.set(key, value, ex=3600)  # 1 hour expiry
                     created_keys.append(key)
-            
+
             return {
                 "created_keys": len(created_keys),
                 "patterns": key_patterns,
@@ -409,29 +409,29 @@ class RedisTestFixture:
     def __init__(self, container: RealRedisTestContainer):
         self.container = container
 
-    async def setup_cache_layers(self) -> Dict[str, Any]:
+    async def setup_cache_layers(self) -> dict[str, Any]:
         """Setup cache layers for multi-level cache testing."""
         async with self.container.get_client() as client:
             # Setup different cache layers with different TTLs
             cache_layers = {
                 "l1_cache": {"db": 0, "ttl": 300},   # 5 minutes
-                "l2_cache": {"db": 1, "ttl": 1800},  # 30 minutes  
-                "l3_cache": {"db": 2, "ttl": 3600},  # 1 hour
+                "l2_cache": {"db": 1, "ttl": 1800},  # 30 minutes
+                # L3 cache no longer used in L1/L2 architecture
             }
-            
+
             for layer_name, config in cache_layers.items():
                 await client.select(config["db"])
                 await client.flushdb()
-                
+
                 # Create sample data for each layer
                 for i in range(10):
                     key = f"{layer_name}:item_{i:03d}"
                     value = f"{layer_name}_value_{i:03d}"
                     await client.set(key, value, ex=config["ttl"])
-            
+
             return cache_layers
 
-    async def validate_cache_performance_targets(self) -> Dict[str, Any]:
+    async def validate_cache_performance_targets(self) -> dict[str, Any]:
         """Validate cache performance against targets."""
         # Performance targets for Redis operations
         targets = {
@@ -439,13 +439,13 @@ class RedisTestFixture:
             "get_operation_ms": 0.5,    # <0.5ms for GET operations
             "mget_batch_ms": 5.0,       # <5ms for batch operations
         }
-        
+
         results = await self.container.test_performance(
             operation_count=1000,
             key_size=50,
             value_size=200
         )
-        
+
         validation = {}
         for operation, target_ms in targets.items():
             if operation == "set_operation_ms":
@@ -456,13 +456,13 @@ class RedisTestFixture:
                 actual_ms = results["mget_operation"]["avg_latency_ms"]
             else:
                 continue
-                
+
             validation[operation] = {
                 "target_ms": target_ms,
                 "actual_ms": actual_ms,
                 "performance_met": actual_ms < target_ms,
             }
-        
+
         return {
             "targets": targets,
             "validation": validation,

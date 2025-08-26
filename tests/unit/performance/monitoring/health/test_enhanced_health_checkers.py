@@ -4,8 +4,7 @@ Integration tests that prioritize real behavior over mocking to prevent false po
 """
 
 import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -140,7 +139,7 @@ class TestMLServiceHealthChecker:
         """Test REAL behavior when ML service is unavailable - should be WARNING, not HEALTHY"""
         checker = EnhancedMLServiceHealthChecker()
         result = await checker.check()
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
+        assert result.status in {HealthStatus.WARNING, HealthStatus.FAILED}
         if result.status == HealthStatus.WARNING:
             assert result.details.get("fallback_mode") is True
             assert "fallback" in result.details.get("message", "").lower()
@@ -151,7 +150,7 @@ class TestMLServiceHealthChecker:
         """Test REAL behavior when ML service import fails - should be WARNING/FAILED"""
         checker = EnhancedMLServiceHealthChecker()
         result = await checker.check()
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
+        assert result.status in {HealthStatus.WARNING, HealthStatus.FAILED}
         assert result.response_time_ms >= 0
         assert (
             "error" in result.details
@@ -163,7 +162,7 @@ class TestMLServiceHealthChecker:
         """Test handling when ML service cannot be imported - test real behavior"""
         checker = EnhancedMLServiceHealthChecker()
         result = await checker.check()
-        assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
+        assert result.status in {HealthStatus.WARNING, HealthStatus.FAILED}
         assert result.response_time_ms >= 0
         if result.status == HealthStatus.WARNING:
             assert "fallback" in result.details.get("message", "").lower()
@@ -178,9 +177,9 @@ class TestMLServiceHealthChecker:
             raise RuntimeError("ML service internal error")
 
         checker = EnhancedMLServiceHealthChecker()
-        for i in range(4):
+        for _i in range(4):
             result = await checker.check()
-            assert result.status in [HealthStatus.WARNING, HealthStatus.FAILED]
+            assert result.status in {HealthStatus.WARNING, HealthStatus.FAILED}
             assert result.response_time_ms >= 0
             assert (
                 "error" in result.details
@@ -296,7 +295,7 @@ async def test_integrated_health_monitoring_scenario():
     ml_checker = EnhancedMLServiceHealthChecker()
     analytics_checker = EnhancedAnalyticsServiceHealthChecker()
     results = []
-    for i in range(5):
+    for _i in range(5):
         ml_result = await ml_checker.check()
         results.append(("ml_service", ml_result))
         analytics_result = await analytics_checker.check()
@@ -307,7 +306,7 @@ async def test_integrated_health_monitoring_scenario():
     assert len(ml_results) == 5
     assert len(analytics_results) == 5
     assert all(
-        r.status in [HealthStatus.WARNING, HealthStatus.FAILED] for r in ml_results
+        r.status in {HealthStatus.WARNING, HealthStatus.FAILED} for r in ml_results
     )
     assert all(r.status == HealthStatus.FAILED for r in analytics_results)
     ml_sla_report = ml_checker.sla_monitor.get_sla_report()

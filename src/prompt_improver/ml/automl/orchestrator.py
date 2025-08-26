@@ -13,10 +13,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from opentelemetry import trace
 from sqlalchemy.ext.asyncio import AsyncSession
 from prompt_improver.utils.datetime_utils import aware_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 # Lazy imports for heavy ML dependencies
 if TYPE_CHECKING:
-    import numpy as np
+    # import numpy as np  # Converted to lazy loading
     import optuna
     from optuna.integration import OptunaSearchCV
     from optuna.storages import RDBStorage
@@ -113,7 +114,7 @@ class AutoMLOrchestrator:
     def _get_numpy(self):
         """Lazy import numpy when needed."""
         try:
-            import numpy as np
+            # import numpy as np  # Converted to lazy loading
             return np
         except ImportError as e:
             logger.error(f"NumPy not available: {e}")
@@ -211,7 +212,7 @@ class AutoMLOrchestrator:
                         optimization_result = await self.rule_optimizer.optimize_rule(rule_id='test_rule', performance_data=performance_data, historical_data=[])
                     else:
                         np = self._get_numpy()
-                        optimization_result = {'effectiveness': np.random.random()}
+                        optimization_result = {'effectiveness': get_numpy().random.random()}
                 else:
                     test_config = {'sample_size': trial.suggest_int('sample_size', 100, 1000), 'confidence_level': trial.suggest_float('confidence_level', 0.9, 0.99), 'effect_size_threshold': trial.suggest_float('effect_size_threshold', 0.1, 0.5)}
                     if self.experiment_orchestrator:
@@ -219,7 +220,7 @@ class AutoMLOrchestrator:
                         optimization_result = experiment_result
                     else:
                         np = self._get_numpy()
-                        optimization_result = {'effectiveness': np.random.random()}
+                        optimization_result = {'effectiveness': get_numpy().random.random()}
                 if optimization_target == 'rule_effectiveness':
                     value = optimization_result.get('effectiveness', 0.0)
                 elif optimization_target == 'execution_time':

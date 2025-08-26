@@ -1,4 +1,3 @@
-import pytest
 from typer.testing import CliRunner
 
 from prompt_improver.cli import app

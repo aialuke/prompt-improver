@@ -13,8 +13,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any, DefaultDict, Deque
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class CounterAdapter:
 
     def __init__(
         self, name: str, description: str, label_names: list[str] | None, adapter
-    ):
+    ) -> None:
         self.name = name
         self.description = description
         self.label_names = label_names or []
@@ -47,7 +46,7 @@ class GaugeAdapter:
 
     def __init__(
         self, name: str, description: str, label_names: list[str] | None, adapter
-    ):
+    ) -> None:
         self.name = name
         self.description = description
         self.label_names = label_names or []
@@ -91,7 +90,7 @@ class HistogramAdapter:
         label_names: list[str] | None,
         buckets: list[float] | None,
         adapter,
-    ):
+    ) -> None:
         self.name = name
         self.description = description
         self.label_names = label_names or []
@@ -314,7 +313,7 @@ class InMemoryHistogram:
 class RealMetricsRegistry:
     """Simple real metrics registry."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.counters = {}
         self.gauges = {}
         self.histograms = {}

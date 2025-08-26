@@ -10,40 +10,33 @@ import logging
 import signal
 import sys
 import time
-from typing import TYPE_CHECKING, Any, Dict
+from typing import Any
 
-from prompt_improver.core.config import get_config
 from prompt_improver.mcp_server.transport import select_transport_mode
-from prompt_improver.mcp_server.protocols.server_protocols import (
+from prompt_improver.shared.interfaces.protocols.mcp import (
     LifecycleManagerProtocol,
-    RuntimeManagerProtocol,
     MCPServerProtocol,
     ServerServicesProtocol,
-    ServiceFactoryProtocol,
-    ServerFactoryProtocol,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
 
 class MCPLifecycleManager:
     """Lifecycle manager for MCP server implementing SRE best practices.
-    
+
     Implements LifecycleManagerProtocol and RuntimeManagerProtocol to provide
     comprehensive server lifecycle management following SRE principles.
     """
-    
+
     def setup_lifecycle_handlers(self, server: MCPServerProtocol) -> None:
         """Setup lifecycle handlers for server instance.
-        
+
         Configures:
         - Signal handlers for graceful shutdown
         - Initialization and shutdown procedures
         - Health monitoring integration
-        
+
         Args:
             server: Server instance to configure lifecycle for
         """
@@ -57,16 +50,16 @@ class MCPLifecycleManager:
 
     async def initialize_server_instance(self, server: MCPServerProtocol) -> bool:
         """Initialize server instance and all services.
-        
+
         Implements proper startup sequencing following SRE practices:
         - Service dependency resolution
         - Health check validation
         - Resource allocation and validation
         - Performance baseline establishment
-        
+
         Args:
             server: Server instance to initialize
-            
+
         Returns:
             bool: True if initialization succeeded, False otherwise
         """
@@ -82,18 +75,18 @@ class MCPLifecycleManager:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to initialize MCP Server: {e}")
+            logger.exception(f"Failed to initialize MCP Server: {e}")
             return False
 
     async def shutdown_server_instance(self, server: MCPServerProtocol) -> None:
         """Gracefully shutdown server instance.
-        
+
         Implements proper shutdown procedures:
         - Connection draining
         - Resource cleanup
         - Service termination sequencing
         - Final health status reporting
-        
+
         Args:
             server: Server instance to shutdown
         """
@@ -105,16 +98,16 @@ class MCPLifecycleManager:
             logger.info("APES MCP Server shutdown completed")
 
         except Exception as e:
-            logger.error(f"Error during server shutdown: {e}")
+            logger.exception(f"Error during server shutdown: {e}")
 
     def setup_signal_handlers(self, server: MCPServerProtocol) -> None:
         """Setup signal handlers for graceful shutdown.
-        
+
         Configures handlers for:
         - SIGTERM: Graceful shutdown
         - SIGINT: Interrupt handling
         - Custom signals for operational control
-        
+
         Args:
             server: Server instance to setup signal handling for
         """
@@ -130,35 +123,35 @@ class MCPLifecycleManager:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-    async def monitor_server_health(self, server: MCPServerProtocol) -> Dict[str, Any]:
+    async def monitor_server_health(self, server: MCPServerProtocol) -> dict[str, Any]:
         """Monitor server health and performance metrics.
-        
+
         Args:
             server: Server instance to monitor
-            
+
         Returns:
             Dict[str, Any]: Health status and performance metrics
         """
         try:
             health_status = await server.health_check()
             runtime_status = self.get_server_runtime_status(server)
-            
+
             return {
                 "health": health_status,
                 "runtime": runtime_status,
                 "timestamp": time.time()
             }
         except Exception as e:
-            logger.error(f"Health monitoring failed: {e}")
+            logger.exception(f"Health monitoring failed: {e}")
             return {
                 "health": {"status": "unhealthy", "error": str(e)},
                 "runtime": {"available": False},
                 "timestamp": time.time()
             }
 
-    async def handle_server_incident(self, server: MCPServerProtocol, incident_type: str, details: Dict[str, Any]) -> None:
+    async def handle_server_incident(self, server: MCPServerProtocol, incident_type: str, details: dict[str, Any]) -> None:
         """Handle server incidents following SRE procedures.
-        
+
         Args:
             server: Server instance experiencing incident
             incident_type: Type of incident (performance, availability, security)
@@ -166,7 +159,7 @@ class MCPLifecycleManager:
         """
         logger.warning(f"Handling server incident: {incident_type}")
         logger.info(f"Incident details: {details}")
-        
+
         # Implement incident response procedures based on type
         if incident_type == "performance":
             await self._handle_performance_incident(server, details)
@@ -177,12 +170,12 @@ class MCPLifecycleManager:
         else:
             logger.warning(f"Unknown incident type: {incident_type}")
 
-    def get_server_runtime_status(self, server: MCPServerProtocol) -> Dict[str, Any]:
+    def get_server_runtime_status(self, server: MCPServerProtocol) -> dict[str, Any]:
         """Get current runtime status and metrics.
-        
+
         Args:
             server: Server instance to check
-            
+
         Returns:
             Dict[str, Any]: Runtime status including uptime, connections, performance
         """
@@ -195,20 +188,20 @@ class MCPLifecycleManager:
                 "available": True
             }
         except Exception as e:
-            logger.error(f"Failed to get runtime status: {e}")
+            logger.exception(f"Failed to get runtime status: {e}")
             return {"available": False, "error": str(e)}
 
-    async def _handle_performance_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+    async def _handle_performance_incident(self, server: MCPServerProtocol, details: dict[str, Any]) -> None:
         """Handle performance-related incidents."""
         logger.info("Implementing performance incident response...")
         # Add performance incident handling logic
 
-    async def _handle_availability_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+    async def _handle_availability_incident(self, server: MCPServerProtocol, details: dict[str, Any]) -> None:
         """Handle availability-related incidents."""
         logger.info("Implementing availability incident response...")
         # Add availability incident handling logic
 
-    async def _handle_security_incident(self, server: MCPServerProtocol, details: Dict[str, Any]) -> None:
+    async def _handle_security_incident(self, server: MCPServerProtocol, details: dict[str, Any]) -> None:
         """Handle security-related incidents."""
         logger.warning("Implementing security incident response...")
         # Add security incident handling logic
@@ -216,12 +209,13 @@ class MCPLifecycleManager:
 
 # Register lifecycle manager in service registry
 from prompt_improver.core.services.service_registry import (
-    register_mcp_lifecycle_manager,
     get_mcp_lifecycle_manager,
+    register_mcp_lifecycle_manager,
 )
 
 # Register lifecycle manager factory
-register_mcp_lifecycle_manager(lambda: MCPLifecycleManager())
+register_mcp_lifecycle_manager(MCPLifecycleManager)
+
 
 def get_lifecycle_manager() -> LifecycleManagerProtocol:
     """Get the lifecycle manager instance from service registry."""
@@ -281,10 +275,10 @@ def run_server_instance(server: MCPServerProtocol) -> None:
         server: The MCP server instance to run
     """
 
-    async def main():
+    async def main() -> None:
         loop = asyncio.get_event_loop()
 
-        def signal_handler():
+        def signal_handler() -> None:
             logger.info("Received shutdown signal")
             try:
                 loop = asyncio.get_running_loop()
@@ -356,16 +350,18 @@ async def create_server_services(config) -> ServerServicesProtocol:
 
     try:
         # Use factory pattern to create services via service registry
-        from prompt_improver.core.services.service_registry import get_mcp_service_factory
-        
+        from prompt_improver.core.services.service_registry import (
+            get_mcp_service_factory,
+        )
+
         service_factory = get_mcp_service_factory()
         services = await service_factory.create_services(config)
-        
+
         logger.info("Server services created successfully using factory")
         return services
 
     except Exception as e:
-        logger.error(f"Failed to create server services: {e}")
+        logger.exception(f"Failed to create server services: {e}")
         raise RuntimeError(f"Service creation failed: {e}")
 
 
@@ -382,11 +378,13 @@ async def initialize_server() -> MCPServerProtocol:
 
     try:
         # Use factory pattern to create and initialize server via service registry
-        from prompt_improver.core.services.service_registry import get_mcp_server_factory
-        
+        from prompt_improver.core.services.service_registry import (
+            get_mcp_server_factory,
+        )
+
         server_factory = get_mcp_server_factory()
         server_instance = server_factory.create_server()
-        
+
         success = await server_factory.initialize_server(server_instance)
         if not success:
             raise RuntimeError("Server initialization failed")
@@ -399,7 +397,7 @@ async def initialize_server() -> MCPServerProtocol:
         return server_instance
 
     except Exception as e:
-        logger.error(f"Failed to initialize MCP server: {e}")
+        logger.exception(f"Failed to initialize MCP server: {e}")
         raise RuntimeError(f"Server initialization failed: {e}")
 
 
@@ -449,7 +447,7 @@ def main() -> None:
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    async def run_server():
+    async def run_server() -> None:
         """Async server runner with unified security initialization."""
         server = await initialize_server()
         logger.info("Starting APES MCP Server with unified security architecture...")
@@ -470,5 +468,5 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
-        logger.error(f"Server startup failed: {e}")
+        logger.exception(f"Server startup failed: {e}")
         raise

@@ -11,8 +11,7 @@ import os
 import statistics
 import sys
 import time
-import timeit
-from typing import Any, Dict
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
@@ -135,7 +134,7 @@ def benchmark_decode_validate(
     # Time the decode + validate operation
     times = []
 
-    for run in range(5):  # Multiple runs for accuracy
+    for _run in range(5):  # Multiple runs for accuracy
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -177,7 +176,7 @@ def benchmark_encoding(
     print(f"📤 Benchmarking {name} (JSON encoding, {iterations:,} iterations)...")
 
     times = []
-    for run in range(3):
+    for _run in range(3):
         start_time = time.perf_counter()
 
         for _ in range(iterations):
@@ -259,7 +258,7 @@ def main():
 
     results["msgspec_encoding"] = benchmark_encoding(
         "msgspec.json.encode()",
-        lambda obj: msgspec.json.encode(obj),
+        msgspec.json.encode,
         PROMPT_ENHANCEMENT_PAYLOAD,
     )
 

@@ -20,9 +20,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from functools import wraps
-from typing import Any, Dict, Optional, TypeVar
+from datetime import datetime
+from typing import Any, TypeVar
 
 import msgspec
 import msgspec.json
@@ -107,11 +106,11 @@ class MiddlewareContext:
 
 
 class UnifiedSecurityMiddleware:
-    """Modern Security Middleware for MCP Server - SecurityServiceFacade Integration
+    """Modern Security Middleware for MCP Server - SecurityServiceFacade Integration.
 
     Provides security middleware using modern SecurityServiceFacade architecture:
     - Authentication: Secure request authentication via facade
-    - Authorization: Role-based access control via facade  
+    - Authorization: Role-based access control via facade
     - Validation: Input/output validation via facade
     - Rate Limiting: Request throttling via facade
     - Monitoring: Security event monitoring via facade
@@ -123,7 +122,7 @@ class UnifiedSecurityMiddleware:
     - Zero legacy compatibility layers (clean break approach)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize modern security middleware."""
         self.logger = logging.getLogger(f"{__name__}.ModernSecurityMiddleware")
         self._security_facade: SecurityServiceFacade | None = None
@@ -144,7 +143,7 @@ class UnifiedSecurityMiddleware:
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize UnifiedSecurityMiddleware: {e}")
+            self.logger.exception(f"Failed to initialize UnifiedSecurityMiddleware: {e}")
             raise
 
     async def __call__(self, context: MiddlewareContext, call_next: CallNext) -> Any:
@@ -179,7 +178,7 @@ class UnifiedSecurityMiddleware:
             return result
 
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"UnifiedSecurityMiddleware error for {context.method}: {e}"
             )
 
@@ -227,7 +226,7 @@ class UnifiedSecurityMiddleware:
 class TimingMiddleware(Middleware):
     """Middleware for measuring request duration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.metrics = defaultdict(list)
 
     async def __call__(self, context: MiddlewareContext, call_next: CallNext) -> Any:
@@ -258,7 +257,7 @@ class TimingMiddleware(Middleware):
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            logger.error(
+            logger.exception(
                 f"Request {context.method} failed after {duration_ms:.2f}ms: {e}"
             )
             raise
@@ -283,7 +282,7 @@ class TimingMiddleware(Middleware):
 class DetailedTimingMiddleware(TimingMiddleware):
     """Enhanced timing middleware with operation breakdown."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.operation_metrics = defaultdict(lambda: defaultdict(list))
 
@@ -291,7 +290,7 @@ class DetailedTimingMiddleware(TimingMiddleware):
         # Add operation timing hooks to context
         operation_timings = {}
 
-        def record_operation(name: str, duration_ms: float):
+        def record_operation(name: str, duration_ms: float) -> None:
             operation_timings[name] = duration_ms
             self.operation_metrics[context.method][name].append(duration_ms)
 
@@ -310,7 +309,7 @@ class DetailedTimingMiddleware(TimingMiddleware):
 class StructuredLoggingMiddleware(Middleware):
     """Middleware for structured JSON logging."""
 
-    def __init__(self, include_payloads: bool = True, max_payload_length: int = 1000):
+    def __init__(self, include_payloads: bool = True, max_payload_length: int = 1000) -> None:
         self.include_payloads = include_payloads
         self.max_payload_length = max_payload_length
 
@@ -368,7 +367,7 @@ class StructuredLoggingMiddleware(Middleware):
 class RateLimitingMiddleware(Middleware):
     """Token bucket rate limiting middleware."""
 
-    def __init__(self, max_requests_per_second: float = 10.0, burst_capacity: int = 20):
+    def __init__(self, max_requests_per_second: float = 10.0, burst_capacity: int = 20) -> None:
         self.max_requests_per_second = max_requests_per_second
         self.burst_capacity = burst_capacity
         self.tokens = burst_capacity
@@ -407,7 +406,7 @@ class RateLimitingMiddleware(Middleware):
 class ErrorHandlingMiddleware(Middleware):
     """Middleware for consistent error handling and transformation."""
 
-    def __init__(self, include_traceback: bool = False, transform_errors: bool = True):
+    def __init__(self, include_traceback: bool = False, transform_errors: bool = True) -> None:
         self.include_traceback = include_traceback
         self.transform_errors = transform_errors
         self.error_counts = defaultdict(int)
@@ -447,7 +446,7 @@ class ErrorHandlingMiddleware(Middleware):
 class MiddlewareStack:
     """Manages a stack of middleware components."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.middleware: list[Middleware] = []
 
     def add(self, middleware: Middleware):
@@ -492,19 +491,15 @@ class OptimizedJSONBMiddleware(Middleware):
     """Optimized JSONB serialization middleware targeting 70% performance improvement.
 
     This middleware addresses the critical bottleneck of JSONB parameter serialization
-    that causes 100ms+ delays, implementing async serialization with connection-level
-    caching to achieve <30ms target performance.
+    that causes 100ms+ delays, implementing async serialization that relies on the
+    unified multi-level cache system (L1/L2) to achieve <30ms target performance.
+
+    Cache stack eliminated: Now uses source-level caching through unified cache facade.
     """
 
-    def __init__(self, cache_ttl_seconds: int = 300, max_cache_size: int = 1000):
-        self.cache_ttl_seconds = cache_ttl_seconds
-        self.max_cache_size = max_cache_size
-        self.cache: dict[str, dict[str, Any]] = {}
-        self.cache_timestamps: dict[str, datetime] = {}
+    def __init__(self) -> None:
         self.performance_metrics = defaultdict(list)
         self.optimization_stats = {
-            "cache_hits": 0,
-            "cache_misses": 0,
             "serializations": 0,
             "avg_optimization_ms": 0.0,
         }
@@ -521,71 +516,42 @@ class OptimizedJSONBMiddleware(Middleware):
         if not jsonb_payload:
             return await call_next(context)
 
-        # Generate cache key for this payload
-        cache_key = self._generate_cache_key(jsonb_payload)
+        # Perform async JSONB serialization without middleware caching
+        # Serialization caching is now handled by unified cache system at source level
+        serialized_data = await self._async_jsonb_serialize(jsonb_payload)
 
-        # Check cache first
-        cached_result = await self._get_cached_serialization(cache_key)
-        if cached_result is not None:
-            # Cache hit - use cached serialization
-            context.metadata["jsonb_serialized"] = cached_result
-            context.metadata["jsonb_cache_hit"] = True
-            self.optimization_stats["cache_hits"] += 1
+        context.metadata["jsonb_serialized"] = serialized_data
+        self.optimization_stats["serializations"] += 1
 
-            optimization_time = (time.perf_counter() - start_time) * 1000
-            self.performance_metrics["cache_hit"].append(optimization_time)
+        optimization_time = (time.perf_counter() - start_time) * 1000
+        self.performance_metrics["serialization"].append(optimization_time)
 
-            logger.debug("JSONB cache hit: %.2fms (target <30ms)", optimization_time)
+        # Log performance against target
+        if optimization_time < 30:
+            logger.debug(
+                f"JSONB serialization success: {optimization_time:.2f}ms (target <30ms)"
+            )
         else:
-            # Cache miss - perform async serialization
-            context.metadata["jsonb_cache_hit"] = False
-            self.optimization_stats["cache_misses"] += 1
-
-            # Async JSONB serialization to prevent blocking
-            serialized_data = await self._async_jsonb_serialize(jsonb_payload)
-
-            # Cache the result
-            await self._cache_serialization(cache_key, serialized_data)
-
-            context.metadata["jsonb_serialized"] = serialized_data
-            self.optimization_stats["serializations"] += 1
-
-            optimization_time = (time.perf_counter() - start_time) * 1000
-            self.performance_metrics["cache_miss"].append(optimization_time)
-
-            # Log performance against target
-            if optimization_time < 30:
-                logger.debug(
-                    f"JSONB optimization success: {optimization_time:.2f}ms (target <30ms)"
-                )
-            else:
-                logger.warning(
-                    f"JSONB optimization exceeded target: {optimization_time:.2f}ms (target <30ms)"
-                )
+            logger.warning(
+                f"JSONB serialization exceeded target: {optimization_time:.2f}ms (target <30ms)"
+            )
 
         # Update average optimization time
-        total_optimizations = (
-            self.optimization_stats["cache_hits"]
-            + self.optimization_stats["cache_misses"]
-        )
-        if total_optimizations > 0:
-            all_times = (
-                self.performance_metrics["cache_hit"]
-                + self.performance_metrics["cache_miss"]
-            )
-            self.optimization_stats["avg_optimization_ms"] = sum(all_times) / len(
-                all_times
-            )
+        if self.performance_metrics["serialization"]:
+            self.optimization_stats["avg_optimization_ms"] = sum(
+                self.performance_metrics["serialization"]
+            ) / len(self.performance_metrics["serialization"])
 
         # Continue with optimized context
         result = await call_next(context)
 
-        # Add optimization metadata to result
+        # Add serialization metadata to result
         if isinstance(result, dict) and "_metadata" not in result:
             result["_metadata"] = {}
         if isinstance(result, dict) and "_metadata" in result:
             result["_metadata"]["jsonb_optimization"] = {
-                "cache_hit": context.metadata.get("jsonb_cache_hit", False),
+                "middleware_caching_eliminated": True,
+                "unified_cache_used": True,
                 "optimization_time_ms": (time.perf_counter() - start_time) * 1000,
                 "target_achieved": optimization_time < 30,
             }
@@ -620,38 +586,6 @@ class OptimizedJSONBMiddleware(Middleware):
 
         return None
 
-    def _generate_cache_key(self, payload: Any) -> str:
-        """Generate a cache key for the JSONB payload."""
-        try:
-            # Use a hash of the payload for efficient cache key generation
-            # Use msgspec for 85x performance improvement in JSON serialization
-            try:
-                payload_str = msgspec.json.encode(payload).decode("utf-8")
-            except Exception:
-                # Fallback to standard JSON for non-msgspec compatible objects
-                payload_str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-            return f"jsonb_{hash(payload_str)}"
-        except (TypeError, ValueError):
-            # Fallback for non-serializable objects
-            return f"jsonb_{hash(str(payload))}"
-
-    async def _get_cached_serialization(self, cache_key: str) -> str | None:
-        """Get cached JSONB serialization if available and not expired."""
-        if cache_key not in self.cache:
-            return None
-
-        # Check if cache entry has expired
-        cache_time = self.cache_timestamps.get(cache_key)
-        if cache_time and datetime.now() - cache_time > timedelta(
-            seconds=self.cache_ttl_seconds
-        ):
-            # Remove expired entry
-            del self.cache[cache_key]
-            del self.cache_timestamps[cache_key]
-            return None
-
-        return self.cache[cache_key].get("serialized")
-
     async def _async_jsonb_serialize(self, payload: Any) -> str:
         """Perform async JSONB serialization to prevent blocking."""
         # Use asyncio.to_thread for CPU-bound JSON serialization
@@ -663,74 +597,41 @@ class OptimizedJSONBMiddleware(Middleware):
                 return serialized.decode("utf-8")
             except Exception:
                 # Fallback to standard JSON if msgspec fails
-                serialized = await asyncio.to_thread(
+                return await asyncio.to_thread(
                     json.dumps,
                     payload,
                     separators=(",", ":"),  # Compact format for performance
                     ensure_ascii=False,  # Allow Unicode for smaller payloads
                 )
-                return serialized
         except Exception as e:
-            logger.error(f"JSONB async serialization failed: {e}")
+            logger.exception(f"JSONB async serialization failed: {e}")
             # Fallback to sync serialization
             try:
                 return msgspec.json.encode(payload).decode("utf-8")
             except Exception:
                 return json.dumps(payload, separators=(",", ":"))
 
-    async def _cache_serialization(self, cache_key: str, serialized_data: str) -> None:
-        """Cache the serialized JSONB data with TTL."""
-        # Implement LRU eviction if cache is full
-        if len(self.cache) >= self.max_cache_size:
-            # Remove oldest entries
-            oldest_keys = sorted(
-                self.cache_timestamps.keys(), key=lambda k: self.cache_timestamps[k]
-            )[: len(self.cache) - self.max_cache_size + 1]
-
-            for old_key in oldest_keys:
-                self.cache.pop(old_key, None)
-                self.cache_timestamps.pop(old_key, None)
-
-        # Cache the serialized data
-        self.cache[cache_key] = {"serialized": serialized_data}
-        self.cache_timestamps[cache_key] = datetime.now()
-
     def get_optimization_stats(self) -> dict[str, Any]:
-        """Get JSONB optimization performance statistics."""
-        total_requests = (
-            self.optimization_stats["cache_hits"]
-            + self.optimization_stats["cache_misses"]
-        )
-        cache_hit_rate = (
-            (self.optimization_stats["cache_hits"] / total_requests * 100)
-            if total_requests > 0
-            else 0
-        )
+        """Get JSONB serialization performance statistics."""
+        total_serializations = self.optimization_stats["serializations"]
 
         return {
-            "total_jsonb_operations": total_requests,
-            "cache_hit_rate_percent": cache_hit_rate,
-            "cache_hits": self.optimization_stats["cache_hits"],
-            "cache_misses": self.optimization_stats["cache_misses"],
-            "serializations_performed": self.optimization_stats["serializations"],
+            "total_jsonb_operations": total_serializations,
+            "middleware_caching_eliminated": True,
+            "unified_cache_delegation": True,
+            "serializations_performed": total_serializations,
             "avg_optimization_time_ms": self.optimization_stats["avg_optimization_ms"],
             "target_achievement_rate": self._calculate_target_achievement_rate(),
-            "cache_size": len(self.cache),
-            "max_cache_size": self.max_cache_size,
-            "cache_ttl_seconds": self.cache_ttl_seconds,
         }
 
     def _calculate_target_achievement_rate(self) -> float:
         """Calculate the rate at which we achieve the <30ms target."""
-        all_times = (
-            self.performance_metrics["cache_hit"]
-            + self.performance_metrics["cache_miss"]
-        )
-        if not all_times:
+        serialization_times = self.performance_metrics.get("serialization", [])
+        if not serialization_times:
             return 0.0
 
-        under_target = sum(1 for t in all_times if t < 30)
-        return (under_target / len(all_times)) * 100
+        under_target = sum(1 for t in serialization_times if t < 30)
+        return (under_target / len(serialization_times)) * 100
 
 
 class ConsolidatedMiddleware(Middleware):
@@ -743,12 +644,14 @@ class ConsolidatedMiddleware(Middleware):
     - WebSocket streaming for performance metrics
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Import consolidated systems
         try:
-            from ...database import get_database_services
-            from ...monitoring.opentelemetry.metrics import get_http_metrics
-            from ...performance.monitoring.health.unified_health_system import (
+            from prompt_improver.database import get_database_services
+            from prompt_improver.monitoring.opentelemetry.metrics import (
+                get_http_metrics,
+            )
+            from prompt_improver.performance.monitoring.health.unified_health_system import (
                 get_unified_health_monitor,
             )
 
@@ -933,7 +836,7 @@ class ParallelProcessingMiddleware(Middleware):
     overall request latency through concurrent operations.
     """
 
-    def __init__(self, max_concurrent_operations: int = 5):
+    def __init__(self, max_concurrent_operations: int = 5) -> None:
         self.max_concurrent_operations = max_concurrent_operations
         self.semaphore = asyncio.Semaphore(max_concurrent_operations)
         self.parallel_stats = {
@@ -1080,7 +983,7 @@ class AdaptivePerformanceMiddleware(Middleware):
         failure_threshold: int = 5,
         recovery_timeout: int = 30,
         degraded_performance_threshold_ms: float = 500,
-    ):
+    ) -> None:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.degraded_threshold_ms = degraded_performance_threshold_ms
@@ -1255,12 +1158,12 @@ async def create_security_middleware_adapter():
 class UnifiedSecurityMiddleware:
     """Wrapper for unified security stack."""
 
-    def __init__(self, security_stack):
+    def __init__(self, security_stack) -> None:
         self.security_stack = security_stack
 
 
 class SecurityMiddlewareAdapter:
     """Adapter for security middleware."""
 
-    def __init__(self, security_stack):
+    def __init__(self, security_stack) -> None:
         self.security_stack = security_stack

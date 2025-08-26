@@ -1,0 +1,68 @@
+{
+  "timestamp": "2025-08-26T10:19:59.229817",
+  "total_improvement_percent": -27.49561212955226,
+  "individual_improvements": {
+    "SessionAnalyticsComponent": 15.98083922023206,
+    "MLAnalyticsComponent": -55.73278232180904,
+    "ABTestingComponent": -47.69218003259098,
+    "PerformanceAnalyticsComponent": -66.63145450862109
+  },
+  "baseline_measurements": {
+    "SessionAnalyticsComponent": 897.19,
+    "MLAnalyticsComponent": 436.47,
+    "ABTestingComponent": 460.25,
+    "PerformanceAnalyticsComponent": 444.26
+  },
+  "optimized_measurements": {
+    "SessionAnalyticsComponent": 753.8115086,
+    "MLAnalyticsComponent": 679.726875,
+    "ABTestingComponent": 679.7532586,
+    "PerformanceAnalyticsComponent": 740.2768998
+  },
+  "lazy_loading_validation": {
+    "SessionAnalyticsComponent": {
+      "component_name": "SessionAnalyticsComponent",
+      "first_function_call_ms": Infinity,
+      "subsequent_calls_ms": [],
+      "cache_effective": false,
+      "numpy_loaded": false,
+      "scipy_loaded": false
+    },
+    "MLAnalyticsComponent": {
+      "component_name": "MLAnalyticsComponent",
+      "first_function_call_ms": Infinity,
+      "subsequent_calls_ms": [],
+      "cache_effective": false,
+      "numpy_loaded": false,
+      "scipy_loaded": false
+    },
+    "ABTestingComponent": {
+      "component_name": "ABTestingComponent",
+      "first_function_call_ms": Infinity,
+      "subsequent_calls_ms": [],
+      "cache_effective": false,
+      "numpy_loaded": false,
+      "scipy_loaded": false
+    },
+    "PerformanceAnalyticsComponent": {
+      "component_name": "PerformanceAnalyticsComponent",
+      "first_function_call_ms": Infinity,
+      "subsequent_calls_ms": [],
+      "cache_effective": false,
+      "numpy_loaded": false,
+      "scipy_loaded": false
+    }
+  },
+  "performance_targets_met": false,
+  "memory_analysis": {
+    "memory_before_mb": 14.81,
+    "memory_after_mb": 144.95,
+    "memory_difference_mb": 130.14,
+    "measurement_success": true
+  },
+  "recommendations": [
+    "Components not meeting 90% target: SessionAnalyticsComponent, MLAnalyticsComponent, ABTestingComponent, PerformanceAnalyticsComponent - review lazy loading implementation",
+    "Ineffective caching detected in: SessionAnalyticsComponent, MLAnalyticsComponent, ABTestingComponent, PerformanceAnalyticsComponent - verify function-level import caching",
+    "High memory usage detected - consider further optimization of large dependencies"
+  ]
+}

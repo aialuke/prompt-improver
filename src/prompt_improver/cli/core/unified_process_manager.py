@@ -6,6 +6,7 @@ and crash recovery capabilities in a single interface.
 """
 
 import asyncio
+import contextlib
 import fcntl
 import json
 import logging
@@ -13,10 +14,10 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import psutil
 
@@ -133,7 +134,7 @@ class ProcessService:
         pid_dir: Path | None = None,
         backup_dir: Path | None = None,
         lock_timeout: float = 5.0,
-    ):
+    ) -> None:
         """Initialize unified process manager with both PID and crash recovery capabilities.
 
         Args:
@@ -163,22 +164,20 @@ class ProcessService:
         self._init_signal_handlers()
         logger.info("ProcessService initialized")
 
-    def _secure_directories(self):
+    def _secure_directories(self) -> None:
         """Ensure directories have proper security settings."""
         for directory in [self.pid_dir, self.backup_dir]:
             try:
                 directory.chmod(493)
                 current_uid = os.getuid()
                 current_gid = os.getgid()
-                try:
+                with contextlib.suppress(OSError, PermissionError):
                     os.chown(directory, current_uid, current_gid)
-                except (OSError, PermissionError):
-                    pass
                 self.logger.debug(f"Secured directory: {directory}")
             except Exception as e:
                 self.logger.warning(f"Failed to secure directory {directory}: {e}")
 
-    def _init_signal_handlers(self):
+    def _init_signal_handlers(self) -> None:
         """Initialize signal handler with lazy import to avoid circular dependency."""
         try:
             from rich.console import Console
@@ -203,7 +202,7 @@ class ProcessService:
         except ImportError as e:
             self.logger.warning(f"Signal handling integration not available: {e}")
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register ProcessService-specific signal handlers."""
         if self.signal_handler is None:
             self.logger.warning(
@@ -268,7 +267,7 @@ class ProcessService:
                 "cleanup_results": cleanup_results,
             }
         except Exception as e:
-            self.logger.error(f"ProcessService shutdown error: {e}")
+            self.logger.exception(f"ProcessService shutdown error: {e}")
             return {
                 "status": "error",
                 "component": "ProcessService",
@@ -296,7 +295,7 @@ class ProcessService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Emergency crash detection failed: {e}")
+            self.logger.exception(f"Emergency crash detection failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def generate_process_status_report(self, signal_context):
@@ -331,14 +330,14 @@ class ProcessService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Process status report generation failed: {e}")
+            self.logger.exception(f"Process status report generation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def prepare_process_cleanup(self, signum, signal_name):
         """Prepare process management for coordinated cleanup."""
         self.logger.info(f"Preparing process cleanup ({signal_name})")
         try:
-            preparation_status = {
+            return {
                 "prepared": True,
                 "component": "ProcessService",
                 "active_sessions": len(self.active_sessions),
@@ -346,9 +345,8 @@ class ProcessService:
                 "detected_crashes": len(self.detected_crashes),
                 "cleanup_locks_ready": True,
             }
-            return preparation_status
         except Exception as e:
-            self.logger.error(f"Process cleanup preparation failed: {e}")
+            self.logger.exception(f"Process cleanup preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "ProcessService",
@@ -359,7 +357,7 @@ class ProcessService:
         """Prepare process management for user interruption (Ctrl+C)."""
         self.logger.info(f"Preparing process interruption handling ({signal_name})")
         try:
-            interruption_preparation = {
+            return {
                 "prepared": True,
                 "component": "ProcessService",
                 "interruption_type": "user_requested",
@@ -367,9 +365,8 @@ class ProcessService:
                 "stale_pid_cleanup_ready": True,
                 "crash_recovery_ready": True,
             }
-            return interruption_preparation
         except Exception as e:
-            self.logger.error(f"Process interruption preparation failed: {e}")
+            self.logger.exception(f"Process interruption preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "ProcessService",
@@ -409,7 +406,7 @@ class ProcessService:
                     "command": " ".join(sys.argv),
                     "process_info": process_info or {},
                 }
-                with open(temp_file, "w") as f:
+                with open(temp_file, "w", encoding="utf-8") as f:
                     fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                     json.dump(pid_data, f, indent=2)
                     f.flush()
@@ -440,7 +437,7 @@ class ProcessService:
                 return (True, f"PID file created successfully: {pid_file_path}")
             except Exception as e:
                 error_msg = f"Failed to create PID file for {session_id}: {e}"
-                self.logger.error(error_msg)
+                self.logger.exception(error_msg)
                 return (False, error_msg)
 
     async def remove_pid_file(self, session_id: str) -> tuple[bool, str]:
@@ -464,7 +461,7 @@ class ProcessService:
                 return (True, f"PID file removed successfully: {session_id}")
             except Exception as e:
                 error_msg = f"Failed to remove PID file for {session_id}: {e}"
-                self.logger.error(error_msg)
+                self.logger.exception(error_msg)
                 return (False, error_msg)
 
     async def get_process_info(self, session_id: str) -> ProcessInfo | None:
@@ -516,7 +513,7 @@ class ProcessService:
             if file_age > self.stale_threshold:
                 return (True, f"PID file is too old: {file_age}")
             try:
-                with open(pid_file_path) as f:
+                with open(pid_file_path, encoding="utf-8") as f:
                     pid_data = json.load(f)
                     pid = pid_data.get("pid")
                 if pid:
@@ -571,7 +568,7 @@ class ProcessService:
                             )
                 return cleaned_sessions
             except Exception as e:
-                self.logger.error(f"Failed to cleanup stale PIDs: {e}")
+                self.logger.exception(f"Failed to cleanup stale PIDs: {e}")
                 return cleaned_sessions
 
     async def detect_system_crashes(self) -> list[CrashContext]:
@@ -596,7 +593,7 @@ class ProcessService:
                 self.logger.info(f"Detected {len(detected_crashes)} crashes")
                 return detected_crashes
             except Exception as e:
-                self.logger.error(f"Failed to detect crashes: {e}")
+                self.logger.exception(f"Failed to detect crashes: {e}")
                 return []
 
     async def _detect_orphaned_processes(self) -> list[CrashContext]:
@@ -626,7 +623,7 @@ class ProcessService:
                     orphaned_crashes.append(crash_context)
             return orphaned_crashes
         except Exception as e:
-            self.logger.error(f"Failed to detect orphaned processes: {e}")
+            self.logger.exception(f"Failed to detect orphaned processes: {e}")
             return []
 
     async def _detect_session_crashes(self) -> list[CrashContext]:
@@ -652,7 +649,7 @@ class ProcessService:
                     session_crashes.append(crash_context)
             return session_crashes
         except Exception as e:
-            self.logger.error(f"Failed to detect session crashes: {e}")
+            self.logger.exception(f"Failed to detect session crashes: {e}")
             return []
 
     async def _detect_system_level_crashes(self) -> list[CrashContext]:
@@ -673,7 +670,7 @@ class ProcessService:
             elif len(crash.affected_sessions) > 1:
                 crash.severity = CrashSeverity.MEDIUM
         except Exception as e:
-            self.logger.error(f"Failed to analyze crash context: {e}")
+            self.logger.exception(f"Failed to analyze crash context: {e}")
         return crash
 
     async def recover_from_crash(self, crash_id: str) -> RecoveryResult:
@@ -720,7 +717,7 @@ class ProcessService:
                                 )
                         except Exception as e:
                             failed_sessions.append(session_id)
-                            self.logger.error(
+                            self.logger.exception(
                                 f"Failed to recover session {session_id}: {e}"
                             )
                 elif crash_context.recovery_strategy == "restore_from_backup":
@@ -754,7 +751,7 @@ class ProcessService:
                 return result
             except Exception as e:
                 error_msg = f"Failed to recover from crash {crash_id}: {e}"
-                self.logger.error(error_msg)
+                self.logger.exception(error_msg)
                 return RecoveryResult(
                     crash_id=crash_id,
                     recovery_status="failed",
@@ -801,7 +798,7 @@ class ProcessService:
                 "status_timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to get system status: {e}")
+            self.logger.exception(f"Failed to get system status: {e}")
             return {"error": str(e), "unified_manager": True}
 
     async def full_system_check_and_recovery(self) -> dict[str, Any]:
@@ -836,7 +833,7 @@ class ProcessService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed system check and recovery: {e}")
+            self.logger.exception(f"Failed system check and recovery: {e}")
             return {"error": str(e), "check_completed": False}
 
 

@@ -6,11 +6,11 @@ authorization, validation, and cryptography services.
 
 import asyncio
 import logging
-import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from prompt_improver.core.di.protocols import (
     ContainerRegistryProtocol,
@@ -31,8 +31,8 @@ class ServiceLifetime(Enum):
 @dataclass
 class SecurityServiceRegistration:
     """Security service registration information."""
-    interface: Type[Any]
-    implementation: Type[Any] | None
+    interface: type[Any]
+    implementation: type[Any] | None
     lifetime: ServiceLifetime
     factory: Callable[[], Any] | None = None
     initialized: bool = False
@@ -43,29 +43,29 @@ class SecurityServiceRegistration:
 
 class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
     """Specialized DI container for security services.
-    
+
     Manages security-related services including:
     - Authentication and authorization
     - Cryptography and key management
     - Input validation and sanitization
     - Security configuration and policies
     - API security and rate limiting
-    
+
     Follows clean architecture with protocol-based dependencies.
     """
 
-    def __init__(self, name: str = "security"):
+    def __init__(self, name: str = "security") -> None:
         """Initialize security services container.
-        
+
         Args:
             name: Container identifier for logging
         """
         self.name = name
         self.logger = logger.getChild(f"container.{name}")
-        self._services: dict[Type[Any], SecurityServiceRegistration] = {}
+        self._services: dict[type[Any], SecurityServiceRegistration] = {}
         self._lock = asyncio.Lock()
         self._initialized = False
-        self._initialization_order: list[Type[Any]] = []
+        self._initialization_order: list[type[Any]] = []
         self._register_default_services()
         self.logger.debug(f"Security container '{self.name}' initialized")
 
@@ -73,36 +73,36 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
         """Register default security services."""
         # Self-registration for dependency injection
         self.register_instance(SecurityContainer, self, tags={"container", "security"})
-        
+
         # Authentication service factory
         self.register_authentication_service_factory()
-        
+
         # Authorization service factory
         self.register_authorization_service_factory()
-        
+
         # Crypto service factory
         self.register_crypto_service_factory()
-        
+
         # Validation service factory
         self.register_validation_service_factory()
-        
+
         # API security service factory
         self.register_api_security_service_factory()
-        
+
         # Rate limiting service factory
         self.register_rate_limiting_service_factory()
-        
+
         # Security config service factory
         self.register_security_config_service_factory()
 
     def register_singleton(
         self,
-        interface: Type[T],
-        implementation: Type[T],
+        interface: type[T],
+        implementation: type[T],
         tags: set[str] | None = None,
     ) -> None:
         """Register a singleton service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation: Concrete implementation class
@@ -120,12 +120,12 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
 
     def register_transient(
         self,
-        interface: Type[T],
+        interface: type[T],
         implementation_or_factory: Any,
         tags: set[str] | None = None,
     ) -> None:
         """Register a transient service.
-        
+
         Args:
             interface: Service interface/protocol
             implementation_or_factory: Implementation class or factory
@@ -142,12 +142,12 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
 
     def register_factory(
         self,
-        interface: Type[T],
+        interface: type[T],
         factory: Any,
         tags: set[str] | None = None,
     ) -> None:
         """Register a service factory.
-        
+
         Args:
             interface: Service interface/protocol
             factory: Factory function to create service
@@ -165,12 +165,12 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
 
     def register_instance(
         self,
-        interface: Type[T],
+        interface: type[T],
         instance: T,
         tags: set[str] | None = None,
     ) -> None:
         """Register a pre-created service instance.
-        
+
         Args:
             interface: Service interface/protocol
             instance: Pre-created service instance
@@ -187,40 +187,40 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
         self._services[interface] = registration
         self.logger.debug(f"Registered instance: {interface.__name__}")
 
-    async def get(self, interface: Type[T]) -> T:
+    async def get(self, interface: type[T]) -> T:
         """Resolve service instance.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
-            
+
         Raises:
             KeyError: If service is not registered
         """
         async with self._lock:
             return await self._resolve_service(interface)
 
-    async def _resolve_service(self, interface: Type[T]) -> T:
+    async def _resolve_service(self, interface: type[T]) -> T:
         """Internal service resolution with lifecycle management.
-        
+
         Args:
             interface: Service interface to resolve
-            
+
         Returns:
             Service instance
         """
         if interface not in self._services:
             raise KeyError(f"Security service not registered: {interface.__name__}")
-            
+
         registration = self._services[interface]
-        
+
         # Return existing singleton instance
-        if (registration.lifetime == ServiceLifetime.SINGLETON and 
+        if (registration.lifetime == ServiceLifetime.SINGLETON and
             registration.initialized and registration.instance is not None):
             return registration.instance
-            
+
         # Create new instance
         if registration.factory:
             instance = await self._create_from_factory(registration.factory)
@@ -228,26 +228,26 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
             instance = await self._create_from_class(registration.implementation)
         else:
             raise ValueError(f"No factory or implementation for {interface.__name__}")
-            
+
         # Initialize if needed
         if hasattr(instance, "initialize") and asyncio.iscoroutinefunction(instance.initialize):
             await instance.initialize()
-            
+
         # Store singleton
         if registration.lifetime == ServiceLifetime.SINGLETON:
             registration.instance = instance
             registration.initialized = True
             self._initialization_order.append(interface)
-            
+
         self.logger.debug(f"Resolved security service: {interface.__name__}")
         return instance
 
     async def _create_from_factory(self, factory: Callable[[], Any]) -> Any:
         """Create service instance from factory.
-        
+
         Args:
             factory: Factory function
-            
+
         Returns:
             Service instance
         """
@@ -255,20 +255,20 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
             return await factory()
         return factory()
 
-    async def _create_from_class(self, implementation: Type[Any]) -> Any:
+    async def _create_from_class(self, implementation: type[Any]) -> Any:
         """Create service instance from class constructor.
-        
+
         Args:
             implementation: Implementation class
-            
+
         Returns:
             Service instance
         """
         import inspect
-        
+
         sig = inspect.signature(implementation.__init__)
         kwargs = {}
-        
+
         for param_name, param in sig.parameters.items():
             if param_name == "self":
                 continue
@@ -280,15 +280,15 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                     if param.default != inspect.Parameter.empty:
                         continue
                     raise
-                    
+
         return implementation(**kwargs)
 
-    def is_registered(self, interface: Type[T]) -> bool:
+    def is_registered(self, interface: type[T]) -> bool:
         """Check if service is registered.
-        
+
         Args:
             interface: Service interface to check
-            
+
         Returns:
             True if registered, False otherwise
         """
@@ -305,7 +305,9 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 return UnifiedAuthenticationManager()
             except ImportError:
                 # Fallback to basic authentication
-                from prompt_improver.security.services.basic_auth_service import BasicAuthService
+                from prompt_improver.security.services.basic_auth_service import (
+                    BasicAuthService,
+                )
                 return BasicAuthService()
 
         self.register_factory(
@@ -325,7 +327,9 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 return AuthorizationComponent()
             except ImportError:
                 # Fallback to basic authorization
-                from prompt_improver.security.services.basic_authz_service import BasicAuthzService
+                from prompt_improver.security.services.basic_authz_service import (
+                    BasicAuthzService,
+                )
                 return BasicAuthzService()
 
         self.register_factory(
@@ -345,7 +349,9 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 return UnifiedCryptoManager()
             except ImportError:
                 # Fallback to basic crypto
-                from prompt_improver.security.services.basic_crypto_service import BasicCryptoService
+                from prompt_improver.security.services.basic_crypto_service import (
+                    BasicCryptoService,
+                )
                 return BasicCryptoService()
 
         self.register_factory(
@@ -365,11 +371,13 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 return UnifiedValidationManager()
             except ImportError:
                 # Fallback to basic validation
-                from prompt_improver.security.services.basic_validation_service import BasicValidationService
+                from prompt_improver.security.services.basic_validation_service import (
+                    BasicValidationService,
+                )
                 return BasicValidationService()
 
         self.register_factory(
-            "validation_service", 
+            "validation_service",
             create_validation_service,
             tags={"validation", "security", "input_sanitization"}
         )
@@ -379,11 +387,15 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
         """Register factory for API security service."""
         def create_api_security_service():
             try:
-                from prompt_improver.security.services.api_security_service import ApiSecurityService
+                from prompt_improver.security.services.api_security_service import (
+                    ApiSecurityService,
+                )
                 return ApiSecurityService()
             except ImportError:
                 # Fallback to no-op API security
-                from prompt_improver.security.services.noop_api_security import NoOpApiSecurityService
+                from prompt_improver.security.services.noop_api_security import (
+                    NoOpApiSecurityService,
+                )
                 return NoOpApiSecurityService()
 
         self.register_factory(
@@ -397,11 +409,15 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
         """Register factory for rate limiting service."""
         def create_rate_limiting_service():
             try:
-                from prompt_improver.security.services.rate_limiting_service import RateLimitingService
+                from prompt_improver.security.services.rate_limiting_service import (
+                    RateLimitingService,
+                )
                 return RateLimitingService()
             except ImportError:
                 # Fallback to no-op rate limiting
-                from prompt_improver.security.services.noop_rate_limiting import NoOpRateLimitingService
+                from prompt_improver.security.services.noop_rate_limiting import (
+                    NoOpRateLimitingService,
+                )
                 return NoOpRateLimitingService()
 
         self.register_factory(
@@ -421,7 +437,9 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 return UnifiedSecurityConfig()
             except ImportError:
                 # Fallback to environment-based security config
-                from prompt_improver.security.services.env_security_config import EnvSecurityConfig
+                from prompt_improver.security.services.env_security_config import (
+                    EnvSecurityConfig,
+                )
                 return EnvSecurityConfig()
 
         self.register_factory(
@@ -465,24 +483,24 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
         """Initialize all security services."""
         if self._initialized:
             return
-            
+
         self.logger.info(f"Initializing security container '{self.name}'")
-        
+
         # Initialize all registered services
         for interface in list(self._services.keys()):
             try:
                 await self.get(interface)
             except Exception as e:
-                self.logger.error(f"Failed to initialize {interface}: {e}")
+                self.logger.exception(f"Failed to initialize {interface}: {e}")
                 raise
-                
+
         self._initialized = True
         self.logger.info(f"Security container '{self.name}' initialization complete")
 
     async def shutdown(self) -> None:
         """Shutdown all security services gracefully."""
         self.logger.info(f"Shutting down security container '{self.name}'")
-        
+
         # Shutdown in reverse initialization order
         for interface in reversed(self._initialization_order):
             registration = self._services.get(interface)
@@ -495,8 +513,8 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                             registration.instance.shutdown()
                     self.logger.debug(f"Shutdown service: {interface.__name__}")
                 except Exception as e:
-                    self.logger.error(f"Error shutting down {interface.__name__}: {e}")
-                    
+                    self.logger.exception(f"Error shutting down {interface.__name__}: {e}")
+
         self._services.clear()
         self._initialization_order.clear()
         self._initialized = False
@@ -511,13 +529,13 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
             "registered_services": len(self._services),
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             try:
                 if (registration.initialized and registration.instance and
                     hasattr(registration.instance, "health_check")):
-                    
+
                     health_check = registration.instance.health_check
                     if asyncio.iscoroutinefunction(health_check):
                         service_health = await health_check()
@@ -535,7 +553,7 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                     "error": str(e),
                 }
                 results["container_status"] = "degraded"
-                
+
         return results
 
     def get_registration_info(self) -> dict[str, Any]:
@@ -545,7 +563,7 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
             "initialized": self._initialized,
             "services": {},
         }
-        
+
         for interface, registration in self._services.items():
             service_name = interface.__name__ if hasattr(interface, "__name__") else str(interface)
             info["services"][service_name] = {
@@ -555,7 +573,7 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
                 "has_instance": registration.instance is not None,
                 "tags": list(registration.tags),
             }
-            
+
         return info
 
     @asynccontextmanager
@@ -569,12 +587,12 @@ class SecurityContainer(SecurityContainerProtocol, ContainerRegistryProtocol):
 
 
 # Global security container instance
-_security_container: Optional[SecurityContainer] = None
+_security_container: SecurityContainer | None = None
 
 
 def get_security_container() -> SecurityContainer:
     """Get the global security container instance.
-    
+
     Returns:
         SecurityContainer: Global security container instance
     """

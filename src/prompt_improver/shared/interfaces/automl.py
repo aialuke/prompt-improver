@@ -1,16 +1,16 @@
 """Shared AutoML interfaces to break circular dependencies
-Following 2025 dependency injection patterns
+Following 2025 dependency injection patterns.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 
 class AutoMLMode(Enum):
-    """AutoML operation modes"""
+    """AutoML operation modes."""
 
     HYPERPARAMETER_OPTIMIZATION = "hpo"
     AUTOMATED_EXPERIMENT_DESIGN = "aed"
@@ -20,7 +20,7 @@ class AutoMLMode(Enum):
 
 @dataclass
 class TrialResult:
-    """Result from an AutoML trial"""
+    """Result from an AutoML trial."""
 
     trial_id: str
     parameters: dict[str, Any]
@@ -31,14 +31,14 @@ class TrialResult:
 
 
 class IAutoMLCallback(Protocol):
-    """Interface for AutoML callbacks
+    """Interface for AutoML callbacks.
 
     Enables loose coupling between orchestrator and callbacks
     by depending on abstractions rather than concrete classes.
     """
 
     def on_trial_start(self, trial_id: str, parameters: dict[str, Any]) -> None:
-        """Called when a trial starts
+        """Called when a trial starts.
 
         Args:
             trial_id: Unique identifier for the trial
@@ -47,7 +47,7 @@ class IAutoMLCallback(Protocol):
         ...
 
     def on_trial_complete(self, result: TrialResult) -> None:
-        """Called when a trial completes
+        """Called when a trial completes.
 
         Args:
             result: Complete trial result
@@ -55,7 +55,7 @@ class IAutoMLCallback(Protocol):
         ...
 
     def on_optimization_start(self, config: dict[str, Any]) -> None:
-        """Called when optimization begins
+        """Called when optimization begins.
 
         Args:
             config: Optimization configuration
@@ -63,7 +63,7 @@ class IAutoMLCallback(Protocol):
         ...
 
     def on_optimization_complete(self, results: list[TrialResult]) -> None:
-        """Called when optimization completes
+        """Called when optimization completes.
 
         Args:
             results: All trial results
@@ -72,7 +72,7 @@ class IAutoMLCallback(Protocol):
 
 
 class IAutoMLOrchestrator(Protocol):
-    """Interface for AutoML orchestrator
+    """Interface for AutoML orchestrator.
 
     Abstracts AutoML implementation details to enable testing
     and multiple AutoML framework support.
@@ -84,7 +84,7 @@ class IAutoMLOrchestrator(Protocol):
         parameter_space: dict[str, Any],
         n_trials: int = 100,
     ) -> list[TrialResult]:
-        """Run optimization with given configuration
+        """Run optimization with given configuration.
 
         Args:
             objective_function: Function to optimize
@@ -97,7 +97,7 @@ class IAutoMLOrchestrator(Protocol):
         ...
 
     def add_callback(self, callback: IAutoMLCallback) -> None:
-        """Add callback to orchestrator
+        """Add callback to orchestrator.
 
         Args:
             callback: Callback to add
@@ -105,7 +105,7 @@ class IAutoMLOrchestrator(Protocol):
         ...
 
     def remove_callback(self, callback: IAutoMLCallback) -> None:
-        """Remove callback from orchestrator
+        """Remove callback from orchestrator.
 
         Args:
             callback: Callback to remove
@@ -113,7 +113,7 @@ class IAutoMLOrchestrator(Protocol):
         ...
 
     async def get_best_trial(self) -> TrialResult | None:
-        """Get the best trial result so far
+        """Get the best trial result so far.
 
         Returns:
             Best trial result or None if no trials completed
@@ -121,17 +121,17 @@ class IAutoMLOrchestrator(Protocol):
         ...
 
     async def stop_optimization(self) -> None:
-        """Stop ongoing optimization"""
+        """Stop ongoing optimization."""
         ...
 
 
 class IAutoMLMetrics(Protocol):
-    """Interface for AutoML metrics collection"""
+    """Interface for AutoML metrics collection."""
 
     async def record_trial_metric(
         self, trial_id: str, metric_name: str, value: float
     ) -> None:
-        """Record a metric for a trial
+        """Record a metric for a trial.
 
         Args:
             trial_id: Trial identifier
@@ -141,7 +141,7 @@ class IAutoMLMetrics(Protocol):
         ...
 
     async def get_optimization_summary(self) -> dict[str, Any]:
-        """Get summary of optimization progress
+        """Get summary of optimization progress.
 
         Returns:
             Summary with key metrics and progress

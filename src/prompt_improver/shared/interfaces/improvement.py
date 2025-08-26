@@ -1,17 +1,17 @@
-"""Interfaces for prompt improvement services following 2025 best practices"""
+"""Interfaces for prompt improvement services following 2025 best practices."""
 
-from typing import Any, Dict, List, Protocol
+from typing import Any, Protocol
 
 
 class IImprovementService(Protocol):
-    """Interface for prompt improvement services
+    """Interface for prompt improvement services.
 
     Following clean architecture principles where business logic
     depends on abstractions, not concrete implementations.
     """
 
     async def improve_prompt(self, prompt: str, context: dict[str, Any]) -> str:
-        """Improve a prompt using available strategies
+        """Improve a prompt using available strategies.
 
         Args:
             prompt: Original prompt text
@@ -23,7 +23,7 @@ class IImprovementService(Protocol):
         ...
 
     async def get_improvement_suggestions(self, prompt: str) -> list[str]:
-        """Get improvement suggestions for a prompt
+        """Get improvement suggestions for a prompt.
 
         Args:
             prompt: Prompt to analyze
@@ -36,7 +36,7 @@ class IImprovementService(Protocol):
     async def validate_improvement(
         self, original: str, improved: str
     ) -> dict[str, Any]:
-        """Validate that an improvement is actually better
+        """Validate that an improvement is actually better.
 
         Args:
             original: Original prompt
@@ -49,14 +49,14 @@ class IImprovementService(Protocol):
 
 
 class IMLService(Protocol):
-    """Interface for ML services supporting prompt improvement
+    """Interface for ML services supporting prompt improvement.
 
     Abstracts away specific ML framework implementations to enable
     easy testing and framework switching.
     """
 
     async def predict_improvement(self, prompt: str) -> dict[str, Any]:
-        """Predict improvement metrics for a prompt
+        """Predict improvement metrics for a prompt.
 
         Args:
             prompt: Prompt to analyze
@@ -67,7 +67,7 @@ class IMLService(Protocol):
         ...
 
     async def train_model(self, training_data: list[dict[str, Any]]) -> bool:
-        """Train the improvement model with new data
+        """Train the improvement model with new data.
 
         Args:
             training_data: List of training examples
@@ -78,7 +78,7 @@ class IMLService(Protocol):
         ...
 
     async def get_model_metrics(self) -> dict[str, float]:
-        """Get current model performance metrics
+        """Get current model performance metrics.
 
         Returns:
             Dictionary of metric names and values
@@ -87,10 +87,10 @@ class IMLService(Protocol):
 
 
 class IRuleEngine(Protocol):
-    """Interface for rule-based improvement engines"""
+    """Interface for rule-based improvement engines."""
 
     async def apply_rules(self, prompt: str, rules: list[str]) -> str:
-        """Apply specified rules to improve a prompt
+        """Apply specified rules to improve a prompt.
 
         Args:
             prompt: Prompt to improve
@@ -102,7 +102,7 @@ class IRuleEngine(Protocol):
         ...
 
     async def get_available_rules(self) -> list[str]:
-        """Get list of available improvement rules
+        """Get list of available improvement rules.
 
         Returns:
             List of rule names

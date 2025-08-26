@@ -10,19 +10,12 @@ Migrated from mock-based testing to real behavior testing following 2025 best pr
 """
 
 import asyncio
-import logging
-import os
-import signal
+import contextlib
 import time
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from prompt_improver.optimization.batch_processor import (
-    BatchProcessor,
-    BatchProcessorConfig,
-)
 from prompt_improver.services.startup import (
     get_startup_task_count,
     init_startup_tasks,
@@ -30,7 +23,6 @@ from prompt_improver.services.startup import (
     shutdown_startup_tasks,
     startup_context,
 )
-from prompt_improver.services.cache.cache_facade import CacheFacade
 
 
 @pytest.mark.asyncio
@@ -39,19 +31,15 @@ class TestShutdownSequence:
 
     async def setup_method(self):
         """Ensure clean state before each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
         assert not is_startup_complete()
         assert get_startup_task_count() == 0
 
     async def teardown_method(self):
         """Ensure clean state after each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     async def test_basic_startup_shutdown_cycle_real_behavior(self):
         """Test basic startup and shutdown cycle with real components."""
@@ -100,7 +88,7 @@ class TestShutdownSequence:
         shutdown_start = time.time()
         shutdown_result = await shutdown_startup_tasks(timeout=15.0)
         shutdown_duration = (time.time() - shutdown_start) * 1000
-        assert shutdown_result["status"] in ["success", "partial_success", "failed"]
+        assert shutdown_result["status"] in {"success", "partial_success", "failed"}
         if shutdown_result["status"] == "failed":
             print("Real behavior: shutdown failed, state may be uncleaned")
             print(f"Startup still complete: {is_startup_complete()}")
@@ -231,20 +219,20 @@ class TestShutdownSequence:
                 "max_attempts": 1,
             },
         )
-        if startup_result["status"] in ["failed", "already_initialized"]:
+        if startup_result["status"] in {"failed", "already_initialized"}:
             shutdown_result = await shutdown_startup_tasks(timeout=5.0)
             return
         shutdown_result1 = await shutdown_startup_tasks(timeout=15.0)
-        assert shutdown_result1["status"] in ["success", "partial_success", "failed"]
+        assert shutdown_result1["status"] in {"success", "partial_success", "failed"}
         if shutdown_result1["status"] == "failed":
             print("Real behavior: first shutdown failed, state may remain")
         else:
             assert not is_startup_complete()
             assert get_startup_task_count() == 0
         shutdown_result2 = await shutdown_startup_tasks(timeout=10.0)
-        assert shutdown_result2["status"] in ["success", "failed", "not_initialized"]
+        assert shutdown_result2["status"] in {"success", "failed", "not_initialized"}
         shutdown_result3 = await shutdown_startup_tasks(timeout=5.0)
-        assert shutdown_result3["status"] in ["success", "failed", "not_initialized"]
+        assert shutdown_result3["status"] in {"success", "failed", "not_initialized"}
 
     async def test_context_manager_shutdown(self):
         """Test shutdown via context manager."""
@@ -287,10 +275,8 @@ class TestShutdownSequence:
             assert shutdown_time < 10000
             assert not is_startup_complete()
         signal_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await signal_task
-        except asyncio.CancelledError:
-            pass
 
     async def test_shutdown_resource_cleanup(self):
         """Test that shutdown properly cleans up resources."""
@@ -345,17 +331,13 @@ class TestShutdownPerformance:
 
     async def setup_method(self):
         """Ensure clean state before each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     async def teardown_method(self):
         """Ensure clean state after each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     def test_shutdown_performance_baseline_real_behavior(self, benchmark):
         """Benchmark baseline shutdown performance with real components."""
@@ -501,7 +483,7 @@ class TestShutdownPerformance:
                 for i in range(50):
                     await session_store.set(f"cycle_{cycle}_session_{i}", {"data": i})
                 shutdown_result = await shutdown_startup_tasks(timeout=10.0)
-                if shutdown_result["status"] in ["success", "partial_success"]:
+                if shutdown_result["status"] in {"success", "partial_success"}:
                     cycle_results.append({"cycle": cycle, "success": True})
                 else:
                     cycle_results.append({"cycle": cycle, "success": False})
@@ -525,17 +507,13 @@ class TestShutdownSequenceIntegration:
 
     async def setup_method(self):
         """Ensure clean state before each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     async def teardown_method(self):
         """Ensure clean state after each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     async def test_end_to_end_shutdown_scenario(self):
         """Test complete end-to-end shutdown scenario."""
@@ -577,7 +555,7 @@ class TestShutdownSequenceIntegration:
             batch_jobs.append(job)
         health_result = await health_monitor.run_health_check()
         print(f"Real behavior: health status is {health_result.overall_status.value}")
-        assert health_result.overall_status.value in ["healthy", "warning", "failed"]
+        assert health_result.overall_status.value in {"healthy", "warning", "failed"}
         assert await session_store.size() == 20
         queue_size = batch_processor.get_queue_size()
         print(f"Real behavior: queue size is {queue_size}")
@@ -626,7 +604,7 @@ class TestShutdownSequenceIntegration:
         else:
             assert shutdown1["status"] == "success"
             assert not is_startup_complete()
-        for i in range(3):
+        for _i in range(3):
             shutdown_n = await shutdown_startup_tasks(timeout=5.0)
             assert shutdown_n["status"] == "not_initialized"
             assert not is_startup_complete()

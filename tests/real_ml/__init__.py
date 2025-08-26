@@ -4,15 +4,15 @@ Provides lightweight real ML implementations for integration testing,
 replacing mocks with actual model training and inference.
 """
 
-from .fixtures import *
-from .lightweight_models import (
+from tests.real_ml.fixtures import *
+from tests.real_ml.lightweight_models import (
     LightweightRegressor,
     LightweightTextClassifier,
     PatternDiscoveryEngine,
     RealMLflowService,
     RealMLService,
 )
-from .test_data_generators import (
+from tests.real_ml.test_data_generators import (
     MLTrainingDataGenerator,
     PromptDataGenerator,
 )
@@ -20,14 +20,13 @@ from .test_data_generators import (
 __all__ = [
     # Models
     "LightweightRegressor",
-    "LightweightTextClassifier", 
-    "PatternDiscoveryEngine",
-    "RealMLflowService",
-    "RealMLService",
-    
+    "LightweightTextClassifier",
     # Data generators
     "MLTrainingDataGenerator",
+    "PatternDiscoveryEngine",
     "PromptDataGenerator",
-    
+    "RealMLService",
+    "RealMLflowService",
+
     # All fixtures are imported via *
 ]

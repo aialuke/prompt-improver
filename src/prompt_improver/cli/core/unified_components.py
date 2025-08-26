@@ -1,4 +1,4 @@
-"""Unified CLI Components with Facade Pattern - Reduced Coupling Implementation
+"""Unified CLI Components with Facade Pattern - Reduced Coupling Implementation.
 
 This is the modernized version of cli/core/__init__.py that uses facade patterns
 to reduce coupling from 11 to 3 internal imports while maintaining full functionality.
@@ -11,28 +11,29 @@ Key improvements:
 - Zero circular import possibilities
 """
 
-import asyncio
 import logging
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
 from prompt_improver.core.facades import get_cli_facade
-from prompt_improver.core.protocols.facade_protocols import CLIFacadeProtocol
+
+if TYPE_CHECKING:
+    from prompt_improver.shared.interfaces.protocols.cli import CLIFacadeProtocol
 
 logger = logging.getLogger(__name__)
 
 
 class UnifiedCLIManager:
     """Unified CLI manager using facade pattern for loose coupling.
-    
+
     This manager provides the same interface as the original CLI core module
     but with dramatically reduced coupling through facade patterns.
-    
+
     Coupling reduction: 11 → 3 internal imports (73% reduction)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the unified CLI manager."""
         self._cli_facade: CLIFacadeProtocol = get_cli_facade()
         self._console = Console()
@@ -43,7 +44,7 @@ class UnifiedCLIManager:
         """Initialize all CLI components through facade."""
         if self._initialized:
             return
-            
+
         await self._cli_facade.initialize_all()
         self._initialized = True
         logger.info("UnifiedCLIManager initialization complete")
@@ -52,7 +53,7 @@ class UnifiedCLIManager:
         """Shutdown all CLI components through facade."""
         if not self._initialized:
             return
-            
+
         await self._cli_facade.shutdown_all()
         self._initialized = False
         logger.info("UnifiedCLIManager shutdown complete")
@@ -121,29 +122,29 @@ class UnifiedCLIManager:
 
 class SignalAwareComponent:
     """Base class for CLI components that need signal handling integration.
-    
+
     Uses facade pattern to reduce dependencies while maintaining signal handling.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize signal-aware component with facade."""
         self._cli_manager = get_cli_manager()
         self._shutdown_priority = 10
         self._register_signal_handlers()
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register component-specific signal handlers through facade."""
         signal_handler = self._cli_manager.get_signal_handler()
         signal_handler.register_shutdown_handler(
             f"{self.__class__.__name__}_shutdown", self.graceful_shutdown
         )
-        
+
         # Register emergency checkpoint handler
         from prompt_improver.cli.core.signal_handler import SignalOperation
         signal_handler.register_operation_handler(
             SignalOperation.CHECKPOINT, self.create_emergency_checkpoint
         )
-        
+
         # Register SIGTERM handler
         import signal
         signal_handler.add_signal_chain_handler(
@@ -245,7 +246,7 @@ def get_process_service() -> Any:
 
 
 def get_system_state_reporter() -> Any:
-    """Get system state reporter.""" 
+    """Get system state reporter."""
     return get_cli_manager().get_system_state_reporter()
 
 
@@ -260,27 +261,25 @@ def get_component_status() -> dict[str, Any]:
 
 
 __all__ = [
-    # Manager class
-    "UnifiedCLIManager",
-    "get_cli_manager",
-    "initialize_cli_manager", 
-    "shutdown_cli_manager",
-    
     # Signal handling
     "SignalAwareComponent",
-    
+    # Manager class
+    "UnifiedCLIManager",
+    "create_emergency_checkpoint",
+    "get_background_manager",
+    "get_cli_manager",
+    "get_component_status",
+    "get_emergency_service",
+    "get_orchestrator",
+    "get_process_service",
+    "get_progress_service",
+    "get_rule_validation_service",
+    "get_session_service",
     # Convenience functions
     "get_shared_signal_handler",
-    "get_background_manager",
-    "get_orchestrator",
-    "get_workflow_service",
-    "get_progress_service", 
-    "get_session_service",
-    "get_training_service",
-    "get_emergency_service",
-    "get_rule_validation_service",
-    "get_process_service",
     "get_system_state_reporter",
-    "create_emergency_checkpoint",
-    "get_component_status",
+    "get_training_service",
+    "get_workflow_service",
+    "initialize_cli_manager",
+    "shutdown_cli_manager",
 ]

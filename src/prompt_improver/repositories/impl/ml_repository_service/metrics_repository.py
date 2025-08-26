@@ -6,14 +6,12 @@ following repository pattern with protocol-based dependency injection.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
-    GenerationAnalytics,
     MLModelPerformance,
     RulePerformance,
     TrainingIteration,
@@ -22,7 +20,6 @@ from prompt_improver.database.models import (
 from prompt_improver.repositories.base_repository import BaseRepository
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
     SyntheticDataMetrics,
-    TrainingMetrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +28,7 @@ logger = logging.getLogger(__name__)
 class MetricsRepository(BaseRepository[TrainingSession]):
     """Repository for ML analytics and performance metrics."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=TrainingSession,
             connection_manager=connection_manager,
@@ -48,7 +45,10 @@ class MetricsRepository(BaseRepository[TrainingSession]):
         """Get comprehensive synthetic data metrics."""
         async with self.get_session() as session:
             try:
-                from prompt_improver.database.models import GenerationSession, SyntheticDataSample
+                from prompt_improver.database.models import (
+                    GenerationSession,
+                    SyntheticDataSample,
+                )
 
                 # Get session info
                 generation_session_query = select(GenerationSession).where(
@@ -56,7 +56,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                 )
                 generation_result = await session.execute(generation_session_query)
                 generation_session = generation_result.scalar_one_or_none()
-                
+
                 if not generation_session:
                     return None
 
@@ -96,7 +96,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                 )
 
             except Exception as e:
-                logger.error(f"Error getting synthetic data metrics: {e}")
+                logger.exception(f"Error getting synthetic data metrics: {e}")
                 raise
 
     async def get_training_analytics(
@@ -139,7 +139,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                 }
 
             except Exception as e:
-                logger.error(f"Error getting training analytics: {e}")
+                logger.exception(f"Error getting training analytics: {e}")
                 raise
 
     async def get_rule_performance_data(
@@ -167,15 +167,15 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     .order_by(desc("usage_count"))
                     .limit(batch_size)
                 )
-                
+
                 result = await session.execute(query)
                 performance_data = []
-                
+
                 for row in result:
                     usage_count = row.usage_count or 0
                     success_count = row.success_count or 0
                     effectiveness_ratio = success_count / usage_count if usage_count > 0 else 0.0
-                    
+
                     performance_data.append({
                         "rule_id": row.rule_id,
                         "rule_name": row.rule_name,
@@ -186,12 +186,12 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                         "confidence_score": row.avg_confidence or 0.0,
                         "last_used": row.last_used,
                     })
-                
+
                 logger.info(f"Retrieved {len(performance_data)} rule performance records")
                 return performance_data
-                
+
             except Exception as e:
-                logger.error(f"Error getting rule performance data: {e}")
+                logger.exception(f"Error getting rule performance data: {e}")
                 raise
 
     async def get_rule_combinations_data(
@@ -203,20 +203,20 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                 # Get rule combinations that appear together frequently
                 query = text("""
                     WITH rule_sessions AS (
-                        SELECT 
+                        SELECT
                             prompt_id,
                             array_agg(DISTINCT rule_id ORDER BY rule_id) as rule_combination,
                             avg(improvement_score) as avg_improvement,
                             avg(confidence_level) as avg_quality,
                             count(*) as usage_count,
                             max(created_at) as last_used
-                        FROM rule_performance 
-                        WHERE prompt_id IS NOT NULL 
+                        FROM rule_performance
+                        WHERE prompt_id IS NOT NULL
                             AND created_at > NOW() - INTERVAL '90 days'
                         GROUP BY prompt_id
                         HAVING count(DISTINCT rule_id) >= 2
                     )
-                    SELECT 
+                    SELECT
                         rule_combination,
                         avg(avg_improvement) as avg_improvement,
                         avg(avg_quality) as avg_quality,
@@ -228,25 +228,23 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     ORDER BY usage_count DESC
                     LIMIT :batch_size
                 """)
-                
+
                 result = await session.execute(query, {"batch_size": batch_size})
-                combination_data = []
-                
-                for row in result:
-                    combination_data.append({
+
+                combination_data = [{
                         "rule_combination": row.rule_combination,
                         "avg_improvement": row.avg_improvement or 0.0,
                         "avg_quality": row.avg_quality or 0.0,
                         "usage_count": row.usage_count or 0,
                         "last_used": row.last_used,
                         "session_count": row.session_count or 0,
-                    })
-                
+                    } for row in result]
+
                 logger.info(f"Retrieved {len(combination_data)} rule combinations")
                 return combination_data
-                
+
             except Exception as e:
-                logger.error(f"Error getting rule combinations data: {e}")
+                logger.exception(f"Error getting rule combinations data: {e}")
                 # Return empty list on error to allow processing to continue
                 return []
 
@@ -259,7 +257,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
         async with self.get_session() as session:
             try:
                 start_date = datetime.now() - timedelta(days=days)
-                
+
                 query = select(
                     func.date_trunc('day', MLModelPerformance.created_at).label('date'),
                     func.avg(MLModelPerformance.accuracy).label('avg_accuracy'),
@@ -267,33 +265,31 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     func.avg(MLModelPerformance.recall).label('avg_recall'),
                     func.count(MLModelPerformance.id).label('model_count'),
                 ).where(MLModelPerformance.created_at >= start_date)
-                
+
                 if model_type:
                     query = query.where(MLModelPerformance.model_type == model_type)
-                
+
                 query = query.group_by(func.date_trunc('day', MLModelPerformance.created_at))
                 query = query.order_by('date')
-                
+
                 result = await session.execute(query)
-                trends = []
-                
-                for row in result:
-                    trends.append({
+
+                trends = [{
                         "date": row.date.isoformat() if row.date else None,
                         "avg_accuracy": float(row.avg_accuracy or 0),
                         "avg_precision": float(row.avg_precision or 0),
                         "avg_recall": float(row.avg_recall or 0),
                         "model_count": row.model_count or 0,
-                    })
-                
+                    } for row in result]
+
                 return {
                     "model_type": model_type,
                     "period_days": days,
                     "trends": trends,
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting performance trends: {e}")
+                logger.exception(f"Error getting performance trends: {e}")
                 raise
 
     async def get_training_efficiency_metrics(
@@ -310,19 +306,19 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     func.min(TrainingIteration.performance_score).label('min_performance'),
                     func.max(TrainingIteration.performance_score).label('max_performance'),
                 )
-                
+
                 if session_id:
                     query = query.where(TrainingIteration.session_id == session_id)
-                
+
                 result = await session.execute(query)
                 stats = result.first()
-                
+
                 # Calculate efficiency score
                 efficiency_score = 0.0
                 if stats.avg_duration and stats.avg_performance:
                     # Simple efficiency: performance per second
                     efficiency_score = stats.avg_performance / stats.avg_duration
-                
+
                 return {
                     "session_id": session_id,
                     "avg_iteration_duration": float(stats.avg_duration or 0),
@@ -334,9 +330,9 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     },
                     "efficiency_score": efficiency_score,
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting training efficiency metrics: {e}")
+                logger.exception(f"Error getting training efficiency metrics: {e}")
                 raise
 
     async def get_model_comparison_metrics(
@@ -347,7 +343,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
         async with self.get_session() as session:
             try:
                 comparisons = {}
-                
+
                 for model_id in model_ids:
                     query = (
                         select(MLModelPerformance)
@@ -357,7 +353,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     )
                     result = await session.execute(query)
                     performance = result.scalar_one_or_none()
-                    
+
                     if performance:
                         comparisons[model_id] = {
                             "accuracy": performance.accuracy or 0.0,
@@ -368,12 +364,12 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                             "model_type": performance.model_type,
                             "last_updated": performance.created_at.isoformat(),
                         }
-                
+
                 # Calculate relative performance
                 if len(comparisons) > 1:
                     metrics = ["accuracy", "precision", "recall", "f1_score"]
                     best_in_metric = {}
-                    
+
                     for metric in metrics:
                         best_value = max(
                             comp[metric] for comp in comparisons.values()
@@ -383,17 +379,17 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                             if comp[metric] == best_value
                         ]
                         best_in_metric[metric] = best_models
-                    
+
                     return {
                         "comparisons": comparisons,
                         "best_in_metric": best_in_metric,
                         "total_models": len(comparisons),
                     }
-                
+
                 return {"comparisons": comparisons, "total_models": len(comparisons)}
-                
+
             except Exception as e:
-                logger.error(f"Error getting model comparison metrics: {e}")
+                logger.exception(f"Error getting model comparison metrics: {e}")
                 raise
 
     async def get_resource_utilization_metrics(
@@ -404,36 +400,36 @@ class MetricsRepository(BaseRepository[TrainingSession]):
         async with self.get_session() as session:
             try:
                 start_time = datetime.now() - timedelta(hours=time_range_hours)
-                
+
                 # Get training sessions in time range
                 query = select(TrainingSession).where(
                     TrainingSession.created_at >= start_time
                 )
                 result = await session.execute(query)
                 sessions = result.scalars().all()
-                
+
                 total_sessions = len(sessions)
-                active_sessions = len([s for s in sessions if s.status in ["running", "paused"]])
-                
+                active_sessions = len([s for s in sessions if s.status in {"running", "paused"}])
+
                 # Calculate average resource utilization
                 resource_utilizations = [
-                    s.resource_utilization for s in sessions 
+                    s.resource_utilization for s in sessions
                     if s.resource_utilization
                 ]
-                
+
                 avg_cpu = 0.0
                 avg_memory = 0.0
                 avg_gpu = 0.0
-                
+
                 if resource_utilizations:
                     cpu_values = [r.get("cpu_percent", 0) for r in resource_utilizations]
                     memory_values = [r.get("memory_percent", 0) for r in resource_utilizations]
                     gpu_values = [r.get("gpu_percent", 0) for r in resource_utilizations]
-                    
+
                     avg_cpu = sum(cpu_values) / len(cpu_values) if cpu_values else 0.0
                     avg_memory = sum(memory_values) / len(memory_values) if memory_values else 0.0
                     avg_gpu = sum(gpu_values) / len(gpu_values) if gpu_values else 0.0
-                
+
                 return {
                     "time_range_hours": time_range_hours,
                     "total_sessions": total_sessions,
@@ -445,7 +441,7 @@ class MetricsRepository(BaseRepository[TrainingSession]):
                     },
                     "utilization_efficiency": min(1.0, (avg_cpu + avg_memory + avg_gpu) / 3 / 100),
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting resource utilization metrics: {e}")
+                logger.exception(f"Error getting resource utilization metrics: {e}")
                 raise

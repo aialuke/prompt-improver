@@ -5,20 +5,21 @@ Tests the complete AutoML workflow following 2025 best practices
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Any, Dict
 
 import pytest
 
+from prompt_improver.database import ManagerMode, create_database_services
 from prompt_improver.ml.automl.callbacks import create_standard_callbacks
 from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
     AutoMLOrchestrator,
 )
-from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+
 # from prompt_improver.optimization.rule_optimizer import RuleOptimizer  # Module doesn't exist
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+from prompt_improver.services.prompt.facade import (
+    PromptServiceFacade as PromptImprovementService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ class TestAutoMLIntegration:
             if "error" in result:
                 logger.info("Expected error in test environment: %s", result["error"])
             else:
-                assert result["status"] in ["completed", "failed"]
+                assert result["status"] in {"completed", "failed"}
         except Exception as e:
             logger.info("Expected exception in test environment: %s", e)
         logger.info("✓ AutoML optimization workflow simulation test passed")

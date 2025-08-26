@@ -8,7 +8,7 @@ Defines the interface for user feedback operations, including:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 

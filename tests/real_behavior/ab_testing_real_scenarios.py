@@ -19,24 +19,17 @@ import logging
 import os
 import random
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
-import pandas as pd
 from scipy import stats
 
-from prompt_improver.database.models import ABExperiment
 from prompt_improver.performance.testing.ab_testing_service import (
-    ABTestConfig,
     ABTestingService,
-    ABTestResult,
-    StatisticalMethod,
-    TestStatus,
 )
 
 sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
@@ -197,7 +190,7 @@ class ABTestingRealScenariosSuite:
                 users_per_sec=users_per_second,
             )
             results_by_variant = {}
-            for variant in experiment_config["variants"].keys():
+            for variant in experiment_config["variants"]:
                 variant_interactions = [
                     i for i in interactions if i["variant"] == variant
                 ]
@@ -240,7 +233,7 @@ class ABTestingRealScenariosSuite:
                     )
                     variant_total = results["users"]
                     if control_total > 0 and variant_total > 0:
-                        chi2, p_value = stats.chi2_contingency([
+                        _chi2, p_value = stats.chi2_contingency([
                             [control_conversions, control_total - control_conversions],
                             [variant_conversions, variant_total - variant_conversions],
                         ])[:2]
@@ -305,7 +298,7 @@ class ABTestingRealScenariosSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error(f"❌ Real experiment execution failed: {e}")
+            logger.exception(f"❌ Real experiment execution failed: {e}")
         self.results.append(result)
 
     async def _test_statistical_significance_detection(self):
@@ -470,7 +463,7 @@ class ABTestingRealScenariosSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error(f"❌ Statistical significance detection failed: {e}")
+            logger.exception(f"❌ Statistical significance detection failed: {e}")
         self.results.append(result)
 
     async def _test_multi_armed_bandit_optimization(self):
@@ -580,7 +573,7 @@ class ABTestingRealScenariosSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error(f"❌ Multi-armed bandit optimization failed: {e}")
+            logger.exception(f"❌ Multi-armed bandit optimization failed: {e}")
         self.results.append(result)
 
     async def _test_real_time_decision_making(self):
@@ -747,7 +740,7 @@ class ABTestingRealScenariosSuite:
                 business_impact_measured={},
                 error_details=str(e),
             )
-            logger.error(f"❌ Real-time decision making failed: {e}")
+            logger.exception(f"❌ Real-time decision making failed: {e}")
         self.results.append(result)
 
     async def _test_experiment_lifecycle_management(self):

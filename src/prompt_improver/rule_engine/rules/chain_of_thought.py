@@ -59,7 +59,7 @@ class ChainOfThoughtRule(BasePromptRule):
     - Step-by-step guidance with quality validation
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = {
             "enable_step_by_step": True,
             "use_thinking_tags": True,
@@ -74,12 +74,12 @@ class ChainOfThoughtRule(BasePromptRule):
         self.priority = 8
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "Chain of Thought Reasoning Rule",
             "type": "Reasoning",
@@ -97,7 +97,7 @@ class ChainOfThoughtRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Check if prompt would benefit from Chain of Thought reasoning"""
+        """Check if prompt would benefit from Chain of Thought reasoning."""
         reasoning_metrics = self._analyze_reasoning_requirements(prompt)
         applies = (
             reasoning_metrics["reasoning_complexity"] > 0.3
@@ -128,7 +128,7 @@ class ChainOfThoughtRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply Chain of Thought reasoning enhancement"""
+        """Apply Chain of Thought reasoning enhancement."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -172,11 +172,11 @@ class ChainOfThoughtRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction for CoT reasoning"""
+        """Generate research-based LLM instruction for CoT reasoning."""
         return '\n<instruction>\nApply Chain of Thought reasoning using research-validated patterns:\n\n1. ZERO-SHOT COT (Kojima et al.):\n   - Add "Let\'s think step by step" for complex reasoning tasks\n   - Encourage explicit intermediate steps\n   - Break down multi-part problems systematically\n\n2. STRUCTURED THINKING:\n   - Use <thinking> tags for intermediate reasoning\n   - Show logical progression from premises to conclusions\n   - Validate each step before proceeding\n\n3. STEP-BY-STEP GUIDANCE:\n   - Number reasoning steps clearly (1, 2, 3...)\n   - Connect each step to the next logically\n   - Summarize key insights at each stage\n\n4. REASONING QUALITY:\n   - Verify logical consistency between steps\n   - Check for missing assumptions or gaps\n   - Ensure conclusion follows from premises\n\nFocus on making the reasoning process explicit, traceable, and verifiable.\n</instruction>\n'
 
     def _analyze_reasoning_requirements(self, prompt: str) -> dict[str, Any]:
-        """Analyze prompt to determine CoT reasoning requirements"""
+        """Analyze prompt to determine CoT reasoning requirements."""
         words = prompt.lower().split()
         reasoning_task_count = sum(
             len(re.findall(pattern, prompt, re.IGNORECASE))
@@ -254,7 +254,7 @@ class ChainOfThoughtRule(BasePromptRule):
         }
 
     def _apply_zero_shot_cot(self, prompt: str) -> tuple[str, list[dict]]:
-        """Apply zero-shot CoT trigger based on Kojima et al. research"""
+        """Apply zero-shot CoT trigger based on Kojima et al. research."""
         trigger = self.config["zero_shot_trigger"]
         enhanced_prompt = f"{prompt}\n\n{trigger}."
         return (
@@ -271,7 +271,7 @@ class ChainOfThoughtRule(BasePromptRule):
     def _apply_few_shot_cot(
         self, prompt: str, reasoning_metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Apply few-shot CoT with structured examples"""
+        """Apply few-shot CoT with structured examples."""
         task_type = self._identify_task_type(prompt)
         example = self._get_cot_example(task_type)
         enhanced_prompt = f"Here's an example of step-by-step reasoning:\n\n{example}\n\nNow, apply the same step-by-step approach to: {prompt}"
@@ -289,7 +289,7 @@ class ChainOfThoughtRule(BasePromptRule):
     def _apply_structured_cot(
         self, prompt: str, reasoning_metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Apply structured CoT with explicit step framework"""
+        """Apply structured CoT with explicit step framework."""
         estimated_steps = reasoning_metrics.get("estimated_steps", 3)
         step_framework = "\n".join([
             f"Step {i}: [Your reasoning for step {i}]"
@@ -308,7 +308,7 @@ class ChainOfThoughtRule(BasePromptRule):
         )
 
     def _add_thinking_structure(self, prompt: str) -> tuple[str, list[dict]]:
-        """Add thinking tags for intermediate reasoning"""
+        """Add thinking tags for intermediate reasoning."""
         if "<thinking>" in prompt.lower():
             return (prompt, [])
         enhanced_prompt = f"{prompt}\n\n<thinking>\nLet me break this down step by step:\n1. First, I need to understand what is being asked...\n2. Then, I should consider the key factors...\n3. Next, I'll work through the logical steps...\n4. Finally, I'll arrive at a well-reasoned conclusion...\n</thinking>\n\n<response>\n[Your final answer here]\n</response>"
@@ -326,7 +326,7 @@ class ChainOfThoughtRule(BasePromptRule):
     def _add_step_guidance(
         self, prompt: str, reasoning_metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Add step-by-step guidance based on task complexity"""
+        """Add step-by-step guidance based on task complexity."""
         if "step" in prompt.lower():
             return (prompt, [])
         guidance = "\n\nPlease approach this step-by-step:\n1. Identify the key components\n2. Analyze the relationships\n3. Work through the logic systematically\n4. Verify your reasoning\n5. Provide a clear conclusion"
@@ -343,7 +343,7 @@ class ChainOfThoughtRule(BasePromptRule):
         )
 
     def _identify_task_type(self, prompt: str) -> str:
-        """Identify the type of reasoning task for appropriate examples"""
+        """Identify the type of reasoning task for appropriate examples."""
         prompt_lower = prompt.lower()
         if any(
             word in prompt_lower for word in ["calculate", "compute", "math", "number"]
@@ -358,7 +358,7 @@ class ChainOfThoughtRule(BasePromptRule):
         return "general"
 
     def _get_cot_example(self, task_type: str) -> str:
-        """Get appropriate CoT example based on task type"""
+        """Get appropriate CoT example based on task type."""
         examples = {
             "mathematical": "\nProblem: If a store sells 3 apples for $2, how much would 12 apples cost?\n\nThinking step by step:\n1. First, I need to find the cost per apple: $2 ÷ 3 apples = $0.67 per apple\n2. Then, I calculate the cost for 12 apples: $0.67 × 12 = $8.04\n3. Therefore, 12 apples would cost $8.04\n",
             "analytical": "\nQuestion: What are the advantages and disadvantages of remote work?\n\nThinking step by step:\n1. First, I'll identify the main advantages:\n   - Flexibility in work schedule and location\n   - Reduced commuting time and costs\n   - Better work-life balance potential\n2. Next, I'll consider the disadvantages:\n   - Potential isolation and reduced collaboration\n   - Distractions at home\n   - Communication challenges\n3. Finally, I'll synthesize: Remote work offers significant benefits but requires careful management of its challenges\n",

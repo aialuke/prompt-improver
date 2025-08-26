@@ -12,8 +12,7 @@ Features:
 """
 
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from prompt_improver.core.interfaces.datetime_service import DateTimeServiceProtocol
@@ -26,7 +25,7 @@ class DateTimeService(DateTimeServiceProtocol):
     robust datetime operations for the ML Pipeline Orchestrator.
     """
 
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self, logger: logging.Logger | None = None) -> None:
         """Initialize the datetime service.
 
         Args:
@@ -75,7 +74,7 @@ class DateTimeService(DateTimeServiceProtocol):
             dt = datetime.fromtimestamp(timestamp, self._utc_tz)
             return dt if aware else dt.replace(tzinfo=None)
         except (ValueError, OSError) as e:
-            self.logger.error(f"Invalid timestamp {timestamp}: {e}")
+            self.logger.exception(f"Invalid timestamp {timestamp}: {e}")
             raise ValueError(f"Invalid timestamp: {timestamp}") from e
 
     async def to_timezone(self, dt: datetime, tz: ZoneInfo) -> datetime:
@@ -97,7 +96,7 @@ class DateTimeService(DateTimeServiceProtocol):
                 dt = dt.replace(tzinfo=self._utc_tz)
             return dt.astimezone(tz)
         except Exception as e:
-            self.logger.error(f"Timezone conversion failed for {dt} to {tz}: {e}")
+            self.logger.exception(f"Timezone conversion failed for {dt} to {tz}: {e}")
             raise ValueError(f"Timezone conversion failed: {e}") from e
 
     async def format_iso(self, dt: datetime) -> str:
@@ -113,7 +112,7 @@ class DateTimeService(DateTimeServiceProtocol):
         try:
             return dt.isoformat()
         except Exception as e:
-            self.logger.error(f"ISO formatting failed for {dt}: {e}")
+            self.logger.exception(f"ISO formatting failed for {dt}: {e}")
             raise ValueError(f"ISO formatting failed: {e}") from e
 
     async def ensure_aware_utc(self, dt: datetime) -> datetime:
@@ -222,7 +221,7 @@ class DateTimeService(DateTimeServiceProtocol):
                 "service_type": "DateTimeService",
             }
         except Exception as e:
-            self.logger.error(f"DateTimeService health check failed: {e}")
+            self.logger.exception(f"DateTimeService health check failed: {e}")
             return {
                 "status": "unhealthy",
                 "error": str(e),

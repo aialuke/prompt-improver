@@ -181,6 +181,7 @@ def clear_registry() -> None:
     """
     get_registry_manager().clear_registry()
     import sys
+    from prompt_improver.core.services.service_registry import RegistryManager
 
     modules_to_clear = []
     for module_name in list(sys.modules.keys()):

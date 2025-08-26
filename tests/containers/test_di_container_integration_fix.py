@@ -84,12 +84,14 @@ async def test_di_container_integration_fix():
             f"✅ Analytics callbacks using modern pattern: {len(analytics_callbacks)}"
         )
         print("\n5️⃣ Testing Error Handling...")
-        from prompt_improver.core.di.container_orchestrator import ServiceNotRegisteredError
+        from prompt_improver.core.di.container_orchestrator import (
+            ServiceNotRegisteredError,
+        )
 
         NonExistentService = type("NonExistentService", (), {})
         try:
             await container.get(NonExistentService)
-            assert False, "Should have raised ServiceNotRegisteredError"
+            raise AssertionError("Should have raised ServiceNotRegisteredError")
         except ServiceNotRegisteredError as e:
             print(f"✅ Proper error handling: {type(e).__name__}")
         print("\n6️⃣ Testing Clean Architecture...")

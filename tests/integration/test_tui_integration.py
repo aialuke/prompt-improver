@@ -3,7 +3,7 @@
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from prompt_improver.tui.dashboard import APESDashboard
 from prompt_improver.tui.data_provider import APESDataProvider

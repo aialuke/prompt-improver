@@ -5,37 +5,24 @@ are properly bound to their protocol interfaces with validation.
 """
 
 import logging
-from typing import Type, TypeVar, Protocol, Optional, Any, Dict, List
+from typing import Any, Protocol, TypeVar
 
 from prompt_improver.core.validation.protocol_registry import (
-    register_protocol_contract,
     get_protocol_registry,
-    validate_all_contracts
+    register_protocol_contract,
+    validate_all_contracts,
 )
 
 # Import all protocol interfaces
-from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
-    PromptServiceFacadeProtocol,
+from prompt_improver.shared.interfaces.protocols.application import (
     PromptAnalysisServiceProtocol,
+    PromptServiceFacadeProtocol,
     RuleApplicationServiceProtocol,
     ValidationServiceProtocol,
 )
-from prompt_improver.repositories.protocols.analytics_repository_protocol import (
-    AnalyticsRepositoryProtocol,
-)
-from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-    AprioriRepositoryProtocol,
-)
-from prompt_improver.repositories.protocols.prompt_repository_protocol import (
-    PromptRepositoryProtocol,
-)
-from prompt_improver.core.di.protocols import (
-    CoreContainerProtocol,
-    MLContainerProtocol,
-    SecurityContainerProtocol,
-    DatabaseContainerProtocol,
-    MonitoringContainerProtocol,
+from prompt_improver.shared.interfaces.protocols.core import (
     ContainerFacadeProtocol,
+    MonitoringContainerProtocol,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,44 +33,44 @@ P = TypeVar("P", bound=Protocol)
 
 class ServiceRegistrationManager:
     """Manages protocol-based service registration and validation."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the service registration manager."""
-        self._registered_services: Dict[str, Any] = {}
-        self._validation_results: Dict[str, Any] = {}
-        
-    def register_all_services(self) -> Dict[str, Any]:
+        self._registered_services: dict[str, Any] = {}
+        self._validation_results: dict[str, Any] = {}
+
+    def register_all_services(self) -> dict[str, Any]:
         """Register all services with their protocol contracts."""
         logger.info("Starting protocol-based service registration")
-        
+
         registration_results = {
             "successful_registrations": [],
             "failed_registrations": [],
             "validation_errors": [],
             "total_registered": 0
         }
-        
+
         try:
             # Register prompt services
             self._register_prompt_services(registration_results)
-            
+
             # Register repository services
             self._register_repository_services(registration_results)
-            
+
             # Register container services
             self._register_container_services(registration_results)
-            
+
             # Validate all contracts
             validation_results = validate_all_contracts()
             self._validation_results = validation_results
-            
+
             # Check for validation errors
             for protocol_name, result in validation_results["contract_validation"].items():
                 if not result["is_valid"]:
                     registration_results["validation_errors"].extend(
                         [f"{protocol_name}: {issue}" for issue in result["issues"]]
                     )
-            
+
             # Check dependency graph
             if not validation_results["dependency_validation"]["is_valid"]:
                 registration_results["validation_errors"].extend(
@@ -92,40 +79,46 @@ class ServiceRegistrationManager:
                 registration_results["validation_errors"].extend(
                     validation_results["dependency_validation"]["missing_dependencies"]
                 )
-            
+
             registration_results["total_registered"] = len(registration_results["successful_registrations"])
-            
+
             logger.info(f"Service registration completed: {registration_results['total_registered']} services registered")
-            
+
         except Exception as e:
-            logger.error(f"Service registration failed: {e}")
+            logger.exception(f"Service registration failed: {e}")
             registration_results["failed_registrations"].append(f"Global registration error: {e}")
-        
+
         return registration_results
-    
-    def _register_prompt_services(self, results: Dict[str, Any]) -> None:
+
+    def _register_prompt_services(self, results: dict[str, Any]) -> None:
         """Register prompt service contracts."""
         try:
             # Import implementations only when registering to avoid circular imports
             from prompt_improver.services.prompt.facade import PromptServiceFacade
-            from prompt_improver.services.prompt.prompt_analysis_service import PromptAnalysisService
-            from prompt_improver.services.prompt.rule_application_service import RuleApplicationService
-            from prompt_improver.services.prompt.validation_service import ValidationService
-            
+            from prompt_improver.services.prompt.prompt_analysis_service import (
+                PromptAnalysisService,
+            )
+            from prompt_improver.services.prompt.rule_application_service import (
+                RuleApplicationService,
+            )
+            from prompt_improver.services.prompt.validation_service import (
+                ValidationService,
+            )
+
             # Register PromptServiceFacade
             register_protocol_contract(
                 protocol_type=PromptServiceFacadeProtocol,
                 implementation_type=PromptServiceFacade,
                 dependencies=[
                     PromptAnalysisServiceProtocol,
-                    RuleApplicationServiceProtocol, 
+                    RuleApplicationServiceProtocol,
                     ValidationServiceProtocol
                 ],
                 lifecycle="singleton",
                 tags={"prompt", "facade", "core"}
             )
             results["successful_registrations"].append("PromptServiceFacadeProtocol")
-            
+
             # Register component services
             register_protocol_contract(
                 protocol_type=PromptAnalysisServiceProtocol,
@@ -134,7 +127,7 @@ class ServiceRegistrationManager:
                 tags={"prompt", "analysis"}
             )
             results["successful_registrations"].append("PromptAnalysisServiceProtocol")
-            
+
             register_protocol_contract(
                 protocol_type=RuleApplicationServiceProtocol,
                 implementation_type=RuleApplicationService,
@@ -142,7 +135,7 @@ class ServiceRegistrationManager:
                 tags={"prompt", "rules"}
             )
             results["successful_registrations"].append("RuleApplicationServiceProtocol")
-            
+
             register_protocol_contract(
                 protocol_type=ValidationServiceProtocol,
                 implementation_type=ValidationService,
@@ -150,33 +143,34 @@ class ServiceRegistrationManager:
                 tags={"prompt", "validation"}
             )
             results["successful_registrations"].append("ValidationServiceProtocol")
-            
+
         except Exception as e:
-            logger.error(f"Failed to register prompt services: {e}")
+            logger.exception(f"Failed to register prompt services: {e}")
             results["failed_registrations"].append(f"Prompt services: {e}")
-    
-    def _register_repository_services(self, results: Dict[str, Any]) -> None:
+
+    def _register_repository_services(self, results: dict[str, Any]) -> None:
         """Register repository service contracts."""
         try:
             # Import implementations
-            from prompt_improver.repositories.impl.analytics_repository import AnalyticsRepository
-            
+
             # Register repository contracts (would need actual implementations)
             # For now, register the protocols as placeholders
-            
+
             logger.info("Repository service registration completed")
-            
+
         except Exception as e:
-            logger.error(f"Failed to register repository services: {e}")
+            logger.exception(f"Failed to register repository services: {e}")
             results["failed_registrations"].append(f"Repository services: {e}")
-    
-    def _register_container_services(self, results: Dict[str, Any]) -> None:
+
+    def _register_container_services(self, results: dict[str, Any]) -> None:
         """Register container service contracts."""
         try:
             # Import container implementations
-            from prompt_improver.core.di.container_orchestrator import ContainerOrchestrator
+            from prompt_improver.core.di.container_orchestrator import (
+                ContainerOrchestrator,
+            )
             from prompt_improver.core.di.monitoring_container import MonitoringContainer
-            
+
             # Register container contracts
             register_protocol_contract(
                 protocol_type=ContainerFacadeProtocol,
@@ -185,7 +179,7 @@ class ServiceRegistrationManager:
                 tags={"container", "orchestrator", "facade"}
             )
             results["successful_registrations"].append("ContainerFacadeProtocol")
-            
+
             register_protocol_contract(
                 protocol_type=MonitoringContainerProtocol,
                 implementation_type=MonitoringContainer,
@@ -193,37 +187,37 @@ class ServiceRegistrationManager:
                 tags={"container", "monitoring"}
             )
             results["successful_registrations"].append("MonitoringContainerProtocol")
-            
+
         except Exception as e:
-            logger.error(f"Failed to register container services: {e}")
+            logger.exception(f"Failed to register container services: {e}")
             results["failed_registrations"].append(f"Container services: {e}")
-    
-    def get_service_by_protocol(self, protocol_type: Type[P]) -> Optional[Type]:
+
+    def get_service_by_protocol(self, protocol_type: type[P]) -> type | None:
         """Get service implementation for a protocol."""
         registry = get_protocol_registry()
         return registry.get_implementation_type(protocol_type)
-    
-    def validate_service_contracts(self) -> Dict[str, Any]:
+
+    def validate_service_contracts(self) -> dict[str, Any]:
         """Validate all registered service contracts."""
         return validate_all_contracts()
-    
-    def get_dependency_order(self) -> List[Type[Protocol]]:
+
+    def get_dependency_order(self) -> list[type[Protocol]]:
         """Get topologically sorted service dependency order."""
         registry = get_protocol_registry()
         return registry.generate_dependency_order()
-    
-    def get_registration_stats(self) -> Dict[str, Any]:
+
+    def get_registration_stats(self) -> dict[str, Any]:
         """Get registration and validation statistics."""
         registry = get_protocol_registry()
         stats = registry.get_registry_stats()
-        
+
         validation_summary = {
             "total_contracts_validated": 0,
             "valid_contracts": 0,
             "invalid_contracts": 0,
             "dependency_graph_valid": True
         }
-        
+
         if self._validation_results:
             contract_validation = self._validation_results.get("contract_validation", {})
             validation_summary["total_contracts_validated"] = len(contract_validation)
@@ -236,7 +230,7 @@ class ServiceRegistrationManager:
             validation_summary["dependency_graph_valid"] = (
                 self._validation_results.get("dependency_validation", {}).get("is_valid", True)
             )
-        
+
         return {
             "registry_stats": stats,
             "validation_summary": validation_summary
@@ -247,37 +241,36 @@ class ServiceRegistrationManager:
 _registration_manager = ServiceRegistrationManager()
 
 
-def register_all_services() -> Dict[str, Any]:
+def register_all_services() -> dict[str, Any]:
     """Register all services with protocol validation."""
     return _registration_manager.register_all_services()
 
 
-def get_service_by_protocol(protocol_type: Type[P]) -> Optional[Type]:
+def get_service_by_protocol[P: Protocol](protocol_type: type[P]) -> type | None:
     """Get service implementation for a protocol."""
     return _registration_manager.get_service_by_protocol(protocol_type)
 
 
-def validate_service_contracts() -> Dict[str, Any]:
+def validate_service_contracts() -> dict[str, Any]:
     """Validate all service contracts."""
     return _registration_manager.validate_service_contracts()
 
 
-def get_registration_stats() -> Dict[str, Any]:
+def get_registration_stats() -> dict[str, Any]:
     """Get service registration statistics."""
     return _registration_manager.get_registration_stats()
 
 
-def create_service_factory(protocol_type: Type[P]) -> Any:
+def create_service_factory[P: Protocol](protocol_type: type[P]) -> Any:
     """Create a factory function for a protocol-based service."""
     def factory(*args, **kwargs):
         registry = get_protocol_registry()
         contract = registry.get_contract(protocol_type)
         if not contract:
             raise ValueError(f"No contract registered for protocol {protocol_type.__name__}")
-        
+
         if contract.implementation_factory:
             return contract.implementation_factory(*args, **kwargs)
-        else:
-            return contract.implementation_type(*args, **kwargs)
-    
+        return contract.implementation_type(*args, **kwargs)
+
     return factory

@@ -5,9 +5,8 @@ Tests the ComponentFactory implementation for proper dependency injection,
 component creation, and Protocol interface compliance.
 """
 
-import asyncio
-from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from src.prompt_improver.core.factories.component_factory import (
@@ -15,10 +14,9 @@ from src.prompt_improver.core.factories.component_factory import (
     DependencyValidator,
     create_component_factory,
 )
-from src.prompt_improver.core.protocols.ml_protocols import (
+from src.prompt_improver.shared.interfaces.protocols.ml import (
     ComponentFactoryProtocol,
     ComponentSpec,
-    ServiceContainerProtocol,
 )
 
 

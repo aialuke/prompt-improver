@@ -9,15 +9,10 @@ Migration from mock-based testing to real behavior testing based on research:
 """
 
 import asyncio
-import tempfile
-import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pytest
 from hypothesis import (
-    HealthCheck,
     assume,
     given,
     settings,
@@ -92,7 +87,7 @@ class TestInMemoryModelCache:
         assert cached_model is model
         predictions = cached_model.predict(X_test)
         assert len(predictions) == len(y_test)
-        assert all(pred in [0, 1] for pred in predictions)
+        assert all(pred in {0, 1} for pred in predictions)
         model_registry.remove_model(model_id)
         assert model_registry.get_model(model_id) is None
 
@@ -101,7 +96,7 @@ class TestInMemoryModelCache:
         self, model_registry, sample_sklearn_model
     ):
         """Test that real models expire in cache after TTL has passed."""
-        model, X_test, y_test = sample_sklearn_model
+        model, _X_test, _y_test = sample_sklearn_model
         model_registry.add_model("expiring_model", model, ttl_minutes=0.02)
         cached_model = model_registry.get_model("expiring_model")
         assert cached_model is not None
@@ -112,7 +107,7 @@ class TestInMemoryModelCache:
 
     def test_cache_eviction_policy_with_real_models(self, multiple_sklearn_models):
         """Test the LRU cache eviction policy with real models."""
-        models, X_test, y_test = multiple_sklearn_models
+        models, _X_test, _y_test = multiple_sklearn_models
         model_registry = InMemoryModelRegistry(max_cache_size_mb=20)
         model_ids = []
         for i, (model_name, model) in enumerate(models.items()):
@@ -243,7 +238,7 @@ class TestAdditionalCacheScenarios:
         X, y = make_classification(
             n_samples=100, n_features=10, n_classes=2, random_state=42
         )
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train, _X_test, y_train, _y_test = train_test_split(
             X, y, test_size=0.3, random_state=42
         )
         model_ids = []
@@ -323,7 +318,7 @@ class TestAdditionalCacheScenarios:
         X, y = make_classification(
             n_samples=200, n_features=15, n_classes=2, random_state=42
         )
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train, X_test, y_train, _y_test = train_test_split(
             X, y, test_size=0.3, random_state=42
         )
         model = RandomForestClassifier(n_estimators=5, random_state=42)

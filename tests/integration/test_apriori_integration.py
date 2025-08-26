@@ -9,13 +9,13 @@ Tests the complete integration of Apriori association rule mining with:
 - Pattern discovery workflow
 """
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from prompt_improver.database import ManagerMode, get_unified_manager
+from prompt_improver.database import ManagerMode
 from prompt_improver.database.models import (
     AprioriAssociationRule,
     AprioriPatternDiscovery,
@@ -163,6 +163,8 @@ class TestAprioriAnalyzer:
     async def test_association_rule_generation(self):
         """Test generation of association rules from frequent itemsets"""
         import pandas as pd
+        from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+        from prompt_improver.database.types import ManagerMode
 
         db_manager = get_database_services(ManagerMode.ML_TRAINING)
         analyzer = AprioriAnalyzer(db_manager=db_manager)

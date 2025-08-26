@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 import pytest
 from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineFactory
-from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
+from prompt_improver.shared.interfaces.protocols.ml import ServiceContainerProtocol
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import PipelineState
 from prompt_improver.ml.orchestration.events.event_types import EventType

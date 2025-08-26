@@ -1,14 +1,12 @@
 """OpenTelemetry metrics instrumentation for APES health checks.
-Health Check Consolidation - Metrics Integration
+Health Check Consolidation - Metrics Integration.
 """
 
 import time
-from collections.abc import Callable
-from functools import wraps
 
 
 class _Timer:
-    """Context manager for timing code execution"""
+    """Context manager for timing code execution."""
 
     def __enter__(self):
         self.start = time.time()
@@ -21,9 +19,9 @@ class _Timer:
 
 
 class MockMetric:
-    """Mock metric class for when metrics are not available"""
+    """Mock metric class for when metrics are not available."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         pass
 
     def inc(self, *args, **kwargs):
@@ -45,5 +43,5 @@ class MockMetric:
 Counter = Gauge = Histogram = Summary = MockMetric
 
 
-def _create_metric_safe(metric_class, *args, **kwargs):
+def _create_metric_safe(metric_class, *args, **kwargs) -> None:
     """Create a metric with graceful duplicate handling."""

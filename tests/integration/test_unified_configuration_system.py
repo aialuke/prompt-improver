@@ -14,19 +14,13 @@ Test Coverage:
 import os
 import pytest
 import time
-import tempfile
-from pathlib import Path
-from typing import Dict, Any
 from unittest.mock import patch
 
 # Test the unified configuration system
 from prompt_improver.core.config_unified import (
-    UnifiedConfig,
     UnifiedConfigManager, 
     Environment,
     LogLevel,
-    ValidationResult,
-    InitializationMetrics,
     get_config,
     get_initialization_metrics,
     reload_config,
@@ -271,6 +265,7 @@ class TestUnifiedConfigurationSystem:
         """Test thread safety of configuration access."""
         import threading
         import queue
+        import gc
         
         results = queue.Queue()
         errors = queue.Queue()

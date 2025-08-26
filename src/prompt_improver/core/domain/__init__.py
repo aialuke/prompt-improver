@@ -7,81 +7,69 @@ and ensure clean architecture boundaries.
 Clean Architecture Principle: Domain types should be infrastructure-agnostic.
 """
 
-from prompt_improver.core.domain.types import (
-    # Session types
-    ImprovementSessionData,
-    PromptSessionData,
-    TrainingSessionData,
-    
-    # Request/Response types
-    AprioriAnalysisRequestData,
-    AprioriAnalysisResponseData,
-    PatternDiscoveryRequestData,
-    PatternDiscoveryResponseData,
-    
-    # Feedback types
-    UserFeedbackData,
-    
-    # Health types
-    HealthCheckResultData,
-    HealthStatusData,
-    
-    # ML types
-    ModelMetricsData,
-    TrainingResultData,
-    
-    # Common types
-    SessionId,
-    UserId,
-    ModelId,
-    RuleId,
-    AnalysisId,
-)
-
 from prompt_improver.core.domain.enums import (
-    SessionStatus,
     AnalysisStatus,
     HealthStatus,
     ModelStatus,
+    SessionStatus,
     TrainingStatus,
     ValidationLevel,
 )
+from prompt_improver.core.domain.types import (
+    AnalysisId,
+    # Request/Response types
+    AprioriAnalysisRequestData,
+    AprioriAnalysisResponseData,
+    # Health types
+    HealthCheckResultData,
+    HealthStatusData,
+    # Session types
+    ImprovementSessionData,
+    ModelId,
+    # ML types
+    ModelMetricsData,
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
+    PromptSessionData,
+    RuleId,
+    # Common types
+    SessionId,
+    TrainingResultData,
+    TrainingSessionData,
+    # Feedback types
+    UserFeedbackData,
+    UserId,
+)
 
 __all__ = [
-    # Session types
-    "ImprovementSessionData",
-    "PromptSessionData", 
-    "TrainingSessionData",
-    
+    "AnalysisId",
+    "AnalysisStatus",
     # Request/Response types
     "AprioriAnalysisRequestData",
     "AprioriAnalysisResponseData",
-    "PatternDiscoveryRequestData", 
-    "PatternDiscoveryResponseData",
-    
-    # Feedback types
-    "UserFeedbackData",
-    
     # Health types
     "HealthCheckResultData",
+    "HealthStatus",
     "HealthStatusData",
-    
+    # Session types
+    "ImprovementSessionData",
+    "ModelId",
     # ML types
     "ModelMetricsData",
-    "TrainingResultData",
-    
+    "ModelStatus",
+    "PatternDiscoveryRequestData",
+    "PatternDiscoveryResponseData",
+    "PromptSessionData",
+    "RuleId",
     # Common types
     "SessionId",
-    "UserId", 
-    "ModelId",
-    "RuleId",
-    "AnalysisId",
-    
     # Enums
     "SessionStatus",
-    "AnalysisStatus",
-    "HealthStatus",
-    "ModelStatus",
+    "TrainingResultData",
+    "TrainingSessionData",
     "TrainingStatus",
+    # Feedback types
+    "UserFeedbackData",
+    "UserId",
     "ValidationLevel",
 ]

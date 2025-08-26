@@ -1,22 +1,15 @@
 """Performance regression detection and alerting system."""
 
-import asyncio
-import json
 import logging
 import statistics
-import time
 import uuid
-from collections.abc import Callable
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from prompt_improver.performance.baseline.models import (
     AlertSeverity,
     BaselineMetrics,
-    MetricDefinition,
-    PerformanceTrend,
     RegressionAlert,
-    TrendDirection,
     get_metric_definition,
 )
 from prompt_improver.performance.baseline.statistical_analyzer import (
@@ -43,7 +36,7 @@ class RegressionThresholds:
         minimum_samples: int = 5,
         significance_threshold: float = 0.05,
         consecutive_violations: int = 3,
-    ):
+    ) -> None:
         """Initialize regression thresholds.
 
         Args:
@@ -73,7 +66,7 @@ class AlertChannel:
 class LogAlertChannel(AlertChannel):
     """Log-based alert channel."""
 
-    def __init__(self, logger_name: str = __name__):
+    def __init__(self, logger_name: str = __name__) -> None:
         self.logger = logging.getLogger(logger_name)
 
     async def send_alert(self, alert: RegressionAlert) -> bool:
@@ -91,14 +84,14 @@ class LogAlertChannel(AlertChannel):
             )
             return True
         except Exception as e:
-            logger.error(f"Failed to send log alert: {e}")
+            logger.exception(f"Failed to send log alert: {e}")
             return False
 
 
 class WebhookAlertChannel(AlertChannel):
     """Webhook-based alert channel."""
 
-    def __init__(self, webhook_url: str, timeout: int = 30):
+    def __init__(self, webhook_url: str, timeout: int = 30) -> None:
         self.webhook_url = webhook_url
         self.timeout = timeout
 
@@ -138,7 +131,7 @@ class WebhookAlertChannel(AlertChannel):
                 logger.error(f"Webhook alert failed with status {response.status}")
                 return False
         except Exception as e:
-            logger.error(f"Failed to send webhook alert: {e}")
+            logger.exception(f"Failed to send webhook alert: {e}")
             return False
 
 
@@ -156,7 +149,7 @@ class RegressionDetector:
         enable_statistical_analysis: bool = True,
         cooldown_period: int = 300,
         max_alerts_per_hour: int = 10,
-    ):
+    ) -> None:
         """Initialize regression detector.
 
         Args:
@@ -217,7 +210,7 @@ class RegressionDetector:
                 if alert:
                     alerts.append(alert)
             except Exception as e:
-                logger.error(f"Error checking regression for {metric_name}: {e}")
+                logger.exception(f"Error checking regression for {metric_name}: {e}")
         self._baseline_history.append(current_baseline)
         if len(self._baseline_history) > 100:
             self._baseline_history = self._baseline_history[-100:]
@@ -266,7 +259,7 @@ class RegressionDetector:
         ):
             try:
                 trend = await self.analyzer.analyze_trend(
-                    metric_name, reference_baselines + [current_baseline]
+                    metric_name, [*reference_baselines, current_baseline]
                 )
                 is_significant = trend.is_significant()
             except Exception as e:
@@ -284,7 +277,7 @@ class RegressionDetector:
             return None
         if not self._is_alert_allowed(metric_name):
             return None
-        alert = RegressionAlert(
+        return RegressionAlert(
             alert_id=str(uuid.uuid4()),
             metric_name=metric_name,
             severity=severity,
@@ -307,7 +300,6 @@ class RegressionDetector:
                 metric_name, severity
             ),
         )
-        return alert
 
     def _extract_metric_values(
         self, baseline: BaselineMetrics, metric_name: str
@@ -395,9 +387,7 @@ class RegressionDetector:
             for alert_time in self._alert_counts[metric_name]
             if alert_time > one_hour_ago
         ]
-        if len(self._alert_counts[metric_name]) >= self.max_alerts_per_hour:
-            return False
-        return True
+        return not len(self._alert_counts[metric_name]) >= self.max_alerts_per_hour
 
     def _generate_alert_message(
         self, metric_name: str, degradation_pct: float, severity: AlertSeverity
@@ -420,11 +410,11 @@ class RegressionDetector:
                 operation = custom_metric.split("_")[0]
                 if operation not in affected:
                     affected.append(operation)
-        if metric_name in ["response_time", "database_connection_time"]:
+        if metric_name in {"response_time", "database_connection_time"}:
             affected.extend(["API endpoints", "Database operations"])
         elif metric_name == "error_rate":
             affected.extend(["All operations", "User requests"])
-        elif metric_name in ["cpu_utilization", "memory_utilization"]:
+        elif metric_name in {"cpu_utilization", "memory_utilization"}:
             affected.extend(["System performance", "All operations"])
         elif metric_name == "cache_hit_rate":
             affected.extend(["Cache operations", "Data retrieval"])
@@ -451,7 +441,7 @@ class RegressionDetector:
                 "Configuration changes",
                 "Resource exhaustion",
             ])
-        elif metric_name in ["cpu_utilization", "memory_utilization"]:
+        elif metric_name in {"cpu_utilization", "memory_utilization"}:
             causes.extend([
                 "Increased workload",
                 "Memory leaks",
@@ -513,7 +503,7 @@ class RegressionDetector:
                 "Review recent code changes",
                 "Test critical user flows",
             ])
-        elif metric_name in ["cpu_utilization", "memory_utilization"]:
+        elif metric_name in {"cpu_utilization", "memory_utilization"}:
             suggestions.extend([
                 "Monitor resource usage trends",
                 "Identify resource-intensive processes",
@@ -544,7 +534,7 @@ class RegressionDetector:
                 else:
                     logger.error(f"Failed to send alert via {type(channel).__name__}")
             except Exception as e:
-                logger.error(f"Error sending alert via {type(channel).__name__}: {e}")
+                logger.exception(f"Error sending alert via {type(channel).__name__}: {e}")
 
     async def resolve_alert(self, alert_id: str, resolution_note: str = "") -> bool:
         """Mark an alert as resolved."""

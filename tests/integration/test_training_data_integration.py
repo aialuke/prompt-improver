@@ -12,11 +12,8 @@ Tests:
 Following 2025 best practices: real ML models, real database integration, minimal mocking.
 """
 
-import asyncio
-import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
 import pytest
@@ -27,7 +24,6 @@ from hypothesis import (
     strategies as st,
 )
 from hypothesis.extra.numpy import arrays
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database.models import (

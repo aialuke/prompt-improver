@@ -37,67 +37,62 @@ Quality Gates:
 - Complete test coverage with real behavior validation
 """
 
-from .database_error_service import (
-    DatabaseErrorService,
-    DatabaseErrorContext,
-    DatabaseErrorCategory,
-    DatabaseErrorSeverity,
+from prompt_improver.services.error_handling.database_error_service import (
     DatabaseCircuitBreakerConfig,
+    DatabaseErrorCategory,
+    DatabaseErrorContext,
+    DatabaseErrorService,
+    DatabaseErrorSeverity,
 )
-from .network_error_service import (
-    NetworkErrorService,
-    NetworkErrorContext,
-    NetworkErrorCategory,
-    NetworkErrorSeverity,
-    NetworkCircuitBreakerConfig,
-)
-from .validation_error_service import (
-    ValidationErrorService,
-    ValidationErrorContext,
-    ValidationErrorCategory,
-    ValidationErrorSeverity,
-)
-from .facade import (
+from prompt_improver.services.error_handling.facade import (
     ErrorHandlingFacade,
     ErrorHandlingFacadeProtocol,
-    UnifiedErrorContext,
-    ErrorServiceType,
     ErrorProcessingMode,
+    ErrorServiceType,
+    UnifiedErrorContext,
+)
+from prompt_improver.services.error_handling.network_error_service import (
+    NetworkCircuitBreakerConfig,
+    NetworkErrorCategory,
+    NetworkErrorContext,
+    NetworkErrorService,
+    NetworkErrorSeverity,
+)
+from prompt_improver.services.error_handling.validation_error_service import (
+    ValidationErrorCategory,
+    ValidationErrorContext,
+    ValidationErrorService,
+    ValidationErrorSeverity,
 )
 
 # Facade as primary entry point (replaces 1,286-line god object)
 ErrorHandlingService = ErrorHandlingFacade
 
 __all__ = [
-    # Core Services
-    "DatabaseErrorService",
-    "NetworkErrorService", 
-    "ValidationErrorService",
-    "ErrorHandlingFacade",
-    
-    # Contexts
-    "DatabaseErrorContext",
-    "NetworkErrorContext",
-    "ValidationErrorContext",
-    "UnifiedErrorContext",
-    
-    # Enums
-    "DatabaseErrorCategory",
-    "DatabaseErrorSeverity",
-    "NetworkErrorCategory", 
-    "NetworkErrorSeverity",
-    "ValidationErrorCategory",
-    "ValidationErrorSeverity",
-    "ErrorServiceType",
-    "ErrorProcessingMode",
-    
     # Configs
     "DatabaseCircuitBreakerConfig",
-    "NetworkCircuitBreakerConfig",
-    
+    # Enums
+    "DatabaseErrorCategory",
+    # Contexts
+    "DatabaseErrorContext",
+    # Core Services
+    "DatabaseErrorService",
+    "DatabaseErrorSeverity",
+    "ErrorHandlingFacade",
     # Protocols
     "ErrorHandlingFacadeProtocol",
-    
     # Primary Interface (replaces legacy god object)
     "ErrorHandlingService",
+    "ErrorProcessingMode",
+    "ErrorServiceType",
+    "NetworkCircuitBreakerConfig",
+    "NetworkErrorCategory",
+    "NetworkErrorContext",
+    "NetworkErrorService",
+    "NetworkErrorSeverity",
+    "UnifiedErrorContext",
+    "ValidationErrorCategory",
+    "ValidationErrorContext",
+    "ValidationErrorService",
+    "ValidationErrorSeverity",
 ]

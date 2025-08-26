@@ -13,21 +13,13 @@ and comprehensive state validation.
 
 import asyncio
 import gc
-import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from prompt_improver.services.health.background_manager import (
-    BackgroundTask,
     BackgroundTaskManager,
     TaskStatus,
-    get_background_task_manager,
-    init_background_task_manager,
-    shutdown_background_task_manager,
 )
 
 pytest_benchmark = pytest.importorskip("pytest_benchmark")
@@ -154,8 +146,7 @@ class TestBackgroundTaskManagerEnhanced:
                         f"lifecycle_{cycle}_{i}", lambda: asyncio.sleep(0.01)
                     )
                 await manager.stop(timeout=1.0)
-            lifecycle_time = (time.time() - start_time) * 1000
-            return lifecycle_time
+            return (time.time() - start_time) * 1000
 
         def run_benchmark():
             return event_loop.run_until_complete(benchmark_lifecycle())
@@ -360,7 +351,7 @@ class TestBackgroundTaskManagerEnhanced:
         assert shutdown_duration < 2.5
         for task_id in task_ids:
             task = manager.get_task_status(task_id)
-            assert task.status in [TaskStatus.COMPLETED, TaskStatus.CANCELLED]
+            assert task.status in {TaskStatus.COMPLETED, TaskStatus.CANCELLED}
 
     @pytest.mark.asyncio
     async def test_resource_cleanup_during_lifecycle(self, clean_manager):
@@ -471,7 +462,7 @@ class TestBackgroundTaskManagerEnhanced:
 
         async def memory_intensive_task(data_size: int):
             """Task that creates and processes large data."""
-            large_data = [i for i in range(data_size)]
+            large_data = list(range(data_size))
             result = sum(large_data)
             await asyncio.sleep(0.01)
             return f"processed_{len(large_data)}_items_sum_{result}"

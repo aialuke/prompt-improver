@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any, Dict, List, Optional
 import warnings
-import numpy as np
-from scipy import stats
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy, get_scipy_stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 try:
     from causallearn.search.ConstraintBased.PC import pc
     from causallearn.utils.cit import fisherz
@@ -133,8 +134,8 @@ class InsightGenerationEngine:
             if len(temporal_data) >= 7:
                 timestamps = [d['timestamp'] for d in temporal_data]
                 scores = [d['avg_score'] for d in temporal_data]
-                x = np.arange(len(scores))
-                slope, intercept, r_value, p_value, std_err = stats.linregress(x, scores)
+                x = get_numpy().arange(len(scores))
+                slope, intercept, r_value, p_value, std_err = get_scipy_stats().linregress(x, scores)
                 if p_value < self.config.significance_threshold:
                     trend_direction = 'improving' if slope > 0 else 'declining'
                     confidence = min(0.95, abs(r_value))
@@ -319,16 +320,16 @@ class InsightGenerationEngine:
         tests = {}
         try:
             n_samples = len(cause_data)
-            correlation, corr_p_value = stats.pearsonr(cause_data, effect_data)
+            correlation, corr_p_value = get_scipy_stats().pearsonr(cause_data, effect_data)
             tests['correlation'] = abs(correlation)
             tests['correlation_p_value'] = corr_p_value
             if n_samples > 3:
-                z_score = 0.5 * np.log((1 + correlation) / (1 - correlation))
-                se_z = 1 / np.sqrt(n_samples - 3)
+                z_score = 0.5 * get_numpy().log((1 + correlation) / (1 - correlation))
+                se_z = 1 / get_numpy().sqrt(n_samples - 3)
                 ci_lower_z = z_score - 1.96 * se_z
                 ci_upper_z = z_score + 1.96 * se_z
-                ci_lower = (np.exp(2 * ci_lower_z) - 1) / (np.exp(2 * ci_lower_z) + 1)
-                ci_upper = (np.exp(2 * ci_upper_z) - 1) / (np.exp(2 * ci_upper_z) + 1)
+                ci_lower = (get_numpy().exp(2 * ci_lower_z) - 1) / (get_numpy().exp(2 * ci_lower_z) + 1)
+                ci_upper = (get_numpy().exp(2 * ci_upper_z) - 1) / (get_numpy().exp(2 * ci_upper_z) + 1)
                 tests['correlation_ci_width'] = abs(ci_upper - ci_lower)
             if n_samples > 15:
                 granger_result = self._granger_causality_test(cause_data, effect_data)
@@ -336,7 +337,7 @@ class InsightGenerationEngine:
             partial_corr_result = self._partial_correlation_test(cause_data, effect_data, causal_graph, cause, effect)
             tests.update(partial_corr_result)
             if n_samples > 20:
-                spearman_corr, spearman_p = stats.spearmanr(cause_data, effect_data)
+                spearman_corr, spearman_p = get_scipy_stats().spearmanr(cause_data, effect_data)
                 tests['spearman_correlation'] = abs(spearman_corr)
                 tests['spearman_p_value'] = spearman_p
                 linearity_score = 1.0 - abs(abs(correlation) - abs(spearman_corr))
@@ -411,7 +412,7 @@ class InsightGenerationEngine:
             results = {'has_confounders': 1.0 if common_parents else 0.0, 'n_confounders': float(len(common_parents))}
             if common_parents and len(common_parents) <= 5:
                 try:
-                    from scipy.stats import linregress
+                    # from get_scipy().stats import linregress  # Converted to lazy loading
                     confounder_penalty = 1.0 / (1.0 + 0.1 * len(common_parents))
                     original_corr = abs(cause_data.corr(effect_data))
                     results['partial_correlation'] = original_corr * confounder_penalty
@@ -436,13 +437,13 @@ class InsightGenerationEngine:
             cause_train, cause_test = (cause_data[:split_point], cause_data[split_point:])
             effect_train, effect_test = (effect_data[:split_point], effect_data[split_point:])
             try:
-                from scipy.stats import linregress
+                # from get_scipy().stats import linregress  # Converted to lazy loading
                 slope_forward, intercept_forward, r_forward, p_forward, se_forward = linregress(cause_train, effect_train)
                 effect_pred = slope_forward * cause_test + intercept_forward
-                forward_mse = np.mean((effect_test - effect_pred) ** 2)
+                forward_mse = get_numpy().mean((effect_test - effect_pred) ** 2)
                 slope_backward, intercept_backward, r_backward, p_backward, se_backward = linregress(effect_train, cause_train)
                 cause_pred = slope_backward * effect_test + intercept_backward
-                backward_mse = np.mean((cause_test - cause_pred) ** 2)
+                backward_mse = get_numpy().mean((cause_test - cause_pred) ** 2)
                 if forward_mse + backward_mse > 0:
                     direction_confidence = backward_mse / (forward_mse + backward_mse)
                 else:

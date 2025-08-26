@@ -1,10 +1,11 @@
-"""Database Configuration Module
+"""Database Configuration Module.
 
 Comprehensive database configuration with connection pooling, health checks,
 and environment-specific settings.
 """
 
 from typing import Any
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -44,7 +45,7 @@ class DatabaseConfig(BaseSettings):
     pool_timeout: int = Field(
         default=10, ge=1, le=120, description="Pool timeout in seconds"
     )
-    
+
     # Legacy pool settings for backward compatibility
     database_pool_size: int = Field(
         default=10, ge=1, le=100, description="Database connection pool size"
@@ -61,7 +62,7 @@ class DatabaseConfig(BaseSettings):
     pool_recycle: int = Field(
         default=3600, ge=300, le=86400, description="Pool recycle time in seconds"
     )
-    
+
     # Health Check Settings
     health_check_timeout: float = Field(
         default=5.0, gt=0, le=60, description="Health check timeout in seconds"
@@ -93,7 +94,7 @@ class DatabaseConfig(BaseSettings):
         """Get the complete database connection URL."""
         if self.database_url:
             return self.database_url
-        
+
         # Build URL from individual components
         return (
             f"postgresql://{self.postgres_username}:{self.postgres_password}"

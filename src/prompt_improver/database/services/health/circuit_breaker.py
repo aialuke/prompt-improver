@@ -14,10 +14,11 @@ Designed for production resilience with configurable failure thresholds.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,8 @@ class CircuitBreakerOpenException(Exception):
         self,
         service_name: str,
         failure_count: int,
-        next_attempt_time: Optional[datetime] = None,
-    ):
+        next_attempt_time: datetime | None = None,
+    ) -> None:
         self.service_name = service_name
         self.failure_count = failure_count
         self.next_attempt_time = next_attempt_time
@@ -94,8 +95,8 @@ class CircuitBreaker:
     """
 
     def __init__(
-        self, service_name: str, config: Optional[CircuitBreakerConfig] = None
-    ):
+        self, service_name: str, config: CircuitBreakerConfig | None = None
+    ) -> None:
         self.service_name = service_name
         self.config = config or CircuitBreakerConfig()
 
@@ -103,7 +104,7 @@ class CircuitBreaker:
         self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0  # For half-open state
-        self.last_failure_time: Optional[datetime] = None
+        self.last_failure_time: datetime | None = None
         self.state_change_time = datetime.now(UTC)
 
         # Recovery timeout with exponential backoff
@@ -132,7 +133,7 @@ class CircuitBreaker:
         if self.state == CircuitBreakerState.CLOSED:
             return True
 
-        elif self.state == CircuitBreakerState.OPEN:
+        if self.state == CircuitBreakerState.OPEN:
             # Check if recovery timeout has elapsed
             if self.last_failure_time:
                 time_since_failure = (
@@ -143,10 +144,7 @@ class CircuitBreaker:
                     return True
             return False
 
-        elif self.state == CircuitBreakerState.HALF_OPEN:
-            return True
-
-        return False
+        return self.state == CircuitBreakerState.HALF_OPEN
 
     def record_success(self, response_time_ms: float = 0) -> None:
         """Record a successful call."""
@@ -164,7 +162,7 @@ class CircuitBreaker:
                 self.failure_count = max(0, self.failure_count - 1)
 
     def record_failure(
-        self, error: Optional[Exception] = None, response_time_ms: float = 0
+        self, error: Exception | None = None, response_time_ms: float = 0
     ) -> None:
         """Record a failed call."""
         self.total_calls += 1
@@ -229,7 +227,7 @@ class CircuitBreaker:
 
         logger.info(f"CircuitBreaker CLOSED for {self.service_name}: service recovered")
 
-    def get_next_attempt_time(self) -> Optional[datetime]:
+    def get_next_attempt_time(self) -> datetime | None:
         """Get the next time a call will be permitted."""
         if self.state != CircuitBreakerState.OPEN or not self.last_failure_time:
             return None
@@ -335,8 +333,7 @@ class CircuitBreaker:
         # Return appropriate wrapper based on function type
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
-        else:
-            return sync_wrapper
+        return sync_wrapper
 
     def __repr__(self) -> str:
         return (

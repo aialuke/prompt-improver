@@ -8,16 +8,12 @@ Migrated from TestContainers to external Redis service patterns for improved per
 """
 
 import asyncio
-import json
 import logging
 import os
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
-from unittest.mock import AsyncMock, patch
-
-import coredis
+from typing import Any
 
 from prompt_improver.database import (
     DatabaseServices,
@@ -109,7 +105,7 @@ class CachePerformanceProfiler:
         """Get statistics for all recorded operations."""
         return {
             operation: self.get_statistics(operation)
-            for operation in self.measurements.keys()
+            for operation in self.measurements
         }
 
     def assert_performance_requirements(
@@ -315,7 +311,7 @@ class CacheTestDataGenerator:
 
 class MockDatabaseService:
     """
-    Mock database service for L3 fallback testing.
+    Mock database service (L3 eliminated in 2025 architecture).
 
     Simulates realistic database behavior with latency, failures,
     and data patterns for comprehensive fallback testing.
@@ -374,7 +370,7 @@ class MockDatabaseService:
 def get_test_cache_config(scenario: str = "default") -> dict[str, Any]:
     """
     Get cache configuration for specific test scenario.
-    
+
     Replaces CacheConfigurationManager.get_test_config() with direct function.
     Uses the same configuration patterns but returns them directly.
 
@@ -419,17 +415,17 @@ def get_test_cache_config(scenario: str = "default") -> dict[str, Any]:
     return scenario_configs.get(scenario, base_config)
 
 
-def create_test_redis_config(host: str = None, port: int = None) -> dict[str, Any]:
+def create_test_redis_config(host: str | None = None, port: int | None = None) -> dict[str, Any]:
     """
     Create Redis configuration for testing.
-    
-    Replaces CacheConfigurationManager.create_external_redis_config() with 
+
+    Replaces CacheConfigurationManager.create_external_redis_config() with
     direct dictionary approach compatible with DatabaseServices.
 
     Args:
         host: Redis host (defaults to env var or redis)
         port: Redis port (defaults to env var or 6379)
-    
+
     Returns:
         Redis configuration dictionary
     """
@@ -636,7 +632,7 @@ class CacheLoadTester:
             cumulative += probability
             if rand_val <= cumulative:
                 return operation
-        return list(operation_mix.keys())[0]
+        return next(iter(operation_mix.keys()))
 
     async def run_sustained_load_test(
         self, duration_seconds: int = 60, target_ops_per_second: int = 100
@@ -688,7 +684,7 @@ async def unified_redis_test_context(
 ):
     """
     Modern context manager for Redis testing using DatabaseServices.
-    
+
     Replaces external_redis_test_context() with DatabaseServices-based approach.
     Provides the same interface but uses production-ready unified infrastructure.
 
@@ -702,15 +698,15 @@ async def unified_redis_test_context(
         mode=ManagerMode.ASYNC_MODERN,
         redis_config=redis_config
     )
-    
+
     try:
         await manager.initialize()
-        
+
         if flush_on_start:
             await _flush_test_data_with_manager(manager, f"{test_prefix}:*")
-        
+
         yield manager
-        
+
     finally:
         if flush_on_end:
             await _flush_test_data_with_manager(manager, f"{test_prefix}:*")
@@ -724,7 +720,7 @@ external_redis_test_context = unified_redis_test_context
 async def _flush_test_data_with_manager(manager: DatabaseServices, pattern: str):
     """
     Helper function to flush test data using DatabaseServices.
-    
+
     Args:
         manager: Initialized DatabaseServices instance
         pattern: Key pattern to match for cleanup

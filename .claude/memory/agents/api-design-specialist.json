@@ -15,6 +15,18 @@
         "description": "Comprehensive OpenAPI 3.0 documentation with examples",
         "frequency": 1,
         "success_rate": 0.95
+      },
+      {
+        "pattern_name": "pragmatic_api_validation",
+        "description": "Validate API problems exist with real consumer usage before endpoint development",
+        "frequency": 1,
+        "success_rate": 0.92
+      },
+      {
+        "pattern_name": "schema_first_api_design",
+        "description": "Pydantic models eliminate complex validation logic and endpoint complexity",
+        "frequency": 1,
+        "success_rate": 0.88
       }
     ],
     "project_specific_context": {

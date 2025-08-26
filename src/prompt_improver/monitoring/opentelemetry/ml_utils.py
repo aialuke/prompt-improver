@@ -1,4 +1,4 @@
-"""OpenTelemetry ML Monitoring Utilities
+"""OpenTelemetry ML Monitoring Utilities.
 ====================================
 
 Utility functions and decorators for ML monitoring integration.
@@ -13,8 +13,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from prompt_improver.monitoring.opentelemetry.metrics import MLMetrics, get_ml_metrics
-from prompt_improver.monitoring.opentelemetry.setup import get_tracer
+from prompt_improver.monitoring.opentelemetry.metrics import get_ml_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 class MLMonitoringMixin:
     """Mixin class to add ML monitoring capabilities to any class."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._ml_metrics = None
         self._ml_alerting = None
@@ -40,7 +39,7 @@ class MLMonitoringMixin:
             self._monitoring_enabled = True
             logger.info(f"ML monitoring enabled for {service_name}")
         except Exception as e:
-            logger.error(f"Failed to enable ML monitoring: {e}")
+            logger.exception(f"Failed to enable ML monitoring: {e}")
             self._monitoring_enabled = False
 
     def record_ml_operation(
@@ -60,7 +59,7 @@ class MLMonitoringMixin:
                 if hasattr(self._ml_metrics, f"record_{metric_name}"):
                     getattr(self._ml_metrics, f"record_{metric_name}")(value)
         except Exception as e:
-            logger.error(f"Failed to record ML operation: {e}")
+            logger.exception(f"Failed to record ML operation: {e}")
 
     def check_ml_alerts(self, analysis_data: dict[str, Any]) -> list[Any]:
         """Check ML alerts and return triggered alerts."""
@@ -69,7 +68,7 @@ class MLMonitoringMixin:
         try:
             return self._ml_alerting.check_alerts(analysis_data)
         except Exception as e:
-            logger.error(f"Failed to check ML alerts: {e}")
+            logger.exception(f"Failed to check ML alerts: {e}")
             return []
 
 
@@ -125,7 +124,7 @@ def ml_monitor(
                                 "service": service_name,
                             },
                         )
-                logger.error(f"ML operation {op_name} failed: {e}")
+                logger.exception(f"ML operation {op_name} failed: {e}")
                 raise
 
         @functools.wraps(func)
@@ -169,7 +168,7 @@ def ml_monitor(
                                 "service": service_name,
                             },
                         )
-                logger.error(f"ML operation {op_name} failed: {e}")
+                logger.exception(f"ML operation {op_name} failed: {e}")
                 raise
 
         if asyncio.iscoroutinefunction(func):
@@ -203,7 +202,7 @@ def create_ml_monitoring_context(
 class MLPerformanceTracker:
     """Track ML model performance over time."""
 
-    def __init__(self, model_name: str, service_name: str = "ml-performance"):
+    def __init__(self, model_name: str, service_name: str = "ml-performance") -> None:
         self.model_name = model_name
         self.service_name = service_name
         self.metrics = get_ml_metrics(service_name)
@@ -246,14 +245,13 @@ class MLPerformanceTracker:
             e["accuracy"] for e in recent_entries if e["accuracy"] is not None
         ]
         latencies = [e["latency"] for e in recent_entries if e["latency"] is not None]
-        summary = {
+        return {
             "model_name": self.model_name,
             "total_predictions": sum(e["batch_size"] for e in recent_entries),
             "avg_accuracy": sum(accuracies) / len(accuracies) if accuracies else None,
             "avg_latency": sum(latencies) / len(latencies) if latencies else None,
             "recent_entries": len(recent_entries),
         }
-        return summary
 
 
 def monitor_failure_analysis(func: Callable) -> Callable:

@@ -1,4 +1,4 @@
-"""Minimal Configuration Facade - Ultimate Loose Coupling Implementation
+"""Minimal Configuration Facade - Ultimate Loose Coupling Implementation.
 
 This facade provides unified configuration access with zero internal imports at module level.
 All imports are done dynamically to achieve maximum decoupling.
@@ -6,22 +6,22 @@ All imports are done dynamically to achieve maximum decoupling.
 Key improvements:
 - Zero internal imports at module level
 - 100% dynamic imports for loose coupling
-- Protocol-based interfaces 
+- Protocol-based interfaces
 - Lazy initialization to minimize startup dependencies
 - Zero circular import possibilities
 """
 
 import importlib
 import logging
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
 
-@runtime_checkable  
+@runtime_checkable
 class MinimalConfigFacadeProtocol(Protocol):
     """Protocol for minimal configuration facade."""
-    
+
     def get_config(self) -> Any: ...
     def get_database_config(self) -> Any: ...
     def get_security_config(self) -> Any: ...
@@ -34,7 +34,7 @@ class MinimalConfigFacadeProtocol(Protocol):
 class MinimalConfigFacade(MinimalConfigFacadeProtocol):
     """Minimal configuration facade with zero coupling at module level."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize facade with lazy loading."""
         self._cache = {}
         logger.debug("MinimalConfigFacade initialized with zero coupling")
@@ -45,7 +45,7 @@ class MinimalConfigFacade(MinimalConfigFacadeProtocol):
             module = importlib.import_module(module_path)
             return getattr(module, function_name)
         except Exception as e:
-            logger.error(f"Dynamic import failed: {module_path}.{function_name} - {e}")
+            logger.exception(f"Dynamic import failed: {module_path}.{function_name} - {e}")
             return None
 
     def get_config(self) -> Any:
@@ -81,7 +81,7 @@ class MinimalConfigFacade(MinimalConfigFacadeProtocol):
         return self._cache.get("monitoring_config")
 
     def get_ml_config(self) -> Any:
-        """Get ML configuration via dynamic import.""" 
+        """Get ML configuration via dynamic import."""
         if "ml_config" not in self._cache:
             get_ml_func = self._dynamic_import("prompt_improver.core.config", "get_ml_config")
             if get_ml_func:
@@ -120,7 +120,7 @@ class MinimalConfigFacade(MinimalConfigFacadeProtocol):
         return self.get_environment_name() == "testing"
 
 
-# Global minimal facade instance  
+# Global minimal facade instance
 _minimal_config_facade: MinimalConfigFacade | None = None
 
 
@@ -133,7 +133,7 @@ def get_minimal_config_facade() -> MinimalConfigFacade:
 
 
 __all__ = [
-    "MinimalConfigFacadeProtocol",
     "MinimalConfigFacade",
+    "MinimalConfigFacadeProtocol",
     "get_minimal_config_facade",
 ]

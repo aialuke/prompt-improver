@@ -16,13 +16,14 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 
 from . import ClusteringResult, ClusteringMetrics, OptimizationResult
 from .clustering_preprocessor_service import ClusteringPreprocessorService, ClusteringPreprocessorServiceFactory
 from .clustering_algorithm_service import ClusteringAlgorithmService, ClusteringAlgorithmServiceFactory
 from .clustering_parameter_service import ClusteringParameterService, ClusteringParameterServiceFactory
 from .clustering_evaluator_service import ClusteringEvaluatorService, ClusteringEvaluatorServiceFactory
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +56,6 @@ class ClusteringOptimizerFacade:
         # Performance tracking
         self.optimization_history = []
         self.performance_metrics = []
-        
-        # Caching
-        self.cache = {}
-        self.cache_hits = 0
-        self.cache_misses = 0
         
         logger.info(f"ClusteringOptimizerFacade initialized: algorithm={algorithm}, "
                    f"preprocessing={preprocessing_strategy}, optimization={parameter_optimization}")
@@ -113,8 +109,8 @@ class ClusteringOptimizerFacade:
             logger.warning(f"Unknown evaluation strategy '{strategy}', using comprehensive")
             return ClusteringEvaluatorServiceFactory.create_comprehensive_evaluator()
 
-    async def optimize_clustering(self, features: np.ndarray, labels: Optional[np.ndarray] = None,
-                                sample_weights: Optional[np.ndarray] = None) -> Dict[str, Any]:
+    async def optimize_clustering(self, features: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None,
+                                sample_weights: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Optimize clustering for high-dimensional features.
         
         Args:
@@ -189,12 +185,7 @@ class ClusteringOptimizerFacade:
                 "preprocessing_info": preprocessing_info,
                 "optimal_parameters": optimal_params,
                 "performance_analysis": performance_analysis,
-                "optimization_time": time.time() - start_time,
-                "cache_stats": {
-                    "hits": self.cache_hits,
-                    "misses": self.cache_misses,
-                    "hit_ratio": self.cache_hits / max(1, self.cache_hits + self.cache_misses)
-                }
+                "optimization_time": time.time() - start_time
             }
             
             logger.info(f"Clustering optimization completed in {time.time() - start_time:.2f}s "
@@ -229,16 +220,16 @@ class ClusteringOptimizerFacade:
                 raise ValueError("features are required for clustering optimization")
             
             if isinstance(features, list):
-                features = np.array(features, dtype=float)
+                features = get_numpy().array(features, dtype=float)
             
             if features.ndim != 2 or features.shape[0] < 3:
                 raise ValueError("Invalid features array")
             
             # Convert optional inputs
             if labels is not None and isinstance(labels, list):
-                labels = np.array(labels)
+                labels = get_numpy().array(labels)
             if sample_weights is not None and isinstance(sample_weights, list):
-                sample_weights = np.array(sample_weights, dtype=float)
+                sample_weights = get_numpy().array(sample_weights, dtype=float)
             
             # Perform clustering optimization
             optimization_result = await self.optimize_clustering(features, labels, sample_weights)
@@ -316,7 +307,7 @@ class ClusteringOptimizerFacade:
                 }
             }
 
-    async def cluster_contexts(self, features: np.ndarray) -> ClusteringResult:
+    async def cluster_contexts(self, features: get_numpy().ndarray) -> ClusteringResult:
         """Simplified async clustering interface compatible with existing code."""
         try:
             if not self._validate_features_simple(features):
@@ -329,7 +320,7 @@ class ClusteringOptimizerFacade:
                 return self._get_default_result(features.shape[0])
             
             return ClusteringResult(
-                cluster_labels=optimization_result.get("labels", np.zeros(features.shape[0], dtype=int)),
+                cluster_labels=optimization_result.get("labels", get_numpy().zeros(features.shape[0], dtype=int)),
                 cluster_centers=optimization_result.get("cluster_centers"),
                 n_clusters=optimization_result.get("quality_metrics", {}).get("n_clusters", 1),
                 silhouette_score=optimization_result.get("quality_metrics", {}).get("silhouette_score", 0.0),
@@ -343,7 +334,7 @@ class ClusteringOptimizerFacade:
             logger.error(f"Clustering failed: {e}")
             return self._get_default_result(features.shape[0])
 
-    async def _optimize_parameters(self, features: np.ndarray, labels: Optional[np.ndarray] = None) -> Dict[str, Any]:
+    async def _optimize_parameters(self, features: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Optimize clustering parameters for the specific dataset."""
         try:
             # Get adaptive parameters as baseline
@@ -390,9 +381,9 @@ class ClusteringOptimizerFacade:
         else:
             return {}
 
-    async def _perform_optimized_clustering(self, features: np.ndarray, 
+    async def _perform_optimized_clustering(self, features: get_numpy().ndarray, 
                                           optimal_params: Dict[str, Any],
-                                          sample_weights: Optional[np.ndarray] = None) -> Dict[str, Any]:
+                                          sample_weights: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Perform clustering with optimized parameters."""
         try:
             # Update algorithm service with optimal parameters
@@ -414,7 +405,7 @@ class ClusteringOptimizerFacade:
                 "cluster_centers": cluster_centers,
                 "probabilities": probabilities,
                 "n_clusters": len(set(labels)) - (1 if -1 in labels else 0),
-                "n_noise_points": int(np.sum(labels == -1))
+                "n_noise_points": int(get_numpy().sum(labels == -1))
             }
             
         except Exception as e:
@@ -430,12 +421,12 @@ class ClusteringOptimizerFacade:
                     "cluster_centers": fallback_service.get_cluster_centers(features, labels),
                     "probabilities": None,
                     "n_clusters": len(set(labels)) - (1 if -1 in labels else 0),
-                    "n_noise_points": int(np.sum(labels == -1))
+                    "n_noise_points": int(get_numpy().sum(labels == -1))
                 }
             except:
                 # Ultimate fallback: single cluster
                 return {
-                    "labels": np.zeros(features.shape[0], dtype=int),
+                    "labels": get_numpy().zeros(features.shape[0], dtype=int),
                     "cluster_centers": None,
                     "probabilities": None,
                     "n_clusters": 1,
@@ -489,29 +480,29 @@ class ClusteringOptimizerFacade:
         
         return recommendations
 
-    def _get_cluster_sizes(self, labels: np.ndarray) -> List[int]:
+    def _get_cluster_sizes(self, labels: get_numpy().ndarray) -> List[int]:
         """Get sizes of each cluster."""
         if len(labels) == 0:
             return []
         
-        unique_labels, counts = np.unique(labels[labels != -1], return_counts=True)
+        unique_labels, counts = get_numpy().unique(labels[labels != -1], return_counts=True)
         return counts.tolist()
 
-    def _validate_features_simple(self, features: np.ndarray) -> bool:
+    def _validate_features_simple(self, features: get_numpy().ndarray) -> bool:
         """Simplified feature validation."""
         try:
             return (features is not None and 
                    features.size > 0 and 
                    len(features.shape) == 2 and 
                    features.shape[0] >= 3 and
-                   np.isfinite(features).all())
+                   get_numpy().isfinite(features).all())
         except:
             return False
 
     def _get_default_result(self, n_samples: int) -> ClusteringResult:
         """Get default clustering result when clustering fails."""
         return ClusteringResult(
-            cluster_labels=np.zeros(n_samples, dtype=int),
+            cluster_labels=get_numpy().zeros(n_samples, dtype=int),
             cluster_centers=None,
             n_clusters=1,
             silhouette_score=0.0,
@@ -540,14 +531,14 @@ class ClusteringOptimizerFacade:
             "status": "available",
             "total_runs": len(self.performance_metrics),
             "recent_performance": {
-                "avg_quality_score": float(np.mean([m.quality_score for m in recent_metrics])),
-                "avg_processing_time": float(np.mean([m.processing_time_seconds for m in recent_metrics])),
-                "avg_memory_usage": float(np.mean([m.memory_usage_mb for m in recent_metrics])),
-                "convergence_rate": float(np.mean([m.convergence_achieved for m in recent_metrics]))
+                "avg_quality_score": float(get_numpy().mean([m.quality_score for m in recent_metrics])),
+                "avg_processing_time": float(get_numpy().mean([m.processing_time_seconds for m in recent_metrics])),
+                "avg_memory_usage": float(get_numpy().mean([m.memory_usage_mb for m in recent_metrics])),
+                "convergence_rate": float(get_numpy().mean([m.convergence_achieved for m in recent_metrics]))
             },
             "cache_performance": {
-                "hit_ratio": self.cache_hits / max(1, self.cache_hits + self.cache_misses),
-                "cache_size": len(self.cache)
+                "hit_ratio": 0.0,
+                "cache_size": 0
             }
         }
 

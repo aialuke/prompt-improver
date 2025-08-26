@@ -6,7 +6,7 @@ maintaining strict architectural separation between MCP and ML components.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.interfaces.ml_interface import (
     MLAnalysisResult,
@@ -35,7 +35,7 @@ class EventBasedMLService(MLServiceInterface):
     services, eliminating duplication while providing a unified interface.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
         self._operation_counter = 0
         self.analysis_service = EventBasedMLAnalysisService()
@@ -69,7 +69,7 @@ class EventBasedMLService(MLServiceInterface):
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to process prompt improvement request: {e}")
+            self.logger.exception(f"Failed to process prompt improvement request: {e}")
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
     async def analyze_rule_effectiveness(
@@ -130,7 +130,7 @@ class EventBasedMLService(MLServiceInterface):
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to get ML pipeline status: {e}")
+            self.logger.exception(f"Failed to get ML pipeline status: {e}")
             return {
                 "pipeline_status": "error",
                 "error": str(e),
@@ -168,7 +168,7 @@ class EventBasedMLService(MLServiceInterface):
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to optimize prompt rules: {e}")
+            self.logger.exception(f"Failed to optimize prompt rules: {e}")
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
     async def get_operation_status(self, operation_id: str) -> dict[str, Any]:
@@ -353,7 +353,7 @@ class EventBasedMLService(MLServiceInterface):
             )
             return deployment_id is not None
         except Exception as e:
-            self.logger.error(f"Failed to load model {model_id}: {e}")
+            self.logger.exception(f"Failed to load model {model_id}: {e}")
             return False
 
     async def predict(

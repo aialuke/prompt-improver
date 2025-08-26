@@ -1,4 +1,4 @@
-"""Emergency operations interface to break circular dependencies"""
+"""Emergency operations interface to break circular dependencies."""
 
 from typing import Protocol
 
@@ -6,14 +6,14 @@ from prompt_improver.shared.types.signals import OperationResult, SignalContext
 
 
 class IEmergencyOperations(Protocol):
-    """Interface for emergency operations management
+    """Interface for emergency operations management.
 
     Abstracts emergency operations to break circular dependencies
     between signal handlers and emergency operation managers.
     """
 
     async def handle_operation(self, context: SignalContext) -> OperationResult:
-        """Handle a signal-triggered emergency operation
+        """Handle a signal-triggered emergency operation.
 
         Args:
             context: Signal context with operation details
@@ -26,7 +26,7 @@ class IEmergencyOperations(Protocol):
     async def create_emergency_checkpoint(
         self, context: SignalContext
     ) -> OperationResult:
-        """Create emergency checkpoint triggered by signal
+        """Create emergency checkpoint triggered by signal.
 
         Args:
             context: Signal context
@@ -37,7 +37,7 @@ class IEmergencyOperations(Protocol):
         ...
 
     async def generate_status_report(self, context: SignalContext) -> OperationResult:
-        """Generate real-time status report
+        """Generate real-time status report.
 
         Args:
             context: Signal context
@@ -48,7 +48,7 @@ class IEmergencyOperations(Protocol):
         ...
 
     async def reload_configuration(self, context: SignalContext) -> OperationResult:
-        """Reload system configuration
+        """Reload system configuration.
 
         Args:
             context: Signal context
@@ -59,7 +59,7 @@ class IEmergencyOperations(Protocol):
         ...
 
     async def emergency_shutdown(self, context: SignalContext) -> OperationResult:
-        """Perform emergency shutdown operations
+        """Perform emergency shutdown operations.
 
         Args:
             context: Signal context with shutdown details

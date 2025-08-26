@@ -10,22 +10,20 @@ Fixes CVSS 7.5 authentication bypass vulnerability with fail-secure policy.
 import logging
 import time
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Any
 
 from coredis.exceptions import ConnectionError, TimeoutError
 
 from prompt_improver.database import (
     ManagerMode,
-    SecurityContext,
-    create_security_context,
     get_database_services,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class RateLimitResult(str, Enum):
+class RateLimitResult(StrEnum):
     """Rate limit check results."""
 
     ALLOWED = "allowed"
@@ -60,7 +58,7 @@ class SlidingWindowRateLimiter:
     Fixes hardcoded Redis URLs and implements fail-secure policy.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize sliding window rate limiter.
 
         Uses DatabaseServices for all Redis connections.
@@ -82,7 +80,7 @@ class SlidingWindowRateLimiter:
                 await self._connection_manager.initialize()
                 logger.debug("SlidingWindowRateLimiter: Initialized DatabaseServices")
             except Exception as e:
-                logger.error(f"Failed to initialize DatabaseServices: {e}")
+                logger.exception(f"Failed to initialize DatabaseServices: {e}")
                 raise
         if not self._connection_manager.cache.redis_client:
             raise ConnectionError(
@@ -140,7 +138,7 @@ class SlidingWindowRateLimiter:
                 window_start=float(result_dict["window_start"]),
             )
         except (ConnectionError, TimeoutError) as e:
-            logger.error(
+            logger.exception(
                 f"Redis connection error in rate limiter (DatabaseServices): {e}"
             )
             return RateLimitStatus(
@@ -153,7 +151,7 @@ class SlidingWindowRateLimiter:
                 window_start=time.time() - window_size_seconds,
             )
         except Exception as e:
-            logger.error(f"Unexpected error in rate limiter (DatabaseServices): {e}")
+            logger.exception(f"Unexpected error in rate limiter (DatabaseServices): {e}")
             return RateLimitStatus(
                 result=RateLimitResult.ERROR,
                 requests_remaining=0,
@@ -211,7 +209,7 @@ class SlidingWindowRateLimiter:
                 "bucket_size_seconds": bucket_size_seconds,
             }
         except Exception as e:
-            logger.error(f"Error getting rate limit info (DatabaseServices): {e}")
+            logger.exception(f"Error getting rate limit info (DatabaseServices): {e}")
             return {
                 "identifier": identifier,
                 "current_requests": 0,
@@ -234,9 +232,7 @@ class SlidingWindowRateLimiter:
         try:
             redis = await self._get_redis()
             pattern = f"rate_limit:sliding:{identifier}:*"
-            keys = []
-            async for key in redis.scan_iter(match=pattern):
-                keys.append(key)
+            keys = [key async for key in redis.scan_iter(match=pattern)]
             if keys:
                 await redis.delete(*keys)
                 logger.info(
@@ -244,7 +240,7 @@ class SlidingWindowRateLimiter:
                 )
             return True
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Error resetting rate limit for {identifier} (DatabaseServices): {e}"
             )
             return False

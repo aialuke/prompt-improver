@@ -9,7 +9,7 @@ Enhanced with 2025 best practices for ML orchestrator integration:
 
 import asyncio
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -40,7 +40,7 @@ class ServiceControlWidget(Static):
     last_update = reactive(datetime.now())
     update_interval = 5.0
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize ServiceControlWidget with 2025 best practices.
 
         Args:

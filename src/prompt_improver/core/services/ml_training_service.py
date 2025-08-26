@@ -6,7 +6,7 @@ maintaining strict architectural separation between MCP and ML components.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.events.ml_event_bus import (
     MLEvent,
@@ -31,7 +31,7 @@ class EventBasedMLTrainingService(MLTrainingInterface):
     architectural separation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logger
         self._job_counter = 0
 
@@ -74,7 +74,7 @@ class EventBasedMLTrainingService(MLTrainingInterface):
             )
             return job_id
         except Exception as e:
-            self.logger.error(f"Failed to submit training job: {e}")
+            self.logger.exception(f"Failed to submit training job: {e}")
             raise
 
     async def optimize_hyperparameters(
@@ -117,7 +117,7 @@ class EventBasedMLTrainingService(MLTrainingInterface):
             self.logger.info(f"Hyperparameter optimization job {job_id} submitted")
             return job_id
         except Exception as e:
-            self.logger.error(f"Failed to submit optimization job: {e}")
+            self.logger.exception(f"Failed to submit optimization job: {e}")
             raise
 
     async def retrain_model(
@@ -160,7 +160,7 @@ class EventBasedMLTrainingService(MLTrainingInterface):
             )
             return job_id
         except Exception as e:
-            self.logger.error(f"Failed to submit retraining job: {e}")
+            self.logger.exception(f"Failed to submit retraining job: {e}")
             raise
 
     async def get_training_status(self, job_id: str) -> dict[str, Any]:
@@ -203,7 +203,7 @@ class EventBasedMLTrainingService(MLTrainingInterface):
             self.logger.info(f"Cancellation request sent for job: {job_id}")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to cancel training job {job_id}: {e}")
+            self.logger.exception(f"Failed to cancel training job {job_id}: {e}")
             return False
 
     async def get_training_results(self, job_id: str) -> dict[str, Any] | None:

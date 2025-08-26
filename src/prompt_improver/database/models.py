@@ -25,7 +25,7 @@ Run validate_database_models.py before/after changes.
 
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import sqlmodel
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ from prompt_improver.utils.datetime_utils import naive_utc_now
 
 
 class PromptSession(SQLModel, table=True):  # 🔒 DATABASE TABLE - DO NOT MIGRATE
-    """Table for tracking prompt improvement sessions
+    """Table for tracking prompt improvement sessions.
 
     ⚠️  PROTECTED: This is an actual PostgreSQL table with live data.
     Contains JSONB columns and relationships - keep SQLModel, table=True
@@ -66,7 +66,7 @@ class PromptSession(SQLModel, table=True):  # 🔒 DATABASE TABLE - DO NOT MIGRA
 
 
 class ABExperiment(SQLModel, table=True):
-    """Table for A/B testing experiments"""
+    """Table for A/B testing experiments."""
 
     __tablename__: str = "ab_experiments"
     __table_args__ = {"extend_existing": True}
@@ -91,15 +91,10 @@ class ABExperiment(SQLModel, table=True):
     experiment_metadata: dict[str, Any] | None = Field(
         default=None, sa_column=sqlmodel.Column(JSONB)
     )
-    __table_args__ = (
-        Index("idx_ab_experiments_status", "status", "started_at"),
-        Index("idx_ab_experiments_target_metric", "target_metric"),
-        {"extend_existing": True},
-    )
 
 
 class RuleMetadata(SQLModel, table=True):  # 🔒 DATABASE TABLE - DO NOT MIGRATE
-    """Table for rule metadata and configuration
+    """Table for rule metadata and configuration.
 
     ⚠️  PROTECTED: Core rule engine database table with JSONB parameters.
     Migration would break rule system - keep SQLModel, table=True
@@ -133,7 +128,7 @@ class RuleMetadata(SQLModel, table=True):  # 🔒 DATABASE TABLE - DO NOT MIGRAT
 
 
 class RulePerformance(SQLModel, table=True):
-    """Table for tracking rule performance metrics - matches actual database schema"""
+    """Table for tracking rule performance metrics - matches actual database schema."""
 
     __tablename__: str = "rule_performance"
     __table_args__ = {"extend_existing": True}
@@ -166,7 +161,7 @@ class RulePerformance(SQLModel, table=True):
 
 
 class DiscoveredPattern(SQLModel, table=True):
-    """Table for storing machine learning discovered patterns"""
+    """Table for storing machine learning discovered patterns."""
 
     __tablename__: str = "discovered_patterns"
     __table_args__ = {"extend_existing": True}
@@ -182,7 +177,7 @@ class DiscoveredPattern(SQLModel, table=True):
 
 
 class UserFeedback(SQLModel, table=True):
-    """Table for user feedback on prompt improvements"""
+    """Table for user feedback on prompt improvements."""
 
     __tablename__: str = "user_feedback"
     __table_args__ = {"extend_existing": True}
@@ -206,7 +201,7 @@ class UserFeedback(SQLModel, table=True):
 
 
 class MLModelPerformance(SQLModel, table=True):
-    """Table for tracking ML model performance metrics"""
+    """Table for tracking ML model performance metrics."""
 
     __tablename__: str = "ml_model_performance"
     __table_args__ = {"extend_existing": True}
@@ -223,7 +218,7 @@ class MLModelPerformance(SQLModel, table=True):
 
 
 class ImprovementSession(SQLModel, table=True):
-    """Enhanced session model with additional metadata"""
+    """Enhanced session model with additional metadata."""
 
     __tablename__: str = "improvement_sessions"
     __table_args__ = {"extend_existing": True}
@@ -244,7 +239,7 @@ class ImprovementSession(SQLModel, table=True):
 
 
 class TrainingSession(SQLModel, table=True):
-    """Table for tracking ML training sessions with continuous adaptive learning"""
+    """Table for tracking ML training sessions with continuous adaptive learning."""
 
     __tablename__: str = "training_sessions"
     __table_args__ = {"extend_existing": True}
@@ -288,7 +283,7 @@ class TrainingSession(SQLModel, table=True):
 
 
 class ImprovementSessionCreate(BaseModel):  # ✅ MIGRATED - API Model
-    """Model for creating improvement sessions
+    """Model for creating improvement sessions.
 
     ✅ This is an API request model (no table=True) - can migrate to Pydantic
     """
@@ -302,7 +297,7 @@ class ImprovementSessionCreate(BaseModel):  # ✅ MIGRATED - API Model
 
 
 class ABExperimentCreate(BaseModel):
-    """Model for creating A/B testing experiments"""
+    """Model for creating A/B testing experiments."""
 
     experiment_name: str
     description: str | None = None
@@ -314,7 +309,7 @@ class ABExperimentCreate(BaseModel):
 
 
 class RulePerformanceCreate(BaseModel):
-    """Model for creating rule performance records"""
+    """Model for creating rule performance records."""
 
     session_id: str
     rule_id: str
@@ -325,7 +320,7 @@ class RulePerformanceCreate(BaseModel):
 
 
 class UserFeedbackCreate(BaseModel):
-    """Model for creating user feedback records"""
+    """Model for creating user feedback records."""
 
     session_id: str
     rating: int = Field(ge=1, le=5)
@@ -334,7 +329,7 @@ class UserFeedbackCreate(BaseModel):
 
 
 class TrainingSessionCreate(BaseModel):
-    """Model for creating training sessions"""
+    """Model for creating training sessions."""
 
     session_id: str
     continuous_mode: bool = True
@@ -345,7 +340,7 @@ class TrainingSessionCreate(BaseModel):
 
 
 class TrainingSessionUpdate(BaseModel):
-    """Model for updating training sessions"""
+    """Model for updating training sessions."""
 
     status: str | None = None
     current_iteration: int | None = None
@@ -369,7 +364,7 @@ class TrainingSessionUpdate(BaseModel):
 
 
 class TrainingIteration(SQLModel, table=True):
-    """Individual training iteration tracking for progress preservation"""
+    """Individual training iteration tracking for progress preservation."""
 
     __tablename__: str = "training_iterations"
     __table_args__ = {"extend_existing": True}
@@ -398,22 +393,10 @@ class TrainingIteration(SQLModel, table=True):
     completed_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=naive_utc_now)
     session: "TrainingSession" = Relationship(back_populates="iterations")
-    __table_args__ = (
-        UniqueConstraint("session_id", "iteration", name="unique_session_iteration"),
-        Index("idx_training_iterations_session", "session_id"),
-        Index(
-            "idx_training_iterations_performance",
-            "performance_metrics",
-            postgresql_using="gin",
-            postgresql_ops={"performance_metrics": "jsonb_path_ops"},
-        ),
-        Index("idx_training_iterations_workflow", "workflow_id"),
-        {"extend_existing": True},
-    )
 
 
 class RuleIntelligenceCache(SQLModel, table=True):
-    """Pre-computed rule effectiveness scores for fast MCP serving"""
+    """Pre-computed rule effectiveness scores for fast MCP serving."""
 
     __tablename__: str = "rule_intelligence_cache"
     __table_args__ = {"extend_existing": True}
@@ -445,20 +428,10 @@ class RuleIntelligenceCache(SQLModel, table=True):
     )
     last_accessed: datetime | None = Field(default=None)
     access_count: int = Field(default=0)
-    __table_args__ = (
-        Index("idx_rule_intelligence_cache_key", "cache_key"),
-        Index("idx_rule_intelligence_rule_id", "rule_id"),
-        Index("idx_rule_intelligence_expires_at", "expires_at"),
-        Index("idx_rule_intelligence_total_score", "total_score"),
-        Index(
-            "idx_rule_intelligence_characteristics_hash", "prompt_characteristics_hash"
-        ),
-        {"extend_existing": True},
-    )
 
 
 class AprioriAssociationRule(SQLModel, table=True):
-    """Table for storing Apriori association rules and their metrics"""
+    """Table for storing Apriori association rules and their metrics."""
 
     __tablename__: str = "apriori_association_rules"
     id: int = Field(primary_key=True)
@@ -486,7 +459,7 @@ class AprioriAssociationRule(SQLModel, table=True):
 
 
 class AprioriPatternDiscovery(SQLModel, table=True):
-    """Table for tracking Apriori pattern discovery runs and metadata"""
+    """Table for tracking Apriori pattern discovery runs and metadata."""
 
     __tablename__: str = "apriori_pattern_discovery"
     id: int = Field(primary_key=True)
@@ -521,7 +494,7 @@ class AprioriPatternDiscovery(SQLModel, table=True):
 
 
 class FrequentItemset(SQLModel, table=True):
-    """Table for storing frequent itemsets discovered by Apriori algorithm"""
+    """Table for storing frequent itemsets discovered by Apriori algorithm."""
 
     __tablename__: str = "frequent_itemsets"
     __table_args__ = {"extend_existing": True}
@@ -535,15 +508,10 @@ class FrequentItemset(SQLModel, table=True):
     itemset_type: str = Field(default="mixed")
     business_relevance: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=naive_utc_now)
-    __table_args__ = (
-        Index("idx_itemset_support", "support", "itemset_length"),
-        Index("idx_itemset_type", "itemset_type", "discovery_run_id"),
-        {"extend_existing": True},
-    )
 
 
 class PatternEvaluation(SQLModel, table=True):
-    """Table for tracking evaluation and validation of discovered patterns"""
+    """Table for tracking evaluation and validation of discovered patterns."""
 
     __tablename__: str = "pattern_evaluations"
     __table_args__ = {"extend_existing": True}
@@ -564,15 +532,10 @@ class PatternEvaluation(SQLModel, table=True):
     evaluator_notes: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=naive_utc_now)
     updated_at: datetime | None = Field(default=None)
-    __table_args__ = (
-        Index("idx_pattern_eval_scores", "validation_score", "business_impact_score"),
-        Index("idx_pattern_eval_status", "evaluation_status", "created_at"),
-        {"extend_existing": True},
-    )
 
 
 class AdvancedPatternResults(SQLModel, table=True):
-    """Table for storing results from advanced pattern discovery (HDBSCAN, FP-Growth, etc.)"""
+    """Table for storing results from advanced pattern discovery (HDBSCAN, FP-Growth, etc.)."""
 
     __tablename__: str = "advanced_pattern_results"
     __table_args__ = {"extend_existing": True}
@@ -612,24 +575,10 @@ class AdvancedPatternResults(SQLModel, table=True):
     discovery_quality_score: float | None = Field(default=None, ge=0.0, le=1.0)
     algorithms_count: int = Field(ge=1, default=1)
     created_at: datetime = Field(default_factory=naive_utc_now)
-    __table_args__ = (
-        Index(
-            "idx_advanced_patterns_algorithms",
-            "algorithms_count",
-            "execution_time_seconds",
-        ),
-        Index(
-            "idx_advanced_patterns_quality",
-            "discovery_quality_score",
-            "total_patterns_discovered",
-        ),
-        Index("idx_advanced_patterns_created", "created_at"),
-        {"extend_existing": True},
-    )
 
 
 class AprioriAnalysisRequest(BaseModel):
-    """Request model for Apriori analysis"""
+    """Request model for Apriori analysis."""
 
     window_days: int = Field(ge=1, le=365, default=30)
     min_support: float = Field(ge=0.01, le=1.0, default=0.1)
@@ -640,7 +589,7 @@ class AprioriAnalysisRequest(BaseModel):
 
 
 class AprioriAnalysisResponse(BaseModel):
-    """Response model for Apriori analysis results"""
+    """Response model for Apriori analysis results."""
 
     discovery_run_id: str
     transaction_count: int
@@ -656,7 +605,7 @@ class AprioriAnalysisResponse(BaseModel):
 
 
 class PatternDiscoveryRequest(BaseModel):
-    """Request model for comprehensive pattern discovery"""
+    """Request model for comprehensive pattern discovery."""
 
     min_effectiveness: float = Field(ge=0.0, le=1.0, default=0.7)
     min_support: int = Field(ge=1, default=5)
@@ -667,7 +616,7 @@ class PatternDiscoveryRequest(BaseModel):
 
 
 class PatternDiscoveryResponse(BaseModel):
-    """Response model for comprehensive pattern discovery results"""
+    """Response model for comprehensive pattern discovery results."""
 
     status: str
     discovery_run_id: str
@@ -703,7 +652,7 @@ class UserSatisfactionStats(BaseModel):
 
 
 class TrainingPrompt(SQLModel, table=True):
-    """Training data model for ML pipeline - follows 2025 SQLModel patterns"""
+    """Training data model for ML pipeline - follows 2025 SQLModel patterns."""
 
     __tablename__: str = "training_prompts"
     id: int | None = Field(default=None, primary_key=True)
@@ -729,7 +678,7 @@ class TrainingPrompt(SQLModel, table=True):
 
 
 class GenerationSession(SQLModel, table=True):
-    """Tracks synthetic data generation sessions"""
+    """Tracks synthetic data generation sessions."""
 
     __tablename__ = "generation_sessions"
     id: int = Field(primary_key=True)
@@ -761,7 +710,7 @@ class GenerationSession(SQLModel, table=True):
 
 
 class GenerationBatch(SQLModel, table=True):
-    """Tracks individual batch processing within generation sessions"""
+    """Tracks individual batch processing within generation sessions."""
 
     __tablename__ = "generation_batches"
     id: int = Field(primary_key=True)
@@ -792,7 +741,7 @@ class GenerationBatch(SQLModel, table=True):
 
 
 class GenerationMethodPerformance(SQLModel, table=True):
-    """Tracks performance metrics for different generation methods"""
+    """Tracks performance metrics for different generation methods."""
 
     __tablename__ = "generation_method_performance"
     id: int = Field(primary_key=True)
@@ -814,7 +763,7 @@ class GenerationMethodPerformance(SQLModel, table=True):
 
 
 class SyntheticDataSample(SQLModel, table=True):
-    """Stores individual synthetic data samples"""
+    """Stores individual synthetic data samples."""
 
     __tablename__ = "synthetic_data_samples"
     id: int = Field(primary_key=True)
@@ -837,7 +786,7 @@ class SyntheticDataSample(SQLModel, table=True):
 
 
 class GenerationQualityAssessment(SQLModel, table=True):
-    """Tracks quality assessment results for generated data"""
+    """Tracks quality assessment results for generated data."""
 
     __tablename__ = "generation_quality_assessments"
     id: int = Field(primary_key=True)
@@ -867,7 +816,7 @@ class GenerationQualityAssessment(SQLModel, table=True):
 
 
 class GenerationAnalytics(SQLModel, table=True):
-    """Stores aggregated analytics and trends for generation performance"""
+    """Stores aggregated analytics and trends for generation performance."""
 
     __tablename__ = "generation_analytics"
     id: int = Field(primary_key=True)

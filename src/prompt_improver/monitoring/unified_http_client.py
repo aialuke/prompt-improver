@@ -1,18 +1,16 @@
 """Unified HTTP Client Factory - Phase 3 Session Management Consolidation
-Extends ExternalAPIHealthMonitor patterns for standardized HTTP client usage across the codebase
+Extends ExternalAPIHealthMonitor patterns for standardized HTTP client usage across the codebase.
 """
 
-import asyncio
 import logging
 import ssl
 import time
 import uuid
-from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
@@ -22,10 +20,6 @@ from prompt_improver.monitoring.external_api_health import (
     APIEndpoint,
     ExternalAPIHealthMonitor,
     ResponseMetrics,
-)
-from prompt_improver.performance.monitoring.health.background_manager import (
-    TaskPriority,
-    get_background_task_manager,
 )
 from prompt_improver.performance.monitoring.health.circuit_breaker import (
     CircuitBreaker,
@@ -37,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class HTTPClientUsage(Enum):
-    """HTTP client usage patterns"""
+    """HTTP client usage patterns."""
 
     WEBHOOK_ALERTS = "webhook_alerts"
     HEALTH_CHECKS = "health_checks"
@@ -49,7 +43,7 @@ class HTTPClientUsage(Enum):
 
 @dataclass
 class HTTPClientConfig:
-    """Configuration for unified HTTP client"""
+    """Configuration for unified HTTP client."""
 
     name: str
     usage_type: HTTPClientUsage
@@ -105,7 +99,7 @@ class RequestOptions(BaseModel):
 
 @dataclass
 class HTTPRequestContext:
-    """Context for HTTP request tracking"""
+    """Context for HTTP request tracking."""
 
     request_id: str
     client_name: str
@@ -118,10 +112,10 @@ class HTTPRequestContext:
 
 class UnifiedHTTPClientFactory:
     """Unified HTTP Client Factory using ExternalAPIHealthMonitor patterns
-    Provides standardized HTTP clients with circuit breakers, monitoring, and SLA tracking
+    Provides standardized HTTP clients with circuit breakers, monitoring, and SLA tracking.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.clients: dict[str, HTTPClientConfig] = {}
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
         self.metrics: dict[str, list[ResponseMetrics]] = {}
@@ -131,7 +125,7 @@ class UnifiedHTTPClientFactory:
     def register_client(
         self, config: HTTPClientConfig, endpoint_config: APIEndpoint | None = None
     ) -> None:
-        """Register a new HTTP client configuration"""
+        """Register a new HTTP client configuration."""
         self.clients[config.name] = config
         if config.circuit_breaker_enabled:
             cb_config = CircuitBreakerConfig(
@@ -153,7 +147,7 @@ class UnifiedHTTPClientFactory:
 
     @asynccontextmanager
     async def get_session(self, client_name: str):
-        """Get a configured HTTP session with circuit breaker and monitoring"""
+        """Get a configured HTTP session with circuit breaker and monitoring."""
         if client_name not in self.clients:
             raise ValueError(f"HTTP client '{client_name}' not registered")
         config = self.clients[client_name]
@@ -186,7 +180,7 @@ class UnifiedHTTPClientFactory:
     async def make_request(
         self, client_name: str, method: str, url: str, **kwargs: RequestOptions
     ) -> aiohttp.ClientResponse:
-        """Make an HTTP request with circuit breaker and monitoring"""
+        """Make an HTTP request with circuit breaker and monitoring."""
         config = self.clients[client_name]
         request_context = HTTPRequestContext(
             request_id=str(uuid.uuid4())[:8],
@@ -200,7 +194,7 @@ class UnifiedHTTPClientFactory:
         if config.circuit_breaker_enabled and client_name in self.circuit_breakers:
             circuit_breaker = self.circuit_breakers[client_name]
             try:
-                response = await circuit_breaker.call(
+                return await circuit_breaker.call(
                     self._execute_request,
                     config,
                     request_context,
@@ -208,7 +202,6 @@ class UnifiedHTTPClientFactory:
                     url,
                     **kwargs,
                 )
-                return response
             except Exception as e:
                 await self._record_request_metrics(
                     config, request_context, None, str(e)
@@ -227,7 +220,7 @@ class UnifiedHTTPClientFactory:
         url: str,
         **kwargs: RequestOptions,
     ) -> aiohttp.ClientResponse:
-        """Execute HTTP request with monitoring"""
+        """Execute HTTP request with monitoring."""
         async with self.get_session(config.name) as session:
             start_time = time.time()
             try:
@@ -259,7 +252,7 @@ class UnifiedHTTPClientFactory:
                     await self._record_request_metrics(
                         config, context, None, str(e), response_time_ms
                     )
-                logger.error(
+                logger.exception(
                     f"HTTP {method} {url} failed: {e} ({response_time_ms:.2f}ms)",
                     extra={
                         "client_name": config.name,
@@ -281,7 +274,7 @@ class UnifiedHTTPClientFactory:
         error: str | None,
         response_time_ms: float | None = None,
     ) -> None:
-        """Record request metrics for monitoring and SLA tracking"""
+        """Record request metrics for monitoring and SLA tracking."""
         if not config.collect_metrics:
             return
         if response_time_ms is None:
@@ -319,7 +312,7 @@ class UnifiedHTTPClientFactory:
     def _parse_rate_limit_header(
         self, headers: dict[str, str], limit_type: str
     ) -> int | None:
-        """Parse rate limit headers (reusing ExternalAPIHealthMonitor logic)"""
+        """Parse rate limit headers (reusing ExternalAPIHealthMonitor logic)."""
         patterns = {
             "remaining": [
                 "x-ratelimit-remaining",
@@ -346,7 +339,7 @@ class UnifiedHTTPClientFactory:
     def _parse_rate_limit_reset_header(
         self, headers: dict[str, str]
     ) -> datetime | None:
-        """Parse rate limit reset headers (reusing ExternalAPIHealthMonitor logic)"""
+        """Parse rate limit reset headers (reusing ExternalAPIHealthMonitor logic)."""
         reset_patterns = [
             "x-ratelimit-reset",
             "x-rate-limit-reset",
@@ -367,7 +360,7 @@ class UnifiedHTTPClientFactory:
         return None
 
     async def get_client_metrics(self, client_name: str) -> dict[str, Any]:
-        """Get comprehensive metrics for a client"""
+        """Get comprehensive metrics for a client."""
         if client_name not in self.metrics:
             return {}
         client_metrics = self.metrics[client_name]
@@ -413,15 +406,15 @@ class UnifiedHTTPClientFactory:
         return metrics_data
 
     async def get_all_metrics(self) -> dict[str, Any]:
-        """Get metrics for all registered clients"""
+        """Get metrics for all registered clients."""
         all_metrics = {}
-        for client_name in self.clients.keys():
+        for client_name in self.clients:
             all_metrics[client_name] = await self.get_client_metrics(client_name)
         total_requests = sum(m.get("total_requests", 0) for m in all_metrics.values())
         total_successful = sum(
             m.get("successful_requests", 0) for m in all_metrics.values()
         )
-        summary = {
+        return {
             "total_clients": len(self.clients),
             "total_requests": total_requests,
             "overall_success_rate": total_successful / total_requests
@@ -429,12 +422,11 @@ class UnifiedHTTPClientFactory:
             else 0.0,
             "clients": all_metrics,
         }
-        return summary
 
     async def health_check_all_clients(self) -> dict[str, bool]:
-        """Perform health check on all registered clients"""
+        """Perform health check on all registered clients."""
         health_status = {}
-        for client_name, config in self.clients.items():
+        for client_name in self.clients:
             try:
                 if client_name in self.circuit_breakers:
                     cb = self.circuit_breakers[client_name]
@@ -442,7 +434,7 @@ class UnifiedHTTPClientFactory:
                 else:
                     health_status[client_name] = True
             except Exception as e:
-                logger.error(f"Health check failed for client {client_name}: {e}")
+                logger.exception(f"Health check failed for client {client_name}: {e}")
                 health_status[client_name] = False
         return health_status
 
@@ -451,7 +443,7 @@ _global_factory: UnifiedHTTPClientFactory | None = None
 
 
 def get_http_client_factory() -> UnifiedHTTPClientFactory:
-    """Get the global HTTP client factory instance"""
+    """Get the global HTTP client factory instance."""
     global _global_factory
     if _global_factory is None:
         _global_factory = UnifiedHTTPClientFactory()
@@ -460,7 +452,7 @@ def get_http_client_factory() -> UnifiedHTTPClientFactory:
 
 
 def _register_default_clients(factory: UnifiedHTTPClientFactory) -> None:
-    """Register default HTTP client configurations"""
+    """Register default HTTP client configurations."""
     factory.register_client(
         HTTPClientConfig(
             name="webhook_alerts",
@@ -523,7 +515,7 @@ def _register_default_clients(factory: UnifiedHTTPClientFactory) -> None:
 async def make_webhook_request(
     url: str, data: dict[str, Any], **kwargs: RequestOptions
 ) -> aiohttp.ClientResponse:
-    """Make a webhook request with standardized configuration"""
+    """Make a webhook request with standardized configuration."""
     factory = get_http_client_factory()
     return await factory.make_request(
         "webhook_alerts", "POST", url, json=data, **kwargs
@@ -533,7 +525,7 @@ async def make_webhook_request(
 async def make_health_check_request(
     url: str, **kwargs: RequestOptions
 ) -> aiohttp.ClientResponse:
-    """Make a health check request with standardized configuration"""
+    """Make a health check request with standardized configuration."""
     factory = get_http_client_factory()
     return await factory.make_request("health_monitoring", "GET", url, **kwargs)
 
@@ -541,20 +533,20 @@ async def make_health_check_request(
 async def make_api_request(
     method: str, url: str, **kwargs: RequestOptions
 ) -> aiohttp.ClientResponse:
-    """Make an API request with standardized configuration"""
+    """Make an API request with standardized configuration."""
     factory = get_http_client_factory()
     return await factory.make_request("api_calls", method, url, **kwargs)
 
 
 async def download_file(url: str, **kwargs) -> aiohttp.ClientResponse:
-    """Download a file with standardized configuration"""
+    """Download a file with standardized configuration."""
     factory = get_http_client_factory()
     return await factory.make_request("downloads", "GET", url, **kwargs)
 
 
 @asynccontextmanager
 async def get_http_session(client_name: str):
-    """Get an HTTP session for advanced usage"""
+    """Get an HTTP session for advanced usage."""
     factory = get_http_client_factory()
     async with factory.get_session(client_name) as session:
         yield session

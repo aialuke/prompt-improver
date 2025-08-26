@@ -1,4 +1,4 @@
-"""OpenTelemetry Auto-Instrumentation for Production Applications
+"""OpenTelemetry Auto-Instrumentation for Production Applications.
 =============================================================
 
 Provides automatic instrumentation for HTTP, database, Redis, and ML operations
@@ -10,7 +10,7 @@ import functools
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, Dict, Optional, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from prompt_improver.monitoring.opentelemetry.metrics import (
     get_database_metrics,
@@ -40,7 +40,7 @@ P = ParamSpec("P")
 class InstrumentationServiceFacade:
     """Manages automatic instrumentation for various components."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._instrumented: dict[str, bool] = {}
         self._tracer = get_tracer(__name__)
 
@@ -64,7 +64,7 @@ class InstrumentationServiceFacade:
             self._instrumented["http"] = True
             logger.info("HTTP instrumentation enabled")
         except Exception as e:
-            logger.error(f"Failed to instrument HTTP: {e}")
+            logger.exception(f"Failed to instrument HTTP: {e}")
 
     def instrument_database(self) -> None:
         """Instrument database operations."""
@@ -75,7 +75,7 @@ class InstrumentationServiceFacade:
             self._instrumented["database"] = True
             logger.info("Database instrumentation enabled")
         except Exception as e:
-            logger.error(f"Failed to instrument database: {e}")
+            logger.exception(f"Failed to instrument database: {e}")
 
     def instrument_redis(self) -> None:
         """Instrument Redis operations."""
@@ -86,7 +86,7 @@ class InstrumentationServiceFacade:
             self._instrumented["redis"] = True
             logger.info("Redis instrumentation enabled")
         except Exception as e:
-            logger.error(f"Failed to instrument Redis: {e}")
+            logger.exception(f"Failed to instrument Redis: {e}")
 
     def uninstrument_all(self) -> None:
         """Disable all instrumentation."""
@@ -100,7 +100,7 @@ class InstrumentationServiceFacade:
             self._instrumented.clear()
             logger.info("All instrumentation disabled")
         except Exception as e:
-            logger.error(f"Failed to uninstrument: {e}")
+            logger.exception(f"Failed to uninstrument: {e}")
 
 
 _instrumentation_manager: InstrumentationServiceFacade | None = None
@@ -454,5 +454,5 @@ def instrument_fastapi_app(app):
         FastAPIInstrumentor.instrument_app(app)
         logger.info("FastAPI application instrumented")
     except Exception as e:
-        logger.error(f"Failed to instrument FastAPI app: {e}")
+        logger.exception(f"Failed to instrument FastAPI app: {e}")
     return app

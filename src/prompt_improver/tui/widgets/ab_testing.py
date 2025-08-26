@@ -15,7 +15,7 @@ class ABTestingWidget(Static):
 
     ab_data = reactive({})
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.console = Console()
 

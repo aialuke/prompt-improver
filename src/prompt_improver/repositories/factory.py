@@ -5,7 +5,7 @@ implementations, ensuring consistent configuration and lifecycle management.
 """
 
 import logging
-from typing import Dict, Type, TypeVar
+from typing import TypeVar
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.repositories.impl.analytics_repository import AnalyticsRepository
@@ -40,7 +40,7 @@ RepositoryProtocol = TypeVar("RepositoryProtocol")
 class RepositoryFactory:
     """Factory for creating and managing repository instances with dependency injection."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         """Initialize repository factory with connection manager.
 
         Args:
@@ -78,7 +78,7 @@ class RepositoryFactory:
             logger.info("Repository factory initialization complete")
 
         except Exception as e:
-            logger.error(f"Repository factory initialization failed: {e}")
+            logger.exception(f"Repository factory initialization failed: {e}")
             raise
 
     def get_analytics_repository(self) -> AnalyticsRepositoryProtocol:
@@ -195,11 +195,11 @@ class RepositoryFactory:
                         )
 
                 except Exception as e:
-                    logger.error(f"Health check failed for {name} repository: {e}")
+                    logger.exception(f"Health check failed for {name} repository: {e}")
                     health_status[name] = False
 
         except Exception as e:
-            logger.error(f"Repository factory health check failed: {e}")
+            logger.exception(f"Repository factory health check failed: {e}")
             return {"factory": False}
 
         return health_status
@@ -211,7 +211,7 @@ class RepositoryFactory:
             self._initialized = False
             logger.info("Repository factory cleanup complete")
         except Exception as e:
-            logger.error(f"Repository factory cleanup failed: {e}")
+            logger.exception(f"Repository factory cleanup failed: {e}")
 
 
 # Global factory instance - will be initialized by dependency injection
@@ -351,7 +351,7 @@ async def setup_repository_dependencies(
             logger.info("All repositories initialized and healthy")
 
     except Exception as e:
-        logger.error(f"Repository dependency setup failed: {e}")
+        logger.exception(f"Repository dependency setup failed: {e}")
         raise
 
 

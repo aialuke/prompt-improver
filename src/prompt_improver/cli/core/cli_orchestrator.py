@@ -6,8 +6,8 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from rich.console import Console
 from rich.progress import (
@@ -20,11 +20,6 @@ from rich.progress import (
 )
 
 from prompt_improver.cli.core.signal_handler import SignalOperation
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.factories.ml_pipeline_factory import (
-    MLPipelineOrchestratorFactory,
-)
-from prompt_improver.core.protocols.ml_protocols import ServiceContainerProtocol
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator,
 )
@@ -39,7 +34,7 @@ class CLIOrchestrator:
     - Managing workflow lifecycle
     """
 
-    def __init__(self, console: Console | None = None):
+    def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
         self.logger = logging.getLogger("apes.cli_orchestrator")
         self.signal_handler = None
@@ -49,7 +44,7 @@ class CLIOrchestrator:
         self._active_workflows: dict[str, dict[str, Any]] = {}
         self._init_signal_handlers()
 
-    def _init_signal_handlers(self):
+    def _init_signal_handlers(self) -> None:
         """Initialize signal handler with lazy import to avoid circular dependency."""
         try:
             from rich.console import Console
@@ -74,7 +69,7 @@ class CLIOrchestrator:
         except ImportError as e:
             self.logger.warning(f"Signal handling integration not available: {e}")
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register CLIOrchestrator-specific signal handlers."""
         if self.signal_handler is None:
             self.logger.warning(
@@ -121,7 +116,7 @@ class CLIOrchestrator:
                 "total_workflows": shutdown_result.get("total_workflows", 0),
             }
         except Exception as e:
-            self.logger.error(f"CLIOrchestrator shutdown error: {e}")
+            self.logger.exception(f"CLIOrchestrator shutdown error: {e}")
             return {"status": "error", "component": "CLIOrchestrator", "error": str(e)}
 
     async def create_workflow_checkpoint(self, signal_context):
@@ -166,7 +161,7 @@ class CLIOrchestrator:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Workflow checkpoint creation failed: {e}")
+            self.logger.exception(f"Workflow checkpoint creation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def generate_workflow_status_report(self, signal_context):
@@ -211,7 +206,7 @@ class CLIOrchestrator:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Workflow status report generation failed: {e}")
+            self.logger.exception(f"Workflow status report generation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def prepare_workflow_shutdown(self, signum, signal_name):
@@ -233,14 +228,14 @@ class CLIOrchestrator:
                 "orchestrator_available": self._orchestrator is not None,
             }
         except Exception as e:
-            self.logger.error(f"Workflow shutdown preparation failed: {e}")
+            self.logger.exception(f"Workflow shutdown preparation failed: {e}")
             return {"prepared": False, "component": "CLIOrchestrator", "error": str(e)}
 
     def prepare_workflow_interruption(self, signum, signal_name):
         """Prepare workflows for user interruption (Ctrl+C)."""
         self.logger.info(f"Preparing workflows for interruption ({signal_name})")
         try:
-            interruption_preparation = {
+            return {
                 "prepared": True,
                 "component": "CLIOrchestrator",
                 "interruption_type": "user_requested",
@@ -248,9 +243,8 @@ class CLIOrchestrator:
                 "graceful_stop_available": True,
                 "progress_preservation_ready": True,
             }
-            return interruption_preparation
         except Exception as e:
-            self.logger.error(f"Workflow interruption preparation failed: {e}")
+            self.logger.exception(f"Workflow interruption preparation failed: {e}")
             return {"prepared": False, "component": "CLIOrchestrator", "error": str(e)}
 
     async def start_continuous_training(
@@ -298,7 +292,7 @@ class CLIOrchestrator:
                 "started_at": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Failed to start continuous training: {e}")
+            self.logger.exception(f"Failed to start continuous training: {e}")
             return {"status": "failed", "error": str(e)}
 
     async def monitor_training_progress(
@@ -358,12 +352,12 @@ class CLIOrchestrator:
                             )
                         else:
                             workflow_state = "unknown"
-                        if workflow_state in [
+                        if workflow_state in {
                             "completed",
                             "failed",
                             "cancelled",
                             "error",
-                        ]:
+                        }:
                             progress.update(
                                 monitor_task, description=f"Training {workflow_state}"
                             )
@@ -491,7 +485,7 @@ class CLIOrchestrator:
         except KeyboardInterrupt:
             self.console.print("\n🛑 Monitoring interrupted", style="yellow")
         except Exception as e:
-            self.logger.error(f"Error monitoring training progress: {e}")
+            self.logger.exception(f"Error monitoring training progress: {e}")
             self.console.print(f"❌ Monitoring error: {e}", style="red")
 
     async def _get_training_metrics(
@@ -669,7 +663,7 @@ class CLIOrchestrator:
                     if hasattr(status.state, "value")
                     else str(status.state)
                 )
-                if status_str in ["completed", "failed", "cancelled"]:
+                if status_str in {"completed", "failed", "cancelled"}:
                     result = status.metadata or {}
                     if workflow_id in self._active_workflows:
                         self._active_workflows[workflow_id]["status"] = status_str
@@ -692,7 +686,7 @@ class CLIOrchestrator:
                 "duration": timeout,
             }
         except Exception as e:
-            self.logger.error(f"Error waiting for workflow completion: {e}")
+            self.logger.exception(f"Error waiting for workflow completion: {e}")
             return {"status": "error", "error": str(e)}
 
     async def wait_for_workflow_completion_with_progress(
@@ -809,7 +803,7 @@ class CLIOrchestrator:
                         f"Error checking workflow status (attempt {consecutive_errors}/{max_consecutive_errors}): {e}"
                     )
                     if consecutive_errors >= max_consecutive_errors:
-                        self.logger.error(
+                        self.logger.exception(
                             f"Too many consecutive errors checking workflow {workflow_id}"
                         )
                         return {
@@ -834,7 +828,7 @@ class CLIOrchestrator:
             }
         except Exception as e:
             duration = time.time() - start_time
-            self.logger.error(f"Critical error waiting for workflow completion: {e}")
+            self.logger.exception(f"Critical error waiting for workflow completion: {e}")
             return {
                 "status": "error",
                 "workflow_id": workflow_id,
@@ -870,7 +864,7 @@ class CLIOrchestrator:
                     else:
                         failed_workflows.append(workflow_id)
                 except Exception as e:
-                    self.logger.error(f"Failed to stop workflow {workflow_id}: {e}")
+                    self.logger.exception(f"Failed to stop workflow {workflow_id}: {e}")
                     failed_workflows.append(workflow_id)
             return {
                 "status": "success" if not failed_workflows else "partial",
@@ -879,7 +873,7 @@ class CLIOrchestrator:
                 "total_workflows": len(self._active_workflows),
             }
         except Exception as e:
-            self.logger.error(f"Error stopping workflows: {e}")
+            self.logger.exception(f"Error stopping workflows: {e}")
             return {"status": "failed", "error": str(e)}
 
     async def get_workflow_status(self, workflow_id: str) -> dict[str, Any]:
@@ -914,7 +908,7 @@ class CLIOrchestrator:
                 })
             return status_dict
         except Exception as e:
-            self.logger.error(f"Error getting workflow status: {e}")
+            self.logger.exception(f"Error getting workflow status: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _get_orchestrator(self) -> MLPipelineOrchestrator:
@@ -1055,7 +1049,7 @@ class CLIOrchestrator:
                 workflow_id, config.get("timeout", 3600)
             )
         except Exception as e:
-            self.logger.error(f"Failed to start single training workflow: {e}")
+            self.logger.exception(f"Failed to start single training workflow: {e}")
             return {"status": "failed", "error": str(e)}
 
     async def stop_training_gracefully(
@@ -1124,7 +1118,7 @@ class CLIOrchestrator:
                 "stopped_workflows": stopped_workflows,
             }
         except Exception as e:
-            self.logger.error(f"Error during graceful shutdown: {e}")
+            self.logger.exception(f"Error during graceful shutdown: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -1163,7 +1157,7 @@ class CLIOrchestrator:
                     if workflow_id in self._active_workflows:
                         del self._active_workflows[workflow_id]
                 except Exception as e:
-                    self.logger.error(
+                    self.logger.exception(
                         f"Error force stopping workflow {workflow_id}: {e}"
                     )
             self.console.print(
@@ -1175,5 +1169,5 @@ class CLIOrchestrator:
                 "stopped_workflows": stopped_workflows,
             }
         except Exception as e:
-            self.logger.error(f"Error during force stop: {e}")
+            self.logger.exception(f"Error during force stop: {e}")
             return {"success": False, "error": str(e), "stopped_workflows": []}

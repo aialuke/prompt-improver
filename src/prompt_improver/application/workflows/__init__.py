@@ -1,4 +1,4 @@
-"""Application Workflows
+"""Application Workflows.
 
 This module contains workflow definitions that orchestrate complex business processes
 by coordinating multiple domain services and repositories within transaction boundaries.
@@ -23,13 +23,13 @@ from prompt_improver.application.workflows.prompt_workflows import (
 
 __all__ = [
     "DashboardDataWorkflow",
-    "SessionComparisonWorkflow", 
-    "TrendAnalysisWorkflow",
     "ModelDeploymentWorkflow",
-    "ModelInferenceWorkflow", 
+    "ModelInferenceWorkflow",
     "PatternDiscoveryWorkflow",
-    "TrainingWorkflow",
     "PromptImprovementWorkflow",
     "RuleApplicationWorkflow",
+    "SessionComparisonWorkflow",
     "SessionManagementWorkflow",
+    "TrainingWorkflow",
+    "TrendAnalysisWorkflow",
 ]

@@ -1,4 +1,4 @@
-"""SLO/SLA Reporting and Dashboard Generation
+"""SLO/SLA Reporting and Dashboard Generation.
 =========================================
 
 Implements comprehensive reporting capabilities for SLO compliance, SLA tracking,
@@ -12,14 +12,14 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from prompt_improver.monitoring.slo.monitor import SLOMonitor
 from prompt_improver.utils.datetime_utils import (
     format_compact_timestamp,
     format_date_only,
     format_display_date,
 )
-from prompt_improver.monitoring.slo.monitor import SLOMonitor
 
 try:
     import jinja2
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReportFormat(Enum):
-    """Supported report output formats"""
+    """Supported report output formats."""
 
     JSON = "json"
     HTML = "html"
@@ -48,7 +48,7 @@ class ReportFormat(Enum):
 
 
 class ReportPeriod(Enum):
-    """Standard reporting periods"""
+    """Standard reporting periods."""
 
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -59,7 +59,7 @@ class ReportPeriod(Enum):
 
 @dataclass
 class SLOComplianceReport:
-    """SLO compliance report data structure"""
+    """SLO compliance report data structure."""
 
     service_name: str
     slo_name: str
@@ -85,7 +85,7 @@ class SLOComplianceReport:
 
 @dataclass
 class SLABreachReport:
-    """SLA breach report for customer impact analysis"""
+    """SLA breach report for customer impact analysis."""
 
     service_name: str
     customer_id: str | None
@@ -108,9 +108,9 @@ class SLABreachReport:
 
 
 class SLOReporter:
-    """Generate comprehensive SLO compliance reports"""
+    """Generate comprehensive SLO compliance reports."""
 
-    def __init__(self, template_dir: str | None = None, output_dir: str | None = None):
+    def __init__(self, template_dir: str | None = None, output_dir: str | None = None) -> None:
         self.template_dir = (
             Path(template_dir) if template_dir else Path(__file__).parent / "templates"
         )
@@ -134,7 +134,7 @@ class SLOReporter:
         period: ReportPeriod,
         end_date: datetime | None = None,
     ) -> SLOComplianceReport:
-        """Generate comprehensive SLO compliance report"""
+        """Generate comprehensive SLO compliance report."""
         end_date = end_date or datetime.now(UTC)
         start_date = self._calculate_period_start(end_date, period)
         evaluation_results = await slo_monitor.evaluate_slos()
@@ -150,7 +150,7 @@ class SLOReporter:
         recommendations = self._generate_recommendations(
             compliance_data, trend_data, incident_data
         )
-        report = SLOComplianceReport(
+        return SLOComplianceReport(
             service_name=slo_monitor.slo_definition.service_name,
             slo_name=slo_monitor.slo_definition.name,
             report_period=period,
@@ -170,12 +170,11 @@ class SLOReporter:
             mean_time_to_recovery=incident_data["mttr"],
             recommendations=recommendations,
         )
-        return report
 
     def _calculate_period_start(
         self, end_date: datetime, period: ReportPeriod
     ) -> datetime:
-        """Calculate start date for reporting period"""
+        """Calculate start date for reporting period."""
         if period == ReportPeriod.DAILY:
             return end_date - timedelta(days=1)
         if period == ReportPeriod.WEEKLY:
@@ -194,7 +193,7 @@ class SLOReporter:
         start_date: datetime,
         end_date: datetime,
     ) -> dict[str, Any]:
-        """Calculate compliance metrics from evaluation results"""
+        """Calculate compliance metrics from evaluation results."""
         slo_results = evaluation_results.get("slo_results", {})
         error_budget_status = evaluation_results.get("error_budget_status", {})
         compliance_ratios = []
@@ -246,7 +245,7 @@ class SLOReporter:
     async def _analyze_compliance_trends(
         self, slo_monitor: SLOMonitor, start_date: datetime, end_date: datetime
     ) -> dict[str, Any]:
-        """Analyze compliance trends over time"""
+        """Analyze compliance trends over time."""
         if slo_monitor.calculators:
             calculator = next(iter(slo_monitor.calculators.values()))
             trends = calculator.analyze_trends(end_date)
@@ -260,7 +259,7 @@ class SLOReporter:
     def _analyze_incidents_and_alerts(
         self, slo_monitor: SLOMonitor, start_date: datetime, end_date: datetime
     ) -> dict[str, Any]:
-        """Analyze incidents and alerts for the period"""
+        """Analyze incidents and alerts for the period."""
         total_alerts = 0
         total_incidents = 0
         recovery_times = []
@@ -268,7 +267,7 @@ class SLOReporter:
             active_alerts = alerter.get_active_alerts()
             total_alerts += len(active_alerts)
             for alert in active_alerts:
-                if alert.severity.value in ["critical", "emergency"]:
+                if alert.severity.value in {"critical", "emergency"}:
                     total_incidents += 1
                     if alert.resolved_at:
                         recovery_time = (
@@ -288,7 +287,7 @@ class SLOReporter:
         trend_data: dict[str, Any],
         incident_data: dict[str, Any],
     ) -> list[str]:
-        """Generate actionable recommendations based on report data"""
+        """Generate actionable recommendations based on report data."""
         recommendations = []
         if compliance_data["overall_compliance"] < 95.0:
             recommendations.append(
@@ -322,7 +321,7 @@ class SLOReporter:
         format: ReportFormat,
         filename: str | None = None,
     ) -> str:
-        """Export report in specified format"""
+        """Export report in specified format."""
         if not filename:
             timestamp = format_compact_timestamp(report.generated_at)
             filename = f"slo_report_{report.service_name}_{timestamp}.{format.value}"
@@ -338,13 +337,13 @@ class SLOReporter:
         raise ValueError(f"Unsupported report format: {format}")
 
     def _export_json(self, report: SLOComplianceReport, filepath: Path) -> str:
-        """Export report as JSON"""
-        with open(filepath, "w") as f:
+        """Export report as JSON."""
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(asdict(report), f, indent=2, default=str)
         return str(filepath)
 
     def _export_html(self, report: SLOComplianceReport, filepath: Path) -> str:
-        """Export report as HTML"""
+        """Export report as HTML."""
         if not self.jinja_env:
             html_content = self._generate_simple_html(report)
         else:
@@ -354,24 +353,24 @@ class SLOReporter:
             except Exception as e:
                 logger.warning(f"Failed to use HTML template: {e}")
                 html_content = self._generate_simple_html(report)
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(html_content)
         return str(filepath)
 
     def _export_markdown(self, report: SLOComplianceReport, filepath: Path) -> str:
-        """Export report as Markdown"""
+        """Export report as Markdown."""
         md_content = f"# SLO Compliance Report\n\n## Service: {report.service_name}\n**Report Period:** {report.report_period.value}  \n**Period:** {format_date_only(report.start_date)} to {format_date_only(report.end_date)}  \n**Generated:** {format_display_date(report.generated_at)}\n\n## Summary\n- **Overall Compliance:** {report.overall_compliance_percentage:.2f}%\n- **Target Compliance:** {report.target_compliance_percentage:.2f}%\n- **Status:** {report.compliance_status}\n- **Error Budget Consumed:** {report.error_budget_consumed_percentage:.2f}%\n- **Error Budget Remaining:** {report.error_budget_remaining:.2f}%\n\n## Trends\n- **Direction:** {report.trend_direction}\n- **Confidence:** {report.trend_confidence:.2f}\n\n## Incidents & Alerts\n- **Incidents:** {report.incident_count}\n- **Alerts:** {report.alert_count}\n- **Mean Time to Recovery:** {report.mean_time_to_recovery:.1f} minutes\n\n## Recommendations\n"
         for i, rec in enumerate(report.recommendations, 1):
             md_content += f"{i}. {rec}\n"
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(md_content)
         return str(filepath)
 
     def _export_csv(self, report: SLOComplianceReport, filepath: Path) -> str:
-        """Export report as CSV"""
+        """Export report as CSV."""
         import csv
 
-        with open(filepath, "w", newline="") as f:
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Metric", "Value", "Unit", "Status"])
             writer.writerow(["Service", report.service_name, "", ""])
@@ -399,14 +398,14 @@ class SLOReporter:
         return str(filepath)
 
     def _generate_simple_html(self, report: SLOComplianceReport) -> str:
-        """Generate simple HTML report without templates"""
+        """Generate simple HTML report without templates."""
         return f"""\n<!DOCTYPE html>\n<html>\n<head>\n    <title>SLO Compliance Report - {report.service_name}</title>\n    <style>\n        body {{ font-family: Arial, sans-serif; margin: 40px; }}\n        .header {{ background-color: #f5f5f5; padding: 20px; border-radius: 5px; }}\n        .metric {{ margin: 10px 0; padding: 10px; border-left: 4px solid #007acc; }}\n        .status-meeting {{ border-left-color: #28a745; }}\n        .status-at-risk {{ border-left-color: #ffc107; }}\n        .status-breaching {{ border-left-color: #dc3545; }}\n        .recommendations {{ background-color: #e9ecef; padding: 15px; border-radius: 5px; }}\n    </style>\n</head>\n<body>\n    <div class="header">\n        <h1>SLO Compliance Report</h1>\n        <h2>{report.service_name}</h2>\n        <p><strong>Period:</strong> {format_date_only(report.start_date)} to {format_date_only(report.end_date)}</p>\n        <p><strong>Generated:</strong> {format_display_date(report.generated_at)}</p>\n    </div>\n    \n    <div class="metric status-{report.compliance_status}">\n        <h3>Overall Compliance: {report.overall_compliance_percentage:.2f}%</h3>\n        <p>Status: {report.compliance_status.upper()}</p>\n    </div>\n    \n    <div class="metric">\n        <h3>Error Budget</h3>\n        <p>Consumed: {report.error_budget_consumed_percentage:.2f}%</p>\n        <p>Remaining: {report.error_budget_remaining:.2f}%</p>\n        <p>Status: {report.error_budget_status}</p>\n    </div>\n    \n    <div class="metric">\n        <h3>Incidents & Alerts</h3>\n        <p>Incidents: {report.incident_count}</p>\n        <p>Alerts: {report.alert_count}</p>\n        <p>Mean Time to Recovery: {report.mean_time_to_recovery:.1f} minutes</p>\n    </div>\n    \n    <div class="recommendations">\n        <h3>Recommendations</h3>\n        <ul>\n            {"".join(f"<li>{rec}</li>" for rec in report.recommendations)}\n        </ul>\n    </div>\n</body>\n</html>\n"""
 
 
 class SLAReporter:
-    """Generate SLA breach reports and customer impact analysis"""
+    """Generate SLA breach reports and customer impact analysis."""
 
-    def __init__(self, output_dir: str | None = None):
+    def __init__(self, output_dir: str | None = None) -> None:
         self.output_dir = Path(output_dir) if output_dir else Path("./sla_reports")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.breach_history: list[SLABreachReport] = []
@@ -422,7 +421,7 @@ class SLAReporter:
         affected_requests: int = 0,
         estimated_revenue_impact: float = 0.0,
     ) -> SLABreachReport:
-        """Record a new SLA breach"""
+        """Record a new SLA breach."""
         impact_level = self._calculate_impact_level(
             affected_requests, estimated_revenue_impact
         )
@@ -443,8 +442,8 @@ class SLAReporter:
             root_cause=None,
             remediation_actions=[],
             customer_notified=False,
-            compensation_required=impact_level in ["high", "critical"],
-            postmortem_required=impact_level in ["high", "critical"],
+            compensation_required=impact_level in {"high", "critical"},
+            postmortem_required=impact_level in {"high", "critical"},
         )
         self.breach_history.append(breach_report)
         logger.warning(f"SLA breach recorded: {service_name}/{sla_target}")
@@ -457,7 +456,7 @@ class SLAReporter:
         root_cause: str | None = None,
         remediation_actions: list[str] | None = None,
     ) -> None:
-        """Resolve an SLA breach"""
+        """Resolve an SLA breach."""
         breach_report.breach_end = resolution_time
         breach_report.breach_duration_minutes = (
             resolution_time - breach_report.breach_start
@@ -474,7 +473,7 @@ class SLAReporter:
     def _calculate_impact_level(
         self, affected_requests: int, revenue_impact: float
     ) -> str:
-        """Calculate customer impact level"""
+        """Calculate customer impact level."""
         if revenue_impact > 10000 or affected_requests > 100000:
             return "critical"
         if revenue_impact > 1000 or affected_requests > 10000:
@@ -486,7 +485,7 @@ class SLAReporter:
     def generate_breach_summary(
         self, start_date: datetime, end_date: datetime
     ) -> dict[str, Any]:
-        """Generate SLA breach summary for period"""
+        """Generate SLA breach summary for period."""
         period_breaches = [
             breach
             for breach in self.breach_history
@@ -545,16 +544,16 @@ class SLAReporter:
 
 
 class DashboardGenerator:
-    """Generate interactive dashboards for SLO/SLA monitoring"""
+    """Generate interactive dashboards for SLO/SLA monitoring."""
 
-    def __init__(self, output_dir: str | None = None):
+    def __init__(self, output_dir: str | None = None) -> None:
         self.output_dir = Path(output_dir) if output_dir else Path("./dashboards")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_slo_dashboard(
         self, slo_reports: list[SLOComplianceReport], title: str = "SLO Dashboard"
     ) -> str:
-        """Generate comprehensive SLO dashboard"""
+        """Generate comprehensive SLO dashboard."""
         dashboard_data = {
             "title": title,
             "generated_at": datetime.now(UTC).isoformat(),
@@ -576,12 +575,12 @@ class DashboardGenerator:
         timestamp = format_compact_timestamp(datetime.now(UTC))
         filename = f"slo_dashboard_{timestamp}.html"
         filepath = self.output_dir / filename
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(html_content)
         return str(filepath)
 
     def _generate_dashboard_html(self, data: dict[str, Any]) -> str:
-        """Generate HTML dashboard"""
+        """Generate HTML dashboard."""
         services_html = ""
         for service in data["services"]:
             status_class = f"status-{service['compliance_status']}"
@@ -593,9 +592,9 @@ class DashboardGenerator:
 
 
 class ExecutiveReporter:
-    """Generate executive-level reports with business impact analysis"""
+    """Generate executive-level reports with business impact analysis."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.revenue_per_request = 0.1
         self.sla_penalty_rate = 0.05
 
@@ -605,7 +604,7 @@ class ExecutiveReporter:
         sla_breaches: list[SLABreachReport],
         period: ReportPeriod,
     ) -> dict[str, Any]:
-        """Generate executive summary with business metrics"""
+        """Generate executive summary with business metrics."""
         if slo_reports:
             avg_compliance = statistics.mean(
                 r.overall_compliance_percentage for r in slo_reports
@@ -655,7 +654,7 @@ class ExecutiveReporter:
         }
 
     def _calculate_satisfaction_impact(self, breaches: list[SLABreachReport]) -> str:
-        """Calculate estimated customer satisfaction impact"""
+        """Calculate estimated customer satisfaction impact."""
         if not breaches:
             return "minimal"
         critical_breaches = sum(
@@ -673,7 +672,7 @@ class ExecutiveReporter:
     def _assess_risk_level(
         self, compliance: float, incidents: int, revenue_impact: float
     ) -> str:
-        """Assess overall business risk level"""
+        """Assess overall business risk level."""
         risk_score = 0
         if compliance < 95:
             risk_score += 3
@@ -702,7 +701,7 @@ class ExecutiveReporter:
         return "low"
 
     def _calculate_operational_score(self, reports: list[SLOComplianceReport]) -> int:
-        """Calculate operational excellence score (0-100)"""
+        """Calculate operational excellence score (0-100)."""
         if not reports:
             return 0
         compliance_weight = 0.4
@@ -729,9 +728,9 @@ class ExecutiveReporter:
     def _generate_executive_recommendations(
         self, compliance: float, incidents: int, revenue_impact: float, risk_level: str
     ) -> list[str]:
-        """Generate executive-level recommendations"""
+        """Generate executive-level recommendations."""
         recommendations = []
-        if risk_level in ["critical", "high"]:
+        if risk_level in {"critical", "high"}:
             recommendations.append(
                 "IMMEDIATE ACTION REQUIRED: Service reliability is below acceptable levels. Recommend emergency review of operational procedures and resource allocation."
             )
@@ -758,7 +757,7 @@ class ExecutiveReporter:
         slo_reports: list[SLOComplianceReport],
         sla_breaches: list[SLABreachReport],
     ) -> dict[str, Any]:
-        """Generate projections for next period"""
+        """Generate projections for next period."""
         if not slo_reports:
             return {"status": "insufficient_data"}
         improving_services = sum(

@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 def get_analytics_router() -> Any | None:
     """Get the analytics router for real-time functionality.
-    
+
     Moved from core.services.analytics_factory to respect Clean Architecture.
     API layer components should be accessed from the API layer, not core services.
-    
+
     Returns:
         FastAPI APIRouter instance for analytics endpoints, or None if import fails
     """
@@ -23,5 +23,5 @@ def get_analytics_router() -> Any | None:
         from prompt_improver.api.analytics_endpoints import analytics_router
         return analytics_router
     except ImportError as e:
-        logger.error(f"Failed to import analytics_router: {e}")
+        logger.exception(f"Failed to import analytics_router: {e}")
         return None

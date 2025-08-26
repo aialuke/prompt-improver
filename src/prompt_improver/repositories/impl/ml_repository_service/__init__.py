@@ -5,18 +5,30 @@ Provides focused domain repositories for training, model performance, experiment
 inference, and analytics with a unified facade interface.
 """
 
-from .experiment_repository import ExperimentRepository
-from .inference_repository import InferenceRepository
-from .metrics_repository import MetricsRepository
-from .ml_repository_facade import MLRepositoryFacade
-from .model_repository import ModelRepository
-from .training_repository import TrainingRepository
+from prompt_improver.repositories.impl.ml_repository_service.experiment_repository import (
+    ExperimentRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.inference_repository import (
+    InferenceRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.metrics_repository import (
+    MetricsRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.ml_repository_facade import (
+    MLRepositoryFacade,
+)
+from prompt_improver.repositories.impl.ml_repository_service.model_repository import (
+    ModelRepository,
+)
+from prompt_improver.repositories.impl.ml_repository_service.training_repository import (
+    TrainingRepository,
+)
 
 __all__ = [
-    "ModelRepository",
-    "TrainingRepository",
-    "MetricsRepository",
-    "ExperimentRepository", 
+    "ExperimentRepository",
     "InferenceRepository",
     "MLRepositoryFacade",
+    "MetricsRepository",
+    "ModelRepository",
+    "TrainingRepository",
 ]

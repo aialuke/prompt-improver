@@ -1,4 +1,4 @@
-"""Cache Module
+"""Cache Module.
 
 This module provides comprehensive caching and Redis health monitoring capabilities.
 
@@ -20,13 +20,13 @@ Features:
 
 # Import from new focused services
 from prompt_improver.monitoring.redis.health import (
-    RedisHealthManager,
+    ConnectionPoolMetrics as ConnectionMetrics,
+    HealthMetrics,
+    PerformanceMetrics,
     RedisHealthChecker as NewRedisHealthChecker,
+    RedisHealthManager,
     RedisHealthStatus,
     RedisRole,
-    HealthMetrics,
-    ConnectionPoolMetrics as ConnectionMetrics,
-    PerformanceMetrics,
 )
 
 # Legacy compatibility removed - clean break modernization
@@ -39,19 +39,18 @@ KeyspaceMetrics = dict  # Legacy - use dict for compatibility
 SlowLogMetrics = dict  # Legacy - use dict for compatibility
 
 __all__ = [
-    # New focused services (recommended)
-    "RedisHealthManager",
-    "NewRedisHealthChecker",
-    "RedisHealthStatus",
-    "RedisRole",
-    "HealthMetrics",
-    
     # Compatibility metric types
     "ConnectionMetrics",
-    "PerformanceMetrics",
-    "MemoryMetrics",
+    "HealthMetrics",
     "KeyspaceMetrics",
+    "MemoryMetrics",
+    "NewRedisHealthChecker",
+    "PerformanceMetrics",
     "PersistenceMetrics",
-    "ReplicationMetrics", 
+    # New focused services (recommended)
+    "RedisHealthManager",
+    "RedisHealthStatus",
+    "RedisRole",
+    "ReplicationMetrics",
     "SlowLogMetrics",
 ]

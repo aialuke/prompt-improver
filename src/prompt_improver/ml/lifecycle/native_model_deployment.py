@@ -201,13 +201,14 @@ import time
 from typing import Any, Dict, List, Optional
 import gc
 import mlflow
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 import redis
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 import psutil
 from pydantic import BaseModel
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
 
 # Configure logging
 logging.basicConfig(
@@ -280,7 +281,7 @@ async def startup():
         model_uri = "models:/{{ metadata.model_name }}/{{ metadata.version }}"
         
         if "{{ metadata.model_format.value }}" == "sklearn":
-            model = mlflow.sklearn.load_model(model_uri)
+            model = mlflow.get_sklearn().load_model(model_uri)
         elif "{{ metadata.model_format.value }}" == "pytorch":
             model = mlflow.pytorch.load_model(model_uri)
         elif "{{ metadata.model_format.value }}" == "tensorflow":
@@ -294,7 +295,7 @@ async def startup():
         # Warm up model with dummy prediction if enabled
         if {{ "true" if deployment_config.preload_model else "false" }}:
             try:
-                dummy_input = np.random.randn(1, 10).astype(np.float32)
+                dummy_input = get_numpy().random.randn(1, 10).astype(get_numpy().float32)
                 _ = model.predict(dummy_input)
                 logger.info("Model warmed up successfully")
             except Exception as e:
@@ -393,7 +394,7 @@ async def predict(request: PredictionRequest, background_tasks: BackgroundTasks)
         
         # Make prediction if not cached
         if predictions is None:
-            input_data = np.array(request.data, dtype=np.float32)
+            input_data = get_numpy().array(request.data, dtype=get_numpy().float32)
             predictions = model.predict(input_data)
             
             # Convert predictions to serializable format

@@ -3,19 +3,14 @@ WebSocket Broadcasting Optimization Performance Tests
 Validates the 40-60% efficiency improvement from targeted group broadcasting
 """
 
-import asyncio
-import json
 import time
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import WebSocket
 
-from prompt_improver.database import (
-    ManagerMode,
-    get_unified_manager,
-)
+from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+from prompt_improver.database.types import ManagerMode
 
 
 class TestWebSocketBroadcastingOptimization:

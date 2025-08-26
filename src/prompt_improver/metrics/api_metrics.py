@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional, cast
+from enum import StrEnum
+from typing import Any, cast
 
 try:
     from prompt_improver.monitoring.opentelemetry.metrics import get_http_metrics
@@ -23,7 +23,7 @@ except Exception:
     _HAS_OTEL = False
 
 
-class HTTPMethod(str, Enum):
+class HTTPMethod(StrEnum):
     GET = "GET"
     POST = "POST"
     PUT = "PUT"
@@ -52,20 +52,20 @@ def _emit_journey_event_otel(service_name: str, metric: UserJourneyMetric) -> No
         pass
 
 
-class EndpointCategory(str, Enum):
+class EndpointCategory(StrEnum):
     PROMPT_IMPROVEMENT = "PROMPT_IMPROVEMENT"
     HEALTH_CHECK = "HEALTH_CHECK"
     OTHER = "OTHER"
 
 
-class AuthenticationMethod(str, Enum):
+class AuthenticationMethod(StrEnum):
     ANONYMOUS = "ANONYMOUS"
     API_KEY = "API_KEY"
     JWT_TOKEN = "JWT_TOKEN"
     OAUTH2 = "OAUTH2"
 
 
-class UserJourneyStage(str, Enum):
+class UserJourneyStage(StrEnum):
     ONBOARDING = "ONBOARDING"
     FIRST_USE = "FIRST_USE"
     REGULAR_USE = "REGULAR_USE"
@@ -131,7 +131,7 @@ class AuthenticationMetric:
 class APIMetricsCollector:
     """In-memory collector for API and user journey metrics."""
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         cfg = config or {}
         self.max_api_metrics: int = int(cfg.get("max_api_metrics", 5000))
         self.max_journey_metrics: int = int(cfg.get("max_journey_metrics", 5000))

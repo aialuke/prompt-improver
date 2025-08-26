@@ -1,20 +1,16 @@
 """Automated reporting and capacity planning for performance baselines."""
 
-import asyncio
 import json
 import logging
 import statistics
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from prompt_improver.performance.baseline.baseline_collector import BaselineCollector
 from prompt_improver.performance.baseline.models import (
     BaselineMetrics,
-    PerformanceTrend,
-    RegressionAlert,
-    get_metric_definition,
 )
 from prompt_improver.performance.baseline.regression_detector import RegressionDetector
 from prompt_improver.performance.baseline.statistical_analyzer import (
@@ -32,7 +28,7 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 try:
-    import numpy as np
+    # import numpy as np  # Converted to lazy loading
     import pandas as pd
 
     PANDAS_AVAILABLE = True
@@ -40,7 +36,6 @@ except ImportError:
     PANDAS_AVAILABLE = False
 try:
     from jinja2 import Environment, FileSystemLoader, Template
-
     JINJA2_AVAILABLE = True
 except ImportError:
     JINJA2_AVAILABLE = False
@@ -58,10 +53,10 @@ class ReportConfig:
         include_recommendations: bool = True,
         chart_format: str = "png",
         chart_dpi: int = 150,
-        report_formats: list[str] = None,
+        report_formats: list[str] | None = None,
         capacity_forecast_days: int = 30,
         performance_sla_targets: dict[str, float] | None = None,
-    ):
+    ) -> None:
         """Initialize report configuration.
 
         Args:
@@ -102,7 +97,7 @@ class PerformanceReport:
         report_type: str,
         generation_time: datetime,
         time_period: tuple[datetime, datetime],
-    ):
+    ) -> None:
         self.report_id = report_id
         self.report_type = report_type
         self.generation_time = generation_time
@@ -152,7 +147,7 @@ class BaselineReporter:
         collector: BaselineCollector | None = None,
         analyzer: StatisticalAnalyzer | None = None,
         detector: RegressionDetector | None = None,
-    ):
+    ) -> None:
         """Initialize baseline reporter.
 
         Args:
@@ -335,7 +330,7 @@ class BaselineReporter:
             overall_grade = performance_score.get("grade", "N/A")
             overall_score = performance_score.get("overall_score", 0)
         except Exception as e:
-            logger.error(f"Failed to calculate performance score: {e}")
+            logger.exception(f"Failed to calculate performance score: {e}")
             overall_grade = "N/A"
             overall_score = 0
         sla_compliance = self._calculate_sla_compliance(baselines)
@@ -426,7 +421,7 @@ class BaselineReporter:
                     "predicted_7d": trend.predicted_value_7d,
                 }
             except Exception as e:
-                logger.error(f"Failed to analyze trend for {metric_name}: {e}")
+                logger.exception(f"Failed to analyze trend for {metric_name}: {e}")
                 trends[metric_name] = {"error": str(e)}
         significant_trends = [
             (metric, data)
@@ -624,7 +619,7 @@ class BaselineReporter:
         output_path: str,
     ) -> Path:
         """Create a dual-line chart."""
-        fig, ax1 = plt.subplots(figsize=(12, 6), dpi=self.config.chart_dpi)
+        _fig, ax1 = plt.subplots(figsize=(12, 6), dpi=self.config.chart_dpi)
         color1 = "tab:blue"
         ax1.set_xlabel("Time", fontsize=12)
         ax1.set_ylabel(ylabel1, color=color1, fontsize=12)
@@ -672,19 +667,19 @@ class BaselineReporter:
         report_dir.mkdir(parents=True, exist_ok=True)
         if "json" in self.config.report_formats:
             json_path = report_dir / "report.json"
-            with open(json_path, "w") as f:
+            with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(report.model_dump(), f, indent=2, default=str)
             report.data_files["json"] = str(json_path)
         if "html" in self.config.report_formats:
             html_path = report_dir / "report.html"
             html_content = self._generate_html_report(report)
-            with open(html_path, "w") as f:
+            with open(html_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
             report.data_files["html"] = str(html_path)
         if "text" in self.config.report_formats:
             text_path = report_dir / "report.txt"
             text_content = self._generate_text_report(report)
-            with open(text_path, "w") as f:
+            with open(text_path, "w", encoding="utf-8") as f:
                 f.write(text_content)
             report.data_files["text"] = str(text_path)
 
@@ -696,8 +691,7 @@ class BaselineReporter:
                 return template.render(report=report)
             except Exception as e:
                 logger.warning(f"Failed to use Jinja template: {e}")
-        html = f"""\n<!DOCTYPE html>\n<html>\n<head>\n    <title>Performance Report - {report.report_type.title()}</title>\n    <style>\n        body {{ font-family: Arial, sans-serif; margin: 20px; }}\n        h1 {{ color: #333; }}\n        h2 {{ color: #666; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}\n        .metric {{ margin: 10px 0; }}\n        .alert {{ color: red; font-weight: bold; }}\n        .good {{ color: green; }}\n        table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}\n        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}\n        th {{ background-color: #f2f2f2; }}\n    </style>\n</head>\n<body>\n    <h1>Performance Report - {report.report_type.title()}</h1>\n    <p><strong>Report ID:</strong> {report.report_id}</p>\n    <p><strong>Generated:</strong> {report.generation_time.strftime("%Y-%m-%d %H:%M:%S UTC")}</p>\n    <p><strong>Period:</strong> {report.time_period[0].strftime("%Y-%m-%d %H:%M")} to {report.time_period[1].strftime("%Y-%m-%d %H:%M")}</p>\n    \n    <h2>Executive Summary</h2>\n    <div class="metric"><strong>Performance Grade:</strong> {report.executive_summary.get("performance_grade", "N/A")}</div>\n    <div class="metric"><strong>Active Issues:</strong> {report.executive_summary.get("active_issues", {}).get("total_alerts", 0)} alerts</div>\n    \n    <h2>Performance Overview</h2>\n    <!-- Performance metrics would be displayed here -->\n    \n    <h2>Recommendations</h2>\n    <ul>\n    {"".join(f"<li><strong>{rec['title']}:</strong> {rec['description']}</li>" for rec in report.recommendations)}\n    </ul>\n</body>\n</html>\n"""
-        return html
+        return f"""\n<!DOCTYPE html>\n<html>\n<head>\n    <title>Performance Report - {report.report_type.title()}</title>\n    <style>\n        body {{ font-family: Arial, sans-serif; margin: 20px; }}\n        h1 {{ color: #333; }}\n        h2 {{ color: #666; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}\n        .metric {{ margin: 10px 0; }}\n        .alert {{ color: red; font-weight: bold; }}\n        .good {{ color: green; }}\n        table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}\n        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}\n        th {{ background-color: #f2f2f2; }}\n    </style>\n</head>\n<body>\n    <h1>Performance Report - {report.report_type.title()}</h1>\n    <p><strong>Report ID:</strong> {report.report_id}</p>\n    <p><strong>Generated:</strong> {report.generation_time.strftime("%Y-%m-%d %H:%M:%S UTC")}</p>\n    <p><strong>Period:</strong> {report.time_period[0].strftime("%Y-%m-%d %H:%M")} to {report.time_period[1].strftime("%Y-%m-%d %H:%M")}</p>\n    \n    <h2>Executive Summary</h2>\n    <div class="metric"><strong>Performance Grade:</strong> {report.executive_summary.get("performance_grade", "N/A")}</div>\n    <div class="metric"><strong>Active Issues:</strong> {report.executive_summary.get("active_issues", {}).get("total_alerts", 0)} alerts</div>\n    \n    <h2>Performance Overview</h2>\n    <!-- Performance metrics would be displayed here -->\n    \n    <h2>Recommendations</h2>\n    <ul>\n    {"".join(f"<li><strong>{rec['title']}:</strong> {rec['description']}</li>" for rec in report.recommendations)}\n    </ul>\n</body>\n</html>\n"""
 
     def _generate_text_report(self, report: PerformanceReport) -> str:
         """Generate text version of the report."""
@@ -759,12 +753,12 @@ class BaselineReporter:
                         current_value = self._percentile(values, 95)
                     else:
                         current_value = statistics.mean(values)
-                    if metric_name in [
+                    if metric_name in {
                         "response_time_p95",
                         "error_rate",
                         "cpu_utilization",
                         "memory_utilization",
-                    ]:
+                    }:
                         compliant_values = [v for v in values if v <= target]
                     else:
                         compliant_values = [v for v in values if v >= target]

@@ -2,7 +2,7 @@
 
 This facade coordinates between three focused services:
 1. PromptAnalysisService - Prompt analysis and improvement logic
-2. RuleApplicationService - Rule execution and validation  
+2. RuleApplicationService - Rule execution and validation
 3. ValidationService - Input validation and business rule checking
 
 Replaces the 1,544-line prompt_improvement.py god object while maintaining
@@ -10,35 +10,37 @@ identical public API. Follows Clean Architecture principles with protocol-based 
 """
 
 import logging
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
-    PromptServiceFacadeProtocol,
+from prompt_improver.core.domain.types import UserFeedbackData
+from prompt_improver.rule_engine.base import BasePromptRule
+from prompt_improver.services.prompt.prompt_analysis_service import (
+    PromptAnalysisService,
+)
+from prompt_improver.services.prompt.rule_application_service import (
+    RuleApplicationService,
+)
+from prompt_improver.services.prompt.validation_service import ValidationService
+from prompt_improver.shared.interfaces.protocols.application import (
     PromptAnalysisServiceProtocol,
+    PromptServiceFacadeProtocol,
     RuleApplicationServiceProtocol,
     ValidationServiceProtocol,
 )
-from prompt_improver.core.domain.types import UserFeedbackData
-from prompt_improver.rule_engine.base import BasePromptRule
 from prompt_improver.utils.datetime_utils import aware_utc_now
-
-from .prompt_analysis_service import PromptAnalysisService
-from .rule_application_service import RuleApplicationService
-from .validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
 
 class PromptServiceFacade(PromptServiceFacadeProtocol):
-    """
-    Unified PromptServiceFacade implementing 2025 best practices.
-    
+    """Unified PromptServiceFacade implementing 2025 best practices.
+
     This facade provides a single entry point for all prompt improvement operations,
     coordinating between specialized services while maintaining high performance
     and reliability.
-    
+
     Key Features:
     - Unified interface for all prompt improvement operations
     - Intelligent service routing and coordination
@@ -50,33 +52,33 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
 
     def __init__(
         self,
-        analysis_service: Optional[PromptAnalysisServiceProtocol] = None,
-        rule_application_service: Optional[RuleApplicationServiceProtocol] = None,
-        validation_service: Optional[ValidationServiceProtocol] = None,
-        config: Optional[Dict[str, Any]] = None
-    ):
+        analysis_service: PromptAnalysisServiceProtocol | None = None,
+        rule_application_service: RuleApplicationServiceProtocol | None = None,
+        validation_service: ValidationServiceProtocol | None = None,
+        config: dict[str, Any] | None = None
+    ) -> None:
         """Initialize PromptServiceFacade with dependency injection."""
         self.config = config or {}
         self.logger = logger
-        
+
         # Initialize services with dependency injection
         self.analysis_service = analysis_service or PromptAnalysisService()
         self.rule_application_service = rule_application_service or RuleApplicationService()
         self.validation_service = validation_service or ValidationService()
-        
+
         # Performance monitoring
         self._request_count = 0
         self._error_count = 0
         self._total_response_time = 0.0
         self._last_health_check = datetime.now()
-        
+
         # Circuit breaker state for services
         self._service_health = {
             "analysis": True,
             "rule_application": True,
             "validation": True
         }
-        
+
         # Configuration
         self._performance_targets = {
             "max_response_time_ms": 5000,
@@ -87,17 +89,17 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
     async def improve_prompt(
         self,
         prompt: str,
-        user_id: Optional[UUID] = None,
-        session_id: Optional[UUID] = None,
-        rules: Optional[List[BasePromptRule]] = None,
-        config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        user_id: UUID | None = None,
+        session_id: UUID | None = None,
+        rules: list[BasePromptRule] | None = None,
+        config: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Main method to improve a prompt."""
         start_time = datetime.now()
-        
+
         try:
             self._request_count += 1
-            
+
             # Create session ID if not provided
             if session_id is None:
                 session_id = UUID(int=self._request_count)
@@ -118,13 +120,13 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                     validation_result = await self.validation_service.validate_prompt_input(
                         prompt, config.get("validation_constraints") if config else None
                     )
-                    
+
                     if not validation_result["valid"]:
                         result["status"] = "validation_failed"
                         result["validation_result"] = validation_result
                         result["error"] = "Prompt validation failed"
                         return result
-                    
+
                     result["validation_result"] = validation_result
                     result["processing_steps"].append({
                         "step": "validation",
@@ -139,7 +141,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                         "reason": "service_unavailable"
                     })
             except Exception as e:
-                logger.error(f"Validation failed: {e}")
+                logger.exception(f"Validation failed: {e}")
                 self._service_health["validation"] = False
                 result["processing_steps"].append({
                     "step": "validation",
@@ -166,7 +168,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                 if self._service_health["analysis"]:
                     # Create a temporary prompt ID for analysis
                     temp_prompt_id = UUID(int=hash(prompt) % (10**16))
-                    
+
                     analysis_result = await self.analysis_service.analyze_prompt(
                         temp_prompt_id, session_id, config
                     )
@@ -184,7 +186,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                         "reason": "service_unavailable"
                     })
             except Exception as e:
-                logger.error(f"Analysis failed: {e}")
+                logger.exception(f"Analysis failed: {e}")
                 self._service_health["analysis"] = False
                 result["processing_steps"].append({
                     "step": "analysis",
@@ -198,13 +200,13 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                 if self._service_health["rule_application"]:
                     # Use provided rules or get default rules
                     rules_to_apply = rules or await self._get_default_rules()
-                    
+
                     if rules_to_apply:
                         # Validate rule compatibility
                         compatibility_result = await self.rule_application_service.validate_rule_compatibility(
                             rules_to_apply
                         )
-                        
+
                         if compatibility_result["overall_compatible"]:
                             # Apply rules
                             rule_application_result = await self.rule_application_service.apply_rules(
@@ -225,7 +227,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                             "status": "no_rules_available",
                             "final_prompt": sanitized_prompt
                         }
-                    
+
                     result["processing_steps"].append({
                         "step": "rule_application",
                         "status": "completed",
@@ -240,7 +242,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                         "reason": "service_unavailable"
                     })
             except Exception as e:
-                logger.error(f"Rule application failed: {e}")
+                logger.exception(f"Rule application failed: {e}")
                 self._service_health["rule_application"] = False
                 result["improved_prompt"] = sanitized_prompt
                 result["processing_steps"].append({
@@ -272,7 +274,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
             # Calculate performance metrics
             total_time = (datetime.now() - start_time).total_seconds() * 1000
             self._total_response_time += total_time
-            
+
             result["performance_metrics"] = {
                 "total_processing_time_ms": total_time,
                 "average_response_time_ms": self._total_response_time / self._request_count,
@@ -286,8 +288,8 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
 
         except Exception as e:
             self._error_count += 1
-            logger.error(f"Error improving prompt: {e}")
-            
+            logger.exception(f"Error improving prompt: {e}")
+
             total_time = (datetime.now() - start_time).total_seconds() * 1000
             return {
                 "status": "error",
@@ -304,12 +306,12 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
     async def get_session_summary(
         self,
         session_id: UUID
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get summary of an improvement session."""
         try:
             # This would typically fetch session data from repository
             # For now, return a summary based on session ID
-            summary = {
+            return {
                 "session_id": str(session_id),
                 "status": "active",
                 "created_at": aware_utc_now().isoformat(),
@@ -318,18 +320,16 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                 "success_rate": 1.0,
                 "last_activity": aware_utc_now().isoformat()
             }
-            
-            return summary
 
         except Exception as e:
-            logger.error(f"Error getting session summary for {session_id}: {e}")
+            logger.exception(f"Error getting session summary for {session_id}: {e}")
             raise
 
     async def process_feedback(
         self,
         feedback: UserFeedbackData,
         session_id: UUID
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process user feedback for a session."""
         try:
             # Process feedback and potentially trigger optimization
@@ -339,7 +339,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                 "processed_at": aware_utc_now().isoformat(),
                 "status": "processed"
             }
-            
+
             # Check if feedback should trigger optimization
             if hasattr(feedback, 'rating') and feedback.rating:
                 if feedback.rating < 3:  # Low rating triggers analysis
@@ -349,10 +349,10 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
             return feedback_result
 
         except Exception as e:
-            logger.error(f"Error processing feedback: {e}")
+            logger.exception(f"Error processing feedback: {e}")
             raise
 
-    async def get_health_status(self) -> Dict[str, Any]:
+    async def get_health_status(self) -> dict[str, Any]:
         """Get health status of all prompt services."""
         try:
             health_status = {
@@ -382,10 +382,10 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
 
             # Determine overall health
             unhealthy_services = [
-                service for service, healthy in self._service_health.items() 
+                service for service, healthy in self._service_health.items()
                 if not healthy
             ]
-            
+
             if unhealthy_services:
                 health_status["overall_health"] = "degraded"
                 health_status["unhealthy_services"] = unhealthy_services
@@ -393,14 +393,14 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
             return health_status
 
         except Exception as e:
-            logger.error(f"Error getting health status: {e}")
+            logger.exception(f"Error getting health status: {e}")
             return {
                 "overall_health": "error",
                 "error": str(e),
                 "timestamp": aware_utc_now().isoformat()
             }
 
-    async def _get_default_rules(self) -> List[BasePromptRule]:
+    async def _get_default_rules(self) -> list[BasePromptRule]:
         """Get default rules for prompt improvement."""
         # This would typically load rules from repository
         # For now, return empty list as rules would be injected
@@ -409,8 +409,8 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
     async def _check_business_rules(
         self,
         operation: str,
-        data: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        data: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> bool:
         """Check business rules for operation."""
         try:
@@ -418,7 +418,7 @@ class PromptServiceFacade(PromptServiceFacadeProtocol):
                 operation, data, context
             )
         except Exception as e:
-            logger.error(f"Business rule check failed for {operation}: {e}")
+            logger.exception(f"Business rule check failed for {operation}: {e}")
             return False  # Fail secure
 
     def _update_service_health(self, service: str, healthy: bool) -> None:

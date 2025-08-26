@@ -13,7 +13,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiofiles
 
@@ -98,7 +98,7 @@ class PerformanceBaseline:
 class PerformanceOptimizer:
     """Comprehensive performance optimization and monitoring system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._measurements: dict[str, list[PerformanceMetrics]] = {}
         self._baselines: dict[str, PerformanceBaseline] = {}
         self._optimization_enabled = True
@@ -234,7 +234,7 @@ class PerformanceOptimizer:
         except FileNotFoundError:
             logger.info(f"Baseline file {filepath} not found, starting fresh")
         except Exception as e:
-            logger.error(f"Failed to load baselines from {filepath}: {e}")
+            logger.exception(f"Failed to load baselines from {filepath}: {e}")
 
     async def run_performance_benchmark(
         self,

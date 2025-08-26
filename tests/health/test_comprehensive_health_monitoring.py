@@ -25,8 +25,8 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -72,7 +72,7 @@ class HealthMonitoringTester:
             try:
                 await test_func()
             except Exception as e:
-                logger.error(f"Test group {group_name} failed: {e}")
+                logger.exception(f"Test group {group_name} failed: {e}")
                 self.results.append(
                     TestResult(
                         name=f"{group_name} (Group)",
@@ -123,14 +123,18 @@ class HealthMonitoringTester:
                     error=f"Import failed: {e}",
                 )
             )
-            logger.error(f"❌ Core health imports failed: {e}")
+            logger.exception(f"❌ Core health imports failed: {e}")
             return
         test_start = time.time()
         try:
-            from prompt_improver.core.protocols.health_protocol import (
-                HealthCheckResult,
-                HealthMonitorProtocol,
+            from prompt_improver.shared.interfaces.protocols.database import (
                 HealthStatus as ProtocolHealthStatus,
+            )
+            from prompt_improver.shared.interfaces.protocols.ml import (
+                HealthMonitorProtocol,
+            )
+            from prompt_improver.shared.interfaces.protocols.monitoring import (
+                HealthCheckResult,
             )
 
             self.results.append(
@@ -150,7 +154,7 @@ class HealthMonitoringTester:
                     error=f"Protocol import failed: {e}",
                 )
             )
-            logger.error(f"❌ Protocol imports failed: {e}")
+            logger.exception(f"❌ Protocol imports failed: {e}")
         test_start = time.time()
         try:
             from prompt_improver.performance.monitoring.health import (
@@ -181,21 +185,20 @@ class HealthMonitoringTester:
                     error=f"Legacy checker import failed: {e}",
                 )
             )
-            logger.error(f"❌ Legacy checker imports failed: {e}")
+            logger.exception(f"❌ Legacy checker imports failed: {e}")
 
     async def _test_core_health_system(self):
         """Test 2: UnifiedHealthMonitor core functionality"""
-        from prompt_improver.core.protocols.health_protocol import (
-            HealthCheckResult,
-            HealthStatus,
-        )
         from prompt_improver.performance.monitoring.health import (
             HealthCheckCategory,
             HealthCheckPlugin,
             HealthCheckPluginConfig,
             UnifiedHealthMonitor,
             get_unified_health_monitor,
-            reset_unified_health_monitor,
+        )
+        from prompt_improver.shared.interfaces.protocols.database import HealthStatus
+        from prompt_improver.shared.interfaces.protocols.monitoring import (
+            HealthCheckResult,
         )
 
         test_start = time.time()
@@ -218,7 +221,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ UnifiedHealthMonitor creation failed: {e}")
+            logger.exception(f"❌ UnifiedHealthMonitor creation failed: {e}")
             return
         test_start = time.time()
         try:
@@ -258,7 +261,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Plugin registration failed: {e}")
+            logger.exception(f"❌ Plugin registration failed: {e}")
         test_start = time.time()
         try:
             health_results = await monitor.check_health()
@@ -295,7 +298,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Health check execution failed: {e}")
+            logger.exception(f"❌ Health check execution failed: {e}")
         test_start = time.time()
         try:
             overall_health = await monitor.get_overall_health()
@@ -333,7 +336,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Overall health summary failed: {e}")
+            logger.exception(f"❌ Overall health summary failed: {e}")
         test_start = time.time()
         try:
             global_monitor = get_unified_health_monitor()
@@ -358,7 +361,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Global monitor access failed: {e}")
+            logger.exception(f"❌ Global monitor access failed: {e}")
 
     async def _test_legacy_compatibility(self):
         """Test 3: HealthService backward compatibility layer"""
@@ -368,7 +371,6 @@ class HealthMonitoringTester:
             HealthResult,
             HealthService,
             get_health_service,
-            reset_health_service,
         )
         from prompt_improver.performance.monitoring.health.base import (
             HealthStatus as BaseHealthStatus,
@@ -394,7 +396,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Legacy HealthService creation failed: {e}")
+            logger.exception(f"❌ Legacy HealthService creation failed: {e}")
             return
         test_start = time.time()
         try:
@@ -436,7 +438,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Legacy checker integration failed: {e}")
+            logger.exception(f"❌ Legacy checker integration failed: {e}")
         test_start = time.time()
         try:
             aggregated_result = await service.run_health_check()
@@ -475,7 +477,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ run_health_check method failed: {e}")
+            logger.exception(f"❌ run_health_check method failed: {e}")
         test_start = time.time()
         try:
             specific_result = await service.run_specific_check("legacy_test_checker")
@@ -512,7 +514,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ run_specific_check method failed: {e}")
+            logger.exception(f"❌ run_specific_check method failed: {e}")
         test_start = time.time()
         try:
             summary = await service.get_health_summary(include_details=True)
@@ -548,7 +550,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ get_health_summary method failed: {e}")
+            logger.exception(f"❌ get_health_summary method failed: {e}")
         test_start = time.time()
         try:
             global_service = get_health_service()
@@ -573,17 +575,17 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Global service instance failed: {e}")
+            logger.exception(f"❌ Global service instance failed: {e}")
 
     async def _test_plugin_system(self):
         """Test 4: Plugin system functionality"""
-        from prompt_improver.core.protocols.health_protocol import HealthStatus
         from prompt_improver.performance.monitoring.health import (
             HealthCheckCategory,
             create_simple_health_plugin,
             get_unified_health_monitor,
             register_health_plugin,
         )
+        from prompt_improver.shared.interfaces.protocols.database import HealthStatus
 
         test_start = time.time()
         try:
@@ -617,7 +619,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Simple plugin creation failed: {e}")
+            logger.exception(f"❌ Simple plugin creation failed: {e}")
             return
         test_start = time.time()
         try:
@@ -644,7 +646,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(
+            logger.exception(
                 f"❌ Plugin registration via convenience function failed: {e}"
             )
         test_start = time.time()
@@ -681,15 +683,15 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Plugin execution failed: {e}")
+            logger.exception(f"❌ Plugin execution failed: {e}")
         test_start = time.time()
         try:
             category_results = await monitor.check_health(
                 category=HealthCheckCategory.CUSTOM
             )
             is_valid = len(category_results) > 0 and all(
-                plugin_name in ["simple_test_plugin", "test_plugin"]
-                for plugin_name in category_results.keys()
+                plugin_name in {"simple_test_plugin", "test_plugin"}
+                for plugin_name in category_results
             )
             self.results.append(
                 TestResult(
@@ -715,7 +717,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Category-based filtering failed: {e}")
+            logger.exception(f"❌ Category-based filtering failed: {e}")
 
     async def _test_integration_points(self):
         """Test 5: Integration with MCP server and TUI dashboard"""
@@ -738,7 +740,7 @@ class HealthMonitoringTester:
                     error=f"MCP server import failed: {e}",
                 )
             )
-            logger.error(f"❌ MCP server import failed: {e}")
+            logger.exception(f"❌ MCP server import failed: {e}")
         test_start = time.time()
         try:
             from prompt_improver.tui.data_provider import TUIDataProvider
@@ -760,7 +762,7 @@ class HealthMonitoringTester:
                     error=f"TUI data provider import failed: {e}",
                 )
             )
-            logger.error(f"❌ TUI data provider import failed: {e}")
+            logger.exception(f"❌ TUI data provider import failed: {e}")
         test_start = time.time()
         try:
             from prompt_improver.core.services.manager import ServiceManager
@@ -782,7 +784,7 @@ class HealthMonitoringTester:
                     error=f"Service manager import failed: {e}",
                 )
             )
-            logger.error(f"❌ Service manager import failed: {e}")
+            logger.exception(f"❌ Service manager import failed: {e}")
 
     async def _test_advanced_features(self):
         """Test 6: Advanced features like circuit breakers"""
@@ -822,7 +824,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Circuit breaker functionality failed: {e}")
+            logger.exception(f"❌ Circuit breaker functionality failed: {e}")
         test_start = time.time()
         try:
             from prompt_improver.performance.monitoring.health import (
@@ -862,19 +864,19 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Health profiles and advanced configuration failed: {e}")
+            logger.exception(f"❌ Health profiles and advanced configuration failed: {e}")
 
     async def _test_error_handling(self):
         """Test 7: Error handling and edge cases"""
-        from prompt_improver.core.protocols.health_protocol import (
-            HealthCheckResult,
-            HealthStatus,
-        )
         from prompt_improver.performance.monitoring.health import (
             HealthCheckCategory,
             HealthCheckPlugin,
             HealthCheckPluginConfig,
             get_unified_health_monitor,
+        )
+        from prompt_improver.shared.interfaces.protocols.database import HealthStatus
+        from prompt_improver.shared.interfaces.protocols.monitoring import (
+            HealthCheckResult,
         )
 
         test_start = time.time()
@@ -932,7 +934,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Timeout handling failed: {e}")
+            logger.exception(f"❌ Timeout handling failed: {e}")
         test_start = time.time()
         try:
 
@@ -978,7 +980,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Exception handling failed: {e}")
+            logger.exception(f"❌ Exception handling failed: {e}")
 
     async def _test_performance(self):
         """Test 8: Performance characteristics"""
@@ -1024,11 +1026,11 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Parallel execution performance failed: {e}")
+            logger.exception(f"❌ Parallel execution performance failed: {e}")
         test_start = time.time()
         try:
             monitor = get_unified_health_monitor()
-            for i in range(10):
+            for _i in range(10):
                 await monitor.check_health()
             self.results.append(
                 TestResult(
@@ -1048,7 +1050,7 @@ class HealthMonitoringTester:
                     error=str(e),
                 )
             )
-            logger.error(f"❌ Memory efficiency failed: {e}")
+            logger.exception(f"❌ Memory efficiency failed: {e}")
 
     def _generate_report(self) -> dict[str, Any]:
         """Generate comprehensive test report"""
@@ -1065,7 +1067,7 @@ class HealthMonitoringTester:
             else:
                 categories[category]["failed"] += 1
             categories[category]["tests"].append(result)
-        report = {
+        return {
             "summary": {
                 "total_tests": len(self.results),
                 "passed": len(passed_tests),
@@ -1089,7 +1091,6 @@ class HealthMonitoringTester:
                 for r in failed_tests
             ],
         }
-        return report
 
 
 async def main():

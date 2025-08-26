@@ -40,6 +40,7 @@ except ImportError:
     np = None  # type: ignore[assignment]
     numpy_available = False
 from prompt_improver.core.types import PerformanceMetrics
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -533,11 +534,11 @@ class PerformanceRegressor:
         response_times = [m.response_time_ms for m in metrics]
         memory_usage = [m.memory_peak_mb for m in metrics]
         if numpy_available:
-            avg_response = float(np.mean(response_times))
-            p95_response = float(np.percentile(response_times, 95))
-            p99_response = float(np.percentile(response_times, 99))
-            avg_memory = float(np.mean(memory_usage))
-            peak_memory = float(np.max(memory_usage))
+            avg_response = float(get_numpy().mean(response_times))
+            p95_response = float(get_numpy().percentile(response_times, 95))
+            p99_response = float(get_numpy().percentile(response_times, 99))
+            avg_memory = float(get_numpy().mean(memory_usage))
+            peak_memory = float(get_numpy().max(memory_usage))
         else:
             avg_response = sum(response_times) / len(response_times)
             p95_response = sorted(response_times)[int(len(response_times) * 0.95)]
@@ -749,6 +750,7 @@ class PerformanceAnalyzer:
             return self._generate_text_report(analysis)
         if format == "json":
             import json
+            from prompt_improver.ml.core.imports import get_numpy
 
             return json.dumps(analysis, indent=2, default=str)
         raise ValueError(f"Unsupported format: {format}")

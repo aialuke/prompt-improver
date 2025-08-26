@@ -188,7 +188,7 @@ class ArchitecturalRules:
 class DependencyAnalyzer:
     """Analyzes module dependencies and detects violations."""
 
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self, logger: logging.Logger | None = None) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.module_graph: dict[str, set[str]] = defaultdict(set)
         self.violations: list[BoundaryViolation] = []
@@ -208,11 +208,9 @@ class DependencyAnalyzer:
                 tree = ast.parse(f.read(), filename=str(file_path))
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        imports.append(alias.name)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        imports.append(node.module)
+                    imports.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node.module)
         except Exception as e:
             self.logger.warning(f"Could not analyze {file_path}: {e}")
         return imports
@@ -231,7 +229,7 @@ class DependencyAnalyzer:
             if py_file.name == "__init__.py" or py_file.stem.startswith("test_"):
                 continue
             relative_path = py_file.relative_to(root_path.parent)
-            module_parts = list(relative_path.parts[:-1]) + [relative_path.stem]
+            module_parts = [*list(relative_path.parts[:-1]), relative_path.stem]
             module_name = ".".join(module_parts)
             imports = self.analyze_file(py_file)
             internal_imports = {
@@ -253,7 +251,7 @@ class DependencyAnalyzer:
         def dfs(node: str, path: list[str]) -> None:
             if node in rec_stack:
                 cycle_start = path.index(node)
-                cycles.append(path[cycle_start:] + [node])
+                cycles.append([*path[cycle_start:], node])
                 return
             if node in visited:
                 return
@@ -364,7 +362,7 @@ class BoundaryEnforcer:
 
     def __init__(
         self, root_path: Path | None = None, logger: logging.Logger | None = None
-    ):
+    ) -> None:
         self.root_path = root_path or Path("src")
         self.logger = logger or logging.getLogger(__name__)
         self.analyzer = DependencyAnalyzer(logger)
@@ -550,7 +548,7 @@ def create_boundary_enforcer(root_path: Path | None = None) -> BoundaryEnforcer:
 class ArchitecturalTest:
     """Test case for architectural boundaries."""
 
-    def __init__(self, enforcer: BoundaryEnforcer | None = None):
+    def __init__(self, enforcer: BoundaryEnforcer | None = None) -> None:
         self.enforcer = enforcer or create_boundary_enforcer()
 
     def test_no_circular_dependencies(self) -> bool:

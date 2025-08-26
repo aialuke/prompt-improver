@@ -12,7 +12,7 @@ unified_connection_manager.py, implementing:
 Designed for production messaging with high-throughput pub/sub operations.
 """
 
-from .pubsub_manager import (
+from prompt_improver.database.services.pubsub.pubsub_manager import (
     AsyncMessageHandler,
     MessageFilter,
     MessageHandler,
@@ -23,11 +23,11 @@ from .pubsub_manager import (
 )
 
 __all__ = [
-    "PubSubManager",
-    "PubSubConfig",
-    "SubscriptionInfo",
-    "create_pubsub_manager",
-    "MessageHandler",
     "AsyncMessageHandler",
     "MessageFilter",
+    "MessageHandler",
+    "PubSubConfig",
+    "PubSubManager",
+    "SubscriptionInfo",
+    "create_pubsub_manager",
 ]

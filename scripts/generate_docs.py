@@ -1,21 +1,19 @@
 """Automated Documentation Generation Script for APES
-Following 2025 best practices for comprehensive documentation
+Following 2025 best practices for comprehensive documentation.
 """
 
 import ast
 import json
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Set
 
 
 class DocumentationGenerator:
     """Automated documentation generator following 2025 standards."""
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path) -> None:
         self.project_root = project_root
         self.src_dir = project_root / "src"
         self.docs_dir = project_root / "docs"
@@ -89,7 +87,7 @@ class DocumentationGenerator:
             module_path = self.src_dir / module.replace(".", "/")
             if module_path.exists():
                 output_file = api_dir / f"{module.split('.')[-1]}.rst"
-                with open(output_file, "w") as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(f"{module.split('.')[-1].title()} Module\n")
                     f.write("=" * (len(module.split(".")[-1]) + 7) + "\n\n")
                     f.write(f".. automodule:: {module}\n")
@@ -107,7 +105,7 @@ class DocumentationGenerator:
             "quickstart.rst": 'Quick Start Guide\n=================\n\nGetting Started\n--------------\n\n1. **Start the MCP Server**\n\n   .. code-block:: bash\n   \n      apes start --mcp-port 3000\n\n2. **Run Health Checks**\n\n   .. code-block:: bash\n   \n      apes health\n\n3. **Process Your First Prompt**\n\n   .. code-block:: python\n   \n      from prompt_improver import PromptImprovementService\n      \n      service = PromptImprovementService()\n      result = await service.improve_prompt("Your prompt here")\n      print(result)\n\nBasic Configuration\n------------------\n\nEdit your `.env` file:\n\n.. code-block:: bash\n\n   POSTGRES_PASSWORD=your_secure_password\n   REDIS_URL=redis://redis:6379\n   LOG_LEVEL=INFO\n',
         }
         for filename, content in guides.items():
-            with open(user_guide_dir / filename, "w") as f:
+            with open(user_guide_dir / filename, "w", encoding="utf-8") as f:
                 f.write(content)
 
     def run_sphinx_build(self) -> bool:
@@ -176,7 +174,7 @@ class DocumentationGenerator:
             "meets_target": overall_coverage >= 90.0,
         }
         report_file = self.docs_dir / "coverage_report.json"
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         print("📈 Documentation Coverage Report:")
         print(f"   Overall: {overall_coverage:.1f}%")

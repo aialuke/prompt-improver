@@ -4,11 +4,8 @@ Tests alias-based deployment, blue-green deployments, health monitoring,
 and rollback capabilities following MLflow best practices.
 """
 
-import asyncio
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import mlflow
 import mlflow.sklearn

@@ -11,10 +11,7 @@ Key Features:
 """
 
 import asyncio
-import time
-from datetime import UTC, datetime, timedelta
 
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -27,39 +24,39 @@ class TestAprioriEndpointsRealBehavior:
         """Test Apriori analysis endpoint with real ML service integration."""
         # Wait for services to be ready
         await api_helpers.wait_for_service_ready(real_api_client)
-        
+
         # Prepare analysis request
         request_data = api_test_data["apriori"]["analysis_request"]
-        
+
         # Monitor performance
         api_performance_monitor.start_request()
-        
+
         # Make real API call
         response = real_api_client.post(
             "/api/v1/apriori/analyze",
             json=request_data
         )
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate performance
         duration_ms = api_performance_monitor.end_request(
             "/api/v1/apriori/analyze", response.status_code
         )
         api_helpers.assert_api_performance(duration_ms, max_response_time_ms=5000)
-        
+
         # Validate response structure
         expected_fields = ["frequent_itemsets", "association_rules", "metadata", "analysis_id"]
         api_helpers.assert_api_response_structure(data, expected_fields)
-        
+
         # Validate frequent itemsets
         assert isinstance(data["frequent_itemsets"], list)
-        
+
         # Validate association rules
         assert isinstance(data["association_rules"], list)
-        
+
         # Validate metadata
         metadata = data["metadata"]
         assert isinstance(metadata, dict)
@@ -72,30 +69,30 @@ class TestAprioriEndpointsRealBehavior:
         """Test pattern discovery endpoint with real ML analysis."""
         # Prepare pattern discovery request
         request_data = api_test_data["apriori"]["pattern_discovery"]
-        
+
         # Make real API call
         response = real_api_client.post(
             "/api/v1/apriori/discover-patterns",
             json=request_data
         )
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response structure
         expected_fields = [
-            "discovered_patterns", "pattern_effectiveness", "discovery_metadata", 
+            "discovered_patterns", "pattern_effectiveness", "discovery_metadata",
             "discovery_run_id", "session_insights"
         ]
         api_helpers.assert_api_response_structure(data, expected_fields)
-        
+
         # Validate discovered patterns
         assert isinstance(data["discovered_patterns"], list)
-        
+
         # Validate pattern effectiveness
         assert isinstance(data["pattern_effectiveness"], dict)
-        
+
         # Validate discovery run ID
         assert isinstance(data["discovery_run_id"], str)
         assert len(data["discovery_run_id"]) > 0
@@ -106,14 +103,14 @@ class TestAprioriEndpointsRealBehavior:
         """Test getting association rules with real database integration."""
         # Make real API call
         response = real_api_client.get("/api/v1/apriori/rules")
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response is a list
         assert isinstance(data, list)
-        
+
         # If rules exist, validate structure
         if data:
             rule = data[0]
@@ -129,14 +126,14 @@ class TestAprioriEndpointsRealBehavior:
         response = real_api_client.get(
             "/api/v1/apriori/rules?min_confidence=0.7&min_support=0.1&limit=10"
         )
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response is a list
         assert isinstance(data, list)
-        
+
         # Validate limit is respected
         assert len(data) <= 10
 
@@ -151,27 +148,27 @@ class TestAprioriEndpointsRealBehavior:
             "pattern_types": ["sequential", "hierarchical", "compositional"],
             "min_pattern_significance": 0.6
         }
-        
+
         # Make real API call
         response = real_api_client.post(
             "/api/v1/apriori/contextualized-patterns",
             json=request_data
         )
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response structure
         expected_fields = [
             "contextualized_patterns", "context_effectiveness", "pattern_insights",
             "analysis_metadata"
         ]
         api_helpers.assert_api_response_structure(data, expected_fields)
-        
+
         # Validate contextualized patterns
         assert isinstance(data["contextualized_patterns"], list)
-        
+
         # Validate context effectiveness
         assert isinstance(data["context_effectiveness"], dict)
 
@@ -181,14 +178,14 @@ class TestAprioriEndpointsRealBehavior:
         """Test getting discovery runs with real database integration."""
         # Make real API call
         response = real_api_client.get("/api/v1/apriori/discovery-runs")
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response is a list
         assert isinstance(data, list)
-        
+
         # If runs exist, validate structure
         if data:
             run = data[0]
@@ -204,14 +201,14 @@ class TestAprioriEndpointsRealBehavior:
         response = real_api_client.get(
             "/api/v1/apriori/discovery-runs?status=completed&limit=5&offset=0"
         )
-        
+
         # Validate response
         assert response.status_code == 200
         data = response.json()
-        
+
         # Validate response is a list
         assert isinstance(data, list)
-        
+
         # Validate limit is respected
         assert len(data) <= 5
 
@@ -225,35 +222,35 @@ class TestAprioriEndpointsRealBehavior:
             "rule_effectiveness_threshold": 0.5,
             "min_pattern_frequency": 1
         }
-        
+
         discovery_response = real_api_client.post(
             "/api/v1/apriori/discover-patterns",
             json=discovery_request
         )
-        
+
         if discovery_response.status_code == 200:
             discovery_data = discovery_response.json()
             discovery_run_id = discovery_data.get("discovery_run_id")
-            
+
             if discovery_run_id:
                 # Get insights for the discovery run
                 response = real_api_client.get(
                     f"/api/v1/apriori/insights/{discovery_run_id}"
                 )
-                
+
                 # Validate response
-                assert response.status_code in [200, 404]  # 404 if run not found
-                
+                assert response.status_code in {200, 404}  # 404 if run not found
+
                 if response.status_code == 200:
                     data = response.json()
-                    
+
                     # Validate response structure
                     expected_fields = [
-                        "discovery_run_id", "insights", "recommendations", 
+                        "discovery_run_id", "insights", "recommendations",
                         "performance_metrics", "pattern_analysis"
                     ]
                     api_helpers.assert_api_response_structure(data, expected_fields)
-                    
+
                     # Validate discovery run ID matches
                     assert data["discovery_run_id"] == discovery_run_id
 
@@ -271,34 +268,34 @@ class TestAprioriEndpointsRealBehavior:
             "min_support": 0.3,
             "min_confidence": 0.5
         }
-        
+
         api_performance_monitor.start_request()
         response = real_api_client.post("/api/v1/apriori/analyze", json=small_request)
         small_duration = api_performance_monitor.end_request(
             "/api/v1/apriori/analyze", response.status_code
         )
-        
+
         assert response.status_code == 200
-        
+
         # Test with larger dataset
         large_request = {
             "transactions": [
-                [f"rule_{i}", f"rule_{i+1}", f"rule_{i+2}"] 
+                [f"rule_{i}", f"rule_{i + 1}", f"rule_{i + 2}"]
                 for i in range(0, 50, 3)
             ],
             "min_support": 0.1,
             "min_confidence": 0.3
         }
-        
+
         api_performance_monitor.start_request()
         response = real_api_client.post("/api/v1/apriori/analyze", json=large_request)
         large_duration = api_performance_monitor.end_request(
             "/api/v1/apriori/analyze", response.status_code
         )
-        
+
         # Validate both requests succeeded
         assert response.status_code == 200
-        
+
         # Validate performance scales reasonably
         assert small_duration < 2000, f"Small dataset analysis too slow: {small_duration}ms"
         assert large_duration < 10000, f"Large dataset analysis too slow: {large_duration}ms"
@@ -313,37 +310,37 @@ class TestAprioriEndpointsRealBehavior:
             "min_support": 1.5,  # Invalid support (> 1.0)
             "min_confidence": -0.1  # Invalid confidence (< 0.0)
         }
-        
+
         response = real_api_client.post(
-            "/api/v1/apriori/analyze", 
+            "/api/v1/apriori/analyze",
             json=invalid_request
         )
-        
+
         # Should return validation error
-        assert response.status_code in [400, 422]
-        
+        assert response.status_code in {400, 422}
+
         # Test malformed JSON
         response = real_api_client.post(
             "/api/v1/apriori/analyze",
             data="invalid json"
         )
-        
+
         # Should return parsing error
-        assert response.status_code in [400, 422]
-        
+        assert response.status_code in {400, 422}
+
         # Test missing required fields
         incomplete_request = {
             "transactions": [["rule_1"]]
             # Missing min_support and min_confidence
         }
-        
+
         response = real_api_client.post(
             "/api/v1/apriori/analyze",
             json=incomplete_request
         )
-        
+
         # Should return validation error
-        assert response.status_code in [400, 422]
+        assert response.status_code in {400, 422}
 
     async def test_apriori_concurrent_analysis_real_integration(
         self, real_api_client: TestClient, api_performance_monitor, api_helpers
@@ -353,15 +350,15 @@ class TestAprioriEndpointsRealBehavior:
         requests = [
             {
                 "transactions": [
-                    [f"rule_{i}", f"rule_{i+1}"] 
-                    for i in range(j, j+10)
+                    [f"rule_{i}", f"rule_{i + 1}"]
+                    for i in range(j, j + 10)
                 ],
                 "min_support": 0.2,
                 "min_confidence": 0.5
             }
             for j in range(0, 30, 10)  # 3 different datasets
         ]
-        
+
         async def make_analysis_request(request_data):
             api_performance_monitor.start_request()
             response = real_api_client.post("/api/v1/apriori/analyze", json=request_data)
@@ -369,15 +366,15 @@ class TestAprioriEndpointsRealBehavior:
                 "/api/v1/apriori/analyze", response.status_code
             )
             return response.status_code, duration
-        
+
         # Make concurrent requests
         tasks = [make_analysis_request(req) for req in requests]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Validate results
         successful_requests = [r for r in results if not isinstance(r, Exception)]
         assert len(successful_requests) >= 2, "At least 2 concurrent requests should succeed"
-        
+
         # Validate all successful requests returned 200
         for status_code, duration in successful_requests:
             assert status_code == 200
@@ -397,31 +394,31 @@ class TestAprioriEndpointsRealBehavior:
             "min_support": 0.3,
             "min_confidence": 0.6
         }
-        
+
         # First request (cache miss)
         api_performance_monitor.start_request()
         response1 = real_api_client.post("/api/v1/apriori/analyze", json=request_data)
         duration1 = api_performance_monitor.end_request(
             "/api/v1/apriori/analyze", response1.status_code
         )
-        
+
         assert response1.status_code == 200
         data1 = response1.json()
-        
+
         # Second identical request (potential cache hit)
         api_performance_monitor.start_request()
         response2 = real_api_client.post("/api/v1/apriori/analyze", json=request_data)
         duration2 = api_performance_monitor.end_request(
             "/api/v1/apriori/analyze", response2.status_code
         )
-        
+
         assert response2.status_code == 200
         data2 = response2.json()
-        
+
         # Validate responses are consistent
         assert data1["frequent_itemsets"] == data2["frequent_itemsets"]
         assert data1["association_rules"] == data2["association_rules"]
-        
+
         # Second request might be faster due to caching (but not guaranteed)
         # Just validate both are within reasonable bounds
         assert duration1 < 10000, f"First request too slow: {duration1}ms"
@@ -431,30 +428,31 @@ class TestAprioriEndpointsRealBehavior:
         self, real_api_client: TestClient, api_helpers
     ):
         """Test Apriori analysis memory usage with large datasets."""
-        import psutil
         import os
-        
+
+        import psutil
+
         # Get initial memory usage
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         # Make request with large dataset
         large_request = {
             "transactions": [
-                [f"rule_{i}", f"rule_{i+1}", f"rule_{i+2}", f"rule_{i+3}"] 
+                [f"rule_{i}", f"rule_{i + 1}", f"rule_{i + 2}", f"rule_{i + 3}"]
                 for i in range(0, 100, 4)
             ],
             "min_support": 0.05,
             "min_confidence": 0.3
         }
-        
+
         response = real_api_client.post("/api/v1/apriori/analyze", json=large_request)
         assert response.status_code == 200
-        
+
         # Check memory usage after processing
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
-        
+
         # Memory increase should be reasonable (< 100MB for this test)
         assert memory_increase < 100, f"Excessive memory usage: {memory_increase}MB"
 
@@ -468,7 +466,7 @@ class TestAprioriEndpointsRealBehavior:
         if hasattr(api_helpers, '__class__'):
             logger = api_helpers.__class__.__name__
         print(f"Cleaning up Apriori test data via {logger}")
-        
+
         # In a real implementation, this would clean up:
         # - Test discovery runs
         # - Test analysis results

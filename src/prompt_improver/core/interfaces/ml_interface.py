@@ -1,4 +1,4 @@
-"""ML Interface Abstractions for MCP-ML Boundary Isolation
+"""ML Interface Abstractions for MCP-ML Boundary Isolation.
 
 Defines Protocol interfaces that MCP components can use to interact with ML
 subsystems without direct imports, maintaining clean architectural boundaries.
@@ -13,14 +13,7 @@ SECURITY FEATURES:
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, Union
-
-if TYPE_CHECKING:
-    from prompt_improver.core.events.ml_event_bus import (
-        MLEvent,
-        MLEventBus,
-        MLEventType,
-    )
+from typing import Any, Protocol
 
 
 class MLHealthStatus(Enum):

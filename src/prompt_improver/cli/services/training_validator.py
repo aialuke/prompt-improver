@@ -1,4 +1,4 @@
-"""Training Validator Service - Clean Architecture Implementation
+"""Training Validator Service - Clean Architecture Implementation.
 
 Implements data validation, quality assessment, and training readiness checks.
 Extracted from training_system_manager.py (2109 lines) as part of decomposition.
@@ -8,7 +8,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,7 @@ from prompt_improver.database import get_sessionmanager
 
 class TrainingValidator(TrainingValidatorProtocol):
     """Training validation service implementing Clean Architecture patterns.
-    
+
     Responsibilities:
     - Data validation and quality assessment
     - Training readiness verification
@@ -28,16 +28,16 @@ class TrainingValidator(TrainingValidatorProtocol):
     - System state detection and analysis
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger("apes.training_validator")
-        self._rule_validator: Optional[RuleValidationService] = None
-        
+        self._rule_validator: RuleValidationService | None = None
+
         # Training system data directory
         self.training_data_dir = Path.home() / ".local" / "share" / "apes" / "training"
 
     async def validate_ready_for_training(self) -> bool:
         """Validate that the system is ready for training.
-        
+
         Returns:
             True if ready for training, False otherwise
         """
@@ -48,7 +48,7 @@ class TrainingValidator(TrainingValidatorProtocol):
                 async with session_manager.get_async_session() as session:
                     await session.execute(text("SELECT 1"))
             except Exception:
-                self.logger.error("Database connectivity check failed")
+                self.logger.exception("Database connectivity check failed")
                 return False
 
             # Validate database schema
@@ -73,12 +73,12 @@ class TrainingValidator(TrainingValidatorProtocol):
             return True
 
         except Exception as e:
-            self.logger.error(f"Training readiness validation failed: {e}")
+            self.logger.exception(f"Training readiness validation failed: {e}")
             return False
 
-    async def validate_database_and_rules(self) -> Dict[str, Any]:
+    async def validate_database_and_rules(self) -> dict[str, Any]:
         """Validate database connectivity, schema, and seeded rules.
-        
+
         Returns:
             Database and rule validation results
         """
@@ -159,9 +159,9 @@ class TrainingValidator(TrainingValidatorProtocol):
         database_status["validation_time_ms"] = (time.time() - validation_start) * 1000
         return database_status
 
-    async def assess_data_availability(self) -> Dict[str, Any]:
+    async def assess_data_availability(self) -> dict[str, Any]:
         """Comprehensive training data availability assessment.
-        
+
         Returns:
             Data availability analysis with quality metrics
         """
@@ -239,7 +239,7 @@ class TrainingValidator(TrainingValidatorProtocol):
                     "training_data_count": training_count >= 100,
                     "synthetic_data_available": synthetic_count > 0,
                     "user_data_available": user_count > 0,
-                    "quality_acceptable": data_status["data_quality"]["status"] in ["good", "unknown"],
+                    "quality_acceptable": data_status["data_quality"]["status"] in {"good", "unknown"},
                 }
 
                 data_status["minimum_requirements"] = {
@@ -248,7 +248,7 @@ class TrainingValidator(TrainingValidatorProtocol):
                 }
 
         except Exception as e:
-            self.logger.error(f"Data availability assessment failed: {e}")
+            self.logger.exception(f"Data availability assessment failed: {e}")
             data_status.update({
                 "training_data": {
                     "status": "error",
@@ -262,9 +262,9 @@ class TrainingValidator(TrainingValidatorProtocol):
         data_status["assessment_time_ms"] = (time.time() - assessment_start) * 1000
         return data_status
 
-    async def detect_system_state(self) -> Dict[str, Any]:
+    async def detect_system_state(self) -> dict[str, Any]:
         """Comprehensive system state detection using 2025 best practices.
-        
+
         Returns:
             Detailed system state information
         """
@@ -304,14 +304,14 @@ class TrainingValidator(TrainingValidatorProtocol):
         system_state["detection_time_ms"] = (time.time() - state_start) * 1000
         return system_state
 
-    async def validate_components(self, orchestrator=None, analytics=None, data_generator=None) -> Dict[str, Any]:
+    async def validate_components(self, orchestrator=None, analytics=None, data_generator=None) -> dict[str, Any]:
         """Validate all training system components with health checks.
-        
+
         Args:
             orchestrator: ML pipeline orchestrator instance
             analytics: Analytics service instance
             data_generator: Data generator instance
-            
+
         Returns:
             Component validation results
         """
@@ -372,15 +372,15 @@ class TrainingValidator(TrainingValidatorProtocol):
 
     async def _perform_comprehensive_quality_assessment(
         self, db_session: AsyncSession, training_count: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform comprehensive quality assessment of training data.
-        
+
         Implements 2025 best practices for data quality evaluation:
         - Multi-dimensional quality scoring
         - Statistical distribution analysis
         - Feature completeness validation
         - Effectiveness score analysis
-        
+
         Returns:
             Detailed quality assessment report
         """
@@ -523,9 +523,9 @@ class TrainingValidator(TrainingValidatorProtocol):
         }
 
     def _generate_quality_recommendations(
-        self, overall_quality: float, avg_effectiveness: float, 
-        avg_completeness: float, metrics: Dict
-    ) -> List[str]:
+        self, overall_quality: float, avg_effectiveness: float,
+        avg_completeness: float, metrics: dict
+    ) -> list[str]:
         """Generate recommendations for improving data quality."""
         recommendations = []
 
@@ -584,7 +584,7 @@ class TrainingValidator(TrainingValidatorProtocol):
                     text("SELECT COUNT(*) FROM training_prompts")
                 )
                 training_count = result.scalar() or 0
-                
+
                 # Require at least 50 training samples
                 return training_count >= 50
         except Exception:

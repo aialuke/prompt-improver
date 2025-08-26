@@ -9,17 +9,16 @@ import json
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
 from typing import TYPE_CHECKING
 
-from prompt_improver.core.config.validation import ValidationResult, ValidationReport
+from prompt_improver.core.config.validation import ValidationReport, ValidationResult
 
 if TYPE_CHECKING:
-    from prompt_improver.core.protocols.prompt_service.prompt_protocols import ValidationServiceProtocol
+    from prompt_improver.shared.interfaces.protocols.application import (
+        ValidationServiceProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +35,10 @@ class ConfigurationValidator:
     """
 
     def __init__(
-        self, 
+        self,
         validation_service: "ValidationServiceProtocol",
         environment: str | None = None
-    ):
+    ) -> None:
         """Initialize validator with validation service and optional environment override."""
         self.validation_service = validation_service
         self.environment = environment or os.getenv("ENVIRONMENT", "development")
@@ -47,7 +46,7 @@ class ConfigurationValidator:
     async def validate_all(self) -> ValidationReport:
         """Perform comprehensive configuration validation."""
         report = ValidationReport(environment=self.environment)
-        
+
         # Use ValidationServiceProtocol methods for core validation
         validation_methods = [
             ("startup_configuration", self.validation_service.validate_startup_configuration),
@@ -55,7 +54,7 @@ class ConfigurationValidator:
             ("security_configuration", self.validation_service.validate_security_configuration),
             ("monitoring_configuration", self.validation_service.validate_monitoring_configuration),
         ]
-        
+
         # Execute validation methods from the protocol
         for component_name, validation_method in validation_methods:
             try:
@@ -67,7 +66,7 @@ class ConfigurationValidator:
                     result = await validation_method()
                 elif component_name == "monitoring_configuration":
                     result = await validation_method(include_connectivity_tests=False)
-                
+
                 report.results.append(result)
             except Exception as e:
                 logger.exception(f"Validation error in {component_name}")
@@ -79,7 +78,7 @@ class ConfigurationValidator:
                         critical=True,
                     )
                 )
-        
+
         # Add additional comprehensive validation checks
         additional_validators = [
             self._validate_environment_setup,
@@ -89,7 +88,7 @@ class ConfigurationValidator:
             self._validate_api_configuration,
             self._validate_health_check_configuration,
         ]
-        
+
         for validator_func in additional_validators:
             try:
                 result = await validator_func()
@@ -107,7 +106,7 @@ class ConfigurationValidator:
                         critical=True,
                     )
                 )
-        
+
         critical_failures = [r for r in report.results if not r.is_valid and r.critical]
         warnings = [r for r in report.results if not r.is_valid and (not r.critical)]
         report.critical_failures = [
@@ -179,7 +178,7 @@ class ConfigurationValidator:
             # Use direct Redis connection instead of database services
             # to avoid circular dependency
             import coredis
-            
+
             client = coredis.Redis.from_url(redis_url)
             await client.ping()
             test_key = "config_validator_test"
@@ -187,7 +186,7 @@ class ConfigurationValidator:
             value = await client.get(test_key)
             await client.delete(test_key)
             await client.close()
-            
+
             if value == b"test_value":
                 return ValidationResult(
                     component="redis_connectivity",
@@ -381,7 +380,7 @@ async def validate_startup_configuration(
     if validation_service is None:
         from prompt_improver.services.prompt.validation_service import ValidationService
         validation_service = ValidationService()
-    
+
     validator = ConfigurationValidator(validation_service, environment)
     report = await validator.validate_all()
     if report.overall_valid:
@@ -433,7 +432,7 @@ if __name__ == "__main__":
         # Create validation service for CLI usage
         from prompt_improver.services.prompt.validation_service import ValidationService
         validation_service = ValidationService()
-        
+
         is_valid, report = await validate_startup_configuration(
             args.environment, validation_service
         )

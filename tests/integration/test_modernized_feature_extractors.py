@@ -16,10 +16,8 @@ This test validates:
 """
 
 import asyncio
-import json
 import logging
 import time
-from typing import Any, Dict
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -327,7 +325,7 @@ async def test_performance_comparison():
         print(f"Running {num_iterations} iterations for each extractor...")
         print("\n1. Testing ContextFeatureExtractor performance...")
         context_times = []
-        for i in range(num_iterations):
+        for _i in range(num_iterations):
             start_time = time.time()
             features = await context_extractor.extract_features_async(context_data)
             end_time = time.time()
@@ -340,7 +338,7 @@ async def test_performance_comparison():
         )
         print("\n2. Testing DomainFeatureExtractor performance...")
         domain_times = []
-        for i in range(num_iterations):
+        for _i in range(num_iterations):
             start_time = time.time()
             features = await domain_extractor.extract_features_async(test_text)
             end_time = time.time()

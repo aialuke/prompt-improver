@@ -6,10 +6,9 @@ patterns and DatabaseServices for database operations.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import and_, desc, func, or_, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, desc, or_, select, update
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -35,7 +34,7 @@ class UserFeedbackRepository(
 ):
     """User feedback repository implementation with comprehensive feedback operations."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=UserFeedback,
             connection_manager=connection_manager,
@@ -63,7 +62,7 @@ class UserFeedbackRepository(
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting feedback by session: {e}")
+                logger.exception(f"Error getting feedback by session: {e}")
                 raise
 
     async def get_feedback_list(
@@ -137,7 +136,7 @@ class UserFeedbackRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting feedback list: {e}")
+                logger.exception(f"Error getting feedback list: {e}")
                 raise
 
     async def update_feedback(
@@ -169,7 +168,7 @@ class UserFeedbackRepository(
                 await session.commit()
                 return result.rowcount > 0
             except Exception as e:
-                logger.error(f"Error marking feedback as processed: {e}")
+                logger.exception(f"Error marking feedback as processed: {e}")
                 raise
 
     async def delete_feedback(self, feedback_id: int) -> bool:
@@ -202,7 +201,7 @@ class UserFeedbackRepository(
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting satisfaction stats: {e}")
+                logger.exception(f"Error getting satisfaction stats: {e}")
                 raise
 
     async def get_feedback_analysis(
@@ -317,7 +316,7 @@ class UserFeedbackRepository(
                 )
 
             except Exception as e:
-                logger.error(f"Error getting feedback analysis: {e}")
+                logger.exception(f"Error getting feedback analysis: {e}")
                 raise
 
     async def get_rating_distribution(
@@ -352,7 +351,7 @@ class UserFeedbackRepository(
                 return distribution
 
             except Exception as e:
-                logger.error(f"Error getting rating distribution: {e}")
+                logger.exception(f"Error getting rating distribution: {e}")
                 raise
 
     async def get_satisfaction_trend(
@@ -388,7 +387,7 @@ class UserFeedbackRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error getting satisfaction trend: {e}")
+            logger.exception(f"Error getting satisfaction trend: {e}")
             raise
 
     # Sentiment Analysis Implementation
@@ -432,7 +431,7 @@ class UserFeedbackRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error analyzing feedback sentiment: {e}")
+            logger.exception(f"Error analyzing feedback sentiment: {e}")
             raise
 
     async def get_sentiment_trends(
@@ -477,7 +476,7 @@ class UserFeedbackRepository(
             return trends
 
         except Exception as e:
-            logger.error(f"Error getting sentiment trends: {e}")
+            logger.exception(f"Error getting sentiment trends: {e}")
             raise
 
     async def get_negative_feedback_analysis(
@@ -538,7 +537,7 @@ class UserFeedbackRepository(
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing negative feedback: {e}")
+            logger.exception(f"Error analyzing negative feedback: {e}")
             raise
 
     # Improvement Area Analysis Implementation
@@ -561,7 +560,7 @@ class UserFeedbackRepository(
             return frequency
 
         except Exception as e:
-            logger.error(f"Error getting improvement area frequency: {e}")
+            logger.exception(f"Error getting improvement area frequency: {e}")
             raise
 
     async def get_improvement_area_trends(
@@ -602,7 +601,7 @@ class UserFeedbackRepository(
             return trends
 
         except Exception as e:
-            logger.error(f"Error getting improvement area trends: {e}")
+            logger.exception(f"Error getting improvement area trends: {e}")
             raise
 
     async def get_improvement_priorities(
@@ -639,7 +638,7 @@ class UserFeedbackRepository(
             return priorities
 
         except Exception as e:
-            logger.error(f"Error getting improvement priorities: {e}")
+            logger.exception(f"Error getting improvement priorities: {e}")
             raise
 
     # Correlation Analysis Implementation
@@ -665,7 +664,7 @@ class UserFeedbackRepository(
             )
 
         except Exception as e:
-            logger.error(f"Error correlating feedback with performance: {e}")
+            logger.exception(f"Error correlating feedback with performance: {e}")
             raise
 
     async def correlate_feedback_with_rules(
@@ -679,7 +678,7 @@ class UserFeedbackRepository(
             return {}
 
         except Exception as e:
-            logger.error(f"Error correlating feedback with rules: {e}")
+            logger.exception(f"Error correlating feedback with rules: {e}")
             raise
 
     async def analyze_satisfaction_drivers(
@@ -713,7 +712,7 @@ class UserFeedbackRepository(
             return drivers
 
         except Exception as e:
-            logger.error(f"Error analyzing satisfaction drivers: {e}")
+            logger.exception(f"Error analyzing satisfaction drivers: {e}")
             raise
 
     # Maintenance and Cleanup Implementation
@@ -731,7 +730,7 @@ class UserFeedbackRepository(
 
                 query = delete(UserFeedback).where(
                     and_(
-                        UserFeedback.is_processed == True,
+                        UserFeedback.is_processed,
                         UserFeedback.created_at < cutoff_date,
                     )
                 )
@@ -749,7 +748,7 @@ class UserFeedbackRepository(
                 return deleted_count
 
             except Exception as e:
-                logger.error(f"Error cleaning up processed feedback: {e}")
+                logger.exception(f"Error cleaning up processed feedback: {e}")
                 raise
 
     async def anonymize_feedback_text(
@@ -785,7 +784,7 @@ class UserFeedbackRepository(
                 return anonymized_count
 
             except Exception as e:
-                logger.error(f"Error anonymizing feedback text: {e}")
+                logger.exception(f"Error anonymizing feedback text: {e}")
                 raise
 
     # Additional placeholder implementations for remaining protocol methods...
@@ -797,7 +796,7 @@ class UserFeedbackRepository(
         try:
             return {"placeholder": "User journey analysis not implemented"}
         except Exception as e:
-            logger.error(f"Error analyzing user journey: {e}")
+            logger.exception(f"Error analyzing user journey: {e}")
             raise
 
     async def predict_user_satisfaction(
@@ -808,7 +807,7 @@ class UserFeedbackRepository(
         try:
             return {"predicted_satisfaction": 0.75, "confidence": 0.6}
         except Exception as e:
-            logger.error(f"Error predicting user satisfaction: {e}")
+            logger.exception(f"Error predicting user satisfaction: {e}")
             raise
 
     async def get_feedback_anomalies(
@@ -821,7 +820,7 @@ class UserFeedbackRepository(
         try:
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error detecting feedback anomalies: {e}")
+            logger.exception(f"Error detecting feedback anomalies: {e}")
             raise
 
     async def segment_users_by_satisfaction(
@@ -833,7 +832,7 @@ class UserFeedbackRepository(
         try:
             return {}  # Placeholder
         except Exception as e:
-            logger.error(f"Error segmenting users by satisfaction: {e}")
+            logger.exception(f"Error segmenting users by satisfaction: {e}")
             raise
 
     async def get_cohort_satisfaction_analysis(
@@ -845,7 +844,7 @@ class UserFeedbackRepository(
         try:
             return {}  # Placeholder
         except Exception as e:
-            logger.error(f"Error analyzing cohort satisfaction: {e}")
+            logger.exception(f"Error analyzing cohort satisfaction: {e}")
             raise
 
     async def generate_satisfaction_report(
@@ -874,7 +873,7 @@ class UserFeedbackRepository(
                 "generated_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error generating satisfaction report: {e}")
+            logger.exception(f"Error generating satisfaction report: {e}")
             raise
 
     async def export_feedback_data(
@@ -905,7 +904,7 @@ class UserFeedbackRepository(
                 return json.dumps(data, indent=2).encode()
             return b"Export format not implemented"
         except Exception as e:
-            logger.error(f"Error exporting feedback data: {e}")
+            logger.exception(f"Error exporting feedback data: {e}")
             raise
 
     def _extract_key_phrases(self, text: str) -> list[str]:

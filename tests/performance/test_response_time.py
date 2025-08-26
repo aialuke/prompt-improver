@@ -6,7 +6,6 @@ with comprehensive benchmarking and performance validation.
 """
 
 import asyncio
-import logging
 import time
 from datetime import datetime
 
@@ -16,8 +15,8 @@ from prompt_improver.optimization.batch_processor import (
     BatchProcessor,
     BatchProcessorConfig,
 )
-from prompt_improver.services.startup import init_startup_tasks, shutdown_startup_tasks
 from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.services.startup import init_startup_tasks, shutdown_startup_tasks
 
 
 @pytest.mark.asyncio
@@ -26,7 +25,7 @@ class TestResponseTimeRequirements:
 
     async def test_session_store_response_time(self, benchmark):
         """Test CacheFacade session operations meet <200ms response time."""
-        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False)
         test_data = {
             "user_id": "test_user_123",
             "session_data": {
@@ -62,8 +61,7 @@ class TestResponseTimeRequirements:
                 assert get_time < 50
                 assert touch_time < 50
                 assert delete_time < 50
-                total_time = set_time + get_time + touch_time + delete_time
-                return total_time
+                return set_time + get_time + touch_time + delete_time
 
             try:
                 loop = asyncio.get_running_loop()
@@ -84,15 +82,13 @@ class TestResponseTimeRequirements:
             batch_size=10, concurrency=5, dry_run=True, timeout=5000
         )
         processor = BatchProcessor(config)
-        test_batch = []
-        for i in range(50):
-            test_batch.append({
+        test_batch = [{
                 "original": f"test prompt {i}",
                 "enhanced": f"enhanced test prompt {i}",
                 "metrics": {"confidence": 0.8 + i % 3 * 0.1},
                 "session_id": f"session_{i % 10}",
                 "priority": i % 5,
-            })
+            } for i in range(50)]
 
         @benchmark
         def batch_processing():
@@ -121,7 +117,7 @@ class TestResponseTimeRequirements:
 
     async def test_concurrent_session_operations_response_time(self, benchmark):
         """Test concurrent session operations meet response time requirements."""
-        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False)
 
         @benchmark
         def concurrent_operations():
@@ -144,8 +140,7 @@ class TestResponseTimeRequirements:
                 get_time = (time.perf_counter() - start_time) * 1000
                 assert all(set_results)
                 assert all(r is not None for r in get_results)
-                total_time = set_time + get_time
-                return total_time
+                return set_time + get_time
 
             try:
                 loop = asyncio.get_running_loop()
@@ -178,8 +173,7 @@ class TestResponseTimeRequirements:
                 shutdown_result = await shutdown_startup_tasks(timeout=10.0)
                 shutdown_time = (time.perf_counter() - start_time) * 1000
                 assert shutdown_result["status"] == "success"
-                total_time = startup_time + shutdown_time
-                return total_time
+                return startup_time + shutdown_time
 
             try:
                 loop = asyncio.get_running_loop()
@@ -196,7 +190,7 @@ class TestResponseTimeRequirements:
 
     async def test_session_cleanup_response_time(self, benchmark):
         """Test session cleanup meets response time requirements."""
-        store = CacheFacade(l1_max_size=1000, l2_default_ttl=1, enable_l2=False, enable_l3=False)  # Short TTL for test
+        store = CacheFacade(l1_max_size=1000, l2_default_ttl=1, enable_l2=False)  # Short TTL for test
 
         @benchmark
         def cleanup_performance():
@@ -208,8 +202,7 @@ class TestResponseTimeRequirements:
                 await asyncio.sleep(0.05)
                 start_time = time.perf_counter()
                 # Cache expiry is handled automatically by CacheFacade TTL
-                cleanup_time = (time.perf_counter() - start_time) * 1000
-                return cleanup_time
+                return (time.perf_counter() - start_time) * 1000
 
             try:
                 loop = asyncio.get_running_loop()
@@ -243,8 +236,7 @@ class TestResponseTimeRequirements:
                     )
                     enqueue_tasks.append(task)
                 await asyncio.gather(*enqueue_tasks)
-                enqueue_time = (time.perf_counter() - start_time) * 1000
-                return enqueue_time
+                return (time.perf_counter() - start_time) * 1000
 
             try:
                 loop = asyncio.get_running_loop()
@@ -266,7 +258,7 @@ class TestPerformanceUnderLoad:
 
     def test_session_store_under_load(self, benchmark):
         """Test CacheFacade session performance under load."""
-        store = CacheFacade(l1_max_size=5000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
+        store = CacheFacade(l1_max_size=5000, l2_default_ttl=3600, enable_l2=False)
 
         def load_test():
             async def run_load_test():

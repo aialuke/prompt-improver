@@ -1,11 +1,11 @@
 """Enhanced Health Checker Implementations with 2025 features
-Updated versions of Priority 3B components
+Updated versions of Priority 3B components.
 """
 
 import asyncio
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthResult,
@@ -29,9 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 class EnhancedMLServiceHealthChecker(EnhancedHealthChecker):
-    """Enhanced ML Service Health Checker with 2025 observability features"""
+    """Enhanced ML Service Health Checker with 2025 observability features."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         circuit_config = CircuitBreakerConfig(
             failure_threshold=3, recovery_timeout=30, response_time_threshold_ms=2000
         )
@@ -64,7 +64,7 @@ class EnhancedMLServiceHealthChecker(EnhancedHealthChecker):
 
     @instrument_health_check("ml_service", "service_availability")
     async def _execute_health_check(self) -> HealthResult:
-        """Execute ML service health check with enhanced monitoring"""
+        """Execute ML service health check with enhanced monitoring."""
         start_time = time.time()
         try:
             with self.telemetry_context.span("import_ml_service"):
@@ -124,13 +124,13 @@ class EnhancedMLServiceHealthChecker(EnhancedHealthChecker):
                 },
             )
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 "ML service health check failed", component="ml_service", error=e
             )
             raise
 
     async def _test_ml_inference(self, ml_service) -> dict[str, Any]:
-        """Test ML service with sample inference"""
+        """Test ML service with sample inference."""
         await asyncio.sleep(0.05)
         return {
             "model_version": "1.0.0",
@@ -141,9 +141,9 @@ class EnhancedMLServiceHealthChecker(EnhancedHealthChecker):
 
 
 class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
-    """Enhanced ML Orchestrator Health Checker with comprehensive monitoring"""
+    """Enhanced ML Orchestrator Health Checker with comprehensive monitoring."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         circuit_config = CircuitBreakerConfig(
             failure_threshold=5, recovery_timeout=60, response_time_threshold_ms=3000
         )
@@ -177,12 +177,12 @@ class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
         self.orchestrator = None
 
     def set_orchestrator(self, orchestrator):
-        """Set the orchestrator instance to monitor"""
+        """Set the orchestrator instance to monitor."""
         self.orchestrator = orchestrator
 
     @instrument_health_check("ml_orchestrator", "orchestrator_health")
     async def _execute_health_check(self) -> HealthResult:
-        """Execute orchestrator health check with enhanced monitoring"""
+        """Execute orchestrator health check with enhanced monitoring."""
         start_time = time.time()
         if not self.orchestrator:
             return HealthResult(
@@ -232,19 +232,19 @@ class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
                 },
             )
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 "Orchestrator health check failed", component="ml_orchestrator", error=e
             )
             raise
 
     async def _check_initialization(self) -> bool:
-        """Check if orchestrator is initialized"""
+        """Check if orchestrator is initialized."""
         return (
             hasattr(self.orchestrator, "initialized") and self.orchestrator.initialized
         )
 
     async def _check_component_health(self) -> dict[str, Any]:
-        """Check health of orchestrator components"""
+        """Check health of orchestrator components."""
         await asyncio.sleep(0.02)
         return {
             "total_components": 10,
@@ -254,7 +254,7 @@ class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
         }
 
     async def _check_workflow_status(self) -> dict[str, Any]:
-        """Check active workflow status"""
+        """Check active workflow status."""
         await asyncio.sleep(0.01)
         return {
             "active_count": 15,
@@ -264,7 +264,7 @@ class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
         }
 
     async def _check_resource_usage(self) -> dict[str, Any]:
-        """Check resource usage"""
+        """Check resource usage."""
         return {
             "cpu_usage_percent": 45,
             "memory_usage_percent": 62,
@@ -273,9 +273,9 @@ class EnhancedMLOrchestratorHealthChecker(EnhancedHealthChecker):
 
 
 class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
-    """Enhanced Analytics Service Health Checker"""
+    """Enhanced Analytics Service Health Checker."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         circuit_config = CircuitBreakerConfig(
             failure_threshold=5, recovery_timeout=60, response_time_threshold_ms=5000
         )
@@ -308,7 +308,7 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
 
     @instrument_health_check("analytics", "service_health")
     async def _execute_health_check(self) -> HealthResult:
-        """Execute analytics service health check"""
+        """Execute analytics service health check."""
         start_time = time.time()
         try:
             with self.telemetry_context.span("import_analytics"):
@@ -391,13 +391,13 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
                 details={"error": "Analytics service not available", "message": str(e)},
             )
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 "Analytics health check failed", component="analytics", error=e
             )
             raise
 
     async def _test_performance_trends(self, analytics) -> dict[str, Any]:
-        """Test analytics performance trends query"""
+        """Test analytics performance trends query."""
         try:
             await asyncio.sleep(0.1)
             return {
@@ -410,7 +410,7 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
             return {"success": False, "error": str(e), "data_points": 0}
 
     async def _check_data_freshness(self, analytics) -> dict[str, Any]:
-        """Check how fresh the analytics data is"""
+        """Check how fresh the analytics data is."""
         try:
             await asyncio.sleep(0.05)
             current_time = time.time()
@@ -430,7 +430,7 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
             }
 
     async def _check_data_quality(self, analytics) -> dict[str, Any]:
-        """Check data quality metrics including completeness, accuracy, and consistency"""
+        """Check data quality metrics including completeness, accuracy, and consistency."""
         try:
             await asyncio.sleep(0.1)
             total_expected_records = 1440
@@ -474,7 +474,7 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
             }
 
     async def _check_processing_lag(self, analytics) -> dict[str, Any]:
-        """Check processing lag and pipeline performance"""
+        """Check processing lag and pipeline performance."""
         try:
             await asyncio.sleep(0.08)
             current_time = time.time()

@@ -1,4 +1,4 @@
-"""Retry Configuration Service - Centralized Configuration Management
+"""Retry Configuration Service - Centralized Configuration Management.
 
 This service eliminates redundant configuration classes and provides a unified interface
 for retry configuration management with performance-optimized caching.
@@ -17,15 +17,15 @@ Architecture:
 - Clean separation between configuration and execution
 """
 
+import asyncio
 import logging
 import time
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
 from prompt_improver.core.config.retry import RetryConfig, RetryStrategy
-from prompt_improver.core.protocols.retry_protocols import RetryConfigProtocol
+from prompt_improver.services.cache.cache_facade import get_cache
+from prompt_improver.shared.interfaces.protocols.cache import CacheType
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ConfigTemplate:
     """Lightweight template for retry configurations.
-    
+
     Templates provide base configurations that can be customized
     for specific use cases while maintaining performance through caching.
     """
-    
+
     name: str
     domain: str
     operation_type: str
@@ -55,7 +55,7 @@ class ConfigTemplate:
     failure_threshold: int = 5
     recovery_timeout_seconds: float = 60.0
     description: str = ""
-    
+
     def to_retry_config(self, **overrides: Any) -> RetryConfig:
         """Convert template to RetryConfig with optional overrides."""
         config_dict = {
@@ -80,29 +80,29 @@ class ConfigTemplate:
 @runtime_checkable
 class RetryConfigurationProtocol(Protocol):
     """Protocol for retry configuration service implementations."""
-    
+
     def get_template(self, domain: str, operation: str) -> ConfigTemplate | None:
         """Get configuration template for domain and operation type."""
         ...
-    
+
     def create_config(
-        self, 
+        self,
         template_name: str | None = None,
-        domain: str = "general", 
+        domain: str = "general",
         operation: str = "default",
         **overrides: Any
     ) -> RetryConfig:
         """Create retry configuration from template with overrides."""
         ...
-    
+
     def get_cached_config(self, cache_key: str) -> RetryConfig | None:
         """Get cached configuration by key (<1ms lookup)."""
         ...
-    
+
     def update_template(self, template: ConfigTemplate) -> None:
         """Update or add configuration template at runtime."""
         ...
-    
+
     def list_templates(self, domain: str | None = None) -> list[ConfigTemplate]:
         """List available templates, optionally filtered by domain."""
         ...
@@ -110,19 +110,19 @@ class RetryConfigurationProtocol(Protocol):
 
 class RetryConfigurationService:
     """Centralized retry configuration management service.
-    
+
     Provides domain-specific templates, caching, and runtime updates
     for retry configurations across the system.
     """
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._templates: dict[str, ConfigTemplate] = {}
         self._config_cache: dict[str, tuple[RetryConfig, float]] = {}
         self._cache_ttl = 300.0  # 5 minutes TTL
         self._setup_default_templates()
         self.logger.info("RetryConfigurationService initialized with domain templates")
-    
+
     def _setup_default_templates(self) -> None:
         """Initialize default domain-specific templates."""
         templates = [
@@ -137,7 +137,7 @@ class RetryConfigurationService:
                 description="Database connection with connection pool awareness"
             ),
             ConfigTemplate(
-                name="db_transaction", domain="database", operation_type="transaction", 
+                name="db_transaction", domain="database", operation_type="transaction",
                 max_attempts=3, strategy=RetryStrategy.LINEAR_BACKOFF,
                 base_delay=1.0, max_delay=10.0, jitter=False,
                 retry_on_exceptions=[ConnectionError], operation_timeout=30.0,
@@ -150,13 +150,13 @@ class RetryConfigurationService:
                 retry_on_exceptions=[TimeoutError], operation_timeout=60.0,
                 description="Database query with timeout handling"
             ),
-            
-            # ML Operation Templates  
+
+            # ML Operation Templates
             ConfigTemplate(
                 name="ml_training", domain="ml", operation_type="training",
                 max_attempts=3, strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
                 base_delay=5.0, max_delay=300.0, jitter=True, backoff_multiplier=3.0,
-                retry_on_exceptions=[RuntimeError, ConnectionError], 
+                retry_on_exceptions=[RuntimeError, ConnectionError],
                 total_timeout=3600.0, enable_circuit_breaker=True, failure_threshold=2,
                 description="ML model training with resource awareness"
             ),
@@ -175,10 +175,10 @@ class RetryConfigurationService:
                 retry_on_exceptions=[IOError, ConnectionError], operation_timeout=120.0,
                 description="ML data loading with I/O error handling"
             ),
-            
+
             # API Operation Templates
             ConfigTemplate(
-                name="api_external", domain="api", operation_type="external", 
+                name="api_external", domain="api", operation_type="external",
                 max_attempts=4, strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
                 base_delay=1.0, max_delay=60.0, jitter=True,
                 retry_on_exceptions=[ConnectionError, TimeoutError],
@@ -199,7 +199,7 @@ class RetryConfigurationService:
                 retry_on_exceptions=[ConnectionError], operation_timeout=15.0,
                 description="API authentication with minimal retries"
             ),
-            
+
             # Critical Operation Templates
             ConfigTemplate(
                 name="critical_high_availability", domain="critical", operation_type="high_availability",
@@ -209,7 +209,7 @@ class RetryConfigurationService:
                 enable_circuit_breaker=True, failure_threshold=3,
                 description="High availability operations with extensive retries"
             ),
-            
+
             # Background Task Templates
             ConfigTemplate(
                 name="background_async", domain="background", operation_type="async_processing",
@@ -219,89 +219,120 @@ class RetryConfigurationService:
                 description="Background async processing with long delays"
             ),
         ]
-        
+
         for template in templates:
             self._templates[f"{template.domain}_{template.operation_type}"] = template
             self.logger.debug(f"Registered template: {template.name} ({template.domain}.{template.operation_type})")
-    
-    @lru_cache(maxsize=100)
+
+    async def get_template_async(self, domain: str, operation: str) -> ConfigTemplate | None:
+        """Get configuration template for domain and operation type (unified cache)."""
+        cache = get_cache(CacheType.APPLICATION)
+        cache_key = f"retry_template:{domain}_{operation}"
+
+        def lookup_template() -> ConfigTemplate | None:
+            """Internal template lookup function for cache fallback."""
+            key = f"{domain}_{operation}"
+            template = self._templates.get(key)
+            if template:
+                self.logger.debug(f"Retrieved template: {key}")
+            return template
+
+        return await cache.get_or_set(
+            cache_key,
+            lookup_template,
+            l1_ttl=7200,  # Cache for 2 hours - templates are relatively stable
+            l2_ttl=14400  # Longer TTL in L2 for frequently accessed templates
+        )
+
     def get_template(self, domain: str, operation: str) -> ConfigTemplate | None:
-        """Get configuration template for domain and operation type."""
-        key = f"{domain}_{operation}"
-        template = self._templates.get(key)
-        if template:
-            self.logger.debug(f"Retrieved template: {key}")
-        return template
-    
+        """Get configuration template for domain and operation type.
+
+        Backward compatible sync wrapper using unified cache infrastructure.
+        """
+        try:
+            # Check if we're in an async context
+            loop = asyncio.get_running_loop()
+            # If we're already in an event loop, fall back to direct lookup
+            # This avoids blocking the event loop
+            self.logger.debug(f"Template lookup for {domain}_{operation} called from async context, using direct lookup")
+            key = f"{domain}_{operation}"
+            template = self._templates.get(key)
+            if template:
+                self.logger.debug(f"Retrieved template: {key}")
+            return template
+        except RuntimeError:
+            # No running event loop, safe to create one
+            return asyncio.run(self.get_template_async(domain, operation))
+
     def create_config(
-        self, 
+        self,
         template_name: str | None = None,
-        domain: str = "general", 
+        domain: str = "general",
         operation: str = "default",
         **overrides: Any
     ) -> RetryConfig:
         """Create retry configuration from template with overrides."""
         start_time = time.perf_counter()
-        
+
         # Get template or use default
         if template_name and "_" in template_name:
             template = self._templates.get(template_name)
         else:
             template = self.get_template(domain, operation)
-            
+
         if not template:
             # Create default template if none found
             template = ConfigTemplate(
                 name=f"{domain}_{operation}", domain=domain, operation_type=operation,
                 description=f"Default template for {domain}.{operation}"
             )
-        
+
         # Create configuration with overrides
         config = template.to_retry_config(**overrides)
-        
+
         # Cache the result
         cache_key = f"{template.name}_{hash(frozenset(overrides.items()))}"
         self._config_cache[cache_key] = (config, time.time())
-        
+
         duration_ms = (time.perf_counter() - start_time) * 1000
         self.logger.debug(f"Created config {cache_key} in {duration_ms:.3f}ms")
-        
+
         return config
-    
+
     def get_cached_config(self, cache_key: str) -> RetryConfig | None:
         """Get cached configuration by key (<1ms lookup)."""
         if cache_key not in self._config_cache:
             return None
-            
+
         config, timestamp = self._config_cache[cache_key]
-        
+
         # Check TTL
         if time.time() - timestamp > self._cache_ttl:
             del self._config_cache[cache_key]
             return None
-            
+
         return config
-    
+
     def update_template(self, template: ConfigTemplate) -> None:
         """Update or add configuration template at runtime."""
         key = f"{template.domain}_{template.operation_type}"
         self._templates[key] = template
-        
+
         # Clear related cache entries
         self.get_template.cache_clear()
-        keys_to_remove = [k for k in self._config_cache.keys() if template.name in k]
+        keys_to_remove = [k for k in self._config_cache if template.name in k]
         for key in keys_to_remove:
             del self._config_cache[key]
-            
+
         self.logger.info(f"Updated template: {template.name}")
-    
+
     def list_templates(self, domain: str | None = None) -> list[ConfigTemplate]:
         """List available templates, optionally filtered by domain."""
         templates = list(self._templates.values())
         if domain:
             templates = [t for t in templates if t.domain == domain]
         return sorted(templates, key=lambda t: (t.domain, t.operation_type))
-    
+
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics for monitoring."""
         cache_info = self.get_template.cache_info()
@@ -312,7 +343,7 @@ class RetryConfigurationService:
             "config_cache_size": len(self._config_cache),
             "registered_templates": len(self._templates),
         }
-    
+
     def clear_expired_cache(self) -> None:
         """Clear expired cache entries."""
         current_time = time.time()
@@ -322,7 +353,7 @@ class RetryConfigurationService:
         ]
         for key in expired_keys:
             del self._config_cache[key]
-        
+
         if expired_keys:
             self.logger.debug(f"Cleared {len(expired_keys)} expired cache entries")
 

@@ -1,4 +1,4 @@
-"""Performance Testing Components
+"""Performance Testing Components.
 
 Modern A/B testing with 2025 best practices and performance testing tools.
 """

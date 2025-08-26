@@ -1,10 +1,8 @@
 """Verification script to detect unused dependencies in the codebase."""
 
 import ast
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 
 def extract_imports_from_file(file_path: Path) -> set[str]:
@@ -18,9 +16,8 @@ def extract_imports_from_file(file_path: Path) -> set[str]:
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.add(alias.name.split(".")[0])
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    imports.add(node.module.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module.split(".")[0])
     except (UnicodeDecodeError, SyntaxError):
         pass
     return imports
@@ -41,7 +38,7 @@ def parse_requirements(req_file: Path) -> list[str]:
     packages = []
     if not req_file.exists():
         return packages
-    with open(req_file) as f:
+    with open(req_file, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line and (not line.startswith("#")) and (not line.startswith("-e")):

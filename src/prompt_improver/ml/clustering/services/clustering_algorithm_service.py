@@ -14,7 +14,8 @@ import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
 
 from . import ClusteringAlgorithmProtocol, ClusteringResult
 
@@ -29,7 +30,9 @@ except ImportError:
     warnings.warn("HDBSCAN not available. Install with: pip install hdbscan")
 
 try:
-    from sklearn.cluster import KMeans, DBSCAN
+    # Test if sklearn clustering is available
+    sklearn = get_sklearn()
+    _ = sklearn.cluster
     SKLEARN_CLUSTERING_AVAILABLE = True
 except ImportError:
     SKLEARN_CLUSTERING_AVAILABLE = False
@@ -76,7 +79,7 @@ class ClusteringAlgorithmService:
             available = ["hdbscan", "kmeans", "dbscan"]
             raise ValueError(f"Unknown algorithm '{self.algorithm}'. Available: {available}")
 
-    def fit_predict(self, X: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> np.ndarray:
+    def fit_predict(self, X: get_numpy().ndarray, sample_weights: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Fit clustering model and predict cluster labels."""
         start_time = time.time()
         
@@ -95,16 +98,16 @@ class ClusteringAlgorithmService:
             fit_time = time.time() - start_time
             
             logger.info(f"Clustering completed in {fit_time:.2f}s: "
-                       f"{len(set(labels))} clusters, {np.sum(labels == -1)} noise points")
+                       f"{len(set(labels))} clusters, {get_numpy().sum(labels == -1)} noise points")
             
             return labels
             
         except Exception as e:
             logger.error(f"Clustering failed: {e}")
             # Return default single cluster assignment
-            return np.zeros(X.shape[0], dtype=int)
+            return get_numpy().zeros(X.shape[0], dtype=int)
 
-    def get_cluster_centers(self, X: np.ndarray, labels: np.ndarray) -> Optional[np.ndarray]:
+    def get_cluster_centers(self, X: get_numpy().ndarray, labels: get_numpy().ndarray) -> Optional[get_numpy().ndarray]:
         """Compute cluster centers from features and labels."""
         try:
             unique_labels = set(labels)
@@ -117,11 +120,11 @@ class ClusteringAlgorithmService:
             centers = []
             for cluster_id in sorted(unique_labels):
                 cluster_mask = labels == cluster_id
-                if np.any(cluster_mask):
-                    center = np.mean(X[cluster_mask], axis=0)
+                if get_numpy().any(cluster_mask):
+                    center = get_numpy().mean(X[cluster_mask], axis=0)
                     centers.append(center)
             
-            return np.array(centers) if centers else None
+            return get_numpy().array(centers) if centers else None
             
         except Exception as e:
             logger.warning(f"Could not compute cluster centers: {e}")
@@ -161,17 +164,19 @@ class ClusteringAlgorithmService:
         elif self.algorithm == "kmeans":
             if not SKLEARN_CLUSTERING_AVAILABLE:
                 raise ImportError("scikit-learn not available")
-            return KMeans(**params)
+            sklearn = get_sklearn()
+            return sklearn.cluster.KMeans(**params)
         
         elif self.algorithm == "dbscan":
             if not SKLEARN_CLUSTERING_AVAILABLE:
                 raise ImportError("scikit-learn not available")
-            return DBSCAN(**params)
+            sklearn = get_sklearn()
+            return sklearn.cluster.DBSCAN(**params)
         
         else:
             raise ValueError(f"Unknown algorithm: {self.algorithm}")
 
-    def _get_adaptive_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+    def _get_adaptive_parameters(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Get adaptive parameters based on data characteristics."""
         n_samples, n_features = X.shape
         params = self.algorithm_params.copy()
@@ -219,7 +224,7 @@ class ClusteringAlgorithmService:
             # Adaptive K-means parameters
             if "n_clusters" not in params:
                 # Heuristic for number of clusters
-                params["n_clusters"] = min(10, max(2, int(np.sqrt(n_samples / 2))))
+                params["n_clusters"] = min(10, max(2, int(get_numpy().sqrt(n_samples / 2))))
             
             if "random_state" not in params:
                 params["random_state"] = 42
@@ -231,18 +236,18 @@ class ClusteringAlgorithmService:
             # Adaptive DBSCAN parameters
             if "eps" not in params:
                 # Heuristic for epsilon based on data scale
-                from sklearn.neighbors import NearestNeighbors
-                nbrs = NearestNeighbors(n_neighbors=min(10, n_samples // 10))
+                sklearn = get_sklearn()
+                nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=min(10, n_samples // 10))
                 nbrs.fit(X)
                 distances, _ = nbrs.kneighbors(X)
-                params["eps"] = np.percentile(distances[:, -1], 90)
+                params["eps"] = get_numpy().percentile(distances[:, -1], 90)
             
             if "min_samples" not in params:
                 params["min_samples"] = max(3, min(10, n_samples // 100))
         
         return params
 
-    def _standard_fit_predict(self, X: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> np.ndarray:
+    def _standard_fit_predict(self, X: get_numpy().ndarray, sample_weights: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Standard fit and predict for manageable dataset sizes."""
         if self.algorithm == "hdbscan":
             # HDBSCAN doesn't use sample_weights in fit_predict
@@ -257,7 +262,7 @@ class ClusteringAlgorithmService:
         
         return labels
 
-    def _batch_fit_predict(self, X: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> np.ndarray:
+    def _batch_fit_predict(self, X: get_numpy().ndarray, sample_weights: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Batch processing for large datasets."""
         logger.info(f"Using batch processing with batch_size={self.batch_size}")
         
@@ -265,7 +270,7 @@ class ClusteringAlgorithmService:
         # In production, this would be more sophisticated
         if X.shape[0] > self.batch_size:
             # Sample data for initial fitting
-            sample_indices = np.random.choice(X.shape[0], self.batch_size, replace=False)
+            sample_indices = get_numpy().random.choice(X.shape[0], self.batch_size, replace=False)
             X_sample = X[sample_indices]
             
             # Fit on sample
@@ -287,7 +292,7 @@ class ClusteringAlgorithmService:
         
         return labels
 
-    def get_cluster_probabilities(self) -> Optional[np.ndarray]:
+    def get_cluster_probabilities(self) -> Optional[get_numpy().ndarray]:
         """Get cluster membership probabilities if available."""
         if not self.is_fitted or not self.clusterer:
             return None
@@ -297,7 +302,7 @@ class ClusteringAlgorithmService:
         
         return None
 
-    def get_cluster_persistence(self) -> Optional[np.ndarray]:
+    def get_cluster_persistence(self) -> Optional[get_numpy().ndarray]:
         """Get cluster persistence values if available (HDBSCAN specific)."""
         if not self.is_fitted or not self.clusterer:
             return None
@@ -307,7 +312,7 @@ class ClusteringAlgorithmService:
         
         return None
 
-    def predict_new_points(self, X_new: np.ndarray) -> np.ndarray:
+    def predict_new_points(self, X_new: get_numpy().ndarray) -> get_numpy().ndarray:
         """Predict cluster membership for new points."""
         if not self.is_fitted:
             raise ValueError("Clusterer must be fitted before predicting")
@@ -318,18 +323,18 @@ class ClusteringAlgorithmService:
             else:
                 # Fallback: assign to nearest cluster center
                 if hasattr(self, "_cluster_centers") and self._cluster_centers is not None:
-                    from sklearn.neighbors import NearestNeighbors
-                    nbrs = NearestNeighbors(n_neighbors=1)
+                    sklearn = get_sklearn()
+                    nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=1)
                     nbrs.fit(self._cluster_centers)
                     _, indices = nbrs.kneighbors(X_new)
                     return indices.flatten()
                 else:
                     # Default to cluster 0
-                    return np.zeros(X_new.shape[0], dtype=int)
+                    return get_numpy().zeros(X_new.shape[0], dtype=int)
         
         except Exception as e:
             logger.warning(f"Prediction failed: {e}")
-            return np.zeros(X_new.shape[0], dtype=int)
+            return get_numpy().zeros(X_new.shape[0], dtype=int)
 
     def get_cluster_hierarchy(self) -> Optional[Dict[str, Any]]:
         """Get cluster hierarchy information if available (HDBSCAN specific)."""
@@ -410,7 +415,7 @@ class ClusteringAlgorithmServiceFactory:
         elif SKLEARN_CLUSTERING_AVAILABLE:
             # Fallback to K-means for large datasets, DBSCAN for smaller
             if n_samples > 5000:
-                n_clusters = min(20, max(2, int(np.sqrt(n_samples / 2))))
+                n_clusters = min(20, max(2, int(get_numpy().sqrt(n_samples / 2))))
                 return ClusteringAlgorithmService(algorithm="kmeans", n_clusters=n_clusters, **kwargs)
             else:
                 return ClusteringAlgorithmService(algorithm="dbscan", **kwargs)

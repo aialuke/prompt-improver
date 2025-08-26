@@ -5,7 +5,6 @@ Testing actual SLA calculations and breach detection
 
 import asyncio
 import time
-from typing import List, Tuple
 
 import pytest
 
@@ -73,7 +72,7 @@ class TestSLAMeasurement:
             alert_cooldown_seconds=5,
         )
         measurement = SLAMeasurement(target)
-        for i in range(10):
+        for _i in range(10):
             measurement.add_measurement(0.05)
         assert measurement.should_alert() is True
         measurement.last_alert_time = time.time()
@@ -106,7 +105,7 @@ class TestSLAMonitor:
         assert 40 <= p50_data["current_value"] <= 60
         assert p50_data["status"] == SLAStatus.MEETING.value
         assert 90 <= p95_data["current_value"] <= 110
-        assert p95_data["status"] in [SLAStatus.MEETING.value, SLAStatus.AT_RISK.value]
+        assert p95_data["status"] in {SLAStatus.MEETING.value, SLAStatus.AT_RISK.value}
         assert 140 <= p99_data["current_value"] <= 260
 
     def test_sla_monitor_availability_tracking(self):
@@ -191,10 +190,10 @@ class TestSLAMonitor:
         report = monitor.get_sla_report()
         queue_sla = report["sla_targets"]["queue_depth"]
         assert queue_sla["current_value"] > 800
-        assert queue_sla["status"] in [
+        assert queue_sla["status"] in {
             SLAStatus.AT_RISK.value,
             SLAStatus.BREACHING.value,
-        ]
+        }
         cache_sla = report["sla_targets"]["cache_hit_rate"]
         assert 0.85 <= cache_sla["current_value"] <= 0.95
 
@@ -212,7 +211,7 @@ class TestSLAMonitor:
         assert "sla_response_time_p50_compliance_ratio" in metrics
         assert "sla_response_time_p50_status" in metrics
         assert isinstance(metrics["sla_response_time_p50_status"], (int, float))
-        assert metrics["sla_response_time_p50_status"] in [0, 1, 2]
+        assert metrics["sla_response_time_p50_status"] in {0, 1, 2}
         assert 0 <= metrics["sla_response_time_p50_compliance_ratio"] <= 1
 
     def test_sla_monitor_registry(self):
@@ -261,5 +260,5 @@ def test_sla_calculation_edge_cases():
     report = monitor.get_sla_report()
     assert report["total_checks"] == 1
     assert report["overall_availability"] == 1.0
-    for sla_name, sla_data in report["sla_targets"].items():
+    for sla_data in report["sla_targets"].values():
         assert sla_data["current_value"] is not None

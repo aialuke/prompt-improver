@@ -17,20 +17,15 @@ Zero regression tolerance - all existing functionality must continue to work.
 import asyncio
 import json
 import logging
-import os
 import sqlite3
 import sys
 import time
-import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-
-import pytest
-import requests
+from typing import Any
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -150,7 +145,7 @@ class ComprehensiveRegressionTester:
         baseline_file = self.baseline_data_path / "baseline_behaviors.json"
         if baseline_file.exists():
             try:
-                with open(baseline_file) as f:
+                with open(baseline_file, encoding="utf-8") as f:
                     self.baseline_behaviors = json.load(f)
                 logger.info(
                     "Loaded %s baseline behaviors", len(self.baseline_behaviors)
@@ -166,11 +161,11 @@ class ComprehensiveRegressionTester:
         """Save current behavior as baseline for future regression testing."""
         baseline_file = self.baseline_data_path / "baseline_behaviors.json"
         try:
-            with open(baseline_file, "w") as f:
+            with open(baseline_file, "w", encoding="utf-8") as f:
                 json.dump(self.baseline_behaviors, f, indent=2, default=str)
             logger.info("Baseline behaviors saved successfully")
         except Exception as e:
-            logger.error("Failed to save baseline data: %s", e)
+            logger.exception("Failed to save baseline data: %s", e)
 
     def _register_regression_tests(self):
         """Register all regression test cases."""
@@ -386,7 +381,7 @@ class ComprehensiveRegressionTester:
         )
 
     async def run_regression_tests(
-        self, categories: list[str] = None, update_baselines: bool = False
+        self, categories: list[str] | None = None, update_baselines: bool = False
     ) -> RegressionSuiteReport:
         """Run comprehensive regression test suite.
 
@@ -481,7 +476,7 @@ class ComprehensiveRegressionTester:
         except Exception as e:
             result.status = "fail"
             result.error_message = str(e)
-            logger.error("Regression test {test_case.test_name} failed: %s", e)
+            logger.exception("Regression test {test_case.test_name} failed: %s", e)
         result.execution_time_seconds = time.time() - start_time
         result.memory_usage_mb = self._get_memory_usage() - start_memory
         result.end_time = aware_utc_now()
@@ -916,7 +911,7 @@ class ComprehensiveRegressionTester:
 
 async def run_comprehensive_regression_tests(
     output_path: Path = Path("./comprehensive_regression_report.json"),
-    categories: list[str] = None,
+    categories: list[str] | None = None,
     update_baselines: bool = False,
     strict_checking: bool = True,
 ) -> RegressionSuiteReport:
@@ -958,7 +953,7 @@ async def run_comprehensive_regression_tests(
         "test_duration_minutes": report.test_duration_minutes,
         "generated_at": report.generated_at.isoformat(),
     }
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(report_data, f, indent=2)
     summary = tester.generate_regression_summary(report)
     print(summary)

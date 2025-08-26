@@ -8,7 +8,6 @@ refactors and keeps compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
 
 try:  # Prefer real OTEL metrics when present
     from prompt_improver.monitoring.opentelemetry.metrics import get_http_metrics

@@ -13,18 +13,12 @@ import asyncio
 import json
 import sys
 import tempfile
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import mlflow
 import numpy as np
 import pandas as pd
-
-from prompt_improver.database.analytics_query_interface import (
-    AnalyticsQueryInterface,
-    MetricType,
-    TimeGranularity,
-)
 
 sys.path.insert(0, "src")
 
@@ -203,7 +197,7 @@ class RealDataScenariosTest:
                 if hasattr(model, "feature_importances_"):
                     feature_importance = model.feature_importances_
                     top_features = np.argsort(feature_importance)[-10:]
-                    for i, feature_idx in enumerate(top_features):
+                    for _i, feature_idx in enumerate(top_features):
                         mlflow.log_metric(
                             f"feature_importance_{feature_idx}",
                             feature_importance[feature_idx],
@@ -270,16 +264,14 @@ class RealDataScenariosTest:
         print(f"  • Simulating {experiment_count} experiments")
         print(f"  • {updates_per_second} updates/second for {duration_seconds} seconds")
         print(f"  • Total updates: {total_updates}")
-        experiments = []
-        for exp_id in range(experiment_count):
-            experiments.append({
+        experiments = [{
                 "experiment_id": f"exp_{exp_id}",
                 "variant_a_conversion": 0.1 + np.random.normal(0, 0.02),
                 "variant_b_conversion": 0.12 + np.random.normal(0, 0.02),
                 "sample_size_a": 0,
                 "sample_size_b": 0,
                 "total_updates": 0,
-            })
+            } for exp_id in range(experiment_count)]
         print("  • Processing high-frequency updates...")
         start_time = asyncio.get_event_loop().time()
         processed_updates = 0
@@ -605,7 +597,7 @@ class RealDataScenariosTest:
                 print(f"  • Avg operation time: {result['avg_operation_time']:.3f}s")
                 print(f"  • Connection wait: {result['avg_connection_wait']:.3f}s")
         results_file = self.temp_dir / "real_data_scenarios_results.json"
-        with open(results_file, "w") as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(self.test_results, f, indent=2, default=str)
         print(f"\n📄 Detailed results saved: {results_file}")
 

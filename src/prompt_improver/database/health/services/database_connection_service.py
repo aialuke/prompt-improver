@@ -6,7 +6,7 @@ health metrics and analysis.
 
 Features:
 - Connection pool utilization tracking
-- Connection age and lifecycle monitoring  
+- Connection age and lifecycle monitoring
 - Connection state analysis
 - Problematic connection identification
 - Pool efficiency scoring
@@ -15,64 +15,65 @@ Features:
 
 import time
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import text
 
 from prompt_improver.core.common import get_logger
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
-from .health_protocols import DatabaseConnectionServiceProtocol
-from .health_types import ConnectionHealthMetrics
+from prompt_improver.database.health.services.health_types import (
+    ConnectionHealthMetrics,
+)
+from prompt_improver.shared.interfaces.protocols.database import SessionManagerProtocol
 
 logger = get_logger(__name__)
 
 
 class DatabaseConnectionService:
     """Service for database connection health monitoring and assessment.
-    
+
     This service provides comprehensive monitoring of database connections,
     including pool utilization, connection lifecycle, and health assessment.
     """
-    
-    def __init__(self, session_manager: SessionManagerProtocol):
+
+    def __init__(self, session_manager: SessionManagerProtocol) -> None:
         """Initialize the connection service.
-        
+
         Args:
             session_manager: Database session manager for executing queries
         """
         self.session_manager = session_manager
-        
+
         # Configuration thresholds
         self.max_connection_lifetime_seconds = 1800  # 30 minutes
         self.long_query_threshold_seconds = 300      # 5 minutes
         self.utilization_warning_threshold = 80.0    # 80%
         self.utilization_critical_threshold = 95.0   # 95%
-    
-    async def collect_connection_metrics(self) -> Dict[str, Any]:
+
+    async def collect_connection_metrics(self) -> dict[str, Any]:
         """Collect comprehensive connection pool metrics.
-        
+
         Returns:
             Dictionary containing detailed connection metrics
         """
         logger.debug("Collecting database connection pool metrics")
         start_time = time.perf_counter()
-        
+
         try:
             # Get connection info from session manager
             connection_info = await self.session_manager.get_connection_info()
-            
+
             # Get detailed connection information
             connection_details = await self.get_connection_details()
-            
+
             # Analyze connection patterns
             age_stats = self.analyze_connection_ages(connection_details)
             state_stats = self.analyze_connection_states(connection_details)
-            
+
             # Calculate utilization metrics
             current_size = connection_info.get("pool_size", 0)
             active_count = state_stats["active"]
             utilization = active_count / current_size * 100 if current_size > 0 else 0
-            
+
             # Build comprehensive metrics
             metrics = ConnectionHealthMetrics(
                 pool_configuration={
@@ -119,26 +120,26 @@ class DatabaseConnectionService:
                 ),
                 collection_time_ms=round((time.perf_counter() - start_time) * 1000, 2)
             )
-            
+
             return self._metrics_to_dict(metrics)
-            
+
         except Exception as e:
-            logger.error(f"Failed to collect connection pool metrics: {e}")
+            logger.exception(f"Failed to collect connection pool metrics: {e}")
             return {
                 "error": str(e),
                 "timestamp": datetime.now(UTC).isoformat(),
                 "collection_time_ms": (time.perf_counter() - start_time) * 1000,
             }
-    
-    async def get_connection_details(self) -> List[Dict[str, Any]]:
+
+    async def get_connection_details(self) -> list[dict[str, Any]]:
         """Get detailed connection information from pg_stat_activity.
-        
+
         Returns:
             List of connection details with timing and state information
         """
         async with self.session_manager.session_context() as session:
             query = text("""
-                SELECT 
+                SELECT
                     pid,
                     usename,
                     application_name,
@@ -156,15 +157,15 @@ class DatabaseConnectionService:
                     backend_type,
                     wait_event_type,
                     wait_event
-                FROM pg_stat_activity 
+                FROM pg_stat_activity
                 WHERE backend_type = 'client backend'
                     AND pid IS NOT NULL
                 ORDER BY backend_start
             """)
-            
+
             result = await session.execute(query)
             rows = result.fetchall()
-            
+
             connections = []
             for row in rows:
                 connection_info = {
@@ -179,7 +180,7 @@ class DatabaseConnectionService:
                     "wait_event_type": row[15],
                     "wait_event": row[16],
                 }
-                
+
                 # Calculate connection age
                 if row[6]:
                     connection_info["age_seconds"] = (
@@ -187,7 +188,7 @@ class DatabaseConnectionService:
                     ).total_seconds()
                 else:
                     connection_info["age_seconds"] = 0.0
-                
+
                 # Calculate query duration
                 if row[8]:
                     connection_info["query_duration_seconds"] = (
@@ -195,17 +196,17 @@ class DatabaseConnectionService:
                     ).total_seconds()
                 else:
                     connection_info["query_duration_seconds"] = 0.0
-                
+
                 connections.append(connection_info)
-            
+
             return connections
-    
-    def analyze_connection_ages(self, connections: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    def analyze_connection_ages(self, connections: list[dict[str, Any]]) -> dict[str, Any]:
         """Analyze connection age distribution and identify old connections.
-        
+
         Args:
             connections: List of connection details
-            
+
         Returns:
             Dictionary with age analysis statistics
         """
@@ -218,12 +219,12 @@ class DatabaseConnectionService:
                 "over_max_lifetime_count": 0,
                 "age_distribution": {},
             }
-        
+
         ages = [conn["age_seconds"] for conn in connections]
         over_max_lifetime = [
             age for age in ages if age > self.max_connection_lifetime_seconds
         ]
-        
+
         # Age distribution buckets
         distribution = {
             "0-5min": len([age for age in ages if age <= 300]),
@@ -231,7 +232,7 @@ class DatabaseConnectionService:
             "30min-2h": len([age for age in ages if 1800 < age <= 7200]),
             "2h+": len([age for age in ages if age > 7200]),
         }
-        
+
         return {
             "total_connections": len(connections),
             "average_age_seconds": sum(ages) / len(ages),
@@ -240,13 +241,13 @@ class DatabaseConnectionService:
             "over_max_lifetime_count": len(over_max_lifetime),
             "age_distribution": distribution,
         }
-    
-    def analyze_connection_states(self, connections: List[Dict[str, Any]]) -> Dict[str, int]:
+
+    def analyze_connection_states(self, connections: list[dict[str, Any]]) -> dict[str, int]:
         """Analyze connection state distribution.
-        
+
         Args:
             connections: List of connection details
-            
+
         Returns:
             Dictionary with connection state counts
         """
@@ -258,48 +259,48 @@ class DatabaseConnectionService:
             "fastpath_function_call": 0,
             "disabled": 0,
         }
-        
+
         for conn in connections:
             state = conn.get("state", "unknown")
             if state in states:
                 states[state] += 1
             else:
                 states["disabled"] += 1
-        
+
         return states
-    
-    def identify_problematic_connections(self, connections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def identify_problematic_connections(self, connections: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Identify connections that may be problematic.
-        
+
         Args:
             connections: List of connection details
-            
+
         Returns:
             List of problematic connections with issue descriptions
         """
         problematic = []
-        
+
         for conn in connections:
             issues = []
-            
+
             # Check for long-running queries
             if conn["query_duration_seconds"] > self.long_query_threshold_seconds:
                 issues.append(
                     f"Long-running query: {conn['query_duration_seconds']:.1f}s"
                 )
-            
+
             # Check for old connections
             if conn["age_seconds"] > self.max_connection_lifetime_seconds:
                 issues.append(f"Old connection: {conn['age_seconds'] / 3600:.1f}h")
-            
+
             # Check for blocking
             if conn.get("wait_event_type") and "Lock" in conn["wait_event_type"]:
                 issues.append(f"Blocked: {conn['wait_event']}")
-            
+
             # Check for idle in transaction
             if conn.get("state") == "idle_in_transaction":
                 issues.append("Idle in transaction")
-            
+
             if issues:
                 problematic.append({
                     "pid": conn["pid"],
@@ -308,18 +309,18 @@ class DatabaseConnectionService:
                     "issues": issues,
                     "query": conn["current_query"][:100] if conn["current_query"] else None,
                 })
-        
+
         return problematic
-    
-    async def get_pool_health_summary(self) -> Dict[str, Any]:
+
+    async def get_pool_health_summary(self) -> dict[str, Any]:
         """Get connection pool health summary with status assessment.
-        
+
         Returns:
             Dictionary with health status and key metrics
         """
         try:
             metrics_dict = await self.collect_connection_metrics()
-            
+
             # Extract key metrics for assessment
             utilization = metrics_dict.get("utilization_metrics", {}).get(
                 "utilization_percent", 0
@@ -330,7 +331,7 @@ class DatabaseConnectionService:
             problematic_count = len(
                 metrics_dict.get("health_indicators", {}).get("problematic_connections", [])
             )
-            
+
             # Determine overall status
             if (
                 utilization > self.utilization_critical_threshold
@@ -345,7 +346,7 @@ class DatabaseConnectionService:
                 status = "warning"
             else:
                 status = "healthy"
-            
+
             return {
                 "status": status,
                 "utilization_percent": utilization,
@@ -358,37 +359,37 @@ class DatabaseConnectionService:
                 "summary": f"Pool utilization: {utilization:.1f}%, Efficiency: {efficiency_score:.1f}/100",
                 "detailed_metrics": metrics_dict,
             }
-            
+
         except Exception as e:
-            logger.error(f"Failed to get connection pool health summary: {e}")
+            logger.exception(f"Failed to get connection pool health summary: {e}")
             return {
                 "status": "error",
                 "error": str(e),
                 "summary": "Connection pool health check failed",
             }
-    
+
     def _calculate_efficiency_score(
-        self, state_stats: Dict[str, int], age_stats: Dict[str, Any]
+        self, state_stats: dict[str, int], age_stats: dict[str, Any]
     ) -> float:
         """Calculate pool efficiency score (0-100).
-        
+
         Args:
             state_stats: Connection state distribution
             age_stats: Connection age statistics
-            
+
         Returns:
             Pool efficiency score between 0 and 100
         """
         total_connections = sum(state_stats.values())
         if total_connections == 0:
             return 100.0
-        
+
         # Calculate ratios
         active_ratio = state_stats["active"] / total_connections
         idle_ratio = state_stats["idle"] / total_connections
         idle_in_transaction_ratio = state_stats["idle_in_transaction"] / total_connections
         long_lived_ratio = age_stats["over_max_lifetime_count"] / total_connections
-        
+
         # Weighted efficiency score
         efficiency = (
             active_ratio * 40          # Active connections are good
@@ -396,24 +397,24 @@ class DatabaseConnectionService:
             - idle_in_transaction_ratio * 30  # Idle in transaction is bad
             - long_lived_ratio * 40    # Long-lived connections are problematic
         ) * 100
-        
+
         return max(0.0, min(100.0, efficiency))
-    
+
     def _generate_pool_recommendations(
-        self, utilization: float, age_stats: Dict[str, Any], state_stats: Dict[str, int]
-    ) -> List[str]:
+        self, utilization: float, age_stats: dict[str, Any], state_stats: dict[str, int]
+    ) -> list[str]:
         """Generate connection pool optimization recommendations.
-        
+
         Args:
             utilization: Pool utilization percentage
             age_stats: Connection age statistics
             state_stats: Connection state distribution
-            
+
         Returns:
             List of recommendation strings
         """
         recommendations = []
-        
+
         # Utilization recommendations
         if utilization > self.utilization_critical_threshold:
             recommendations.append(
@@ -423,33 +424,33 @@ class DatabaseConnectionService:
             recommendations.append(
                 f"WARNING: Pool utilization at {utilization:.1f}% - monitor closely"
             )
-        
+
         # Age-based recommendations
         if age_stats["over_max_lifetime_count"] > 0:
             recommendations.append(
                 f"Found {age_stats['over_max_lifetime_count']} connections over max lifetime - consider connection recycling"
             )
-        
+
         # State-based recommendations
         if state_stats["idle_in_transaction"] > 0:
             recommendations.append(
                 f"Found {state_stats['idle_in_transaction']} idle-in-transaction connections - check application transaction handling"
             )
-        
+
         # Efficiency recommendations
         if utilization < 10 and sum(state_stats.values()) > 5:
             recommendations.append(
                 f"Low utilization ({utilization:.1f}%) - consider reducing pool size"
             )
-        
+
         return recommendations
-    
-    def _metrics_to_dict(self, metrics: ConnectionHealthMetrics) -> Dict[str, Any]:
+
+    def _metrics_to_dict(self, metrics: ConnectionHealthMetrics) -> dict[str, Any]:
         """Convert ConnectionHealthMetrics dataclass to dictionary.
-        
+
         Args:
             metrics: Connection health metrics dataclass
-            
+
         Returns:
             Dictionary representation of metrics
         """

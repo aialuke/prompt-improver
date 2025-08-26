@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 # Import Protocol interfaces for dependency injection
-from ....core.protocols.ml_protocols import (
+from ....shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     ComponentFactoryProtocol,
     ComponentRegistryProtocol,
@@ -28,7 +28,7 @@ from ....core.protocols.ml_protocols import (
     ResourceManagerProtocol,
     WorkflowEngineProtocol,
 )
-from ....core.protocols.retry_protocols import RetryManagerProtocol
+from ....shared.interfaces.protocols.core import RetryManagerProtocol
 
 # Import actual classes where protocols don't exist yet
 from ....security.input_sanitization import InputSanitizer

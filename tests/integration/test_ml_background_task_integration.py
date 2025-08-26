@@ -10,27 +10,18 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
-    AutoMLOrchestrator,
     create_automl_orchestrator,
 )
 from prompt_improver.ml.evaluation.experiment_orchestrator import (
-    ExperimentArm,
-    ExperimentConfiguration,
     ExperimentOrchestrator,
-    ExperimentType,
 )
 from prompt_improver.ml.lifecycle.ml_platform_integration import (
     MLPlatformIntegration,
-    create_ml_platform,
 )
-from prompt_improver.ml.orchestration.core.workflow_execution_engine import (
-    WorkflowExecutor,
-)
-from prompt_improver.ml.orchestration.events.adaptive_event_bus import AdaptiveEventBus
 from prompt_improver.performance.monitoring.health.background_manager import (
     EnhancedBackgroundTaskManager,
     TaskPriority,
@@ -86,7 +77,7 @@ class MLBackgroundTaskIntegrationValidator:
             logger.info("✅ AutoML Orchestrator integration test passed")
             return result
         except Exception as e:
-            logger.error("❌ AutoML Orchestrator integration test failed: %s", e)
+            logger.exception("❌ AutoML Orchestrator integration test failed: %s", e)
             return {"status": "failed", "error": str(e), "test_time": time.time()}
 
     async def test_experiment_orchestrator_integration(self) -> dict[str, Any]:
@@ -109,7 +100,7 @@ class MLBackgroundTaskIntegrationValidator:
             logger.info("✅ Experiment Orchestrator integration test passed")
             return result
         except Exception as e:
-            logger.error("❌ Experiment Orchestrator integration test failed: %s", e)
+            logger.exception("❌ Experiment Orchestrator integration test failed: %s", e)
             return {"status": "failed", "error": str(e), "test_time": time.time()}
 
     async def test_ml_platform_integration(self) -> dict[str, Any]:
@@ -139,7 +130,7 @@ class MLBackgroundTaskIntegrationValidator:
             logger.info("✅ ML Platform Integration test passed")
             return result
         except Exception as e:
-            logger.error("❌ ML Platform Integration test failed: %s", e)
+            logger.exception("❌ ML Platform Integration test failed: %s", e)
             return {"status": "failed", "error": str(e), "test_time": time.time()}
 
     async def test_task_lifecycle_management(self) -> dict[str, Any]:
@@ -190,7 +181,7 @@ class MLBackgroundTaskIntegrationValidator:
             logger.info("✅ Task lifecycle management test passed")
             return test_result
         except Exception as e:
-            logger.error("❌ Task lifecycle management test failed: %s", e)
+            logger.exception("❌ Task lifecycle management test failed: %s", e)
             return {"status": "failed", "error": str(e), "test_time": time.time()}
 
     async def test_task_cancellation_and_retry(self) -> dict[str, Any]:
@@ -226,7 +217,7 @@ class MLBackgroundTaskIntegrationValidator:
             logger.info("✅ Task cancellation test passed")
             return result
         except Exception as e:
-            logger.error("❌ Task cancellation test failed: %s", e)
+            logger.exception("❌ Task cancellation test failed: %s", e)
             return {"status": "failed", "error": str(e), "test_time": time.time()}
 
     async def run_comprehensive_validation(self) -> dict[str, Any]:
@@ -308,10 +299,9 @@ async def main():
             f"Task Success Rate: {results['task_manager_performance']['overall_success_rate']:.1%}"
         )
         print("=" * 80)
-        exit_code = 0 if results["integration_status"] == "SUCCESS" else 1
-        return exit_code
+        return 0 if results["integration_status"] == "SUCCESS" else 1
     except Exception as e:
-        logger.error("❌ Validation failed with error: %s", e)
+        logger.exception("❌ Validation failed with error: %s", e)
         return 1
     finally:
         await validator.cleanup()

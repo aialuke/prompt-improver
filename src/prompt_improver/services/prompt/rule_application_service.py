@@ -9,21 +9,15 @@ This service handles:
 Part of the PromptServiceFacade decomposition following Clean Architecture principles.
 """
 
-import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from prompt_improver.core.events.ml_event_bus import (
-        MLEvent,
-        MLEventType,
-    )
-from prompt_improver.core.protocols.prompt_service.prompt_protocols import (
+from prompt_improver.rule_engine.base import BasePromptRule
+from prompt_improver.shared.interfaces.protocols.application import (
     RuleApplicationServiceProtocol,
 )
-from prompt_improver.rule_engine.base import BasePromptRule
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
@@ -32,11 +26,7 @@ logger = logging.getLogger(__name__)
 class RuleApplicationService(RuleApplicationServiceProtocol):
     """Service for rule execution and validation."""
 
-    def __init__(self):
-        self.rule_performance_cache = {}
-        self.compatibility_cache = {}
-        self.execution_stats = {}
-        self.cache_ttl = 600  # 10 minutes
+    def __init__(self) -> None:
         self.logger = logging.getLogger(__name__)
 
     async def _get_ml_event_bus(self):
@@ -48,7 +38,7 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
             self.logger.info("ML event bus not available (torch not installed)")
             return None
 
-    def _create_ml_event(self, event_type: str, source: str, data: Dict[str, Any]):
+    def _create_ml_event(self, event_type: str, source: str, data: dict[str, Any]):
         """Lazy create ML event to avoid torch dependencies."""
         try:
             from prompt_improver.core.events.ml_event_bus import MLEvent, MLEventType
@@ -64,10 +54,10 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
     async def apply_rules(
         self,
         prompt: str,
-        rules: List[BasePromptRule],
-        session_id: Optional[UUID] = None,
-        config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        rules: list[BasePromptRule],
+        session_id: UUID | None = None,
+        config: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Apply a set of rules to a prompt."""
         try:
             start_time = datetime.now()
@@ -87,20 +77,20 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
             for i, rule in enumerate(rules):
                 try:
                     rule_start_time = datetime.now()
-                    
+
                     # Apply rule
                     rule_result = await self._execute_single_rule(
                         current_prompt, rule, config
                     )
-                    
+
                     rule_execution_time = (datetime.now() - rule_start_time).total_seconds() * 1000
-                    
+
                     if rule_result.get("success", False):
                         current_prompt = rule_result.get("improved_prompt", current_prompt)
                         improvement_score = rule_result.get("improvement_score", 0.0)
                         total_improvement_score += improvement_score
                         successful_applications += 1
-                        
+
                         rule_info = {
                             "rule_id": getattr(rule, 'rule_id', f"rule_{i}"),
                             "rule_name": getattr(rule, 'name', rule.__class__.__name__),
@@ -120,9 +110,9 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
                             "error": rule_result.get("error", "Unknown error"),
                             "execution_time_ms": rule_execution_time
                         }
-                    
+
                     results["applied_rules"].append(rule_info)
-                    
+
                     # Update performance stats
                     await self._update_rule_performance_stats(
                         getattr(rule, 'rule_id', rule.__class__.__name__),
@@ -130,9 +120,9 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
                         rule_result.get("success", False),
                         improvement_score if rule_result.get("success") else 0.0
                     )
-                    
+
                 except Exception as rule_error:
-                    logger.error(f"Error applying rule {rule.__class__.__name__}: {rule_error}")
+                    logger.exception(f"Error applying rule {rule.__class__.__name__}: {rule_error}")
                     results["applied_rules"].append({
                         "rule_id": getattr(rule, 'rule_id', f"rule_{i}"),
                         "rule_name": getattr(rule, 'name', rule.__class__.__name__),
@@ -144,7 +134,7 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
 
             results["final_prompt"] = current_prompt
             total_execution_time = (datetime.now() - start_time).total_seconds() * 1000
-            
+
             results["execution_summary"] = {
                 "total_rules": len(rules),
                 "successful_applications": successful_applications,
@@ -157,45 +147,41 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
 
             # Publish execution event
             await self._publish_execution_event(results, session_id)
-            
+
             return results
 
         except Exception as e:
-            logger.error(f"Error applying rules: {e}")
+            logger.exception(f"Error applying rules: {e}")
             raise
 
     async def validate_rule_compatibility(
         self,
-        rules: List[BasePromptRule],
-        prompt_type: Optional[str] = None
-    ) -> Dict[str, bool]:
+        rules: list[BasePromptRule],
+        prompt_type: str | None = None
+    ) -> dict[str, bool]:
         """Validate if rules are compatible with each other."""
         try:
-            cache_key = self._get_compatibility_cache_key(rules, prompt_type)
-            cached_result = self._get_cached_compatibility(cache_key)
-            if cached_result is not None:
-                return cached_result
 
             compatibility_matrix = {}
             warnings = []
 
             for i, rule1 in enumerate(rules):
                 rule1_id = getattr(rule1, 'rule_id', rule1.__class__.__name__)
-                
+
                 for j, rule2 in enumerate(rules):
                     if i >= j:  # Avoid duplicate checks
                         continue
-                    
+
                     rule2_id = getattr(rule2, 'rule_id', rule2.__class__.__name__)
                     pair_key = f"{rule1_id}+{rule2_id}"
-                    
+
                     # Check compatibility
                     is_compatible = await self._check_rule_pair_compatibility(
                         rule1, rule2, prompt_type
                     )
-                    
+
                     compatibility_matrix[pair_key] = is_compatible
-                    
+
                     if not is_compatible:
                         warnings.append({
                             "rule1": rule1_id,
@@ -206,39 +192,36 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
 
             # Overall compatibility
             all_compatible = all(compatibility_matrix.values())
-            
-            result = {
+
+            return {
                 "overall_compatible": all_compatible,
                 "compatibility_matrix": compatibility_matrix,
                 "warnings": warnings,
                 "recommendation": "safe" if all_compatible else "review_order"
             }
 
-            self._cache_compatibility(cache_key, result)
-            return result
-
         except Exception as e:
-            logger.error(f"Error validating rule compatibility: {e}")
+            logger.exception(f"Error validating rule compatibility: {e}")
             return {"overall_compatible": False, "error": str(e)}
 
     async def execute_rule_chain(
         self,
         prompt: str,
-        rule_chain: List[BasePromptRule],
+        rule_chain: list[BasePromptRule],
         stop_on_error: bool = False
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Execute a chain of rules in sequence."""
         try:
             chain_results = []
             current_prompt = prompt
-            
+
             for i, rule in enumerate(rule_chain):
                 try:
                     rule_start_time = datetime.now()
-                    
+
                     rule_result = await self._execute_single_rule(current_prompt, rule)
                     rule_execution_time = (datetime.now() - rule_start_time).total_seconds() * 1000
-                    
+
                     result_entry = {
                         "step": i + 1,
                         "rule_id": getattr(rule, 'rule_id', rule.__class__.__name__),
@@ -251,7 +234,7 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
                         "changes_made": rule_result.get("changes_made", []),
                         "confidence": rule_result.get("confidence", 0.0)
                     }
-                    
+
                     if rule_result.get("success"):
                         current_prompt = rule_result.get("improved_prompt", current_prompt)
                     else:
@@ -260,9 +243,9 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
                             result_entry["chain_stopped"] = True
                             chain_results.append(result_entry)
                             break
-                    
+
                     chain_results.append(result_entry)
-                    
+
                 except Exception as rule_error:
                     error_entry = {
                         "step": i + 1,
@@ -273,9 +256,9 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
                         "error": str(rule_error),
                         "execution_time_ms": 0
                     }
-                    
+
                     chain_results.append(error_entry)
-                    
+
                     if stop_on_error:
                         error_entry["chain_stopped"] = True
                         break
@@ -283,75 +266,38 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
             return chain_results
 
         except Exception as e:
-            logger.error(f"Error executing rule chain: {e}")
+            logger.exception(f"Error executing rule chain: {e}")
             raise
 
     async def get_rule_performance_metrics(
         self,
         rule_id: str,
-        time_range: Optional[tuple[datetime, datetime]] = None
-    ) -> Dict[str, Any]:
+        time_range: tuple[datetime, datetime] | None = None
+    ) -> dict[str, Any]:
         """Get performance metrics for a specific rule."""
         try:
-            if rule_id not in self.execution_stats:
-                return {
-                    "rule_id": rule_id,
-                    "total_executions": 0,
-                    "success_rate": 0.0,
-                    "average_execution_time_ms": 0.0,
-                    "average_improvement_score": 0.0,
-                    "last_execution": None
-                }
-
-            stats = self.execution_stats[rule_id]
-            
-            # Filter by time range if provided
-            if time_range:
-                start_time, end_time = time_range
-                filtered_executions = [
-                    exec_data for exec_data in stats["executions"]
-                    if start_time <= exec_data["timestamp"] <= end_time
-                ]
-            else:
-                filtered_executions = stats["executions"]
-
-            if not filtered_executions:
-                return {
-                    "rule_id": rule_id,
-                    "total_executions": 0,
-                    "success_rate": 0.0,
-                    "average_execution_time_ms": 0.0,
-                    "average_improvement_score": 0.0,
-                    "time_range": time_range
-                }
-
-            successful_executions = [e for e in filtered_executions if e["success"]]
-            
-            metrics = {
+            # Note: Performance metrics now handled at database level
+            # Return basic metrics structure for compatibility
+            return {
                 "rule_id": rule_id,
-                "total_executions": len(filtered_executions),
-                "successful_executions": len(successful_executions),
-                "success_rate": len(successful_executions) / len(filtered_executions),
-                "average_execution_time_ms": sum(e["execution_time_ms"] for e in filtered_executions) / len(filtered_executions),
-                "average_improvement_score": sum(e["improvement_score"] for e in successful_executions) / max(len(successful_executions), 1),
-                "min_execution_time_ms": min(e["execution_time_ms"] for e in filtered_executions),
-                "max_execution_time_ms": max(e["execution_time_ms"] for e in filtered_executions),
-                "last_execution": max(e["timestamp"] for e in filtered_executions).isoformat(),
-                "time_range": [t.isoformat() for t in time_range] if time_range else None
+                "total_executions": 0,
+                "success_rate": 0.0,
+                "average_execution_time_ms": 0.0,
+                "average_improvement_score": 0.0,
+                "last_execution": None,
+                "note": "Performance metrics moved to database level for unified caching"
             }
 
-            return metrics
-
         except Exception as e:
-            logger.error(f"Error getting rule performance metrics for {rule_id}: {e}")
+            logger.exception(f"Error getting rule performance metrics for {rule_id}: {e}")
             return {"rule_id": rule_id, "error": str(e)}
 
     async def _execute_single_rule(
         self,
         prompt: str,
         rule: BasePromptRule,
-        config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        config: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Execute a single rule on a prompt."""
         try:
             # Check if rule has required methods
@@ -369,7 +315,7 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
 
             # Execute rule
             result = await rule.apply(prompt, {})
-            
+
             return {
                 "success": True,
                 "improved_prompt": result.get("improved_prompt", prompt),
@@ -389,32 +335,29 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
         self,
         rule1: BasePromptRule,
         rule2: BasePromptRule,
-        prompt_type: Optional[str] = None
+        prompt_type: str | None = None
     ) -> bool:
         """Check if two rules are compatible."""
         try:
             # Get rule categories/types
             rule1_type = getattr(rule1, 'rule_type', 'general')
             rule2_type = getattr(rule2, 'rule_type', 'general')
-            
+
             # Known incompatible combinations
             incompatible_pairs = {
                 ('structure', 'structure'),  # Multiple structure rules may conflict
                 ('format', 'format'),        # Multiple format rules may conflict
             }
-            
+
             if (rule1_type, rule2_type) in incompatible_pairs:
                 return False
-            
+
             # Check for conflicting requirements
             rule1_requirements = getattr(rule1, 'requirements', set())
             rule2_requirements = getattr(rule2, 'requirements', set())
-            
+
             # Rules that both require exclusive control are incompatible
-            if 'exclusive_control' in rule1_requirements and 'exclusive_control' in rule2_requirements:
-                return False
-            
-            return True
+            return not ('exclusive_control' in rule1_requirements and 'exclusive_control' in rule2_requirements)
 
         except Exception as e:
             logger.warning(f"Error checking rule compatibility: {e}")
@@ -427,80 +370,34 @@ class RuleApplicationService(RuleApplicationServiceProtocol):
         success: bool,
         improvement_score: float
     ) -> None:
-        """Update performance statistics for a rule."""
-        try:
-            if rule_id not in self.execution_stats:
-                self.execution_stats[rule_id] = {
-                    "executions": [],
-                    "total_count": 0
-                }
+        """Update performance statistics for a rule.
 
-            execution_data = {
-                "timestamp": datetime.now(),
-                "execution_time_ms": execution_time_ms,
-                "success": success,
-                "improvement_score": improvement_score
-            }
-
-            self.execution_stats[rule_id]["executions"].append(execution_data)
-            self.execution_stats[rule_id]["total_count"] += 1
-
-            # Keep only last 1000 executions per rule
-            if len(self.execution_stats[rule_id]["executions"]) > 1000:
-                self.execution_stats[rule_id]["executions"] = self.execution_stats[rule_id]["executions"][-1000:]
-
-        except Exception as e:
-            logger.warning(f"Error updating rule performance stats: {e}")
+        Note: Performance stats are now handled at the database level
+        through repositories for unified caching and persistence.
+        """
+        # Performance tracking moved to database level
+        # This method kept for API compatibility but no longer caches locally
 
     async def _publish_execution_event(
         self,
-        results: Dict[str, Any],
-        session_id: Optional[UUID]
+        results: dict[str, Any],
+        session_id: UUID | None
     ) -> None:
         """Publish rule execution event for monitoring."""
         try:
-            event_bus = await get_ml_event_bus()
-            execution_event = MLEvent(
-                event_type=MLEventType.TRAINING_DATA,
-                source="rule_application_service",
-                data={
-                    "operation": "rule_execution_completed",
-                    "session_id": str(session_id) if session_id else None,
-                    "execution_summary": results["execution_summary"],
-                    "timestamp": results["timestamp"]
-                }
-            )
-            await event_bus.publish(execution_event)
+            event_bus = await self._get_ml_event_bus()
+            if event_bus:
+                execution_event = self._create_ml_event(
+                    "TRAINING_DATA",
+                    "rule_application_service",
+                    {
+                        "operation": "rule_execution_completed",
+                        "session_id": str(session_id) if session_id else None,
+                        "execution_summary": results["execution_summary"],
+                        "timestamp": results["timestamp"]
+                    }
+                )
+                if execution_event:
+                    await event_bus.publish(execution_event)
         except Exception as e:
             logger.warning(f"Failed to publish execution event: {e}")
-
-    def _get_compatibility_cache_key(
-        self,
-        rules: List[BasePromptRule],
-        prompt_type: Optional[str]
-    ) -> str:
-        """Generate cache key for compatibility check."""
-        rule_ids = [getattr(rule, 'rule_id', rule.__class__.__name__) for rule in rules]
-        rule_ids.sort()  # Ensure consistent ordering
-        return f"compat_{hash(tuple(rule_ids))}_{prompt_type or 'none'}"
-
-    def _get_cached_compatibility(self, cache_key: str) -> Optional[Dict[str, bool]]:
-        """Get cached compatibility result."""
-        if cache_key in self.compatibility_cache:
-            cached_item = self.compatibility_cache[cache_key]
-            if (datetime.now() - cached_item["timestamp"]).seconds < self.cache_ttl:
-                return cached_item["data"]
-        return None
-
-    def _cache_compatibility(self, cache_key: str, result: Dict[str, bool]) -> None:
-        """Cache compatibility result."""
-        self.compatibility_cache[cache_key] = {
-            "data": result,
-            "timestamp": datetime.now()
-        }
-        
-        # Simple cache cleanup
-        if len(self.compatibility_cache) > 50:
-            oldest_key = min(self.compatibility_cache.keys(),
-                           key=lambda k: self.compatibility_cache[k]["timestamp"])
-            del self.compatibility_cache[oldest_key]

@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from .performance_gap_analyzer import PerformanceGap
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 class DifficultyLevel(Enum):
     """Difficulty levels for synthetic data generation."""
@@ -221,8 +222,8 @@ class DifficultyDistributionAnalyzer:
         """Calculate overall complexity score from performance gaps."""
         if not performance_gaps:
             return 0.5
-        severity_complexity = np.mean([gap.severity for gap in performance_gaps])
-        confidence_complexity = 1.0 - np.mean([gap.confidence for gap in performance_gaps])
+        severity_complexity = get_numpy().mean([gap.severity for gap in performance_gaps])
+        confidence_complexity = 1.0 - get_numpy().mean([gap.confidence for gap in performance_gaps])
         type_complexity = len({gap.gap_type for gap in performance_gaps}) / 3.0
         overall_complexity = severity_complexity * 0.4 + confidence_complexity * 0.3 + type_complexity * 0.3
         return min(1.0, max(0.0, overall_complexity))
@@ -245,7 +246,7 @@ class DifficultyDistributionAnalyzer:
         """Calculate optimal hardness threshold for example classification."""
         base_threshold = hardness_analysis.get('optimal_threshold', 0.7)
         if performance_gaps:
-            avg_severity = np.mean([gap.severity for gap in performance_gaps])
+            avg_severity = get_numpy().mean([gap.severity for gap in performance_gaps])
             if avg_severity > 0.7:
                 base_threshold = max(0.5, base_threshold - 0.1)
             elif avg_severity < 0.3:
@@ -272,7 +273,7 @@ class DifficultyDistributionAnalyzer:
         base_priority = self.config['focus_area_weights'].get(area, 1.0)
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower() or area.lower() in str(gap.metadata).lower()]
         if relevant_gaps:
-            gap_impact = np.mean([gap.severity * gap.improvement_potential for gap in relevant_gaps])
+            gap_impact = get_numpy().mean([gap.severity * gap.improvement_potential for gap in relevant_gaps])
             gap_adjustment = 1.0 + gap_impact
         else:
             gap_adjustment = 1.0
@@ -285,7 +286,7 @@ class DifficultyDistributionAnalyzer:
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower()]
         if not relevant_gaps:
             return 'adaptive'
-        avg_severity = np.mean([gap.severity for gap in relevant_gaps])
+        avg_severity = get_numpy().mean([gap.severity for gap in relevant_gaps])
         if avg_severity >= 0.7:
             return 'hard'
         elif avg_severity >= 0.4:
@@ -308,7 +309,7 @@ class DifficultyDistributionAnalyzer:
         if not relevant_gaps:
             return 0.0
         relevance_score = len(relevant_gaps) / len(performance_gaps)
-        severity_weight = np.mean([gap.severity for gap in relevant_gaps])
+        severity_weight = get_numpy().mean([gap.severity for gap in relevant_gaps])
         return min(1.0, relevance_score * severity_weight * 2.0)
 
     def _calculate_area_complexity(self, area: str, performance_gaps: list[PerformanceGap]) -> float:
@@ -316,6 +317,6 @@ class DifficultyDistributionAnalyzer:
         relevant_gaps = [gap for gap in performance_gaps if area.lower() in gap.gap_type.lower()]
         if not relevant_gaps:
             return 0.5
-        severity_complexity = np.mean([gap.severity for gap in relevant_gaps])
-        confidence_complexity = 1.0 - np.mean([gap.confidence for gap in relevant_gaps])
+        severity_complexity = get_numpy().mean([gap.severity for gap in relevant_gaps])
+        confidence_complexity = 1.0 - get_numpy().mean([gap.confidence for gap in relevant_gaps])
         return (severity_complexity + confidence_complexity) / 2.0

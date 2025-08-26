@@ -48,7 +48,7 @@ class PerformanceMetricsWidget(Static):
         enable_slo_monitoring: bool = True,
         enable_adaptive_thresholds: bool = True,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.console = Console()
         self.logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class PerformanceMetricsWidget(Static):
             if self.enable_slo_monitoring:
                 self.update_slo_display()
         except Exception as e:
-            self.logger.error(f"Failed to update performance data: {e}")
+            self.logger.exception(f"Failed to update performance data: {e}")
             self.performance_data = {"error": str(e)}
             self.health_status = "error"
             self.update_display()

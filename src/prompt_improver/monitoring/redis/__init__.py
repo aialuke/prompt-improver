@@ -4,7 +4,7 @@ Focused Redis health monitoring services following Clean Architecture patterns.
 Replaces the 1473-line god object with specialized, focused services.
 
 Services:
-- RedisHealthChecker: Connection status and response time monitoring  
+- RedisHealthChecker: Connection status and response time monitoring
 - RedisConnectionMonitor: Connection pool management and failover detection
 - RedisMetricsCollector: Performance metrics and throughput analysis
 - RedisAlertingService: Incident detection and notification management
@@ -19,36 +19,38 @@ Features:
 """
 
 # Import new focused health services
-from .health import (
-    RedisHealthChecker,
-    RedisConnectionMonitor,
-    RedisMetricsCollector,
-    RedisAlertingService,
-    RedisRecoveryService,
-    RedisHealthManager,
-    DefaultRedisClientProvider,
-    RedisHealthStatus,
-    RedisRole,
-    HealthMetrics,
-    ConnectionPoolMetrics,
-    PerformanceMetrics,
+from prompt_improver.monitoring.redis.health import (
     AlertEvent,
+    ConnectionPoolMetrics,
+    DefaultRedisClientProvider,
+    HealthMetrics,
+    PerformanceMetrics,
     RecoveryEvent,
+    RedisAlertingService,
+    RedisConnectionMonitor,
+    RedisHealthChecker,
+    RedisHealthManager,
+    RedisHealthStatus,
+    RedisMetricsCollector,
+    RedisRecoveryService,
+    RedisRole,
 )
 
 # Legacy services (for compatibility)
 try:
-    from .protocols import (
+    from prompt_improver.monitoring.redis.services import (
+        RedisConnectionMonitor as LegacyRedisConnectionMonitor,
+    )
+    from prompt_improver.shared.interfaces.protocols.monitoring import (
         RedisConnectionMonitorProtocol,
         RedisHealthCheckerProtocol,
     )
-    from .services import RedisConnectionMonitor as LegacyRedisConnectionMonitor
 except ImportError:
     # Legacy services not available
     pass
 # Legacy types (for compatibility)
 try:
-    from .types import (
+    from prompt_improver.monitoring.redis.types import (
         ConnectionHealthStatus,
         RedisAlertLevel,
         RedisHealthConfig,
@@ -61,25 +63,23 @@ except ImportError:
     pass
 
 __all__ = [
-    # New focused services (recommended)
-    "RedisHealthChecker",
-    "RedisConnectionMonitor",
-    "RedisMetricsCollector", 
-    "RedisAlertingService",
-    "RedisRecoveryService",
-    "RedisHealthManager",
-    "DefaultRedisClientProvider",
-    
-    # New types
-    "RedisHealthStatus",
-    "RedisRole",
-    "HealthMetrics",
-    "ConnectionPoolMetrics",
-    "PerformanceMetrics",
     "AlertEvent",
+    "ConnectionPoolMetrics",
+    "DefaultRedisClientProvider",
+    "HealthMetrics",
+    "PerformanceMetrics",
     "RecoveryEvent",
-    
+    "RedisAlertingService",
+    "RedisConnectionMonitor",
     # Legacy compatibility (if available)
     "RedisConnectionMonitorProtocol",
+    # New focused services (recommended)
+    "RedisHealthChecker",
     "RedisHealthCheckerProtocol",
+    "RedisHealthManager",
+    # New types
+    "RedisHealthStatus",
+    "RedisMetricsCollector",
+    "RedisRecoveryService",
+    "RedisRole",
 ]

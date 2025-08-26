@@ -8,7 +8,6 @@ Replaces prometheus-based ML monitoring tests with OTel-native validation.
 
 import asyncio
 import time
-from typing import Any, Dict
 
 import pytest
 
@@ -67,11 +66,11 @@ class TestOpenTelemetryMLMonitoring:
 
     def test_ml_alerting_system(self):
         """Test ML metrics collection for alerting system using OpenTelemetry."""
-        for i in range(10):
+        for _i in range(10):
             self.ml_metrics.record_inference(
                 model_name="critical_system", duration_s=0.25, success=False
             )
-        for i in range(5):
+        for _i in range(5):
             self.ml_metrics.record_inference(
                 model_name="critical_system", duration_s=0.1, success=True
             )
@@ -209,12 +208,12 @@ class TestOpenTelemetryMLMonitoring:
     async def test_ml_alert_cooldown_functionality(self):
         """Test ML metrics collection for alert cooldown analysis."""
         critical_failure_rate = 0.25
-        for i in range(10):
+        for _i in range(10):
             self.ml_metrics.record_inference(
                 model_name="critical_alert_system", duration_s=0.5, success=False
             )
         await asyncio.sleep(0.1)
-        for i in range(5):
+        for _i in range(5):
             self.ml_metrics.record_inference(
                 model_name="critical_alert_system", duration_s=0.3, success=False
             )

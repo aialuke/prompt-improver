@@ -1,4 +1,4 @@
-"""Training Persistence Service - Clean Architecture Implementation
+"""Training Persistence Service - Clean Architecture Implementation.
 
 Implements database operations, session persistence, and recovery functionality.
 Extracted from training_system_manager.py (2109 lines) as part of decomposition.
@@ -9,18 +9,17 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.cli.services.training_protocols import TrainingPersistenceProtocol
-from prompt_improver.database import ManagerMode, get_database_services, get_sessionmanager
+from prompt_improver.database import ManagerMode, get_database_services
 
 
 class TrainingPersistence(TrainingPersistenceProtocol):
     """Training persistence service implementing Clean Architecture patterns.
-    
+
     Responsibilities:
     - Database operations for training sessions
     - Progress persistence and recovery
@@ -28,23 +27,23 @@ class TrainingPersistence(TrainingPersistenceProtocol):
     - Session state tracking
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger("apes.training_persistence")
         self._unified_session_manager = None
 
-    async def _ensure_database_services(self):
+    async def _ensure_database_services(self) -> None:
         """Ensure database services are available for persistence operations."""
         if self._unified_session_manager is None:
             self._unified_session_manager = await get_database_services(
                 ManagerMode.MCP_SERVER
             )
 
-    async def create_training_session(self, training_config: Dict[str, Any]) -> str:
+    async def create_training_session(self, training_config: dict[str, Any]) -> str:
         """Create training session using unified connection management.
-        
+
         Args:
             training_config: Training configuration dictionary
-            
+
         Returns:
             Created training session ID
         """
@@ -76,24 +75,24 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return session_id
 
         except Exception as e:
-            self.logger.error(f"Failed to create training session: {e}")
+            self.logger.exception(f"Failed to create training session: {e}")
             raise
 
     async def update_training_progress(
         self,
         session_id: str,
         iteration: int,
-        performance_metrics: Dict[str, float],
+        performance_metrics: dict[str, float],
         improvement_score: float = 0.0,
     ) -> bool:
         """Update training progress using unified connection management.
-        
+
         Args:
             session_id: Training session ID
             iteration: Current iteration number
             performance_metrics: Performance metrics dictionary
             improvement_score: Improvement score for this iteration
-            
+
         Returns:
             True if updated successfully, False otherwise
         """
@@ -107,7 +106,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             # Update training session progress in database
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    UPDATE training_sessions 
+                    UPDATE training_sessions
                     SET current_iteration = :iteration,
                         performance_metrics = :metrics,
                         improvement_score = :score,
@@ -137,15 +136,15 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to update training progress: {e}")
+            self.logger.exception(f"Failed to update training progress: {e}")
             return False
 
-    async def get_training_session_context(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_training_session_context(self, session_id: str) -> dict[str, Any] | None:
         """Get training session context from database.
-        
+
         Args:
             session_id: Training session ID
-            
+
         Returns:
             Training session context if available, None otherwise
         """
@@ -159,9 +158,9 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             # Get session data from database
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    SELECT session_id, config, status, current_iteration, 
+                    SELECT session_id, config, status, current_iteration,
                            performance_metrics, improvement_score, created_at, updated_at
-                    FROM training_sessions 
+                    FROM training_sessions
                     WHERE session_id = :session_id
                 """)
 
@@ -184,15 +183,15 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 return None
 
         except Exception as e:
-            self.logger.error(f"Failed to get training session context: {e}")
+            self.logger.exception(f"Failed to get training session context: {e}")
             return None
 
     async def save_training_progress(self, session_id: str) -> bool:
         """Save current training progress to database.
-        
+
         Args:
             session_id: Training session ID to save progress for
-            
+
         Returns:
             True if progress saved successfully, False otherwise
         """
@@ -206,7 +205,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             # Update session status to indicate progress save
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    UPDATE training_sessions 
+                    UPDATE training_sessions
                     SET status = 'paused',
                         updated_at = :updated_at,
                         progress_saved_at = :progress_saved_at
@@ -231,15 +230,15 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to save training progress: {e}")
+            self.logger.exception(f"Failed to save training progress: {e}")
             return False
 
     async def create_checkpoint(self, session_id: str) -> str:
         """Create emergency training checkpoint.
-        
+
         Args:
             session_id: Training session ID to create checkpoint for
-            
+
         Returns:
             Checkpoint ID if created successfully
         """
@@ -256,7 +255,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             # Create checkpoint record
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    INSERT INTO training_checkpoints 
+                    INSERT INTO training_checkpoints
                     (checkpoint_id, session_id, session_state, created_at)
                     VALUES (:checkpoint_id, :session_id, :session_state, :created_at)
                 """)
@@ -276,15 +275,15 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return checkpoint_id
 
         except Exception as e:
-            self.logger.error(f"Failed to create checkpoint: {e}")
+            self.logger.exception(f"Failed to create checkpoint: {e}")
             raise
 
-    async def restore_from_checkpoint(self, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+    async def restore_from_checkpoint(self, checkpoint_id: str) -> dict[str, Any] | None:
         """Restore training session from checkpoint.
-        
+
         Args:
             checkpoint_id: Checkpoint ID to restore from
-            
+
         Returns:
             Restored session context if successful, None otherwise
         """
@@ -308,7 +307,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                     return None
 
                 session_state = json.loads(row[1])
-                
+
                 # Restore session to database
                 await self._restore_session_state(session_state)
 
@@ -316,12 +315,12 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 return session_state
 
         except Exception as e:
-            self.logger.error(f"Failed to restore from checkpoint: {e}")
+            self.logger.exception(f"Failed to restore from checkpoint: {e}")
             return None
 
-    async def get_active_sessions(self) -> List[Dict[str, Any]]:
+    async def get_active_sessions(self) -> list[dict[str, Any]]:
         """Get all active training sessions.
-        
+
         Returns:
             List of active training session dictionaries
         """
@@ -332,7 +331,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 query = text("""
                     SELECT session_id, config, status, current_iteration,
                            performance_metrics, improvement_score, created_at, updated_at
-                    FROM training_sessions 
+                    FROM training_sessions
                     WHERE status IN ('initializing', 'running', 'paused')
                     ORDER BY created_at DESC
                 """)
@@ -357,16 +356,16 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 return active_sessions
 
         except Exception as e:
-            self.logger.error(f"Failed to get active sessions: {e}")
+            self.logger.exception(f"Failed to get active sessions: {e}")
             return []
 
     async def terminate_session(self, session_id: str, reason: str = "manual_termination") -> bool:
         """Terminate a training session.
-        
+
         Args:
             session_id: Session ID to terminate
             reason: Reason for termination
-            
+
         Returns:
             True if terminated successfully, False otherwise
         """
@@ -375,7 +374,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
 
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    UPDATE training_sessions 
+                    UPDATE training_sessions
                     SET status = 'terminated',
                         termination_reason = :reason,
                         terminated_at = :terminated_at,
@@ -402,20 +401,20 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to terminate session: {e}")
+            self.logger.exception(f"Failed to terminate session: {e}")
             return False
 
     async def get_session_history(
-        self, 
-        session_id: Optional[str] = None, 
+        self,
+        session_id: str | None = None,
         limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get training session history.
-        
+
         Args:
             session_id: Specific session ID, or None for all sessions
             limit: Maximum number of records to return
-            
+
         Returns:
             List of training session records
         """
@@ -426,9 +425,9 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 if session_id:
                     query = text("""
                         SELECT session_id, config, status, current_iteration,
-                               performance_metrics, improvement_score, created_at, 
+                               performance_metrics, improvement_score, created_at,
                                updated_at, terminated_at, termination_reason
-                        FROM training_sessions 
+                        FROM training_sessions
                         WHERE session_id = :session_id
                         ORDER BY created_at DESC
                         LIMIT :limit
@@ -439,9 +438,9 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 else:
                     query = text("""
                         SELECT session_id, config, status, current_iteration,
-                               performance_metrics, improvement_score, created_at, 
+                               performance_metrics, improvement_score, created_at,
                                updated_at, terminated_at, termination_reason
-                        FROM training_sessions 
+                        FROM training_sessions
                         ORDER BY created_at DESC
                         LIMIT :limit
                     """)
@@ -468,15 +467,15 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 return history
 
         except Exception as e:
-            self.logger.error(f"Failed to get session history: {e}")
+            self.logger.exception(f"Failed to get session history: {e}")
             return []
 
     async def cleanup_old_sessions(self, days_old: int = 30) -> int:
         """Clean up old completed training sessions.
-        
+
         Args:
             days_old: Sessions older than this many days will be cleaned up
-            
+
         Returns:
             Number of sessions cleaned up
         """
@@ -488,7 +487,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             async with self._unified_session_manager.get_async_session() as db_session:
                 # First, get count of sessions to be deleted
                 count_query = text("""
-                    SELECT COUNT(*) FROM training_sessions 
+                    SELECT COUNT(*) FROM training_sessions
                     WHERE status IN ('completed', 'terminated', 'failed')
                     AND created_at < :cutoff_time
                 """)
@@ -500,7 +499,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
 
                 # Delete old sessions
                 delete_query = text("""
-                    DELETE FROM training_sessions 
+                    DELETE FROM training_sessions
                     WHERE status IN ('completed', 'terminated', 'failed')
                     AND created_at < :cutoff_time
                 """)
@@ -511,22 +510,22 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return count
 
         except Exception as e:
-            self.logger.error(f"Failed to cleanup old sessions: {e}")
+            self.logger.exception(f"Failed to cleanup old sessions: {e}")
             return 0
 
     async def store_training_iteration_data(
         self,
         session_id: str,
         iteration: int,
-        iteration_data: Dict[str, Any]
+        iteration_data: dict[str, Any]
     ) -> bool:
         """Store detailed training iteration data.
-        
+
         Args:
             session_id: Training session ID
             iteration: Iteration number
             iteration_data: Detailed iteration data
-            
+
         Returns:
             True if stored successfully, False otherwise
         """
@@ -535,11 +534,11 @@ class TrainingPersistence(TrainingPersistenceProtocol):
 
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    INSERT INTO training_iterations 
+                    INSERT INTO training_iterations
                     (session_id, iteration, iteration_data, created_at)
                     VALUES (:session_id, :iteration, :iteration_data, :created_at)
-                    ON CONFLICT (session_id, iteration) 
-                    DO UPDATE SET 
+                    ON CONFLICT (session_id, iteration)
+                    DO UPDATE SET
                         iteration_data = EXCLUDED.iteration_data,
                         updated_at = :created_at
                 """)
@@ -558,20 +557,20 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to store training iteration data: {e}")
+            self.logger.exception(f"Failed to store training iteration data: {e}")
             return False
 
     async def get_training_iteration_data(
-        self, 
-        session_id: str, 
-        iteration: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        session_id: str,
+        iteration: int | None = None
+    ) -> list[dict[str, Any]]:
         """Get training iteration data for analysis.
-        
+
         Args:
             session_id: Training session ID
             iteration: Specific iteration number, or None for all iterations
-            
+
         Returns:
             List of iteration data records
         """
@@ -582,7 +581,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 if iteration is not None:
                     query = text("""
                         SELECT iteration, iteration_data, created_at, updated_at
-                        FROM training_iterations 
+                        FROM training_iterations
                         WHERE session_id = :session_id AND iteration = :iteration
                     """)
                     result = await db_session.execute(
@@ -591,7 +590,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 else:
                     query = text("""
                         SELECT iteration, iteration_data, created_at, updated_at
-                        FROM training_iterations 
+                        FROM training_iterations
                         WHERE session_id = :session_id
                         ORDER BY iteration ASC
                     """)
@@ -612,21 +611,21 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 return iteration_data
 
         except Exception as e:
-            self.logger.error(f"Failed to get training iteration data: {e}")
+            self.logger.exception(f"Failed to get training iteration data: {e}")
             return []
 
-    async def _restore_session_state(self, session_state: Dict[str, Any]) -> None:
+    async def _restore_session_state(self, session_state: dict[str, Any]) -> None:
         """Restore session state to database.
-        
+
         Args:
             session_state: Session state to restore
         """
         try:
             session_id = session_state["session_id"]
-            
+
             async with self._unified_session_manager.get_async_session() as db_session:
                 query = text("""
-                    UPDATE training_sessions 
+                    UPDATE training_sessions
                     SET config = :config,
                         current_iteration = :current_iteration,
                         performance_metrics = :performance_metrics,
@@ -650,13 +649,13 @@ class TrainingPersistence(TrainingPersistenceProtocol):
                 await db_session.commit()
 
         except Exception as e:
-            self.logger.error(f"Failed to restore session state: {e}")
+            self.logger.exception(f"Failed to restore session state: {e}")
             raise
 
     # Utility methods
-    async def get_database_health(self) -> Dict[str, Any]:
+    async def get_database_health(self) -> dict[str, Any]:
         """Check database connectivity and health.
-        
+
         Returns:
             Database health status
         """
@@ -666,7 +665,7 @@ class TrainingPersistence(TrainingPersistenceProtocol):
             async with self._unified_session_manager.get_async_session() as db_session:
                 # Test basic connectivity
                 await db_session.execute(text("SELECT 1"))
-                
+
                 # Get session counts
                 result = await db_session.execute(
                     text("SELECT COUNT(*) FROM training_sessions")

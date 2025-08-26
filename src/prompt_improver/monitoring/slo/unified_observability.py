@@ -1,4 +1,4 @@
-"""Unified SLO Observability Integration
+"""Unified SLO Observability Integration.
 ====================================
 
 Enhanced observability integration between SLO monitoring components and
@@ -12,14 +12,14 @@ import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
 )
-from prompt_improver.monitoring.slo.framework import SLOTarget, SLOTimeWindow
+from prompt_improver.monitoring.slo.framework import SLOTimeWindow
 
 try:
     from opentelemetry import metrics, trace
@@ -81,13 +81,13 @@ class UnifiedSLOObservability:
     SLO monitoring components and DatabaseServices cache operations.
     """
 
-    def __init__(self, unified_manager=None):
+    def __init__(self, unified_manager=None) -> None:
         """Initialize unified SLO observability.
 
         Args:
             unified_manager: Optional DatabaseServices instance
         """
-        self._unified_manager = unified_manager or await get_database_services(
+        self._unified_manager = unified_manager or get_database_services(
             ManagerMode.ASYNC_MODERN
         )
         self._active_contexts: dict[str, SLOObservabilityContext] = {}
@@ -196,7 +196,7 @@ class UnifiedSLOObservability:
                         "status": "error",
                     },
                 )
-            logger.error(f"SLO operation {operation} failed for {service_name}: {e}")
+            logger.exception(f"SLO operation {operation} failed for {service_name}: {e}")
             raise
         finally:
             duration = time.time() - context.start_time
@@ -254,7 +254,7 @@ class UnifiedSLOObservability:
             "timestamp": time.time(),
         }
         for context in self._active_contexts.values():
-            if context_id in [context.trace_id, context.span_id]:
+            if context_id in {context.trace_id, context.span_id}:
                 context.cache_operations.append(cache_op)
                 break
         if OPENTELEMETRY_AVAILABLE and slo_cache_performance_histogram:
@@ -353,7 +353,7 @@ class UnifiedSLOObservability:
                 else:
                     callback(alert_context)
             except Exception as e:
-                logger.error(f"Alert correlation callback failed: {e}")
+                logger.exception(f"Alert correlation callback failed: {e}")
         logger.info(f"Correlated alert {alert_id} with cache context for {service_name}.{target_name}")
 
     def register_correlation_callback(self, callback: Callable):

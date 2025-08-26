@@ -4,10 +4,9 @@ Provides pytest fixtures that create real ML services and data
 instead of mocks, ensuring true ML behavior testing.
 """
 
-import asyncio
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -92,7 +91,7 @@ def training_dataset(prompt_data_generator):
     prompts, labels, metadata = prompt_data_generator.generate_training_dataset(50)
     return {
         "prompts": prompts,
-        "labels": labels, 
+        "labels": labels,
         "metadata": metadata
     }
 
@@ -107,7 +106,7 @@ def pattern_discovery_data(prompt_data_generator):
 def feature_matrix(ml_training_data_generator):
     """Sample feature matrix for ML training."""
     return ml_training_data_generator.generate_feature_matrix(
-        n_samples=100, 
+        n_samples=100,
         n_features=8,
         noise_level=0.05
     )
@@ -117,7 +116,7 @@ def feature_matrix(ml_training_data_generator):
 def regression_targets(feature_matrix, ml_training_data_generator):
     """Regression targets correlated with features."""
     return ml_training_data_generator.generate_regression_targets(
-        feature_matrix, 
+        feature_matrix,
         target_type="linear"
     )
 
@@ -136,7 +135,7 @@ def trained_text_classifier(real_text_classifier, training_dataset):
     """Pre-trained text classifier for testing."""
     classifier = real_text_classifier
     result = classifier.fit(
-        training_dataset["prompts"], 
+        training_dataset["prompts"],
         training_dataset["labels"]
     )
     return classifier, result
@@ -154,15 +153,15 @@ def trained_regressor(real_regressor, feature_matrix, regression_targets):
 async def ml_service_with_models(real_ml_service, sample_rules_data, sample_performance_data):
     """ML service with pre-trained models."""
     service = real_ml_service
-    
+
     # Train some models
     optimization_result = await service.optimize_rules(
-        sample_rules_data[:10], 
+        sample_rules_data[:10],
         sample_performance_data[:10]
     )
-    
+
     pattern_result = await service.discover_patterns(sample_performance_data)
-    
+
     return service, {
         "optimization_result": optimization_result,
         "pattern_result": pattern_result
@@ -173,19 +172,19 @@ async def ml_service_with_models(real_ml_service, sample_rules_data, sample_perf
 async def mlflow_with_experiments(real_mlflow_service, sample_rules_data):
     """MLflow service with sample experiments and models."""
     service = real_mlflow_service
-    
+
     # Create sample experiments
     experiments = []
     for i, rule in enumerate(sample_rules_data[:3]):
         run_id = await service.log_experiment(
-            f"experiment_{rule['name']}", 
+            f"experiment_{rule['name']}",
             rule.get("default_parameters", {})
         )
         experiments.append(run_id)
-        
+
         # Log a model for each experiment
         model_uri = await service.log_model(
-            f"model_{rule['name']}", 
+            f"model_{rule['name']}",
             {"type": "test_model", "rule_id": rule["id"]},
             {
                 "accuracy": 0.85 + i * 0.02,
@@ -193,7 +192,7 @@ async def mlflow_with_experiments(real_mlflow_service, sample_rules_data):
                 "features": 10 + i
             }
         )
-    
+
     return service, {"experiments": experiments}
 
 
@@ -212,7 +211,7 @@ def time_series_data(ml_training_data_generator):
 @pytest.fixture
 def ml_pipeline_test_data(
     sample_rules_data,
-    sample_performance_data, 
+    sample_performance_data,
     pattern_discovery_data,
     feature_matrix,
     regression_targets
@@ -232,7 +231,7 @@ def ml_pipeline_test_data(
 @pytest.fixture
 def real_ml_components(
     real_ml_service,
-    real_text_classifier, 
+    real_text_classifier,
     real_regressor,
     pattern_discovery_engine,
     real_mlflow_service
@@ -249,31 +248,31 @@ def real_ml_components(
 
 class RealMLTestSession:
     """Session manager for real ML testing with proper cleanup."""
-    
+
     def __init__(self, storage_dir: Path):
         self.storage_dir = storage_dir
         self.services = {}
         self.trained_models = {}
-        
+
     async def setup_ml_service(self) -> RealMLService:
         """Setup real ML service."""
         service = RealMLService(random_state=42)
         self.services["ml_service"] = service
         return service
-    
+
     async def setup_mlflow_service(self) -> RealMLflowService:
         """Setup real MLflow service."""
         service = RealMLflowService(storage_dir=self.storage_dir)
         self.services["mlflow_service"] = service
         return service
-        
-    async def train_models(self, training_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def train_models(self, training_data: dict[str, Any]) -> dict[str, Any]:
         """Train models with provided data."""
         results = {}
-        
+
         if "ml_service" in self.services:
             service = self.services["ml_service"]
-            
+
             # Train optimization model
             if "rules" in training_data and "performance" in training_data:
                 opt_result = await service.optimize_rules(
@@ -281,17 +280,17 @@ class RealMLTestSession:
                     training_data["performance"]
                 )
                 results["optimization"] = opt_result
-                
+
             # Discover patterns
             if "patterns" in training_data:
                 pattern_result = await service.discover_patterns(
                     training_data["patterns"]
                 )
                 results["patterns"] = pattern_result
-        
+
         self.trained_models.update(results)
         return results
-    
+
     async def cleanup(self):
         """Cleanup resources."""
         self.services.clear()
@@ -330,7 +329,7 @@ def complex_rules_dataset(prompt_data_generator):
     rules = prompt_data_generator.generate_rules_data(100)
     performance = prompt_data_generator.generate_performance_data(rules)
     patterns = prompt_data_generator.generate_pattern_data(200)
-    
+
     return {
         "rules": rules,
         "performance": performance,
@@ -346,14 +345,14 @@ async def end_to_end_ml_pipeline(
     ml_pipeline_test_data
 ):
     """Complete end-to-end ML pipeline for integration testing."""
-    
+
     # Setup services
     ml_service = await real_ml_session.setup_ml_service()
     mlflow_service = await real_ml_session.setup_mlflow_service()
-    
+
     # Train models
     training_results = await real_ml_session.train_models(ml_pipeline_test_data)
-    
+
     # Create experiments in MLflow
     experiment_ids = []
     for i in range(3):
@@ -362,7 +361,7 @@ async def end_to_end_ml_pipeline(
             {"test_param": i, "dataset_size": len(ml_pipeline_test_data["rules"])}
         )
         experiment_ids.append(exp_id)
-    
+
     return {
         "ml_service": ml_service,
         "mlflow_service": mlflow_service,

@@ -14,19 +14,17 @@ Based on research from 5 current sources:
 5. Thread-Safe TextStat Usage (2025)
 """
 
+import asyncio
+import hashlib
 import logging
 import warnings
 from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import UTC, datetime, timezone
-from functools import lru_cache
-from typing import Any, Dict, Optional, Protocol, Union
+from datetime import UTC, datetime
 
 # Move textstat import to lazy loading to avoid pkg_resources warning on module import
-from typing import TYPE_CHECKING
+from typing import Any, Protocol
 
-if TYPE_CHECKING:
-    import textstat
 
 def _get_textstat():
     """Lazy load textstat when needed to avoid pkg_resources warning on module import."""
@@ -41,11 +39,48 @@ def _get_textstat():
         import textstat
         return textstat
 
+
 from pydantic import BaseModel, Field, field_validator
 
 from prompt_improver.core.types import TimestampedModel
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_text_hash(text: str, extra_params: str | None = None) -> str:
+    """Generate SHA256 hash for text caching.
+
+    Args:
+        text: Text content to hash
+        extra_params: Optional extra parameters to include in hash
+
+    Returns:
+        SHA256 hash as hexadecimal string
+    """
+    hash_input = text
+    if extra_params:
+        hash_input += f":{extra_params}"
+
+    return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16]  # 16 chars for brevity
+
+
+def _get_textstat_cache() -> CacheFacade:
+    """Get dedicated cache instance for textstat operations.
+
+    Optimized for L1-only caching with 2-hour TTL for deterministic text analysis.
+    """
+    return CacheFacade(
+        l1_max_size=2000,  # Higher cache size for text analysis
+        l2_default_ttl=7200,  # 2 hours TTL
+        enable_l2=False,  # L1-only for sub-millisecond performance
+        enable_warming=False,  # Disable warming for simplicity
+    )
+
+
+# Global cache instance for textstat operations
+_textstat_cache: CacheFacade | None = None
+_cache_lock = asyncio.Lock()
 
 
 class TextStatFunction(Protocol):
@@ -156,7 +191,7 @@ class TextStatWrapper:
     - Clean synchronous API that can be used in any context
     """
 
-    def __init__(self, config: TextStatConfig | None = None):  # type: ignore[override]
+    def __init__(self, config: TextStatConfig | None = None) -> None:  # type: ignore[override]
         """Initialize TextStat wrapper.
 
         Args:
@@ -166,10 +201,16 @@ class TextStatWrapper:
         self.metrics = TextStatMetrics()
         self._initialized = False
 
+        # Initialize unified cache for textstat operations
+        global _textstat_cache
+        if _textstat_cache is None:
+            _textstat_cache = _get_textstat_cache()
+        self._cache = _textstat_cache
+
         # Initialize TextStat with optimal configuration
         self._initialize_textstat()
 
-        logger.info(f"TextStatWrapper initialized with config: {self.config}")
+        logger.info(f"TextStatWrapper initialized with unified cache and config: {self.config}")
 
     def _initialize_textstat(self) -> None:
         """Initialize TextStat with optimal configuration."""
@@ -203,21 +244,39 @@ class TextStatWrapper:
             )
             yield
 
-    def _safe_textstat_call(
+    async def _cached_textstat_call(
         self,
         operation_name: str,
         func: Callable[[str], float | int],
         text: str,
         default_value: float | int = 0,
+        extra_params: str | None = None,
     ) -> float | int:
-        """Safely execute TextStat operation with error handling."""
+        """Execute TextStat operation with unified cache and error handling."""
         import time
+
+        # Generate cache key using text hash
+        text_hash = _generate_text_hash(text, extra_params)
+        cache_key = f"textstat:{operation_name}:{text_hash}"
 
         start_time = time.time() * 1000
 
         try:
+            # Try cache first
+            cached_result = await self._cache.get(cache_key)
+            if cached_result is not None:
+                # Cache hit - update metrics
+                if self.config.enable_metrics:
+                    duration_ms = (time.time() * 1000) - start_time
+                    self.metrics.update_timing(duration_ms, cache_hit=True)
+                return cached_result
+
+            # Cache miss - compute and cache result
             with self._warning_suppression():
                 result = func(text)
+
+            # Cache the result with 2-hour TTL
+            await self._cache.set(cache_key, result, l2_ttl=7200, l1_ttl=7200)
 
             # Update metrics for successful operation
             if self.config.enable_metrics:
@@ -236,93 +295,179 @@ class TextStatWrapper:
 
             return default_value
 
-    # Core TextStat Operations with Optimization and Caching
+    def _fallback_textstat_call(
+        self,
+        operation_name: str,
+        func: Callable[[str], float | int],
+        text: str,
+        default_value: float | int = 0,
+        extra_params: str | None = None,
+    ) -> float | int:
+        """Direct textstat call without caching for sync calls from async context."""
+        try:
+            textstat = _get_textstat()
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="pkg_resources is deprecated.*",
+                    category=UserWarning,
+                    module="pkg_resources.*",
+                )
+                if extra_params:
+                    return func(text, extra_params)
+                return func(text)
+        except Exception as e:
+            logger.warning(f"Fallback TextStat {operation_name} failed: {e}")
+            return default_value
 
-    @lru_cache(maxsize=1024)
+    def _safe_textstat_call_sync(
+        self,
+        operation_name: str,
+        func: Callable[[str], float | int],
+        text: str,
+        default_value: float | int = 0,
+        extra_params: str | None = None,
+    ) -> float | int:
+        """Synchronous wrapper for cached textstat calls."""
+        try:
+            # Try to use existing event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to handle differently
+            # Use a simple fallback for sync calls from async context
+            return self._fallback_textstat_call(operation_name, func, text, default_value, extra_params)
+
+        except RuntimeError:
+            # No running event loop, create one
+            try:
+                return asyncio.run(
+                    self._cached_textstat_call(operation_name, func, text, default_value, extra_params)
+                )
+            except Exception as e:
+                logger.exception(f"Async cache execution failed for {operation_name}: {e}")
+                return self._direct_textstat_call(operation_name, func, text, default_value)
+
+    def _direct_textstat_call(
+        self,
+        operation_name: str,
+        func: Callable[[str], float | int],
+        text: str,
+        default_value: float | int = 0,
+    ) -> float | int:
+        """Direct TextStat operation execution (fallback without caching)."""
+        import time
+
+        start_time = time.time() * 1000
+
+        try:
+            with self._warning_suppression():
+                result = func(text)
+
+            # Update metrics for successful operation (cache miss)
+            if self.config.enable_metrics:
+                duration_ms = (time.time() * 1000) - start_time
+                self.metrics.update_timing(duration_ms, cache_hit=False)
+
+            return result
+
+        except Exception as e:
+            logger.warning(
+                f"TextStat {operation_name} failed for text length {len(text)}: {e}"
+            )
+
+            if self.config.enable_metrics:
+                self.metrics.increment_errors()
+
+            return default_value
+
+    # Core TextStat Operations with Unified Cache Infrastructure
+
     def flesch_reading_ease(self, text: str) -> float:
         """Calculate Flesch Reading Ease score (0-100, higher = easier)."""
         textstat = _get_textstat()
-        return self._safe_textstat_call(
+        return self._safe_textstat_call_sync(
             "flesch_reading_ease",
             textstat.flesch_reading_ease,  # type: ignore[attr-defined]
             text,
             default_value=50.0,
         )
 
-    @lru_cache(maxsize=1024)
     def flesch_kincaid_grade(self, text: str) -> float:
         """Calculate Flesch-Kincaid Grade Level."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "flesch_kincaid_grade",
             textstat.flesch_kincaid_grade,  # type: ignore[attr-defined]
             text,
             default_value=8.0,
         )
 
-    @lru_cache(maxsize=1024)
     def syllable_count(self, text: str) -> int:
         """Count syllables with 100% accuracy using CMUdict."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "syllable_count",
             textstat.syllable_count,  # type: ignore[attr-defined]
             text,
             default_value=len(text.split()),  # Fallback: estimate 1 syllable per word
         )
 
-    @lru_cache(maxsize=1024)
     def sentence_count(self, text: str) -> int:
         """Count sentences in text."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "sentence_count",
             textstat.sentence_count,  # type: ignore[attr-defined]
             text,
             default_value=1,
         )
 
-    @lru_cache(maxsize=1024)
     def lexicon_count(self, text: str, removepunct: bool = True) -> int:
         """Count lexicon (words) in text."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        # Include removepunct parameter in cache key for proper caching
+        extra_params = f"removepunct={removepunct}"
+        return self._safe_textstat_call_sync(
             "lexicon_count",
             lambda t: textstat.lexicon_count(t, removepunct=removepunct),  # type: ignore[attr-defined]
             text,
             default_value=len(text.split()),
+            extra_params=extra_params,
         )
 
-    @lru_cache(maxsize=1024)
     def automated_readability_index(self, text: str) -> float:
         """Calculate Automated Readability Index."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "automated_readability_index",
             textstat.automated_readability_index,  # type: ignore[attr-defined]
             text,
             default_value=8.0,
         )
 
-    @lru_cache(maxsize=1024)
     def coleman_liau_index(self, text: str) -> float:
         """Calculate Coleman-Liau Index."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "coleman_liau_index",
             textstat.coleman_liau_index,  # type: ignore[attr-defined]
             text,
             default_value=8.0,
         )
 
-    @lru_cache(maxsize=1024)
     def gunning_fog(self, text: str) -> float:
         """Calculate Gunning Fog Index."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "gunning_fog",
             textstat.gunning_fog,  # type: ignore[attr-defined]
             text,
             default_value=8.0,
         )
 
-    @lru_cache(maxsize=1024)
     def smog_index(self, text: str) -> float:
         """Calculate SMOG Index."""
-        return self._safe_textstat_call(
+        textstat = _get_textstat()
+        return self._safe_textstat_call_sync(
             "smog_index",
             textstat.smog_index,  # type: ignore[attr-defined]
             text,
@@ -400,49 +545,61 @@ class TextStatWrapper:
 
     def get_metrics(self) -> dict[str, Any]:
         """Get performance metrics."""
+        # Get unified cache statistics
+        cache_stats = self._cache.get_performance_stats()
+
         return {
             "metrics": self.metrics.model_dump(),  # type: ignore[attr-defined]
             "config": self.config.model_dump(),  # type: ignore[attr-defined]
-            "cache_stats": {
-                "flesch_reading_ease": getattr(
-                    self.flesch_reading_ease,
-                    "cache_info",
-                    lambda: {"hits": 0, "misses": 0},
-                )(),
-                "syllable_count": getattr(
-                    self.syllable_count, "cache_info", lambda: {"hits": 0, "misses": 0}
-                )(),
+            "unified_cache_stats": {
+                "cache_level": "L1_Memory",
+                "hit_rate": cache_stats.get("hit_rate", 0.0),
+                "total_operations": cache_stats.get("total_operations", 0),
+                "avg_response_time_ms": cache_stats.get("avg_response_time_ms", 0.0),
+                "memory_usage_mb": cache_stats.get("estimated_memory_bytes", 0) / (1024 * 1024),
+                "slo_compliant": cache_stats.get("slo_compliant", True),
+                "health_status": cache_stats.get("health_status", "healthy"),
             },
+            "textstat_operations": [
+                "flesch_reading_ease", "flesch_kincaid_grade", "syllable_count",
+                "sentence_count", "lexicon_count", "automated_readability_index",
+                "coleman_liau_index", "gunning_fog", "smog_index"
+            ],
         }
 
     def clear_cache(self) -> dict[str, Any]:
-        """Clear all cached results."""
-        cleared_count = 0
+        """Clear all cached results from unified cache."""
+        try:
+            # Clear all textstat-related cache entries using pattern matching
+            pattern = "textstat:*"
 
-        # Clear all cached methods
-        cached_methods = [
-            self.flesch_reading_ease,
-            self.flesch_kincaid_grade,
-            self.syllable_count,
-            self.sentence_count,
-            self.lexicon_count,
-            self.automated_readability_index,
-            self.coleman_liau_index,
-            self.gunning_fog,
-            self.smog_index,
-        ]
+            # Use asyncio to clear cache
+            try:
+                loop = asyncio.get_running_loop()
+                task = asyncio.create_task(self._cache.invalidate_pattern(pattern))
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(lambda: asyncio.run(task))
+                    cleared_count = future.result(timeout=5.0)
+            except RuntimeError:
+                # No running event loop, create one
+                cleared_count = asyncio.run(self._cache.invalidate_pattern(pattern))
 
-        for method in cached_methods:
-            if hasattr(method, "cache_clear"):
-                method.cache_clear()
-                cleared_count += 1
+            logger.info(f"Cleared {cleared_count} TextStat cache entries from unified cache")
+            return {
+                "status": "success",
+                "cleared_entries": cleared_count,
+                "cache_pattern": pattern,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
 
-        logger.info(f"Cleared {cleared_count} TextStat caches")
-        return {
-            "status": "success",
-            "cleared_caches": cleared_count,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        except Exception as e:
+            logger.exception(f"Failed to clear TextStat unified cache: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
 
     def health_check(self) -> dict[str, Any]:
         """Perform health check of TextStat wrapper."""
@@ -461,7 +618,7 @@ class TextStatWrapper:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            logger.error(f"TextStat health check failed: {e}")
+            logger.exception(f"TextStat health check failed: {e}")
             return {
                 "status": "unhealthy",
                 "component": "textstat_wrapper",

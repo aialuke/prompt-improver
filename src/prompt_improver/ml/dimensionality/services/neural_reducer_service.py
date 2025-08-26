@@ -14,25 +14,34 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-import numpy as np
-from sklearn.preprocessing import RobustScaler
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn, get_torch
+
+if TYPE_CHECKING:
+    from sklearn.preprocessing import RobustScaler
+    import numpy as np
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return sklearn.preprocessing.RobustScaler
+    
+    RobustScaler = _get_sklearn_imports()
 
 from . import ReductionProtocol, ReductionResult
 
 logger = logging.getLogger(__name__)
 
-# Neural network imports with fallback using TYPE_CHECKING pattern
-if TYPE_CHECKING:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.utils.data import DataLoader, TensorDataset
-
+# Neural network imports with fallback
 try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.utils.data import DataLoader, TensorDataset
+    torch = get_torch()
+    nn = torch.nn
+    optim = torch.optim
+    DataLoader = torch.utils.data.DataLoader
+    TensorDataset = torch.utils.data.TensorDataset
     TORCH_AVAILABLE = True
 except ImportError:
     # Create dummy classes for when torch is unavailable
@@ -136,8 +145,8 @@ class VariationalAutoencoder(nn.Module):
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
+        std = get_torch().exp(0.5 * logvar)
+        eps = get_torch().randn_like(std)
         return mu + eps * std
 
     def decode(self, z):
@@ -151,7 +160,7 @@ class VariationalAutoencoder(nn.Module):
 
     def loss_function(self, recon_x, x, mu, logvar):
         recon_loss = nn.functional.mse_loss(recon_x, x, reduction='sum')
-        kld_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        kld_loss = -0.5 * get_torch().sum(1 + logvar - mu.pow(2) - logvar.exp())
         return recon_loss + self.beta * kld_loss
 
 class TransformerReducer(nn.Module):
@@ -180,7 +189,7 @@ class TransformerReducer(nn.Module):
         self.output_projection = nn.Linear(hidden_dim, output_dim)
 
         # Positional encoding
-        self.pos_encoding = nn.Parameter(torch.randn(1, 1, hidden_dim))
+        self.pos_encoding = nn.Parameter(get_torch().randn(1, 1, hidden_dim))
 
     def forward(self, x):
         # x shape: (batch_size, input_dim)
@@ -227,9 +236,9 @@ class NeuralReducerService:
 
         # Device selection
         if device == "auto":
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.device = get_torch().device("cuda" if get_torch().cuda.is_available() else "cpu")
         else:
-            self.device = torch.device(device)
+            self.device = get_torch().device(device)
 
         self.model = None
         self.optimizer = None
@@ -238,7 +247,7 @@ class NeuralReducerService:
 
         logger.info(f"NeuralReducerService initialized: {model_type}, device: {self.device}")
 
-    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> 'NeuralReducerService':
+    def fit(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> 'NeuralReducerService':
         """Fit the neural dimensionality reducer."""
         if not TORCH_AVAILABLE:
             raise ImportError("PyTorch is required for neural network methods")
@@ -263,7 +272,7 @@ class NeuralReducerService:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         # Prepare data
-        X_tensor = torch.FloatTensor(X_scaled).to(self.device)
+        X_tensor = get_torch().FloatTensor(X_scaled).to(self.device)
         dataset = TensorDataset(X_tensor)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
@@ -299,16 +308,16 @@ class NeuralReducerService:
         logger.info(f"Neural model training completed in {training_time:.2f}s")
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Transform data to lower dimensional space."""
         if not self.is_fitted:
             raise ValueError("Model must be fitted before transform")
 
         X_scaled = self.scaler.transform(X)
-        X_tensor = torch.FloatTensor(X_scaled).to(self.device)
+        X_tensor = get_torch().FloatTensor(X_scaled).to(self.device)
 
         self.model.eval()
-        with torch.no_grad():
+        with get_torch().no_grad():
             if self.model_type == "autoencoder":
                 encoded = self.model.encode(X_tensor)
             elif self.model_type == "vae":
@@ -319,7 +328,7 @@ class NeuralReducerService:
 
         return encoded.cpu().numpy()
 
-    def fit_transform(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> np.ndarray:
+    def fit_transform(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Fit the model and transform the data."""
         return self.fit(X, y).transform(X)
 
@@ -337,16 +346,16 @@ class NeuralReducerService:
             "torch_available": TORCH_AVAILABLE
         }
 
-    def get_reconstruction_error(self, X: np.ndarray) -> float:
+    def get_reconstruction_error(self, X: get_numpy().ndarray) -> float:
         """Calculate reconstruction error for fitted model."""
         if not self.is_fitted or self.model_type == "transformer":
             return 0.0
 
         X_scaled = self.scaler.transform(X)
-        X_tensor = torch.FloatTensor(X_scaled).to(self.device)
+        X_tensor = get_torch().FloatTensor(X_scaled).to(self.device)
 
         self.model.eval()
-        with torch.no_grad():
+        with get_torch().no_grad():
             if self.model_type == "autoencoder":
                 recon, _ = self.model(X_tensor)
             elif self.model_type == "vae":

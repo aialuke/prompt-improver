@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ...utils.datetime_utils import aware_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -102,11 +103,11 @@ class ModelPerformanceTracker:
             recent_snapshots = self._performance_history[model_id].get_recent_snapshots(hours=1)
             if recent_snapshots:
                 recent_latencies = [s.avg_latency_ms for s in recent_snapshots]
-                avg_latency = np.mean(recent_latencies)
-                p50_latency = np.percentile(recent_latencies, 50)
-                p95_latency = np.percentile(recent_latencies, 95)
-                p99_latency = np.percentile(recent_latencies, 99)
-                max_latency = np.max(recent_latencies)
+                avg_latency = get_numpy().mean(recent_latencies)
+                p50_latency = get_numpy().percentile(recent_latencies, 50)
+                p95_latency = get_numpy().percentile(recent_latencies, 95)
+                p99_latency = get_numpy().percentile(recent_latencies, 99)
+                max_latency = get_numpy().max(recent_latencies)
             else:
                 avg_latency = p50_latency = p95_latency = p99_latency = max_latency = 0.0
             time_window_minutes = 1.0
@@ -136,7 +137,7 @@ class ModelPerformanceTracker:
             rps_values = [s.requests_per_second for s in recent_snapshots]
             performance_trend = self._calculate_performance_trend(recent_snapshots)
             degradation_detected, degradation_score = await self._detect_performance_degradation(model_id, recent_snapshots)
-            return {'model_id': model_id, 'period_hours': hours, 'timestamp': aware_utc_now().isoformat(), 'snapshot_count': len(recent_snapshots), 'latency_summary': {'avg_ms': float(np.mean(latencies)), 'min_ms': float(np.min(latencies)), 'max_ms': float(np.max(latencies)), 'p95_ms': float(np.percentile(latencies, 95)), 'p99_ms': float(np.percentile(latencies, 99)), 'std_ms': float(np.std(latencies))}, 'throughput_summary': {'avg_rps': float(np.mean(rps_values)), 'max_rps': float(np.max(rps_values)), 'total_requests': sum(s.sample_count for s in recent_snapshots)}, 'quality_summary': {'avg_success_rate': float(np.mean(success_rates)), 'min_success_rate': float(np.min(success_rates)), 'avg_error_rate': float(np.mean(error_rates)), 'max_error_rate': float(np.max(error_rates))}, 'performance_trend': performance_trend, 'degradation_detected': degradation_detected, 'degradation_score': degradation_score, 'current_status': self._assess_current_performance(recent_snapshots[-1]), 'recommendations': self._generate_performance_recommendations(recent_snapshots, degradation_detected, performance_trend)}
+            return {'model_id': model_id, 'period_hours': hours, 'timestamp': aware_utc_now().isoformat(), 'snapshot_count': len(recent_snapshots), 'latency_summary': {'avg_ms': float(get_numpy().mean(latencies)), 'min_ms': float(get_numpy().min(latencies)), 'max_ms': float(get_numpy().max(latencies)), 'p95_ms': float(get_numpy().percentile(latencies, 95)), 'p99_ms': float(get_numpy().percentile(latencies, 99)), 'std_ms': float(get_numpy().std(latencies))}, 'throughput_summary': {'avg_rps': float(get_numpy().mean(rps_values)), 'max_rps': float(get_numpy().max(rps_values)), 'total_requests': sum(s.sample_count for s in recent_snapshots)}, 'quality_summary': {'avg_success_rate': float(get_numpy().mean(success_rates)), 'min_success_rate': float(get_numpy().min(success_rates)), 'avg_error_rate': float(get_numpy().mean(error_rates)), 'max_error_rate': float(get_numpy().max(error_rates))}, 'performance_trend': performance_trend, 'degradation_detected': degradation_detected, 'degradation_score': degradation_score, 'current_status': self._assess_current_performance(recent_snapshots[-1]), 'recommendations': self._generate_performance_recommendations(recent_snapshots, degradation_detected, performance_trend)}
         except Exception as e:
             logger.error('Failed to get performance summary for {model_id}: %s', e)
             return {'model_id': model_id, 'error': str(e), 'timestamp': aware_utc_now().isoformat()}
@@ -157,8 +158,8 @@ class ModelPerformanceTracker:
             latencies = [s.avg_latency_ms for s in snapshots]
             recent_half = latencies[len(latencies) // 2:]
             older_half = latencies[:len(latencies) // 2]
-            recent_avg = np.mean(recent_half)
-            older_avg = np.mean(older_half)
+            recent_avg = get_numpy().mean(recent_half)
+            older_avg = get_numpy().mean(older_half)
             if older_avg > 0:
                 change_percent = (recent_avg - older_avg) / older_avg * 100
             else:
@@ -184,8 +185,8 @@ class ModelPerformanceTracker:
                 baseline = await self._establish_performance_baseline(model_id, recent_snapshots)
                 if not baseline:
                     return (False, 0.0)
-            current_latency = np.mean([s.avg_latency_ms for s in recent_snapshots[-5:]])
-            current_error_rate = np.mean([s.error_rate for s in recent_snapshots[-5:]])
+            current_latency = get_numpy().mean([s.avg_latency_ms for s in recent_snapshots[-5:]])
+            current_error_rate = get_numpy().mean([s.error_rate for s in recent_snapshots[-5:]])
             latency_degradation = (current_latency - baseline['avg_latency']) / baseline['avg_latency']
             error_rate_degradation = current_error_rate - baseline['avg_error_rate']
             degradation_score = max(0.0, min(1.0, (latency_degradation + error_rate_degradation * 2) / 3))
@@ -202,7 +203,7 @@ class ModelPerformanceTracker:
                 return None
             baseline_size = int(len(snapshots) * 0.7)
             baseline_snapshots = snapshots[:baseline_size]
-            baseline = {'avg_latency': float(np.mean([s.avg_latency_ms for s in baseline_snapshots])), 'p95_latency': float(np.mean([s.p95_latency_ms for s in baseline_snapshots])), 'avg_error_rate': float(np.mean([s.error_rate for s in baseline_snapshots])), 'avg_success_rate': float(np.mean([s.success_rate for s in baseline_snapshots])), 'established_at': aware_utc_now().timestamp()}
+            baseline = {'avg_latency': float(get_numpy().mean([s.avg_latency_ms for s in baseline_snapshots])), 'p95_latency': float(get_numpy().mean([s.p95_latency_ms for s in baseline_snapshots])), 'avg_error_rate': float(get_numpy().mean([s.error_rate for s in baseline_snapshots])), 'avg_success_rate': float(get_numpy().mean([s.success_rate for s in baseline_snapshots])), 'established_at': aware_utc_now().timestamp()}
             self._performance_baselines[model_id] = baseline
             logger.info('Established performance baseline for %s', model_id)
             return baseline

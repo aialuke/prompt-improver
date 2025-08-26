@@ -3,21 +3,13 @@
 import asyncio
 import json
 import logging
-import time
 import uuid
-from collections.abc import Callable
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
-from prompt_improver.utils.datetime_utils import (
-    format_compact_timestamp,
-    format_date_only,
-)
 from prompt_improver.performance.baseline.baseline_collector import BaselineCollector
 from prompt_improver.performance.baseline.models import (
-    BaselineMetrics,
-    PerformanceTrend,
     RegressionAlert,
 )
 from prompt_improver.performance.baseline.profiler import ContinuousProfiler
@@ -28,6 +20,10 @@ from prompt_improver.performance.baseline.statistical_analyzer import (
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
+)
+from prompt_improver.utils.datetime_utils import (
+    format_compact_timestamp,
+    format_date_only,
 )
 
 try:
@@ -68,7 +64,7 @@ class AutomationConfig:
         storage_path: Path | None = None,
         backup_enabled: bool = True,
         backup_schedule: str = "0 2 * * *",
-    ):
+    ) -> None:
         """Initialize automation configuration."""
         self.collection_schedule = collection_schedule
         self.analysis_schedule = analysis_schedule
@@ -103,7 +99,7 @@ class AutomationTaskResult:
         end_time: datetime,
         result_data: dict[str, Any] | None = None,
         error_message: str | None = None,
-    ):
+    ) -> None:
         self.task_id = task_id
         self.task_type = task_type
         self.status = status
@@ -137,7 +133,7 @@ class BaselineAutomation:
         analyzer: StatisticalAnalyzer | None = None,
         detector: RegressionDetector | None = None,
         profiler: ContinuousProfiler | None = None,
-    ):
+    ) -> None:
         """Initialize baseline automation."""
         self.config = config or AutomationConfig()
         self.collector = collector or BaselineCollector()
@@ -245,7 +241,7 @@ class BaselineAutomation:
                 self._scheduled_tasks["backup"] = backup_task
                 logger.info(f"Scheduled backup: {self.config.backup_schedule}")
         except Exception as e:
-            logger.error(f"Failed to schedule automation tasks: {e}")
+            logger.exception(f"Failed to schedule automation tasks: {e}")
 
     async def _cancel_scheduled_tasks(self) -> None:
         """Cancel all scheduled tasks."""
@@ -257,7 +253,7 @@ class BaselineAutomation:
                     task.cancel()
                 logger.debug(f"Cancelled scheduled task: {task_name}")
             except Exception as e:
-                logger.error(f"Error cancelling task {task_name}: {e}")
+                logger.exception(f"Error cancelling task {task_name}: {e}")
         self._scheduled_tasks.clear()
 
     async def _fallback_task_loop(self) -> None:
@@ -285,17 +281,16 @@ class BaselineAutomation:
                 if (
                     self.config.enable_auto_reporting
                     and (current_time - last_reporting).total_seconds() >= 86400
-                ):
-                    if current_time.hour == 9:
-                        await self._run_automated_reporting()
-                        last_reporting = current_time
+                ) and current_time.hour == 9:
+                    await self._run_automated_reporting()
+                    last_reporting = current_time
                 if (current_time - last_cleanup).total_seconds() >= 86400:
                     if current_time.hour == 1:
                         await self._run_cleanup()
                         last_cleanup = current_time
                 await asyncio.sleep(60)
             except Exception as e:
-                logger.error(f"Error in fallback task loop: {e}")
+                logger.exception(f"Error in fallback task loop: {e}")
                 await asyncio.sleep(60)
 
     async def _run_trend_analysis(self) -> None:
@@ -335,7 +330,7 @@ class BaselineAutomation:
                         "predicted_7d": trend.predicted_value_7d,
                     }
                 except Exception as e:
-                    logger.error(f"Failed to analyze trend for {metric_name}: {e}")
+                    logger.exception(f"Failed to analyze trend for {metric_name}: {e}")
             await self._save_analysis_results(task_id, analysis_results)
             result = AutomationTaskResult(
                 task_id=task_id,
@@ -354,7 +349,7 @@ class BaselineAutomation:
                 f"Completed trend analysis (task: {task_id}): {len(analysis_results)} metrics"
             )
         except Exception as e:
-            logger.error(f"Trend analysis failed (task: {task_id}): {e}")
+            logger.exception(f"Trend analysis failed (task: {task_id}): {e}")
             result = AutomationTaskResult(
                 task_id=task_id,
                 task_type="trend_analysis",
@@ -411,7 +406,7 @@ class BaselineAutomation:
                     f"Regression detection (task: {task_id}): No regressions detected"
                 )
         except Exception as e:
-            logger.error(f"Regression detection failed (task: {task_id}): {e}")
+            logger.exception(f"Regression detection failed (task: {task_id}): {e}")
             result = AutomationTaskResult(
                 task_id=task_id,
                 task_type="regression_detection",
@@ -444,7 +439,7 @@ class BaselineAutomation:
             await self._record_task_result(result)
             logger.info(f"Completed automated reporting (task: {task_id})")
         except Exception as e:
-            logger.error(f"Automated reporting failed (task: {task_id}): {e}")
+            logger.exception(f"Automated reporting failed (task: {task_id}): {e}")
             result = AutomationTaskResult(
                 task_id=task_id,
                 task_type="automated_reporting",
@@ -501,7 +496,7 @@ class BaselineAutomation:
             await self._record_task_result(result)
             logger.info(f"Completed cleanup (task: {task_id}): {cleanup_stats}")
         except Exception as e:
-            logger.error(f"Cleanup failed (task: {task_id}): {e}")
+            logger.exception(f"Cleanup failed (task: {task_id}): {e}")
             result = AutomationTaskResult(
                 task_id=task_id,
                 task_type="cleanup",
@@ -551,7 +546,7 @@ class BaselineAutomation:
             await self._record_task_result(result)
             logger.info(f"Completed backup (task: {task_id}): {backup_stats}")
         except Exception as e:
-            logger.error(f"Backup failed (task: {task_id}): {e}")
+            logger.exception(f"Backup failed (task: {task_id}): {e}")
             result = AutomationTaskResult(
                 task_id=task_id,
                 task_type="backup",
@@ -575,7 +570,7 @@ class BaselineAutomation:
             "analysis_type": "trend_analysis",
             "results": results,
         }
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(analysis_data, f, indent=2, default=str)
 
     async def _save_regression_alerts(
@@ -591,7 +586,7 @@ class BaselineAutomation:
             "alert_count": len(alerts),
             "alerts": [alert.model_dump() for alert in alerts],
         }
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(alerts_data, f, indent=2, default=str)
 
     async def _save_report(self, task_id: str, report_data: dict[str, Any]) -> None:
@@ -599,7 +594,7 @@ class BaselineAutomation:
         timestamp_str = format_compact_timestamp(datetime.now(UTC))
         filename = f"report_{timestamp_str}_{task_id[:8]}.json"
         filepath = self.reports_path / filename
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2, default=str)
 
     async def _generate_daily_report(self) -> dict[str, Any]:
@@ -640,7 +635,7 @@ class BaselineAutomation:
                     file_path.unlink()
                     removed_count += 1
             except Exception as e:
-                logger.error(f"Failed to remove {file_path}: {e}")
+                logger.exception(f"Failed to remove {file_path}: {e}")
         return removed_count
 
     async def _record_task_result(self, result: AutomationTaskResult) -> None:

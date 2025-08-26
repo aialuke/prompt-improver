@@ -1,35 +1,31 @@
-"""Cache services package for multi-level caching architecture.
+"""Cache services package for high-performance direct caching architecture.
 
-This package provides focused cache services following Single Responsibility Principle:
+This package provides focused cache services implementing direct cache-aside pattern:
 - L1CacheService: In-memory cache (<1ms response time)
-- L2RedisService: Redis cache (1-10ms response time)  
-- L3DatabaseService: Database cache (10-50ms response time)
-- CacheCoordinatorService: Multi-level orchestration
+- L2RedisService: Redis cache (1-10ms response time)
+- CacheFacade: Direct L1+L2 operations (eliminates coordination overhead)
 - CacheMonitoringService: Health monitoring and metrics
 
-Designed to achieve sub-200ms response times for all MCP operations.
+Designed to achieve <2ms response times through elimination of coordination anti-patterns.
+Architecture: App → CacheFacade → Direct L1 → Direct L2 → Storage
 """
 
-from .l1_cache_service import L1CacheService
-from .l2_redis_service import L2RedisService
-from .l3_database_service import L3DatabaseService
-from .cache_coordinator_service import CacheCoordinatorService
-from .cache_monitoring_service import CacheMonitoringService
-from .protocols import (
+from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.services.cache.cache_monitoring_service import (
+    CacheMonitoringService,
+)
+from prompt_improver.services.cache.l1_cache_service import L1CacheService
+from prompt_improver.services.cache.l2_redis_service import L2RedisService
+from prompt_improver.shared.interfaces.protocols.cache import (
+    CacheHealthProtocol as CacheMonitoringProtocol,
     CacheServiceProtocol,
-    CacheCoordinatorProtocol,
-    CacheMonitoringProtocol,
-    CacheWarmingProtocol,
 )
 
 __all__ = [
-    "L1CacheService",
-    "L2RedisService", 
-    "L3DatabaseService",
-    "CacheCoordinatorService",
+    "CacheFacade",
+    "CacheMonitoringProtocol",
     "CacheMonitoringService",
     "CacheServiceProtocol",
-    "CacheCoordinatorProtocol",
-    "CacheMonitoringProtocol",
-    "CacheWarmingProtocol",
+    "L1CacheService",
+    "L2RedisService",
 ]

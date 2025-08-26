@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import os
 import time
-from typing import Any, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 from src.prompt_improver.metrics.api_metrics import (
     AuthenticationMethod,
@@ -31,8 +31,10 @@ from src.prompt_improver.monitoring.opentelemetry.metrics import (
     get_http_metrics,
 )
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
+
+if TYPE_CHECKING:
+    from starlette.requests import Request
+    from starlette.responses import Response
 
 JourneyLabelsMode = Literal["none", "hashed", "full"]
 
@@ -192,7 +194,7 @@ def register_unified_http_middleware(
     except Exception:
         pass
     enabled_val = os.getenv(env_flag, "true").strip().lower()
-    enabled = enabled_val in ("1", "true", "yes", "on")
+    enabled = enabled_val in {"1", "true", "yes", "on"}
     if not enabled:
         return False
     try:

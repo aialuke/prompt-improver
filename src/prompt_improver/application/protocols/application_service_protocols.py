@@ -1,27 +1,26 @@
-"""Application Service Protocols
+"""Application Service Protocols.
 
 Defines the interfaces for application services that orchestrate business workflows
 and coordinate between presentation and domain layers.
 """
 
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 from prompt_improver.core.domain.types import (
     AprioriAnalysisRequestData,
     AprioriAnalysisResponseData,
-    PatternDiscoveryRequestData,
-    PatternDiscoveryResponseData,
     AssociationRuleFilterData,
     PatternDiscoveryFilterData,
+    PatternDiscoveryRequestData,
+    PatternDiscoveryResponseData,
 )
+
 # These are already imported above as domain DTOs - no database models needed
 
 
 class ApplicationServiceProtocol(Protocol):
     """Base protocol for all application services."""
-    
+
     async def initialize(self) -> None:
         """Initialize the application service."""
         ...
@@ -33,50 +32,50 @@ class ApplicationServiceProtocol(Protocol):
 
 class PromptApplicationServiceProtocol(Protocol):
     """Protocol for prompt improvement application service."""
-    
+
     async def improve_prompt(
         self,
         prompt: str,
         session_id: str,
-        improvement_options: Dict[str, Any] | None = None,
-    ) -> Dict[str, Any]:
+        improvement_options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Orchestrate the complete prompt improvement workflow."""
         ...
 
     async def apply_rules_to_prompt(
         self,
         prompt: str,
-        rule_ids: List[str],
+        rule_ids: list[str],
         session_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Apply specific rules to a prompt with session tracking."""
         ...
 
     async def create_improvement_session(
         self,
         initial_prompt: str,
-        user_preferences: Dict[str, Any] | None = None,
-    ) -> Dict[str, Any]:
+        user_preferences: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create a new prompt improvement session."""
         ...
 
     async def finalize_improvement_session(
         self,
         session_id: str,
-        feedback: Dict[str, Any] | None = None,
-    ) -> Dict[str, Any]:
+        feedback: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Finalize an improvement session with user feedback."""
         ...
 
 
 class MLApplicationServiceProtocol(Protocol):
     """Protocol for ML training and inference application service."""
-    
+
     async def execute_training_workflow(
         self,
-        training_config: Dict[str, Any],
+        training_config: dict[str, Any],
         session_id: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a complete ML training workflow."""
         ...
 
@@ -99,39 +98,39 @@ class MLApplicationServiceProtocol(Protocol):
     async def deploy_model(
         self,
         model_id: str,
-        deployment_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        deployment_config: dict[str, Any],
+    ) -> dict[str, Any]:
         """Deploy a trained model to production."""
         ...
 
     async def execute_inference(
         self,
         model_id: str,
-        input_data: Dict[str, Any],
-        inference_config: Dict[str, Any] | None = None,
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+        inference_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute model inference with proper error handling."""
         ...
 
 
 class AnalyticsApplicationServiceProtocol(Protocol):
     """Protocol for analytics and reporting application service."""
-    
+
     async def generate_dashboard_data(
         self,
         time_range_hours: int = 24,
         include_comparisons: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate comprehensive dashboard data."""
         ...
 
     async def execute_trend_analysis(
         self,
         metric_type: str,
-        time_range: Dict[str, Any],
+        time_range: dict[str, Any],
         granularity: str = "day",
-        session_ids: List[str] | None = None,
-    ) -> Dict[str, Any]:
+        session_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Execute trend analysis workflow."""
         ...
 
@@ -141,7 +140,7 @@ class AnalyticsApplicationServiceProtocol(Protocol):
         session_b_id: str,
         comparison_dimension: str = "performance",
         method: str = "t_test",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute session comparison analysis."""
         ...
 
@@ -149,7 +148,7 @@ class AnalyticsApplicationServiceProtocol(Protocol):
         self,
         session_id: str,
         include_insights: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate comprehensive session summary."""
         ...
 
@@ -158,39 +157,39 @@ class AnalyticsApplicationServiceProtocol(Protocol):
         session_id: str,
         export_format: str = "json",
         include_detailed_metrics: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Export session report in specified format."""
         ...
 
 
 class TrainingApplicationServiceProtocol(Protocol):
     """Protocol for training workflow orchestration."""
-    
+
     async def start_training_workflow(
         self,
-        workflow_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        workflow_config: dict[str, Any],
+    ) -> dict[str, Any]:
         """Start a new training workflow."""
         ...
 
     async def monitor_training_progress(
         self,
         workflow_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Monitor training workflow progress."""
         ...
 
     async def pause_training_workflow(
         self,
         workflow_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Pause an active training workflow."""
         ...
 
     async def resume_training_workflow(
         self,
         workflow_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Resume a paused training workflow."""
         ...
 
@@ -198,39 +197,39 @@ class TrainingApplicationServiceProtocol(Protocol):
         self,
         workflow_id: str,
         graceful: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stop a training workflow with optional graceful shutdown."""
         ...
 
 
 class HealthApplicationServiceProtocol(Protocol):
     """Protocol for health monitoring and system status."""
-    
+
     async def perform_comprehensive_health_check(
         self,
         include_detailed_metrics: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform comprehensive system health check."""
         ...
 
     async def monitor_system_performance(
         self,
         duration_seconds: int = 60,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Monitor system performance over specified duration."""
         ...
 
     async def diagnose_system_issues(
         self,
-        component_filter: List[str] | None = None,
-    ) -> Dict[str, Any]:
+        component_filter: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Diagnose potential system issues."""
         ...
 
     async def execute_performance_benchmark(
         self,
-        benchmark_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        benchmark_config: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute performance benchmark workflow."""
         ...
 
@@ -252,15 +251,15 @@ class AprioriApplicationServiceProtocol(Protocol):
         sort_by: str = "lift",
         sort_desc: bool = True,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Retrieve association rules with filtering and sorting."""
         ...
 
     async def get_contextualized_patterns(
         self,
-        context_items: List[str],
+        context_items: list[str],
         min_confidence: float = 0.6,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get patterns relevant to specific context items."""
         ...
 
@@ -282,13 +281,13 @@ class PatternApplicationServiceProtocol(Protocol):
         sort_by: str = "created_at",
         sort_desc: bool = True,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Retrieve historical pattern discovery runs."""
         ...
 
     async def get_discovery_insights(
         self,
         discovery_run_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get detailed insights for a specific discovery run."""
         ...

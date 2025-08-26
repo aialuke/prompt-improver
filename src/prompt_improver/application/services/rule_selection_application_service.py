@@ -1,4 +1,4 @@
-"""Rule Selection Application Service
+"""Rule Selection Application Service.
 
 Application layer service for rule discovery and selection business workflows.
 Orchestrates use cases including rule loading, caching, and optimization strategies.
@@ -13,18 +13,19 @@ Follows Clean Architecture principles by:
 import json
 import logging
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.protocols.rule_selection_protocols import (
-    RuleSelectionProtocol,
+from prompt_improver.rule_engine.base import BasePromptRule
+from prompt_improver.services.cache.cache_factory import CacheFactory
+from prompt_improver.shared.interfaces.protocols.application import (
+    BanditOptimizationProtocol,
     RuleCacheProtocol,
     RuleLoaderProtocol,
-    BanditOptimizationProtocol,
+    RuleSelectionProtocol,
 )
-from prompt_improver.rule_engine.base import BasePromptRule
 
 if TYPE_CHECKING:
     from prompt_improver.core.events.ml_event_bus import (
@@ -43,29 +44,30 @@ logger = logging.getLogger(__name__)
 
 class RuleSelectionApplicationService(
     RuleSelectionProtocol,
-    RuleCacheProtocol, 
+    RuleCacheProtocol,
     RuleLoaderProtocol,
     BanditOptimizationProtocol
 ):
     """Application service for rule selection business workflows.
-    
+
     This service orchestrates complex business logic including:
     - Rule discovery and loading from multiple sources
-    - Intelligent caching strategies  
+    - Intelligent caching strategies
     - Multi-armed bandit optimization for rule selection
     - Traditional priority-based selection fallback
     - ML event bus integration for experimentation
-    
+
     Located in application layer as it coordinates use cases and workflows.
     """
 
-    def __init__(self, enable_bandit_optimization: bool = True):
+    def __init__(self, enable_bandit_optimization: bool = True) -> None:
         """Initialize rule selection application service.
-        
+
         Args:
             enable_bandit_optimization: Enable ML-based bandit optimization
         """
-        self.rule_cache = {}
+        # Use CacheFactory for optimized rule caching (singleton pattern)
+        self.rule_cache_facade = CacheFactory.get_rule_cache()
         self.cache_ttl = 300
         self.enable_bandit_optimization = enable_bandit_optimization
         self.bandit_experiment_id: str | None = None
@@ -76,9 +78,9 @@ class RuleSelectionApplicationService(
     ) -> dict[str, BasePromptRule]:
         """Get active rules with intelligent caching strategy."""
         cache_key = "active_rules"
-        
+
         # Check cache first
-        cached_rules = self.get_cached_rules(cache_key)
+        cached_rules = await self.get_cached_rules(cache_key)
         if cached_rules:
             return cached_rules[0]
 
@@ -91,7 +93,7 @@ class RuleSelectionApplicationService(
             rules = self.get_fallback_rules()
 
         # Cache the results
-        self.cache_rules(cache_key, rules)
+        await self.cache_rules(cache_key, rules)
         return rules
 
     async def get_optimal_rules(
@@ -102,11 +104,11 @@ class RuleSelectionApplicationService(
         limit: int = 5,
     ) -> list[dict[str, Any]]:
         """Get optimal rules using intelligent selection strategy.
-        
+
         Orchestrates business logic to choose between:
         - ML-based bandit optimization (when available)
         - Traditional priority-based selection (fallback)
-        
+
         This is application-layer logic coordinating multiple use cases.
         """
         # Initialize bandit experiment if needed
@@ -118,7 +120,7 @@ class RuleSelectionApplicationService(
             return await self.get_bandit_optimized_rules(
                 prompt_characteristics, preferred_rules, db_session, limit
             )
-        
+
         return await self._get_traditional_optimal_rules(
             preferred_rules, db_session, limit
         )
@@ -129,17 +131,17 @@ class RuleSelectionApplicationService(
         """Get rules metadata for administrative purposes."""
         if not db_session:
             return []
-        
+
         try:
             from prompt_improver.database.models import RuleMetadata
 
             query = select(RuleMetadata)
             if enabled_only:
-                query = query.where(RuleMetadata.enabled == True)
-            
+                query = query.where(RuleMetadata.enabled)
+
             result = await db_session.execute(query)
             rules = result.scalars().all()
-            
+
             return [
                 {
                     "rule_id": rule.rule_id,
@@ -152,7 +154,7 @@ class RuleSelectionApplicationService(
                 for rule in rules
             ]
         except Exception as e:
-            logger.error(f"Error getting rules metadata: {e}")
+            logger.exception(f"Error getting rules metadata: {e}")
             return []
 
     def get_bandit_experiment_id(self) -> str | None:
@@ -164,21 +166,37 @@ class RuleSelectionApplicationService(
         self.bandit_experiment_id = experiment_id
 
     # RuleCacheProtocol implementation
-    def get_cached_rules(self, cache_key: str) -> tuple[dict[str, BasePromptRule], float] | None:
-        """Get cached rules if available and not expired."""
-        if cache_key in self.rule_cache:
-            cached_rules, timestamp = self.rule_cache[cache_key]
-            if time.time() - timestamp < self.cache_ttl:
-                return cached_rules, timestamp
+    async def get_cached_rules(self, cache_key: str) -> tuple[dict[str, BasePromptRule], float] | None:
+        """Get cached rules using unified CacheFacade."""
+        try:
+            cached_data = await self.rule_cache_facade.get(cache_key)
+            if cached_data:
+                # Extract rules dict and timestamp from cached data
+                rules_dict, timestamp = cached_data["rules"], cached_data["timestamp"]
+                if time.time() - timestamp < self.cache_ttl:
+                    return rules_dict, timestamp
+        except Exception as e:
+            logger.warning(f"Cache retrieval failed for key {cache_key}: {e}")
         return None
 
-    def cache_rules(self, cache_key: str, rules: dict[str, BasePromptRule]) -> None:
-        """Cache rules with timestamp."""
-        self.rule_cache[cache_key] = (rules, time.time())
+    async def cache_rules(self, cache_key: str, rules: dict[str, BasePromptRule]) -> None:
+        """Cache rules with timestamp using unified CacheFacade."""
+        try:
+            cache_data = {
+                "rules": rules,
+                "timestamp": time.time()
+            }
+            await self.rule_cache_facade.set(cache_key, cache_data, l2_ttl=self.cache_ttl)
+        except Exception as e:
+            logger.warning(f"Cache storage failed for key {cache_key}: {e}")
 
-    def clear_cache(self) -> None:
-        """Clear all cached rules."""
-        self.rule_cache.clear()
+    async def clear_cache(self) -> None:
+        """Clear all cached rules using unified CacheFacade."""
+        try:
+            # Clear cache using pattern invalidation for rule cache keys
+            await self.rule_cache_facade.invalidate_pattern("active_rules*")
+        except Exception as e:
+            logger.warning(f"Cache clear failed: {e}")
 
     # RuleLoaderProtocol implementation
     async def load_rules_from_database(
@@ -215,7 +233,7 @@ class RuleSelectionApplicationService(
                     rules[config.rule_id] = rule_instance
             return rules
         except Exception as e:
-            logger.error(f"Failed to load rules from database: {e}")
+            logger.exception(f"Failed to load rules from database: {e}")
             return self.get_fallback_rules()
 
     def get_fallback_rules(self) -> dict[str, BasePromptRule]:
@@ -252,12 +270,12 @@ class RuleSelectionApplicationService(
         self, db_session: AsyncSession | None = None
     ) -> str | None:
         """Initialize bandit experiment via ML event bus communication.
-        
+
         This is application-layer logic for coordinating ML experimentation.
         """
         if not self.enable_bandit_optimization:
             return None
-        
+
         try:
             # Get available rules for experiment
             if db_session:
@@ -270,7 +288,7 @@ class RuleSelectionApplicationService(
             else:
                 available_rules = [
                     "clarity_enhancement",
-                    "specificity_enhancement", 
+                    "specificity_enhancement",
                     "chain_of_thought",
                     "few_shot_examples",
                     "role_based_prompting",
@@ -285,7 +303,7 @@ class RuleSelectionApplicationService(
                         MLEventType,
                         get_ml_event_bus,
                     )
-                    
+
                     event_bus = await get_ml_event_bus()
                     experiment_event = MLEvent(
                         event_type=MLEventType.TRAINING_REQUEST,
@@ -298,14 +316,14 @@ class RuleSelectionApplicationService(
                         },
                     )
                     await event_bus.publish(experiment_event)
-                    
+
                     import uuid
                     self.bandit_experiment_id = f"bandit_exp_{uuid.uuid4().hex[:8]}"
                     logger.info(
                         f"Requested bandit experiment initialization for {len(available_rules)} rules"
                     )
                     return self.bandit_experiment_id
-                    
+
                 except ImportError:
                     logger.info("ML event bus not available, disabling bandit optimization")
                     self.enable_bandit_optimization = False
@@ -316,7 +334,7 @@ class RuleSelectionApplicationService(
                 )
                 return None
         except Exception as e:
-            logger.error(f"Failed to request bandit experiment initialization: {e}")
+            logger.exception(f"Failed to request bandit experiment initialization: {e}")
             self.enable_bandit_optimization = False
             return None
 
@@ -332,7 +350,7 @@ class RuleSelectionApplicationService(
             return await self._get_traditional_optimal_rules(
                 preferred_rules, db_session, limit
             )
-        
+
         try:
             # Lazy load ML event bus
             try:
@@ -341,7 +359,7 @@ class RuleSelectionApplicationService(
                     MLEventType,
                     get_ml_event_bus,
                 )
-                
+
                 event_bus = await get_ml_event_bus()
                 selection_event = MLEvent(
                     event_type=MLEventType.ANALYSIS_REQUEST,
@@ -363,7 +381,7 @@ class RuleSelectionApplicationService(
             default_rules = [
                 "clarity_enhancement",
                 "specificity_enhancement",
-                "chain_of_thought", 
+                "chain_of_thought",
                 "few_shot_examples",
                 "role_based_prompting",
             ]
@@ -400,15 +418,14 @@ class RuleSelectionApplicationService(
                     "role_based_prompting": "Role-Based Prompting Rule",
                     "xml_structure_enhancement": "XML Structure Enhancement Rule",
                 }
-                for rule_id in selected_rules:
-                    optimal_rules.append({
+                optimal_rules.extend({
                         "rule_id": rule_id,
                         "rule_name": rule_name_map.get(rule_id, rule_id),
                         "priority": 1.0,
                         "enabled": True,
                         "bandit_confidence": rule_confidence_map[rule_id],
                         "selection_method": "bandit",
-                    })
+                    } for rule_id in selected_rules)
 
             # Handle preferred rules priority
             if preferred_rules:
@@ -427,9 +444,9 @@ class RuleSelectionApplicationService(
                 f"{[(r['rule_id'], r.get('bandit_confidence', 0)) for r in optimal_rules]}"
             )
             return optimal_rules[:limit]
-            
+
         except Exception as e:
-            logger.error(f"Error in bandit rule selection: {e}")
+            logger.exception(f"Error in bandit rule selection: {e}")
             return await self._get_traditional_optimal_rules(
                 preferred_rules, db_session, limit
             )
@@ -439,7 +456,7 @@ class RuleSelectionApplicationService(
     ) -> dict[str, Any]:
         """Prepare context for contextual bandit from prompt characteristics."""
         context = {}
-        
+
         if "length" in prompt_characteristics:
             context["prompt_length"] = min(
                 1.0, prompt_characteristics["length"] / 1000.0
@@ -495,7 +512,7 @@ class RuleSelectionApplicationService(
                 },
                 {
                     "rule_id": "specificity_enhancement",
-                    "rule_name": "Specificity Enhancement Rule", 
+                    "rule_name": "Specificity Enhancement Rule",
                     "selection_method": "default",
                 },
             ]
@@ -511,16 +528,14 @@ class RuleSelectionApplicationService(
             )
             result = await db_session.execute(query)
             rules_metadata = result.scalars().all()
-            optimal_rules = []
 
-            for rule in rules_metadata:
-                optimal_rules.append({
+            optimal_rules = [{
                     "rule_id": rule.rule_id,
                     "rule_name": rule.rule_name,
                     "priority": rule.priority,
                     "enabled": rule.enabled,
                     "selection_method": "traditional",
-                })
+                } for rule in rules_metadata]
 
             if preferred_rules:
                 preferred_set = set(preferred_rules)
@@ -530,7 +545,7 @@ class RuleSelectionApplicationService(
                 )
             return optimal_rules
         except Exception as e:
-            logger.error(f"Error in traditional rule selection: {e}")
+            logger.exception(f"Error in traditional rule selection: {e}")
             return []
 
     # Rule import helper methods

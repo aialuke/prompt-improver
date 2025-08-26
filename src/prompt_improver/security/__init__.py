@@ -13,11 +13,6 @@ from prompt_improver.security.authorization import (
 from prompt_improver.security.differential_privacy import DifferentialPrivacyService
 from prompt_improver.security.federated_learning import FederatedLearningService
 from prompt_improver.security.input_sanitization import InputSanitizer
-from prompt_improver.security.owasp_input_validator import (
-    OWASP2025InputValidator,
-    ThreatType,
-    ValidationResult,
-)
 from prompt_improver.security.input_validator import (
     InputValidator,
     ValidationError,
@@ -29,6 +24,11 @@ from prompt_improver.security.key_manager import (
     get_key_manager,
 )
 from prompt_improver.security.memory_guard import MemoryGuard, get_memory_guard
+from prompt_improver.security.owasp_input_validator import (
+    OWASP2025InputValidator,
+    ThreatType,
+    ValidationResult,
+)
 from prompt_improver.security.secure_logging import SecureLogger
 from prompt_improver.security.services.security_service_facade import (
     SecurityServiceFacade,
@@ -36,10 +36,6 @@ from prompt_improver.security.services.security_service_facade import (
 )
 
 __all__ = [
-    # Core security services (modern architecture)
-    "SecurityServiceFacade",
-    "get_security_service_facade",
-    
     # Specialized security components
     "AdversarialDefenseSystem",
     "AuthorizationService",
@@ -47,21 +43,22 @@ __all__ = [
     "FederatedLearningService",
     "InputSanitizer",
     "InputValidator",  # Legacy validator (being phased out)
-    "OWASP2025InputValidator",  # Modern OWASP-compliant validator
+    # Key management services
+    "KeyRotationConfig",
     "MemoryGuard",
-    "SecureLogger",
-    
+    "OWASP2025InputValidator",  # Modern OWASP-compliant validator
     # Security models and enums
     "Permission",
     "Role",
+    "SecureLogger",
+    # Core security services (modern architecture)
+    "SecurityServiceFacade",
     "ThreatType",
+    "UnifiedKeyService",
     "ValidationError",
     "ValidationResult",
     "ValidationSchema",
-    
-    # Key management services
-    "KeyRotationConfig", 
-    "UnifiedKeyService",
     "get_key_manager",
     "get_memory_guard",
+    "get_security_service_facade",
 ]

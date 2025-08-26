@@ -1,5 +1,5 @@
 """API Module for Prompt Improver
-Provides REST and WebSocket API endpoints for the application
+Provides REST and WebSocket API endpoints for the application.
 """
 
 from fastapi import APIRouter

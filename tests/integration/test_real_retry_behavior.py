@@ -7,7 +7,7 @@ without mocks or complex dependencies.
 
 import asyncio
 import time
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -247,7 +247,7 @@ class TestRealRetryBehavior:
         cb_status = retry_manager.get_circuit_breaker_status("circuit_test")
         assert cb_status["failure_count"] == 1
         assert cb_status["state"] == "CLOSED"
-        for i in range(2):
+        for _i in range(2):
             with pytest.raises(ConnectionError):
                 await retry_manager.retry_async(
                     always_failing,
@@ -278,7 +278,7 @@ class TestRealRetryBehavior:
                 raise ConnectionError(f"Failure {call_count}")
             return "recovered"
 
-        for i in range(3):
+        for _i in range(3):
             with pytest.raises(ConnectionError):
                 await retry_manager.retry_async(
                     initially_failing_then_success,

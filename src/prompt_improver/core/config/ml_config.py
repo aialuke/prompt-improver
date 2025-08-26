@@ -1,10 +1,11 @@
-"""ML Configuration Module
+"""ML Configuration Module.
 
 Configuration for machine learning pipelines, model serving,
 external ML services, and orchestration settings.
 """
 
 import os
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -159,7 +160,7 @@ class OrchestrationConfig(BaseModel):
     auto_scaling_enabled: bool = Field(
         default=True, description="Enable auto-scaling for ML resources"
     )
-    
+
     # Advanced orchestration settings (consolidated from ml/orchestration/config)
     max_concurrent_workflows: int = Field(
         default=10, ge=1, le=100, description="Maximum concurrent workflows"

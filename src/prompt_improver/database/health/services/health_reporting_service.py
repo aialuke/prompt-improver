@@ -15,35 +15,33 @@ Features:
 
 import json
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.common import get_logger
-from .health_protocols import HealthReportingServiceProtocol
-from .health_types import DatabaseHealthMetrics, HealthTrend
 
 logger = get_logger(__name__)
 
 
 class HealthReportingService:
     """Service for database health reporting and historical analysis.
-    
+
     This service provides comprehensive reporting capabilities for database health
     metrics, including trend analysis, historical comparisons, and data export.
     """
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the health reporting service."""
         # Metrics history storage
-        self._metrics_history: List[Dict[str, Any]] = []
+        self._metrics_history: list[dict[str, Any]] = []
         self._max_history_size = 1000  # Keep last 1000 data points
-        
+
         # Trend analysis configuration
         self._trend_analysis_window = 10  # Points to consider for trend calculation
         self._trend_threshold = 0.05      # 5% change threshold for trend detection
-    
-    def add_metrics_to_history(self, metrics: Dict[str, Any]) -> None:
+
+    def add_metrics_to_history(self, metrics: dict[str, Any]) -> None:
         """Add metrics to history for trend analysis.
-        
+
         Args:
             metrics: Health metrics to add to history
         """
@@ -51,37 +49,37 @@ class HealthReportingService:
             # Ensure timestamp is present
             if "timestamp" not in metrics:
                 metrics["timestamp"] = datetime.now(UTC).isoformat()
-            
+
             # Add to history
             self._metrics_history.append(metrics.copy())
-            
+
             # Limit history size
             if len(self._metrics_history) > self._max_history_size:
                 self._metrics_history = self._metrics_history[-self._max_history_size:]
-            
+
             logger.debug(f"Added metrics to history. Total history size: {len(self._metrics_history)}")
-            
+
         except Exception as e:
-            logger.error(f"Failed to add metrics to history: {e}")
-    
-    def get_health_trends(self, hours: int = 24) -> Dict[str, Any]:
+            logger.exception(f"Failed to add metrics to history: {e}")
+
+    def get_health_trends(self, hours: int = 24) -> dict[str, Any]:
         """Get health trends over the specified time period.
-        
+
         Args:
             hours: Number of hours to analyze for trends
-            
+
         Returns:
             Dictionary containing trend analysis results
         """
         try:
             cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
-            
+
             # Filter recent metrics
             recent_metrics = [
                 m for m in self._metrics_history
                 if datetime.fromisoformat(m["timestamp"].replace("Z", "+00:00")) >= cutoff_time
             ]
-            
+
             if len(recent_metrics) < 2:
                 return {
                     "status": "insufficient_data",
@@ -89,7 +87,7 @@ class HealthReportingService:
                     "data_points_found": len(recent_metrics),
                     "hours_requested": hours,
                 }
-            
+
             # Extract trend data for key metrics
             health_scores = self._extract_metric_values(recent_metrics, "health_score")
             connection_utilizations = self._extract_nested_metric_values(
@@ -101,7 +99,7 @@ class HealthReportingService:
             slow_query_counts = self._extract_nested_metric_values(
                 recent_metrics, "query_performance", "slow_queries_count"
             )
-            
+
             # Calculate trends
             trends = {
                 "health_score": self._calculate_trend(health_scores),
@@ -109,10 +107,10 @@ class HealthReportingService:
                 "cache_hit_ratio": self._calculate_trend(cache_hit_ratios),
                 "slow_query_count": self._calculate_trend(slow_query_counts),
             }
-            
+
             # Generate trend summary
             trend_summary = self._generate_trend_summary(recent_metrics)
-            
+
             return {
                 "status": "success",
                 "period_hours": hours,
@@ -137,43 +135,43 @@ class HealthReportingService:
                 "summary": trend_summary,
                 "analysis_timestamp": datetime.now(UTC).isoformat(),
             }
-            
+
         except Exception as e:
-            logger.error(f"Failed to get health trends: {e}")
+            logger.exception(f"Failed to get health trends: {e}")
             return {
                 "status": "error",
                 "error": str(e),
                 "hours_requested": hours,
                 "analysis_timestamp": datetime.now(UTC).isoformat(),
             }
-    
-    def generate_health_report(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+
+    def generate_health_report(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Generate comprehensive health report.
-        
+
         Args:
             metrics: Current health metrics
-            
+
         Returns:
             Comprehensive health report with analysis and recommendations
         """
         try:
             report_timestamp = datetime.now(UTC)
-            
+
             # Extract key metrics for reporting
             health_score = metrics.get("health_score", 0)
             issues = metrics.get("issues", [])
             recommendations = metrics.get("recommendations", [])
-            
+
             # Categorize issues by severity
             critical_issues = [issue for issue in issues if issue.get("severity") == "critical"]
             warning_issues = [issue for issue in issues if issue.get("severity") == "warning"]
             info_issues = [issue for issue in issues if issue.get("severity") == "info"]
-            
+
             # Categorize recommendations by priority
             critical_recommendations = [rec for rec in recommendations if rec.get("priority") == "critical"]
             high_recommendations = [rec for rec in recommendations if rec.get("priority") == "high"]
             medium_recommendations = [rec for rec in recommendations if rec.get("priority") == "medium"]
-            
+
             # Determine overall health status
             if health_score >= 90:
                 overall_status = "excellent"
@@ -190,20 +188,20 @@ class HealthReportingService:
             else:
                 overall_status = "critical"
                 status_description = "Database health is critical with severe issues requiring urgent intervention."
-            
+
             # Component health summary
             component_health = self._assess_component_health(metrics)
-            
+
             # Performance summary
             performance_summary = self._generate_performance_summary(metrics)
-            
+
             # Resource utilization summary
             resource_summary = self._generate_resource_summary(metrics)
-            
+
             # Historical context if available
             historical_context = self._get_historical_context()
-            
-            report = {
+
+            return {
                 "report_metadata": {
                     "generated_at": report_timestamp.isoformat(),
                     "report_type": "comprehensive_health_report",
@@ -246,11 +244,9 @@ class HealthReportingService:
                     "transaction_metrics": metrics.get("transactions", {}),
                 },
             }
-            
-            return report
-            
+
         except Exception as e:
-            logger.error(f"Failed to generate health report: {e}")
+            logger.exception(f"Failed to generate health report: {e}")
             return {
                 "report_metadata": {
                     "generated_at": datetime.now(UTC).isoformat(),
@@ -263,24 +259,24 @@ class HealthReportingService:
                     "status_description": f"Failed to generate report: {e}",
                 },
             }
-    
-    def generate_trend_summary(self, recent_metrics: List[Dict[str, Any]]) -> str:
+
+    def generate_trend_summary(self, recent_metrics: list[dict[str, Any]]) -> str:
         """Generate a human-readable trend summary.
-        
+
         Args:
             recent_metrics: List of recent health metrics
-            
+
         Returns:
             Human-readable trend summary string
         """
         try:
             if not recent_metrics:
                 return "No data available for trend analysis."
-            
+
             latest = recent_metrics[-1]
             health_score = latest.get("health_score", 0)
             issues_count = len(latest.get("issues", []))
-            
+
             # Determine health status
             if health_score >= 90:
                 health_status = "excellent"
@@ -290,7 +286,7 @@ class HealthReportingService:
                 health_status = "fair"
             else:
                 health_status = "poor"
-            
+
             # Trend direction analysis
             if len(recent_metrics) >= 2:
                 previous_score = recent_metrics[-2].get("health_score", health_score)
@@ -302,72 +298,71 @@ class HealthReportingService:
                     trend_direction = "stable"
             else:
                 trend_direction = "stable"
-            
+
             summary = (
                 f"Database health is {health_status} (score: {health_score:.1f}/100) "
                 f"with {issues_count} active issues. "
                 f"Trend: {trend_direction} over recent monitoring period."
             )
-            
+
             # Add component-specific insights
             latest_connection = latest.get("connection_pool", {})
             if isinstance(latest_connection, dict):
                 utilization = latest_connection.get("utilization_percent", 0)
                 if utilization > 90:
                     summary += f" Connection pool utilization is high ({utilization:.1f}%)."
-            
+
             latest_cache = latest.get("cache", {})
             if isinstance(latest_cache, dict):
                 hit_ratio = latest_cache.get("overall_cache_hit_ratio_percent", 100)
                 if hit_ratio < 95:
                     summary += f" Cache hit ratio needs attention ({hit_ratio:.1f}%)."
-            
+
             return summary
-            
+
         except Exception as e:
-            logger.error(f"Failed to generate trend summary: {e}")
+            logger.exception(f"Failed to generate trend summary: {e}")
             return f"Failed to generate trend summary: {e}"
-    
+
     def export_metrics(self, format_type: str = "json") -> str:
         """Export metrics in specified format.
-        
+
         Args:
             format_type: Export format ("json", "csv", or "summary")
-            
+
         Returns:
             Exported metrics data as string
         """
         try:
             if format_type.lower() == "json":
                 return json.dumps(self._metrics_history, indent=2, default=str)
-            
-            elif format_type.lower() == "csv":
+
+            if format_type.lower() == "csv":
                 return self._export_to_csv()
-            
-            elif format_type.lower() == "summary":
+
+            if format_type.lower() == "summary":
                 return self._export_summary()
-            
-            else:
-                raise ValueError(f"Unsupported export format: {format_type}")
-            
+
+            raise ValueError(f"Unsupported export format: {format_type}")
+
         except Exception as e:
-            logger.error(f"Failed to export metrics in format {format_type}: {e}")
+            logger.exception(f"Failed to export metrics in format {format_type}: {e}")
             return f"Export failed: {e}"
-    
-    def get_metrics_history(self) -> List[Dict[str, Any]]:
+
+    def get_metrics_history(self) -> list[dict[str, Any]]:
         """Get historical metrics data.
-        
+
         Returns:
             List of historical metrics
         """
         return self._metrics_history.copy()
-    
+
     def clear_history(self) -> None:
         """Clear metrics history (for testing or reset purposes)."""
         self._metrics_history.clear()
         logger.info("Metrics history cleared")
-    
-    def _extract_metric_values(self, metrics_list: List[Dict[str, Any]], key: str) -> List[float]:
+
+    def _extract_metric_values(self, metrics_list: list[dict[str, Any]], key: str) -> list[float]:
         """Extract values for a specific metric key from metrics list."""
         values = []
         for metrics in metrics_list:
@@ -375,10 +370,10 @@ class HealthReportingService:
             if value is not None and isinstance(value, (int, float)):
                 values.append(float(value))
         return values
-    
+
     def _extract_nested_metric_values(
-        self, metrics_list: List[Dict[str, Any]], parent_key: str, child_key: str
-    ) -> List[float]:
+        self, metrics_list: list[dict[str, Any]], parent_key: str, child_key: str
+    ) -> list[float]:
         """Extract values for a nested metric key from metrics list."""
         values = []
         for metrics in metrics_list:
@@ -388,8 +383,8 @@ class HealthReportingService:
                 if value is not None and isinstance(value, (int, float)):
                     values.append(float(value))
         return values
-    
-    def _calculate_trend(self, values: List[float]) -> Dict[str, Any]:
+
+    def _calculate_trend(self, values: list[float]) -> dict[str, Any]:
         """Calculate trend information for a series of values."""
         if len(values) < 2:
             return {
@@ -398,24 +393,24 @@ class HealthReportingService:
                 "confidence": "low",
                 "data_points": len(values),
             }
-        
+
         # Calculate trend using simple linear approach
         window_size = min(self._trend_analysis_window, len(values))
         recent_values = values[-window_size:]
-        
+
         # Compare recent average to earlier average
         mid_point = len(recent_values) // 2
         if mid_point == 0:
             mid_point = 1
-        
+
         earlier_avg = sum(recent_values[:mid_point]) / mid_point
         recent_avg = sum(recent_values[mid_point:]) / (len(recent_values) - mid_point)
-        
+
         if earlier_avg == 0:
             change_percent = 0.0
         else:
             change_percent = ((recent_avg - earlier_avg) / earlier_avg) * 100
-        
+
         # Determine trend direction
         if abs(change_percent) < self._trend_threshold * 100:
             direction = "stable"
@@ -423,10 +418,10 @@ class HealthReportingService:
             direction = "increasing"
         else:
             direction = "decreasing"
-        
+
         # Confidence based on data points and consistency
         confidence = "high" if len(values) >= 10 else "medium" if len(values) >= 5 else "low"
-        
+
         return {
             "direction": direction,
             "change_percent": round(change_percent, 2),
@@ -435,74 +430,74 @@ class HealthReportingService:
             "current_value": values[-1] if values else None,
             "average_value": sum(values) / len(values) if values else None,
         }
-    
-    def _assess_component_health(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _assess_component_health(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Assess health of individual components."""
         component_health = {}
-        
+
         # Connection pool health
         pool_metrics = metrics.get("connection_pool", {})
         if isinstance(pool_metrics, dict):
             utilization = pool_metrics.get("utilization_percent", 0)
             efficiency = pool_metrics.get("pool_efficiency_score", 100)
-            
+
             if utilization > 95 or efficiency < 50:
                 status = "critical"
             elif utilization > 80 or efficiency < 70:
                 status = "warning"
             else:
                 status = "healthy"
-            
+
             component_health["connection_pool"] = {
                 "status": status,
                 "utilization_percent": utilization,
                 "efficiency_score": efficiency,
             }
-        
+
         # Query performance health
         query_metrics = metrics.get("query_performance", {})
         if isinstance(query_metrics, dict):
             slow_queries = query_metrics.get("slow_queries_count", 0)
             assessment = query_metrics.get("overall_assessment", "unknown")
-            
+
             if slow_queries > 10 or assessment == "poor":
                 status = "critical"
             elif slow_queries > 5 or assessment == "moderate":
                 status = "warning"
             else:
                 status = "healthy"
-            
+
             component_health["query_performance"] = {
                 "status": status,
                 "slow_queries_count": slow_queries,
                 "assessment": assessment,
             }
-        
+
         # Cache health
         cache_metrics = metrics.get("cache", {})
         if isinstance(cache_metrics, dict):
             hit_ratio = cache_metrics.get("overall_cache_hit_ratio_percent", 100)
-            
+
             if hit_ratio < 90:
                 status = "critical"
             elif hit_ratio < 95:
                 status = "warning"
             else:
                 status = "healthy"
-            
+
             component_health["cache"] = {
                 "status": status,
                 "hit_ratio_percent": hit_ratio,
             }
-        
+
         return component_health
-    
-    def _generate_performance_summary(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _generate_performance_summary(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Generate performance analysis summary."""
         query_metrics = metrics.get("query_performance", {})
         if not isinstance(query_metrics, dict):
             return {"status": "no_data"}
-        
+
         return {
             "slow_queries_count": query_metrics.get("slow_queries_count", 0),
             "frequent_queries_count": len(query_metrics.get("frequent_queries", [])),
@@ -511,11 +506,11 @@ class HealthReportingService:
             "overall_assessment": query_metrics.get("overall_assessment", "unknown"),
             "performance_summary": query_metrics.get("performance_summary", ""),
         }
-    
-    def _generate_resource_summary(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _generate_resource_summary(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Generate resource utilization summary."""
         summary = {}
-        
+
         # Connection pool resources
         pool_metrics = metrics.get("connection_pool", {})
         if isinstance(pool_metrics, dict):
@@ -524,7 +519,7 @@ class HealthReportingService:
                 "total_connections": pool_metrics.get("total_connections", 0),
                 "active_connections": pool_metrics.get("active_connections", 0),
             }
-        
+
         # Cache resources
         cache_metrics = metrics.get("cache", {})
         if isinstance(cache_metrics, dict):
@@ -532,7 +527,7 @@ class HealthReportingService:
                 "hit_ratio_percent": cache_metrics.get("overall_cache_hit_ratio_percent", 100),
                 "efficiency": cache_metrics.get("cache_efficiency", "unknown"),
             }
-        
+
         # Storage resources
         storage_metrics = metrics.get("storage", {})
         if isinstance(storage_metrics, dict):
@@ -540,34 +535,34 @@ class HealthReportingService:
                 "database_size_pretty": storage_metrics.get("database_size_pretty", "unknown"),
                 "index_to_table_ratio": storage_metrics.get("index_to_table_ratio", 0),
             }
-        
+
         return summary
-    
-    def _get_historical_context(self) -> Dict[str, Any]:
+
+    def _get_historical_context(self) -> dict[str, Any]:
         """Get historical context for the current metrics."""
         if len(self._metrics_history) < 2:
             return {"status": "insufficient_data"}
-        
+
         # Compare with metrics from 24 hours ago (or as far back as we have data)
         target_time = datetime.now(UTC) - timedelta(hours=24)
         historical_metrics = None
-        
+
         for metrics in self._metrics_history:
             metrics_time = datetime.fromisoformat(metrics["timestamp"].replace("Z", "+00:00"))
             if metrics_time <= target_time:
                 historical_metrics = metrics
-        
+
         if not historical_metrics:
             historical_metrics = self._metrics_history[0]
-        
+
         current_metrics = self._metrics_history[-1]
-        
+
         # Compare key metrics
         current_score = current_metrics.get("health_score", 0)
         historical_score = historical_metrics.get("health_score", 0)
-        
+
         score_change = current_score - historical_score
-        
+
         return {
             "status": "available",
             "comparison_period": "24_hours",
@@ -576,62 +571,62 @@ class HealthReportingService:
             "historical_timestamp": historical_metrics["timestamp"],
             "current_timestamp": current_metrics["timestamp"],
         }
-    
-    def _categorize_issues(self, issues: List[Dict[str, Any]]) -> Dict[str, int]:
+
+    def _categorize_issues(self, issues: list[dict[str, Any]]) -> dict[str, int]:
         """Categorize issues by category."""
         categories = {}
         for issue in issues:
             category = issue.get("category", "unknown")
             categories[category] = categories.get(category, 0) + 1
         return categories
-    
-    def _categorize_recommendations(self, recommendations: List[Dict[str, Any]]) -> Dict[str, int]:
+
+    def _categorize_recommendations(self, recommendations: list[dict[str, Any]]) -> dict[str, int]:
         """Categorize recommendations by category."""
         categories = {}
         for rec in recommendations:
             category = rec.get("category", "unknown")
             categories[category] = categories.get(category, 0) + 1
         return categories
-    
+
     def _export_to_csv(self) -> str:
         """Export metrics history to CSV format."""
         if not self._metrics_history:
             return "No data available for CSV export"
-        
+
         # Simple CSV export with key metrics
         csv_lines = ["timestamp,health_score,connection_utilization,cache_hit_ratio,slow_queries"]
-        
+
         for metrics in self._metrics_history:
             timestamp = metrics.get("timestamp", "")
             health_score = metrics.get("health_score", 0)
-            
+
             connection_util = 0
             pool_metrics = metrics.get("connection_pool", {})
             if isinstance(pool_metrics, dict):
                 connection_util = pool_metrics.get("utilization_percent", 0)
-            
+
             cache_hit_ratio = 100
             cache_metrics = metrics.get("cache", {})
             if isinstance(cache_metrics, dict):
                 cache_hit_ratio = cache_metrics.get("overall_cache_hit_ratio_percent", 100)
-            
+
             slow_queries = 0
             query_metrics = metrics.get("query_performance", {})
             if isinstance(query_metrics, dict):
                 slow_queries = query_metrics.get("slow_queries_count", 0)
-            
+
             csv_lines.append(f"{timestamp},{health_score},{connection_util},{cache_hit_ratio},{slow_queries}")
-        
+
         return "\n".join(csv_lines)
-    
+
     def _export_summary(self) -> str:
         """Export a summary of metrics history."""
         if not self._metrics_history:
             return "No metrics data available"
-        
+
         latest = self._metrics_history[-1]
         total_points = len(self._metrics_history)
-        
+
         summary_lines = [
             "Database Health Metrics Summary",
             "=" * 35,
@@ -642,39 +637,38 @@ class HealthReportingService:
             "",
             "Recent Issues:",
         ]
-        
+
         issues = latest.get("issues", [])
         if issues:
-            for issue in issues[:5]:  # Show top 5 issues
-                summary_lines.append(f"- [{issue.get('severity', 'unknown').upper()}] {issue.get('message', 'No message')}")
+            # Show top 5 issues
+            summary_lines.extend(f"- [{issue.get('severity', 'unknown').upper()}] {issue.get('message', 'No message')}" for issue in issues[:5])
         else:
             summary_lines.append("- No issues detected")
-        
+
         summary_lines.append("")
         summary_lines.append("Recent Recommendations:")
-        
+
         recommendations = latest.get("recommendations", [])
         if recommendations:
-            for rec in recommendations[:5]:  # Show top 5 recommendations
-                summary_lines.append(f"- [{rec.get('priority', 'unknown').upper()}] {rec.get('description', 'No description')}")
+            # Show top 5 recommendations
+            summary_lines.extend(f"- [{rec.get('priority', 'unknown').upper()}] {rec.get('description', 'No description')}" for rec in recommendations[:5])
         else:
             summary_lines.append("- No recommendations")
-        
+
         return "\n".join(summary_lines)
-    
+
     def _get_data_span(self) -> str:
         """Get the time span of collected data."""
         if len(self._metrics_history) < 2:
             return "Single data point"
-        
+
         try:
             earliest = datetime.fromisoformat(self._metrics_history[0]["timestamp"].replace("Z", "+00:00"))
             latest = datetime.fromisoformat(self._metrics_history[-1]["timestamp"].replace("Z", "+00:00"))
             span = latest - earliest
-            
+
             if span.days > 0:
                 return f"{span.days} days, {span.seconds // 3600} hours"
-            else:
-                return f"{span.seconds // 3600} hours, {(span.seconds % 3600) // 60} minutes"
+            return f"{span.seconds // 3600} hours, {(span.seconds % 3600) // 60} minutes"
         except Exception:
             return "Unknown span"

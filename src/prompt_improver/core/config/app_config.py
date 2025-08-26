@@ -1,17 +1,15 @@
-"""Main Application Configuration Module
+"""Main Application Configuration Module.
 
 Unified configuration system with hierarchical structure and environment-based settings.
 Consolidates all configuration concerns into a single entry point with proper validation.
 """
 
-import os
-from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 from prompt_improver.core.config.database_config import DatabaseConfig
-from prompt_improver.core.config.ml_config import MLConfig  
+from prompt_improver.core.config.ml_config import MLConfig
 from prompt_improver.core.config.monitoring_config import MonitoringConfig
 from prompt_improver.core.config.security_config import SecurityConfig
 
@@ -65,7 +63,7 @@ class AppConfig(BaseSettings):
 
     model_config = {
         "env_file": ".env",
-        "env_file_encoding": "utf-8", 
+        "env_file_encoding": "utf-8",
         "case_sensitive": False,
         "extra": "ignore",
         "validate_assignment": True,

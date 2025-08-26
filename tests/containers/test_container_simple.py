@@ -18,7 +18,10 @@ async def test_container_import():
     """Test that we can import the container without errors."""
     print("🧪 Testing container import...")
     try:
-        from prompt_improver.core.di.container_orchestrator import DIContainer, ServiceLifetime
+        from prompt_improver.core.di.container_orchestrator import (
+            DIContainer,
+            ServiceLifetime,
+        )
 
         print("✅ Container import successful!")
         return (DIContainer, ServiceLifetime)

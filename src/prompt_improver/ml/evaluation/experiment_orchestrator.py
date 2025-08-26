@@ -11,7 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 import pandas as pd
 from prompt_improver.utils.datetime_utils import aware_utc_now
 from prompt_improver.utils.datetime_utils import format_compact_timestamp, format_display_date, format_date_only
@@ -330,27 +330,27 @@ class ExperimentOrchestrator:
     def _calculate_sample_size_requirements(self, config: ExperimentConfiguration) -> dict[str, Any]:
         """Calculate required sample sizes for experiment"""
         try:
-            from scipy import stats
+            # from scipy import stats  # Converted to lazy loading
             alpha = config.significance_level
             power = config.statistical_power
             effect_size = config.effect_size_threshold
-            z_alpha = stats.norm.ppf(1 - alpha / 2)
-            z_beta = stats.norm.ppf(power)
+            z_alpha = get_scipy_stats().norm.ppf(1 - alpha / 2)
+            z_beta = get_scipy_stats().norm.ppf(power)
             n_per_group = (z_alpha + z_beta) ** 2 * 2 / effect_size ** 2
-            n_per_group = int(np.ceil(n_per_group))
+            n_per_group = int(get_numpy().ceil(n_per_group))
             n_total = n_per_group * len(config.arms)
             if len(config.arms) > 2:
                 corrected_alpha = alpha / (len(config.arms) - 1)
-                z_alpha_corrected = stats.norm.ppf(1 - corrected_alpha / 2)
+                z_alpha_corrected = get_scipy_stats().norm.ppf(1 - corrected_alpha / 2)
                 n_per_group_corrected = (z_alpha_corrected + z_beta) ** 2 * 2 / effect_size ** 2
-                n_per_group_corrected = int(np.ceil(n_per_group_corrected))
+                n_per_group_corrected = int(get_numpy().ceil(n_per_group_corrected))
                 n_total_corrected = n_per_group_corrected * len(config.arms)
             else:
                 n_per_group_corrected = n_per_group
                 n_total_corrected = n_total
             daily_traffic = config.traffic_allocation * 1000
             estimated_days = n_total_corrected / daily_traffic
-            return {'required_sample_size_per_group': n_per_group, 'required_total_sample_size': n_total, 'corrected_sample_size_per_group': n_per_group_corrected, 'corrected_total_sample_size': n_total_corrected, 'estimated_duration_days': max(1, int(np.ceil(estimated_days))), 'recommended_minimum': max(config.minimum_sample_size, n_total_corrected), 'power_analysis': {'alpha': alpha, 'power': power, 'effect_size': effect_size, 'n_arms': len(config.arms)}}
+            return {'required_sample_size_per_group': n_per_group, 'required_total_sample_size': n_total, 'corrected_sample_size_per_group': n_per_group_corrected, 'corrected_total_sample_size': n_total_corrected, 'estimated_duration_days': max(1, int(get_numpy().ceil(estimated_days))), 'recommended_minimum': max(config.minimum_sample_size, n_total_corrected), 'power_analysis': {'alpha': alpha, 'power': power, 'effect_size': effect_size, 'n_arms': len(config.arms)}}
         except Exception as e:
             logger.warning('Error calculating sample size: %s', e)
             return {'required_sample_size_per_group': config.minimum_sample_size // len(config.arms), 'required_total_sample_size': config.minimum_sample_size, 'estimated_duration_days': 14, 'error': str(e)}
@@ -455,12 +455,12 @@ class ExperimentOrchestrator:
             for arm_id, arm_data in experiment_data['arms'].items():
                 if not arm_data['outcomes']:
                     continue
-                outcomes = np.array(arm_data['outcomes'])
+                outcomes = get_numpy().array(arm_data['outcomes'])
                 pattern_id = f'performance_distribution_{arm_id}'
                 patterns_data[pattern_id] = {'type': 'performance_distribution', 'description': f'Performance distribution for {arm_id}'}
-                high_perf = np.sum(outcomes > np.percentile(outcomes, 75))
-                med_perf = np.sum((outcomes >= np.percentile(outcomes, 25)) & (outcomes <= np.percentile(outcomes, 75)))
-                low_perf = np.sum(outcomes < np.percentile(outcomes, 25))
+                high_perf = get_numpy().sum(outcomes > get_numpy().percentile(outcomes, 75))
+                med_perf = get_numpy().sum((outcomes >= get_numpy().percentile(outcomes, 25)) & (outcomes <= get_numpy().percentile(outcomes, 75)))
+                low_perf = get_numpy().sum(outcomes < get_numpy().percentile(outcomes, 25))
                 if arm_id == list(experiment_data['arms'].keys())[0]:
                     control_patterns[pattern_id] = {'high': high_perf, 'medium': med_perf, 'low': low_perf}
                 else:
@@ -488,7 +488,7 @@ class ExperimentOrchestrator:
                 all_treatments.extend(treatments)
             if len(all_outcomes) < 20:
                 return None
-            result = self.causal_analyzer.analyze_causal_effect(outcome_data=np.array(all_outcomes), treatment_data=np.array(all_treatments), assignment_mechanism=TreatmentAssignment.RANDOMIZED, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES)
+            result = self.causal_analyzer.analyze_causal_effect(outcome_data=get_numpy().array(all_outcomes), treatment_data=get_numpy().array(all_treatments), assignment_mechanism=TreatmentAssignment.RANDOMIZED, method=CausalMethod.DIFFERENCE_IN_DIFFERENCES)
             return result
         except Exception as e:
             logger.error('Error in causal analysis: %s', e)
@@ -501,13 +501,13 @@ class ExperimentOrchestrator:
         try:
             control_arm_id = list(experiment_data['arms'].keys())[0]
             control_outcomes = experiment_data['arms'][control_arm_id]['outcomes']
-            control_mean = np.mean(control_outcomes) if control_outcomes else 0
+            control_mean = get_numpy().mean(control_outcomes) if control_outcomes else 0
             for arm_id, arm_data in experiment_data['arms'].items():
                 if not arm_data['outcomes']:
                     continue
                 outcomes = arm_data['outcomes']
-                arm_mean = np.mean(outcomes)
-                arm_std = np.std(outcomes, ddof=1) if len(outcomes) > 1 else 0
+                arm_mean = get_numpy().mean(outcomes)
+                arm_std = get_numpy().std(outcomes, ddof=1) if len(outcomes) > 1 else 0
                 arm_performance[arm_id] = {'mean': float(arm_mean), 'std': float(arm_std), 'sample_size': len(outcomes), 'confidence_interval': self._calculate_ci(outcomes) if len(outcomes) > 1 else (arm_mean, arm_mean)}
                 if control_mean > 0:
                     relative_lift = (arm_mean - control_mean) / control_mean
@@ -521,14 +521,14 @@ class ExperimentOrchestrator:
     def _calculate_ci(self, data: list[float], confidence: float=0.95) -> tuple[float, float]:
         """Calculate confidence interval for data"""
         try:
-            from scipy import stats
-            data_array = np.array(data)
-            mean = np.mean(data_array)
-            se = stats.sem(data_array)
-            h = se * stats.t.ppf((1 + confidence) / 2.0, len(data_array) - 1)
+            # from scipy import stats  # Converted to lazy loading
+            data_array = get_numpy().array(data)
+            mean = get_numpy().mean(data_array)
+            se = get_scipy_stats().sem(data_array)
+            h = se * get_scipy_stats().t.ppf((1 + confidence) / 2.0, len(data_array) - 1)
             return (float(mean - h), float(mean + h))
         except Exception:
-            mean = np.mean(data)
+            mean = get_numpy().mean(data)
             return (mean, mean)
 
     def _generate_stopping_recommendation(self, config: ExperimentConfiguration, statistical_result: AdvancedValidationResult, causal_result: CausalInferenceResult | None, performance_metrics: dict[str, Any]) -> dict[str, Any]:
@@ -841,6 +841,7 @@ class ExperimentOrchestrator:
     async def _simulate_experiment_phase(self, experiment: ABExperiment, phase_num: int) -> dict[str, Any]:
         """Simulate experiment phase data (replace with real data collection in production)."""
         import random
+        from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
         base_samples = 50 * phase_num
         control_visitors = base_samples + random.randint(-10, 10)
         treatment_visitors = base_samples + random.randint(-10, 10)

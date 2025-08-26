@@ -1,4 +1,4 @@
-"""Core ML Event Bus for MCP-ML Boundary Isolation
+"""Core ML Event Bus for MCP-ML Boundary Isolation.
 
 Provides event-driven communication between MCP components and ML subsystems
 without direct ML imports, ensuring clean architectural boundaries.
@@ -15,9 +15,9 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
@@ -174,7 +174,7 @@ class MLEventBus:
     - Efficient event routing with minimal overhead
     """
 
-    def __init__(self, max_queue_size: int = 10000, max_history_size: int = 1000):
+    def __init__(self, max_queue_size: int = 10000, max_history_size: int = 1000) -> None:
         """Initialize the ML Event Bus.
 
         Args:
@@ -323,16 +323,16 @@ class MLEventBus:
             )
             return True
         except TimeoutError:
-            self.logger.error(
+            self.logger.exception(
                 f"Event queue full, dropping event {event.event_type.value}"
             )
             return False
         except ValueError as e:
             self.security_violations += 1
-            self.logger.error(f"Event validation failed: {e}")
+            self.logger.exception(f"Event validation failed: {e}")
             return False
         except Exception as e:
-            self.logger.error(f"Error publishing event: {e}")
+            self.logger.exception(f"Error publishing event: {e}")
             return False
 
     async def publish_and_wait(self, event: MLEvent, timeout: float = 5.0) -> list[Any]:
@@ -412,13 +412,13 @@ class MLEventBus:
                         results.append(result)
                     except Exception as e:
                         results.append(e)
-                        self.logger.error(f"Handler task {task_id} failed: {e}")
+                        self.logger.exception(f"Handler task {task_id} failed: {e}")
         except TimeoutError:
-            self.logger.error(
+            self.logger.exception(
                 f"Timeout waiting for handlers of {event.event_type.value}"
             )
         except Exception as e:
-            self.logger.error(f"Error in publish_and_wait: {e}")
+            self.logger.exception(f"Error in publish_and_wait: {e}")
         return results
 
     def get_subscription_stats(self) -> dict[str, Any]:
@@ -475,7 +475,7 @@ class MLEventBus:
                 break
             except Exception as e:
                 self.failed_events_count += 1
-                self.logger.error(f"Error processing event: {e}")
+                self.logger.exception(f"Error processing event: {e}")
         self.logger.info("ML event processing stopped")
 
     async def _handle_event(self, event: MLEvent) -> None:
@@ -498,20 +498,16 @@ class MLEventBus:
                         None, subscription.handler, event
                     )
             except TimeoutError:
-                self.logger.error(f"Handler {subscription.subscription_id} timed out")
+                self.logger.exception(f"Handler {subscription.subscription_id} timed out")
             except Exception as e:
-                self.logger.error(
+                self.logger.exception(
                     f"Error in handler {subscription.subscription_id}: {e}"
                 )
 
     def _get_filtered_subscribers(self, event: MLEvent) -> list[EventSubscription]:
         """Get subscribers filtered by event type and source."""
         subscribers = self.subscriptions.get(event.event_type, [])
-        filtered_subscribers = []
-        for sub in subscribers:
-            if sub.source_filter is None or sub.source_filter == event.source:
-                filtered_subscribers.append(sub)
-        return filtered_subscribers
+        return [sub for sub in subscribers if sub.source_filter is None or sub.source_filter == event.source]
 
     def _add_to_history(self, event: MLEvent) -> None:
         """Add event to history with size management."""

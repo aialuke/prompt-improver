@@ -1,6 +1,6 @@
 """Metrics collection and monitoring services."""
 
-from .metrics_collector import (
+from prompt_improver.monitoring.metrics.metrics_collector import (
     OPENTELEMETRY_AVAILABLE,
     CacheMetrics,
     ConnectionMetrics,
@@ -10,10 +10,10 @@ from .metrics_collector import (
 )
 
 __all__ = [
-    "MetricsCollector",
+    "OPENTELEMETRY_AVAILABLE",
     "CacheMetrics",
     "ConnectionMetrics",
-    "SecurityMetrics",
+    "MetricsCollector",
     "OperationStats",
-    "OPENTELEMETRY_AVAILABLE",
+    "SecurityMetrics",
 ]

@@ -13,14 +13,11 @@ from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-import numpy as np
-from scipy import stats
-from scipy.stats import bootstrap
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+# from get_scipy().stats import bootstrap  # Converted to lazy loading
 try:
-    from sklearn.ensemble import RandomForestRegressor
-    from sklearn.linear_model import BayesianRidge
-    from sklearn.metrics import mean_squared_error, r2_score
-    from sklearn.model_selection import KFold, PermutationTestScore
+    from prompt_improver.core.utils.lazy_ml_loader import get_scipy, get_sklearn
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -28,6 +25,9 @@ except ImportError:
 try:
     import arviz as az
     import pymc as pm
+    from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+    from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
+    from prompt_improver.core.utils.lazy_ml_loader import get_sklearn_metrics, get_sklearn
     BAYESIAN_AVAILABLE = True
 except ImportError:
     BAYESIAN_AVAILABLE = False
@@ -165,7 +165,7 @@ class EnhancedOptimizationValidator:
             self.logger.error('Orchestrated optimization validation failed: %s', e)
             return {'orchestrator_compatible': True, 'component_result': {'error': str(e), 'validation_summary': {}}, 'local_metadata': {'execution_time': (datetime.now() - start_time).total_seconds(), 'error': True, 'component_version': '2025.1.0'}}
 
-    async def validate_enhanced_optimization(self, optimization_id: str, baseline_data: dict[str, Any], optimized_data: dict[str, Any], metrics: list[str]=None, causal_features: np.ndarray | None=None) -> ValidationResult:
+    async def validate_enhanced_optimization(self, optimization_id: str, baseline_data: dict[str, Any], optimized_data: dict[str, Any], metrics: list[str]=None, causal_features: get_numpy().ndarray | None=None) -> ValidationResult:
         """Enhanced optimization validation using 2025 best practices"""
         self.logger.info('Enhanced validation for optimization %s', optimization_id)
         baseline_scores = baseline_data.get('scores', [])
@@ -174,8 +174,8 @@ class EnhancedOptimizationValidator:
             raise ValueError('Both baseline and optimized scores are required')
         if len(baseline_scores) < self.config.min_sample_size or len(optimized_scores) < self.config.min_sample_size:
             raise ValueError(f'Insufficient sample size. Need at least {self.config.min_sample_size} samples')
-        baseline_array = np.array(baseline_scores, dtype=float)
-        optimized_array = np.array(optimized_scores, dtype=float)
+        baseline_array = get_numpy().array(baseline_scores, dtype=float)
+        optimized_array = get_numpy().array(optimized_scores, dtype=float)
         result = ValidationResult(optimization_id=optimization_id, valid=False, validation_method=self.config.validation_method, validation_date=datetime.now().isoformat(), p_value=1.0, effect_size=0.0, effect_size_magnitude=EffectSizeMagnitude.NEGLIGIBLE, confidence_interval=(0.0, 0.0))
         try:
             classical_result = await self._perform_classical_analysis(baseline_array, optimized_array)
@@ -208,11 +208,11 @@ class EnhancedOptimizationValidator:
             result.warnings.append(f'Validation error: {str(e)}')
             return result
 
-    async def _perform_classical_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
+    async def _perform_classical_analysis(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray) -> dict[str, Any]:
         """Perform classical statistical analysis"""
-        statistic, p_value = stats.ttest_ind(optimized, baseline)
-        pooled_std = np.sqrt((np.var(baseline, ddof=1) + np.var(optimized, ddof=1)) / 2)
-        effect_size = (np.mean(optimized) - np.mean(baseline)) / pooled_std
+        statistic, p_value = get_scipy_stats().ttest_ind(optimized, baseline)
+        pooled_std = get_numpy().sqrt((get_numpy().var(baseline, ddof=1) + get_numpy().var(optimized, ddof=1)) / 2)
+        effect_size = (get_numpy().mean(optimized) - get_numpy().mean(baseline)) / pooled_std
         abs_effect = abs(effect_size)
         if abs_effect < 0.1:
             magnitude = EffectSizeMagnitude.NEGLIGIBLE
@@ -225,11 +225,11 @@ class EnhancedOptimizationValidator:
         else:
             magnitude = EffectSizeMagnitude.VERY_LARGE
         n1, n2 = (len(baseline), len(optimized))
-        se = np.sqrt((n1 + n2) / (n1 * n2) + effect_size ** 2 / (2 * (n1 + n2)))
-        margin = stats.t.ppf(1 - (1 - self.config.bootstrap_confidence_level) / 2, n1 + n2 - 2) * se
+        se = get_numpy().sqrt((n1 + n2) / (n1 * n2) + effect_size ** 2 / (2 * (n1 + n2)))
+        margin = get_scipy_stats().t.ppf(1 - (1 - self.config.bootstrap_confidence_level) / 2, n1 + n2 - 2) * se
         ci_lower = effect_size - margin
         ci_upper = effect_size + margin
-        return {'statistic': float(statistic), 'p_value': float(p_value), 'effect_size': float(effect_size), 'effect_size_magnitude': magnitude, 'confidence_interval': (float(ci_lower), float(ci_upper)), 'baseline_mean': float(np.mean(baseline)), 'optimized_mean': float(np.mean(optimized)), 'baseline_std': float(np.std(baseline, ddof=1)), 'optimized_std': float(np.std(optimized, ddof=1))}
+        return {'statistic': float(statistic), 'p_value': float(p_value), 'effect_size': float(effect_size), 'effect_size_magnitude': magnitude, 'confidence_interval': (float(ci_lower), float(ci_upper)), 'baseline_mean': float(get_numpy().mean(baseline)), 'optimized_mean': float(get_numpy().mean(optimized)), 'baseline_std': float(get_numpy().std(baseline, ddof=1)), 'optimized_std': float(get_numpy().std(optimized, ddof=1))}
 
     async def _make_validation_decision(self, result: ValidationResult) -> bool:
         """Make overall validation decision based on all analyses"""
@@ -274,7 +274,7 @@ class EnhancedOptimizationValidator:
         if result.bayesian_result:
             bayes_robust = result.bayesian_result.get('convergence_score', 0.0)
             robustness_components.append(bayes_robust)
-        return np.mean(robustness_components) if robustness_components else 0.5
+        return get_numpy().mean(robustness_components) if robustness_components else 0.5
 
     async def _generate_recommendations(self, result: ValidationResult) -> list[str]:
         """Generate actionable recommendations"""
@@ -312,37 +312,37 @@ class EnhancedOptimizationValidator:
             baseline_metric = baseline_data.get(f'{metric}_scores', [])
             optimized_metric = optimized_data.get(f'{metric}_scores', [])
             if baseline_metric and optimized_metric:
-                metric_analysis = await self._perform_classical_analysis(np.array(baseline_metric), np.array(optimized_metric))
+                metric_analysis = await self._perform_classical_analysis(get_numpy().array(baseline_metric), get_numpy().array(optimized_metric))
                 weight = self.config.metric_weights.get(metric, 1.0)
                 weighted_score = metric_analysis['effect_size'] * weight
                 overall_scores.append(weighted_score)
                 metric_results[metric] = {'analysis': metric_analysis, 'weight': weight, 'weighted_score': weighted_score}
-        overall_score = np.mean(overall_scores) if overall_scores else 0.0
+        overall_score = get_numpy().mean(overall_scores) if overall_scores else 0.0
         return {'metric_results': metric_results, 'overall_score': float(overall_score), 'metrics_validated': len(metric_results), 'consistent_improvement': sum(1 for score in overall_scores if score > 0) / len(overall_scores) if overall_scores else 0}
 
-    async def _quantify_uncertainty(self, baseline: np.ndarray, optimized: np.ndarray, result: ValidationResult) -> dict[str, float]:
+    async def _quantify_uncertainty(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray, result: ValidationResult) -> dict[str, float]:
         """Quantify uncertainty in validation results"""
         uncertainty_metrics = {}
         uncertainty_metrics['p_value_uncertainty'] = self._calculate_p_value_uncertainty(baseline, optimized)
         uncertainty_metrics['effect_size_uncertainty'] = abs(result.confidence_interval[1] - result.confidence_interval[0]) / 2
         uncertainty_metrics['sample_adequacy'] = min(1.0, (len(baseline) + len(optimized)) / (2 * self.config.min_sample_size))
-        baseline_cv = np.std(baseline) / np.mean(baseline) if np.mean(baseline) != 0 else float('inf')
-        optimized_cv = np.std(optimized) / np.mean(optimized) if np.mean(optimized) != 0 else float('inf')
+        baseline_cv = get_numpy().std(baseline) / get_numpy().mean(baseline) if get_numpy().mean(baseline) != 0 else float('inf')
+        optimized_cv = get_numpy().std(optimized) / get_numpy().mean(optimized) if get_numpy().mean(optimized) != 0 else float('inf')
         uncertainty_metrics['variance_stability'] = 1.0 / (1.0 + abs(baseline_cv - optimized_cv))
-        uncertainty_metrics['overall_uncertainty'] = 1.0 - np.mean([1.0 - uncertainty_metrics['p_value_uncertainty'], 1.0 - uncertainty_metrics['effect_size_uncertainty'], uncertainty_metrics['sample_adequacy'], uncertainty_metrics['variance_stability']])
+        uncertainty_metrics['overall_uncertainty'] = 1.0 - get_numpy().mean([1.0 - uncertainty_metrics['p_value_uncertainty'], 1.0 - uncertainty_metrics['effect_size_uncertainty'], uncertainty_metrics['sample_adequacy'], uncertainty_metrics['variance_stability']])
         return uncertainty_metrics
 
-    def _calculate_p_value_uncertainty(self, baseline: np.ndarray, optimized: np.ndarray) -> float:
+    def _calculate_p_value_uncertainty(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray) -> float:
         """Calculate uncertainty in p-value estimation"""
         n_bootstrap = 1000
         p_values = []
         for _ in range(n_bootstrap):
-            baseline_boot = np.random.choice(baseline, size=len(baseline), replace=True)
-            optimized_boot = np.random.choice(optimized, size=len(optimized), replace=True)
-            _, p_val = stats.ttest_ind(optimized_boot, baseline_boot)
+            baseline_boot = get_numpy().random.choice(baseline, size=len(baseline), replace=True)
+            optimized_boot = get_numpy().random.choice(optimized, size=len(optimized), replace=True)
+            _, p_val = get_scipy_stats().ttest_ind(optimized_boot, baseline_boot)
             p_values.append(p_val)
-        p_values = np.array(p_values)
-        return float(np.std(p_values) / np.mean(p_values)) if np.mean(p_values) > 0 else 1.0
+        p_values = get_numpy().array(p_values)
+        return float(get_numpy().std(p_values) / get_numpy().mean(p_values)) if get_numpy().mean(p_values) > 0 else 1.0
 
 class RobustStatisticalValidator:
     """Robust statistical validation using bootstrap and permutation tests"""
@@ -351,44 +351,44 @@ class RobustStatisticalValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def bootstrap_analysis(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
+    async def bootstrap_analysis(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray) -> dict[str, Any]:
         """Perform bootstrap analysis"""
         if not SKLEARN_AVAILABLE:
             return {'error': 'scikit-learn not available for bootstrap analysis'}
         try:
 
             def statistic(x, y):
-                return np.mean(x) - np.mean(y)
+                return get_numpy().mean(x) - get_numpy().mean(y)
             combined_data = (optimized, baseline)
             res = bootstrap(combined_data, statistic, n_resamples=self.config.bootstrap_samples, confidence_level=self.config.bootstrap_confidence_level, random_state=42)
             bootstrap_diffs = []
             for _ in range(1000):
-                boot_opt = np.random.choice(optimized, size=len(optimized), replace=True)
-                boot_base = np.random.choice(baseline, size=len(baseline), replace=True)
-                bootstrap_diffs.append(np.mean(boot_opt) - np.mean(boot_base))
-            bootstrap_diffs = np.array(bootstrap_diffs)
-            p_value_bootstrap = np.mean(bootstrap_diffs <= 0)
+                boot_opt = get_numpy().random.choice(optimized, size=len(optimized), replace=True)
+                boot_base = get_numpy().random.choice(baseline, size=len(baseline), replace=True)
+                bootstrap_diffs.append(get_numpy().mean(boot_opt) - get_numpy().mean(boot_base))
+            bootstrap_diffs = get_numpy().array(bootstrap_diffs)
+            p_value_bootstrap = get_numpy().mean(bootstrap_diffs <= 0)
             return {'confidence_interval': (float(res.confidence_interval.low), float(res.confidence_interval.high)), 'bootstrap_p_value': float(p_value_bootstrap), 'significant': p_value_bootstrap < self.config.significance_level, 'consistency_score': 1.0 - p_value_bootstrap if p_value_bootstrap < 0.5 else 0.0, 'method': 'bootstrap'}
         except Exception as e:
             self.logger.error('Bootstrap analysis failed: %s', e)
             return {'error': str(e)}
 
-    async def permutation_test(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
+    async def permutation_test(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray) -> dict[str, Any]:
         """Perform permutation test"""
         try:
-            combined = np.concatenate([baseline, optimized])
+            combined = get_numpy().concatenate([baseline, optimized])
             n_baseline = len(baseline)
-            observed_diff = np.mean(optimized) - np.mean(baseline)
+            observed_diff = get_numpy().mean(optimized) - get_numpy().mean(baseline)
             permutation_diffs = []
             for _ in range(self.config.permutation_samples):
-                permuted = np.random.permutation(combined)
+                permuted = get_numpy().random.permutation(combined)
                 perm_baseline = permuted[:n_baseline]
                 perm_optimized = permuted[n_baseline:]
-                perm_diff = np.mean(perm_optimized) - np.mean(perm_baseline)
+                perm_diff = get_numpy().mean(perm_optimized) - get_numpy().mean(perm_baseline)
                 permutation_diffs.append(perm_diff)
-            permutation_diffs = np.array(permutation_diffs)
-            p_value = np.mean(permutation_diffs >= observed_diff)
-            return {'observed_difference': float(observed_diff), 'p_value': float(p_value), 'significant': p_value < self.config.significance_level, 'permutation_distribution_mean': float(np.mean(permutation_diffs)), 'permutation_distribution_std': float(np.std(permutation_diffs)), 'method': 'permutation_test'}
+            permutation_diffs = get_numpy().array(permutation_diffs)
+            p_value = get_numpy().mean(permutation_diffs >= observed_diff)
+            return {'observed_difference': float(observed_diff), 'p_value': float(p_value), 'significant': p_value < self.config.significance_level, 'permutation_distribution_mean': float(get_numpy().mean(permutation_diffs)), 'permutation_distribution_std': float(get_numpy().std(permutation_diffs)), 'method': 'permutation_test'}
         except Exception as e:
             self.logger.error('Permutation test failed: %s', e)
             return {'error': str(e)}
@@ -400,7 +400,7 @@ class BayesianValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def bayesian_comparison(self, baseline: np.ndarray, optimized: np.ndarray) -> dict[str, Any]:
+    async def bayesian_comparison(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray) -> dict[str, Any]:
         """Perform Bayesian model comparison"""
         if not BAYESIAN_AVAILABLE:
             return {'error': 'PyMC/ArviZ not available for Bayesian analysis'}
@@ -417,13 +417,13 @@ class CausalInferenceValidator:
         self.config = config
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
 
-    async def causal_validation(self, baseline: np.ndarray, optimized: np.ndarray, features: np.ndarray) -> dict[str, Any]:
+    async def causal_validation(self, baseline: get_numpy().ndarray, optimized: get_numpy().ndarray, features: get_numpy().ndarray) -> dict[str, Any]:
         """Perform causal inference validation"""
         try:
-            treatment = np.concatenate([np.zeros(len(baseline)), np.ones(len(optimized))])
-            outcomes = np.concatenate([baseline, optimized])
-            causal_effect = np.mean(optimized) - np.mean(baseline)
-            confounding_strength = np.random.uniform(0.1, 0.3)
+            treatment = get_numpy().concatenate([get_numpy().zeros(len(baseline)), get_numpy().ones(len(optimized))])
+            outcomes = get_numpy().concatenate([baseline, optimized])
+            causal_effect = get_numpy().mean(optimized) - get_numpy().mean(baseline)
+            confounding_strength = get_numpy().random.uniform(0.1, 0.3)
             return {'causal_effect': float(causal_effect), 'confounding_strength': float(confounding_strength), 'causal_significant': abs(causal_effect) > self.config.min_effect_size, 'method': 'simplified_causal_inference', 'note': 'Simplified causal analysis - full implementation requires causal inference libraries'}
         except Exception as e:
             self.logger.error('Causal validation failed: %s', e)

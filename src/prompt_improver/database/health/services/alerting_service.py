@@ -14,23 +14,25 @@ Features:
 """
 
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.core.common import get_logger
-from .health_protocols import AlertingServiceProtocol
-from .health_types import HealthAlert, HealthRecommendation, HealthThreshold
+from prompt_improver.database.health.services.health_types import (
+    HealthAlert,
+    HealthThreshold,
+)
 
 logger = get_logger(__name__)
 
 
 class AlertingService:
     """Service for database health alerting and notification management.
-    
+
     This service provides comprehensive health assessment, issue identification,
     and recommendation generation with configurable thresholds and alerting.
     """
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the alerting service with default thresholds."""
         # Default threshold configurations
         self.thresholds = {
@@ -77,23 +79,23 @@ class AlertingService:
                 description="Number of blocking locks"
             ),
         }
-        
+
         # Alert history for deduplication and tracking
-        self._alert_history: List[HealthAlert] = []
+        self._alert_history: list[HealthAlert] = []
         self._max_alert_history = 1000
-    
-    def calculate_health_score(self, metrics: Dict[str, Any]) -> float:
+
+    def calculate_health_score(self, metrics: dict[str, Any]) -> float:
         """Calculate overall health score based on all metrics (0-100).
-        
+
         Args:
             metrics: Comprehensive database health metrics
-            
+
         Returns:
             Health score between 0 and 100
         """
         try:
             score = 100.0
-            
+
             # Connection pool health (25% weight)
             pool_metrics = metrics.get("connection_pool", {})
             if isinstance(pool_metrics, dict) and "utilization_percent" in pool_metrics:
@@ -102,7 +104,7 @@ class AlertingService:
                     score -= 20  # Critical impact
                 elif utilization > 80:
                     score -= 10  # Warning impact
-            
+
             # Query performance health (30% weight)
             query_metrics = metrics.get("query_performance", {})
             if isinstance(query_metrics, dict):
@@ -113,7 +115,7 @@ class AlertingService:
                     score -= 15  # Warning impact
                 elif slow_queries > 0:
                     score -= min(10, slow_queries * 2)  # Gradual impact
-            
+
             # Cache performance health (20% weight)
             cache_metrics = metrics.get("cache", {})
             if isinstance(cache_metrics, dict):
@@ -122,7 +124,7 @@ class AlertingService:
                     score -= 20  # Critical impact
                 elif hit_ratio < 95:
                     score -= 10  # Warning impact
-            
+
             # Replication health (15% weight)
             replication_metrics = metrics.get("replication", {})
             if isinstance(replication_metrics, dict) and replication_metrics.get("replication_enabled"):
@@ -131,14 +133,14 @@ class AlertingService:
                     score -= 15  # Critical impact
                 elif lag_seconds > 60:
                     score -= 8   # Warning impact
-            
+
             # Lock health (5% weight)
             lock_metrics = metrics.get("locks", {})
             if isinstance(lock_metrics, dict):
                 blocking_locks = lock_metrics.get("blocking_locks", 0)
                 long_running_locks = lock_metrics.get("long_running_locks", 0)
                 score -= min(5, (blocking_locks + long_running_locks) * 1)
-            
+
             # Transaction health (5% weight)
             txn_metrics = metrics.get("transactions", {})
             if isinstance(txn_metrics, dict):
@@ -147,32 +149,32 @@ class AlertingService:
                     score -= 5   # Critical impact
                 elif rollback_ratio > 10:
                     score -= 3   # Warning impact
-            
+
             return max(0.0, min(100.0, score))
-            
+
         except Exception as e:
-            logger.error(f"Failed to calculate health score: {e}")
+            logger.exception(f"Failed to calculate health score: {e}")
             return 0.0
-    
-    def identify_health_issues(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+    def identify_health_issues(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
         """Identify specific health issues based on metrics.
-        
+
         Args:
             metrics: Comprehensive database health metrics
-            
+
         Returns:
             List of identified health issues with severity and details
         """
         issues = []
         timestamp = datetime.now(UTC).isoformat()
-        
+
         try:
             # Connection pool issues
             pool_metrics = metrics.get("connection_pool", {})
             if isinstance(pool_metrics, dict):
                 utilization = pool_metrics.get("utilization_percent", 0)
                 threshold = self.thresholds["connection_pool_utilization"]
-                
+
                 if utilization > threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -191,13 +193,13 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-            
+
             # Query performance issues
             query_metrics = metrics.get("query_performance", {})
             if isinstance(query_metrics, dict):
                 slow_queries = query_metrics.get("slow_queries_count", 0)
                 threshold = self.thresholds["slow_queries_count"]
-                
+
                 if slow_queries > threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -216,13 +218,13 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-            
+
             # Cache performance issues
             cache_metrics = metrics.get("cache", {})
             if isinstance(cache_metrics, dict):
                 hit_ratio = cache_metrics.get("overall_cache_hit_ratio_percent", 100)
                 threshold = self.thresholds["cache_hit_ratio"]
-                
+
                 if hit_ratio < threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -241,13 +243,13 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-            
+
             # Replication issues
             replication_metrics = metrics.get("replication", {})
             if isinstance(replication_metrics, dict) and replication_metrics.get("replication_enabled"):
                 lag_seconds = replication_metrics.get("lag_seconds", 0)
                 threshold = self.thresholds["replication_lag_seconds"]
-                
+
                 if lag_seconds > threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -266,13 +268,13 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-            
+
             # Lock issues
             lock_metrics = metrics.get("locks", {})
             if isinstance(lock_metrics, dict):
                 blocking_locks = lock_metrics.get("blocking_locks", 0)
                 threshold = self.thresholds["blocking_locks"]
-                
+
                 if blocking_locks > threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -291,13 +293,13 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-            
+
             # Transaction issues
             txn_metrics = metrics.get("transactions", {})
             if isinstance(txn_metrics, dict):
                 rollback_ratio = txn_metrics.get("rollback_ratio_percent", 0)
                 threshold = self.thresholds["rollback_ratio_percent"]
-                
+
                 if rollback_ratio > threshold.critical_threshold:
                     issues.append({
                         "severity": "critical",
@@ -316,7 +318,7 @@ class AlertingService:
                         "threshold": threshold.warning_threshold,
                         "timestamp": timestamp,
                     })
-                
+
                 # Long-running transaction issues
                 long_txns = len(txn_metrics.get("long_running_transactions", []))
                 if long_txns > 0:
@@ -328,9 +330,9 @@ class AlertingService:
                         "threshold": 0,
                         "timestamp": timestamp,
                     })
-            
+
         except Exception as e:
-            logger.error(f"Failed to identify health issues: {e}")
+            logger.exception(f"Failed to identify health issues: {e}")
             issues.append({
                 "severity": "error",
                 "category": "monitoring",
@@ -339,20 +341,20 @@ class AlertingService:
                 "threshold": 0,
                 "timestamp": timestamp,
             })
-        
+
         return issues
-    
-    def generate_recommendations(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+    def generate_recommendations(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
         """Generate actionable recommendations based on metrics and identified issues.
-        
+
         Args:
             metrics: Comprehensive database health metrics
-            
+
         Returns:
             List of actionable recommendations with priority and expected impact
         """
         recommendations = []
-        
+
         try:
             # Connection pool recommendations
             pool_metrics = metrics.get("connection_pool", {})
@@ -368,13 +370,13 @@ class AlertingService:
                     })
                 elif utilization > 80:
                     recommendations.append({
-                        "category": "connection_pool", 
+                        "category": "connection_pool",
                         "priority": "high",
                         "action": "monitor_pool_usage",
                         "description": f"Monitor connection pool usage closely (utilization: {utilization:.1f}%)",
                         "expected_impact": "Prevent connection pool exhaustion",
                     })
-                
+
                 waiting_requests = pool_metrics.get("waiting_requests", 0)
                 if waiting_requests > 0:
                     recommendations.append({
@@ -384,7 +386,7 @@ class AlertingService:
                         "description": f"Optimize connection usage - {waiting_requests} requests waiting",
                         "expected_impact": "Reduced connection contention and wait times",
                     })
-            
+
             # Query performance recommendations
             query_metrics = metrics.get("query_performance", {})
             if isinstance(query_metrics, dict):
@@ -405,7 +407,7 @@ class AlertingService:
                         "description": f"Analyze and optimize {slow_queries} slow queries",
                         "expected_impact": "Improved query performance and reduced resource usage",
                     })
-                
+
                 missing_indexes = query_metrics.get("missing_indexes_count", 0)
                 if missing_indexes > 0:
                     recommendations.append({
@@ -415,7 +417,7 @@ class AlertingService:
                         "description": f"Add {missing_indexes} missing indexes for frequently queried columns",
                         "expected_impact": "Faster query execution and reduced I/O",
                     })
-            
+
             # Cache performance recommendations
             cache_metrics = metrics.get("cache", {})
             if isinstance(cache_metrics, dict):
@@ -436,7 +438,7 @@ class AlertingService:
                         "description": f"Tune cache settings - hit ratio below optimal: {hit_ratio:.1f}%",
                         "expected_impact": "Improved cache efficiency and query performance",
                     })
-            
+
             # Storage recommendations
             storage_metrics = metrics.get("storage", {})
             if isinstance(storage_metrics, dict) and "bloat_metrics" in storage_metrics:
@@ -459,7 +461,7 @@ class AlertingService:
                             "description": f"Schedule maintenance for {bloated_tables} tables with bloat",
                             "expected_impact": "Preventive maintenance to avoid performance degradation",
                         })
-            
+
             # Replication recommendations
             replication_metrics = metrics.get("replication", {})
             if isinstance(replication_metrics, dict) and replication_metrics.get("replication_enabled"):
@@ -480,14 +482,14 @@ class AlertingService:
                         "description": f"Monitor replication lag closely: {lag_seconds:.1f} seconds",
                         "expected_impact": "Prevented replication issues and maintained consistency",
                     })
-            
+
             # Add timestamp to all recommendations
             timestamp = datetime.now(UTC).isoformat()
             for rec in recommendations:
                 rec["timestamp"] = timestamp
-            
+
         except Exception as e:
-            logger.error(f"Failed to generate recommendations: {e}")
+            logger.exception(f"Failed to generate recommendations: {e}")
             recommendations.append({
                 "category": "monitoring",
                 "priority": "error",
@@ -496,35 +498,35 @@ class AlertingService:
                 "expected_impact": "Restored health monitoring capabilities",
                 "timestamp": datetime.now(UTC).isoformat(),
             })
-        
+
         return recommendations
-    
-    def check_thresholds(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+    def check_thresholds(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
         """Check if any metrics exceed defined thresholds.
-        
+
         Args:
             metrics: Metrics to check against thresholds
-            
+
         Returns:
             List of threshold violations
         """
         violations = []
         timestamp = datetime.now(UTC).isoformat()
-        
+
         try:
             for metric_name, threshold in self.thresholds.items():
                 if not threshold.enabled:
                     continue
-                
+
                 # Extract metric value based on metric name
                 metric_value = self._extract_metric_value(metrics, metric_name)
                 if metric_value is None:
                     continue
-                
+
                 # Check threshold violation
                 is_violation = False
                 severity = "info"
-                
+
                 if threshold.comparison_operator == "greater_than":
                     if metric_value > threshold.critical_threshold:
                         is_violation = True
@@ -539,7 +541,7 @@ class AlertingService:
                     elif metric_value < threshold.warning_threshold:
                         is_violation = True
                         severity = "warning"
-                
+
                 if is_violation:
                     violations.append({
                         "metric_name": metric_name,
@@ -553,9 +555,9 @@ class AlertingService:
                         "description": threshold.description,
                         "timestamp": timestamp,
                     })
-            
+
         except Exception as e:
-            logger.error(f"Failed to check thresholds: {e}")
+            logger.exception(f"Failed to check thresholds: {e}")
             violations.append({
                 "metric_name": "system_error",
                 "metric_value": 0,
@@ -565,15 +567,15 @@ class AlertingService:
                 "description": f"Threshold checking failed: {e}",
                 "timestamp": timestamp,
             })
-        
+
         return violations
-    
-    async def send_alert(self, alert: Dict[str, Any]) -> bool:
+
+    async def send_alert(self, alert: dict[str, Any]) -> bool:
         """Send alert notification.
-        
+
         Args:
             alert: Alert information to send
-            
+
         Returns:
             True if alert was sent successfully, False otherwise
         """
@@ -584,11 +586,11 @@ class AlertingService:
                 f"HEALTH ALERT [{alert.get('severity', 'unknown').upper()}] "
                 f"{alert.get('category', 'unknown')}: {alert.get('message', 'No message')}"
             )
-            
+
             # Add to alert history for tracking
             alert_obj = HealthAlert(
                 severity=alert.get("severity", "unknown"),
-                category=alert.get("category", "unknown"), 
+                category=alert.get("category", "unknown"),
                 message=alert.get("message", ""),
                 metric_name=alert.get("metric_name", ""),
                 metric_value=alert.get("metric_value", 0.0),
@@ -596,24 +598,24 @@ class AlertingService:
                 source_service="alerting_service",
                 alert_id=f"{alert.get('category', 'unknown')}_{datetime.now(UTC).timestamp()}",
             )
-            
+
             self._alert_history.append(alert_obj)
-            
+
             # Limit alert history size
             if len(self._alert_history) > self._max_alert_history:
                 self._alert_history = self._alert_history[-self._max_alert_history:]
-            
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"Failed to send alert: {e}")
+            logger.exception(f"Failed to send alert: {e}")
             return False
-    
+
     def set_threshold(
         self, metric_name: str, warning_threshold: float, critical_threshold: float
     ) -> None:
         """Set threshold for a specific metric.
-        
+
         Args:
             metric_name: Name of the metric
             warning_threshold: Warning threshold value
@@ -622,9 +624,9 @@ class AlertingService:
         try:
             # Determine comparison operator based on metric type
             comparison_operator = "greater_than"
-            if metric_name in ["cache_hit_ratio"]:
+            if metric_name in {"cache_hit_ratio"}:
                 comparison_operator = "less_than"
-            
+
             self.thresholds[metric_name] = HealthThreshold(
                 metric_name=metric_name,
                 warning_threshold=warning_threshold,
@@ -633,27 +635,27 @@ class AlertingService:
                 enabled=True,
                 description=f"Custom threshold for {metric_name}"
             )
-            
+
             logger.info(
                 f"Updated threshold for {metric_name}: "
                 f"warning={warning_threshold}, critical={critical_threshold}"
             )
-            
+
         except Exception as e:
-            logger.error(f"Failed to set threshold for {metric_name}: {e}")
-    
-    def get_alert_history(self, hours: int = 24) -> List[Dict[str, Any]]:
+            logger.exception(f"Failed to set threshold for {metric_name}: {e}")
+
+    def get_alert_history(self, hours: int = 24) -> list[dict[str, Any]]:
         """Get recent alert history.
-        
+
         Args:
             hours: Number of hours to look back
-            
+
         Returns:
             List of recent alerts
         """
         try:
             cutoff_time = datetime.now(UTC).timestamp() - (hours * 3600)
-            recent_alerts = [
+            return [
                 {
                     "alert_id": alert.alert_id,
                     "severity": alert.severity,
@@ -667,18 +669,17 @@ class AlertingService:
                 for alert in self._alert_history
                 if alert.timestamp.timestamp() > cutoff_time
             ]
-            return recent_alerts
         except Exception as e:
-            logger.error(f"Failed to get alert history: {e}")
+            logger.exception(f"Failed to get alert history: {e}")
             return []
-    
-    def _extract_metric_value(self, metrics: Dict[str, Any], metric_name: str) -> Optional[float]:
+
+    def _extract_metric_value(self, metrics: dict[str, Any], metric_name: str) -> float | None:
         """Extract metric value from metrics dictionary based on metric name.
-        
+
         Args:
             metrics: Metrics dictionary
             metric_name: Name of the metric to extract
-            
+
         Returns:
             Metric value or None if not found
         """
@@ -686,29 +687,29 @@ class AlertingService:
             if metric_name == "connection_pool_utilization":
                 pool_metrics = metrics.get("connection_pool", {})
                 return pool_metrics.get("utilization_percent")
-            
-            elif metric_name == "slow_queries_count":
+
+            if metric_name == "slow_queries_count":
                 query_metrics = metrics.get("query_performance", {})
                 return query_metrics.get("slow_queries_count", 0)
-            
-            elif metric_name == "cache_hit_ratio":
+
+            if metric_name == "cache_hit_ratio":
                 cache_metrics = metrics.get("cache", {})
                 return cache_metrics.get("overall_cache_hit_ratio_percent")
-            
-            elif metric_name == "replication_lag_seconds":
+
+            if metric_name == "replication_lag_seconds":
                 replication_metrics = metrics.get("replication", {})
                 return replication_metrics.get("lag_seconds")
-            
-            elif metric_name == "rollback_ratio_percent":
+
+            if metric_name == "rollback_ratio_percent":
                 txn_metrics = metrics.get("transactions", {})
                 return txn_metrics.get("rollback_ratio_percent")
-            
-            elif metric_name == "blocking_locks":
+
+            if metric_name == "blocking_locks":
                 lock_metrics = metrics.get("locks", {})
                 return lock_metrics.get("blocking_locks")
-            
+
             return None
-            
+
         except Exception as e:
-            logger.error(f"Failed to extract metric value for {metric_name}: {e}")
+            logger.exception(f"Failed to extract metric value for {metric_name}: {e}")
             return None

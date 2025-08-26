@@ -6,11 +6,10 @@ patterns and DatabaseServices for database operations.
 
 import logging
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.repositories.protocols.health_repository_protocol import (
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 class HealthRepository(HealthRepositoryProtocol):
     """Health repository implementation with comprehensive health monitoring operations."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         self.connection_manager = connection_manager
         logger.info("Health repository initialized")
 
@@ -64,7 +63,7 @@ class HealthRepository(HealthRepositoryProtocol):
 
         except Exception as e:
             response_time = (datetime.now() - start_time).total_seconds() * 1000
-            logger.error(f"Database health check failed: {e}")
+            logger.exception(f"Database health check failed: {e}")
 
             return HealthStatus(
                 component="database",
@@ -123,7 +122,7 @@ class HealthRepository(HealthRepositoryProtocol):
 
         except Exception as e:
             response_time = (datetime.now() - start_time).total_seconds() * 1000
-            logger.error(f"Connection pool health check failed: {e}")
+            logger.exception(f"Connection pool health check failed: {e}")
 
             return HealthStatus(
                 component="connection_pool",
@@ -156,7 +155,7 @@ class HealthRepository(HealthRepositoryProtocol):
 
         except Exception as e:
             response_time = (datetime.now() - start_time).total_seconds() * 1000
-            logger.error(f"Cache health check failed: {e}")
+            logger.exception(f"Cache health check failed: {e}")
 
             return HealthStatus(
                 component="cache",
@@ -172,24 +171,18 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             # Placeholder for external service checks
             services = ["ml_service", "analytics_service", "notification_service"]
-            health_statuses = []
 
-            for service in services:
-                health_statuses.append(
-                    HealthStatus(
+            return [HealthStatus(
                         component=service,
                         status="healthy",
                         timestamp=datetime.now(),
                         response_time_ms=50.0,
                         details={"service_type": "internal"},
                         error_message=None,
-                    )
-                )
-
-            return health_statuses
+                    ) for service in services]
 
         except Exception as e:
-            logger.error(f"External services health check failed: {e}")
+            logger.exception(f"External services health check failed: {e}")
             return []
 
     async def perform_full_health_check(self) -> SystemHealthSummary:
@@ -204,7 +197,7 @@ class HealthRepository(HealthRepositoryProtocol):
             external_health = await self.check_external_services_health()
 
             # Aggregate results
-            all_checks = [db_health, pool_health, cache_health] + external_health
+            all_checks = [db_health, pool_health, cache_health, *external_health]
 
             healthy_count = sum(1 for check in all_checks if check.status == "healthy")
             warning_count = sum(1 for check in all_checks if check.status == "warning")
@@ -248,7 +241,7 @@ class HealthRepository(HealthRepositoryProtocol):
             )
 
         except Exception as e:
-            logger.error(f"Full health check failed: {e}")
+            logger.exception(f"Full health check failed: {e}")
             return SystemHealthSummary(
                 overall_status="unknown",
                 components_checked=0,
@@ -273,9 +266,9 @@ class HealthRepository(HealthRepositoryProtocol):
 
                 # Query database statistics
                 stats_query = text("""
-                    SELECT 
+                    SELECT
                         setting::int as max_connections
-                    FROM pg_settings 
+                    FROM pg_settings
                     WHERE name = 'max_connections'
                 """)
                 stats_result = await session.execute(stats_query)
@@ -289,11 +282,11 @@ class HealthRepository(HealthRepositoryProtocol):
                 table_sizes = {}
                 try:
                     size_query = text("""
-                        SELECT 
+                        SELECT
                             schemaname,
                             tablename,
                             pg_total_relation_size(schemaname||'.'||tablename) as size
-                        FROM pg_tables 
+                        FROM pg_tables
                         WHERE schemaname = 'public'
                         LIMIT 10
                     """)
@@ -317,7 +310,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 )
 
         except Exception as e:
-            logger.error(f"Error getting database metrics: {e}")
+            logger.exception(f"Error getting database metrics: {e}")
             # Return minimal metrics on error
             return DatabaseHealthMetrics(
                 connection_pool_size=10,
@@ -342,8 +335,8 @@ class HealthRepository(HealthRepositoryProtocol):
                 if not table_names:
                     # Get all tables in public schema
                     tables_query = text("""
-                        SELECT tablename 
-                        FROM pg_tables 
+                        SELECT tablename
+                        FROM pg_tables
                         WHERE schemaname = 'public'
                     """)
                     tables_result = await session.execute(tables_query)
@@ -385,7 +378,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 return table_health
 
         except Exception as e:
-            logger.error(f"Error checking table health: {e}")
+            logger.exception(f"Error checking table health: {e}")
             return {}
 
     async def check_index_health(self) -> dict[str, dict[str, Any]]:
@@ -394,13 +387,13 @@ class HealthRepository(HealthRepositoryProtocol):
             async with self.connection_manager.get_session() as session:
                 # Get index usage statistics
                 index_query = text("""
-                    SELECT 
+                    SELECT
                         schemaname,
                         tablename,
                         indexname,
                         idx_tup_read,
                         idx_tup_fetch
-                    FROM pg_stat_user_indexes 
+                    FROM pg_stat_user_indexes
                     WHERE schemaname = 'public'
                     ORDER BY idx_tup_read DESC
                     LIMIT 20
@@ -419,7 +412,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 return index_stats
 
         except Exception as e:
-            logger.error(f"Error checking index health: {e}")
+            logger.exception(f"Error checking index health: {e}")
             return {"error": f"Index health check failed: {e}"}
 
     async def detect_table_bloat(
@@ -431,7 +424,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Simplified bloat detection (would require more complex queries in production)
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error detecting table bloat: {e}")
+            logger.exception(f"Error detecting table bloat: {e}")
             return []
 
     async def analyze_slow_queries(
@@ -444,7 +437,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would require pg_stat_statements extension
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error analyzing slow queries: {e}")
+            logger.exception(f"Error analyzing slow queries: {e}")
             return []
 
     # Performance Monitoring Implementation
@@ -462,7 +455,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 requests_per_second=10.0,  # From request tracking
             )
         except Exception as e:
-            logger.error(f"Error getting performance metrics: {e}")
+            logger.exception(f"Error getting performance metrics: {e}")
             raise
 
     async def get_performance_history(
@@ -475,7 +468,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Placeholder for performance history
             return []
         except Exception as e:
-            logger.error(f"Error getting performance history: {e}")
+            logger.exception(f"Error getting performance history: {e}")
             return []
 
     async def get_performance_trends(
@@ -488,7 +481,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Placeholder for performance trends
             return []
         except Exception as e:
-            logger.error(f"Error getting performance trends: {e}")
+            logger.exception(f"Error getting performance trends: {e}")
             return []
 
     async def detect_performance_anomalies(
@@ -502,7 +495,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Placeholder for anomaly detection
             return []
         except Exception as e:
-            logger.error(f"Error detecting performance anomalies: {e}")
+            logger.exception(f"Error detecting performance anomalies: {e}")
             return []
 
     # Connection Monitoring Implementation
@@ -511,7 +504,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             async with self.connection_manager.get_session() as session:
                 connections_query = text("""
-                    SELECT 
+                    SELECT
                         pid,
                         usename,
                         application_name,
@@ -519,16 +512,14 @@ class HealthRepository(HealthRepositoryProtocol):
                         state,
                         query_start,
                         state_change
-                    FROM pg_stat_activity 
+                    FROM pg_stat_activity
                     WHERE state != 'idle'
                     ORDER BY query_start DESC
                     LIMIT 20
                 """)
                 result = await session.execute(connections_query)
 
-                connections = []
-                for row in result:
-                    connections.append({
+                return [{
                         "pid": row[0],
                         "username": row[1],
                         "application": row[2],
@@ -536,12 +527,10 @@ class HealthRepository(HealthRepositoryProtocol):
                         "state": row[4],
                         "query_start": row[5].isoformat() if row[5] else None,
                         "state_change": row[6].isoformat() if row[6] else None,
-                    })
-
-                return connections
+                    } for row in result]
 
         except Exception as e:
-            logger.error(f"Error getting active connections: {e}")
+            logger.exception(f"Error getting active connections: {e}")
             return []
 
     async def get_connection_pool_stats(self) -> dict[str, Any]:
@@ -550,7 +539,7 @@ class HealthRepository(HealthRepositoryProtocol):
             pool_info = await self.connection_manager.get_connection_info()
             return pool_info or {}
         except Exception as e:
-            logger.error(f"Error getting connection pool stats: {e}")
+            logger.exception(f"Error getting connection pool stats: {e}")
             return {"error": str(e)}
 
     async def check_connection_leaks(
@@ -562,7 +551,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would require monitoring connection lifetimes
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error checking connection leaks: {e}")
+            logger.exception(f"Error checking connection leaks: {e}")
             return []
 
     async def monitor_connection_patterns(
@@ -574,7 +563,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would require connection pattern tracking
             return {}  # Placeholder
         except Exception as e:
-            logger.error(f"Error monitoring connection patterns: {e}")
+            logger.exception(f"Error monitoring connection patterns: {e}")
             return {}
 
     # Placeholder implementations for remaining methods...
@@ -599,7 +588,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 resolved_at=None,
             )
         except Exception as e:
-            logger.error(f"Error creating health alert: {e}")
+            logger.exception(f"Error creating health alert: {e}")
             raise
 
     async def get_active_alerts(
@@ -612,7 +601,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would query alerts table
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error getting active alerts: {e}")
+            logger.exception(f"Error getting active alerts: {e}")
             return []
 
     async def resolve_alert(
@@ -625,7 +614,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would update alerts table
             return True  # Placeholder
         except Exception as e:
-            logger.error(f"Error resolving alert: {e}")
+            logger.exception(f"Error resolving alert: {e}")
             return False
 
     async def get_alert_history(
@@ -639,7 +628,7 @@ class HealthRepository(HealthRepositoryProtocol):
             # Would query alerts table with filters
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error getting alert history: {e}")
+            logger.exception(f"Error getting alert history: {e}")
             return []
 
     # Additional methods would be implemented following the same patterns...
@@ -655,7 +644,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 "diagnostics_completed_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error running database diagnostics: {e}")
+            logger.exception(f"Error running database diagnostics: {e}")
             return {"error": str(e)}
 
     async def analyze_query_patterns(
@@ -666,7 +655,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return {}  # Placeholder
         except Exception as e:
-            logger.error(f"Error analyzing query patterns: {e}")
+            logger.exception(f"Error analyzing query patterns: {e}")
             return {}
 
     async def check_data_integrity(
@@ -677,7 +666,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error checking data integrity: {e}")
+            logger.exception(f"Error checking data integrity: {e}")
             return []
 
     async def validate_foreign_key_constraints(self) -> list[dict[str, Any]]:
@@ -685,7 +674,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return []  # Placeholder
         except Exception as e:
-            logger.error(f"Error validating foreign key constraints: {e}")
+            logger.exception(f"Error validating foreign key constraints: {e}")
             return []
 
     async def check_disk_usage(self) -> dict[str, Any]:
@@ -693,7 +682,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return {}  # Placeholder
         except Exception as e:
-            logger.error(f"Error checking disk usage: {e}")
+            logger.exception(f"Error checking disk usage: {e}")
             return {}
 
     async def run_table_maintenance(
@@ -709,7 +698,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 "status": "not_implemented",
             }
         except Exception as e:
-            logger.error(f"Error running table maintenance: {e}")
+            logger.exception(f"Error running table maintenance: {e}")
             return {"error": str(e)}
 
     async def optimize_database_performance(self) -> dict[str, list[str]]:
@@ -723,7 +712,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 ]
             }
         except Exception as e:
-            logger.error(f"Error getting optimization recommendations: {e}")
+            logger.exception(f"Error getting optimization recommendations: {e}")
             return {"error": [str(e)]}
 
     async def cleanup_old_health_data(
@@ -734,7 +723,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return 0  # Placeholder
         except Exception as e:
-            logger.error(f"Error cleaning up old health data: {e}")
+            logger.exception(f"Error cleaning up old health data: {e}")
             return 0
 
     async def generate_health_report(
@@ -759,7 +748,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 },
             }
         except Exception as e:
-            logger.error(f"Error generating health report: {e}")
+            logger.exception(f"Error generating health report: {e}")
             return {"error": str(e)}
 
     async def export_health_metrics(
@@ -779,13 +768,13 @@ class HealthRepository(HealthRepositoryProtocol):
                 return json.dumps(report, indent=2, default=str).encode()
             return b"Export format not implemented"
         except Exception as e:
-            logger.error(f"Error exporting health metrics: {e}")
+            logger.exception(f"Error exporting health metrics: {e}")
             return b"Export failed"
 
     async def setup_health_monitoring(
         self,
         check_interval_seconds: int = 60,
-        alert_thresholds: dict[str, Any] = None,
+        alert_thresholds: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Setup continuous health monitoring."""
         try:
@@ -795,7 +784,7 @@ class HealthRepository(HealthRepositoryProtocol):
                 "thresholds": alert_thresholds or {},
             }
         except Exception as e:
-            logger.error(f"Error setting up health monitoring: {e}")
+            logger.exception(f"Error setting up health monitoring: {e}")
             return {"error": str(e)}
 
     async def get_system_capacity_analysis(self) -> dict[str, Any]:
@@ -803,7 +792,7 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return {"capacity_analysis": "not_implemented"}
         except Exception as e:
-            logger.error(f"Error analyzing system capacity: {e}")
+            logger.exception(f"Error analyzing system capacity: {e}")
             return {"error": str(e)}
 
     async def predict_system_load(
@@ -814,5 +803,5 @@ class HealthRepository(HealthRepositoryProtocol):
         try:
             return {"load_prediction": "not_implemented", "hours_ahead": hours_ahead}
         except Exception as e:
-            logger.error(f"Error predicting system load: {e}")
+            logger.exception(f"Error predicting system load: {e}")
             return {"error": str(e)}

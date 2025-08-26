@@ -6,10 +6,11 @@ enabling more targeted and relevant analysis for different types of prompts.
 from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import dataclass, field
-from functools import lru_cache
 import logging
 import re
 from typing import Any
+import hashlib
+import json
 from .domain_detector import DomainClassificationResult, DomainDetector, PromptDomain
 try:
     import spacy
@@ -26,6 +27,9 @@ except ImportError:
     span = None
     token = None
     SPACY_AVAILABLE = False
+
+# Import unified cache facade for ML-specific caching
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 @dataclass
 class DomainFeatures:
@@ -281,16 +285,62 @@ class AcademicDomainExtractor(BaseDomainExtractor):
 class DomainFeatureExtractor:
     """Main coordinator for domain-specific feature extraction."""
 
-    def __init__(self, enable_spacy: bool=True):
+    def __init__(self, enable_spacy: bool=True, cache_facade: CacheFacade | None=None):
         """Initialize the domain feature extractor."""
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
-        self.domain_detector = DomainDetector(use_spacy=enable_spacy)
+        self.domain_detector = DomainDetector(use_spacy=enable_spacy, cache_facade=cache_facade)
         self.extractors = {'technical': TechnicalDomainExtractor(), 'creative': CreativeDomainExtractor(), 'academic': AcademicDomainExtractor()}
+        # Initialize ML-specific cache with 4-hour TTL for stable feature extraction
+        self._cache = cache_facade or CacheFacade(
+            l1_max_size=500,   # Preserve original cache size
+            l2_default_ttl=14400,  # 4 hours for domain feature results
+            enable_l2=True,    # Use L2 for persistence across restarts
+        )
         self._feature_cache = {}
 
-    @lru_cache(maxsize=500)
+    def _generate_ml_cache_key(self, text: str) -> str:
+        """Generate ML-specific cache key for domain feature extraction.
+        
+        Cache key pattern: ml:features:{text_hash}:{extractors_hash}
+        """
+        # Hash text content for cache key
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()[:12]
+        
+        # Include extractor configuration in key (for when extractors change)
+        extractors_config = str(len(self.extractors)) + str(type(self.extractors['technical']).__name__)
+        extractors_hash = hashlib.md5(extractors_config.encode()).hexdigest()[:8]
+        
+        return f"ml:features:{text_hash}:{extractors_hash}"
+    
+    async def extract_domain_features_async(self, text: str) -> DomainFeatures:
+        """Async domain feature extraction using unified cache infrastructure."""
+        if not text or not text.strip():
+            return DomainFeatures(domain=PromptDomain.GENERAL, confidence=0.0)
+        
+        cache_key = self._generate_ml_cache_key(text)
+        
+        # Try to get from unified cache first
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            self.logger.debug(f"Domain features cache hit for key: {cache_key}")
+            return cached_result
+        
+        # Cache miss - perform feature extraction and cache result
+        result = self._perform_feature_extraction(text)
+        
+        # Cache with ML-specific TTL (4 hours)
+        await self._cache.set(
+            key=cache_key,
+            value=result,
+            l2_ttl=14400,  # 4 hours
+            l1_ttl=3600    # 1 hour for L1
+        )
+        
+        self.logger.debug(f"Domain features cached with key: {cache_key}")
+        return result
+    
     def extract_domain_features(self, text: str) -> DomainFeatures:
-        """Extract comprehensive domain-specific features from text.
+        """Extract comprehensive domain-specific features using unified cache infrastructure.
 
         Args:
             text: Input prompt text
@@ -298,8 +348,14 @@ class DomainFeatureExtractor:
         Returns:
             DomainFeatures object with extracted features
         """
-        if not text or not text.strip():
-            return DomainFeatures(domain=PromptDomain.GENERAL, confidence=0.0)
+        try:
+            loop = asyncio.get_running_loop()
+            return asyncio.run_coroutine_threadsafe(self.extract_domain_features_async(text), loop).result()
+        except RuntimeError:
+            return asyncio.run(self.extract_domain_features_async(text))
+    
+    def _perform_feature_extraction(self, text: str) -> DomainFeatures:
+        """Core feature extraction logic extracted from original cached method."""
         domain_result = self.domain_detector.detect_domain(text)
         features = DomainFeatures(domain=domain_result.primary_domain, confidence=domain_result.confidence, complexity_score=domain_result.technical_complexity, specificity_score=domain_result.domain_specificity, secondary_domains=domain_result.secondary_domains, hybrid_domain=domain_result.hybrid_domain)
         all_domains = [domain_result.primary_domain] + [d[0] for d in domain_result.secondary_domains]
@@ -375,8 +431,8 @@ class DomainFeatureExtractor:
             feature_names.append(f'conv_{key}')
         return (feature_vector, feature_names)
 
-    async def extract_domain_features_async(self, text: str) -> DomainFeatures:
-        """Async version of domain feature extraction."""
+    async def extract_domain_features_async_old(self, text: str) -> DomainFeatures:
+        """Legacy async version of domain feature extraction."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.extract_domain_features, text)
 

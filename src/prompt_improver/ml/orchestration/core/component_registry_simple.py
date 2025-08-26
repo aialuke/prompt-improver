@@ -2,7 +2,7 @@
 Simple component registry implementation for testing.
 """
 from typing import Dict, List, Any
-from prompt_improver.core.protocols.ml_protocols import ComponentRegistryProtocol
+from prompt_improver.shared.interfaces.protocols.ml import ComponentRegistryProtocol
 
 
 class SimpleComponentRegistry:

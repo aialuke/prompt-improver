@@ -1,0 +1,187 @@
+name: "Copilot Setup Steps"
+
+# Automatically run when setup steps change and allow manual execution
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+      - pyproject.toml
+      - requirements*.txt
+      - docker-compose.yml
+      - .env.example
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+      - pyproject.toml
+      - requirements*.txt
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` for GitHub Copilot to recognize it
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: prompt_improver_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libpq-dev \
+            postgresql-client \
+            redis-tools \
+            curl \
+            jq
+      
+      - name: Install uv for fast Python package management
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Install Python dependencies
+        run: |
+          uv pip install --system -e ".[dev,test,docs,security]"
+      
+      - name: Set up environment variables
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/prompt_improver_test" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+          echo "ENVIRONMENT=test" >> .env
+          echo "LOG_LEVEL=INFO" >> .env
+      
+      - name: Wait for services to be ready
+        run: |
+          # Wait for PostgreSQL
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          
+          # Wait for Redis
+          until redis-cli -h localhost -p 6379 ping; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+      
+      - name: Set up database schema
+        run: |
+          # Create database and apply schema
+          PGPASSWORD=postgres psql -h localhost -U postgres -d prompt_improver_test -f database/schema.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d prompt_improver_test -f database/rule_seeds.sql
+      
+      - name: Install and configure development tools
+        run: |
+          # Install code quality tools
+          uv pip install --system pre-commit
+          
+          # Set up pre-commit hooks
+          pre-commit install
+          
+          # Install Node.js for any frontend tooling
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+      
+      - name: Verify installation
+        run: |
+          # Verify Python environment
+          python --version
+          python -c "import src.prompt_improver; print('✅ Package importable')"
+          
+          # Verify database connection
+          python -c "
+          import asyncio
+          import asyncpg
+          async def test_db():
+              conn = await asyncpg.connect('postgresql://postgres:postgres@localhost:5432/prompt_improver_test')
+              result = await conn.fetch('SELECT version()')
+              print(f'✅ Database: {result[0][0][:50]}...')
+              await conn.close()
+          asyncio.run(test_db())
+          "
+          
+          # Verify Redis connection
+          python -c "
+          import asyncio
+          import coredis
+          async def test_redis():
+              redis = coredis.Redis.from_url('redis://localhost:6379')
+              result = await redis.ping()
+              print(f'✅ Redis: Connected = {result}')
+              await redis.close()
+          asyncio.run(test_redis())
+          "
+          
+          # Verify development tools
+          ruff --version
+          pyright --version || echo "⚠️  Pyright not available (optional)"
+          pytest --version
+      
+      - name: Run quick validation tests
+        run: |
+          # Run code quality checks
+          ruff format --check .
+          ruff check .
+          
+          # Run a subset of tests to verify everything works
+          pytest tests/unit/ -v --tb=short -x --disable-warnings
+      
+      - name: Display setup summary
+        run: |
+          echo "🎉 Copilot environment setup complete!"
+          echo ""
+          echo "Available services:"
+          echo "  - PostgreSQL: localhost:5432 (prompt_improver_test database)"
+          echo "  - Redis: localhost:6379"
+          echo ""
+          echo "Development tools installed:"
+          echo "  - Python $(python --version | cut -d' ' -f2)"
+          echo "  - uv package manager"
+          echo "  - Ruff formatter/linter"
+          echo "  - pytest testing framework"
+          echo "  - Pre-commit hooks"
+          echo ""
+          echo "Project structure:"
+          echo "  - src/prompt_improver/: Main application code"
+          echo "  - tests/: Test suite"
+          echo "  - docs/: Documentation"
+          echo "  - database/: Database schema and migrations"
+          echo ""
+          echo "Ready for development! 🚀"

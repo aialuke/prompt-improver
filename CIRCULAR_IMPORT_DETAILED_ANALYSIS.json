@@ -1,0 +1,65 @@
+{
+  "results": {
+    "lazy_patterns": [],
+    "files_with_patterns": [],
+    "pattern_counts": {
+      "type_checking": 0,
+      "lazy_import": 0
+    },
+    "top_files": []
+  },
+  "tools_status": {
+    "type_safety_validator": "exists",
+    "performance_analyzer": "exists",
+    "boundaries": "exists"
+  },
+  "recommendations": {
+    "immediate_actions": [],
+    "architectural_improvements": [
+      {
+        "title": "Expand Protocol-Based Architecture",
+        "description": "Create comprehensive protocol definitions for all service interfaces",
+        "benefit": "Eliminates remaining circular import risks",
+        "complexity": "medium"
+      },
+      {
+        "title": "Service Registry Enhancement",
+        "description": "Use existing service registry for all lazy-loaded dependencies",
+        "benefit": "Centralizes dependency management",
+        "complexity": "low"
+      },
+      {
+        "title": "Boundary Enforcement",
+        "description": "Implement automated architectural boundary testing",
+        "benefit": "Prevents future circular import introduction",
+        "complexity": "low"
+      }
+    ],
+    "migration_phases": [
+      {
+        "phase": 1,
+        "title": "Protocol Extraction",
+        "description": "Move TYPE_CHECKING imports to shared protocols",
+        "effort_days": "2-3",
+        "files_affected": 0,
+        "risk": "low"
+      },
+      {
+        "phase": 2,
+        "title": "Service Facade Utilization",
+        "description": "Replace lazy imports with existing facade patterns",
+        "effort_days": "3-4",
+        "files_affected": 0,
+        "risk": "medium"
+      },
+      {
+        "phase": 3,
+        "title": "Dependency Injection Enhancement",
+        "description": "Complete migration to DI patterns",
+        "effort_days": "2-3",
+        "files_affected": 0,
+        "risk": "low"
+      }
+    ]
+  }
+}

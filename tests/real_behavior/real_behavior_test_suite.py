@@ -17,65 +17,72 @@ Key Features:
 """
 
 import asyncio
-import gc
-import json
 import logging
-import os
 import sys
-import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import psutil
-import pytest
 
 # Real behavior test modules - import with error handling
 try:
-    from .type_safety_real_tests import TypeSafetyRealTestSuite
+    from tests.real_behavior.type_safety_real_tests import TypeSafetyRealTestSuite
 except ImportError:
     TypeSafetyRealTestSuite = None
 
 try:
-    from .database_real_performance import DatabaseRealPerformanceTestSuite
+    from tests.real_behavior.database_real_performance import (
+        DatabaseRealPerformanceTestSuite,
+    )
 except ImportError:
     DatabaseRealPerformanceTestSuite = None
 
 try:
-    from .batch_processing_real_tests import BatchProcessingRealTestSuite
+    from tests.real_behavior.batch_processing_real_tests import (
+        BatchProcessingRealTestSuite,
+    )
 except ImportError:
     BatchProcessingRealTestSuite = None
 
 try:
-    from .ab_testing_real_scenarios import ABTestingRealScenariosSuite
+    from tests.real_behavior.ab_testing_real_scenarios import (
+        ABTestingRealScenariosSuite,
+    )
 except ImportError:
     ABTestingRealScenariosSuite = None
 
 try:
-    from .dev_experience_real_validation import DevExperienceRealValidationSuite
+    from tests.real_behavior.dev_experience_real_validation import (
+        DevExperienceRealValidationSuite,
+    )
 except ImportError:
     DevExperienceRealValidationSuite = None
 
 try:
-    from .ml_platform_real_deployment import MLPlatformRealDeploymentSuite
+    from tests.real_behavior.ml_platform_real_deployment import (
+        MLPlatformRealDeploymentSuite,
+    )
 except ImportError:
     MLPlatformRealDeploymentSuite = None
 
 try:
-    from .end_to_end_real_workflow import EndToEndRealWorkflowSuite
+    from tests.real_behavior.end_to_end_real_workflow import EndToEndRealWorkflowSuite
 except ImportError:
     EndToEndRealWorkflowSuite = None
 
 try:
-    from .real_performance_benchmarks import RealPerformanceBenchmarksSuite
+    from tests.real_behavior.real_performance_benchmarks import (
+        RealPerformanceBenchmarksSuite,
+    )
 except ImportError:
     RealPerformanceBenchmarksSuite = None
 
 try:
-    from .real_integration_tests import RealIntegrationTestSuite
+    from tests.real_behavior.real_integration_tests import RealIntegrationTestSuite
 except ImportError:
     RealIntegrationTestSuite = None
 
@@ -287,14 +294,14 @@ class RealBehaviorTestSuite:
             total = len(phase_results)
 
             logger.info("✅ Phase Complete: {passed}/%s tests passed", total)
-            logger.info("⏱️  Phase Time: %ss", phase_time:.2f)
-            logger.info("💾 Memory Used: %sMB", memory_used:.2f)
+            logger.info("⏱️  Phase Time: %.2fs", phase_time)
+            logger.info("💾 Memory Used: %.2fMB", memory_used)
 
             if passed < total:
                 logger.warning("⚠️  {total - passed} tests failed in %s", suite_name)
 
         except Exception as e:
-            logger.error("❌ Phase {suite_name} failed: %s", e)
+            logger.exception("❌ Phase {suite_name} failed: %s", e)
             # Record failure
             failure_result = RealBehaviorTestResult(
                 test_suite=suite_name,
@@ -322,9 +329,7 @@ class RealBehaviorTestSuite:
         # Calculate performance improvements
         performance_improvements = {}
         for result in self.results:
-            for metric, value in result.actual_performance_metrics.items():
-                if "improvement" in metric.lower():
-                    performance_improvements[metric] = value
+            performance_improvements.update({metric: value for metric, value in result.actual_performance_metrics.items() if "improvement" in metric.lower()})
 
         # Aggregate business impact
         business_impact = {}
@@ -534,7 +539,7 @@ async def main():
     report = test_suite.generate_comprehensive_report()
 
     report_path = Path("real_behavior_validation_report.md")
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
 
     print(f"\n📊 Comprehensive report saved to: {report_path}")

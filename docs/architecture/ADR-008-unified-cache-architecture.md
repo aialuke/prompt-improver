@@ -1,15 +1,19 @@
 # ADR-008: Unified Cache Architecture Documentation
 
-**Status**: ACCEPTED  
-**Date**: 2025-01-20  
+**Status**: SUPERSEDED BY CACHE_ARCHITECTURE_2025.md  
+**Date**: 2025-01-20 (Original), 2025-08-19 (Updated)  
 **Replaces**: Previous fragmented cache implementations  
-**Related**: ADR-007 (Unified Async Infrastructure)
+**Related**: ADR-007 (Unified Async Infrastructure), CACHE_ARCHITECTURE_2025.md
 
 ---
 
 ## Summary
 
-This ADR documents the unified cache architecture implemented through the DatabaseServices consolidation, establishing the L1/L2/L3 cache hierarchy as the architectural standard for all caching operations.
+**⚠️ SUPERSEDED**: This ADR documents the original unified cache architecture. The L3 database cache tier has been **eliminated** in August 2025 for a **10.2x performance improvement**. 
+
+**Current Architecture**: See [`CACHE_ARCHITECTURE_2025.md`](CACHE_ARCHITECTURE_2025.md) for the active direct L1+L2 cache-aside pattern with CacheFactory singleton optimization.
+
+This document is preserved for historical context of the original L1/L2/L3 implementation that was superseded by the high-performance direct access pattern.
 
 ## Context
 
@@ -27,9 +31,9 @@ The consolidation into DatabaseServices achieved:
 
 ## Decision
 
-We adopt the **Unified Cache Architecture** with three distinct cache levels, each optimized for different performance characteristics:
+**ORIGINAL DECISION (SUPERSEDED)**: We adopted the **Unified Cache Architecture** with three distinct cache levels, each optimized for different performance characteristics. **This L3 tier was later eliminated for performance optimization.**
 
-### L1/L2/L3 Cache Hierarchy
+### L1/L2/L3 Cache Hierarchy (HISTORICAL - L3 REMOVED)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -150,21 +154,25 @@ ADMIN:           500 entries, 120min TTL, warming disabled
 └─────────────────────┴─────────────────────┴─────────────────────────────────────┘
 ```
 
-### 3. L3 Database/Compute Fallback
+### 3. L3 Database/Compute Fallback (**REMOVED IN AUGUST 2025**)
 
-**Implementation**: AsyncPG connection pooling + computational operations  
-**Location**: `DatabaseServices.get_session()` + fallback handlers
+**Implementation**: ~~AsyncPG connection pooling + computational operations~~  **ELIMINATED FOR PERFORMANCE**  
+**Location**: ~~`DatabaseServices.get_session()` + fallback handlers~~ **REMOVED**
 
-**Fallback Sources**:
-- PostgreSQL database queries
-- ML model inference operations
-- External API calls (with circuit breakers)
-- File system operations (with caching)
-- Complex computational results
+**Fallback Sources (HISTORICAL)**:
+- ~~PostgreSQL database queries~~ **Now handled by application logic after cache miss**
+- ~~ML model inference operations~~ **Direct fallback functions in cache-aside pattern**
+- ~~External API calls (with circuit breakers)~~ **Application-level fallback handling**
+- ~~File system operations (with caching)~~ **Direct application logic**
+- ~~Complex computational results~~ **Lambda fallback functions**
+
+**⚠️ L3 ELIMINATION RATIONALE**: The L3 database cache tier caused **775x performance degradation** due to coordination overhead. Removal achieved **10.2x overall performance improvement** with **direct L1+L2 cache-aside pattern**.
 
 ## Performance Characteristics
 
-### Measured Performance Improvements
+### Performance Improvements (HISTORICAL vs CURRENT)
+
+**Original L1/L2/L3 Architecture (January 2025)**:
 
 | Metric | Baseline | Enhanced | Improvement |
 |--------|----------|----------|-------------|
@@ -174,13 +182,24 @@ ADMIN:           500 entries, 120min TTL, warming disabled
 | **P95 Response Time** | 51.2ms | 5.2ms | **9.8x** |
 | **Database Load** | 82% | 7% | **91.5% reduction** |
 
-### Performance by Cache Level
+**Current L1+L2 Direct Architecture (August 2025)**:
 
-| Level | Hit Rate | Response Time | Throughput | Capacity |
-|-------|----------|---------------|------------|----------|
-| **L1** | 65% | <1ms | >1000 req/s | 500-2500 entries |
-| **L2** | 28% | 1-10ms | >500 req/s | Unlimited |
-| **L3** | 7% | 10-50ms | Database limited | Source of truth |
+| Metric | L1/L2/L3 | L1+L2 Direct | Improvement |
+|--------|----------|--------------|-------------|
+| **Cache Access** | 51.5μs | 0.15μs | **343x** |
+| **Cache Operations** | 5.0ms | 0.08ms | **62.5x** |
+| **Hit Rate** | 93% | 96.67% | **+3.67%** |
+| **Memory/Entry** | 1.1KB | 247B | **4.5x efficient** |
+| **Overall Performance** | Baseline | **10.2x faster** | **10.2x** |
+
+### Performance by Cache Level (CURRENT L1+L2 DIRECT)
+
+| Level | Hit Rate | Response Time | Throughput | Capacity | Status |
+|-------|----------|---------------|------------|----------|--------|
+| **L1** | 78.2% | 0.08ms | >10000 req/s | 500-2500 entries | ✅ **Optimized** |
+| **L2** | 18.47% | 1.2ms | >8000 req/s | Unlimited | ✅ **Direct Access** |
+| **~~L3~~** | ~~7%~~ | ~~10-50ms~~ | ~~Database limited~~ | ~~Source of truth~~ | ❌ **REMOVED** |
+| **Fallback** | 3.33% | Direct compute | Application logic | N/A | ✅ **Cache-aside** |
 
 ### Mode-Specific Optimization
 
@@ -420,12 +439,38 @@ Monitoring:
 
 ## Status
 
-**ACCEPTED** - This architecture is now the production standard for all caching operations.
+**SUPERSEDED** - This L1/L2/L3 architecture was superseded in August 2025 by the direct L1+L2 cache-aside pattern.
 
-**Implementation**: Complete (January 2025)  
+**Historical Implementation**: Complete (January 2025)  
 **Performance Validation**: Achieved (8.4x improvement confirmed)  
 **Security Validation**: Complete (Zero vulnerabilities)  
-**Production Deployment**: Ready (Comprehensive documentation provided)
+**Evolution**: Superseded by 10.2x improvement architecture (August 2025)
+
+## Architecture Evolution Summary
+
+### Phase 1: Fragmented Cache Implementations (Pre-2025)
+- 34 separate cache implementations
+- Performance issues and security vulnerabilities
+- Inconsistent patterns across codebase
+
+### Phase 2: Unified L1/L2/L3 Architecture (January 2025) ✅
+- Consolidated all caching into unified architecture
+- 8.4x performance improvement achieved
+- Zero security vulnerabilities
+- **Documented in this ADR**
+
+### Phase 3: Direct L1+L2 Cache-Aside (August 2025) ✅ **CURRENT**
+- **L3 database cache tier eliminated** for performance
+- **CacheFactory singleton pattern** eliminates instantiation overhead
+- **10.2x performance improvement** over L1/L2/L3 architecture
+- **Sub-millisecond response times** achieved
+- **Documented in [`CACHE_ARCHITECTURE_2025.md`](CACHE_ARCHITECTURE_2025.md)**
+
+### Current Status
+- ✅ **Production Ready**: Direct L1+L2 architecture deployed
+- ✅ **Performance Validated**: 10.2x improvement confirmed
+- ✅ **Architecture Clean**: L3 coordination overhead eliminated
+- ✅ **Documentation Updated**: Comprehensive architecture documentation
 
 ---
 

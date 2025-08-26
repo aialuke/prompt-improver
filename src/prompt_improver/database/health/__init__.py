@@ -1,4 +1,4 @@
-"""Database Health Monitoring Infrastructure
+"""Database Health Monitoring Infrastructure.
 
 Comprehensive PostgreSQL health monitoring with real metrics collection,
 connection pool optimization, and performance analysis.
@@ -9,7 +9,7 @@ This package provides decomposed service architecture for health monitoring:
 
 ### Decomposed Architecture
 - **DatabaseHealthService**: Unified interface with focused service composition
-- **DatabaseConnectionService**: Connection pool monitoring and health assessment  
+- **DatabaseConnectionService**: Connection pool monitoring and health assessment
 - **HealthMetricsService**: Performance metrics collection and analysis
 - **AlertingService**: Health alerting, issue identification, and recommendations
 - **HealthReportingService**: Historical analysis, reporting, and trend tracking
@@ -51,66 +51,59 @@ from prompt_improver.database.health.services import (
 
 # Utility components (still active)
 from prompt_improver.database.health.index_health_assessor import IndexHealthAssessor
-from prompt_improver.database.health.table_bloat_detector import TableBloatDetector
 
 # New decomposed services (RECOMMENDED)
+# Convenience imports for protocols and types
 from prompt_improver.database.health.services import (
-    DatabaseHealthService,
-    DatabaseConnectionService,
-    HealthMetricsService,
     AlertingService,
+    AlertingServiceProtocol,
+    ConnectionHealthMetrics,
+    DatabaseConnectionService,
+    DatabaseConnectionServiceProtocol,
+    DatabaseHealthMetrics,
+    DatabaseHealthService,
+    DatabaseHealthServiceProtocol,
+    HealthAlert,
+    HealthMetricsService,
+    HealthMetricsServiceProtocol,
+    HealthRecommendation,
     HealthReportingService,
+    HealthReportingServiceProtocol,
+    HealthThreshold,
+    HealthTrend,
+    QueryPerformanceMetrics,
     create_database_health_service,
     get_database_health_service,
 )
-
-# Convenience imports for protocols and types
-from prompt_improver.database.health.services import (
-    DatabaseHealthServiceProtocol,
-    DatabaseConnectionServiceProtocol,
-    HealthMetricsServiceProtocol,
-    AlertingServiceProtocol,
-    HealthReportingServiceProtocol,
-    DatabaseHealthMetrics,
-    ConnectionHealthMetrics,
-    QueryPerformanceMetrics,
-    HealthAlert,
-    HealthRecommendation,
-    HealthTrend,
-    HealthThreshold,
-)
+from prompt_improver.database.health.table_bloat_detector import TableBloatDetector
 
 __all__ = [
-    # Legacy components removed - use decomposed services
-    
-    # Utility components (active)
-    "IndexHealthAssessor", 
-    "TableBloatDetector",
-    
-    # New decomposed services (recommended)
-    "DatabaseHealthService",
-    "DatabaseConnectionService",
-    "HealthMetricsService",
-    "AlertingService", 
-    "HealthReportingService",
-    "create_database_health_service",
-    "get_database_health_service",
-    
-    # Protocol interfaces
-    "DatabaseHealthServiceProtocol",
-    "DatabaseConnectionServiceProtocol",
-    "HealthMetricsServiceProtocol",
+    "AlertingService",
     "AlertingServiceProtocol",
-    "HealthReportingServiceProtocol",
-    
+    "ConnectionHealthMetrics",
+    "DatabaseConnectionService",
+    "DatabaseConnectionServiceProtocol",
     # Data types
     "DatabaseHealthMetrics",
-    "ConnectionHealthMetrics", 
-    "QueryPerformanceMetrics",
+    # New decomposed services (recommended)
+    "DatabaseHealthService",
+    # Protocol interfaces
+    "DatabaseHealthServiceProtocol",
     "HealthAlert",
+    "HealthMetricsService",
+    "HealthMetricsServiceProtocol",
     "HealthRecommendation",
-    "HealthTrend",
+    "HealthReportingService",
+    "HealthReportingServiceProtocol",
     "HealthThreshold",
+    "HealthTrend",
+    # Legacy components removed - use decomposed services
+    # Utility components (active)
+    "IndexHealthAssessor",
+    "QueryPerformanceMetrics",
+    "TableBloatDetector",
+    "create_database_health_service",
+    "get_database_health_service",
 ]
 
 # Version and architecture information

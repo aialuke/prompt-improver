@@ -1,4 +1,4 @@
-"""CI/CD Integration for Performance Monitoring
+"""CI/CD Integration for Performance Monitoring.
 
 This module provides comprehensive CI/CD integration for performance monitoring,
 regression detection, and automated performance gating for deployment pipelines.
@@ -14,22 +14,24 @@ Features:
 import asyncio
 import json
 import logging
-import os
 import sys
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import aiofiles
 
-from .comprehensive_benchmark import (
+from prompt_improver.performance.validation.comprehensive_benchmark import (
     ValidationBenchmarkFramework,
     ValidationBenchmarkResult,
 )
-from .memory_profiler import MemoryLeakDetector
-from .regression_detector import PerformanceRegressionDetector, RegressionSeverity
+from prompt_improver.performance.validation.memory_profiler import MemoryLeakDetector
+from prompt_improver.performance.validation.regression_detector import (
+    PerformanceRegressionDetector,
+    RegressionSeverity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,7 @@ class PerformanceGateResult:
 class PerformanceCIIntegration:
     """CI/CD integration for performance monitoring."""
 
-    def __init__(self, config_dir: Path | None = None):
+    def __init__(self, config_dir: Path | None = None) -> None:
         self.config_dir = config_dir or Path(".performance")
         self.config_dir.mkdir(exist_ok=True)
 
@@ -222,7 +224,7 @@ class PerformanceCIIntegration:
             return gate_result
 
         except Exception as e:
-            logger.error(f"Performance gate failed with error: {e}")
+            logger.exception(f"Performance gate failed with error: {e}")
             # Return failure result
             return PerformanceGateResult(
                 stage=stage,
@@ -429,7 +431,7 @@ class PerformanceCIIntegration:
             for regression in regressions:
                 degradation = regression["degradation_percent"]
                 if degradation > budget.max_regression_percent:
-                    if regression["severity"] in ["critical", "high"]:
+                    if regression["severity"] in {"critical", "high"}:
                         budget_passed = False
                         critical_violations.append(
                             f"{operation_name}: {regression['severity'].upper()} regression {degradation:.1f}% exceeds budget {budget.max_regression_percent:.1f}%"
@@ -455,7 +457,7 @@ class PerformanceCIIntegration:
                     critical_leaks = [
                         p
                         for p in leak_patterns
-                        if p.get("severity") in ["CRITICAL", "HIGH"]
+                        if p.get("severity") in {"CRITICAL", "HIGH"}
                     ]
 
                     if critical_leaks:
@@ -606,19 +608,16 @@ class PerformanceCIIntegration:
 
         if result.critical_violations:
             lines.extend(["CRITICAL VIOLATIONS:", "-" * 20])
-            for violation in result.critical_violations:
-                lines.append(f"  ❌ {violation}")
+            lines.extend(f"  ❌ {violation}" for violation in result.critical_violations)
             lines.append("")
 
         if result.warnings:
             lines.extend(["WARNINGS:", "-" * 20])
-            for warning in result.warnings:
-                lines.append(f"  ⚠️  {warning}")
+            lines.extend(f"  ⚠️  {warning}" for warning in result.warnings)
             lines.append("")
 
         lines.extend(["RECOMMENDATIONS:", "-" * 20])
-        for recommendation in result.recommendations:
-            lines.append(f"  • {recommendation}")
+        lines.extend(f"  • {recommendation}" for recommendation in result.recommendations)
 
         lines.extend(["", "=" * 80])
 
@@ -708,7 +707,7 @@ class PerformanceCIIntegration:
 
                 logger.info(f"Loaded {len(self.budgets)} performance budgets")
             except Exception as e:
-                logger.error(f"Failed to load performance budgets: {e}")
+                logger.exception(f"Failed to load performance budgets: {e}")
                 self.budgets = []
 
     async def _save_performance_budgets(self, budgets: list[PerformanceBudget]) -> None:
@@ -782,7 +781,7 @@ async def run_performance_gate_cli(
     try:
         ci_stage = CIStage(stage.lower())
     except ValueError:
-        logger.error(f"Invalid CI stage: {stage}")
+        logger.exception(f"Invalid CI stage: {stage}")
         print(f"Valid stages: {[s.value for s in CIStage]}")
         return 2
 

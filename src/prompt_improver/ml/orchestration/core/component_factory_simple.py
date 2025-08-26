@@ -2,7 +2,7 @@
 Simple component factory implementation for testing.
 """
 from typing import Any, Dict
-from prompt_improver.core.protocols.ml_protocols import ComponentFactoryProtocol
+from prompt_improver.shared.interfaces.protocols.ml import ComponentFactoryProtocol
 
 
 class SimpleComponentFactory:

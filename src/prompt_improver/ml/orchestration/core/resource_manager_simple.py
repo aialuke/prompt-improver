@@ -3,7 +3,7 @@ Simple resource manager implementation for testing.
 """
 import psutil
 from typing import Dict
-from prompt_improver.core.protocols.ml_protocols import ResourceManagerProtocol
+from prompt_improver.shared.interfaces.protocols.ml import ResourceManagerProtocol
 
 
 class SimpleResourceManager:

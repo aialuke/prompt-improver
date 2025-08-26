@@ -24,7 +24,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from prompt_improver.core.protocols.ml_protocols import (
+from prompt_improver.shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     ComponentFactoryProtocol,
     ComponentRegistryProtocol,

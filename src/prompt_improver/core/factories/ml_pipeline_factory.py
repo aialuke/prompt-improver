@@ -4,15 +4,14 @@ Factory pattern implementation for creating ML pipeline components with
 proper dependency injection, following modern architecture patterns.
 """
 
-import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
-from prompt_improver.core.protocols.ml_protocols import (
+from prompt_improver.shared.interfaces.protocols.core import EventBusProtocol
+from prompt_improver.shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     DatabaseServiceProtocol,
-    EventBusProtocol,
     HealthMonitorProtocol,
     MLflowServiceProtocol,
     ResourceManagerProtocol,
@@ -225,7 +224,7 @@ async def create_production_orchestrator(
     if config_file:
         import yaml
 
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
     return await MLPipelineOrchestratorFactory.create_with_external_services(config)
 

@@ -5,7 +5,7 @@ following Python 3.12+ best practices and comprehensive formatting functions for
 string representation across the application.
 
 UTC Handling (Python 3.12+ best practices):
-- naive_utc_now(): Returns naive UTC datetime for database compatibility  
+- naive_utc_now(): Returns naive UTC datetime for database compatibility
 - aware_utc_now(): Returns timezone-aware UTC datetime for services/logging
 - ensure_naive_utc() / ensure_aware_utc(): Timezone conversion utilities
 

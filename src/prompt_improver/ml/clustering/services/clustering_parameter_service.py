@@ -11,10 +11,16 @@ Follows clean architecture patterns with protocol-based interfaces.
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 import itertools
 
-import numpy as np
+# Lazy loading for ML dependencies
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = None
 
 from . import ParameterOptimizationProtocol, OptimizationResult
 
@@ -22,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Optional imports for advanced optimization
 try:
-    from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+    from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
     SKLEARN_METRICS_AVAILABLE = True
 except ImportError:
     SKLEARN_METRICS_AVAILABLE = False
@@ -61,15 +67,16 @@ class ClusteringParameterService:
         # Optimization state
         self.optimization_history = []
         self.best_params = None
-        self.best_score = -np.inf
+        self.best_score = -get_numpy().inf
         
         logger.info(f"ClusteringParameterService initialized: {algorithm}, "
                    f"metric={scoring_metric}, max_iter={max_iterations}")
 
-    def optimize_parameters(self, X: np.ndarray, param_grid: Dict[str, List[Any]], 
-                          labels: Optional[np.ndarray] = None) -> OptimizationResult:
+    def optimize_parameters(self, X: Any, param_grid: Dict[str, List[Any]], 
+                          labels: Optional[Any] = None) -> OptimizationResult:
         """Optimize clustering parameters using grid search."""
         start_time = time.time()
+        np = get_numpy()  # Get numpy when actually needed
         
         try:
             # Generate parameter combinations
@@ -112,7 +119,7 @@ class ClusteringParameterService:
             logger.error(f"Parameter optimization failed: {e}")
             return self._empty_optimization_result(start_time)
 
-    def get_adaptive_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+    def get_adaptive_parameters(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Get adaptive parameters based on data characteristics."""
         n_samples, n_features = X.shape
         
@@ -164,11 +171,11 @@ class ClusteringParameterService:
         
         return combinations
 
-    def _grid_search_optimize(self, X: np.ndarray, param_combinations: List[Dict[str, Any]],
-                            labels: Optional[np.ndarray]) -> Tuple[Dict[str, Any], float, List[Dict[str, Any]]]:
+    def _grid_search_optimize(self, X: get_numpy().ndarray, param_combinations: List[Dict[str, Any]],
+                            labels: Optional[get_numpy().ndarray]) -> Tuple[Dict[str, Any], float, List[Dict[str, Any]]]:
         """Perform grid search optimization."""
         best_params = {}
-        best_score = -np.inf
+        best_score = -get_numpy().inf
         history = []
         
         early_stopping_counter = 0
@@ -223,8 +230,8 @@ class ClusteringParameterService:
         
         return best_params, best_score, history
 
-    def _evaluate_parameters(self, X: np.ndarray, params: Dict[str, Any],
-                           labels: Optional[np.ndarray]) -> float:
+    def _evaluate_parameters(self, X: get_numpy().ndarray, params: Dict[str, Any],
+                           labels: Optional[get_numpy().ndarray]) -> float:
         """Evaluate clustering quality for given parameters."""
         if not SKLEARN_METRICS_AVAILABLE:
             logger.warning("Limited evaluation due to missing scikit-learn")
@@ -241,7 +248,7 @@ class ClusteringParameterService:
             logger.debug(f"Parameter evaluation failed: {e}")
             return -1.0  # Penalty for failed clustering
 
-    def _cluster_with_params(self, X: np.ndarray, params: Dict[str, Any]) -> np.ndarray:
+    def _cluster_with_params(self, X: get_numpy().ndarray, params: Dict[str, Any]) -> get_numpy().ndarray:
         """Perform clustering with given parameters."""
         if self.algorithm == "hdbscan":
             if not HDBSCAN_AVAILABLE:
@@ -250,19 +257,19 @@ class ClusteringParameterService:
             return clusterer.fit_predict(X)
         
         elif self.algorithm == "kmeans":
-            from sklearn.cluster import KMeans
-            clusterer = KMeans(**params)
+            sklearn = get_sklearn()
+            clusterer = sklearn.cluster.KMeans(**params)
             return clusterer.fit_predict(X)
         
         elif self.algorithm == "dbscan":
-            from sklearn.cluster import DBSCAN
-            clusterer = DBSCAN(**params)
+            sklearn = get_sklearn()
+            clusterer = sklearn.cluster.DBSCAN(**params)
             return clusterer.fit_predict(X)
         
         else:
             raise ValueError(f"Unknown algorithm: {self.algorithm}")
 
-    def _calculate_clustering_score(self, X: np.ndarray, labels: np.ndarray) -> float:
+    def _calculate_clustering_score(self, X: get_numpy().ndarray, labels: get_numpy().ndarray) -> float:
         """Calculate clustering quality score."""
         try:
             # Check for valid clustering
@@ -274,7 +281,7 @@ class ClusteringParameterService:
             
             # Filter out noise points for scoring
             mask = labels != -1
-            if np.sum(mask) < 10:  # Need minimum points for meaningful scoring
+            if get_numpy().sum(mask) < 10:  # Need minimum points for meaningful scoring
                 return -1.0
             
             X_filtered = X[mask]
@@ -332,7 +339,7 @@ class ClusteringParameterService:
     def _get_adaptive_kmeans_params(self, n_samples: int, n_features: int) -> Dict[str, Any]:
         """Get adaptive K-means parameters."""
         # Heuristic for number of clusters
-        n_clusters = min(10, max(2, int(np.sqrt(n_samples / 2))))
+        n_clusters = min(10, max(2, int(get_numpy().sqrt(n_samples / 2))))
         
         return {
             "n_clusters": n_clusters,
@@ -341,16 +348,16 @@ class ClusteringParameterService:
             "max_iter": 300
         }
 
-    def _get_adaptive_dbscan_params(self, X: np.ndarray, n_samples: int, n_features: int) -> Dict[str, Any]:
+    def _get_adaptive_dbscan_params(self, X: get_numpy().ndarray, n_samples: int, n_features: int) -> Dict[str, Any]:
         """Get adaptive DBSCAN parameters."""
         # Estimate eps using k-distance method
         try:
-            from sklearn.neighbors import NearestNeighbors
+            sklearn = get_sklearn()
             k = min(10, max(4, n_samples // 100))
-            nbrs = NearestNeighbors(n_neighbors=k)
+            nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=k)
             nbrs.fit(X)
             distances, _ = nbrs.kneighbors(X)
-            eps = np.percentile(distances[:, -1], 90)
+            eps = get_numpy().percentile(distances[:, -1], 90)
         except:
             eps = 0.5  # Default fallback
         
@@ -414,7 +421,7 @@ class ClusteringParameterService:
         
         scores = [h["score"] for h in history]
         best_scores = []
-        best_so_far = -np.inf
+        best_so_far = -get_numpy().inf
         
         for score in scores:
             if score > best_so_far:

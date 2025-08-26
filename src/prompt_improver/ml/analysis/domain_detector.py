@@ -6,9 +6,10 @@ domain-specific feature extraction and optimization strategies.
 import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
 import logging
 import re
+import hashlib
+import json
 try:
     import spacy
     from spacy.lang.en import english
@@ -26,6 +27,9 @@ except ImportError:
     Span = None
     Token = None
     SPACY_AVAILABLE = False
+
+# Import unified cache facade for ML-specific caching
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 class PromptDomain(Enum):
     """Enumeration of prompt domains for classification."""
@@ -84,7 +88,7 @@ class DomainClassificationResult:
 class DomainDetector:
     """Intelligent domain detection system for prompts."""
 
-    def __init__(self, use_spacy: bool=True):
+    def __init__(self, use_spacy: bool=True, cache_facade: CacheFacade | None=None):
         """Initialize the domain detector."""
         self.logger = logging.getLogger(f'{__name__}.{self.__class__.__name__}')
         self.use_spacy = use_spacy and SPACY_AVAILABLE
@@ -92,6 +96,12 @@ class DomainDetector:
         self.nlp = None
         self.phrase_matcher = None
         self.pattern_matcher = None
+        # Initialize ML-specific cache with 4-hour TTL for stable domain classification
+        self._cache = cache_facade or CacheFacade(
+            l1_max_size=1000,  # Preserve original cache size
+            l2_default_ttl=14400,  # 4 hours for domain classification results
+            enable_l2=True,  # Use L2 for persistence across restarts
+        )
         if self.use_spacy:
             self._initialize_spacy_components()
         self._compile_domain_patterns()
@@ -148,9 +158,51 @@ class DomainDetector:
                     all_terms.update(terms)
         return all_terms
 
-    @lru_cache(maxsize=1000)
+    def _generate_ml_cache_key(self, text: str) -> str:
+        """Generate ML-specific cache key for domain detection.
+        
+        Cache key pattern: ml:domain:{text_hash}:{keywords_hash}
+        """
+        # Hash text content for cache key
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()[:12]
+        
+        # Include domain keywords configuration in key (for when keywords change)
+        keywords_config = str(len(self.domain_keywords.software_development)) + \
+                         str(len(self.domain_keywords.data_science)) + \
+                         str(len(self.domain_keywords.ai_ml))
+        keywords_hash = hashlib.md5(keywords_config.encode()).hexdigest()[:8]
+        
+        return f"ml:domain:{text_hash}:{keywords_hash}"
+    
+    async def detect_domain_async(self, text: str) -> DomainClassificationResult:
+        """Async domain detection using unified cache infrastructure."""
+        if not text or not text.strip():
+            return DomainClassificationResult(primary_domain=PromptDomain.GENERAL, confidence=0.0)
+        
+        cache_key = self._generate_ml_cache_key(text)
+        
+        # Try to get from unified cache first
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            self.logger.debug(f"Domain detection cache hit for key: {cache_key}")
+            return cached_result
+        
+        # Cache miss - perform domain detection and cache result
+        result = self._perform_domain_detection(text)
+        
+        # Cache with ML-specific TTL (4 hours)
+        await self._cache.set(
+            key=cache_key,
+            value=result,
+            l2_ttl=14400,  # 4 hours
+            l1_ttl=3600    # 1 hour for L1
+        )
+        
+        self.logger.debug(f"Domain detection cached with key: {cache_key}")
+        return result
+    
     def detect_domain(self, text: str) -> DomainClassificationResult:
-        """Detect the primary domain of a prompt text.
+        """Detect the primary domain of a prompt text using unified cache infrastructure.
 
         Args:
             text: Input prompt text
@@ -158,8 +210,14 @@ class DomainDetector:
         Returns:
             DomainClassificationResult with classification details
         """
-        if not text or not text.strip():
-            return DomainClassificationResult(primary_domain=PromptDomain.general, confidence=0.0)
+        try:
+            loop = asyncio.get_running_loop()
+            return asyncio.run_coroutine_threadsafe(self.detect_domain_async(text), loop).result()
+        except RuntimeError:
+            return asyncio.run(self.detect_domain_async(text))
+    
+    def _perform_domain_detection(self, text: str) -> DomainClassificationResult:
+        """Core domain detection logic extracted from original cached method."""
         text_lower = text.lower()
         domain_scores = {}
         keywords_found = {}
@@ -181,7 +239,7 @@ class DomainDetector:
             if pattern_matches > 0:
                 pattern_scores[domain] = pattern_matches / len(patterns)
         final_scores = {}
-        domain_mapping = {'software_development': PromptDomain.SOFTWARE_DEVELOPMENT, 'data_science': PromptDomain.DATA_SCIENCE, 'ai_ml': PromptDomain.AI_ML, 'web_development': PromptDomain.WEB_DEVELOPMENT, 'creative_writing': PromptDomain.CREATIVE_WRITING, 'content_creation': PromptDomain.CONTENT_CREATION, 'research': PromptDomain.research, 'education': PromptDomain.education, 'academic_writing': PromptDomain.ACADEMIC_WRITING, 'business_analysis': PromptDomain.BUSINESS_ANALYSIS, 'medical': PromptDomain.medical, 'legal': PromptDomain.legal}
+        domain_mapping = {'software_development': PromptDomain.SOFTWARE_DEVELOPMENT, 'data_science': PromptDomain.DATA_SCIENCE, 'ai_ml': PromptDomain.AI_ML, 'web_development': PromptDomain.WEB_DEVELOPMENT, 'creative_writing': PromptDomain.CREATIVE_WRITING, 'content_creation': PromptDomain.CONTENT_CREATION, 'research': PromptDomain.RESEARCH, 'education': PromptDomain.EDUCATION, 'academic_writing': PromptDomain.ACADEMIC_WRITING, 'business_analysis': PromptDomain.BUSINESS_ANALYSIS, 'medical': PromptDomain.MEDICAL, 'legal': PromptDomain.LEGAL}
         for domain_name, score in domain_scores.items():
             if domain_name in domain_mapping:
                 domain_enum = domain_mapping[domain_name]
@@ -192,7 +250,7 @@ class DomainDetector:
             if domain_enum not in final_scores:
                 final_scores[domain_enum] = score
         if not final_scores:
-            primary_domain = PromptDomain.general
+            primary_domain = PromptDomain.GENERAL
             confidence = 0.0
             secondary_domains = []
         else:
@@ -222,14 +280,14 @@ class DomainDetector:
         score_variance = sum((score - max_score) ** 2 for score in domain_scores.values())
         return max_score * (1 - score_variance / len(domain_scores))
 
-    async def detect_domain_async(self, text: str) -> DomainClassificationResult:
-        """Async version of domain detection."""
+    async def detect_domain_async_old(self, text: str) -> DomainClassificationResult:
+        """Legacy async version of domain detection."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.detect_domain, text)
 
     def get_domain_keywords(self, domain: PromptDomain) -> set[str]:
         """Get keywords for a specific domain."""
-        domain_attr_map = {PromptDomain.SOFTWARE_DEVELOPMENT: 'software_development', PromptDomain.DATA_SCIENCE: 'data_science', PromptDomain.AI_ML: 'ai_ml', PromptDomain.WEB_DEVELOPMENT: 'web_development', PromptDomain.CREATIVE_WRITING: 'creative_writing', PromptDomain.CONTENT_CREATION: 'content_creation', PromptDomain.research: 'research', PromptDomain.education: 'education', PromptDomain.ACADEMIC_WRITING: 'academic_writing', PromptDomain.BUSINESS_ANALYSIS: 'business_analysis', PromptDomain.medical: 'medical', PromptDomain.legal: 'legal'}
+        domain_attr_map = {PromptDomain.SOFTWARE_DEVELOPMENT: 'software_development', PromptDomain.DATA_SCIENCE: 'data_science', PromptDomain.AI_ML: 'ai_ml', PromptDomain.WEB_DEVELOPMENT: 'web_development', PromptDomain.CREATIVE_WRITING: 'creative_writing', PromptDomain.CONTENT_CREATION: 'content_creation', PromptDomain.RESEARCH: 'research', PromptDomain.EDUCATION: 'education', PromptDomain.ACADEMIC_WRITING: 'academic_writing', PromptDomain.BUSINESS_ANALYSIS: 'business_analysis', PromptDomain.MEDICAL: 'medical', PromptDomain.LEGAL: 'legal'}
         attr_name = domain_attr_map.get(domain)
         if attr_name and hasattr(self.domain_keywords, attr_name):
             return getattr(self.domain_keywords, attr_name)

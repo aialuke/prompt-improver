@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from .performance_gap_analyzer import GapAnalysisResult, PerformanceGap
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 class GenerationStrategy(Enum):
     """Available generation strategies with 2025 best practices."""
@@ -79,19 +80,19 @@ class GenerationStrategyAnalyzer:
         if not all_gaps:
             return {'total_gaps': 0, 'severity_distribution': {}, 'gap_types': {}, 'complexity_score': 0.0}
         severities = [gap.severity for gap in all_gaps]
-        severity_distribution = {'critical': sum(1 for s in severities if s >= 0.7) / len(severities), 'moderate': sum(1 for s in severities if 0.3 <= s < 0.7) / len(severities), 'minor': sum(1 for s in severities if s < 0.3) / len(severities), 'mean': np.mean(severities), 'std': np.std(severities)}
+        severity_distribution = {'critical': sum(1 for s in severities if s >= 0.7) / len(severities), 'moderate': sum(1 for s in severities if 0.3 <= s < 0.7) / len(severities), 'minor': sum(1 for s in severities if s < 0.3) / len(severities), 'mean': get_numpy().mean(severities), 'std': get_numpy().std(severities)}
         gap_types = {}
         for gap in all_gaps:
             gap_types[gap.gap_type] = gap_types.get(gap.gap_type, 0) + 1
         complexity_score = severity_distribution['critical'] * 1.0 + severity_distribution['moderate'] * 0.6 + severity_distribution['minor'] * 0.2
-        return {'total_gaps': len(all_gaps), 'severity_distribution': severity_distribution, 'gap_types': gap_types, 'complexity_score': complexity_score, 'improvement_potential': np.mean([gap.improvement_potential for gap in all_gaps])}
+        return {'total_gaps': len(all_gaps), 'severity_distribution': severity_distribution, 'gap_types': gap_types, 'complexity_score': complexity_score, 'improvement_potential': get_numpy().mean([gap.improvement_potential for gap in all_gaps])}
 
     def _assess_generation_complexity(self, gap_analysis: GapAnalysisResult, hardness_analysis: dict[str, Any]) -> dict[str, Any]:
         """Assess the complexity of data generation requirements."""
         hard_ratio = hardness_analysis.get('distribution', {}).get('hard_examples_ratio', 0.3)
         hardness_variance = hardness_analysis.get('distribution', {}).get('std', 0.2)
         all_gaps = gap_analysis.critical_gaps + gap_analysis.improvement_opportunities
-        gap_complexity = np.mean([gap.severity * (1 - gap.confidence) for gap in all_gaps]) if all_gaps else 0.0
+        gap_complexity = get_numpy().mean([gap.severity * (1 - gap.confidence) for gap in all_gaps]) if all_gaps else 0.0
         unique_gap_types = len({gap.gap_type for gap in all_gaps})
         pattern_complexity = min(unique_gap_types / 3.0, 1.0)
         overall_complexity = hard_ratio * 0.4 + gap_complexity * 0.3 + pattern_complexity * 0.2 + hardness_variance * 0.1

@@ -7,10 +7,9 @@ Defines the interface for analytics data access, including:
 - Statistical analytics
 """
 
-from abc import ABC, abstractmethod
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -20,8 +19,6 @@ from prompt_improver.core.domain.types import (
     PromptSessionData,
     RuleEffectivenessData,
     UserSatisfactionData,
-    SessionId,
-    UserId,
 )
 
 
@@ -222,9 +219,9 @@ class AnalyticsRepositoryProtocol(Protocol):
     ) -> dict[str, Any]:
         """Generate structured analytics report."""
         ...
-    
+
     # Advanced Analytics Methods (migrated from analytics_query_interface.py)
-    
+
     async def get_performance_distribution_analysis(
         self,
         start_date: datetime,
@@ -233,7 +230,7 @@ class AnalyticsRepositoryProtocol(Protocol):
     ) -> dict[str, Any]:
         """Get performance distribution analysis with histogram data."""
         ...
-    
+
     async def get_correlation_analysis(
         self,
         metrics: list[str],

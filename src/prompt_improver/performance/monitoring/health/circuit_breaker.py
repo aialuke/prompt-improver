@@ -1,5 +1,5 @@
 """Circuit Breaker Pattern Implementation for Health Checkers
-Following 2025 best practices for failure isolation
+Following 2025 best practices for failure isolation.
 """
 
 import logging
@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 from prompt_improver.core.config import get_config
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitState(Enum):
-    """Circuit breaker states"""
+    """Circuit breaker states."""
 
     closed = "closed"
     open = "open"
@@ -24,7 +24,7 @@ class CircuitState(Enum):
 
 @dataclass
 class CircuitBreakerConfig:
-    """Configuration for circuit breaker behavior"""
+    """Configuration for circuit breaker behavior."""
 
     failure_threshold: int = 5
     recovery_timeout: int = 60
@@ -49,14 +49,14 @@ class CircuitBreakerConfig:
 
 
 class CircuitBreaker:
-    """Modern circuit breaker implementation with 2025 observability patterns"""
+    """Modern circuit breaker implementation with 2025 observability patterns."""
 
     def __init__(
         self,
         name: str,
         config: CircuitBreakerConfig | None = None,
         on_state_change: Callable[[str, CircuitState], None] | None = None,
-    ):
+    ) -> None:
         self.name = name
         self.config = config or CircuitBreakerConfig()
         self.on_state_change = on_state_change
@@ -74,21 +74,20 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        """Get current circuit state with automatic transition logic"""
-        if self._state == CircuitState.open:
-            if self._should_attempt_reset():
-                self._transition_to(CircuitState.HALF_OPEN)
+        """Get current circuit state with automatic transition logic."""
+        if self._state == CircuitState.open and self._should_attempt_reset():
+            self._transition_to(CircuitState.HALF_OPEN)
         return self._state
 
     def _should_attempt_reset(self) -> bool:
-        """Check if enough time has passed to try recovery"""
+        """Check if enough time has passed to try recovery."""
         return (
             self._last_failure_time is not None
             and time.time() - self._last_failure_time >= self.config.recovery_timeout
         )
 
-    def _transition_to(self, new_state: CircuitState):
-        """Transition to new state with logging and callback"""
+    def _transition_to(self, new_state: CircuitState) -> None:
+        """Transition to new state with logging and callback."""
         if self._state != new_state:
             old_state = self._state
             self._state = new_state
@@ -104,7 +103,7 @@ class CircuitBreaker:
                 self._half_open_calls = 0
 
     async def call(self, func: Callable, *args, **kwargs) -> Any:
-        """Execute function with circuit breaker protection
+        """Execute function with circuit breaker protection.
 
         Args:
             func: Async function to execute
@@ -139,8 +138,8 @@ class CircuitBreaker:
             self._record_failure()
             raise
 
-    def _record_success(self):
-        """Record successful call and update state"""
+    def _record_success(self) -> None:
+        """Record successful call and update state."""
         self._call_metrics["successful_calls"] += 1
         if self._state == CircuitState.HALF_OPEN:
             self._half_open_calls += 1
@@ -153,8 +152,8 @@ class CircuitBreaker:
                     f"Circuit breaker '{self.name}' success rate below threshold"
                 )
 
-    def _record_failure(self, is_timeout: bool = False):
-        """Record failed call and update state"""
+    def _record_failure(self, is_timeout: bool = False) -> None:
+        """Record failed call and update state."""
         self._call_metrics["failed_calls"] += 1
         self._last_failure_time = time.time()
         if self._state == CircuitState.HALF_OPEN:
@@ -164,8 +163,8 @@ class CircuitBreaker:
             if self._failure_count >= self.config.failure_threshold:
                 self._transition_to(CircuitState.open)
 
-    def _record_slow_response(self):
-        """Record slow response for circuit breaker failure counting"""
+    def _record_slow_response(self) -> None:
+        """Record slow response for circuit breaker failure counting."""
         self._last_failure_time = time.time()
         if self._state == CircuitState.HALF_OPEN:
             self._transition_to(CircuitState.open)
@@ -175,14 +174,14 @@ class CircuitBreaker:
                 self._transition_to(CircuitState.open)
 
     def _calculate_success_rate(self) -> float:
-        """Calculate current success rate"""
+        """Calculate current success rate."""
         total = self._call_metrics["total_calls"]
         if total == 0:
             return 1.0
         return self._call_metrics["successful_calls"] / total
 
     def get_metrics(self) -> dict[str, Any]:
-        """Get current circuit breaker metrics for monitoring"""
+        """Get current circuit breaker metrics for monitoring."""
         return {
             "name": self.name,
             "state": self._state.value,
@@ -194,7 +193,7 @@ class CircuitBreaker:
         }
 
     def reset(self):
-        """Manually reset the circuit breaker"""
+        """Manually reset the circuit breaker."""
         self._transition_to(CircuitState.closed)
         self._failure_count = 0
         self._last_failure_time = None
@@ -202,29 +201,29 @@ class CircuitBreaker:
 
 
 class CircuitBreakerOpen(Exception):
-    """Exception raised when circuit breaker is open"""
+    """Exception raised when circuit breaker is open."""
 
 
 class CircuitBreakerRegistry:
-    """Registry for managing multiple circuit breakers"""
+    """Registry for managing multiple circuit breakers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._breakers: dict[str, CircuitBreaker] = {}
 
     def get_or_create(
         self, name: str, config: CircuitBreakerConfig | None = None
     ) -> CircuitBreaker:
-        """Get existing or create new circuit breaker"""
+        """Get existing or create new circuit breaker."""
         if name not in self._breakers:
             self._breakers[name] = CircuitBreaker(name, config)
         return self._breakers[name]
 
     def get_all_metrics(self) -> dict[str, Any]:
-        """Get metrics for all circuit breakers"""
+        """Get metrics for all circuit breakers."""
         return {name: breaker.get_metrics() for name, breaker in self._breakers.items()}
 
     def reset_all(self):
-        """Reset all circuit breakers"""
+        """Reset all circuit breakers."""
         for breaker in self._breakers.values():
             breaker.reset()
 

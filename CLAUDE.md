@@ -4,136 +4,82 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Core Development Principles
 
-**Search existing solutions before creating new code:**
+**Pragmatic Problem Validation (FIRST STEP):**
+- **Is this a real problem in production?** Theory loses to practice, every time
+- **How many users actually encounter this?** Quantify impact before solving
+- **Does complexity match severity?** Don't over-engineer edge cases
+- **Can we measure this problem?** If not measurable, likely not real
+
+**Search existing solutions before creating new code (AFTER validation):**
 - Direct name search: `rg "exact_function_name|exact_class_name" --type py`
 - Pattern search: `rg "validate.*email|email.*validation" --type py`
 - Import search: `rg "from.*import.*{similar}|import.*{similar}" --type py`
 
+**For Complex Analysis - Multi-Method Discovery:**
+- **Filesystem**: `find . -name "*target*.py"` (comprehensive first)
+- **Content**: `rg "pattern" --type py` (cross-validate findings)
+- **Challenge assumptions** about file locations/patterns
+- **Add 20% buffer** to scope estimates
+
 **Apply Clean Architecture & SOLID principles (ENFORCED 2025):**
-- **MANDATORY**: Use repository patterns with protocol-based DI (SessionManagerProtocol)
+- **Philosophy**: Good programmers worry about data structures, not code. Proper data modeling eliminates complexity.
+- **MANDATORY**: Use repository patterns with protocol-based DI (SessionManagerProtocol) - isolates data concerns
 - **FORBIDDEN**: Direct database imports in business logic (`from prompt_improver.database import get_session`)
-- **REQUIRED**: Service naming convention (*Facade, *Service, *Manager)
-- **ENFORCED**: No classes >500 lines (god object elimination)
-- **MANDATORY**: Real behavior testing with testcontainers (no mocks for external services)
+- **REQUIRED**: Service naming convention (*Facade, *Service, *Manager) - clear responsibility boundaries
+- **ENFORCED**: No classes >500 lines (god object elimination) - maintain single responsibility
+- **MANDATORY**: Real behavior testing with testcontainers (no mocks for external services) - practice over theory
 
 **Code deletion verification:**
 - `rg "ExactItemName" . --type py -n` (verify zero usage)
 - `rg "from.*import.*ExactItemName|import.*ExactItemName" . --type py -n`
 
-**Modernization patterns (2025):**
-- Python: %formatting→f-strings, os.path→pathlib, dict.keys()→dict iteration
-- Type hints: Any→specific types, missing annotations→explicit typing
-- Async: callback patterns→async/await, threading→asyncio where appropriate
-- Architecture: Direct database imports→repository protocols
-- Services: Multiple managers→unified service facades
+**Modernization patterns (2025):** Python: %formatting→f-strings, os.path→pathlib; Type hints: Any→specific types; Async: callbacks→async/await; Architecture: Direct database imports→repository protocols
 
-**Service Architecture Patterns (2025 COMPLETED TRANSFORMATION):**
-- **Database**: Repository pattern with SessionManagerProtocol, ZERO direct imports (ACHIEVED)
-- **Security**: SecurityServiceFacade consolidating authentication, authorization, validation, crypto
-- **Analytics**: AnalyticsServiceFacade with 114x performance improvement and 96.67% cache hit rates
-- **ML**: MLModelServiceFacade replacing 1,043-line god object with 5 focused services (COMPLETED)
-- **Prompt Services**: PromptServiceFacade replacing 1,500+ line god object with 3 focused services (COMPLETED)
-- **Monitoring**: UnifiedMonitoringFacade consolidating 8+ health checkers (<25ms operations)
-- **Database Pool**: PostgreSQLPoolManager decomposed into 3 components (942 → 3×<400 lines)
-- **Application Layer**: Application services for workflow orchestration (Clean Architecture)
-- **Caching**: Multi-level strategy (L1 Memory, L2 Redis, L3 Database) achieving <2ms response times
-- **Testing**: Real behavior testing with testcontainers (87.5% validation success achieved)
+**2025 Architecture Achievements:** Repository pattern with SessionManagerProtocol; Service facades replacing god objects; Multi-level caching <2ms response; Real behavior testing with testcontainers (87.5% success)
 
-**REFERENCE**: See docs/architecture/ARCHITECTURE_PATTERNS_2025_UPDATED.md for complete patterns including god object decomposition
-
-## God Object Decomposition (August 2025 COMPLETED)
-
-**Clean Break Strategy - Zero Backwards Compatibility:**
-- PromptServiceFacade: 1,500+ line god object → 3 focused services (PromptAnalysisService, RuleApplicationService, ValidationService)
-- **ENFORCED**: No classes >500 lines (Single Responsibility Principle)
-- **MANDATORY**: Facade pattern for unified interfaces with internal component specialization
-- **REQUIRED**: Protocol-based dependency injection throughout decomposed services
-- **VALIDATED**: Real behavior testing confirms architectural integrity
-
-**Import Migration Pattern:**
-```python
-# OLD (REMOVED):
-from prompt_improver.core.services.prompt_improvement import PromptImprovementService
-
-# NEW (REQUIRED):
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
-```
-
-**Quality Gates Enforced:**
-- Single responsibility maintained across all decomposed services
-- Protocol-based interfaces for all service communication
-- Zero circular imports through architectural cleanup
-- Performance maintained (0.36ms facade coordination, 0.000413ms L1 cache)
-- Complete test coverage with real behavior validation
 
 ## Evidence-Based Analysis
 
 **When user requests:** verify, check, analyze, review, evaluate, assess, think, or "think hard"
 
-**Required format:** [Finding]: [Evidence] 📍 Source: file:line
+**PROBLEM VALIDATION (Do First):**
+- **Reality Check**: Is this solving a real production problem or theoretical concern?
+- **User Impact**: Quantify how many users/systems are affected
+- **Complexity Assessment**: Does solution complexity match problem severity?
+- **Measurability**: Can we measure the problem and its resolution?
 
-**Include:** Confidence level (HIGH/MEDIUM/LOW), scope examined ("X/Y files"), methodology used
+**DISCOVERY REQUIREMENTS (Complex Tasks):**
+- **Multi-Method Validation**: Use 2+ discovery methods (filesystem + content + dependency analysis)
+- **Assumption Challenge**: Document and test initial scope assumptions
+- **Scope Lock**: Complete discovery BEFORE implementation planning
 
-**Validation levels:**
-- Basic: Syntax, imports, type safety, functionality
-- Integration: Database connections, external services, API contracts
-- Performance: Response time 0.1-500ms, memory 10-1000MB, realistic test scenarios
+**Format**: [Finding]: [Evidence] 📍 Source: file:line
+**Include**: Confidence level, scope examined, methodology used
+**Validation**: Basic (syntax, imports) → Integration (services, APIs) → Performance (response times, memory)
 
-**Always use parallel tool execution** - batch Read/Grep/Glob/Bash calls simultaneously for 3-10x performance improvement.
+**CRITICAL**: Challenge initial estimates with systematic verification
+**Batch Operations**: Use parallel tool execution for 3-10x performance improvement
 
 ## Tool & Agent Usage
 
 **Core Infrastructure Agents:**
-- **database-specialist**: PostgreSQL/JSONB optimization, custom SQL migrations, query performance (APES schema)
-- **ml-orchestrator**: ML pipelines (5 services), model registry (@champion/@production), feature engineering
-- **performance-engineer**: Cross-cutting performance, SLO monitoring, cache optimization (96.67% hit rate)
-- **security-architect**: Security policies, OWASP 2025, authentication/authorization design
-- **infrastructure-specialist**: Docker/testcontainers, CI/CD, real behavior testing (no mocks)
+- **database-specialist**: PostgreSQL/JSONB optimization, query performance
+- **ml-orchestrator**: ML pipelines, model registry (@champion/@production)
+- **performance-engineer**: Cross-cutting performance, cache optimization (96.67% hit rate)
+- **security-architect**: Security policies, OWASP 2025, auth/authorization design
+- **infrastructure-specialist**: Docker/testcontainers, CI/CD, real behavior testing
 
 **Specialized Domain Agents:**
-- **data-pipeline-specialist**: ETL processes, analytics pipelines, data transformation
-- **api-design-specialist**: FastAPI design, OpenAPI docs, REST architecture
-- **monitoring-observability-specialist**: OpenTelemetry, distributed tracing, SLO monitoring
-- **testing-strategy-specialist**: Real behavior testing, testcontainers, quality assurance
-- **configuration-management-specialist**: Environment configs, settings management
-- **documentation-specialist**: Technical docs, API documentation, ADRs
+- **data-pipeline-specialist**: ETL processes, analytics pipelines
+- **api-design-specialist**: FastAPI design, OpenAPI docs
+- **monitoring-observability-specialist**: OpenTelemetry, distributed tracing
+- **testing-strategy-specialist**: Real behavior testing, quality assurance
+- **configuration-management-specialist**: Environment configs, settings
+- **documentation-specialist**: Technical docs, API documentation
 
-**Automatic Agent Selection Triggers:**
-Database: query|schema|migration|PostgreSQL|SQL → database-specialist
-ML/AI: model|training|feature|pipeline|ML → ml-orchestrator
-Performance: slow|optimize|bottleneck|cache → performance-engineer
-Security: auth|security|vulnerability|encrypt → security-architect
-Infrastructure: docker|container|CI/CD|deploy → infrastructure-specialist
-API: endpoint|FastAPI|OpenAPI|REST → api-design-specialist
-Testing: test|testcontainer|quality → testing-strategy-specialist
-Data: ETL|analytics|data processing → data-pipeline-specialist
-Monitoring: observability|tracing|metrics → monitoring-observability-specialist
-Config: config|environment|settings → configuration-management-specialist
-Docs: documentation|ADR|technical writing → documentation-specialist
-
-**Delegation Flow:**
-performance-engineer → database-specialist (query optimization)
-performance-engineer → ml-orchestrator (ML performance)
-security-architect → infrastructure-specialist (security tool deployment)
-ml-orchestrator → infrastructure-specialist (deployment infrastructure)
-infrastructure-specialist → database-specialist (database infrastructure)
-
-**APES Architecture Integration:**
-- PostgreSQL 15+ with JSONB optimization (database-specialist)
-- Custom SQL migrations in database/migrations/ (database-specialist)
-- Testcontainers for real behavior testing (infrastructure-specialist + testing-strategy-specialist)
-- Multi-level caching L1/L2/L3 achieving <2ms response (performance-engineer)
-- Model registry aliases @champion/@production/@challenger (ml-orchestrator)
-
-**External tool integration:**
-- Search previous solutions via memory tools first
-- Use Context7 for external dependencies and best practices
-- Document decisions and patterns for future reference
-- Fall back to manual analysis when MCP unavailable
-
-**Parallel execution patterns:** Always batch independent operations - file reads, searches, validations. Default to parallel unless sequential dependencies exist.
-
-**Comprehensive Documentation:** → docs/architecture/CLAUDE_CODE_AGENT_BEST_PRACTICES.md
+**Automatic Agent Selection**: Use appropriate specialist for domain-specific tasks
+**Delegation Flow**: performance-engineer → database-specialist (query optimization)
+**Architecture Integration**: PostgreSQL 15+ JSONB, testcontainers, L1/L2/L3 caching <2ms, model registry @champion/@production
 
 ## Extended Thinking & Context Management
 
@@ -141,49 +87,55 @@ infrastructure-specialist → database-specialist (database infrastructure)
 - After tool results: Reflect and determine next steps
 - Before complex decisions: Multi-step reasoning and planning
 - During problem decomposition: Breaking down complex tasks
-- For iterative improvement: Analyzing and refining approaches
-
-**Thinking triggers:** analyze, plan, evaluate, reason, decompose, optimize, strategize, debug
 
 ## Error Handling & Correction
 
-**Priority hierarchy:** Security > Code Correctness > Type Safety > Code Quality > Test Passing
+**Priority hierarchy:** Security > Code Correctness > Simplicity > Type Safety > Code Quality > Test Passing
+
+**Simplicity Check:**
+- **Can this be done with fewer concepts?** Reduce by half, then half again
+- **Are there special cases that could be eliminated?** Good taste means transforming edge cases into normal cases
+- **Classic example**: Linked list deletion - from 10 lines with conditionals to 4 lines without
 
 **Root cause analysis over quick fixes:**
 - Investigate before applying fixes
 - Document error type, location, specific cause
-- Re-examine with different methodology when needed
-
-**Development vs Production:**
-- Temporary fixes acceptable in development with TODO documentation
-- Production code requires proper fixes: import types correctly, fix type mismatches, maintain explicit typing
-- Avoid masking issues: no # type: ignore, Any types, or deletion without understanding
-
-**Always validate claims with concrete evidence before marking complete.**
+- Validate claims with concrete evidence before marking complete
 
 ## Architectural Compliance (2025 Standards)
 
-**MANDATORY Patterns - Must Follow:**
+**MANDATORY Patterns:**
 - **Clean Architecture**: Strict layer separation (Presentation → Application → Domain → Repository → Infrastructure)
-- **Repository Pattern**: All data access through protocol-based repository interfaces, zero database imports in business logic
-- **Protocol-Based DI**: Use typing.Protocol for interfaces, constructor injection for dependencies
-- **Service Facades**: Consolidate related functionality into unified facades with internal components
-- **Application Services**: Business workflow orchestration between presentation and domain layers
-- **Multi-Level Caching**: L1 (Memory) + L2 (Redis) + L3 (Database) for performance optimization
-- **Structured Error Handling**: Exception hierarchy with correlation tracking, decorators for error propagation
+  - *Why*: Data flow clarity eliminates special cases and hidden dependencies
+- **Repository Pattern**: All data access through protocol-based interfaces
+  - *Why*: Focus on data structures and ownership, not implementation details
+- **Protocol-Based DI**: Use typing.Protocol for interfaces
+  - *Why*: Eliminates coupling, enables true dependency inversion
+- **Service Facades**: Consolidate related functionality into unified facades
+  - *Why*: Transform special cases into normal operations through proper abstraction
+- **Multi-Level Caching**: L1 (Memory) + L2 (Redis) + L3 (Database) achieving <2ms response times
+  - *Why*: Data structure optimization yields order-of-magnitude performance gains
 - **Real Behavior Testing**: Integration tests use testcontainers, no mocks for external services
+  - *Why*: Theory loses to practice - test real behavior, not assumptions
 
-**PROHIBITED Patterns - Must Avoid:**
-- **Direct Database Access**: From service or presentation layers (use repositories only)
+**PROHIBITED Patterns:**
+- **Direct Database Access**: From service or presentation layers
 - **God Objects**: Classes >500 lines (split into focused services)
+- **Deep Nesting**: Functions with >3 levels of indentation (redesign the logic)
+- **Special-Case Proliferation**: Multiple if/else for edge cases (redesign data structure instead)
 - **Infrastructure in Core**: Database/cache imports in business logic
-- **Service Proliferation**: Multiple overlapping services (consolidate into facades)
-- **Hardcoded Values**: Configuration must be externalized with environment variables
-- **Backwards Compatibility Layers**: Clean break strategy to eliminate technical debt
-- **Mock Integration Tests**: Use real services via testcontainers for integration validation
+- **Mock Integration Tests**: Use real services via testcontainers
+- **Unnecessary Abstraction**: Don't create patterns for problems that don't exist in production
 
 **Performance Requirements:**
-- **Response Times**: P95 <100ms for endpoints, <2ms achieved on critical paths
+- **Response Times**: P95 <100ms for endpoints, <2ms on critical paths
 - **Cache Performance**: >80% hit rates (96.67% achieved)
-- **Memory Usage**: 10-1000MB range maintained
 - **Test Coverage**: 85%+ on service boundaries
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+File Creation Context:
+- **Refactoring**: Creating files to eliminate god objects is REQUIRED
+- **Features**: New files need strong justification (prefer existing structure)
+- **Documentation**: Only when explicitly requested by user
+ALWAYS prefer editing existing files over creating new ones when adding functionality.

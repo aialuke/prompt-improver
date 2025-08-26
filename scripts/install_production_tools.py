@@ -1,5 +1,5 @@
 """Production Tools Installation Script - 2025 Best Practices
-Installs k6, safety, prometheus, and other production readiness tools
+Installs k6, safety, prometheus, and other production readiness tools.
 """
 
 import asyncio
@@ -11,7 +11,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import aiofiles
 import aiohttp
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProductionToolsInstaller:
-    """Production Tools Installer following 2025 best practices
+    """Production Tools Installer following 2025 best practices.
 
     Installs and configures:
     - k6 for load testing
@@ -33,7 +32,7 @@ class ProductionToolsInstaller:
     - bandit for SAST scanning
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.system = platform.system().lower()
         self.arch = platform.machine().lower()
         self.tools_status = {}
@@ -50,7 +49,7 @@ class ProductionToolsInstaller:
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
     async def install_all_tools(self) -> dict[str, bool]:
-        """Install all production readiness tools"""
+        """Install all production readiness tools."""
         logger.info("🚀 Starting production tools installation (2025 best practices)")
         await self._check_existing_tools()
         await self._install_python_tools()
@@ -62,7 +61,7 @@ class ProductionToolsInstaller:
         return self.tools_status
 
     async def _check_existing_tools(self) -> None:
-        """Check which tools are already installed"""
+        """Check which tools are already installed."""
         logger.info("🔍 Checking existing tool installations...")
         tools_to_check = {
             "k6": ["k6", "version"],
@@ -87,7 +86,7 @@ class ProductionToolsInstaller:
                 self.tools_status[tool] = False
 
     async def _install_python_tools(self) -> None:
-        """Install Python-based security tools"""
+        """Install Python-based security tools."""
         logger.info("🐍 Installing Python security tools...")
         python_tools = ["safety", "bandit[toml]", "pip-audit"]
         for tool in python_tools:
@@ -107,11 +106,11 @@ class ProductionToolsInstaller:
                     logger.error("❌ Failed to install %s: %s", tool, result.stderr)
                     self.tools_status[tool.split("[")[0]] = False
             except subprocess.TimeoutExpired:
-                logger.error("❌ Timeout installing %s", tool)
+                logger.exception("❌ Timeout installing %s", tool)
                 self.tools_status[tool.split("[")[0]] = False
 
     async def _install_k6(self) -> None:
-        """Install k6 load testing tool"""
+        """Install k6 load testing tool."""
         if self.tools_status.get("k6", False):
             logger.info("✅ k6 already installed, skipping")
             return
@@ -125,11 +124,11 @@ class ProductionToolsInstaller:
                 logger.warning("❌ k6 installation not supported for %s", self.system)
                 self.tools_status["k6"] = False
         except Exception as e:
-            logger.error("❌ Failed to install k6: %s", e)
+            logger.exception("❌ Failed to install k6: %s", e)
             self.tools_status["k6"] = False
 
     async def _install_k6_macos(self) -> None:
-        """Install k6 on macOS"""
+        """Install k6 on macOS."""
         try:
             result = subprocess.run(
                 ["brew", "install", "k6"],
@@ -147,7 +146,7 @@ class ProductionToolsInstaller:
         await self._install_k6_direct()
 
     async def _install_k6_linux(self) -> None:
-        """Install k6 on Linux"""
+        """Install k6 on Linux."""
         package_managers = [
             (["apt", "update"], ["apt", "install", "-y", "k6"]),
             (["yum", "update"], ["yum", "install", "-y", "k6"]),
@@ -172,7 +171,7 @@ class ProductionToolsInstaller:
         await self._install_k6_direct()
 
     async def _install_k6_direct(self) -> None:
-        """Install k6 via direct download"""
+        """Install k6 via direct download."""
         logger.info("📥 Installing k6 via direct download...")
         arch_map = {
             "x86_64": "amd64",
@@ -185,7 +184,6 @@ class ProductionToolsInstaller:
         k6_system = system_map.get(self.system, "linux")
         download_url = f"https://github.com/grafana/k6/releases/download/v{self.versions['k6']}/k6-v{self.versions['k6']}-{k6_system}-{k6_arch}.tar.gz"
         try:
-            from prompt_improver.monitoring.unified_http_client import download_file
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(download_url) as response:
@@ -218,11 +216,11 @@ class ProductionToolsInstaller:
                     else:
                         raise Exception(f"Download failed: HTTP {response.status}")
         except Exception as e:
-            logger.error("❌ Failed to install k6 directly: %s", e)
+            logger.exception("❌ Failed to install k6 directly: %s", e)
             self.tools_status["k6"] = False
 
     async def _install_prometheus(self) -> None:
-        """Install Prometheus monitoring system"""
+        """Install Prometheus monitoring system."""
         if self.tools_status.get("prometheus", False):
             logger.info("✅ Prometheus already installed, skipping")
             return
@@ -231,7 +229,7 @@ class ProductionToolsInstaller:
         self.tools_status["prometheus"] = True
 
     async def _install_grafana(self) -> None:
-        """Install Grafana visualization"""
+        """Install Grafana visualization."""
         if self.tools_status.get("grafana-server", False):
             logger.info("✅ Grafana already installed, skipping")
             return
@@ -240,7 +238,7 @@ class ProductionToolsInstaller:
         self.tools_status["grafana-server"] = True
 
     async def _create_prometheus_docker_config(self) -> None:
-        """Create Prometheus Docker configuration"""
+        """Create Prometheus Docker configuration."""
         prometheus_config = {
             "global": {"scrape_interval": "15s", "evaluation_interval": "15s"},
             "scrape_configs": [
@@ -260,7 +258,7 @@ class ProductionToolsInstaller:
         logger.info("✅ Prometheus configuration created: %s", config_file)
 
     async def _create_grafana_docker_config(self) -> None:
-        """Create Grafana Docker configuration"""
+        """Create Grafana Docker configuration."""
         grafana_config = {
             "server": {"http_port": 3000, "domain": "localhost"},
             "security": {"admin_user": "admin", "admin_password": "admin"},
@@ -285,13 +283,13 @@ class ProductionToolsInstaller:
         logger.info("✅ Grafana configuration created: %s", config_file)
 
     async def _configure_tools(self) -> None:
-        """Configure installed tools"""
+        """Configure installed tools."""
         logger.info("⚙️  Configuring production tools...")
         await self._create_tool_configs()
         await self._update_path()
 
     async def _create_tool_configs(self) -> None:
-        """Create configuration files for tools"""
+        """Create configuration files for tools."""
         k6_config = {
             "options": {
                 "stages": [
@@ -313,13 +311,13 @@ class ProductionToolsInstaller:
         logger.info("✅ k6 configuration created: %s", config_file)
 
     async def _update_path(self) -> None:
-        """Update PATH to include tool installation directory"""
+        """Update PATH to include tool installation directory."""
         if str(self.install_dir) not in os.environ.get("PATH", ""):
             logger.info("💡 Add %s to your PATH:", self.install_dir)
             logger.info('   export PATH="%s:$PATH"', self.install_dir)
 
     async def _verify_installations(self) -> None:
-        """Verify all tool installations"""
+        """Verify all tool installations."""
         logger.info("🔍 Verifying tool installations...")
         verification_commands = {
             "k6": ["k6", "version"],
@@ -343,7 +341,7 @@ class ProductionToolsInstaller:
 
 
 async def main():
-    """Main function for tool installation"""
+    """Main function for tool installation."""
     print("🚀 Production Tools Installation - 2025 Best Practices")
     print("=" * 60)
     installer = ProductionToolsInstaller()
@@ -373,7 +371,7 @@ async def main():
             print("\n⚠️  PARTIAL INSTALLATION - Some tools failed to install")
             sys.exit(1)
     except Exception as e:
-        logger.error("Installation failed with error: %s", e)
+        logger.exception("Installation failed with error: %s", e)
         print(f"\n💥 INSTALLATION ERROR: {e}")
         sys.exit(1)
 

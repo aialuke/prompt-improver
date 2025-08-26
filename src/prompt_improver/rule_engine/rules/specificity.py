@@ -8,13 +8,10 @@ Based on research synthesis from:
 """
 
 import re
-from typing import Any
 
 # Heavy ML import moved to TYPE_CHECKING for lazy loading
-from typing import TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
 from prompt_improver.rule_engine.base import (
     BasePromptRule,
     RuleCheckResult,
@@ -141,7 +138,7 @@ class SpecificityRule(BasePromptRule):
     - Configurable specificity thresholds
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._llm_transformer = None
         self.config = {
             "vague_language_threshold": 0.3,
@@ -163,17 +160,19 @@ class SpecificityRule(BasePromptRule):
     def _get_llm_transformer(self):
         """Lazy load LLM transformer when needed."""
         if self._llm_transformer is None:
-            from prompt_improver.ml.preprocessing.llm_transformer import LLMTransformerService
+            from prompt_improver.ml.preprocessing.llm_transformer import (
+                LLMTransformerService,
+            )
             self._llm_transformer = LLMTransformerService()
         return self._llm_transformer
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "Specificity and Detail Rule",
             "type": "Fundamental",
@@ -190,7 +189,7 @@ class SpecificityRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Enhanced check using research-validated specificity metrics"""
+        """Enhanced check using research-validated specificity metrics."""
         specificity_metrics = self._calculate_specificity_metrics(prompt)
         vague_language_ratio = specificity_metrics["vague_language_ratio"]
         applies = vague_language_ratio > self.config["vague_language_threshold"]
@@ -219,7 +218,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply research-validated specificity enhancements"""
+        """Apply research-validated specificity enhancements."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -276,11 +275,11 @@ class SpecificityRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction for specificity enhancement"""
+        """Generate research-based LLM instruction for specificity enhancement."""
         return '\n<instruction>\nEnhance prompt specificity using research-validated patterns:\n\n1. VAGUE LANGUAGE REMOVAL:\n   - Replace hedge words (maybe, perhaps, might) with direct statements\n   - Convert vague quantifiers (some, many) to specific numbers\n   - Replace vague nouns (thing, stuff) with concrete terms\n\n2. WHO/WHAT/WHEN/WHERE SPECIFICITY:\n   - WHO: Specify target audience, user type, or stakeholder\n   - WHAT: Define exact deliverable, outcome, or result\n   - WHEN: Include timeframe, deadline, or timing constraints\n   - WHERE: Clarify context, environment, or setting\n\n3. CONCRETE EXAMPLES:\n   - Add specific instances using "such as", "for example"\n   - Include real-world scenarios and use cases\n   - Provide sample inputs and expected outputs\n\n4. QUANTIFIABLE METRICS:\n   - Specify numbers, percentages, counts, or measurements\n   - Define length, duration, size constraints\n   - Include performance or quality metrics\n\n5. MEASURABLE OUTCOMES:\n   - Define success criteria explicitly\n   - Use action verbs with specific results\n   - Include evaluation methods or standards\n\nFocus on making every element concrete, measurable, and unambiguous.\n</instruction>\n'
 
     def _calculate_specificity_metrics(self, prompt: str) -> dict[str, Any]:
-        """Calculate comprehensive specificity metrics based on research"""
+        """Calculate comprehensive specificity metrics based on research."""
         words = prompt.lower().split()
         total_words = len(words)
         vague_words = []
@@ -341,7 +340,7 @@ class SpecificityRule(BasePromptRule):
     def _calculate_overall_specificity_score(
         self, prompt: str, vague_ratio: float
     ) -> float:
-        """Calculate overall specificity score using multiple factors"""
+        """Calculate overall specificity score using multiple factors."""
         vague_score = max(0, 1.0 - vague_ratio * 2)
         words = prompt.split()
         length_score = min(1.0, len(words) / 20)
@@ -369,7 +368,7 @@ class SpecificityRule(BasePromptRule):
         return min(1.0, overall_score)
 
     def _remove_hedge_words(self, prompt: str) -> tuple[str, list[dict]]:
-        """Remove hedge words that reduce specificity"""
+        """Remove hedge words that reduce specificity."""
         improved_prompt = prompt
         transformations = []
         hedge_replacements = {
@@ -411,7 +410,7 @@ class SpecificityRule(BasePromptRule):
         return (improved_prompt, transformations)
 
     def _apply_who_what_when_where(self, prompt: str) -> tuple[str, list[dict]]:
-        """Apply who/what/when/where specificity pattern"""
+        """Apply who/what/when/where specificity pattern."""
         if any(word in prompt.lower() for word in ["who", "what", "when", "where"]):
             return (prompt, [])
         guidance = "\n\nPlease specify:\n- WHO: Target audience or user type\n- WHAT: Specific deliverable or outcome\n- WHEN: Timeframe or constraints\n- WHERE: Context or environment"
@@ -428,7 +427,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def _add_concrete_examples(self, prompt: str) -> tuple[str, list[dict]]:
-        """Add concrete examples to improve specificity"""
+        """Add concrete examples to improve specificity."""
         if any(
             example_word in prompt.lower()
             for example_word in SPECIFICITY_PATTERNS["concrete_examples"]
@@ -448,7 +447,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def _add_quantifiable_metrics(self, prompt: str) -> tuple[str, list[dict]]:
-        """Add quantifiable metrics and measurements"""
+        """Add quantifiable metrics and measurements."""
         if any(
             metric in prompt.lower()
             for metric in SPECIFICITY_PATTERNS["quantifiable_metrics"]
@@ -468,7 +467,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def _enforce_specific_outcomes(self, prompt: str) -> tuple[str, list[dict]]:
-        """Enforce specific, measurable outcomes"""
+        """Enforce specific, measurable outcomes."""
         if any(indicator in prompt.lower() for indicator in MEASURABLE_INDICATORS):
             return (prompt, [])
         outcome_enforcement = "\n\nDefine specific, measurable outcomes and success criteria for this task."
@@ -485,7 +484,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def _add_success_criteria(self, prompt: str) -> tuple[str, list[dict]]:
-        """Add explicit success criteria"""
+        """Add explicit success criteria."""
         if any(keyword in prompt.lower() for keyword in SUCCESS_CRITERIA_KEYWORDS):
             return (prompt, [])
         criteria_addition = "\n\nSuccess criteria: Define what constitutes successful completion of this task, including quality standards and evaluation methods."
@@ -502,7 +501,7 @@ class SpecificityRule(BasePromptRule):
         )
 
     def _replace_vague_language(self, prompt: str) -> tuple[str, list[dict]]:
-        """Replace vague language with specific alternatives"""
+        """Replace vague language with specific alternatives."""
         improved_prompt = prompt
         transformations = []
         specific_replacements = {
@@ -536,7 +535,7 @@ class SpecificityRule(BasePromptRule):
         return (improved_prompt, transformations)
 
     def _fallback_specificity_improvement(self, prompt: str, metadata: dict) -> dict:
-        """Enhanced fallback method with research patterns"""
+        """Enhanced fallback method with research patterns."""
         improved_prompt = prompt
         transformations = []
         additions = []

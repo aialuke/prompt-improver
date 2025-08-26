@@ -10,14 +10,17 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 from sqlalchemy import text
 
-from prompt_improver.database import ManagerMode, get_unified_manager
+from prompt_improver.database import ManagerMode
+from prompt_improver.database.composition import (
+    get_database_services,
+)
+from prompt_improver.database.types import ManagerMode
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +84,7 @@ class BasicAsyncPGPerformanceTest:
         """Test a specific database operation."""
         times = []
         errors = 0
-        for i in range(iterations):
+        for _i in range(iterations):
             start_time = time.perf_counter()
             try:
                 async with self.manager.get_async_session() as session:
@@ -91,7 +94,7 @@ class BasicAsyncPGPerformanceTest:
                 execution_time_ms = (end_time - start_time) * 1000
                 times.append(execution_time_ms)
             except Exception as e:
-                logger.error("Error in {operation_name} iteration {i}: %s", e)
+                logger.exception("Error in {operation_name} iteration {i}: %s", e)
                 errors += 1
                 times.append(1000.0)
             await asyncio.sleep(0.01)
@@ -115,7 +118,7 @@ class BasicAsyncPGPerformanceTest:
         """Test connection establishment performance."""
         times = []
         errors = 0
-        for i in range(iterations):
+        for _i in range(iterations):
             start_time = time.perf_counter()
             try:
                 async with self.manager.get_async_session() as session:
@@ -125,7 +128,7 @@ class BasicAsyncPGPerformanceTest:
                 connection_time_ms = (end_time - start_time) * 1000
                 times.append(connection_time_ms)
             except Exception as e:
-                logger.error("Connection error in iteration {i}: %s", e)
+                logger.exception("Connection error in iteration {i}: %s", e)
                 errors += 1
                 times.append(100.0)
             await asyncio.sleep(0.02)
@@ -177,7 +180,7 @@ class BasicAsyncPGPerformanceTest:
             },
         }
         report_file = Path("basic_performance_results.json")
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2)
         logger.info("📄 Basic performance results saved to %s", report_file)
 

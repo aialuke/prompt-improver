@@ -10,17 +10,12 @@ Following 2025 best practices:
 """
 
 import asyncio
-import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock
 
 import asyncpg
 import pytest
 
 from prompt_improver.database.performance_monitor import (
     DatabasePerformanceMonitor,
-    get_performance_monitor,
 )
 from prompt_improver.database.query_optimizer import DatabaseConnectionOptimizer
 
@@ -32,10 +27,8 @@ class TestDatabasePerformanceIntegration:
     async def db_connection(self):
         """Create database connection using DatabaseServices for real behavior testing."""
         try:
-            from prompt_improver.database import (
-                ManagerMode,
-                get_unified_manager,
-            )
+            from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+            from prompt_improver.database.types import ManagerMode
 
             manager = get_database_services(ManagerMode.ASYNC_MODERN)
             async with manager.get_async_session() as session:

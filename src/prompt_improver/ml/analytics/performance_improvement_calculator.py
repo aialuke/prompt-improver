@@ -9,11 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
-from scipy import stats
-from scipy.stats import pearsonr, spearmanr
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+# from get_scipy().stats import pearsonr, spearmanr  # Converted to lazy loading
 from ...database.models import TrainingIteration, TrainingSession
 from ...utils.datetime_utils import naive_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 logger = logging.getLogger(__name__)
 
 class TrendDirection(Enum):
@@ -108,8 +110,8 @@ class PerformanceImprovementCalculator:
                 else:
                     improvements[metric] = {'absolute': 0.0, 'relative': 0.0}
             weighted_improvement = sum((improvements[metric]['relative'] * weight for metric, weight in self.metric_weights.items()))
-            absolute_improvement = np.mean([improvements[metric]['absolute'] for metric in self.metric_weights.keys()])
-            relative_improvement = np.mean([improvements[metric]['relative'] for metric in self.metric_weights.keys()])
+            absolute_improvement = get_numpy().mean([improvements[metric]['absolute'] for metric in self.metric_weights.keys()])
+            relative_improvement = get_numpy().mean([improvements[metric]['relative'] for metric in self.metric_weights.keys()])
             time_diff = (current_metrics.timestamp - previous_metrics.timestamp).total_seconds()
             improvement_rate = weighted_improvement / (time_diff / 3600) if time_diff > 0 else 0.0
             significance, effect_size = await self._calculate_statistical_significance(current_metrics, previous_metrics)
@@ -140,9 +142,9 @@ class PerformanceImprovementCalculator:
             if len(performance_scores) < 3:
                 return TrendAnalysis(direction=TrendDirection.STABLE, slope=0.0, correlation=0.0, p_value=1.0, trend_strength='insufficient_data', volatility_score=0.0, prediction_confidence=0.0)
             correlation, p_value = pearsonr(iteration_numbers, performance_scores)
-            slope, intercept, r_value, p_val, std_err = stats.linregress(iteration_numbers, performance_scores)
+            slope, intercept, r_value, p_val, std_err = get_scipy_stats().linregress(iteration_numbers, performance_scores)
             direction = self._classify_trend_direction(correlation, p_value)
-            volatility_score = np.std(performance_scores) / np.mean(performance_scores) if np.mean(performance_scores) > 0 else 0.0
+            volatility_score = get_numpy().std(performance_scores) / get_numpy().mean(performance_scores) if get_numpy().mean(performance_scores) > 0 else 0.0
             trend_strength = self._classify_trend_strength(abs(correlation), p_value)
             prediction_confidence = self._calculate_prediction_confidence(correlation, p_value, len(performance_scores), volatility_score)
             return TrendAnalysis(direction=direction, slope=slope, correlation=correlation, p_value=p_value, trend_strength=trend_strength, volatility_score=volatility_score, prediction_confidence=prediction_confidence)
@@ -194,9 +196,9 @@ class PerformanceImprovementCalculator:
             mid_point = len(scores) // 2
             before_scores = scores[:mid_point]
             after_scores = scores[mid_point:]
-            statistic, p_value = stats.ttest_ind(after_scores, before_scores)
-            pooled_std = np.sqrt(((len(after_scores) - 1) * np.var(after_scores, ddof=1) + (len(before_scores) - 1) * np.var(before_scores, ddof=1)) / (len(after_scores) + len(before_scores) - 2))
-            cohens_d = (np.mean(after_scores) - np.mean(before_scores)) / pooled_std if pooled_std > 0 else 0.0
+            statistic, p_value = get_scipy_stats().ttest_ind(after_scores, before_scores)
+            pooled_std = get_numpy().sqrt(((len(after_scores) - 1) * get_numpy().var(after_scores, ddof=1) + (len(before_scores) - 1) * get_numpy().var(before_scores, ddof=1)) / (len(after_scores) + len(before_scores) - 2))
+            cohens_d = (get_numpy().mean(after_scores) - get_numpy().mean(before_scores)) / pooled_std if pooled_std > 0 else 0.0
             return (p_value < self.significance_level, abs(cohens_d))
         except Exception as e:
             self.logger.error('Error calculating statistical significance: %s', e)
@@ -278,10 +280,10 @@ class PerformanceImprovementCalculator:
         if len(improvement_history) < 5:
             return 0.0
         recent_improvements = improvement_history[-5:]
-        avg_recent = np.mean(recent_improvements)
+        avg_recent = get_numpy().mean(recent_improvements)
         if len(improvement_history) >= 10:
             earlier_improvements = improvement_history[-10:-5]
-            avg_earlier = np.mean(earlier_improvements)
+            avg_earlier = get_numpy().mean(earlier_improvements)
             if avg_earlier > 0:
                 stagnation = max(0.0, (avg_earlier - avg_recent) / avg_earlier)
             else:

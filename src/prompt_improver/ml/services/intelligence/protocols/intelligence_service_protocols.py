@@ -80,14 +80,6 @@ class PatternDiscoveryServiceProtocol(Protocol):
     async def analyze_pattern_insights(self, patterns: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze discovered patterns for insights."""
         ...
-    
-    async def cache_pattern_results(self, pattern_key: str, results: Dict[str, Any]) -> None:
-        """Cache pattern discovery results."""
-        ...
-    
-    async def get_cached_patterns(self, pattern_key: str) -> Optional[Dict[str, Any]]:
-        """Retrieve cached pattern results."""
-        ...
 
 
 class MLPredictionServiceProtocol(Protocol):

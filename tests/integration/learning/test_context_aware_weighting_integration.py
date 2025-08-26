@@ -5,15 +5,13 @@ This test suite validates that the context-aware weighting system integrates
 correctly with the complete ML pipeline and produces expected behavior.
 """
 
-from typing import Any, Dict, List
 
 import numpy as np
 import pytest
 
-from prompt_improver.learning.context_aware_weighter import WeightingStrategy
-from prompt_improver.learning.context_learner import (
+from prompt_improver.ml.learning.algorithms.context_learner import (
     ContextConfig,
-    ContextSpecificLearner,
+    ContextLearner as ContextSpecificLearner,
 )
 
 

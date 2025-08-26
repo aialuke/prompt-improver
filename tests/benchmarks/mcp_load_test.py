@@ -8,13 +8,11 @@ to verify memory efficiency and response times under realistic conditions.
 """
 
 import asyncio
-import multiprocessing
 import os
 import statistics
 import sys
 import time
 import tracemalloc
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 # Add src to path
@@ -162,8 +160,7 @@ async def simulate_mcp_request(
         response_bytes = codec.encode_response(response)
 
         # Calculate total time
-        total_time = (time.perf_counter() - start_time) * 1_000_000  # microseconds
-        return total_time
+        return (time.perf_counter() - start_time) * 1_000_000  # microseconds
 
     except Exception as e:
         print(f"⚠️  Request {request_id} failed: {e}")
@@ -203,7 +200,7 @@ async def run_concurrent_load_test(
 
                 # Update peak memory periodically
                 if request_id % 1000 == 0:
-                    current, peak = tracemalloc.get_traced_memory()
+                    _current, peak = tracemalloc.get_traced_memory()
                     metrics.peak_memory_mb = max(
                         metrics.peak_memory_mb, peak / (1024 * 1024)
                     )
@@ -221,7 +218,7 @@ async def run_concurrent_load_test(
     load_test_time = time.perf_counter() - load_test_start
 
     # Final memory measurement
-    current, peak = tracemalloc.get_traced_memory()
+    _current, peak = tracemalloc.get_traced_memory()
     metrics.peak_memory_mb = max(metrics.peak_memory_mb, peak / (1024 * 1024))
     tracemalloc.stop()
 
@@ -374,7 +371,7 @@ async def main():
         import json
 
         results_file = os.path.join(os.path.dirname(__file__), "load_test_results.json")
-        with open(results_file, "w") as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(test_results, f, indent=2, default=str)
         print(f"\n📁 Load test results saved to: {results_file}")
     except Exception as e:

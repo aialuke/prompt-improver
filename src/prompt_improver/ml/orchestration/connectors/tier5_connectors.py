@@ -73,7 +73,7 @@ class RedisCacheConnector(ComponentConnector):
     async def _multi_level_caching(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Multi-level caching."""
         await asyncio.sleep(0.2)
-        return {'cache_levels': 3, 'hit_rate_l1': 0.85, 'hit_rate_l2': 0.7, 'hit_rate_l3': 0.45, 'overall_hit_rate': 0.78, 'cache_size': '1.2GB'}
+        return {'cache_levels': 2, 'hit_rate_l1': 0.85, 'hit_rate_l2': 0.7, 'overall_hit_rate': 0.82, 'cache_size': '1.2GB'}
 
     async def _cache_optimization(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Cache optimization."""

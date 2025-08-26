@@ -6,10 +6,9 @@ following repository pattern with protocol-based dependency injection.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.database import DatabaseServices
 from prompt_improver.database.models import (
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 class TrainingRepository(BaseRepository[TrainingSession]):
     """Repository for training session and iteration management."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         super().__init__(
             model_class=TrainingSession,
             connection_manager=connection_manager,
@@ -111,7 +110,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting training sessions: {e}")
+                logger.exception(f"Error getting training sessions: {e}")
                 raise
 
     async def get_training_session_by_id(
@@ -124,7 +123,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting training session by ID: {e}")
+                logger.exception(f"Error getting training session by ID: {e}")
                 raise
 
     async def update_training_session(
@@ -149,7 +148,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 await session.commit()
                 return await self.get_training_session_by_id(session_id)
             except Exception as e:
-                logger.error(f"Error updating training session: {e}")
+                logger.exception(f"Error updating training session: {e}")
                 raise
 
     async def get_active_training_sessions(self) -> list[TrainingSession]:
@@ -162,7 +161,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 result = await session.execute(query)
                 return list(result.scalars().all())
             except Exception as e:
-                logger.error(f"Error getting active training sessions: {e}")
+                logger.exception(f"Error getting active training sessions: {e}")
                 raise
 
     async def get_training_session_metrics(
@@ -234,7 +233,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 )
 
             except Exception as e:
-                logger.error(f"Error getting training session metrics: {e}")
+                logger.exception(f"Error getting training session metrics: {e}")
                 raise
 
     # Training Iteration Management
@@ -253,7 +252,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 logger.info(f"Created training iteration {iteration.id}")
                 return iteration
             except Exception as e:
-                logger.error(f"Error creating training iteration: {e}")
+                logger.exception(f"Error creating training iteration: {e}")
                 raise
 
     async def get_training_iterations(
@@ -291,7 +290,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting training iterations: {e}")
+                logger.exception(f"Error getting training iterations: {e}")
                 raise
 
     async def get_latest_iteration(
@@ -310,7 +309,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 result = await session.execute(query)
                 return result.scalar_one_or_none()
             except Exception as e:
-                logger.error(f"Error getting latest iteration: {e}")
+                logger.exception(f"Error getting latest iteration: {e}")
                 raise
 
     async def get_iteration_performance_trend(
@@ -344,7 +343,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 ]
 
             except Exception as e:
-                logger.error(f"Error getting iteration performance trend: {e}")
+                logger.exception(f"Error getting iteration performance trend: {e}")
                 raise
 
     # Training Data Management - Core Methods Only
@@ -359,19 +358,19 @@ class TrainingRepository(BaseRepository[TrainingSession]):
             try:
                 query = select(func.count(TrainingPrompt.id))
                 conditions = []
-                
+
                 if session_id:
                     conditions.append(TrainingPrompt.session_id == session_id)
                 if is_active:
                     conditions.append(TrainingPrompt.is_active == is_active)
-                
+
                 if conditions:
                     query = query.where(and_(*conditions))
-                
+
                 result = await session.execute(query)
                 return result.scalar() or 0
             except Exception as e:
-                logger.error(f"Error getting training prompts count: {e}")
+                logger.exception(f"Error getting training prompts count: {e}")
                 raise
 
     # Cleanup and Maintenance
@@ -416,7 +415,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 return deleted_count
 
             except Exception as e:
-                logger.error(f"Error cleaning up old iterations: {e}")
+                logger.exception(f"Error cleaning up old iterations: {e}")
                 raise
 
     async def cleanup_failed_sessions(
@@ -444,7 +443,7 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 return deleted_count
 
             except Exception as e:
-                logger.error(f"Error cleaning up failed sessions: {e}")
+                logger.exception(f"Error cleaning up failed sessions: {e}")
                 raise
 
     async def archive_completed_sessions(
@@ -475,5 +474,5 @@ class TrainingRepository(BaseRepository[TrainingSession]):
                 return archived_count
 
             except Exception as e:
-                logger.error(f"Error archiving completed sessions: {e}")
+                logger.exception(f"Error archiving completed sessions: {e}")
                 raise

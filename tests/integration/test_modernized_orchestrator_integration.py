@@ -18,11 +18,10 @@ Best Practices:
 
 import asyncio
 import logging
-import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -98,7 +97,7 @@ class ModernizedComponentIntegrationTest:
             logger.info("✅ Component registration test passed")
             return {"success": True, "components_found": len(tier1_components)}
         except Exception as e:
-            logger.error("❌ Component registration test failed: %s", e)
+            logger.exception("❌ Component registration test failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_direct_component_integration(self) -> dict[str, Any]:
@@ -176,7 +175,7 @@ class ModernizedComponentIntegrationTest:
                 "variance_preserved": result.variance_preserved,
             }
         except Exception as e:
-            logger.error("❌ DimensionalityReducer integration failed: %s", e)
+            logger.exception("❌ DimensionalityReducer integration failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_synthetic_data_generator_integration(self) -> dict[str, Any]:
@@ -240,7 +239,7 @@ class ModernizedComponentIntegrationTest:
                 "processing_time": statistical_time,
             }
         except Exception as e:
-            logger.error("❌ SyntheticDataGenerator integration failed: %s", e)
+            logger.exception("❌ SyntheticDataGenerator integration failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_orchestrator_workflow_integration(self) -> dict[str, Any]:
@@ -249,10 +248,6 @@ class ModernizedComponentIntegrationTest:
         try:
             from prompt_improver.core.factories.component_factory import (
                 ComponentFactory,
-            )
-            from prompt_improver.core.protocols.ml_protocols import ComponentSpec
-            from prompt_improver.ml.orchestration.core.component_registry import (
-                ComponentTier,
             )
 
             factory = ComponentFactory(orchestrator._service_container)
@@ -278,7 +273,7 @@ class ModernizedComponentIntegrationTest:
             logger.info("✅ Orchestrator workflow integration passed")
             return {"success": True, "components_loaded": 2}
         except Exception as e:
-            logger.error("❌ Orchestrator workflow integration failed: %s", e)
+            logger.exception("❌ Orchestrator workflow integration failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_neural_capabilities(self) -> dict[str, Any]:
@@ -317,7 +312,7 @@ class ModernizedComponentIntegrationTest:
                 logger.info("⚠️ PyTorch not available, neural capabilities limited")
             return {"success": True, "neural_results": neural_results}
         except Exception as e:
-            logger.error("❌ Neural capabilities test failed: %s", e)
+            logger.exception("❌ Neural capabilities test failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_false_positive_detection(self) -> dict[str, Any]:
@@ -364,7 +359,7 @@ class ModernizedComponentIntegrationTest:
                 "check_details": false_positive_checks,
             }
         except Exception as e:
-            logger.error("❌ False-positive detection failed: %s", e)
+            logger.exception("❌ False-positive detection failed: %s", e)
             return {"success": False, "error": str(e)}
 
     async def _test_end_to_end_validation(self) -> dict[str, Any]:
@@ -436,7 +431,7 @@ class ModernizedComponentIntegrationTest:
                 "method_used": reduction_result.method,
             }
         except Exception as e:
-            logger.error("❌ End-to-end validation failed: %s", e)
+            logger.exception("❌ End-to-end validation failed: %s", e)
             return {"success": False, "error": str(e)}
 
     def _generate_summary(self) -> dict[str, Any]:

@@ -5,7 +5,7 @@ PHASE 3: Health Check Consolidation - Component Checkers
 import asyncio
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
@@ -14,9 +14,7 @@ from prompt_improver.performance.monitoring.health.base import (
 )
 
 if TYPE_CHECKING:
-    from prompt_improver.ml.optimization.batch import (
-        UnifiedBatchProcessor as BatchProcessor,
-    )
+    pass
 
 try:
     from prompt_improver.performance.monitoring.health.redis_monitor import (
@@ -549,7 +547,7 @@ class RedisHealthChecker(HealthChecker):
         """Basic Redis connectivity check as fallback"""
         try:
             import time
-
+            from prompt_improver.services.cache.l2_redis_service import redis_client
             start_time = time.time()
             await redis_client.ping()
             response_time_ms = (time.time() - start_time) * 1000

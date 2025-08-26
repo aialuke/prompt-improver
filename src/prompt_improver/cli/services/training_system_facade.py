@@ -1,4 +1,4 @@
-"""Training System Facade - Backwards Compatibility Layer
+"""Training System Facade - Backwards Compatibility Layer.
 
 Provides backwards compatibility interface while using decomposed training services internally.
 Maintains the original TrainingService interface for existing code during transition.
@@ -7,41 +7,41 @@ Maintains the original TrainingService interface for existing code during transi
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from rich.console import Console
 
+from prompt_improver.cli.services import create_training_system
 from prompt_improver.cli.services.training_protocols import (
     TrainingMetricsProtocol,
     TrainingOrchestratorProtocol,
     TrainingPersistenceProtocol,
     TrainingValidatorProtocol,
 )
-from prompt_improver.cli.services import create_training_system
 
 
 class TrainingServiceFacade:
     """Facade providing backwards compatibility for the original TrainingService interface.
-    
+
     Uses the decomposed training services internally while maintaining the original API.
-    This facilitates gradual migration from the monolithic TrainingService to the 
+    This facilitates gradual migration from the monolithic TrainingService to the
     decomposed architecture.
-    
+
     Note: This is a transitional facade. New code should use the decomposed services directly.
     """
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
         self.logger = logging.getLogger("apes.training_system_facade")
 
         # Create the decomposed training system internally
         self._orchestrator: TrainingOrchestratorProtocol = create_training_system(console)
-        
+
         # Extract individual services for direct access (if available via orchestrator)
         self._validator: TrainingValidatorProtocol = getattr(self._orchestrator, 'validator', None)
         self._metrics: TrainingMetricsProtocol = getattr(self._orchestrator, 'metrics', None)
         self._persistence: TrainingPersistenceProtocol = getattr(self._orchestrator, 'persistence', None)
-        
+
         # Create services directly if not available via orchestrator
         if not self._validator:
             from prompt_improver.cli.services import create_training_validator
@@ -58,9 +58,9 @@ class TrainingServiceFacade:
         self.training_data_dir.mkdir(parents=True, exist_ok=True)
 
     # Main orchestration methods - delegate to orchestrator
-    async def start_training_system(self) -> Dict[str, Any]:
+    async def start_training_system(self) -> dict[str, Any]:
         """Start training system components - delegates to orchestrator.
-        
+
         Returns:
             Training system startup results with performance metrics
         """
@@ -68,18 +68,18 @@ class TrainingServiceFacade:
 
     async def stop_training_system(self, graceful: bool = True) -> bool:
         """Stop training system gracefully - delegates to orchestrator.
-        
+
         Args:
             graceful: Whether to perform graceful shutdown
-            
+
         Returns:
             True if shutdown successful, False otherwise
         """
         return await self._orchestrator.stop_training_system(graceful)
 
-    async def get_training_status(self) -> Dict[str, Any]:
+    async def get_training_status(self) -> dict[str, Any]:
         """Get training system status - delegates to orchestrator.
-        
+
         Returns:
             Training system status and metrics
         """
@@ -88,18 +88,18 @@ class TrainingServiceFacade:
     # Validation methods - delegate to validator
     async def validate_ready_for_training(self) -> bool:
         """Validate that the system is ready for training.
-        
+
         Returns:
             True if ready for training, False otherwise
         """
         return await self._validator.validate_ready_for_training()
 
-    async def smart_initialize(self) -> Dict[str, Any]:
+    async def smart_initialize(self) -> dict[str, Any]:
         """Enhanced smart initialization with comprehensive system state detection.
-        
+
         Note: This method combines multiple validation and initialization steps
         from the decomposed services.
-        
+
         Returns:
             Detailed initialization results with system state analysis
         """
@@ -107,7 +107,7 @@ class TrainingServiceFacade:
             # Phase 1: System State Detection
             system_state = await self._validator.detect_system_state()
 
-            # Phase 2: Component Validation  
+            # Phase 2: Component Validation
             component_status = await self._validator.validate_components(
                 orchestrator=self._orchestrator.orchestrator,
                 analytics=getattr(self._orchestrator, '_analytics', None),
@@ -155,7 +155,7 @@ class TrainingServiceFacade:
             }
 
         except Exception as e:
-            self.logger.error(f"Smart initialization failed: {e}")
+            self.logger.exception(f"Smart initialization failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -164,12 +164,12 @@ class TrainingServiceFacade:
             }
 
     # Persistence methods - delegate to persistence service
-    async def create_training_session(self, training_config: Dict[str, Any]) -> str:
+    async def create_training_session(self, training_config: dict[str, Any]) -> str:
         """Create training session using persistence service.
-        
+
         Args:
             training_config: Training configuration
-            
+
         Returns:
             Created training session ID
         """
@@ -178,16 +178,16 @@ class TrainingServiceFacade:
     async def update_training_progress(
         self,
         iteration: int,
-        performance_metrics: Dict[str, float],
+        performance_metrics: dict[str, float],
         improvement_score: float = 0.0,
     ) -> bool:
         """Update training progress using persistence service.
-        
+
         Args:
             iteration: Current iteration
             performance_metrics: Performance metrics
             improvement_score: Improvement score
-            
+
         Returns:
             True if updated successfully
         """
@@ -195,43 +195,42 @@ class TrainingServiceFacade:
         if not session_id:
             self.logger.warning("No active training session for progress update")
             return False
-            
+
         return await self._persistence.update_training_progress(
             session_id, iteration, performance_metrics, improvement_score
         )
 
-    async def get_training_session_context(self) -> Optional[Dict[str, Any]]:
+    async def get_training_session_context(self) -> dict[str, Any] | None:
         """Get current training session context from persistence service.
-        
+
         Returns:
             Training session context if available
         """
         session_id = self._orchestrator.training_session_id
         if not session_id:
             return None
-            
+
         return await self._persistence.get_training_session_context(session_id)
 
     async def get_active_sessions(self) -> list:
         """Get all active training sessions.
-        
+
         Returns:
             List of active training session objects
         """
-        sessions = await self._persistence.get_active_sessions()
-        return sessions  # Return as list for backwards compatibility
+        return await self._persistence.get_active_sessions()
 
     # Metrics methods - delegate to metrics service
-    async def get_system_status(self) -> Dict[str, Any]:
+    async def get_system_status(self) -> dict[str, Any]:
         """Get comprehensive system status including health and active sessions.
-        
+
         Returns:
             System status dictionary
         """
         try:
             # Get orchestrator status
             training_status = await self._orchestrator.get_training_status()
-            
+
             # Get active sessions
             active_sessions = await self._persistence.get_active_sessions()
 
@@ -247,7 +246,7 @@ class TrainingServiceFacade:
             # Overall health
             healthy = (
                 training_status.get("training_system_status") == "running" and
-                len([s for s in active_sessions if s.get("status") in ["running", "paused"]]) >= 0
+                len([s for s in active_sessions if s.get("status") in {"running", "paused"}]) >= 0
             )
 
             return {
@@ -270,7 +269,7 @@ class TrainingServiceFacade:
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to get system status: {e}")
+            self.logger.exception(f"Failed to get system status: {e}")
             return {
                 "healthy": False,
                 "status": "error",
@@ -284,7 +283,7 @@ class TrainingServiceFacade:
         """Access to the orchestrator service."""
         return self._orchestrator
 
-    @property 
+    @property
     def validator(self) -> TrainingValidatorProtocol:
         """Access to the validator service."""
         return self._validator
@@ -306,8 +305,8 @@ class TrainingServiceFacade:
         return self._orchestrator.training_status
 
     @property
-    def training_session_id(self) -> Optional[str]:
-        """Get current training session ID."""  
+    def training_session_id(self) -> str | None:
+        """Get current training session ID."""
         return self._orchestrator.training_session_id
 
     # Signal handling methods - delegate to orchestrator

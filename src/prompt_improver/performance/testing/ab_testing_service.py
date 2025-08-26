@@ -1,4 +1,4 @@
-"""Modern A/B Testing Service (2025)
+"""Modern A/B Testing Service (2025).
 
 Comprehensive A/B testing framework incorporating 2025 best practices:
 - Hybrid Bayesian-Frequentist statistical approach
@@ -13,16 +13,19 @@ import logging
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel
-from scipy import stats
-from sklearn.utils import resample
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
+from prompt_improver.core.utils.lazy_ml_loader import (, get_numpy, get_scipy_stats, get_sklearn_utils
+    get_numpy,
+    get_scipy_stats,
+    get_sklearn_utils,
+)
 from prompt_improver.database.models import (
     ABExperiment,
     ABExperimentCreate,
@@ -34,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestStatus(Enum):
-    """Modern test execution status with 2025 enhancements"""
+    """Modern test execution status with 2025 enhancements."""
 
     pending = "pending"
     WARMING_UP = "warming_up"
@@ -46,7 +49,7 @@ class TestStatus(Enum):
 
 
 class StatisticalMethod(Enum):
-    """Statistical approaches for significance testing"""
+    """Statistical approaches for significance testing."""
 
     frequentist = "frequentist"
     bayesian = "bayesian"
@@ -54,7 +57,7 @@ class StatisticalMethod(Enum):
 
 
 class StoppingReason(Enum):
-    """Reasons for early stopping"""
+    """Reasons for early stopping."""
 
     STATISTICAL_SIGNIFICANCE = "statistical_significance"
     futility = "futility"
@@ -64,7 +67,7 @@ class StoppingReason(Enum):
 
 
 class ModernABConfig(BaseModel):
-    """2025 A/B Testing Configuration with advanced statistical options"""
+    """2025 A/B Testing Configuration with advanced statistical options."""
 
     confidence_level: float = Field(default=0.95)
     statistical_power: float = Field(default=0.8)
@@ -82,7 +85,7 @@ class ModernABConfig(BaseModel):
 
 
 class StatisticalResult(BaseModel):
-    """Comprehensive statistical analysis results"""
+    """Comprehensive statistical analysis results."""
 
     control_conversions: int
     control_visitors: int
@@ -109,7 +112,7 @@ class StatisticalResult(BaseModel):
 
 
 class ExperimentMetrics(BaseModel):
-    """Advanced experiment tracking metrics"""
+    """Advanced experiment tracking metrics."""
 
     start_time: datetime
     current_time: datetime
@@ -125,7 +128,7 @@ class ExperimentMetrics(BaseModel):
 
 
 class ModernABTestingService:
-    """Advanced A/B Testing Service incorporating 2025 best practices
+    """Advanced A/B Testing Service incorporating 2025 best practices.
 
     features:
     - Hybrid Bayesian-Frequentist statistics for optimal accuracy
@@ -138,7 +141,7 @@ class ModernABTestingService:
     Note: For adaptive allocation, integrate with existing MultiarmedBanditFramework
     """
 
-    def __init__(self, config: ModernABConfig | None = None):
+    def __init__(self, config: ModernABConfig | None = None) -> None:
         self.config = config or ModernABConfig()
         self._experiment_cache: dict[str, Any] = {}
         logger.info(
@@ -156,7 +159,7 @@ class ModernABTestingService:
         success_metric: str = "conversion_rate",
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """Create a new A/B experiment with modern statistical framework
+        """Create a new A/B experiment with modern statistical framework.
 
         Args:
             db_session: Database session
@@ -192,7 +195,7 @@ class ModernABTestingService:
             db_session.add(db_experiment)
             await db_session.commit()
         except Exception as e:
-            logger.error(f"Database error creating experiment {experiment_id}: {e}")
+            logger.exception(f"Database error creating experiment {experiment_id}: {e}")
             raise ValueError(f"Failed to create experiment: {e}")
         logger.info(
             f"Created experiment {experiment_id} with required sample size {required_sample_size}"
@@ -205,7 +208,7 @@ class ModernABTestingService:
         experiment_id: str,
         current_time: datetime | None = None,
     ) -> StatisticalResult:
-        """Perform comprehensive statistical analysis using 2025 methods
+        """Perform comprehensive statistical analysis using 2025 methods.
 
         Args:
             db_session: Database session
@@ -279,7 +282,7 @@ class ModernABTestingService:
         treatment_conversions: int,
         treatment_visitors: int,
     ) -> StatisticalResult:
-        """2025 Hybrid Bayesian-Frequentist approach for optimal accuracy"""
+        """2025 Hybrid Bayesian-Frequentist approach for optimal accuracy."""
         freq_result = await self._frequentist_analysis(
             control_conversions,
             control_visitors,
@@ -327,13 +330,13 @@ class ModernABTestingService:
         treatment_conversions: int,
         treatment_visitors: int,
     ) -> StatisticalResult:
-        """Enhanced frequentist analysis with 2025 improvements"""
+        """Enhanced frequentist analysis with 2025 improvements."""
         control_rate = control_conversions / control_visitors
         treatment_rate = treatment_conversions / treatment_visitors
         pooled_rate = (control_conversions + treatment_conversions) / (
             control_visitors + treatment_visitors
         )
-        pooled_se = np.sqrt(
+        pooled_se = get_numpy().sqrt(
             pooled_rate
             * (1 - pooled_rate)
             * (1 / control_visitors + 1 / treatment_visitors)
@@ -343,7 +346,7 @@ class ModernABTestingService:
             p_value = 1.0
         else:
             z_score = (treatment_rate - control_rate) / pooled_se
-            p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
+            p_value = 2 * (1 - get_scipy_stats().norm.cdf(abs(z_score)))
         ci_lower, ci_upper = self._wilson_confidence_interval(
             treatment_rate - control_rate,
             control_visitors + treatment_visitors,
@@ -394,21 +397,21 @@ class ModernABTestingService:
         treatment_conversions: int,
         treatment_visitors: int,
     ) -> StatisticalResult:
-        """Bayesian analysis with Beta-Binomial conjugate priors"""
+        """Bayesian analysis with Beta-Binomial conjugate priors."""
         prior_alpha, prior_beta = (1, 1)
         control_alpha = prior_alpha + control_conversions
         control_beta = prior_beta + control_visitors - control_conversions
         treatment_alpha = prior_alpha + treatment_conversions
         treatment_beta = prior_beta + treatment_visitors - treatment_conversions
         n_samples = 10000
-        rng = np.random.default_rng()
+        rng = get_numpy().random.default_rng()
         control_samples = rng.beta(control_alpha, control_beta, n_samples)
         treatment_samples = rng.beta(treatment_alpha, treatment_beta, n_samples)
-        bayesian_probability = np.mean(treatment_samples > control_samples)
+        bayesian_probability = get_numpy().mean(treatment_samples > control_samples)
         diff_samples = treatment_samples - control_samples
         credible_interval = (
-            np.percentile(diff_samples, 2.5),
-            np.percentile(diff_samples, 97.5),
+            get_numpy().percentile(diff_samples, 2.5),
+            get_numpy().percentile(diff_samples, 97.5),
         )
         control_rate = control_conversions / control_visitors
         treatment_rate = treatment_conversions / treatment_visitors
@@ -440,7 +443,7 @@ class ModernABTestingService:
     async def _evaluate_early_stopping(
         self, result: StatisticalResult, experiment_id: str
     ) -> StatisticalResult:
-        """Evaluate early stopping criteria using 2025 methods"""
+        """Evaluate early stopping criteria using 2025 methods."""
         if self.config.enable_sequential_testing:
             alpha_boundary = self._calculate_alpha_boundary(experiment_id)
             if result.p_value <= alpha_boundary:
@@ -462,21 +465,21 @@ class ModernABTestingService:
         power: float,
         alpha: float,
     ) -> int:
-        """Calculate required sample size using modern methods"""
+        """Calculate required sample size using modern methods."""
         treatment_rate = baseline_rate * (1 + minimum_detectable_effect)
         pooled_rate = (baseline_rate + treatment_rate) / 2
         pooled_variance = pooled_rate * (1 - pooled_rate)
-        z_alpha = stats.norm.ppf(1 - alpha / 2)
-        z_beta = stats.norm.ppf(power)
+        z_alpha = get_scipy_stats().norm.ppf(1 - alpha / 2)
+        z_beta = get_scipy_stats().norm.ppf(power)
         effect_size = abs(treatment_rate - baseline_rate)
         n_per_group = 2 * pooled_variance * (z_alpha + z_beta) ** 2 / effect_size**2
-        return max(int(np.ceil(n_per_group)), self.config.minimum_sample_size)
+        return max(int(get_numpy().ceil(n_per_group)), self.config.minimum_sample_size)
 
     def _wilson_confidence_interval(
         self, difference: float, n: int, confidence_level: float
     ) -> tuple[float, float]:
-        """Wilson score confidence interval (more robust than Wald)"""
-        z = stats.norm.ppf(1 - (1 - confidence_level) / 2)
+        """Wilson score confidence interval (more robust than Wald)."""
+        z = get_scipy_stats().norm.ppf(1 - (1 - confidence_level) / 2)
         se = np.sqrt(difference * (1 - difference) / n) if n > 0 else 0
         margin = z * se
         return (difference - margin, difference + margin)
@@ -489,7 +492,7 @@ class ModernABTestingService:
         treatment_visitors: int,
         n_bootstrap: int = 1000,
     ) -> tuple[float, float]:
-        """Bootstrap confidence interval for robust estimation"""
+        """Bootstrap confidence interval for robust estimation."""
         control_data = [1] * control_conversions + [0] * (
             control_visitors - control_conversions
         )
@@ -498,10 +501,10 @@ class ModernABTestingService:
         )
         bootstrap_diffs = []
         for _ in range(n_bootstrap):
-            control_sample = resample(
+            control_sample = get_sklearn_utils().resample(
                 control_data, replace=True, n_samples=len(control_data)
             )
-            treatment_sample = resample(
+            treatment_sample = get_sklearn_utils().resample(
                 treatment_data, replace=True, n_samples=len(treatment_data)
             )
             control_rate_bs = np.mean(control_sample)
@@ -518,7 +521,7 @@ class ModernABTestingService:
         control_n: int,
         treatment_n: int,
     ) -> float:
-        """Calculate Cohen's d effect size for proportions"""
+        """Calculate Cohen's d effect size for proportions."""
         pooled_rate = (control_rate * control_n + treatment_rate * treatment_n) / (
             control_n + treatment_n
         )
@@ -528,11 +531,11 @@ class ModernABTestingService:
         return (treatment_rate - control_rate) / np.sqrt(pooled_variance)
 
     def _calculate_alpha_boundary(self, experiment_id: str) -> float:
-        """Calculate alpha spending boundary for sequential testing"""
+        """Calculate alpha spending boundary for sequential testing."""
         return 0.005
 
     def _check_futility(self, result: StatisticalResult) -> bool:
-        """Check if experiment is unlikely to reach significance"""
+        """Check if experiment is unlikely to reach significance."""
         return (
             result.confidence_interval[1] < self.config.practical_significance_threshold
             and result.confidence_interval[0]
@@ -540,7 +543,7 @@ class ModernABTestingService:
         )
 
     def _check_practical_equivalence(self, result: StatisticalResult) -> bool:
-        """Check if variants are practically equivalent"""
+        """Check if variants are practically equivalent."""
         equivalence_bound = self.config.practical_significance_threshold / 2
         return (
             result.confidence_interval[0] > -equivalence_bound
@@ -550,7 +553,7 @@ class ModernABTestingService:
     async def _get_experiment_data(
         self, db_session: AsyncSession, experiment_id: str
     ) -> tuple[list[Any], list[Any]]:
-        """Get experiment data from database"""
+        """Get experiment data from database."""
         try:
             stmt = select(ABExperiment).where(
                 ABExperiment.experiment_id == experiment_id
@@ -619,7 +622,7 @@ class ModernABTestingService:
                     treatment_data.append(data_point)
             return (control_data, treatment_data)
         except Exception as e:
-            logger.error(f"Error fetching experiment data for {experiment_id}: {e}")
+            logger.exception(f"Error fetching experiment data for {experiment_id}: {e}")
             return ([], [])
 
     async def _update_experiment_metrics(
@@ -629,12 +632,12 @@ class ModernABTestingService:
         result: StatisticalResult,
         current_time: datetime,
     ) -> None:
-        """Update experiment with latest metrics"""
+        """Update experiment with latest metrics."""
 
     async def check_early_stopping(
         self, experiment_id: str, look_number: int, db_session: AsyncSession
     ) -> dict[str, Any]:
-        """Check if experiment should be stopped early based on statistical criteria
+        """Check if experiment should be stopped early based on statistical criteria.
 
         Args:
             experiment_id: Experiment identifier
@@ -673,7 +676,7 @@ class ModernABTestingService:
                 "effect_size": result.relative_lift,
             }
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Error in early stopping check for experiment {experiment_id}: {e}"
             )
             return {
@@ -686,7 +689,7 @@ class ModernABTestingService:
     async def stop_experiment(
         self, experiment_id: str, reason: str, db_session: AsyncSession
     ) -> bool:
-        """Stop an experiment with the given reason
+        """Stop an experiment with the given reason.
 
         Args:
             experiment_id: Experiment identifier
@@ -714,12 +717,12 @@ class ModernABTestingService:
             logger.info(f"Stopped experiment {experiment_id} with reason: {reason}")
             return True
         except Exception as e:
-            logger.error(f"Error stopping experiment {experiment_id}: {e}")
+            logger.exception(f"Error stopping experiment {experiment_id}: {e}")
             await db_session.rollback()
             return False
 
     def _calculate_current_statistical_power(self, result: StatisticalResult) -> float:
-        """Calculate current statistical power based on observed effect"""
+        """Calculate current statistical power based on observed effect."""
         if result.control_visitors == 0 or result.treatment_visitors == 0:
             return 0.0
         observed_effect = abs(result.relative_lift)
@@ -733,13 +736,13 @@ class ModernABTestingService:
         return max(0.1, min(0.95, sample_size / 200.0))
 
     def _calculate_sequential_boundary(self, look_number: int) -> float:
-        """Calculate sequential testing boundary for given look"""
+        """Calculate sequential testing boundary for given look."""
         base_alpha = 0.05
         boundary_factor = np.sqrt(4.0 / look_number)
         return base_alpha / boundary_factor
 
     async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Orchestrator-compatible interface for A/B testing (2025 pattern)
+        """Orchestrator-compatible interface for A/B testing (2025 pattern).
 
         Args:
             config: Configuration dictionary with analysis parameters
@@ -821,7 +824,7 @@ class ModernABTestingService:
                 },
             }
         except Exception as e:
-            logger.error(f"Orchestrated A/B testing analysis failed: {e}")
+            logger.exception(f"Orchestrated A/B testing analysis failed: {e}")
             return {
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "ab_testing_summary": {}},
@@ -836,7 +839,7 @@ class ModernABTestingService:
     async def _generate_synthetic_experiment_data(
         self, experiment_name: str, config: dict[str, Any]
     ) -> dict[str, Any]:
-        """Generate synthetic experiment data for orchestrator testing"""
+        """Generate synthetic experiment data for orchestrator testing."""
         sample_size_per_variant = config.get("sample_size_per_variant", 1000)
         baseline_conversion_rate = config.get("baseline_conversion_rate", 0.15)
         effect_size = config.get("effect_size", 0.1)
@@ -885,7 +888,7 @@ class ModernABTestingService:
         treatment_conversions: int,
         treatment_visitors: int,
     ) -> StatisticalResult:
-        """Perform statistical analysis on synthetic data"""
+        """Perform statistical analysis on synthetic data."""
         if self.config.statistical_method == StatisticalMethod.hybrid:
             return await self._hybrid_statistical_analysis(
                 control_conversions,
@@ -908,7 +911,7 @@ class ModernABTestingService:
         )
 
     async def _collect_comprehensive_ab_testing_data(self) -> dict[str, Any]:
-        """Collect comprehensive A/B testing framework data"""
+        """Collect comprehensive A/B testing framework data."""
         return {
             "configuration": {
                 "confidence_level": self.config.confidence_level,
@@ -953,7 +956,7 @@ class ModernABTestingService:
 def create_ab_testing_service(
     config: ModernABConfig | None = None,
 ) -> ModernABTestingService:
-    """Create an A/B testing service with optimal 2025 configuration"""
+    """Create an A/B testing service with optimal 2025 configuration."""
     if config is None:
         config = ModernABConfig(
             confidence_level=0.95,

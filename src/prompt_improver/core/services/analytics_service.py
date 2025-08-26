@@ -1,4 +1,4 @@
-"""Analytics Service - Analytics and metrics operations
+"""Analytics Service - Analytics and metrics operations.
 
 Handles all analytics and metrics operations including:
 - Prompt analysis and classification
@@ -10,17 +10,18 @@ Handles all analytics and metrics operations including:
 Follows single responsibility principle for analytics concerns.
 """
 
-import logging
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from prompt_improver.core.common import get_logger
+
+logger = get_logger(__name__)
 
 
 class AnalyticsService:
-    """Service focused on analytics and metrics operations"""
+    """Service focused on analytics and metrics operations."""
 
     async def analyze_prompt(self, prompt: str) -> dict[str, Any]:
-        """Analyze prompt characteristics for rule selection"""
+        """Analyze prompt characteristics for rule selection."""
         return {
             "type": self._classify_prompt_type(prompt),
             "length": len(prompt),
@@ -42,7 +43,7 @@ class AnalyticsService:
         }
 
     def _classify_prompt_type(self, prompt: str) -> str:
-        """Classify the type of prompt"""
+        """Classify the type of prompt."""
         prompt_lower = prompt.lower()
         if any(word in prompt_lower for word in ["explain", "describe", "what is"]):
             return "explanation"
@@ -55,7 +56,7 @@ class AnalyticsService:
         return "general"
 
     def _calculate_complexity(self, prompt: str) -> float:
-        """Calculate prompt complexity score (0-1)"""
+        """Calculate prompt complexity score (0-1)."""
         words = prompt.split()
         if not words:
             return 0.0
@@ -73,7 +74,7 @@ class AnalyticsService:
         return (length_score + vocab_score + sentence_complexity) / 3
 
     def _assess_clarity(self, prompt: str) -> float:
-        """Assess prompt clarity (0-1, higher is clearer)"""
+        """Assess prompt clarity (0-1, higher is clearer)."""
         clarity_score = 1.0
         word_count = len(prompt.split())
 
@@ -97,7 +98,7 @@ class AnalyticsService:
         return max(0.0, min(1.0, clarity_score))
 
     def _assess_specificity(self, prompt: str) -> float:
-        """Assess prompt specificity (0-1, higher is more specific)"""
+        """Assess prompt specificity (0-1, higher is more specific)."""
         specificity_score = 0.5
 
         specific_indicators = ["when", "where", "how", "why", "which", "what kind"]
@@ -124,7 +125,7 @@ class AnalyticsService:
         return max(0.0, min(1.0, specificity_score))
 
     def _detect_domain(self, prompt: str) -> str:
-        """Detect the domain/category of the prompt"""
+        """Detect the domain/category of the prompt."""
         prompt_lower = prompt.lower()
 
         # Technical domain indicators
@@ -204,7 +205,7 @@ class AnalyticsService:
         return "general"
 
     def _calculate_readability(self, prompt: str) -> float:
-        """Calculate readability score (0-100, higher is more readable)"""
+        """Calculate readability score (0-100, higher is more readable)."""
         words = prompt.split()
         if not words:
             return 0.0
@@ -222,7 +223,7 @@ class AnalyticsService:
         return min(100, readability)
 
     def _detect_sentiment(self, prompt: str) -> str:
-        """Detect sentiment of the prompt"""
+        """Detect sentiment of the prompt."""
         prompt_lower = prompt.lower()
 
         positive_words = [
@@ -257,13 +258,12 @@ class AnalyticsService:
 
         if positive_count > negative_count:
             return "positive"
-        elif negative_count > positive_count:
+        if negative_count > positive_count:
             return "negative"
-        else:
-            return "neutral"
+        return "neutral"
 
     def calculate_metrics(self, prompt: str) -> dict[str, float]:
-        """Calculate metrics for a prompt"""
+        """Calculate metrics for a prompt."""
         return {
             "clarity": self._assess_clarity(prompt),
             "specificity": self._assess_specificity(prompt),
@@ -272,12 +272,12 @@ class AnalyticsService:
         }
 
     def _assess_completeness(self, prompt: str) -> float:
-        """Assess if prompt provides complete information"""
+        """Assess if prompt provides complete information."""
         word_count = len(prompt.split())
         base_score = min(word_count / 30, 1.0)
 
         # Boost for complete sentences
-        if prompt.endswith(".") or prompt.endswith("!") or prompt.endswith("?"):
+        if prompt.endswith((".", "!", "?")):
             base_score += 0.1
 
         # Boost for context provision
@@ -287,7 +287,7 @@ class AnalyticsService:
         return min(1.0, base_score)
 
     def _assess_structure(self, prompt: str) -> float:
-        """Assess prompt structure quality"""
+        """Assess prompt structure quality."""
         structure_score = 0.5
 
         if "." in prompt:
@@ -308,7 +308,7 @@ class AnalyticsService:
     def calculate_improvement_score(
         self, before: dict[str, float], after: dict[str, float]
     ) -> float:
-        """Calculate improvement score based on metrics"""
+        """Calculate improvement score based on metrics."""
         weights = {
             "clarity": 0.3,
             "specificity": 0.3,
@@ -333,7 +333,7 @@ class AnalyticsService:
     def generate_improvement_summary(
         self, applied_rules: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """Generate a summary of improvements made"""
+        """Generate a summary of improvements made."""
         if not applied_rules:
             return {
                 "total_rules_applied": 0,
@@ -381,22 +381,21 @@ class AnalyticsService:
     def _generate_recommendation(
         self, applied_rules: list[dict[str, Any]], avg_confidence: float
     ) -> str:
-        """Generate a recommendation based on applied rules and confidence"""
+        """Generate a recommendation based on applied rules and confidence."""
         if avg_confidence >= 0.8:
             return (
                 "High confidence improvements applied. Results should be significant."
             )
-        elif avg_confidence >= 0.6:
+        if avg_confidence >= 0.6:
             return "Moderate improvements applied. Consider additional refinement."
-        elif avg_confidence >= 0.4:
+        if avg_confidence >= 0.4:
             return "Basic improvements applied. Manual review recommended."
-        else:
-            return "Low confidence improvements. Manual revision strongly recommended."
+        return "Low confidence improvements. Manual revision strongly recommended."
 
     def calculate_overall_confidence(
         self, applied_rules: list[dict[str, Any]]
     ) -> float:
-        """Calculate overall confidence score"""
+        """Calculate overall confidence score."""
         if not applied_rules:
             return 0.0
 
@@ -405,16 +404,15 @@ class AnalyticsService:
         # Weight recent rules more heavily if there are many
         if len(confidences) > 3:
             weights = [1.0 + (i * 0.1) for i in range(len(confidences))]
-            weighted_sum = sum(c * w for c, w in zip(confidences, weights))
+            weighted_sum = sum(c * w for c, w in zip(confidences, weights, strict=False))
             weight_sum = sum(weights)
             return weighted_sum / weight_sum
-        else:
-            return sum(confidences) / len(confidences)
+        return sum(confidences) / len(confidences)
 
     def prepare_bandit_context(
         self, prompt_characteristics: dict[str, Any]
     ) -> dict[str, Any]:
-        """Prepare context for contextual bandit from prompt characteristics"""
+        """Prepare context for contextual bandit from prompt characteristics."""
         context = {}
 
         if "length" in prompt_characteristics:
@@ -476,7 +474,7 @@ class AnalyticsService:
     def calculate_rule_effectiveness_metrics(
         self, performance_data: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """Calculate aggregate metrics for rule effectiveness analysis"""
+        """Calculate aggregate metrics for rule effectiveness analysis."""
         if not performance_data:
             return {
                 "average_improvement_score": 0.0,
@@ -510,7 +508,7 @@ class AnalyticsService:
     def _calculate_rule_breakdown(
         self, performance_data: list[dict[str, Any]]
     ) -> dict[str, dict[str, Any]]:
-        """Calculate metrics breakdown by individual rules"""
+        """Calculate metrics breakdown by individual rules."""
         rule_stats = {}
 
         for data in performance_data:

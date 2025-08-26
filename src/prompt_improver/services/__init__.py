@@ -7,14 +7,18 @@ This package contains the decomposed services that replace god objects:
 - security: SecurityServiceFacade and component services (planned)
 """
 
-from .prompt.facade import PromptServiceFacade
-from .prompt.prompt_analysis_service import PromptAnalysisService
-from .prompt.rule_application_service import RuleApplicationService
-from .prompt.validation_service import ValidationService
+from prompt_improver.services.prompt.facade import PromptServiceFacade
+from prompt_improver.services.prompt.prompt_analysis_service import (
+    PromptAnalysisService,
+)
+from prompt_improver.services.prompt.rule_application_service import (
+    RuleApplicationService,
+)
+from prompt_improver.services.prompt.validation_service import ValidationService
 
 __all__ = [
-    "PromptServiceFacade",
     "PromptAnalysisService",
+    "PromptServiceFacade",
     "RuleApplicationService",
     "ValidationService",
 ]

@@ -5,15 +5,14 @@ database implementation details. Uses domain models instead of database models.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
-from uuid import UUID
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
 
 class SessionData(BaseModel):
     """Domain model for improvement session data."""
-    
+
     session_id: str
     original_prompt: str
     final_prompt: str
@@ -26,7 +25,7 @@ class SessionData(BaseModel):
 
 class RulePerformanceData(BaseModel):
     """Domain model for rule performance tracking."""
-    
+
     rule_id: str
     session_id: str
     improvement_score: float
@@ -40,7 +39,7 @@ class RulePerformanceData(BaseModel):
 
 class FeedbackData(BaseModel):
     """Domain model for user feedback."""
-    
+
     session_id: str
     user_id: str | None = None
     rating: int  # 1-5 scale
@@ -53,7 +52,7 @@ class FeedbackData(BaseModel):
 
 class ModelPerformanceData(BaseModel):
     """Domain model for ML model performance metrics."""
-    
+
     model_id: str
     model_type: str
     accuracy: float
@@ -69,7 +68,7 @@ class ModelPerformanceData(BaseModel):
 
 class ExperimentData(BaseModel):
     """Domain model for A/B experiment data."""
-    
+
     experiment_id: str
     experiment_name: str
     description: str | None = None
@@ -96,7 +95,7 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def get_recent_sessions(
-        self, 
+        self,
         limit: int = 100,
         user_context_filter: dict[str, Any] | None = None
     ) -> list[SessionData]:
@@ -104,8 +103,8 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def update_session(
-        self, 
-        session_id: str, 
+        self,
+        session_id: str,
         update_data: dict[str, Any]
     ) -> bool:
         """Update session data."""
@@ -117,7 +116,7 @@ class PersistenceRepositoryProtocol(Protocol):
 
     # Rule Performance Tracking
     async def store_rule_performance(
-        self, 
+        self,
         performance_data: RulePerformanceData
     ) -> bool:
         """Store rule performance metrics."""
@@ -134,7 +133,7 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def get_performance_by_session(
-        self, 
+        self,
         session_id: str
     ) -> list[RulePerformanceData]:
         """Get all rule performances for a session."""
@@ -146,7 +145,7 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def get_feedback_by_session(
-        self, 
+        self,
         session_id: str
     ) -> list[FeedbackData]:
         """Get feedback for a session."""
@@ -161,15 +160,15 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def mark_feedback_processed(
-        self, 
+        self,
         feedback_ids: list[str]
     ) -> int:
         """Mark feedback as processed, return count updated."""
         ...
 
-    # Model Performance Tracking  
+    # Model Performance Tracking
     async def store_model_performance(
-        self, 
+        self,
         performance_data: ModelPerformanceData
     ) -> bool:
         """Store ML model performance metrics."""
@@ -184,7 +183,7 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def get_latest_model_performance(
-        self, 
+        self,
         model_type: str
     ) -> ModelPerformanceData | None:
         """Get latest performance for model type."""
@@ -212,7 +211,7 @@ class PersistenceRepositoryProtocol(Protocol):
         ...
 
     async def complete_experiment(
-        self, 
+        self,
         experiment_id: str,
         final_metrics: dict[str, Any]
     ) -> bool:

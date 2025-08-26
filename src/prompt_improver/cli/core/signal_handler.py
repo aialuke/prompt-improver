@@ -3,14 +3,15 @@ Implements 2025 best practices for graceful shutdown with asyncio integration.
 """
 
 import asyncio
+import contextlib
 import logging
 import signal
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from rich.console import Console
 
@@ -86,7 +87,7 @@ class AsyncSignalHandler:
     - Signal-triggered operations (checkpoint, status, config reload)
     """
 
-    def __init__(self, console: Console | None = None):
+    def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console()
         self.logger = logging.getLogger(__name__)
         self.shutdown_event = asyncio.Event()
@@ -128,10 +129,8 @@ class AsyncSignalHandler:
                 signal.SIGUSR2,
                 signal.SIGHUP,
             ]:
-                try:
+                with contextlib.suppress(OSError, ValueError):
                     self.original_handlers[sig] = signal.signal(sig, signal.SIG_DFL)
-                except (OSError, ValueError):
-                    pass
             self.loop.add_signal_handler(
                 signal.SIGINT, self._handle_signal, signal.SIGINT, "SIGINT"
             )
@@ -257,7 +256,7 @@ class AsyncSignalHandler:
                     )
                     self.execute_operation_sync(operation, signal_context)
             except Exception as e:
-                self.logger.error(f"Error scheduling {operation.value} operation: {e}")
+                self.logger.exception(f"Error scheduling {operation.value} operation: {e}")
                 self.console.print(
                     f"❌ Failed to execute {operation.value}: {e}", style="red"
                 )
@@ -387,7 +386,7 @@ class AsyncSignalHandler:
                     "priority": priority,
                 }
             except Exception as e:
-                self.logger.error(f"Error in signal chain handler {i + 1}: {e}")
+                self.logger.exception(f"Error in signal chain handler {i + 1}: {e}")
                 results[f"handler_{i}"] = {
                     "status": "error",
                     "error": str(e),
@@ -432,7 +431,7 @@ class AsyncSignalHandler:
             )
             self.logger.info("Default emergency operation handlers registered")
         except Exception as e:
-            self.logger.error(f"Failed to register emergency handlers: {e}")
+            self.logger.exception(f"Failed to register emergency handlers: {e}")
 
     async def _default_checkpoint_handler(self, _context) -> dict[str, Any]:
         """Default checkpoint handler when emergency operations not available."""
@@ -480,7 +479,7 @@ class AsyncSignalHandler:
             self.console.print(message, style="green")
             return result
         except Exception as e:
-            self.logger.error(f"Error executing {operation.value} operation: {e}")
+            self.logger.exception(f"Error executing {operation.value} operation: {e}")
             self.console.print(f"❌ {operation.value} failed: {e}", style="red")
             raise
 
@@ -508,7 +507,7 @@ class AsyncSignalHandler:
             message = success_messages.get(operation, f"✅ {operation.value} completed")
             self.console.print(message, style="green")
         except Exception as e:
-            self.logger.error(f"Error executing {operation.value} operation: {e}")
+            self.logger.exception(f"Error executing {operation.value} operation: {e}")
             self.console.print(f"❌ {operation.value} failed: {e}", style="red")
 
     def cleanup_signal_handlers(self) -> None:
@@ -535,7 +534,7 @@ class AsyncSignalHandler:
                     self._restore_original_handlers()
                 self.logger.debug(f"Completed cleanup step: {cleanup_step}")
             except Exception as e:
-                self.logger.error(f"Error in cleanup step {cleanup_step}: {e}")
+                self.logger.exception(f"Error in cleanup step {cleanup_step}: {e}")
         self.logger.info("Signal handler cleanup completed")
 
     def _cleanup_coredis_connections(self) -> None:
@@ -648,7 +647,7 @@ class AsyncSignalHandler:
             )
             return await self._execute_force_shutdown()
         except Exception as e:
-            self.logger.error(f"Error during graceful shutdown: {e}")
+            self.logger.exception(f"Error during graceful shutdown: {e}")
             self.console.print(f"❌ Shutdown error: {e}", style="red")
             if self.shutdown_context and self.shutdown_context.force_after_timeout:
                 return await self._execute_force_shutdown()
@@ -685,7 +684,7 @@ class AsyncSignalHandler:
                 results[name] = {"status": "timeout", "timeout": timeout}
                 self.console.print(f"   ⏰ {name} (timed out)", style="dim yellow")
             except Exception as e:
-                self.logger.error(f"Error in shutdown handler {name}: {e}")
+                self.logger.exception(f"Error in shutdown handler {name}: {e}")
                 results[name] = {"status": "error", "error": str(e)}
                 self.console.print(f"   ❌ {name} (error)", style="dim red")
         return results
@@ -710,7 +709,7 @@ class AsyncSignalHandler:
                 results[name] = {"status": "timeout"}
                 self.console.print(f"   ⏰ {name} (timed out)", style="dim yellow")
             except Exception as e:
-                self.logger.error(f"Error in cleanup handler {name}: {e}")
+                self.logger.exception(f"Error in cleanup handler {name}: {e}")
                 results[name] = {"status": "error", "error": str(e)}
                 self.console.print(f"   ❌ {name} (error)", style="dim red")
         return results

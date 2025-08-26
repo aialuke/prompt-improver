@@ -9,7 +9,9 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
+    from prompt_improver.shared.interfaces.protocols.mcp import (
+        MCPServerProtocol as APESMCPServer,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,7 @@ def setup_transport_handlers(server: "APESMCPServer") -> None:
 
 
 def run_streamable_http(
-    server: "APESMCPServer", host: str = None, port: int = None
+    server: "APESMCPServer", host: str | None = None, port: int | None = None
 ) -> None:
     """Run server with Streamable HTTP transport (2025-03-26 spec).
 
@@ -64,7 +66,7 @@ def run_streamable_http(
         logger.info("Falling back to standard stdio transport")
         server.mcp.run()
     except Exception as e:
-        logger.error(f"Failed to start with HTTP transport: {e}")
+        logger.exception(f"Failed to start with HTTP transport: {e}")
         raise
 
 
@@ -82,7 +84,7 @@ def get_transport_config() -> dict[str, str | int | None]:
     }
 
 
-def validate_http_config(host: str = None, port: int = None) -> tuple[bool, str]:
+def validate_http_config(host: str | None = None, port: int | None = None) -> tuple[bool, str]:
     """Validate HTTP transport configuration.
 
     Args:
@@ -117,7 +119,7 @@ def select_transport_mode(args) -> str:
     if args.http:
         return "http"
 
-    if os.getenv("MCP_FORCE_HTTP", "").lower() in ("1", "true", "yes"):
+    if os.getenv("MCP_FORCE_HTTP", "").lower() in {"1", "true", "yes"}:
         return "http"
 
     return "stdio"

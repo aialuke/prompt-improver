@@ -1,11 +1,10 @@
-"""SLI Calculator Components for SLO/SLA Monitoring
+"""SLI Calculator Components for SLO/SLA Monitoring.
 ===============================================
 
 Implements Service Level Indicator (SLI) calculations with multi-window analysis,
 percentile computations, and availability tracking following Google SRE practices.
 """
 
-import asyncio
 import logging
 import math
 import statistics
@@ -13,12 +12,10 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from prompt_improver.database import (
-    ManagerMode,
     create_security_context,
-    get_database_services,
 )
 from prompt_improver.monitoring.slo.framework import SLOTarget, SLOTimeWindow, SLOType
 
@@ -27,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SLIMeasurement:
-    """Individual SLI measurement point"""
+    """Individual SLI measurement point."""
 
     timestamp: float
     value: float
@@ -38,7 +35,7 @@ class SLIMeasurement:
 
 @dataclass
 class SLIResult:
-    """Result of SLI calculation for a time window"""
+    """Result of SLI calculation for a time window."""
 
     slo_target: SLOTarget
     time_window: SLOTimeWindow
@@ -55,33 +52,33 @@ class SLIResult:
 
     @property
     def is_compliant(self) -> bool:
-        """Check if SLI meets the SLO target"""
-        if self.slo_target.slo_type in [
+        """Check if SLI meets the SLO target."""
+        if self.slo_target.slo_type in {
             SLOType.AVAILABILITY,
             SLOType.THROUGHPUT,
             SLOType.QUALITY,
-        ]:
+        }:
             return self.current_value >= self.target_value
         return self.current_value <= self.target_value
 
     @property
     def compliance_percentage(self) -> float:
-        """Get compliance as percentage (0-100)"""
-        if self.slo_target.slo_type in [
+        """Get compliance as percentage (0-100)."""
+        if self.slo_target.slo_type in {
             SLOType.AVAILABILITY,
             SLOType.THROUGHPUT,
             SLOType.QUALITY,
-        ]:
+        }:
             return min(100.0, self.current_value / self.target_value * 100.0)
         return max(0.0, 100.0 - self.current_value / self.target_value * 100.0)
 
 
 class SLICalculator:
-    """Base SLI calculator for single time window calculations"""
+    """Base SLI calculator for single time window calculations."""
 
     def __init__(
         self, slo_target: SLOTarget, max_measurements: int = 10000, unified_manager=None
-    ):
+    ) -> None:
         self.slo_target = slo_target
         self.max_measurements = max_measurements
         if unified_manager:
@@ -94,7 +91,7 @@ class SLICalculator:
         self._cache_ttl = 60
 
     async def _ensure_security_context(self):
-        """Ensure security context exists for Redis operations"""
+        """Ensure security context exists for Redis operations."""
         if self._security_context is None:
             self._security_context = await create_security_context(
                 agent_id=f"slo_calculator_{self.slo_target.service_name}_{self.slo_target.name}",
@@ -111,7 +108,7 @@ class SLICalculator:
         labels: dict[str, str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Add a new SLI measurement"""
+        """Add a new SLI measurement."""
         measurement = SLIMeasurement(
             timestamp=timestamp or time.time(),
             value=value,
@@ -142,7 +139,7 @@ class SLICalculator:
         )
 
     async def _store_measurement_unified(self, measurement: SLIMeasurement) -> None:
-        """Store measurement in unified cache system for distributed access"""
+        """Store measurement in unified cache system for distributed access."""
         try:
             if not self._initialized:
                 await self._unified_manager.initialize()
@@ -173,7 +170,7 @@ class SLICalculator:
     async def calculate_sli(
         self, time_window: SLOTimeWindow | None = None, end_time: datetime | None = None
     ) -> SLIResult:
-        """Calculate SLI for specified time window"""
+        """Calculate SLI for specified time window."""
         time_window = time_window or self.slo_target.time_window
         end_time = end_time or datetime.now(UTC)
         start_time = end_time - timedelta(seconds=time_window.seconds)
@@ -262,7 +259,7 @@ class SLICalculator:
         return result
 
     def _calculate_value_by_type(self, measurements: list[SLIMeasurement]) -> float:
-        """Calculate current value based on SLO type"""
+        """Calculate current value based on SLO type."""
         values = [m.value for m in measurements]
         if self.slo_target.slo_type == SLOType.AVAILABILITY:
             successful = sum(1 for m in measurements if m.success)
@@ -292,15 +289,15 @@ class SLICalculator:
         return statistics.mean(values)
 
     def _calculate_percentile(self, values: list[float], percentile: int) -> float:
-        """Calculate percentile value"""
+        """Calculate percentile value."""
         if not values:
             return 0.0
         sorted_values = sorted(values)
         index = percentile / 100.0 * (len(sorted_values) - 1)
         if index.is_integer():
             return sorted_values[int(index)]
-        lower_index = int(math.floor(index))
-        upper_index = int(math.ceil(index))
+        lower_index = math.floor(index)
+        upper_index = math.ceil(index)
         weight = index - lower_index
         return (
             sorted_values[lower_index] * (1 - weight)
@@ -308,30 +305,30 @@ class SLICalculator:
         )
 
     def _calculate_compliance_ratio(self, current_value: float) -> float:
-        """Calculate compliance ratio based on SLO type"""
+        """Calculate compliance ratio based on SLO type."""
         target = self.slo_target.target_value
         if target == 0:
             return 1.0 if current_value == 0 else 0.0
-        if self.slo_target.slo_type in [
+        if self.slo_target.slo_type in {
             SLOType.AVAILABILITY,
             SLOType.THROUGHPUT,
             SLOType.QUALITY,
-        ]:
+        }:
             return min(1.0, current_value / target)
         return max(0.0, 1.0 - current_value / target)
 
     def get_measurement_count(self) -> int:
-        """Get total number of measurements stored"""
+        """Get total number of measurements stored."""
         return len(self._measurements)
 
     def clear_measurements(self) -> None:
-        """Clear all stored measurements"""
+        """Clear all stored measurements."""
         self._measurements.clear()
         self._result_cache.clear()
 
 
 class MultiWindowSLICalculator:
-    """Calculator for multiple time windows with trend analysis"""
+    """Calculator for multiple time windows with trend analysis."""
 
     def __init__(
         self,
@@ -340,7 +337,7 @@ class MultiWindowSLICalculator:
         max_measurements: int = 50000,
         redis_url: str | None = None,
         unified_manager=None,
-    ):
+    ) -> None:
         self.slo_target = slo_target
         self.windows = windows or [
             SLOTimeWindow.HOUR_1,
@@ -372,20 +369,20 @@ class MultiWindowSLICalculator:
         labels: dict[str, str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Add measurement to all window calculators"""
+        """Add measurement to all window calculators."""
         for calculator in self.calculators.values():
             calculator.add_measurement(value, timestamp, success, labels, metadata)
 
     def calculate_all_windows(
         self, end_time: datetime | None = None
     ) -> dict[SLOTimeWindow, SLIResult]:
-        """Calculate SLI for all configured time windows"""
+        """Calculate SLI for all configured time windows."""
         results = {}
         for window, calculator in self.calculators.items():
             try:
                 results[window] = calculator.calculate_sli(window, end_time)
             except Exception as e:
-                logger.error(f"Failed to calculate SLI for window {window}: {e}")
+                logger.exception(f"Failed to calculate SLI for window {window}: {e}")
                 results[window] = SLIResult(
                     slo_target=self.slo_target,
                     time_window=window,
@@ -399,7 +396,7 @@ class MultiWindowSLICalculator:
         return results
 
     def analyze_trends(self, end_time: datetime | None = None) -> dict[str, Any]:
-        """Analyze SLI trends over time"""
+        """Analyze SLI trends over time."""
         end_time = end_time or datetime.now(UTC)
         trend_results = []
         interval_seconds = self.trend_window.seconds // self.trend_points
@@ -440,14 +437,14 @@ class MultiWindowSLICalculator:
             direction = (
                 "improving"
                 if self.slo_target.slo_type
-                in [SLOType.AVAILABILITY, SLOType.THROUGHPUT]
+                in {SLOType.AVAILABILITY, SLOType.THROUGHPUT}
                 else "degrading"
             )
         else:
             direction = (
                 "degrading"
                 if self.slo_target.slo_type
-                in [SLOType.AVAILABILITY, SLOType.THROUGHPUT]
+                in {SLOType.AVAILABILITY, SLOType.THROUGHPUT}
                 else "improving"
             )
         mean_y = sum_y / n
@@ -466,7 +463,7 @@ class MultiWindowSLICalculator:
         }
 
     def get_summary(self, end_time: datetime | None = None) -> dict[str, Any]:
-        """Get comprehensive SLI summary across all windows"""
+        """Get comprehensive SLI summary across all windows."""
         window_results = self.calculate_all_windows(end_time)
         trend_analysis = self.analyze_trends(end_time)
         worst_window = None
@@ -504,21 +501,23 @@ class MultiWindowSLICalculator:
 
 
 class PercentileCalculator:
-    """Specialized calculator for latency percentiles"""
+    """Specialized calculator for latency percentiles."""
 
     def __init__(
-        self, percentiles: list[int] = [50, 90, 95, 99], max_samples: int = 10000
-    ):
+        self, percentiles: list[int] | None = None, max_samples: int = 10000
+    ) -> None:
+        if percentiles is None:
+            percentiles = [50, 90, 95, 99]
         self.percentiles = percentiles
         self.max_samples = max_samples
         self._samples = deque(maxlen=max_samples)
 
     def add_sample(self, value: float, timestamp: float | None = None) -> None:
-        """Add a latency sample"""
+        """Add a latency sample."""
         self._samples.append({"value": value, "timestamp": timestamp or time.time()})
 
     def calculate_percentiles(self, window_seconds: int = 3600) -> dict[int, float]:
-        """Calculate percentiles for specified time window"""
+        """Calculate percentiles for specified time window."""
         current_time = time.time()
         cutoff_time = current_time - window_seconds
         recent_samples = [
@@ -533,8 +532,8 @@ class PercentileCalculator:
             if index.is_integer():
                 results[percentile] = sorted_samples[int(index)]
             else:
-                lower_index = int(math.floor(index))
-                upper_index = int(math.ceil(index))
+                lower_index = math.floor(index)
+                upper_index = math.ceil(index)
                 weight = index - lower_index
                 results[percentile] = (
                     sorted_samples[lower_index] * (1 - weight)
@@ -543,7 +542,7 @@ class PercentileCalculator:
         return results
 
     def get_statistics(self, window_seconds: int = 3600) -> dict[str, float]:
-        """Get comprehensive latency statistics"""
+        """Get comprehensive latency statistics."""
         current_time = time.time()
         cutoff_time = current_time - window_seconds
         recent_samples = [
@@ -573,9 +572,9 @@ class PercentileCalculator:
 
 
 class AvailabilityCalculator:
-    """Specialized calculator for availability metrics"""
+    """Specialized calculator for availability metrics."""
 
-    def __init__(self, max_events: int = 100000):
+    def __init__(self, max_events: int = 100000) -> None:
         self.max_events = max_events
         self._events = deque(maxlen=max_events)
 
@@ -585,7 +584,7 @@ class AvailabilityCalculator:
         timestamp: float | None = None,
         labels: dict[str, str] | None = None,
     ) -> None:
-        """Record an availability event"""
+        """Record an availability event."""
         self._events.append({
             "success": success,
             "timestamp": timestamp or time.time(),
@@ -593,7 +592,7 @@ class AvailabilityCalculator:
         })
 
     def calculate_availability(self, window_seconds: int = 3600) -> dict[str, Any]:
-        """Calculate availability metrics for time window"""
+        """Calculate availability metrics for time window."""
         current_time = time.time()
         cutoff_time = current_time - window_seconds
         recent_events = [e for e in self._events if e["timestamp"] >= cutoff_time]
@@ -622,7 +621,7 @@ class AvailabilityCalculator:
         }
 
     def _calculate_mttr(self, events: list[dict[str, Any]]) -> float:
-        """Calculate Mean Time To Recovery"""
+        """Calculate Mean Time To Recovery."""
         recovery_times = []
         failure_start = None
         for event in sorted(events, key=lambda x: x["timestamp"]):
@@ -635,7 +634,7 @@ class AvailabilityCalculator:
         return statistics.mean(recovery_times) if recovery_times else 0.0
 
     def _calculate_mtbf(self, events: list[dict[str, Any]]) -> float:
-        """Calculate Mean Time Between Failures"""
+        """Calculate Mean Time Between Failures."""
         failure_timestamps = [e["timestamp"] for e in events if not e["success"]]
         if len(failure_timestamps) < 2:
             return 0.0

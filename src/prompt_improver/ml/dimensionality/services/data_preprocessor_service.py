@@ -14,18 +14,39 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
+
+if TYPE_CHECKING:
+    from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_classif, mutual_info_classif
+    from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler
+    from sklearn.decomposition import PCA
+    import numpy as np
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return (
+            sklearn.feature_selection.VarianceThreshold,
+            sklearn.preprocessing.RobustScaler,
+            sklearn.preprocessing.StandardScaler,
+            sklearn.preprocessing.MinMaxScaler,
+            sklearn.feature_selection.SelectKBest,
+            sklearn.feature_selection.f_classif,
+            sklearn.feature_selection.mutual_info_classif,
+            sklearn.decomposition.PCA
+        )
+    
+    (VarianceThreshold, RobustScaler, StandardScaler, MinMaxScaler,
+     SelectKBest, f_classif, mutual_info_classif, PCA) = _get_sklearn_imports()
 
 from . import PreprocessorProtocol, PreprocessingResult
 
 logger = logging.getLogger(__name__)
 
-# Optional imports for advanced preprocessing
+# Check sklearn availability
 try:
-    from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
-    from sklearn.decomposition import PCA
+    get_sklearn()
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -66,7 +87,7 @@ class DataPreprocessorService:
         logger.info(f"DataPreprocessorService initialized: scaling={scaling_method}, "
                    f"variance_threshold={variance_threshold}, feature_selection={feature_selection_method}")
 
-    def preprocess(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> PreprocessingResult:
+    def preprocess(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> PreprocessingResult:
         """Preprocess data for dimensionality reduction."""
         start_time = time.time()
         original_shape = X.shape
@@ -106,7 +127,7 @@ class DataPreprocessorService:
                 self.preprocessing_pipeline.append(("feature_selection", self.feature_selection_method))
             
             # Final validation
-            if np.any(np.isnan(X_filtered)) or np.any(np.isinf(X_filtered)):
+            if get_numpy().any(get_numpy().isnan(X_filtered)) or get_numpy().any(get_numpy().isinf(X_filtered)):
                 return PreprocessingResult(
                     status="failed",
                     features=X,
@@ -150,7 +171,7 @@ class DataPreprocessorService:
                 preprocessing_time=time.time() - start_time
             )
 
-    def validate_input(self, X: np.ndarray) -> Dict[str, Any]:
+    def validate_input(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Validate input data quality and characteristics."""
         try:
             validation_result = {
@@ -182,12 +203,12 @@ class DataPreprocessorService:
                 }
             
             # Check for invalid values
-            if np.any(np.isnan(X)):
-                nan_count = np.sum(np.isnan(X))
+            if get_numpy().any(get_numpy().isnan(X)):
+                nan_count = get_numpy().sum(get_numpy().isnan(X))
                 validation_result["warnings"].append(f"Found {nan_count} NaN values")
             
-            if np.any(np.isinf(X)):
-                inf_count = np.sum(np.isinf(X))
+            if get_numpy().any(get_numpy().isinf(X)):
+                inf_count = get_numpy().sum(get_numpy().isinf(X))
                 validation_result["warnings"].append(f"Found {inf_count} infinite values")
             
             # Compute statistics
@@ -195,14 +216,14 @@ class DataPreprocessorService:
                 "n_samples": n_samples,
                 "n_features": n_features,
                 "data_range": {
-                    "min": float(np.nanmin(X)),
-                    "max": float(np.nanmax(X)),
-                    "mean": float(np.nanmean(X)),
-                    "std": float(np.nanstd(X))
+                    "min": float(get_numpy().nanmin(X)),
+                    "max": float(get_numpy().nanmax(X)),
+                    "mean": float(get_numpy().nanmean(X)),
+                    "std": float(get_numpy().nanstd(X))
                 },
-                "constant_features": int(np.sum(np.var(X, axis=0) < self.variance_threshold)),
-                "missing_values": int(np.sum(np.isnan(X))),
-                "infinite_values": int(np.sum(np.isinf(X)))
+                "constant_features": int(get_numpy().sum(get_numpy().var(X, axis=0) < self.variance_threshold)),
+                "missing_values": int(get_numpy().sum(get_numpy().isnan(X))),
+                "infinite_values": int(get_numpy().sum(get_numpy().isinf(X)))
             }
             
             # Check data characteristics
@@ -219,7 +240,7 @@ class DataPreprocessorService:
                 "error": f"Validation failed: {str(e)}"
             }
 
-    def scale_features(self, X: np.ndarray) -> np.ndarray:
+    def scale_features(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Scale features for optimal reduction performance."""
         return self._apply_scaling(X)
 
@@ -237,30 +258,30 @@ class DataPreprocessorService:
             logger.warning(f"Unknown scaling method '{self.scaling_method}', using robust")
             return RobustScaler()
 
-    def _clean_data(self, X: np.ndarray) -> np.ndarray:
+    def _clean_data(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Clean data by handling missing values and outliers."""
         X_cleaned = X.copy()
         
         # Handle NaN values by replacing with column median
-        if np.any(np.isnan(X_cleaned)):
+        if get_numpy().any(get_numpy().isnan(X_cleaned)):
             logger.info("Handling NaN values with column median imputation")
             for col in range(X_cleaned.shape[1]):
                 col_data = X_cleaned[:, col]
-                if np.any(np.isnan(col_data)):
-                    median_value = np.nanmedian(col_data)
-                    X_cleaned[np.isnan(col_data), col] = median_value
+                if get_numpy().any(get_numpy().isnan(col_data)):
+                    median_value = get_numpy().nanmedian(col_data)
+                    X_cleaned[get_numpy().isnan(col_data), col] = median_value
         
         # Handle infinite values by clipping to reasonable bounds
-        if np.any(np.isinf(X_cleaned)):
+        if get_numpy().any(get_numpy().isinf(X_cleaned)):
             logger.info("Handling infinite values by clipping")
             # Clip to 99.9% percentile bounds
             for col in range(X_cleaned.shape[1]):
                 col_data = X_cleaned[:, col]
-                finite_data = col_data[np.isfinite(col_data)]
+                finite_data = col_data[get_numpy().isfinite(col_data)]
                 if len(finite_data) > 0:
-                    lower_bound = np.percentile(finite_data, 0.1)
-                    upper_bound = np.percentile(finite_data, 99.9)
-                    X_cleaned[:, col] = np.clip(col_data, lower_bound, upper_bound)
+                    lower_bound = get_numpy().percentile(finite_data, 0.1)
+                    upper_bound = get_numpy().percentile(finite_data, 99.9)
+                    X_cleaned[:, col] = get_numpy().clip(col_data, lower_bound, upper_bound)
         
         # Outlier detection and handling (if enabled)
         if self.outlier_detection:
@@ -268,14 +289,14 @@ class DataPreprocessorService:
         
         return X_cleaned
 
-    def _handle_outliers(self, X: np.ndarray) -> np.ndarray:
+    def _handle_outliers(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Handle outliers using IQR-based method."""
         X_outlier_handled = X.copy()
         
         for col in range(X.shape[1]):
             col_data = X[:, col]
-            Q1 = np.percentile(col_data, 25)
-            Q3 = np.percentile(col_data, 75)
+            Q1 = get_numpy().percentile(col_data, 25)
+            Q3 = get_numpy().percentile(col_data, 75)
             IQR = Q3 - Q1
             
             # Define outlier bounds
@@ -283,11 +304,11 @@ class DataPreprocessorService:
             upper_bound = Q3 + 1.5 * IQR
             
             # Clip outliers
-            X_outlier_handled[:, col] = np.clip(col_data, lower_bound, upper_bound)
+            X_outlier_handled[:, col] = get_numpy().clip(col_data, lower_bound, upper_bound)
         
         return X_outlier_handled
 
-    def _apply_scaling(self, X: np.ndarray) -> np.ndarray:
+    def _apply_scaling(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Apply feature scaling."""
         if self.scaler is None:
             return X
@@ -297,7 +318,7 @@ class DataPreprocessorService:
         else:
             return self.scaler.transform(X)
 
-    def _remove_constant_features(self, X: np.ndarray) -> Tuple[np.ndarray, int]:
+    def _remove_constant_features(self, X: get_numpy().ndarray) -> Tuple[get_numpy().ndarray, int]:
         """Remove constant and low-variance features."""
         if not SKLEARN_AVAILABLE:
             return X, 0
@@ -317,7 +338,7 @@ class DataPreprocessorService:
         
         return X_filtered, removed_count
 
-    def _apply_feature_selection(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _apply_feature_selection(self, X: get_numpy().ndarray, y: get_numpy().ndarray) -> Tuple[get_numpy().ndarray, get_numpy().ndarray]:
         """Apply feature selection based on labels."""
         if not SKLEARN_AVAILABLE:
             return X, None
@@ -345,35 +366,35 @@ class DataPreprocessorService:
         
         return X_selected, feature_scores
 
-    def _compute_data_quality_score(self, X: np.ndarray) -> float:
+    def _compute_data_quality_score(self, X: get_numpy().ndarray) -> float:
         """Compute overall data quality score."""
         try:
             quality_factors = []
             
             # Factor 1: No invalid values
-            has_invalid = np.any(np.isnan(X)) or np.any(np.isinf(X))
+            has_invalid = get_numpy().any(get_numpy().isnan(X)) or get_numpy().any(get_numpy().isinf(X))
             quality_factors.append(0.0 if has_invalid else 1.0)
             
             # Factor 2: Feature variance (higher variance = better)
-            feature_variances = np.var(X, axis=0)
-            avg_variance = np.mean(feature_variances)
+            feature_variances = get_numpy().var(X, axis=0)
+            avg_variance = get_numpy().mean(feature_variances)
             variance_score = min(1.0, avg_variance / (avg_variance + 1))  # Normalize
             quality_factors.append(variance_score)
             
             # Factor 3: No constant features
-            constant_features = np.sum(feature_variances < self.variance_threshold)
+            constant_features = get_numpy().sum(feature_variances < self.variance_threshold)
             constant_score = max(0.0, 1.0 - constant_features / X.shape[1])
             quality_factors.append(constant_score)
             
             # Factor 4: Reasonable data range (not too extreme)
-            data_range = np.max(X) - np.min(X)
+            data_range = get_numpy().max(X) - get_numpy().min(X)
             range_score = 1.0 if 0.1 <= data_range <= 1000 else 0.5
             quality_factors.append(range_score)
             
             # Compute weighted average
-            quality_score = np.mean(quality_factors)
+            quality_score = get_numpy().mean(quality_factors)
             
-            return float(np.clip(quality_score, 0.0, 1.0))
+            return float(get_numpy().clip(quality_score, 0.0, 1.0))
             
         except Exception as e:
             logger.warning(f"Quality score computation failed: {e}")

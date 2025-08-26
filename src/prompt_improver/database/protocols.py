@@ -10,15 +10,14 @@ Following research-validated best practices:
 - Support for async operations throughout
 """
 
-import asyncio
-from datetime import datetime
-from typing import Any, AsyncContextManager, Dict, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Protocol
 
-from sqlalchemy.ext.asyncio import AsyncSession
+# Import heavy dependencies only for type checking to optimize startup performance
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-from .types import (
+from prompt_improver.database.types import (
     CacheMetrics,
-    ConnectionInfo,
     ConnectionMode,
     DatabaseMetrics,
     HealthStatus,
@@ -30,7 +29,7 @@ class DatabaseServiceProtocol(Protocol):
 
     async def get_session(
         self, mode: ConnectionMode = ConnectionMode.READ_WRITE
-    ) -> AsyncContextManager[AsyncSession]:
+    ) -> AsyncContextManager["AsyncSession"]:
         """Get a database session with specified access mode."""
         ...
 
@@ -52,14 +51,14 @@ class DatabaseServiceProtocol(Protocol):
 
 
 class CacheServiceProtocol(Protocol):
-    """Protocol for cache services (L1, L2, L3)."""
+    """Protocol for cache services (L1, L2)."""
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache by key."""
         ...
 
     async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
+        self, key: str, value: Any, ttl_seconds: int | None = None
     ) -> bool:
         """Set value in cache with optional TTL."""
         ...
@@ -88,7 +87,7 @@ class CacheServiceProtocol(Protocol):
 class MultiLevelCacheServiceProtocol(Protocol):
     """Protocol for multi-level cache management."""
 
-    async def get(self, key: str, security_context: Any = None) -> Optional[Any]:
+    async def get(self, key: str, security_context: Any = None) -> Any | None:
         """Get value with multi-level fallback."""
         ...
 
@@ -96,7 +95,7 @@ class MultiLevelCacheServiceProtocol(Protocol):
         self,
         key: str,
         value: Any,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         security_context: Any = None,
     ) -> bool:
         """Set value across cache levels."""
@@ -106,11 +105,11 @@ class MultiLevelCacheServiceProtocol(Protocol):
         """Invalidate key across all cache levels."""
         ...
 
-    async def warm_cache(self, keys: List[str]) -> Dict[str, bool]:
+    async def warm_cache(self, keys: list[str]) -> dict[str, bool]:
         """Warm cache with specified keys."""
         ...
 
-    async def get_comprehensive_metrics(self) -> Dict[str, Any]:
+    async def get_comprehensive_metrics(self) -> dict[str, Any]:
         """Get metrics from all cache levels."""
         ...
 
@@ -120,7 +119,7 @@ class LockServiceProtocol(Protocol):
 
     async def acquire(
         self, resource_id: str, timeout_seconds: float = 30.0, ttl_seconds: float = 60.0
-    ) -> Optional[str]:
+    ) -> str | None:
         """Acquire distributed lock, returns lock token if successful."""
         ...
 
@@ -158,7 +157,7 @@ class PubSubServiceProtocol(Protocol):
         """Unsubscribe from channel."""
         ...
 
-    async def get_active_subscriptions(self) -> Dict[str, Any]:
+    async def get_active_subscriptions(self) -> dict[str, Any]:
         """Get active subscriptions info."""
         ...
 
@@ -178,7 +177,7 @@ class HealthServiceProtocol(Protocol):
         """Get overall system health status."""
         ...
 
-    async def get_health_details(self) -> Dict[str, Any]:
+    async def get_health_details(self) -> dict[str, Any]:
         """Get detailed health information for all components."""
         ...
 
@@ -223,18 +222,18 @@ class MetricsServiceProtocol(Protocol):
         ...
 
     def increment_counter(
-        self, metric_name: str, tags: Optional[Dict[str, str]] = None
+        self, metric_name: str, tags: dict[str, str] | None = None
     ) -> None:
         """Increment counter metric."""
         ...
 
     def record_gauge(
-        self, metric_name: str, value: float, tags: Optional[Dict[str, str]] = None
+        self, metric_name: str, value: float, tags: dict[str, str] | None = None
     ) -> None:
         """Record gauge metric."""
         ...
 
-    def get_metrics_summary(self) -> Dict[str, Any]:
+    def get_metrics_summary(self) -> dict[str, Any]:
         """Get summary of all collected metrics."""
         ...
 
@@ -258,10 +257,10 @@ class DatabaseServicesProtocol(Protocol):
         """Shutdown all composed services."""
         ...
 
-    async def health_check_all(self) -> Dict[str, HealthStatus]:
+    async def health_check_all(self) -> dict[str, HealthStatus]:
         """Health check all services."""
         ...
 
-    async def get_metrics_all(self) -> Dict[str, Any]:
+    async def get_metrics_all(self) -> dict[str, Any]:
         """Get metrics from all services."""
         ...

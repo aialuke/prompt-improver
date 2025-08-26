@@ -9,7 +9,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class TechnicalDebtMonitor:
     """Comprehensive technical debt monitoring and reporting system."""
 
-    def __init__(self, project_root: Path = None):
+    def __init__(self, project_root: Path | None = None) -> None:
         self.project_root = project_root or Path.cwd()
         self.report_dir = self.project_root / "reports" / "debt_monitoring"
         self.report_dir.mkdir(parents=True, exist_ok=True)
@@ -47,7 +47,7 @@ class TechnicalDebtMonitor:
                 results["metrics"][name] = await task
                 logger.info("✅ %s analysis completed", name)
             except Exception as e:
-                logger.error("❌ %s analysis failed: %s", name, e)
+                logger.exception("❌ %s analysis failed: %s", name, e)
                 results["metrics"][name] = {"error": str(e)}
         results["debt_score"] = self.calculate_debt_score(results["metrics"])
         await self.save_results(results)
@@ -68,7 +68,7 @@ class TechnicalDebtMonitor:
                 critical_count = sum(
                     1
                     for v in violations
-                    if v.get("code") in ["F401", "F841", "E722", "S105", "S106", "S608"]
+                    if v.get("code") in {"F401", "F841", "E722", "S105", "S106", "S608"}
                 )
                 return {
                     "total_violations": len(violations),
@@ -327,11 +327,11 @@ class TechnicalDebtMonitor:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"debt_analysis_{timestamp}.json"
         filepath = self.report_dir / filename
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         logger.info("Results saved to %s", filepath)
         latest_path = self.report_dir / "latest.json"
-        with open(latest_path, "w") as f:
+        with open(latest_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
 
 
@@ -353,7 +353,7 @@ async def main():
         print("=" * 60)
         return 0 if debt_score.get("overall_score", 0) >= 6 else 1
     except Exception as e:
-        logger.error("Analysis failed: %s", e)
+        logger.exception("Analysis failed: %s", e)
         return 1
 
 

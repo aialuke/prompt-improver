@@ -21,8 +21,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
-from scipy import stats
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 logger = logging.getLogger(__name__)
 
 class StoppingDecision(Enum):
@@ -211,10 +213,10 @@ class AdvancedEarlyStoppingFramework:
 
     def _calculate_test_statistics(self, control: list[float], treatment: list[float]) -> dict[str, float]:
         """Calculate basic test statistics"""
-        control_mean = np.mean(control)
-        treatment_mean = np.mean(treatment)
-        statistic, p_value = stats.ttest_ind(treatment, control, equal_var=False)
-        pooled_std = np.sqrt(((len(control) - 1) * np.var(control, ddof=1) + (len(treatment) - 1) * np.var(treatment, ddof=1)) / (len(control) + len(treatment) - 2))
+        control_mean = get_numpy().mean(control)
+        treatment_mean = get_numpy().mean(treatment)
+        statistic, p_value = get_scipy_stats().ttest_ind(treatment, control, equal_var=False)
+        pooled_std = get_numpy().sqrt(((len(control) - 1) * get_numpy().var(control, ddof=1) + (len(treatment) - 1) * get_numpy().var(treatment, ddof=1)) / (len(control) + len(treatment) - 2))
         effect_size = (treatment_mean - control_mean) / pooled_std if pooled_std > 0 else 0
         return {'test_statistic': float(statistic), 'p_value': float(p_value), 'effect_size': float(effect_size), 'control_mean': float(control_mean), 'treatment_mean': float(treatment_mean)}
 
@@ -224,9 +226,9 @@ class AdvancedEarlyStoppingFramework:
         beta = self.config.beta
         a = math.log(beta / (1 - alpha))
         b = math.log((1 - beta) / alpha)
-        control_mean = np.mean(control)
-        treatment_mean = np.mean(treatment)
-        pooled_var = (np.var(control, ddof=1) + np.var(treatment, ddof=1)) / 2
+        control_mean = get_numpy().mean(control)
+        treatment_mean = get_numpy().mean(treatment)
+        pooled_var = (get_numpy().var(control, ddof=1) + get_numpy().var(treatment, ddof=1)) / 2
         if pooled_var <= 0:
             log_lr = 0.0
         else:
@@ -281,8 +283,8 @@ class AdvancedEarlyStoppingFramework:
         if function_type == AlphaSpendingFunction.OBRIEN_FLEMING:
             if t <= 0:
                 return 0
-            z_alpha_4 = stats.norm.ppf(1 - alpha / 4)
-            return 4 - 4 * stats.norm.cdf(z_alpha_4 / math.sqrt(t))
+            z_alpha_4 = get_scipy_stats().norm.ppf(1 - alpha / 4)
+            return 4 - 4 * get_scipy_stats().norm.cdf(z_alpha_4 / math.sqrt(t))
         if function_type == AlphaSpendingFunction.WANG_TSIATIS:
             rho = 0.5
             if t <= 0:
@@ -294,7 +296,7 @@ class AdvancedEarlyStoppingFramework:
         """Calculate rejection boundary for current alpha spending"""
         if alpha_spent <= 0:
             return float('inf')
-        z_alpha = stats.norm.ppf(1 - alpha_spent / 2)
+        z_alpha = get_scipy_stats().norm.ppf(1 - alpha_spent / 2)
         return z_alpha
 
     def _calculate_futility_boundary(self, info_frac: float) -> float:
@@ -308,17 +310,17 @@ class AdvancedEarlyStoppingFramework:
         current_n = len(treatment)
         if current_n == 0:
             return 0.0
-        current_effect = np.mean(treatment) - np.mean(control)
-        pooled_var = (np.var(control, ddof=1) + np.var(treatment, ddof=1)) / 2
+        current_effect = get_numpy().mean(treatment) - get_numpy().mean(control)
+        pooled_var = (get_numpy().var(control, ddof=1) + get_numpy().var(treatment, ddof=1)) / 2
         if pooled_var <= 0:
             return 0.0
-        z_alpha = stats.norm.ppf(1 - self.config.alpha / 2)
-        z_beta = stats.norm.ppf(1 - self.config.beta)
+        z_alpha = get_scipy_stats().norm.ppf(1 - self.config.alpha / 2)
+        z_beta = get_scipy_stats().norm.ppf(1 - self.config.beta)
         required_n = 2 * pooled_var * ((z_alpha + z_beta) / target_effect) ** 2
         if current_n >= required_n:
             se_current = math.sqrt(2 * pooled_var / current_n)
             z_current = abs(current_effect) / se_current if se_current > 0 else 0
-            return 1 - stats.norm.cdf(z_alpha - z_current) if z_current > 0 else 0.0
+            return 1 - get_scipy_stats().norm.cdf(z_alpha - z_current) if z_current > 0 else 0.0
         remaining_n = required_n - current_n
         if remaining_n <= 0:
             return 1.0
@@ -326,7 +328,7 @@ class AdvancedEarlyStoppingFramework:
         z_current = current_effect / se_current if se_current > 0 else 0
         se_final = math.sqrt(2 * pooled_var / required_n)
         z_final = current_effect / se_final if se_final > 0 else 0
-        conditional_power = 1 - stats.norm.cdf(z_alpha - z_final) if z_final > 0 else 0.0
+        conditional_power = 1 - get_scipy_stats().norm.cdf(z_alpha - z_final) if z_final > 0 else 0.0
         return max(0.0, min(1.0, conditional_power))
 
     def _make_stopping_decision(self, stats_result: dict[str, float], sprt_bounds: SPRTBounds | None, group_seq_bounds: GroupSequentialBounds | None, stop_for_futility: bool, conditional_power: float) -> tuple[StoppingDecision, str, float]:
@@ -383,11 +385,11 @@ class AdvancedEarlyStoppingFramework:
         if conditional_power >= 0.8:
             return 0
         current_n = len(treatment)
-        pooled_var = (np.var(control, ddof=1) + np.var(treatment, ddof=1)) / 2
+        pooled_var = (get_numpy().var(control, ddof=1) + get_numpy().var(treatment, ddof=1)) / 2
         if pooled_var <= 0:
             return 100
-        z_alpha = stats.norm.ppf(1 - self.config.alpha / 2)
-        z_beta = stats.norm.ppf(1 - self.config.beta)
+        z_alpha = get_scipy_stats().norm.ppf(1 - self.config.alpha / 2)
+        z_beta = get_scipy_stats().norm.ppf(1 - self.config.beta)
         target_effect = self.config.effect_size_h1
         required_n_per_group = ((z_alpha + z_beta) / target_effect) ** 2 * pooled_var
         remaining = max(0, int(required_n_per_group - current_n))

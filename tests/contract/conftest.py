@@ -5,22 +5,22 @@ Provides contract testing infrastructure for API and service boundary validation
 Tests verify API contracts, schema compliance, and protocol adherence.
 """
 
-import json
 import os
-from typing import Dict, Any
+from typing import Any
 from uuid import uuid4
 
+import msgspec
 import pytest
 import requests
-import msgspec
 from msgspec import ValidationError as MsgspecValidationError
-from pydantic import BaseModel, ValidationError as PydanticValidationError
+
 
 # API Contract Testing
 @pytest.fixture
 def api_base_url():
     """Base URL for API contract testing."""
     return os.environ.get("TEST_API_BASE_URL", "http://localhost:8000")
+
 
 @pytest.fixture
 def api_client(api_base_url):
@@ -30,29 +30,30 @@ def api_client(api_base_url):
         "Content-Type": "application/json",
         "Accept": "application/json"
     })
-    
+
     class APIClient:
         def __init__(self, base_url: str, session: requests.Session):
             self.base_url = base_url
             self.session = session
-        
-        def post(self, endpoint: str, data: Dict[str, Any] = None, **kwargs):
+
+        def post(self, endpoint: str, data: dict[str, Any] | None = None, **kwargs):
             url = f"{self.base_url}{endpoint}"
             return self.session.post(url, json=data, **kwargs)
-        
-        def get(self, endpoint: str, params: Dict[str, Any] = None, **kwargs):
+
+        def get(self, endpoint: str, params: dict[str, Any] | None = None, **kwargs):
             url = f"{self.base_url}{endpoint}"
             return self.session.get(url, params=params, **kwargs)
-        
-        def put(self, endpoint: str, data: Dict[str, Any] = None, **kwargs):
+
+        def put(self, endpoint: str, data: dict[str, Any] | None = None, **kwargs):
             url = f"{self.base_url}{endpoint}"
             return self.session.put(url, json=data, **kwargs)
-        
+
         def delete(self, endpoint: str, **kwargs):
             url = f"{self.base_url}{endpoint}"
             return self.session.delete(url, **kwargs)
-    
+
     return APIClient(api_base_url, session)
+
 
 # Schema Validation
 @pytest.fixture
@@ -105,53 +106,55 @@ def api_schemas():
         }
     }
 
+
 @pytest.fixture
 def schema_validator(api_schemas):
     """Schema validation helper."""
-    def validate_schema(data: Dict[str, Any], schema_name: str) -> bool:
+    def validate_schema(data: dict[str, Any], schema_name: str) -> bool:
         """Validate data against named schema."""
         if schema_name not in api_schemas:
             raise ValueError(f"Unknown schema: {schema_name}")
-        
+
         try:
             # Convert schema to msgspec Struct for validation
             schema_struct = msgspec.convert(api_schemas[schema_name], type=dict)
             msgspec.validate(data, type=type(schema_struct))
             return True
         except MsgspecValidationError as e:
-            pytest.fail(f"Schema validation failed for {schema_name}: {str(e)}")
-    
+            pytest.fail(f"Schema validation failed for {schema_name}: {e!s}")
+
     return validate_schema
+
 
 # MCP Protocol Testing
 @pytest.fixture
 def mcp_client():
     """MCP client for protocol contract testing."""
-    import asyncio
     from mcp import ClientSession
     from mcp.client.stdio import stdio_client
-    
+
     class MCPTestClient:
         def __init__(self):
             self.client = None
             self.session = None
-        
+
         async def connect(self, command: list):
             """Connect to MCP server."""
             self.client = await stdio_client(command)
             self.session = ClientSession(self.client)
             await self.session.initialize()
-        
-        async def call_tool(self, name: str, arguments: Dict[str, Any]):
+
+        async def call_tool(self, name: str, arguments: dict[str, Any]):
             """Call MCP tool."""
             return await self.session.call_tool(name, arguments)
-        
+
         async def disconnect(self):
             """Disconnect from MCP server."""
             if self.client:
                 await self.client.close()
-    
+
     return MCPTestClient()
+
 
 @pytest.fixture
 def mcp_schemas():
@@ -192,6 +195,7 @@ def mcp_schemas():
         }
     }
 
+
 # Contract Test Data
 @pytest.fixture
 def contract_test_data():
@@ -222,6 +226,7 @@ def contract_test_data():
         }
     }
 
+
 # Performance requirements for contract tests
 @pytest.fixture
 def performance_requirements():
@@ -231,6 +236,7 @@ def performance_requirements():
         "mcp_response_time_ms": 200,  # MCP responses should be < 200ms
         "concurrent_requests": 10     # Should handle 10 concurrent requests
     }
+
 
 # Backward compatibility testing
 @pytest.fixture
@@ -242,6 +248,7 @@ def api_versions():
         "deprecated": [],
         "breaking_changes": {}
     }
+
 
 def pytest_configure(config):
     """Configure contract test markers."""

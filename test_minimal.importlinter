@@ -1,0 +1,9 @@
+[importlinter]
+root_package = prompt_improver
+
+[importlinter.contracts.test]
+name = "Test Contract"
+type = "independence"
+modules = [
+    "prompt_improver.core"
+]

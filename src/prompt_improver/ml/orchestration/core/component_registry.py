@@ -12,7 +12,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from collections.abc import Callable
 import uuid
-from ....core.protocols.ml_protocols import ComponentRegistryProtocol, ComponentSpec, ServiceStatus
+from ....shared.interfaces.protocols.ml import ComponentRegistryProtocol, ComponentSpec, ServiceStatus
 from ....performance.monitoring.health.background_manager import TaskPriority, get_background_task_manager
 from ..config.orchestrator_config import OrchestratorConfig
 from ..shared.component_types import ComponentCapability, ComponentInfo, ComponentTier

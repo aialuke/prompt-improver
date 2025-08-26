@@ -3,16 +3,14 @@ Tests for Enhanced Stop Command Implementation
 Tests the Week 7 enhanced stop command with signal handling and progress preservation.
 """
 
-import asyncio
 import json
 import tempfile
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from prompt_improver.cli.core.cli_orchestrator import CLIOrchestrator
 from prompt_improver.cli.core.progress_preservation import (
     ProgressPreservationManager,
     ProgressSnapshot,
@@ -22,7 +20,6 @@ from prompt_improver.cli.core.signal_handler import (
     ShutdownContext,
     ShutdownReason,
 )
-from prompt_improver.database.models import TrainingIteration, TrainingSession
 
 
 class TestAsyncSignalHandler:
@@ -173,7 +170,7 @@ class TestProgressPreservationManager:
             / f"{sample_progress_snapshot.session_id}_progress.json"
         )
         assert backup_file.exists()
-        with open(backup_file) as f:
+        with open(backup_file, encoding="utf-8") as f:
             backup_data = json.load(f)
         assert "snapshots" in backup_data
         assert len(backup_data["snapshots"]) == 1
@@ -198,7 +195,7 @@ class TestProgressPreservationManager:
             )
             await progress_manager._save_to_backup_file(snapshot)
         backup_file = progress_manager.backup_dir / f"{session_id}_progress.json"
-        with open(backup_file) as f:
+        with open(backup_file, encoding="utf-8") as f:
             backup_data = json.load(f)
         assert len(backup_data["snapshots"]) == 50
         assert backup_data["snapshots"][0]["iteration"] == 5

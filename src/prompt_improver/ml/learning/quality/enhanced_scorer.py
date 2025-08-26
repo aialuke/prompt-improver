@@ -13,13 +13,9 @@ from datetime import datetime
 import logging
 from typing import Any
 import warnings
-import numpy as np
-from scipy import stats
-from scipy.spatial.distance import jensenshannon
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import StandardScaler
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats, get_sklearn
 warnings.filterwarnings('ignore')
 logger = logging.getLogger(__name__)
 
@@ -124,8 +120,8 @@ class EnhancedQualityScorer:
             EnhancedQualityMetrics with detailed assessment
         """
         start_time = datetime.utcnow()
-        features_array = np.array(features)
-        effectiveness_array = np.array(effectiveness_scores)
+        features_array = get_numpy().array(features)
+        effectiveness_array = get_numpy().array(effectiveness_scores)
         logger.info('Starting comprehensive quality assessment')
         fidelity = await self._assess_fidelity(features_array, effectiveness_array)
         utility = await self._assess_utility(features_array, effectiveness_array, generation_params)
@@ -139,34 +135,34 @@ class EnhancedQualityScorer:
         duration = (datetime.utcnow() - start_time).total_seconds()
         return EnhancedQualityMetrics(fidelity=fidelity, utility=utility, privacy=privacy, statistical_validity=statistical_validity, diversity=diversity, consistency=consistency, overall_score=overall_score, confidence_score=confidence_score, recommendation_tier=recommendation_tier, assessment_timestamp=start_time.isoformat(), total_samples=len(features), assessment_duration=duration)
 
-    async def _assess_fidelity(self, features: np.ndarray, effectiveness: np.ndarray) -> QualityDimension:
+    async def _assess_fidelity(self, features: get_numpy().ndarray, effectiveness: get_numpy().ndarray) -> QualityDimension:
         """Assess statistical fidelity using distribution similarity metrics"""
         sub_metrics = {}
         ks_scores = []
         for i in range(features.shape[1]):
-            ks_stat, ks_p = stats.kstest(features[:, i], 'norm', args=(features[:, i].mean(), features[:, i].std()))
+            ks_stat, ks_p = get_scipy_stats().kstest(features[:, i], 'norm', args=(features[:, i].mean(), features[:, i].std()))
             ks_scores.append(1.0 - ks_stat)
-        sub_metrics['distribution_similarity'] = np.mean(ks_scores)
-        hist, bins = np.histogram(effectiveness, bins=20, density=True)
+        sub_metrics['distribution_similarity'] = get_numpy().mean(ks_scores)
+        hist, bins = get_numpy().histogram(effectiveness, bins=20, density=True)
         hist = hist / hist.sum()
         alpha, beta_param = (2.5, 1.5)
-        expected_beta = stats.beta.pdf(bins[:-1], alpha, beta_param)
+        expected_beta = get_scipy_stats().beta.pdf(bins[:-1], alpha, beta_param)
         expected_beta = expected_beta / expected_beta.sum()
         js_divergence = jensenshannon(hist, expected_beta)
         sub_metrics['effectiveness_distribution'] = 1.0 - js_divergence
-        corr_matrix = np.corrcoef(features.T)
-        identity_matrix = np.eye(corr_matrix.shape[0])
-        corr_deviation = float(np.mean(np.abs(corr_matrix - identity_matrix)))
+        corr_matrix = get_numpy().corrcoef(features.T)
+        identity_matrix = get_numpy().eye(corr_matrix.shape[0])
+        corr_deviation = float(get_numpy().mean(get_numpy().abs(corr_matrix - identity_matrix)))
         sub_metrics['feature_independence'] = max(0.0, 1.0 - corr_deviation)
-        fidelity_score = np.mean(list(sub_metrics.values()))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean([sub_metrics[k] for k in sub_metrics]), [fidelity_score] * 100)
+        fidelity_score = get_numpy().mean(list(sub_metrics.values()))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean([sub_metrics[k] for k in sub_metrics]), [fidelity_score] * 100)
         return QualityDimension(name='fidelity', score=float(fidelity_score), weight=self.dimension_weights['fidelity'], sub_metrics=sub_metrics, threshold_met=bool(fidelity_score >= 0.6), confidence_interval=confidence_interval, interpretation=self._interpret_fidelity_score(fidelity_score))
 
-    async def _assess_utility(self, features: np.ndarray, effectiveness: np.ndarray, params: dict) -> QualityDimension:
+    async def _assess_utility(self, features: get_numpy().ndarray, effectiveness: get_numpy().ndarray, params: dict) -> QualityDimension:
         """Assess ML utility using predictive modeling potential"""
         sub_metrics = {}
-        feature_variances = np.var(features, axis=0)
-        normalized_variance = min(1.0, float(np.mean(feature_variances)) / 2.0)
+        feature_variances = get_numpy().var(features, axis=0)
+        normalized_variance = min(1.0, float(get_numpy().mean(feature_variances)) / 2.0)
         sub_metrics['feature_informativeness'] = normalized_variance
         if len(features) >= 10:
             try:
@@ -191,70 +187,71 @@ class EnhancedQualityScorer:
         else:
             sub_metrics['dimensionality_quality'] = 0.3
             sub_metrics['clustering_potential'] = 0.3
-        eff_std = np.std(effectiveness)
-        eff_range = np.max(effectiveness) - np.min(effectiveness)
+        eff_std = get_numpy().std(effectiveness)
+        eff_range = get_numpy().max(effectiveness) - get_numpy().min(effectiveness)
         sub_metrics['effectiveness_variance'] = min(1.0, eff_std / 0.3)
         sub_metrics['effectiveness_range'] = float(min(1.0, eff_range / 0.8))
-        utility_score = np.mean(list(sub_metrics.values()))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
+        utility_score = get_numpy().mean(list(sub_metrics.values()))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean(x), list(sub_metrics.values()))
         return QualityDimension(name='utility', score=float(utility_score), weight=self.dimension_weights['utility'], sub_metrics=sub_metrics, threshold_met=bool(utility_score >= 0.6), confidence_interval=confidence_interval, interpretation=self._interpret_utility_score(float(utility_score)))
 
-    async def _assess_privacy(self, features: np.ndarray, effectiveness: np.ndarray) -> QualityDimension:
+    async def _assess_privacy(self, features: get_numpy().ndarray, effectiveness: get_numpy().ndarray) -> QualityDimension:
         """Assess privacy preservation through uniqueness and anonymity"""
         sub_metrics = {}
-        unique_samples = len(np.unique(features, axis=0))
+        unique_samples = len(get_numpy().unique(features, axis=0))
         total_samples = len(features)
         sub_metrics['sample_uniqueness'] = unique_samples / total_samples
         feature_uniqueness_scores = []
         for i in range(features.shape[1]):
-            unique_values = len(np.unique(features[:, i]))
+            unique_values = len(get_numpy().unique(features[:, i]))
             max_possible = min(total_samples, 100)
             feature_uniqueness_scores.append(unique_values / max_possible)
-        sub_metrics['feature_uniqueness'] = float(np.mean(feature_uniqueness_scores))
-        unique_effectiveness = len(np.unique(effectiveness))
+        sub_metrics['feature_uniqueness'] = float(get_numpy().mean(feature_uniqueness_scores))
+        unique_effectiveness = len(get_numpy().unique(effectiveness))
         sub_metrics['effectiveness_anonymity'] = unique_effectiveness / total_samples
         if len(features) >= 2:
-            from scipy.spatial.distance import pdist
+            scipy = get_scipy_stats()
+            pdist = scipy.spatial.distance.pdist
             distances = pdist(features)
-            min_distance = float(np.min(distances))
-            mean_distance = float(np.mean(distances))
+            min_distance = float(get_numpy().min(distances))
+            mean_distance = float(get_numpy().mean(distances))
             sub_metrics['inter_sample_distance'] = min(1.0, min_distance / (mean_distance * 0.1))
         else:
             sub_metrics['inter_sample_distance'] = 1.0
-        privacy_score = np.mean(list(sub_metrics.values()))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
+        privacy_score = get_numpy().mean(list(sub_metrics.values()))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean(x), list(sub_metrics.values()))
         return QualityDimension(name='privacy', score=float(privacy_score), weight=self.dimension_weights['privacy'], sub_metrics=sub_metrics, threshold_met=bool(privacy_score >= 0.8), confidence_interval=confidence_interval, interpretation=self._interpret_privacy_score(float(privacy_score)))
 
-    async def _assess_statistical_validity(self, features: np.ndarray, effectiveness: np.ndarray) -> QualityDimension:
+    async def _assess_statistical_validity(self, features: get_numpy().ndarray, effectiveness: get_numpy().ndarray) -> QualityDimension:
         """Assess statistical validity and correctness"""
         sub_metrics = {}
-        finite_features = np.isfinite(features).all()
-        finite_effectiveness = np.isfinite(effectiveness).all()
+        finite_features = get_numpy().isfinite(features).all()
+        finite_effectiveness = get_numpy().isfinite(effectiveness).all()
         sub_metrics['data_validity'] = float(finite_features and finite_effectiveness)
-        features_in_range = np.all((features >= -5) & (features <= 5))
-        effectiveness_in_range = np.all((effectiveness >= 0) & (effectiveness <= 1))
+        features_in_range = get_numpy().all((features >= -5) & (features <= 5))
+        effectiveness_in_range = get_numpy().all((effectiveness >= 0) & (effectiveness <= 1))
         sub_metrics['value_ranges'] = float(features_in_range and effectiveness_in_range)
-        feature_means = np.mean(features, axis=0)
-        feature_stds = np.std(features, axis=0)
-        reasonable_means = np.all(np.abs(feature_means) <= 3)
-        reasonable_stds = np.all((feature_stds > 0) & (feature_stds <= 5))
+        feature_means = get_numpy().mean(features, axis=0)
+        feature_stds = get_numpy().std(features, axis=0)
+        reasonable_means = get_numpy().all(get_numpy().abs(feature_means) <= 3)
+        reasonable_stds = get_numpy().all((feature_stds > 0) & (feature_stds <= 5))
         sub_metrics['statistical_moments'] = float(reasonable_means and reasonable_stds)
-        eff_mean = np.mean(effectiveness)
-        eff_std = np.std(effectiveness)
+        eff_mean = get_numpy().mean(effectiveness)
+        eff_std = get_numpy().std(effectiveness)
         reasonable_eff_mean = 0.2 <= eff_mean <= 0.9
         reasonable_eff_std = 0.05 <= eff_std <= 0.5
         sub_metrics['effectiveness_validity'] = float(reasonable_eff_mean and reasonable_eff_std)
-        validity_score = np.mean(list(sub_metrics.values()))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
+        validity_score = get_numpy().mean(list(sub_metrics.values()))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean(x), list(sub_metrics.values()))
         return QualityDimension(name='statistical_validity', score=float(validity_score), weight=self.dimension_weights['statistical_validity'], sub_metrics=sub_metrics, threshold_met=bool(validity_score >= 0.9), confidence_interval=confidence_interval, interpretation=self._interpret_validity_score(float(validity_score)))
 
-    async def _assess_diversity(self, features: np.ndarray, domain_counts: dict[str, int]) -> QualityDimension:
+    async def _assess_diversity(self, features: get_numpy().ndarray, domain_counts: dict[str, int]) -> QualityDimension:
         """Assess sample diversity and domain coverage"""
         sub_metrics = {}
         total_samples = sum(domain_counts.values())
         domain_proportions = [count / total_samples for count in domain_counts.values()]
-        shannon_entropy = -sum(p * np.log(p) for p in domain_proportions if p > 0)
-        max_entropy = np.log(len(domain_counts))
+        shannon_entropy = -sum(p * get_numpy().log(p) for p in domain_proportions if p > 0)
+        max_entropy = get_numpy().log(len(domain_counts))
         sub_metrics['domain_diversity'] = shannon_entropy / max_entropy if max_entropy > 0 else 0
         if len(features) >= 5:
             try:
@@ -262,40 +259,40 @@ class EnhancedQualityScorer:
                 features_scaled = scaler.fit_transform(features)
                 pca = PCA(n_components=min(3, features.shape[1]))
                 pca_features = pca.fit_transform(features_scaled)
-                pc_coverage = np.mean(np.std(pca_features, axis=0))
+                pc_coverage = get_numpy().mean(get_numpy().std(pca_features, axis=0))
                 sub_metrics['feature_space_coverage'] = min(1.0, pc_coverage / 2.0)
             except Exception:
                 sub_metrics['feature_space_coverage'] = 0.5
         else:
             sub_metrics['feature_space_coverage'] = 0.3
-        effectiveness_range = np.max(features) - np.min(features) if len(features) > 1 else 0
+        effectiveness_range = get_numpy().max(features) - get_numpy().min(features) if len(features) > 1 else 0
         sub_metrics['effectiveness_diversity'] = min(1.0, effectiveness_range / 1.0)
         min_samples_per_domain = 10
         adequate_samples = all(count >= min_samples_per_domain for count in domain_counts.values())
         sub_metrics['sample_adequacy'] = float(adequate_samples)
-        diversity_score = np.mean(list(sub_metrics.values()))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
+        diversity_score = get_numpy().mean(list(sub_metrics.values()))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean(x), list(sub_metrics.values()))
         return QualityDimension(name='diversity', score=float(diversity_score), weight=self.dimension_weights['diversity'], sub_metrics=sub_metrics, threshold_met=bool(diversity_score >= 0.7), confidence_interval=confidence_interval, interpretation=self._interpret_diversity_score(diversity_score))
 
-    async def _assess_consistency(self, features: np.ndarray, effectiveness: np.ndarray) -> QualityDimension:
+    async def _assess_consistency(self, features: get_numpy().ndarray, effectiveness: get_numpy().ndarray) -> QualityDimension:
         """Assess internal consistency and logical relationships"""
         sub_metrics = {}
         correlations = []
         for i in range(features.shape[1]):
-            corr = np.corrcoef(features[:, i], effectiveness)[0, 1]
-            if not np.isnan(corr):
+            corr = get_numpy().corrcoef(features[:, i], effectiveness)[0, 1]
+            if not get_numpy().isnan(corr):
                 correlations.append(abs(corr))
         if correlations:
-            avg_correlation = float(np.mean(correlations))
+            avg_correlation = float(get_numpy().mean(correlations))
             consistency_score = 1.0 - abs(avg_correlation - 0.4) / 0.4
             sub_metrics['feature_effectiveness_consistency'] = max(0.0, consistency_score)
         else:
             sub_metrics['feature_effectiveness_consistency'] = 0.5
         if features.shape[1] > 1:
-            feature_corr_matrix = np.corrcoef(features.T)
-            mask = ~np.eye(feature_corr_matrix.shape[0], dtype=bool)
-            off_diagonal_corrs = np.abs(feature_corr_matrix[mask])
-            avg_feature_corr = np.mean(off_diagonal_corrs) if len(off_diagonal_corrs) > 0 else 0
+            feature_corr_matrix = get_numpy().corrcoef(features.T)
+            mask = ~get_numpy().eye(feature_corr_matrix.shape[0], dtype=bool)
+            off_diagonal_corrs = get_numpy().abs(feature_corr_matrix[mask])
+            avg_feature_corr = get_numpy().mean(off_diagonal_corrs) if len(off_diagonal_corrs) > 0 else 0
             if avg_feature_corr > 0.8:
                 sub_metrics['inter_feature_consistency'] = 1.0 - (avg_feature_corr - 0.8) / 0.2
             elif avg_feature_corr < 0.1:
@@ -304,19 +301,19 @@ class EnhancedQualityScorer:
                 sub_metrics['inter_feature_consistency'] = 1.0
         else:
             sub_metrics['inter_feature_consistency'] = 1.0
-        sorted_indices = np.argsort(effectiveness)
+        sorted_indices = get_numpy().argsort(effectiveness)
         sorted_features = features[sorted_indices]
         monotonic_scores = []
         for i in range(features.shape[1]):
-            trend_correlation, _ = stats.spearmanr(effectiveness, features[:, i])
-            if not np.isnan(trend_correlation):
+            trend_correlation, _ = get_scipy_stats().spearmanr(effectiveness, features[:, i])
+            if not get_numpy().isnan(trend_correlation):
                 monotonic_scores.append(abs(trend_correlation))
         if monotonic_scores:
-            sub_metrics['monotonicity_consistency'] = np.mean(monotonic_scores)
+            sub_metrics['monotonicity_consistency'] = get_numpy().mean(monotonic_scores)
         else:
             sub_metrics['monotonicity_consistency'] = 0.5
-        consistency_score = float(np.mean(list(sub_metrics.values())))
-        confidence_interval = self._bootstrap_confidence_interval(lambda x: np.mean(x), list(sub_metrics.values()))
+        consistency_score = float(get_numpy().mean(list(sub_metrics.values())))
+        confidence_interval = self._bootstrap_confidence_interval(lambda x: get_numpy().mean(x), list(sub_metrics.values()))
         return QualityDimension(name='consistency', score=float(consistency_score), weight=self.dimension_weights['consistency'], sub_metrics=sub_metrics, threshold_met=bool(consistency_score >= 0.6), confidence_interval=confidence_interval, interpretation=self._interpret_consistency_score(consistency_score))
 
     def _calculate_weighted_score(self, dimensions: list[QualityDimension]) -> float:
@@ -328,10 +325,10 @@ class EnhancedQualityScorer:
     def _calculate_confidence_score(self, dimensions: list[QualityDimension]) -> float:
         """Calculate confidence in the overall assessment"""
         scores = [dim.score for dim in dimensions]
-        score_std = float(np.std(scores))
+        score_std = float(get_numpy().std(scores))
         consistency_confidence = max(0.0, 1.0 - score_std)
         interval_widths = [dim.confidence_interval[1] - dim.confidence_interval[0] for dim in dimensions]
-        avg_interval_width = float(np.mean(interval_widths))
+        avg_interval_width = float(get_numpy().mean(interval_widths))
         interval_confidence = max(0.0, 1.0 - avg_interval_width)
         return (consistency_confidence + interval_confidence) / 2.0
 
@@ -348,11 +345,11 @@ class EnhancedQualityScorer:
             return (0.0, 1.0)
         bootstrap_samples = []
         for _ in range(n_bootstrap):
-            sample = np.random.choice(data, size=len(data), replace=True)
+            sample = get_numpy().random.choice(data, size=len(data), replace=True)
             bootstrap_samples.append(func(sample))
         alpha = 1 - self.confidence_level
-        lower = np.percentile(bootstrap_samples, 100 * alpha / 2)
-        upper = np.percentile(bootstrap_samples, 100 * (1 - alpha / 2))
+        lower = get_numpy().percentile(bootstrap_samples, 100 * alpha / 2)
+        upper = get_numpy().percentile(bootstrap_samples, 100 * (1 - alpha / 2))
         return (float(lower), float(upper))
 
     def _interpret_fidelity_score(self, score: float) -> str:

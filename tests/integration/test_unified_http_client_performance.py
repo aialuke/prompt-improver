@@ -4,10 +4,9 @@ Tests circuit breaker functionality, response time improvements, and reliability
 """
 
 import asyncio
-import json
+import contextlib
 import time
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -80,12 +79,10 @@ class TestUnifiedHTTPClientPerformance:
             metrics = await http_factory.get_client_metrics("test_webhook")
             assert "circuit_breaker" in metrics
             start_time = time.time()
-            try:
+            with contextlib.suppress(Exception):
                 await http_factory.make_request(
                     "test_webhook", "POST", "http://test.com", json={"test": "final"}
                 )
-            except Exception:
-                pass
             fast_fail_time = time.time() - start_time
             assert fast_fail_time < 0.1, (
                 f"Circuit breaker should fail fast, took {fast_fail_time:.3f}s"
@@ -262,12 +259,10 @@ class TestUnifiedHTTPClientPerformance:
                 "success"
             ]
             start_time = time.time()
-            try:
+            with contextlib.suppress(Exception):
                 await http_factory.make_request(
                     "test_api", "GET", "https://secure.test.com/ssl"
                 )
-            except Exception:
-                pass
             ssl_time = time.time() - start_time
             assert ssl_time < 0.1, f"SSL request took {ssl_time:.3f}s"
 
@@ -282,12 +277,10 @@ class TestUnifiedHTTPClientPerformance:
             ]
             start_time = time.time()
             for i in range(10):
-                try:
+                with contextlib.suppress(Exception):
                     await http_factory.make_request(
                         "test_api", "GET", f"http://test.com/metrics/{i}"
                     )
-                except Exception:
-                    pass
             request_time = time.time() - start_time
             metrics_start = time.time()
             metrics = await http_factory.get_client_metrics("test_api")
@@ -337,10 +330,8 @@ class TestHTTPClientConsolidationBenchmark:
 
         async def new_http_pattern():
             start_time = time.time()
-            try:
+            with contextlib.suppress(Exception):
                 response = await make_api_request("GET", "http://test.com")
-            except Exception:
-                pass
             return time.time() - start_time
 
         with patch("aiohttp.ClientSession"):
@@ -379,10 +370,8 @@ class TestPhase3IntegrationValidation:
         with patch("aiohttp.ClientSession"):
             for client_name, method, url in client_tests:
                 start_time = time.time()
-                try:
+                with contextlib.suppress(Exception):
                     await factory.make_request(client_name, method, url)
-                except Exception:
-                    pass
                 request_time = time.time() - start_time
                 assert request_time < 0.1, (
                     f"{client_name} request took {request_time:.3f}s"

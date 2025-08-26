@@ -6,7 +6,6 @@ Following 2025 best practices: real behavior testing without mocks.
 
 import asyncio
 import time
-from typing import Any, Dict
 
 import pytest
 
@@ -21,7 +20,6 @@ from prompt_improver.performance.monitoring.health import (
 )
 from prompt_improver.performance.monitoring.health.background_manager import (
     BackgroundTaskManager,
-    get_background_task_manager,
 )
 from prompt_improver.performance.monitoring.health.checkers import QueueHealthChecker
 
@@ -90,11 +88,11 @@ class TestQueueHealthIntegration:
         checker = QueueHealthChecker(batch_processor=real_batch_processor)
         result = await checker.check()
         assert result.component == "queue"
-        assert result.status in [
+        assert result.status in {
             HealthStatus.HEALTHY,
             HealthStatus.WARNING,
             HealthStatus.FAILED,
-        ]
+        }
         assert result.details is not None
         assert "total_queue_backlog" in result.details
         assert "queue_capacity_utilization" in result.details
@@ -118,11 +116,11 @@ class TestQueueHealthIntegration:
         assert "queue" in available_checks
         queue_result = await health_service.run_specific_check("queue")
         assert queue_result.component == "queue"
-        assert queue_result.status in [
+        assert queue_result.status in {
             HealthStatus.HEALTHY,
             HealthStatus.WARNING,
             HealthStatus.FAILED,
-        ]
+        }
 
     @pytest.mark.asyncio
     async def test_queue_health_metrics_collection(
@@ -193,7 +191,7 @@ class TestQueueHealthIntegration:
         server = APESMCPServer()
         await server.initialize()
         response = await server._health_queue_impl()
-        assert response["status"] in ["healthy", "warning", "failed"]
+        assert response["status"] in {"healthy", "warning", "failed"}
         assert "message" in response
         assert "queue_length" in response
         assert "retry_backlog" in response
@@ -219,11 +217,11 @@ class TestQueueHealthIntegration:
         )
         checker = QueueHealthChecker(batch_processor=None)
         result = await checker.check()
-        assert result.status in [
+        assert result.status in {
             HealthStatus.WARNING,
             HealthStatus.HEALTHY,
             HealthStatus.FAILED,
-        ]
+        }
         assert result.component == "queue"
 
     @pytest.mark.asyncio
@@ -241,11 +239,11 @@ class TestQueueHealthIntegration:
         assert "queue" in result.checks
         queue_check = result.checks["queue"]
         assert queue_check.component == "queue"
-        assert result.overall_status in [
+        assert result.overall_status in {
             HealthStatus.HEALTHY,
             HealthStatus.WARNING,
             HealthStatus.FAILED,
-        ]
+        }
 
     @pytest.mark.asyncio
     async def test_queue_health_status_messages(self, real_batch_processor):

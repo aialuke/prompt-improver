@@ -8,19 +8,18 @@ import asyncio
 import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, Dict, Optional, Type, TypeVar
+from typing import Any, AsyncContextManager, TypeVar
 
-from prompt_improver.core.protocols.ml_protocols import (
+from prompt_improver.shared.interfaces.protocols.core import EventBusProtocol
+from prompt_improver.shared.interfaces.protocols.ml import (
     CacheServiceProtocol,
     DatabaseServiceProtocol,
-    EventBusProtocol,
-    HealthMonitorProtocol,
     MLflowServiceProtocol,
     ResourceManagerProtocol,
-    ServiceContainerProtocol,
     ServiceStatus,
     WorkflowEngineProtocol,
 )
+from prompt_improver.shared.interfaces.protocols.monitoring import HealthMonitorProtocol
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ class MLServiceContainer:
     - Resource cleanup
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the service container."""
         self._services: dict[str, Any] = {}
         self._factories: dict[str, Callable[[], Any]] = {}
@@ -138,7 +137,7 @@ class MLServiceContainer:
                 self._logger.info(f"Created service via factory: {service_name}")
                 return service_instance
             except Exception as e:
-                self._logger.error(f"Failed to create service '{service_name}': {e}")
+                self._logger.exception(f"Failed to create service '{service_name}': {e}")
                 raise RuntimeError(f"Service creation failed for '{service_name}': {e}")
         raise KeyError(f"Service not found: {service_name}")
 
@@ -189,7 +188,7 @@ class MLServiceContainer:
                 self._health_checks[service_name] = service.health_check
             self._logger.debug(f"Initialized service: {service_name}")
         except Exception as e:
-            self._logger.error(
+            self._logger.exception(
                 f"Service initialization failed for '{service_name}': {e}"
             )
             raise
@@ -220,7 +219,7 @@ class MLServiceContainer:
             await service.shutdown()
             self._logger.debug(f"Shutdown service: {service_name}")
         except Exception as e:
-            self._logger.error(f"Service shutdown failed for '{service_name}': {e}")
+            self._logger.exception(f"Service shutdown failed for '{service_name}': {e}")
 
     async def health_check_all_services(self) -> dict[str, ServiceStatus]:
         """Check health of all registered services."""
@@ -250,7 +249,7 @@ class MLServiceContainer:
                 return await health_check_func()
             return health_check_func()
         except Exception as e:
-            self._logger.error(f"Health check error for '{service_name}': {e}")
+            self._logger.exception(f"Health check error for '{service_name}': {e}")
             return ServiceStatus.ERROR
 
     def is_initialized(self) -> bool:

@@ -4,26 +4,19 @@ import asyncio
 import json
 import logging
 import time
-import tracemalloc
 import uuid
 from collections.abc import Callable
-from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta, timezone
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from prompt_improver.utils.datetime_utils import (
-    format_compact_timestamp,
-    format_date_only,
-    format_display_date,
-)
 from prompt_improver.performance.baseline.models import (
     STANDARD_METRICS,
     BaselineMetrics,
     MetricDefinition,
     MetricType,
     MetricValue,
-    get_metric_definition,
 )
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
@@ -42,11 +35,7 @@ try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-try:
-    from prompt_improver.performance.monitoring.metrics_registry import (
-        get_metrics_registry,
-    )
-except ImportError:
+with suppress(ImportError):
     pass
 logger = logging.getLogger(__name__)
 
@@ -68,7 +57,7 @@ class BaselineCollector:
         enable_redis_metrics: bool = True,
         enable_application_metrics: bool = True,
         custom_collectors: list[Callable] | None = None,
-    ):
+    ) -> None:
         """Initialize baseline collector.
 
         Args:
@@ -99,7 +88,7 @@ class BaselineCollector:
             f"BaselineCollector initialized with {collection_interval}s interval"
         )
 
-    def _initialize_standard_metrics(self):
+    def _initialize_standard_metrics(self) -> None:
         """Initialize standard metric definitions."""
         for name, definition in STANDARD_METRICS.items():
             if name not in self.metrics_config:
@@ -132,10 +121,8 @@ class BaselineCollector:
         self._collecting = False
         if self._collection_task and (not self._collection_task.done()):
             self._collection_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._collection_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Baseline collection stopped")
 
     async def _collection_loop(self) -> None:
@@ -148,7 +135,7 @@ class BaselineCollector:
                 await self._cleanup_old_data()
                 logger.debug(f"Collected baseline with {len(baseline.metrics)} metrics")
             except Exception as e:
-                logger.error(f"Error during baseline collection: {e}")
+                logger.exception(f"Error during baseline collection: {e}")
             if self._collecting:
                 await asyncio.sleep(self.collection_interval)
 
@@ -169,7 +156,7 @@ class BaselineCollector:
             try:
                 await collector(baseline)
             except Exception as e:
-                logger.error(f"Custom collector failed: {e}")
+                logger.exception(f"Custom collector failed: {e}")
         return baseline
 
     async def _collect_system_metrics(self, baseline: BaselineMetrics) -> None:
@@ -218,7 +205,7 @@ class BaselineCollector:
                 timestamp=datetime.now(UTC),
             )
         except Exception as e:
-            logger.error(f"Failed to collect system metrics: {e}")
+            logger.exception(f"Failed to collect system metrics: {e}")
 
     async def _collect_database_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect database performance metrics."""
@@ -232,7 +219,7 @@ class BaselineCollector:
                 timestamp=datetime.now(UTC),
             )
         except Exception as e:
-            logger.error(f"Failed to collect database metrics: {e}")
+            logger.exception(f"Failed to collect database metrics: {e}")
 
     async def _collect_redis_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect Redis/cache performance metrics."""
@@ -246,7 +233,7 @@ class BaselineCollector:
                 timestamp=datetime.now(UTC),
             )
         except Exception as e:
-            logger.error(f"Failed to collect Redis metrics: {e}")
+            logger.exception(f"Failed to collect Redis metrics: {e}")
 
     async def _collect_application_metrics(self, baseline: BaselineMetrics) -> None:
         """Collect application-specific metrics."""
@@ -264,7 +251,7 @@ class BaselineCollector:
                     )
             self._operation_tracking.clear()
         except Exception as e:
-            logger.error(f"Failed to collect application metrics: {e}")
+            logger.exception(f"Failed to collect application metrics: {e}")
 
     async def _store_baseline(self, baseline: BaselineMetrics) -> None:
         """Store baseline to disk."""
@@ -285,10 +272,10 @@ class BaselineCollector:
                     for name, metric in baseline.metrics.items()
                 },
             }
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(baseline_data, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to store baseline: {e}")
+            logger.exception(f"Failed to store baseline: {e}")
 
     async def _cleanup_old_data(self) -> None:
         """Clean up old baseline data files."""
@@ -298,7 +285,7 @@ class BaselineCollector:
                 if filepath.stat().st_mtime < cutoff_time.timestamp():
                     filepath.unlink()
         except Exception as e:
-            logger.error(f"Failed to cleanup old data: {e}")
+            logger.exception(f"Failed to cleanup old data: {e}")
 
     async def record_request(
         self,
@@ -326,7 +313,7 @@ class BaselineCollector:
                     timestamp_str = filepath.stem.split("_", 1)[1]
                     timestamp = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
                     if timestamp >= cutoff_time:
-                        with open(filepath) as f:
+                        with open(filepath, encoding="utf-8") as f:
                             data = json.load(f)
                         baseline = BaselineMetrics(
                             timestamp=datetime.fromisoformat(data["timestamp"]),
@@ -349,7 +336,7 @@ class BaselineCollector:
             baselines.sort(key=lambda b: b.timestamp)
             return baselines
         except Exception as e:
-            logger.error(f"Failed to load recent baselines: {e}")
+            logger.exception(f"Failed to load recent baselines: {e}")
             return []
 
     def get_collection_status(self) -> dict[str, Any]:

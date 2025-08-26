@@ -1,4 +1,4 @@
-"""Application Service Protocols
+"""Application Service Protocols.
 
 This module defines the protocols (interfaces) for application services,
 establishing clear contracts for business workflow orchestration.
@@ -14,10 +14,10 @@ from prompt_improver.application.protocols.application_service_protocols import 
 )
 
 __all__ = [
-    "ApplicationServiceProtocol",
     "AnalyticsApplicationServiceProtocol",
+    "ApplicationServiceProtocol",
     "HealthApplicationServiceProtocol",
-    "MLApplicationServiceProtocol", 
+    "MLApplicationServiceProtocol",
     "PromptApplicationServiceProtocol",
     "TrainingApplicationServiceProtocol",
 ]

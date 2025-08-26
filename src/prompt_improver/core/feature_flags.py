@@ -1,4 +1,4 @@
-"""Feature Flag Manager for Prompt Improver
+"""Feature Flag Manager for Prompt Improver.
 
 Provides a comprehensive feature flag system with hot-reloading, percentage-based rollouts,
 and sophisticated user bucketing for managing technical debt cleanup phases.
@@ -18,20 +18,20 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import yaml
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 logger = logging.getLogger(__name__)
 
 
-class FlagState(str, Enum):
+class FlagState(StrEnum):
     """Feature flag states."""
 
     ENABLED = "enabled"
@@ -39,7 +39,7 @@ class FlagState(str, Enum):
     ROLLOUT = "rollout"
 
 
-class RolloutStrategy(str, Enum):
+class RolloutStrategy(StrEnum):
     """Rollout strategies for feature flags."""
 
     PERCENTAGE = "percentage"
@@ -117,7 +117,7 @@ class FeatureFlagMetrics(BaseModel):
 class FileWatcher(FileSystemEventHandler):
     """File system watcher for hot-reloading feature flags."""
 
-    def __init__(self, callback):
+    def __init__(self, callback) -> None:
         self.callback = callback
         self._last_modified = {}
         self._debounce_time = 0.5
@@ -134,7 +134,7 @@ class FileWatcher(FileSystemEventHandler):
         try:
             self.callback(file_path)
         except Exception as e:
-            logger.error(f"Error in file watcher callback: {e}")
+            logger.exception(f"Error in file watcher callback: {e}")
 
 
 class FeatureFlagService:
@@ -149,7 +149,7 @@ class FeatureFlagService:
     - Multiple configuration sources (YAML, JSON)
     """
 
-    def __init__(self, config_path: str | Path, watch_files: bool = True):
+    def __init__(self, config_path: str | Path, watch_files: bool = True) -> None:
         self.config_path = Path(config_path)
         self.watch_files = watch_files
         self._lock = asyncio.Lock()
@@ -173,8 +173,8 @@ class FeatureFlagService:
                 if not self.config_path.exists():
                     logger.warning(f"Configuration file not found: {self.config_path}")
                     return
-                with open(self.config_path) as f:
-                    if self.config_path.suffix.lower() in [".yml", ".yaml"]:
+                with open(self.config_path, encoding="utf-8") as f:
+                    if self.config_path.suffix.lower() in {".yml", ".yaml"}:
                         config_data = yaml.safe_load(f)
                     else:
                         config_data = json.load(f)
@@ -186,7 +186,7 @@ class FeatureFlagService:
                         flag_def = FeatureFlagDefinition(**flag_config)
                         new_flags[flag_key] = flag_def
                     except Exception as e:
-                        logger.error(f"Error loading flag '{flag_key}': {e}")
+                        logger.exception(f"Error loading flag '{flag_key}': {e}")
                         continue
                 self._flags = new_flags
                 self._config_loaded_at = datetime.now(UTC)
@@ -195,7 +195,7 @@ class FeatureFlagService:
                     f"Loaded {len(self._flags)} feature flags from {self.config_path}"
                 )
         except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
+            logger.exception(f"Error loading configuration: {e}")
 
     def _start_file_watcher(self) -> None:
         """Start file system watcher for hot-reloading."""
@@ -209,7 +209,7 @@ class FeatureFlagService:
             self._observer.start()
             logger.info(f"Started file watcher for {watch_path}")
         except Exception as e:
-            logger.error(f"Error starting file watcher: {e}")
+            logger.exception(f"Error starting file watcher: {e}")
 
     def _on_config_changed(self, file_path: str) -> None:
         """Handle configuration file changes."""
@@ -222,8 +222,7 @@ class FeatureFlagService:
         """Generate consistent hash for user bucketing."""
         combined = f"{flag_key}:{user_id}"
         hash_bytes = hashlib.sha256(combined.encode()).digest()
-        hash_value = int.from_bytes(hash_bytes[:4], byteorder="big") / 2**32
-        return hash_value
+        return int.from_bytes(hash_bytes[:4], byteorder="big") / 2**32
 
     def _evaluate_rollout(
         self, flag: FeatureFlagDefinition, context: EvaluationContext
@@ -254,7 +253,7 @@ class FeatureFlagService:
                 if self._evaluate_condition(rule.condition, context):
                     return rule.variant
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Error evaluating rule '{rule.name}' for flag '{flag.key}': {e}"
                 )
                 continue
@@ -346,7 +345,7 @@ class FeatureFlagService:
                         else next(
                             (
                                 v
-                                for v in flag.variants.keys()
+                                for v in flag.variants
                                 if v != flag.default_variant
                             ),
                             flag.default_variant,
@@ -374,20 +373,19 @@ class FeatureFlagService:
                 self._update_metrics(result)
                 return result
         except Exception as e:
-            logger.error(f"Error evaluating flag '{flag_key}': {e}")
+            logger.exception(f"Error evaluating flag '{flag_key}': {e}")
             async with self._lock:
                 if flag_key not in self._metrics:
                     self._metrics[flag_key] = FeatureFlagMetrics(flag_key=flag_key)
                 self._metrics[flag_key].error_count += 1
                 self._metrics[flag_key].last_error = str(e)
-            result = EvaluationResult(
+            return EvaluationResult(
                 flag_key=flag_key,
                 variant="error",
                 value=default_value,
                 reason="EVALUATION_ERROR",
                 evaluation_context=context,
             )
-            return result
 
     async def is_enabled(self, flag_key: str, context: EvaluationContext) -> bool:
         """Check if a feature flag is enabled for the given context."""

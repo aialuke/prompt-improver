@@ -18,7 +18,7 @@ import asyncio
 import hashlib
 import secrets
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -241,7 +241,7 @@ class TestSecurityValidation:
         """Test rate limiting for authentication attempts"""
         failed_attempts = 0
         max_attempts = 5
-        for i in range(10):
+        for _i in range(10):
             result = auth_service.authenticate_user("test_user", "wrong_password")
             if result is None:
                 failed_attempts += 1

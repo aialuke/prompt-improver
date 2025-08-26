@@ -7,7 +7,7 @@ import asyncio
 import os
 import sys
 import time
-from typing import Any, Dict
+from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
@@ -100,7 +100,7 @@ async def test_mcp_server_startup() -> dict[str, Any]:
         try:
             ready_task = asyncio.create_task(server._health_ready_impl())
             ready_result = await asyncio.wait_for(ready_task, timeout=5.0)
-            ready_working = ready_result.get("status") in ["ready", "not_ready"]
+            ready_working = ready_result.get("status") in {"ready", "not_ready"}
             results["health_checks"]["ready"] = ready_working
             print(
                 f"✅ Health ready: {('✅ Working' if ready_working else '❌ Failed')}"
@@ -231,7 +231,7 @@ def main():
         + sum(
             1
             for status in results["basic_tools"].values()
-            if status in [True, "security_blocked"]
+            if status in {True, "security_blocked"}
         )
         + sum(1 for status in results["health_checks"].values() if status)
         + sum(1 for status in results["database_operations"].values() if status)

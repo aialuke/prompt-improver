@@ -17,10 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.services.cache.cache_facade import (
-    CacheFacade as CacheManager,
-)
-# CacheManagerConfig removed - use CacheFacade constructor parameters instead
+from prompt_improver.services.cache.cache_factory import CacheFactory
 from .protocols import MLServiceProtocol
 from .registry import MLModelRegistry
 from .training_service import MLTrainingService
@@ -44,8 +41,7 @@ class MLModelServiceFacade(MLServiceProtocol):
         db_manager=None, 
         orchestrator_event_bus=None,
         max_cache_size_mb: int = 500,
-        default_ttl_minutes: int = 60,
-        cache_manager: Optional[CacheManager] = None
+        default_ttl_minutes: int = 60
     ):
         """Initialize the ML service facade with all component services.
         
@@ -54,7 +50,6 @@ class MLModelServiceFacade(MLServiceProtocol):
             orchestrator_event_bus: Event bus for orchestrator integration
             max_cache_size_mb: Maximum cache size for model registry
             default_ttl_minutes: Default TTL for cached models
-            cache_manager: Optional cache manager for inference result caching
         """
         # Create the model registry (shared by all services)
         self.model_registry = MLModelRegistry(
@@ -62,9 +57,9 @@ class MLModelServiceFacade(MLServiceProtocol):
             default_ttl_minutes=default_ttl_minutes
         )
         
-        # Performance optimization - multi-level caching for inference results
-        self.cache_manager = cache_manager
-        self._cache_enabled = cache_manager is not None
+        # Performance optimization - direct ML analysis cache for <10ms response times
+        self.cache_manager = CacheFactory.get_ml_analysis_cache()
+        self._cache_enabled = True
         
         # Performance metrics
         self._performance_metrics = {
@@ -83,9 +78,7 @@ class MLModelServiceFacade(MLServiceProtocol):
             orchestrator_event_bus=orchestrator_event_bus
         )
         
-        self.inference_service = MLInferenceService(
-            model_registry=self.model_registry
-        )
+        self.inference_service = MLInferenceService()
         
         self.production_service = MLProductionService(
             model_registry=self.model_registry,
@@ -104,7 +97,7 @@ class MLModelServiceFacade(MLServiceProtocol):
             orchestrator_event_bus=orchestrator_event_bus
         )
         
-        logger.info(f"ML Model Service Facade initialized with all component services (caching: {self._cache_enabled})")
+        logger.info(f"ML Model Service Facade initialized with optimized ML analysis cache (target: <10ms response times)")
 
     # Training methods - delegate to training service
     async def optimize_rules(
@@ -181,7 +174,7 @@ class MLModelServiceFacade(MLServiceProtocol):
                     await self.cache_manager.set(
                         cache_key, 
                         result, 
-                        ttl_seconds=1800  # 30 minutes
+                        l2_ttl=1800  # 30 minutes
                     )
                     logger.debug(f"Cached inference result: {model_id}")
                 except Exception as e:
@@ -252,7 +245,7 @@ class MLModelServiceFacade(MLServiceProtocol):
                     await self.cache_manager.set(
                         cache_key, 
                         result, 
-                        ttl_seconds=900  # 15 minutes
+                        l2_ttl=900  # 15 minutes
                     )
                     logger.debug("Cached pattern discovery result")
                 except Exception as e:
@@ -315,7 +308,7 @@ class MLModelServiceFacade(MLServiceProtocol):
                     await self.cache_manager.set(
                         cache_key, 
                         result, 
-                        ttl_seconds=600  # 10 minutes
+                        l2_ttl=600  # 10 minutes
                     )
                     logger.debug("Cached contextualized patterns result")
                 except Exception as e:

@@ -21,40 +21,40 @@ from prompt_improver.repositories.protocols.health_repository_protocol import (
 from prompt_improver.repositories.protocols.ml_repository_protocol import (
     MLRepositoryProtocol,
 )
+from prompt_improver.repositories.protocols.monitoring_repository_protocol import (
+    MonitoringRepositoryProtocol,
+)
+from prompt_improver.repositories.protocols.persistence_repository_protocol import (
+    PersistenceRepositoryProtocol,
+)
 from prompt_improver.repositories.protocols.rules_repository_protocol import (
     RulesRepositoryProtocol,
 )
 from prompt_improver.repositories.protocols.user_feedback_repository_protocol import (
     UserFeedbackRepositoryProtocol,
 )
-from prompt_improver.repositories.protocols.persistence_repository_protocol import (
-    PersistenceRepositoryProtocol,
-)
-from prompt_improver.repositories.protocols.monitoring_repository_protocol import (
-    MonitoringRepositoryProtocol,
-)
-from prompt_improver.repositories.protocols.session_manager_protocol import (
+from prompt_improver.shared.interfaces.protocols.database import (
+    QueryExecutorProtocol,
     SessionManagerProtocol,
     SessionProtocol,
-    QueryExecutorProtocol,
 )
 
 __all__ = [
-    # Base protocols
-    "BaseRepositoryProtocol",
-    "QueryBuilderProtocol",
-    "TransactionManagerProtocol",
-    # Session management protocols
-    "SessionManagerProtocol",
-    "SessionProtocol", 
-    "QueryExecutorProtocol",
     # Domain-specific protocols
     "AnalyticsRepositoryProtocol",
     "AprioriRepositoryProtocol",
-    "MLRepositoryProtocol",
-    "RulesRepositoryProtocol",
-    "UserFeedbackRepositoryProtocol",
+    # Base protocols
+    "BaseRepositoryProtocol",
     "HealthRepositoryProtocol",
-    "PersistenceRepositoryProtocol",
+    "MLRepositoryProtocol",
     "MonitoringRepositoryProtocol",
+    "PersistenceRepositoryProtocol",
+    "QueryBuilderProtocol",
+    "QueryExecutorProtocol",
+    "RulesRepositoryProtocol",
+    # Session management protocols
+    "SessionManagerProtocol",
+    "SessionProtocol",
+    "TransactionManagerProtocol",
+    "UserFeedbackRepositoryProtocol",
 ]

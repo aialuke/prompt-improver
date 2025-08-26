@@ -1,4 +1,4 @@
-"""OpenTelemetry Integration with Existing Monitoring Infrastructure
+"""OpenTelemetry Integration with Existing Monitoring Infrastructure.
 ================================================================
 
 Provides integration adapters to connect OpenTelemetry with existing
@@ -6,8 +6,6 @@ OpenTelemetry metrics, health checks, and monitoring systems.
 """
 
 import logging
-from contextlib import contextmanager
-from typing import Dict, Optional
 
 from prompt_improver.monitoring.opentelemetry.metrics import (
     get_business_metrics,
@@ -15,10 +13,6 @@ from prompt_improver.monitoring.opentelemetry.metrics import (
     get_http_metrics,
 )
 from prompt_improver.monitoring.opentelemetry.setup import get_meter, get_tracer
-from prompt_improver.monitoring.opentelemetry.tracing import (
-    add_span_attributes,
-    trace_async,
-)
 
 try:
     from opentelemetry import (
@@ -37,7 +31,7 @@ logger = logging.getLogger(__name__)
 class MetricsIntegration:
     """Integrates OpenTelemetry metrics with existing monitoring systems."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize metrics integration with OpenTelemetry collectors."""
         self.http_metrics = get_http_metrics()
         self.database_metrics = get_database_metrics()

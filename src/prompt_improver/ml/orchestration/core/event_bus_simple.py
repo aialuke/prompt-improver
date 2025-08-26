@@ -3,7 +3,7 @@ Simple event bus implementation for testing.
 """
 import asyncio
 from typing import Any, Callable, Dict, List
-from prompt_improver.core.protocols.ml_protocols import EventBusProtocol
+from prompt_improver.shared.interfaces.protocols.ml import EventBusProtocol
 
 
 class SimpleEventBus:

@@ -9,7 +9,7 @@ This container follows clean architecture principles by:
 Features:
 - Clean architecture compliance
 - Repository interface injection
-- Service lifecycle management  
+- Service lifecycle management
 - Async service initialization
 - Type-safe service resolution
 - Easy testing with mock repositories
@@ -17,25 +17,21 @@ Features:
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional, Protocol, Type, TypeVar
 from contextlib import asynccontextmanager
-from collections.abc import Awaitable
+from typing import Any, TypeVar
 
+from prompt_improver.core.services.persistence_service_clean import (
+    CleanPersistenceService,
+)
 from prompt_improver.repositories.interfaces.repository_interfaces import (
     IPersistenceRepository,
-    IRulesRepository, 
-    IMLRepository,
-    IUserFeedbackRepository,
-    IAnalyticsRepository,
-    IHealthRepository,
-    IMonitoringRepository,
-    ISessionManager,
+    IRulesRepository,
 )
-from prompt_improver.core.services.persistence_service_clean import CleanPersistenceService
+from prompt_improver.rule_engine.intelligent_rule_selector import (
+    CleanRuleSelectionService,
+)
+
 # CLEAN ARCHITECTURE 2025: Rule selection moved to application layer
-from prompt_improver.application.services.rule_selection_application_service import (
-    RuleSelectionApplicationService,
-)
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -43,8 +39,8 @@ T = TypeVar("T")
 
 class ServiceNotRegisteredError(Exception):
     """Raised when attempting to resolve unregistered service."""
-    
-    def __init__(self, service_type: Type[Any]):
+
+    def __init__(self, service_type: type[Any]) -> None:
         self.service_type = service_type
         super().__init__(f"Service {service_type.__name__} is not registered")
 
@@ -52,30 +48,30 @@ class ServiceNotRegisteredError(Exception):
 class CleanDIContainer:
     """Clean dependency injection container following clean architecture."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the clean DI container."""
-        self._singletons: Dict[Type[Any], Any] = {}
-        self._factories: Dict[Type[Any], Any] = {}
-        self._repositories: Dict[Type[Any], Any] = {}
+        self._singletons: dict[type[Any], Any] = {}
+        self._factories: dict[type[Any], Any] = {}
+        self._repositories: dict[type[Any], Any] = {}
         self._initialized = False
 
-    def register_repository(self, interface: Type[T], implementation: T) -> None:
+    def register_repository(self, interface: type[T], implementation: T) -> None:
         """Register a repository implementation for an interface."""
         self._repositories[interface] = implementation
         logger.debug(f"Registered repository {interface.__name__} -> {type(implementation).__name__}")
 
-    def register_singleton(self, interface: Type[T], factory: Any) -> None:
+    def register_singleton(self, interface: type[T], factory: Any) -> None:
         """Register a singleton service with its factory."""
         self._factories[interface] = factory
         logger.debug(f"Registered singleton {interface.__name__}")
 
-    def get_repository(self, interface: Type[T]) -> T:
+    def get_repository(self, interface: type[T]) -> T:
         """Get a repository instance by interface."""
         if interface not in self._repositories:
             raise ServiceNotRegisteredError(interface)
         return self._repositories[interface]
 
-    def get_service(self, interface: Type[T]) -> T:
+    def get_service(self, interface: type[T]) -> T:
         """Get a service instance by interface (singleton pattern)."""
         # Check if already instantiated
         if interface in self._singletons:
@@ -88,17 +84,14 @@ class CleanDIContainer:
         # Create instance using factory
         factory = self._factories[interface]
         try:
-            if callable(factory):
-                instance = factory(self)
-            else:
-                instance = factory
-            
+            instance = factory(self) if callable(factory) else factory
+
             self._singletons[interface] = instance
             logger.debug(f"Created singleton instance of {interface.__name__}")
             return instance
 
         except Exception as e:
-            logger.error(f"Failed to create instance of {interface.__name__}: {e}")
+            logger.exception(f"Failed to create instance of {interface.__name__}: {e}")
             raise
 
     async def initialize_services(self) -> None:
@@ -118,14 +111,14 @@ class CleanDIContainer:
                         implementation.initialize()
                     logger.debug(f"Initialized repository {interface.__name__}")
                 except Exception as e:
-                    logger.error(f"Failed to initialize repository {interface.__name__}: {e}")
+                    logger.exception(f"Failed to initialize repository {interface.__name__}: {e}")
 
         # Initialize services (they depend on repositories)
         for interface in self._factories:
             try:
                 # Trigger lazy instantiation
                 service = self.get_service(interface)
-                
+
                 # Call async initializer if present
                 if hasattr(service, 'initialize') and callable(service.initialize):
                     if asyncio.iscoroutinefunction(service.initialize):
@@ -135,7 +128,7 @@ class CleanDIContainer:
                     logger.debug(f"Initialized service {interface.__name__}")
 
             except Exception as e:
-                logger.error(f"Failed to initialize service {interface.__name__}: {e}")
+                logger.exception(f"Failed to initialize service {interface.__name__}: {e}")
 
         self._initialized = True
         logger.info("Clean DI container initialization complete")
@@ -154,7 +147,7 @@ class CleanDIContainer:
                         instance.shutdown()
                     logger.debug(f"Shutdown service {interface.__name__}")
                 except Exception as e:
-                    logger.error(f"Failed to shutdown service {interface.__name__}: {e}")
+                    logger.exception(f"Failed to shutdown service {interface.__name__}: {e}")
 
         # Shutdown repositories
         for interface, implementation in self._repositories.items():
@@ -166,7 +159,7 @@ class CleanDIContainer:
                         implementation.shutdown()
                     logger.debug(f"Shutdown repository {interface.__name__}")
                 except Exception as e:
-                    logger.error(f"Failed to shutdown repository {interface.__name__}: {e}")
+                    logger.exception(f"Failed to shutdown repository {interface.__name__}: {e}")
 
         self._initialized = False
         logger.info("Clean DI container shutdown complete")
@@ -180,7 +173,7 @@ class CleanDIContainer:
         finally:
             await self.shutdown_services()
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Perform health check on all registered services."""
         health_status = {
             "container_initialized": self._initialized,
@@ -206,7 +199,7 @@ class CleanDIContainer:
             except Exception as e:
                 health_status["repository_health"][interface.__name__] = f"error: {e}"
 
-        # Check service health  
+        # Check service health
         for interface, instance in self._singletons.items():
             try:
                 if hasattr(instance, 'health_check') and callable(instance.health_check):
@@ -224,7 +217,7 @@ class CleanDIContainer:
 
 
 # Global container instance
-_clean_container: Optional[CleanDIContainer] = None
+_clean_container: CleanDIContainer | None = None
 
 
 def get_clean_container() -> CleanDIContainer:
@@ -238,7 +231,6 @@ def get_clean_container() -> CleanDIContainer:
 
 def _configure_clean_container(container: CleanDIContainer) -> None:
     """Configure the clean DI container with default services."""
-    
     # Register core clean services
     container.register_singleton(
         CleanPersistenceService,
@@ -246,7 +238,7 @@ def _configure_clean_container(container: CleanDIContainer) -> None:
             persistence_repository=c.get_repository(IPersistenceRepository)
         )
     )
-    
+
     container.register_singleton(
         CleanRuleSelectionService,
         lambda c: CleanRuleSelectionService(
@@ -258,19 +250,19 @@ def _configure_clean_container(container: CleanDIContainer) -> None:
 
 
 # Convenience functions
-async def resolve_service(interface: Type[T]) -> T:
+async def resolve_service[T](interface: type[T]) -> T:
     """Resolve a service from the global container."""
     container = get_clean_container()
     return container.get_service(interface)
 
 
-async def resolve_repository(interface: Type[T]) -> T:
+async def resolve_repository[T](interface: type[T]) -> T:
     """Resolve a repository from the global container."""
     container = get_clean_container()
     return container.get_repository(interface)
 
 
-def register_test_repositories(repositories: Dict[Type[Any], Any]) -> None:
+def register_test_repositories(repositories: dict[type[Any], Any]) -> None:
     """Register test repositories for testing purposes."""
     container = get_clean_container()
     for interface, implementation in repositories.items():

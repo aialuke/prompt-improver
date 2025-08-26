@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from ...core.utils.lazy_ml_loader import get_numpy, get_torch
 
 from ...database.models import TrainingPrompt
 from ..analytics.generation_analytics import (
@@ -67,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 # Check for PyTorch availability for neural methods
 try:
-    import torch
+    # import torch  # Converted to lazy loading
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -141,7 +142,7 @@ class ProductionSyntheticDataGenerator:
         """
         self.target_samples = target_samples
         self.random_state = random_state
-        self.rng = np.random.RandomState(random_state)
+        self.rng = get_numpy().random.RandomState(random_state)
         self.use_enhanced_scoring = use_enhanced_scoring
         self.generation_method = generation_method
         self.neural_model_type = neural_model_type
@@ -578,7 +579,7 @@ class ProductionSyntheticDataGenerator:
         try:
             # First generate a base dataset using statistical methods for training the neural model
             base_result = await self.generate_comprehensive_training_data()
-            base_features = np.array(base_result["features"])
+            base_features = get_numpy().array(base_result["features"])
 
             # Train neural model on base data
             self.neural_generator.fit(base_features)
@@ -652,7 +653,7 @@ class ProductionSyntheticDataGenerator:
 
             for feature_vector in features:
                 # Determine domain based on feature characteristics
-                domain_name = self._select_domain_from_features(np.array(feature_vector))
+                domain_name = self._select_domain_from_features(get_numpy().array(feature_vector))
                 domain_config = self.domains[domain_name]
 
                 # Generate effectiveness score for this domain
@@ -700,7 +701,7 @@ class ProductionSyntheticDataGenerator:
         try:
             # First generate a base dataset using statistical methods for training the diffusion model
             base_result = await self.generate_comprehensive_training_data()
-            base_features = np.array(base_result["features"])
+            base_features = get_numpy().array(base_result["features"])
 
             # Train diffusion model on base data
             self.neural_generator.fit(base_features)
@@ -824,7 +825,7 @@ class ProductionSyntheticDataGenerator:
         return result
 
     # Helper methods for maintaining compatibility
-    def _select_domain_from_features(self, feature_vector: np.ndarray) -> str:
+    def _select_domain_from_features(self, feature_vector: get_numpy().ndarray) -> str:
         """Select domain based on feature characteristics"""
         # Simple heuristic based on feature ranges
         clarity = feature_vector[0] if len(feature_vector) > 0 else 0.5
@@ -856,30 +857,30 @@ class ProductionSyntheticDataGenerator:
     ) -> QualityMetrics:
         """Assess quality of comprehensive generation"""
         try:
-            feature_array = np.array(features)
-            effectiveness_array = np.array(effectiveness)
+            feature_array = get_numpy().array(features)
+            effectiveness_array = get_numpy().array(effectiveness)
             
             # Distribution quality
             dist_quality = self.statistical_quality_assessor.assess_sample_quality(features)
             
             # Feature diversity (variance across features)
-            feature_variances = np.var(feature_array, axis=0)
-            diversity_score = np.mean(feature_variances > 0.1)
+            feature_variances = get_numpy().var(feature_array, axis=0)
+            diversity_score = get_numpy().mean(feature_variances > 0.1)
             
             # Effectiveness variance
-            eff_variance = np.var(effectiveness_array)
+            eff_variance = get_numpy().var(effectiveness_array)
             variance_score = min(1.0, eff_variance / 0.1)  # Normalize
             
             # Class balance (check effectiveness distribution)
-            hist, _ = np.histogram(effectiveness_array, bins=5)
-            balance_score = 1.0 - np.std(hist) / np.mean(hist + 1e-8)
+            hist, _ = get_numpy().histogram(effectiveness_array, bins=5)
+            balance_score = 1.0 - get_numpy().std(hist) / get_numpy().mean(hist + 1e-8)
             
             # Correlation structure (features shouldn't be too correlated)
-            correlation_matrix = np.corrcoef(feature_array.T)
-            max_correlation = np.max(np.abs(correlation_matrix - np.eye(len(self.feature_names))))
+            correlation_matrix = get_numpy().corrcoef(feature_array.T)
+            max_correlation = get_numpy().max(get_numpy().abs(correlation_matrix - get_numpy().eye(len(self.feature_names))))
             correlation_score = max(0, 1.0 - max_correlation / 0.8)
             
-            overall_score = np.mean([
+            overall_score = get_numpy().mean([
                 dist_quality, diversity_score, variance_score, 
                 balance_score, correlation_score
             ])

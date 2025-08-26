@@ -1,9 +1,9 @@
-"""Resilience Services Package
+"""Resilience Services Package.
 
 Centralized resilience and retry configuration management following clean architecture principles.
 
 This package provides:
-- RetryConfigurationService for centralized retry configuration management  
+- RetryConfigurationService for centralized retry configuration management
 - BackoffStrategyService for optimized delay calculations (<1ms performance)
 - CircuitBreakerService for state management and protection
 - RetryOrchestratorService for coordination of all retry operations (<10ms decisions)
@@ -20,28 +20,28 @@ This package provides:
 - Service coordination with comprehensive observability
 """
 
-from .backoff_strategy_service import (
+from prompt_improver.core.services.resilience.backoff_strategy_service import (
     BackoffStrategyProtocol,
     BackoffStrategyService,
     StrategyMetrics,
     calculate_delay,
     get_backoff_strategy_service,
 )
-from .circuit_breaker_service import (
-    CircuitBreakerService,
+from prompt_improver.core.services.resilience.circuit_breaker_service import (
+    CallRecord,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
+    CircuitBreakerService,
     CircuitState,
-    CallRecord,
     create_circuit_breaker_service,
 )
-from .retry_configuration_service import (
+from prompt_improver.core.services.resilience.retry_configuration_service import (
     ConfigTemplate,
     RetryConfigurationProtocol,
     RetryConfigurationService,
     get_retry_configuration_service,
 )
-from .retry_orchestrator_service import (
+from prompt_improver.core.services.resilience.retry_orchestrator_service import (
     RetryExecutionContext,
     RetryOrchestratorProtocol,
     RetryOrchestratorService,
@@ -58,7 +58,7 @@ __all__ = [
     "CircuitBreakerService",
     "CircuitState",
     "ConfigTemplate",
-    "RetryConfigurationProtocol", 
+    "RetryConfigurationProtocol",
     "RetryConfigurationService",
     "RetryExecutionContext",
     "RetryOrchestratorProtocol",

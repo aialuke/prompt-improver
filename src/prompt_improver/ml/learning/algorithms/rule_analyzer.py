@@ -9,12 +9,11 @@ from datetime import datetime
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 import warnings
-import numpy as np
-from scipy import stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 try:
     import pandas as pd
-    from sklearn.metrics import mean_absolute_error, mean_squared_error
-    from sklearn.model_selection import TimeSeriesSplit
+    from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
     TIME_SERIES_AVAILABLE = True
 except ImportError:
     TIME_SERIES_AVAILABLE = False
@@ -168,9 +167,9 @@ class RuleEffectivenessAnalyzer:
             overall_scores = [dp['overall_score'] for dp in data_points]
             total_applications = len(data_points)
             success_rate = sum(1 for s in scores if s > 0.5) / total_applications
-            avg_improvement = float(np.mean(scores))
-            std_improvement = float(np.std(scores))
-            median_improvement = float(np.median(scores))
+            avg_improvement = float(get_numpy().mean(scores))
+            std_improvement = float(get_numpy().std(scores))
+            median_improvement = float(get_numpy().median(scores))
             consistency_score = 1 - std_improvement / avg_improvement if avg_improvement > 0 else 0
             consistency_score = max(0, min(1, consistency_score))
             contexts = list({self._get_context_key(dp['context']) for dp in data_points})
@@ -200,13 +199,13 @@ class RuleEffectivenessAnalyzer:
             rule_ids = data_points[0]['rule_ids']
             frequency = len(data_points)
             combo_scores = [dp['score'] for dp in data_points]
-            avg_improvement = float(np.mean(combo_scores))
+            avg_improvement = float(get_numpy().mean(combo_scores))
             individual_sums = []
             for dp in data_points:
                 if dp['individual_scores']:
                     individual_sums.append(sum(dp['individual_scores']))
             if individual_sums:
-                avg_individual_sum = np.mean(individual_sums)
+                avg_individual_sum = get_numpy().mean(individual_sums)
                 synergy_score = avg_improvement - avg_individual_sum
             else:
                 synergy_score = 0.0
@@ -260,17 +259,17 @@ class RuleEffectivenessAnalyzer:
         top_rules = sorted(rule_metrics.items(), key=lambda x: (x[1].avg_improvement, x[1].consistency_score), reverse=True)[:5]
         bottom_rules = sorted(rule_metrics.items(), key=lambda x: (x[1].avg_improvement, x[1].consistency_score))[:3]
         best_combinations = sorted(combination_metrics, key=lambda x: x.avg_improvement, reverse=True)[:3]
-        summary = {'total_rules': len(rule_metrics), 'avg_improvement_across_rules': float(np.mean(all_improvements)), 'avg_consistency_across_rules': float(np.mean(all_consistency)), 'top_performing_rules': [{'rule_id': rule_id, 'avg_improvement': metrics.avg_improvement, 'consistency': metrics.consistency_score} for rule_id, metrics in top_rules], 'underperforming_rules': [{'rule_id': rule_id, 'avg_improvement': metrics.avg_improvement, 'applications': metrics.total_applications} for rule_id, metrics in bottom_rules], 'best_combinations': [{'rules': combo.rule_ids, 'avg_improvement': combo.avg_improvement, 'synergy': combo.synergy_score} for combo in best_combinations], 'rules_needing_attention': len([m for m in rule_metrics.values() if m.avg_improvement < 0.5 or m.consistency_score < 0.6])}
+        summary = {'total_rules': len(rule_metrics), 'avg_improvement_across_rules': float(get_numpy().mean(all_improvements)), 'avg_consistency_across_rules': float(get_numpy().mean(all_consistency)), 'top_performing_rules': [{'rule_id': rule_id, 'avg_improvement': metrics.avg_improvement, 'consistency': metrics.consistency_score} for rule_id, metrics in top_rules], 'underperforming_rules': [{'rule_id': rule_id, 'avg_improvement': metrics.avg_improvement, 'applications': metrics.total_applications} for rule_id, metrics in bottom_rules], 'best_combinations': [{'rules': combo.rule_ids, 'avg_improvement': combo.avg_improvement, 'synergy': combo.synergy_score} for combo in best_combinations], 'rules_needing_attention': len([m for m in rule_metrics.values() if m.avg_improvement < 0.5 or m.consistency_score < 0.6])}
         if ts_validation_results:
             ts_stability_scores = [result.temporal_stability for result in ts_validation_results.values()]
             declining_trends = [result for result in ts_validation_results.values() if result.trend_coefficient and result.trend_coefficient < -0.01]
             rules_with_changes = [result for result in ts_validation_results.values() if len(result.change_points) > 0]
-            summary['time_series_analysis'] = {'rules_validated': len(ts_validation_results), 'avg_temporal_stability': float(np.mean(ts_stability_scores)), 'rules_with_declining_trends': len(declining_trends), 'rules_with_performance_shifts': len(rules_with_changes), 'most_stable_rule': max(ts_validation_results.items(), key=lambda x: x[1].temporal_stability)[0] if ts_validation_results else None, 'least_stable_rule': min(ts_validation_results.items(), key=lambda x: x[1].temporal_stability)[0] if ts_validation_results else None}
+            summary['time_series_analysis'] = {'rules_validated': len(ts_validation_results), 'avg_temporal_stability': float(get_numpy().mean(ts_stability_scores)), 'rules_with_declining_trends': len(declining_trends), 'rules_with_performance_shifts': len(rules_with_changes), 'most_stable_rule': max(ts_validation_results.items(), key=lambda x: x[1].temporal_stability)[0] if ts_validation_results else None, 'least_stable_rule': min(ts_validation_results.items(), key=lambda x: x[1].temporal_stability)[0] if ts_validation_results else None}
         if bayesian_results:
             posterior_stds = [result.posterior_std for result in bayesian_results.values()]
             high_uncertainty_rules = [result for result in bayesian_results.values() if result.posterior_std > 0.2]
             convergence_issues = [result for result in bayesian_results.values() if result.rhat_statistic > 1.1]
-            summary['bayesian_analysis'] = {'rules_modeled': len(bayesian_results), 'avg_posterior_uncertainty': float(np.mean(posterior_stds)), 'high_uncertainty_rules': len(high_uncertainty_rules), 'convergence_issues': len(convergence_issues), 'most_certain_rule': min(bayesian_results.items(), key=lambda x: x[1].posterior_std)[0] if bayesian_results else None, 'most_uncertain_rule': max(bayesian_results.items(), key=lambda x: x[1].posterior_std)[0] if bayesian_results else None}
+            summary['bayesian_analysis'] = {'rules_modeled': len(bayesian_results), 'avg_posterior_uncertainty': float(get_numpy().mean(posterior_stds)), 'high_uncertainty_rules': len(high_uncertainty_rules), 'convergence_issues': len(convergence_issues), 'most_certain_rule': min(bayesian_results.items(), key=lambda x: x[1].posterior_std)[0] if bayesian_results else None, 'most_uncertain_rule': max(bayesian_results.items(), key=lambda x: x[1].posterior_std)[0] if bayesian_results else None}
         return summary
 
     async def _perform_advanced_time_series_analysis(self, rule_data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
@@ -318,13 +317,14 @@ class RuleEffectivenessAnalyzer:
                 return {'error': 'Time series libraries not available'}
             from statsmodels.tsa.seasonal import seasonal_decompose
             import pandas as pd
+            from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
             df = pd.DataFrame({'timestamp': timestamps, 'score': scores})
             df.set_index('timestamp', inplace=True)
             if len(df) > 20:
                 df = df.resample('1h').mean().ffill()
             if len(df) >= 10:
                 decomposition = seasonal_decompose(df['score'], model='additive', period=min(7, len(df) // 2))
-                return {'trend_strength': float(np.var(decomposition.trend.dropna()) / np.var(df['score'])), 'seasonal_strength': float(np.var(decomposition.seasonal) / np.var(df['score'])), 'residual_variance': float(np.var(decomposition.resid.dropna())), 'decomposition_success': True, 'period_detected': 7}
+                return {'trend_strength': float(get_numpy().var(decomposition.trend.dropna()) / get_numpy().var(df['score'])), 'seasonal_strength': float(get_numpy().var(decomposition.seasonal) / get_numpy().var(df['score'])), 'residual_variance': float(get_numpy().var(decomposition.resid.dropna())), 'decomposition_success': True, 'period_detected': 7}
             return {'insufficient_data': 'Need at least 10 data points for decomposition'}
         except Exception as e:
             return {'error': str(e)}
@@ -336,9 +336,9 @@ class RuleEffectivenessAnalyzer:
             change_points = []
             window_size = max(5, len(scores) // 10)
             for i in range(window_size, len(scores) - window_size):
-                before_mean = np.mean(scores[i - window_size:i])
-                after_mean = np.mean(scores[i:i + window_size])
-                t_stat, p_value = stats.ttest_ind(scores[i - window_size:i], scores[i:i + window_size])
+                before_mean = get_numpy().mean(scores[i - window_size:i])
+                after_mean = get_numpy().mean(scores[i:i + window_size])
+                t_stat, p_value = get_scipy_stats().ttest_ind(scores[i - window_size:i], scores[i:i + window_size])
                 if p_value < 0.05 and abs(after_mean - before_mean) > 0.1:
                     change_points.append(i)
             return change_points
@@ -354,9 +354,9 @@ class RuleEffectivenessAnalyzer:
                 before_window = scores[i - window_size:i]
                 after_window = scores[i:i + window_size]
                 if len(before_window) > 2 and len(after_window) > 2:
-                    t_stat, p_value = stats.ttest_ind(before_window, after_window)
+                    t_stat, p_value = get_scipy_stats().ttest_ind(before_window, after_window)
                     if p_value < 0.05:
-                        change_points.append({'timestamp': timestamps[i].isoformat(), 'index': i, 'before_mean': float(np.mean(before_window)), 'after_mean': float(np.mean(after_window)), 'magnitude': float(abs(np.mean(after_window) - np.mean(before_window))), 'p_value': float(p_value)})
+                        change_points.append({'timestamp': timestamps[i].isoformat(), 'index': i, 'before_mean': float(get_numpy().mean(before_window)), 'after_mean': float(get_numpy().mean(after_window)), 'magnitude': float(abs(get_numpy().mean(after_window) - get_numpy().mean(before_window))), 'p_value': float(p_value)})
             return {'change_points_detected': len(change_points), 'change_points': change_points[:5], 'stability_score': 1.0 - min(1.0, len(change_points) / max(1, len(scores) // 10))}
         except Exception as e:
             return {'error': str(e)}
@@ -367,14 +367,14 @@ class RuleEffectivenessAnalyzer:
             if len(scores) < 5:
                 return {'insufficient_data': 'Need at least 5 data points for trend analysis'}
             time_numeric = [(ts - timestamps[0]).total_seconds() for ts in timestamps]
-            slope, intercept, r_value, p_value, std_err = stats.linregress(time_numeric, scores)
+            slope, intercept, r_value, p_value, std_err = get_scipy_stats().linregress(time_numeric, scores)
             trend_direction = 'increasing' if slope > 0 else 'decreasing' if slope < 0 else 'stable'
             trend_strength = abs(r_value)
             recent_window = max(5, len(scores) // 4)
             recent_scores = scores[-recent_window:]
             historical_scores = scores[:-recent_window] if len(scores) > recent_window else scores
-            recent_avg = np.mean(recent_scores)
-            historical_avg = np.mean(historical_scores)
+            recent_avg = get_numpy().mean(recent_scores)
+            historical_avg = get_numpy().mean(historical_scores)
             performance_change = recent_avg - historical_avg
             return {'trend_direction': trend_direction, 'trend_strength': float(trend_strength), 'slope': float(slope), 'r_squared': float(r_value ** 2), 'p_value': float(p_value), 'significant_trend': p_value < 0.05, 'recent_performance': float(recent_avg), 'historical_performance': float(historical_avg), 'performance_change': float(performance_change), 'performance_change_pct': float(performance_change / historical_avg * 100) if historical_avg > 0 else 0.0}
         except Exception as e:
@@ -391,7 +391,7 @@ class RuleEffectivenessAnalyzer:
             for score in scores[1:]:
                 ewma = alpha * score + (1 - alpha) * ewma
             forecast_horizon = 5
-            confidence_interval = 1.96 * np.std(scores)
+            confidence_interval = 1.96 * get_numpy().std(scores)
             for i in range(forecast_horizon):
                 forecasts.append({'period': i + 1, 'forecast': float(ewma), 'lower_bound': float(ewma - confidence_interval), 'upper_bound': float(ewma + confidence_interval)})
             if len(scores) >= 20:
@@ -402,8 +402,8 @@ class RuleEffectivenessAnalyzer:
                 for score in train_data[1:]:
                     train_ewma = alpha * score + (1 - alpha) * train_ewma
                 forecast_errors = [abs(train_ewma - actual) for actual in validation_data]
-                mae = np.mean(forecast_errors)
-                mape = np.mean([abs(error / actual) for error, actual in zip(forecast_errors, validation_data, strict=False) if actual != 0]) * 100
+                mae = get_numpy().mean(forecast_errors)
+                mape = get_numpy().mean([abs(error / actual) for error, actual in zip(forecast_errors, validation_data, strict=False) if actual != 0]) * 100
                 accuracy_metrics = {'mae': float(mae), 'mape': float(mape), 'validation_periods': validation_size}
             else:
                 accuracy_metrics = {'insufficient_data_for_validation': True}
@@ -421,10 +421,10 @@ class RuleEffectivenessAnalyzer:
             rolling_stds = []
             for i in range(window_size, len(scores) + 1):
                 window = scores[i - window_size:i]
-                rolling_means.append(np.mean(window))
-                rolling_stds.append(np.std(window))
-            mean_stability = 1.0 - np.std(rolling_means) / np.mean(scores) if np.mean(scores) > 0 else 0.0
-            variance_stability = 1.0 - np.std(rolling_stds) / np.mean(rolling_stds) if np.mean(rolling_stds) > 0 else 0.0
+                rolling_means.append(get_numpy().mean(window))
+                rolling_stds.append(get_numpy().std(window))
+            mean_stability = 1.0 - get_numpy().std(rolling_means) / get_numpy().mean(scores) if get_numpy().mean(scores) > 0 else 0.0
+            variance_stability = 1.0 - get_numpy().std(rolling_stds) / get_numpy().mean(rolling_stds) if get_numpy().mean(rolling_stds) > 0 else 0.0
             n_periods = min(5, len(scores) // 4)
             period_size = len(scores) // n_periods
             period_performances = []
@@ -433,10 +433,10 @@ class RuleEffectivenessAnalyzer:
                 end_idx = (i + 1) * period_size if i < n_periods - 1 else len(scores)
                 period_scores = scores[start_idx:end_idx]
                 if period_scores:
-                    period_performances.append(np.mean(period_scores))
-            period_consistency = 1.0 - np.std(period_performances) / np.mean(period_performances) if period_performances and np.mean(period_performances) > 0 else 0.0
+                    period_performances.append(get_numpy().mean(period_scores))
+            period_consistency = 1.0 - get_numpy().std(period_performances) / get_numpy().mean(period_performances) if period_performances and get_numpy().mean(period_performances) > 0 else 0.0
             overall_stability = (mean_stability + variance_stability + period_consistency) / 3
-            return {'overall_stability_score': float(overall_stability), 'mean_stability': float(mean_stability), 'variance_stability': float(variance_stability), 'period_consistency': float(period_consistency), 'stability_classification': 'stable' if overall_stability > 0.7 else 'moderate' if overall_stability > 0.4 else 'unstable', 'rolling_statistics': {'mean_variance': float(np.var(rolling_means)), 'std_variance': float(np.var(rolling_stds))}}
+            return {'overall_stability_score': float(overall_stability), 'mean_stability': float(mean_stability), 'variance_stability': float(variance_stability), 'period_consistency': float(period_consistency), 'stability_classification': 'stable' if overall_stability > 0.7 else 'moderate' if overall_stability > 0.4 else 'unstable', 'rolling_statistics': {'mean_variance': float(get_numpy().var(rolling_means)), 'std_variance': float(get_numpy().var(rolling_stds))}}
         except Exception as e:
             return {'error': str(e)}
 
@@ -453,17 +453,17 @@ class RuleEffectivenessAnalyzer:
             feature_vector = [len(str(context)), hash(str(context)) % 1000 / 1000.0, point.get('overall_score', 0.5)]
             features.append(feature_vector)
             targets.append(point.get('score', 0.5))
-        features_array = np.array(features)
-        targets_array = np.array(targets)
+        features_array = get_numpy().array(features)
+        targets_array = get_numpy().array(targets)
         for train_idx, test_idx in ts_splits.split(features_array):
             train_features, test_features = (features_array[train_idx], features_array[test_idx])
             train_targets, test_targets = (targets_array[train_idx], targets_array[test_idx])
-            mean_prediction = np.mean(train_targets)
-            predictions = np.full(len(test_targets), mean_prediction)
-            mse = np.mean((test_targets - predictions) ** 2)
+            mean_prediction = get_numpy().mean(train_targets)
+            predictions = get_numpy().full(len(test_targets), mean_prediction)
+            mse = get_numpy().mean((test_targets - predictions) ** 2)
             cv_results['cv_scores'].append(-mse)
-        cv_results['mean_score'] = float(np.mean(cv_results['cv_scores']))
-        cv_results['std_score'] = float(np.std(cv_results['cv_scores']))
+        cv_results['mean_score'] = float(get_numpy().mean(cv_results['cv_scores']))
+        cv_results['std_score'] = float(get_numpy().std(cv_results['cv_scores']))
         return cv_results
 
     def _generate_time_series_summary(self, analysis_results: dict[str, Any]) -> dict[str, Any]:
@@ -500,7 +500,7 @@ class RuleEffectivenessAnalyzer:
         if high_change_points:
             summary['recommendations'].append('Frequent performance changes detected - implement performance monitoring')
         if len(summary['forecast_reliability']) > 0:
-            avg_mape = np.mean(summary['forecast_reliability'])
+            avg_mape = get_numpy().mean(summary['forecast_reliability'])
             if avg_mape > 20:
                 summary['recommendations'].append('Low forecast reliability - consider more sophisticated forecasting models')
         return summary
@@ -513,8 +513,8 @@ class RuleEffectivenessAnalyzer:
         try:
             timestamped_points.sort(key=lambda x: x['timestamp'])
             scores = [dp['score'] for dp in timestamped_points]
-            x = np.arange(len(scores))
-            slope, _, r_value, p_value, _ = stats.linregress(x, scores)
+            x = get_numpy().arange(len(scores))
+            slope, _, r_value, p_value, _ = get_scipy_stats().linregress(x, scores)
             if p_value < 0.05 and abs(r_value) > 0.3:
                 if slope > 0:
                     return 'improving'
@@ -571,7 +571,7 @@ class RuleEffectivenessAnalyzer:
     def _time_series_cross_validate(self, ts_data: pd.DataFrame, rule_id: str) -> TimeSeriesValidationResult | None:
         """Perform time series cross-validation"""
         try:
-            X = np.arange(len(ts_data)).reshape(-1, 1)
+            X = get_numpy().arange(len(ts_data)).reshape(-1, 1)
             y = ts_data['score'].values
             tscv = TimeSeriesSplit(n_splits=self.config.time_series_cv_splits, test_size=max(5, len(ts_data) // (self.config.time_series_cv_splits + 1)))
             cv_scores = []
@@ -580,16 +580,16 @@ class RuleEffectivenessAnalyzer:
                 X_train, X_test = (X[train_idx], X[test_idx])
                 y_train, y_test = (y[train_idx], y[test_idx])
                 try:
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(X_train.flatten(), y_train)
+                    slope, intercept, r_value, p_value, std_err = get_scipy_stats().linregress(X_train.flatten(), y_train)
                     y_pred = slope * X_test.flatten() + intercept
                     score = -mean_squared_error(y_test, y_pred)
                     cv_scores.append(score)
                     fold_predictions.extend(y_pred.tolist())
                 except Exception:
-                    y_pred = np.full(len(y_test), np.mean(y_train))
+                    y_pred = get_numpy().full(len(y_test), get_numpy().mean(y_train))
                     score = -mean_squared_error(y_test, y_pred)
                     cv_scores.append(score)
-            temporal_stability = 1.0 - np.std(cv_scores) / max(abs(np.mean(cv_scores)), 0.001)
+            temporal_stability = 1.0 - get_numpy().std(cv_scores) / max(abs(get_numpy().mean(cv_scores)), 0.001)
             temporal_stability = max(0.0, min(1.0, temporal_stability))
             trend_coefficient = None
             seasonal_component = None
@@ -599,7 +599,7 @@ class RuleEffectivenessAnalyzer:
                 if self.config.seasonal_decomposition:
                     seasonal_component = self._detect_seasonal_patterns(ts_data)
                 change_points = self._detect_change_points_from_dataframe(ts_data)
-            return TimeSeriesValidationResult(rule_id=rule_id, cv_scores=cv_scores, mean_cv_score=float(np.mean(cv_scores)), std_cv_score=float(np.std(cv_scores)), temporal_stability=temporal_stability, trend_coefficient=trend_coefficient, seasonal_component=seasonal_component, change_points=change_points)
+            return TimeSeriesValidationResult(rule_id=rule_id, cv_scores=cv_scores, mean_cv_score=float(get_numpy().mean(cv_scores)), std_cv_score=float(get_numpy().std(cv_scores)), temporal_stability=temporal_stability, trend_coefficient=trend_coefficient, seasonal_component=seasonal_component, change_points=change_points)
         except Exception as e:
             self.logger.warning('Time series cross-validation failed for %s: %s', rule_id, e)
             return None
@@ -607,9 +607,9 @@ class RuleEffectivenessAnalyzer:
     def _calculate_trend_coefficient(self, ts_data: pd.DataFrame) -> float | None:
         """Calculate trend coefficient for time series"""
         try:
-            x = np.arange(len(ts_data))
+            x = get_numpy().arange(len(ts_data))
             y = ts_data['score'].values
-            slope, _, r_value, p_value, _ = stats.linregress(x, y)
+            slope, _, r_value, p_value, _ = get_scipy_stats().linregress(x, y)
             if p_value < 0.05:
                 return float(slope)
             return None
@@ -640,9 +640,9 @@ class RuleEffectivenessAnalyzer:
             change_points = []
             window_size = max(5, len(scores) // 10)
             for i in range(window_size, len(scores) - window_size):
-                before_mean = np.mean(scores[i - window_size:i])
-                after_mean = np.mean(scores[i:i + window_size])
-                t_stat, p_value = stats.ttest_ind(scores[i - window_size:i], scores[i:i + window_size])
+                before_mean = get_numpy().mean(scores[i - window_size:i])
+                after_mean = get_numpy().mean(scores[i:i + window_size])
+                t_stat, p_value = get_scipy_stats().ttest_ind(scores[i - window_size:i], scores[i:i + window_size])
                 if p_value < 0.05 and abs(after_mean - before_mean) > 0.1:
                     change_points.append(i)
             return change_points
@@ -685,7 +685,7 @@ class RuleEffectivenessAnalyzer:
     def _fit_bayesian_model(self, data_points: list[dict[str, Any]], rule_id: str) -> BayesianModelResult | None:
         """Fit Bayesian hierarchical model for rule effectiveness"""
         try:
-            scores = np.array([dp['score'] for dp in data_points])
+            scores = get_numpy().array([dp['score'] for dp in data_points])
             contexts = [self._get_context_key(dp['context']) for dp in data_points]
             unique_contexts = list(set(contexts))
             context_indices = [unique_contexts.index(ctx) for ctx in contexts]
@@ -711,13 +711,13 @@ class RuleEffectivenessAnalyzer:
                 posterior_samples = trace.posterior['mu']
             except KeyError:
                 mu_logit_samples = trace.posterior['mu_prior_logit']
-                posterior_samples = 1 / (1 + np.exp(-mu_logit_samples))
+                posterior_samples = 1 / (1 + get_numpy().exp(-mu_logit_samples))
             posterior_mean = float(posterior_samples.mean())
             posterior_std = float(posterior_samples.std())
             alpha = 1 - self.config.credible_interval
             lower_percentile = alpha / 2 * 100
             upper_percentile = (1 - alpha / 2) * 100
-            credible_interval = (float(np.percentile(posterior_samples, lower_percentile)), float(np.percentile(posterior_samples, upper_percentile)))
+            credible_interval = (float(get_numpy().percentile(posterior_samples, lower_percentile)), float(get_numpy().percentile(posterior_samples, upper_percentile)))
             try:
                 summary = az.summary(trace, var_names=['mu'])
                 effective_sample_size = float(summary.iloc[0]['ess_bulk'])
@@ -830,9 +830,9 @@ class RuleEffectivenessAnalyzer:
                 scores.append(float(data_point))
         if not scores:
             return {'method': 'fallback', 'error': 'No performance data available', 'recommendation': 'Collect more data for analysis'}
-        mean_score = np.mean(scores)
-        std_score = np.std(scores)
-        return {'method': 'basic_statistics', 'mean_effectiveness': float(mean_score), 'std_effectiveness': float(std_score), 'sample_size': len(scores), 'confidence_interval': {'lower': float(mean_score - 1.96 * std_score / np.sqrt(len(scores))), 'upper': float(mean_score + 1.96 * std_score / np.sqrt(len(scores)))}, 'recommendation': self._generate_basic_recommendation(mean_score, std_score)}
+        mean_score = get_numpy().mean(scores)
+        std_score = get_numpy().std(scores)
+        return {'method': 'basic_statistics', 'mean_effectiveness': float(mean_score), 'std_effectiveness': float(std_score), 'sample_size': len(scores), 'confidence_interval': {'lower': float(mean_score - 1.96 * std_score / get_numpy().sqrt(len(scores))), 'upper': float(mean_score + 1.96 * std_score / get_numpy().sqrt(len(scores)))}, 'recommendation': self._generate_basic_recommendation(mean_score, std_score)}
 
     def _extract_uncertainty_metrics(self, analysis_result) -> dict[str, Any]:
         """Extract uncertainty quantification metrics from Bayesian analysis."""

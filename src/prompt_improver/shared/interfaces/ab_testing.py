@@ -1,4 +1,4 @@
-"""A/B Testing Service Interface
+"""A/B Testing Service Interface.
 
 This module provides abstractions for A/B testing functionality to maintain
 clean architecture boundaries and enable dependency injection.
@@ -6,9 +6,10 @@ clean architecture boundaries and enable dependency injection.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class IABTestingService(ABC):
@@ -22,14 +23,14 @@ class IABTestingService(ABC):
     @abstractmethod
     async def create_experiment(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         name: str,
         description: str,
         hypothesis: str,
         control_rule_ids: list[str],
         treatment_rule_ids: list[str],
         success_metric: str = "conversion_rate",
-        metadata: Dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a new A/B experiment.
 
@@ -46,15 +47,14 @@ class IABTestingService(ABC):
         Returns:
             Experiment ID
         """
-        pass
 
     @abstractmethod
     async def analyze_experiment(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         experiment_id: str,
         current_time: datetime | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform statistical analysis on experiment.
 
         Args:
@@ -65,12 +65,11 @@ class IABTestingService(ABC):
         Returns:
             Statistical analysis results
         """
-        pass
 
     @abstractmethod
     async def check_early_stopping(
-        self, experiment_id: str, look_number: int, db_session: AsyncSession
-    ) -> Dict[str, Any]:
+        self, experiment_id: str, look_number: int, db_session: "AsyncSession"
+    ) -> dict[str, Any]:
         """Check if experiment should be stopped early.
 
         Args:
@@ -81,11 +80,10 @@ class IABTestingService(ABC):
         Returns:
             Early stopping decision and reasoning
         """
-        pass
 
     @abstractmethod
     async def stop_experiment(
-        self, experiment_id: str, reason: str, db_session: AsyncSession
+        self, experiment_id: str, reason: str, db_session: "AsyncSession"
     ) -> bool:
         """Stop an experiment with given reason.
 
@@ -97,10 +95,9 @@ class IABTestingService(ABC):
         Returns:
             Success status
         """
-        pass
 
     @abstractmethod
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Run orchestrator-compatible A/B testing analysis.
 
         Args:
@@ -109,7 +106,6 @@ class IABTestingService(ABC):
         Returns:
             Orchestrator-compatible results
         """
-        pass
 
 
 class NoOpABTestingService(IABTestingService):
@@ -121,24 +117,24 @@ class NoOpABTestingService(IABTestingService):
 
     async def create_experiment(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         name: str,
         description: str,
         hypothesis: str,
         control_rule_ids: list[str],
         treatment_rule_ids: list[str],
         success_metric: str = "conversion_rate",
-        metadata: Dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create no-op experiment."""
         return "noop-experiment-id"
 
     async def analyze_experiment(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         experiment_id: str,
         current_time: datetime | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return no-op analysis results."""
         return {
             "status": "disabled",
@@ -147,8 +143,8 @@ class NoOpABTestingService(IABTestingService):
         }
 
     async def check_early_stopping(
-        self, experiment_id: str, look_number: int, db_session: AsyncSession
-    ) -> Dict[str, Any]:
+        self, experiment_id: str, look_number: int, db_session: "AsyncSession"
+    ) -> dict[str, Any]:
         """Return no-op early stopping check."""
         return {
             "should_stop": False,
@@ -157,12 +153,12 @@ class NoOpABTestingService(IABTestingService):
         }
 
     async def stop_experiment(
-        self, experiment_id: str, reason: str, db_session: AsyncSession
+        self, experiment_id: str, reason: str, db_session: "AsyncSession"
     ) -> bool:
         """No-op experiment stop."""
         return True
 
-    async def run_orchestrated_analysis(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
         """Return no-op orchestrated analysis."""
         return {
             "orchestrator_compatible": True,

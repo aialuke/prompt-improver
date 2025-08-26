@@ -8,7 +8,7 @@ Defines the interface for Apriori-specific data access operations, including:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -249,7 +249,7 @@ class AprioriRepositoryProtocol(Protocol):
     async def get_rule_effectiveness_comparison(
         self,
         rule_ids: list[int],
-        metrics: list[str] = ["support", "confidence", "lift"],
+        metrics: list[str] | None = None,
     ) -> dict[str, dict[str, float]]:
         """Compare effectiveness metrics between rules."""
         ...

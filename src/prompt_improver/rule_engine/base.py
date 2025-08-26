@@ -23,7 +23,7 @@ class TransformationResult(NamedTuple):
     success: bool
     improved_prompt: str
     confidence: float = 0.8
-    transformations: list = []
+    transformations: list[dict[str, Any]] = []
 
 
 class LLMInstruction(NamedTuple):

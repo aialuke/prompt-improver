@@ -1,4 +1,4 @@
-"""ML Application Service
+"""ML Application Service.
 
 Orchestrates machine learning workflows including training, inference, pattern discovery,
 and model deployment while managing complex transaction boundaries and resource coordination.
@@ -6,21 +6,12 @@ and model deployment while managing complex transaction boundaries and resource 
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-from prompt_improver.application.protocols.application_service_protocols import (
-    MLApplicationServiceProtocol,
-)
 if TYPE_CHECKING:
     from prompt_improver.database.composition import DatabaseServices
 from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
-from prompt_improver.repositories.protocols.apriori_repository_protocol import (
-    AprioriRepositoryProtocol,
-)
 from prompt_improver.core.domain.types import (
     AprioriAnalysisRequestData,
     AprioriAnalysisResponseData,
@@ -40,11 +31,10 @@ logger = logging.getLogger(__name__)
 
 
 class MLApplicationService:
-    """
-    Application service for ML training and inference workflows.
-    
+    """Application service for ML training and inference workflows.
+
     Orchestrates complex ML processes including:
-    - Training workflow coordination and monitoring  
+    - Training workflow coordination and monitoring
     - Pattern discovery and analysis orchestration
     - Model deployment and version management
     - Inference pipeline coordination
@@ -60,7 +50,7 @@ class MLApplicationService:
         ml_model_service: MLModelService,
         apriori_analyzer: AprioriAnalyzer,
         pattern_discovery: AdvancedPatternDiscovery,
-    ):
+    ) -> None:
         self.db_services = db_services
         self.ml_repository = ml_repository
         self.ml_service_container = ml_service_container
@@ -81,12 +71,11 @@ class MLApplicationService:
 
     async def execute_training_workflow(
         self,
-        training_config: Dict[str, Any],
+        training_config: dict[str, Any],
         session_id: str | None = None,
-    ) -> Dict[str, Any]:
-        """
-        Execute a complete ML training workflow.
-        
+    ) -> dict[str, Any]:
+        """Execute a complete ML training workflow.
+
         Orchestrates the entire ML training process:
         1. Validate training configuration
         2. Initialize training resources and data pipelines
@@ -94,20 +83,20 @@ class MLApplicationService:
         4. Validate model performance and metrics
         5. Store model artifacts and metadata
         6. Clean up training resources
-        
+
         Args:
             training_config: Configuration for training workflow
             session_id: Optional session identifier for tracking
-            
+
         Returns:
             Dict containing training results and metadata
         """
         workflow_id = str(uuid.uuid4())
-        start_time = datetime.now(timezone.utc)
-        
+        start_time = datetime.now(UTC)
+
         try:
             self.logger.info(f"Starting training workflow {workflow_id}")
-            
+
             # 1. Validate configuration
             config_validation = await self._validate_training_config(training_config)
             if not config_validation["valid"]:
@@ -117,7 +106,7 @@ class MLApplicationService:
                     "workflow_id": workflow_id,
                     "timestamp": start_time.isoformat(),
                 }
-            
+
             # 2. Transaction boundary for entire training workflow
             async with self.db_services.get_session() as db_session:
                 try:
@@ -125,29 +114,29 @@ class MLApplicationService:
                     training_context = await self._initialize_training_context(
                         workflow_id, training_config, session_id, db_session
                     )
-                    
+
                     # 4. Execute training via ML model service
                     training_result = await self.ml_model_service.execute_training(
                         training_config=training_config,
                         session_context=training_context,
                         db_session=db_session,
                     )
-                    
+
                     # 5. Store training results and artifacts
                     await self._store_training_artifacts(
                         workflow_id, training_result, db_session
                     )
-                    
+
                     # 6. Update training metrics and status
                     await self._update_training_status(
                         workflow_id, "completed", training_result, db_session
                     )
-                    
+
                     await db_session.commit()
-                    
-                    end_time = datetime.now(timezone.utc)
+
+                    end_time = datetime.now(UTC)
                     duration_seconds = (end_time - start_time).total_seconds()
-                    
+
                     return {
                         "status": "success",
                         "workflow_id": workflow_id,
@@ -166,21 +155,21 @@ class MLApplicationService:
                         },
                         "timestamp": end_time.isoformat(),
                     }
-                    
+
                 except Exception as e:
                     await db_session.rollback()
                     await self._update_training_status(
                         workflow_id, "failed", {"error": str(e)}, db_session
                     )
                     raise
-                    
+
         except Exception as e:
-            self.logger.error(f"Training workflow {workflow_id} failed: {e}")
+            self.logger.exception(f"Training workflow {workflow_id} failed: {e}")
             return {
                 "status": "error",
                 "workflow_id": workflow_id,
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def execute_pattern_discovery(
@@ -188,29 +177,28 @@ class MLApplicationService:
         request: PatternDiscoveryRequestData,
         session_id: str | None = None,
     ) -> PatternDiscoveryResponseData:
-        """
-        Execute comprehensive pattern discovery workflow.
-        
+        """Execute comprehensive pattern discovery workflow.
+
         Orchestrates advanced pattern discovery using multiple algorithms:
         1. Traditional ML parameter analysis
         2. HDBSCAN clustering for density-based patterns
         3. FP-Growth for frequent pattern mining
         4. Apriori for association rule mining
         5. Semantic analysis for rule relationships
-        
+
         Args:
             request: Pattern discovery configuration
             session_id: Optional session identifier
-            
+
         Returns:
             PatternDiscoveryResponseData with comprehensive patterns
         """
         discovery_run_id = str(uuid.uuid4())
-        start_time = datetime.now(timezone.utc)
-        
+        start_time = datetime.now(UTC)
+
         try:
             self.logger.info(f"Starting pattern discovery {discovery_run_id}")
-            
+
             # Transaction boundary for pattern discovery workflow
             async with self.db_services.get_session() as db_session:
                 try:
@@ -222,7 +210,7 @@ class MLApplicationService:
                         use_advanced_discovery=request.use_advanced_discovery,
                         include_apriori=request.include_apriori,
                     )
-                    
+
                     # Validate discovery results
                     if discovery_results.get("status") == "error":
                         return PatternDiscoveryResponseData(
@@ -233,17 +221,17 @@ class MLApplicationService:
                             advanced_patterns=None,
                             apriori_patterns=None,
                         )
-                    
+
                     # Store pattern discovery metadata
                     await self._store_pattern_discovery_metadata(
                         discovery_run_id, request, discovery_results, db_session
                     )
-                    
+
                     await db_session.commit()
-                    
-                    end_time = datetime.now(timezone.utc)
+
+                    end_time = datetime.now(UTC)
                     duration_seconds = (end_time - start_time).total_seconds()
-                    
+
                     return PatternDiscoveryResponseData(
                         status=discovery_results.get("status", "success"),
                         discovery_run_id=discovery_run_id,
@@ -261,14 +249,14 @@ class MLApplicationService:
                             "session_id": session_id,
                         },
                     )
-                    
+
                 except Exception as e:
                     await db_session.rollback()
-                    self.logger.error(f"Pattern discovery {discovery_run_id} failed: {e}")
+                    self.logger.exception(f"Pattern discovery {discovery_run_id} failed: {e}")
                     raise
-                    
+
         except Exception as e:
-            self.logger.error(f"Pattern discovery workflow failed: {e}")
+            self.logger.exception(f"Pattern discovery workflow failed: {e}")
             return PatternDiscoveryResponseData(
                 status="error",
                 discovery_run_id=discovery_run_id,
@@ -283,29 +271,28 @@ class MLApplicationService:
         request: AprioriAnalysisRequestData,
         session_id: str | None = None,
     ) -> AprioriAnalysisResponseData:
-        """
-        Execute Apriori association rule mining workflow.
-        
+        """Execute Apriori association rule mining workflow.
+
         Orchestrates comprehensive Apriori analysis:
         1. Data preparation and transaction building
         2. Frequent itemset mining
         3. Association rule generation
         4. Rule validation and filtering
         5. Business insight generation
-        
+
         Args:
             request: Apriori analysis configuration
             session_id: Optional session identifier
-            
+
         Returns:
             AprioriAnalysisResponseData with discovered patterns
         """
         analysis_id = str(uuid.uuid4())
-        start_time = datetime.now(timezone.utc)
-        
+        start_time = datetime.now(UTC)
+
         try:
             self.logger.info(f"Starting Apriori analysis {analysis_id}")
-            
+
             # Transaction boundary for Apriori analysis
             async with self.db_services.get_session() as db_session:
                 try:
@@ -315,17 +302,17 @@ class MLApplicationService:
                         session_id=session_id,
                         db_session=db_session,
                     )
-                    
+
                     # Store analysis metadata
                     await self._store_apriori_metadata(
                         analysis_id, request, analysis_result, db_session
                     )
-                    
+
                     await db_session.commit()
-                    
-                    end_time = datetime.now(timezone.utc)
+
+                    end_time = datetime.now(UTC)
                     duration_seconds = (end_time - start_time).total_seconds()
-                    
+
                     # Enhance result with workflow metadata
                     if isinstance(analysis_result, dict):
                         analysis_result["workflow_metadata"] = {
@@ -335,16 +322,16 @@ class MLApplicationService:
                             "completed_at": end_time.isoformat(),
                             "session_id": session_id,
                         }
-                    
+
                     return analysis_result
-                    
+
                 except Exception as e:
                     await db_session.rollback()
-                    self.logger.error(f"Apriori analysis {analysis_id} failed: {e}")
+                    self.logger.exception(f"Apriori analysis {analysis_id} failed: {e}")
                     raise
-                    
+
         except Exception as e:
-            self.logger.error(f"Apriori analysis workflow failed: {e}")
+            self.logger.exception(f"Apriori analysis workflow failed: {e}")
             return AprioriAnalysisResponseData(
                 status="error",
                 analysis_id=analysis_id,
@@ -352,37 +339,36 @@ class MLApplicationService:
                 transaction_count=0,
                 frequent_itemsets=[],
                 association_rules=[],
-                execution_time_seconds=(datetime.now(timezone.utc) - start_time).total_seconds(),
+                execution_time_seconds=(datetime.now(UTC) - start_time).total_seconds(),
             )
 
     async def deploy_model(
         self,
         model_id: str,
-        deployment_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Deploy a trained model to production.
-        
+        deployment_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Deploy a trained model to production.
+
         Orchestrates model deployment workflow:
         1. Validate model and deployment configuration
         2. Prepare deployment environment
         3. Deploy model with proper versioning
         4. Validate deployment and run health checks
         5. Update model registry and routing
-        
+
         Args:
             model_id: Model identifier to deploy
             deployment_config: Deployment configuration
-            
+
         Returns:
             Dict containing deployment results
         """
         deployment_id = str(uuid.uuid4())
-        start_time = datetime.now(timezone.utc)
-        
+        start_time = datetime.now(UTC)
+
         try:
             self.logger.info(f"Starting model deployment {deployment_id} for model {model_id}")
-            
+
             # Transaction boundary for deployment
             async with self.db_services.get_session() as db_session:
                 try:
@@ -397,24 +383,24 @@ class MLApplicationService:
                             "error": model_validation["error"],
                             "timestamp": start_time.isoformat(),
                         }
-                    
+
                     # 2. Execute deployment via ML service
                     deployment_result = await self.ml_model_service.deploy_model(
                         model_id=model_id,
                         deployment_config=deployment_config,
                         db_session=db_session,
                     )
-                    
+
                     # 3. Store deployment metadata
                     await self._store_deployment_metadata(
                         deployment_id, model_id, deployment_config, deployment_result, db_session
                     )
-                    
+
                     await db_session.commit()
-                    
-                    end_time = datetime.now(timezone.utc)
+
+                    end_time = datetime.now(UTC)
                     duration_seconds = (end_time - start_time).total_seconds()
-                    
+
                     return {
                         "status": "success",
                         "deployment_id": deployment_id,
@@ -428,51 +414,50 @@ class MLApplicationService:
                         },
                         "timestamp": end_time.isoformat(),
                     }
-                    
+
                 except Exception as e:
                     await db_session.rollback()
                     raise
-                    
+
         except Exception as e:
-            self.logger.error(f"Model deployment {deployment_id} failed: {e}")
+            self.logger.exception(f"Model deployment {deployment_id} failed: {e}")
             return {
                 "status": "error",
                 "deployment_id": deployment_id,
                 "model_id": model_id,
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def execute_inference(
         self,
         model_id: str,
-        input_data: Dict[str, Any],
-        inference_config: Dict[str, Any] | None = None,
-    ) -> Dict[str, Any]:
-        """
-        Execute model inference with proper error handling.
-        
+        input_data: dict[str, Any],
+        inference_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Execute model inference with proper error handling.
+
         Orchestrates inference workflow:
         1. Validate model availability and input data
         2. Prepare input data and apply preprocessing
         3. Execute model inference
         4. Apply post-processing and validation
         5. Log inference metrics and results
-        
+
         Args:
             model_id: Model identifier for inference
             input_data: Input data for inference
             inference_config: Optional inference configuration
-            
+
         Returns:
             Dict containing inference results
         """
         inference_id = str(uuid.uuid4())
-        start_time = datetime.now(timezone.utc)
-        
+        start_time = datetime.now(UTC)
+
         try:
             self.logger.info(f"Executing inference {inference_id} with model {model_id}")
-            
+
             # Lightweight validation without database transaction for performance
             input_validation = await self._validate_inference_input(input_data)
             if not input_validation["valid"]:
@@ -482,22 +467,22 @@ class MLApplicationService:
                     "error": input_validation["error"],
                     "timestamp": start_time.isoformat(),
                 }
-            
+
             # Execute inference (typically no database transaction needed)
             inference_result = await self.ml_model_service.execute_inference(
                 model_id=model_id,
                 input_data=input_data,
                 config=inference_config or {},
             )
-            
+
             # Log inference metrics asynchronously
             await self._log_inference_metrics(
                 inference_id, model_id, input_data, inference_result
             )
-            
-            end_time = datetime.now(timezone.utc)
+
+            end_time = datetime.now(UTC)
             duration_ms = (end_time - start_time).total_seconds() * 1000
-            
+
             return {
                 "status": "success",
                 "inference_id": inference_id,
@@ -511,20 +496,20 @@ class MLApplicationService:
                     "configuration": inference_config or {},
                 },
             }
-            
+
         except Exception as e:
-            self.logger.error(f"Inference {inference_id} failed: {e}")
+            self.logger.exception(f"Inference {inference_id} failed: {e}")
             return {
                 "status": "error",
                 "inference_id": inference_id,
                 "model_id": model_id,
                 "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     # Private helper methods
 
-    async def _validate_training_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _validate_training_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate training configuration."""
         try:
             required_fields = ["model_type", "training_data", "hyperparameters"]
@@ -536,18 +521,18 @@ class MLApplicationService:
             return {"valid": False, "error": str(e)}
 
     async def _initialize_training_context(
-        self, workflow_id: str, config: Dict[str, Any], session_id: str | None, db_session
-    ) -> Dict[str, Any]:
+        self, workflow_id: str, config: dict[str, Any], session_id: str | None, db_session
+    ) -> dict[str, Any]:
         """Initialize training context and resources."""
         return {
             "workflow_id": workflow_id,
             "session_id": session_id,
             "training_config": config,
-            "initialized_at": datetime.now(timezone.utc).isoformat(),
+            "initialized_at": datetime.now(UTC).isoformat(),
         }
 
     async def _store_training_artifacts(
-        self, workflow_id: str, training_result: Dict[str, Any], db_session
+        self, workflow_id: str, training_result: dict[str, Any], db_session
     ) -> None:
         """Store training artifacts and metadata."""
         await self.ml_repository.store_training_artifacts(
@@ -558,7 +543,7 @@ class MLApplicationService:
         )
 
     async def _update_training_status(
-        self, workflow_id: str, status: str, result: Dict[str, Any], db_session
+        self, workflow_id: str, status: str, result: dict[str, Any], db_session
     ) -> None:
         """Update training workflow status."""
         await self.ml_repository.update_training_status(
@@ -569,7 +554,7 @@ class MLApplicationService:
         )
 
     async def _store_pattern_discovery_metadata(
-        self, discovery_run_id: str, request: PatternDiscoveryRequestData, results: Dict[str, Any], db_session
+        self, discovery_run_id: str, request: PatternDiscoveryRequestData, results: dict[str, Any], db_session
     ) -> None:
         """Store pattern discovery metadata."""
         await self.ml_repository.store_pattern_discovery_metadata(
@@ -592,7 +577,7 @@ class MLApplicationService:
 
     async def _validate_model_for_deployment(
         self, model_id: str, db_session
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate model readiness for deployment."""
         try:
             model_exists = await self.ml_repository.check_model_exists(model_id, db_session)
@@ -603,7 +588,7 @@ class MLApplicationService:
             return {"valid": False, "error": str(e)}
 
     async def _store_deployment_metadata(
-        self, deployment_id: str, model_id: str, config: Dict[str, Any], result: Dict[str, Any], db_session
+        self, deployment_id: str, model_id: str, config: dict[str, Any], result: dict[str, Any], db_session
     ) -> None:
         """Store deployment metadata."""
         await self.ml_repository.store_deployment_metadata(
@@ -614,7 +599,7 @@ class MLApplicationService:
             db_session=db_session,
         )
 
-    async def _validate_inference_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _validate_inference_input(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Validate inference input data."""
         try:
             if not input_data:
@@ -624,7 +609,7 @@ class MLApplicationService:
             return {"valid": False, "error": str(e)}
 
     async def _log_inference_metrics(
-        self, inference_id: str, model_id: str, input_data: Dict[str, Any], result: Dict[str, Any]
+        self, inference_id: str, model_id: str, input_data: dict[str, Any], result: dict[str, Any]
     ) -> None:
         """Log inference metrics asynchronously."""
         try:
@@ -634,4 +619,4 @@ class MLApplicationService:
                 f"input_size: {len(str(input_data))}, success: {result.get('status') == 'success'}"
             )
         except Exception as e:
-            self.logger.error(f"Failed to log inference metrics: {e}")
+            self.logger.exception(f"Failed to log inference metrics: {e}")

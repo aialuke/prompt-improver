@@ -14,8 +14,19 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-import numpy as np
-from sklearn.datasets import make_classification
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
+
+if TYPE_CHECKING:
+    from sklearn.datasets import make_classification
+    import numpy as np
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return sklearn.datasets.make_classification
+    
+    make_classification = _get_sklearn_imports()
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -61,13 +72,13 @@ class MethodPerformanceTracker:
             if not history:
                 continue
             recent_metrics = history[-10:]
-            weights = np.linspace(0.5, 1.0, len(recent_metrics))
+            weights = get_numpy().linspace(0.5, 1.0, len(recent_metrics))
             quality_scores = [m.quality_score for m in recent_metrics]
             diversity_scores = [m.diversity_score for m in recent_metrics]
             success_rates = [m.success_rate for m in recent_metrics]
-            weighted_quality = np.average(quality_scores, weights=weights)
-            weighted_diversity = np.average(diversity_scores, weights=weights)
-            weighted_success = np.average(success_rates, weights=weights)
+            weighted_quality = get_numpy().average(quality_scores, weights=weights)
+            weighted_diversity = get_numpy().average(diversity_scores, weights=weights)
+            weighted_success = get_numpy().average(success_rates, weights=weights)
             self.method_rankings[method] = 0.4 * weighted_quality + 0.3 * weighted_diversity + 0.3 * weighted_success
 
     def _calculate_gap_bonus(self, method: str, performance_gaps: dict[str, float]) -> float:
@@ -81,7 +92,7 @@ class MethodPerformanceTracker:
                 relevant_metrics.append(metrics)
         if not relevant_metrics:
             return 0.0
-        return np.mean([m.quality_score for m in relevant_metrics]) * 0.2
+        return get_numpy().mean([m.quality_score for m in relevant_metrics]) * 0.2
 
     def _calculate_gap_similarity(self, gaps1: dict[str, float], gaps2: dict[str, float]) -> float:
         """Calculate similarity between two gap patterns"""
@@ -93,7 +104,7 @@ class MethodPerformanceTracker:
             diff = abs(gaps1[key] - gaps2[key])
             similarity = max(0, 1 - diff)
             similarities.append(similarity)
-        return np.mean(similarities)
+        return get_numpy().mean(similarities)
 
 class StatisticalDataGenerator:
     """Statistical data generator using scikit-learn methods"""
@@ -105,7 +116,7 @@ class StatisticalDataGenerator:
             random_state: Random seed for reproducible generation
         """
         self.random_state = random_state
-        self.rng = np.random.RandomState(random_state)
+        self.rng = get_numpy().random.RandomState(random_state)
 
     async def generate_statistical_samples(self, sample_count: int, data_dim: int, n_clusters_per_class: int=2, class_sep: float=0.8) -> list:
         """Generate samples using statistical methods
@@ -142,7 +153,7 @@ class StatisticalDataGenerator:
         normalized_effectiveness = (base_effectiveness + 1) / 2
         return (enhanced_features.tolist(), normalized_effectiveness.tolist())
 
-    def _apply_domain_enhancement(self, features: np.ndarray, domain_name: str) -> np.ndarray:
+    def _apply_domain_enhancement(self, features: get_numpy().ndarray, domain_name: str) -> get_numpy().ndarray:
         """Apply domain-specific enhancements to statistical features
         
         Args:
@@ -155,16 +166,16 @@ class StatisticalDataGenerator:
         enhanced = features.copy()
         if domain_name == 'technical':
             enhanced = enhanced * 1.2
-            enhanced = np.clip(enhanced, -3, 3)
+            enhanced = get_numpy().clip(enhanced, -3, 3)
         elif domain_name == 'creative':
             noise = self.rng.normal(0, 0.1, enhanced.shape)
             enhanced = enhanced + noise
         elif domain_name == 'analytical':
             enhanced = enhanced * 0.9
-            enhanced = np.round(enhanced, 2)
+            enhanced = get_numpy().round(enhanced, 2)
         elif domain_name == 'instructional':
             enhanced = enhanced * 0.8
-            enhanced = np.clip(enhanced, -2, 2)
+            enhanced = get_numpy().clip(enhanced, -2, 2)
         elif domain_name == 'conversational':
             enhanced = enhanced + self.rng.normal(0, 0.05, enhanced.shape)
         return enhanced
@@ -173,7 +184,7 @@ class StatisticalQualityAssessor:
     """Quality assessment for statistically generated data"""
 
     def __init__(self, random_state: int=42):
-        self.rng = np.random.RandomState(random_state)
+        self.rng = get_numpy().random.RandomState(random_state)
 
     def assess_sample_quality(self, samples: list) -> float:
         """Assess quality of statistically generated samples
@@ -187,7 +198,7 @@ class StatisticalQualityAssessor:
         if not samples:
             return 0.0
         try:
-            data = np.array(samples)
+            data = get_numpy().array(samples)
             quality_components = []
             dist_quality = self._assess_distribution_quality(data)
             quality_components.append(dist_quality * 0.3)
@@ -200,30 +211,30 @@ class StatisticalQualityAssessor:
             logger.error('Quality assessment failed: %s', e)
             return 0.5
 
-    def _assess_distribution_quality(self, data: np.ndarray) -> float:
+    def _assess_distribution_quality(self, data: get_numpy().ndarray) -> float:
         """Assess the distribution quality of the data"""
         try:
-            means = np.mean(data, axis=0)
-            stds = np.std(data, axis=0)
-            mean_quality = np.mean(np.abs(means) < 2)
-            std_quality = np.mean((stds > 0.1) & (stds < 3))
+            means = get_numpy().mean(data, axis=0)
+            stds = get_numpy().std(data, axis=0)
+            mean_quality = get_numpy().mean(get_numpy().abs(means) < 2)
+            std_quality = get_numpy().mean((stds > 0.1) & (stds < 3))
             return (mean_quality + std_quality) / 2
         except Exception:
             return 0.5
 
-    def _assess_variance_quality(self, data: np.ndarray) -> float:
+    def _assess_variance_quality(self, data: get_numpy().ndarray) -> float:
         """Assess the variance structure of the data"""
         try:
-            variances = np.var(data, axis=0)
-            variance_consistency = 1.0 - np.std(variances) / (np.mean(variances) + 1e-08)
-            variance_consistency = np.clip(variance_consistency, 0, 1)
-            min_variance = np.min(variances)
+            variances = get_numpy().var(data, axis=0)
+            variance_consistency = 1.0 - get_numpy().std(variances) / (get_numpy().mean(variances) + 1e-08)
+            variance_consistency = get_numpy().clip(variance_consistency, 0, 1)
+            min_variance = get_numpy().min(variances)
             variance_adequacy = min(1.0, min_variance / 0.1)
             return (variance_consistency + variance_adequacy) / 2
         except Exception:
             return 0.5
 
-    def _assess_diversity_quality(self, data: np.ndarray) -> float:
+    def _assess_diversity_quality(self, data: get_numpy().ndarray) -> float:
         """Assess the diversity of generated samples"""
         try:
             n_samples = min(100, data.shape[0])
@@ -232,12 +243,12 @@ class StatisticalQualityAssessor:
             distances = []
             for i in range(n_samples):
                 for j in range(i + 1, n_samples):
-                    dist = np.linalg.norm(sample_data[i] - sample_data[j])
+                    dist = get_numpy().linalg.norm(sample_data[i] - sample_data[j])
                     distances.append(dist)
             if not distances:
                 return 0.5
-            mean_distance = np.mean(distances)
-            data_scale = np.sqrt(data.shape[1])
+            mean_distance = get_numpy().mean(distances)
+            data_scale = get_numpy().sqrt(data.shape[1])
             normalized_distance = mean_distance / (data_scale * 2)
             return min(1.0, normalized_distance)
         except Exception:

@@ -6,8 +6,7 @@ and PostgreSQL integration following APES architectural patterns.
 """
 
 import asyncio
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -15,10 +14,8 @@ from src.prompt_improver.metrics.api_metrics import (
     APIMetricsCollector,
     APIUsageMetric,
     AuthenticationMethod,
-    AuthenticationMetric,
     EndpointCategory,
     HTTPMethod,
-    RateLimitMetric,
     UserJourneyMetric,
     UserJourneyStage,
     get_api_metrics_collector,
@@ -147,7 +144,7 @@ class TestAPIMetricsIntegration:
         assert analytics["unique_endpoints"] == 2
         endpoint_data = analytics["endpoint_analytics"]
         assert len(endpoint_data) == 2
-        for endpoint, data in endpoint_data.items():
+        for data in endpoint_data.values():
             assert "request_count" in data
             assert "avg_response_time_ms" in data
             assert "success_rate" in data

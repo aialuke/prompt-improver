@@ -3,21 +3,18 @@ Tests for Analytics Query Interface
 Tests real behavior with actual database integration and optimized query performance.
 """
 
-import asyncio
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from prompt_improver.database.analytics_query_interface import (
     AnalyticsQueryInterface,
-    AnalyticsQueryResult,
     MetricType,
     TimeGranularity,
     TimeSeriesPoint,
     TrendAnalysisResult,
 )
-from prompt_improver.database.models import TrainingIteration, TrainingSession
 
 
 class TestAnalyticsQueryInterface:
@@ -26,8 +23,7 @@ class TestAnalyticsQueryInterface:
     @pytest.fixture
     async def mock_db_session(self):
         """Create mock database session"""
-        session = AsyncMock()
-        return session
+        return AsyncMock()
 
     @pytest.fixture
     def analytics_interface(self, mock_db_session):
@@ -100,7 +96,7 @@ class TestAnalyticsQueryInterface:
             )
             assert isinstance(result, TrendAnalysisResult)
             assert len(result.time_series) == 7
-            assert result.trend_direction in ["increasing", "decreasing", "stable"]
+            assert result.trend_direction in {"increasing", "decreasing", "stable"}
             assert 0.0 <= result.trend_strength <= 1.0
             assert -1.0 <= result.correlation_coefficient <= 1.0
             for point in result.time_series:

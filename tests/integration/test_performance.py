@@ -13,7 +13,7 @@ import statistics
 import sys
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from hypothesis import (
@@ -25,8 +25,10 @@ from prompt_improver.database import get_session_context
 from prompt_improver.database.models import ImprovementSession, RulePerformance
 from prompt_improver.rule_engine import RuleEngine
 from prompt_improver.services.analytics import AnalyticsService
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.services.prompt.facade import (
+    PromptServiceFacade as PromptImprovementService,
+)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
@@ -36,7 +38,7 @@ class PerformanceTester:
 
     def __init__(self):
         self.results = {}
-        self.session_store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False, enable_l3=False)
+        self.session_store = CacheFacade(l1_max_size=1000, l2_default_ttl=3600, enable_l2=False)
         self.analytics_service = None
         self.improvement_service = None
         self.rule_engine = None
@@ -400,8 +402,7 @@ class PerformanceTester:
 async def main():
     """Main performance testing function"""
     tester = PerformanceTester()
-    results = await tester.run_comprehensive_test()
-    return results
+    return await tester.run_comprehensive_test()
 
 
 @pytest.mark.benchmark

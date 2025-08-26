@@ -21,10 +21,9 @@ from typing import Any
 from collections.abc import Callable
 import uuid
 
-import numpy as np
-from scipy.stats import norm
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import Matern
+# import numpy as np  # Converted to lazy loading
+# from get_scipy().stats import norm  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy, get_sklearn
 
 from prompt_improver.ml.types import features, labels
 from prompt_improver.utils.datetime_utils import aware_utc_now
@@ -343,8 +342,8 @@ class MultiObjectiveBayesianOptimizer:
         if len(self.X_observed) >= 2:
             for objective in self.objectives:
                 self.gps[objective].fit(
-                    np.array(self.X_observed), 
-                    np.array(self.y_observed[objective])
+                    get_numpy().array(self.X_observed), 
+                    get_numpy().array(self.y_observed[objective])
                 )
         
         # Update Pareto front
@@ -354,21 +353,21 @@ class MultiObjectiveBayesianOptimizer:
         """Generate random sample within bounds."""
         sample = {}
         for param, (low, high) in self.bounds.items():
-            sample[param] = np.random.uniform(low, high)
+            sample[param] = get_numpy().random.uniform(low, high)
         return sample
     
     def _optimize_multi_objective_acquisition(self) -> dict[str, float]:
         """Optimize multi-objective acquisition function."""
         # Simplified multi-objective expected improvement
         def acquisition(x_input: Any) -> float:
-            x_array = np.atleast_2d(x_input)
+            x_array = get_numpy().atleast_2d(x_input)
             total_ei = 0.0
             
             for objective in self.objectives:
                 mu, sigma = self.gps[objective].predict(x_array, return_std=True)
-                y_best = np.max(self.y_observed[objective])
+                y_best = get_numpy().max(self.y_observed[objective])
                 
-                with np.errstate(divide='warn'):
+                with get_numpy().errstate(divide='warn'):
                     z = (mu - y_best) / sigma
                     ei = sigma * (z * norm.cdf(z) + norm.pdf(z))
                     ei[sigma == 0.0] = 0.0
@@ -383,10 +382,10 @@ class MultiObjectiveBayesianOptimizer:
         
         for _ in range(20):
             x0 = self._random_sample()
-            x0_array = np.array([x0[name] for name in self.param_names])
+            x0_array = get_numpy().array([x0[name] for name in self.param_names])
             
             # Simple gradient-free optimization
-            result = x0_array  # Placeholder - would use scipy.optimize
+            result = x0_array  # Placeholder - would use get_scipy().optimize
             acq_value = acquisition(result)
             
             if acq_value < best_acq:
@@ -688,10 +687,10 @@ class EnhancedExperimentOrchestrator:
             best_trial_id=best_trial.get("trial_id", "unknown") if best_trial else "none",
             best_hyperparameters=best_trial.get("hyperparameters", {}) if best_trial else {},
             best_metric_value=float(best_score),
-            metric_mean=float(np.mean(metric_values)),
-            metric_std=float(np.std(metric_values)),
-            metric_min=float(np.min(metric_values)),
-            metric_max=float(np.max(metric_values)),
+            metric_mean=float(get_numpy().mean(metric_values)),
+            metric_std=float(get_numpy().std(metric_values)),
+            metric_min=float(get_numpy().min(metric_values)),
+            metric_max=float(get_numpy().max(metric_values)),
             total_duration_seconds=0.0,  # Would need to track timing
             avg_trial_duration_seconds=0.0,  # Would need to track timing
             early_stopped=False
@@ -1063,6 +1062,8 @@ class EnhancedExperimentOrchestrator:
     async def _mock_training(self, train_data: Any, validation_data: Any, params: dict[str, Any]) -> tuple[None, dict[str, float]]:
         """Mock training function for demonstration."""
         import random
+        from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+        from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 
         # Simulate training time
         await asyncio.sleep(random.uniform(0.1, 0.5))

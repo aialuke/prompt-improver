@@ -25,13 +25,14 @@ import time
 from typing import Any, Dict, List, Optional, Union
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ....security import OWASP2025InputValidator, ValidationError
 from ....security.input_sanitization import InputSanitizer
 from ....utils.datetime_utils import aware_utc_now
 from ...analysis.domain_detector import PromptDomain
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 try:
-    from ...analysis.domain_analyzer import DomainAnalyzer
+    from ...analysis.domain_feature_extractor import DomainFeatureExtractor as DomainAnalyzer
     DOMAIN_ANALYSIS_AVAILABLE = True
 except ImportError:
     DOMAIN_ANALYSIS_AVAILABLE = False
@@ -319,7 +320,7 @@ class DomainFeatureExtractor:
         logger.debug('Starting domain feature extraction [correlation_id=%s]', correlation_id)
         if self.config.deterministic:
             random.seed(42)
-            np.random.seed(42)
+            get_numpy().random.seed(42)
         used_analyzer = False
         if self.domain_analyzer and self.config.use_domain_analyzer:
             try:

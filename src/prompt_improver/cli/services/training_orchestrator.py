@@ -1,4 +1,4 @@
-"""Training Orchestrator Service - Clean Architecture Implementation
+"""Training Orchestrator Service - Clean Architecture Implementation.
 
 Implements training workflow orchestration and component coordination.
 Extracted from training_system_manager.py (2109 lines) as part of decomposition.
@@ -8,27 +8,18 @@ import logging
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 from sqlalchemy import text
 
 from prompt_improver.cli.core.signal_handler import SignalOperation
-from prompt_improver.cli.services.training_protocols import (
-    TrainingMetricsProtocol,
-    TrainingPersistenceProtocol,
-    TrainingValidatorProtocol,
-)
-from prompt_improver.core.di.ml_container import MLServiceContainer
-from prompt_improver.core.factories.ml_pipeline_factory import (
-    MLPipelineOrchestratorFactory,
-)
-from prompt_improver.core.protocols.ml_protocols import (
-    ComponentFactoryProtocol,
-    ServiceContainerProtocol,
-)
 from prompt_improver.core.services.analytics_factory import get_analytics_interface
-from prompt_improver.database import ManagerMode, get_database_services, get_sessionmanager
+from prompt_improver.database import (
+    ManagerMode,
+    get_database_services,
+    get_sessionmanager,
+)
 from prompt_improver.ml.orchestration.config.orchestrator_config import (
     OrchestratorConfig,
 )
@@ -38,11 +29,16 @@ from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
 from prompt_improver.ml.preprocessing.orchestrator import (
     ProductionSyntheticDataGenerator,
 )
+from prompt_improver.shared.interfaces.protocols.cli import (
+    TrainingMetricsProtocol,
+    TrainingPersistenceProtocol,
+    TrainingValidatorProtocol,
+)
 
 
 class TrainingOrchestrator:
     """Training workflow orchestrator implementing Clean Architecture patterns.
-    
+
     Responsibilities:
     - Core workflow orchestration and component coordination
     - Training system lifecycle management
@@ -52,45 +48,45 @@ class TrainingOrchestrator:
 
     def __init__(
         self,
-        console: Optional[Console] = None,
-        validator: Optional[TrainingValidatorProtocol] = None,
-        metrics: Optional[TrainingMetricsProtocol] = None,
-        persistence: Optional[TrainingPersistenceProtocol] = None,
-    ):
+        console: Console | None = None,
+        validator: TrainingValidatorProtocol | None = None,
+        metrics: TrainingMetricsProtocol | None = None,
+        persistence: TrainingPersistenceProtocol | None = None,
+    ) -> None:
         self.console = console or Console()
         self.logger = logging.getLogger("apes.training_orchestrator")
-        
+
         # Protocol-based dependencies
         self.validator = validator
         self.metrics = metrics
         self.persistence = persistence
-        
+
         # Core orchestration state
         self._training_status = "stopped"
-        self._training_session_id: Optional[str] = None
-        self._orchestrator: Optional[MLPipelineOrchestrator] = None
+        self._training_session_id: str | None = None
+        self._orchestrator: MLPipelineOrchestrator | None = None
         self._analytics: Any = None
-        self._data_generator: Optional[ProductionSyntheticDataGenerator] = None
-        
+        self._data_generator: ProductionSyntheticDataGenerator | None = None
+
         # Performance tracking
-        self._startup_time: Optional[float] = None
-        
+        self._startup_time: float | None = None
+
         # Training system data directory
         self.training_data_dir = Path.home() / ".local" / "share" / "apes" / "training"
         self.training_data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Unified session manager for database access
         self._unified_session_manager = None
-        
+
         # Signal handling components
         self.signal_handler = None
         self.background_manager = None
         self._shutdown_priority = 5
-        
+
         # Initialize signal handling
         self._init_signal_handlers()
 
-    def _init_signal_handlers(self):
+    def _init_signal_handlers(self) -> None:
         """Initialize signal handler with lazy import to avoid circular dependency."""
         try:
             from prompt_improver.cli.core.signal_handler import AsyncSignalHandler
@@ -100,7 +96,7 @@ class TrainingOrchestrator:
 
             if self.signal_handler is None:
                 self.signal_handler = AsyncSignalHandler(console=self.console)
-                
+
                 try:
                     import asyncio
                     loop = asyncio.get_running_loop()
@@ -116,7 +112,7 @@ class TrainingOrchestrator:
         except ImportError as e:
             self.logger.warning(f"Signal handling integration not available: {e}")
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register orchestrator-specific signal handlers."""
         if self.signal_handler is None:
             self.logger.warning("Signal handler not initialized, skipping registration")
@@ -155,9 +151,9 @@ class TrainingOrchestrator:
 
         self.logger.info("TrainingOrchestrator signal handlers registered")
 
-    async def start_training_system(self) -> Dict[str, Any]:
+    async def start_training_system(self) -> dict[str, Any]:
         """Start training system components - orchestrates full initialization.
-        
+
         Returns:
             Training system startup results with performance metrics
         """
@@ -207,7 +203,7 @@ class TrainingOrchestrator:
 
         except Exception as e:
             self._training_status = "failed"
-            self.logger.error(f"Failed to start training system: {e}")
+            self.logger.exception(f"Failed to start training system: {e}")
             return {
                 "status": "failed",
                 "error": str(e),
@@ -216,10 +212,10 @@ class TrainingOrchestrator:
 
     async def stop_training_system(self, graceful: bool = True) -> bool:
         """Stop training system gracefully with progress preservation.
-        
+
         Args:
             graceful: Whether to perform graceful shutdown
-            
+
         Returns:
             True if shutdown successful, False otherwise
         """
@@ -249,12 +245,12 @@ class TrainingOrchestrator:
             return True
 
         except Exception as e:
-            self.logger.error(f"Error stopping training system: {e}")
+            self.logger.exception(f"Error stopping training system: {e}")
             return False
 
-    async def get_training_status(self) -> Dict[str, Any]:
+    async def get_training_status(self) -> dict[str, Any]:
         """Get training system status using metrics service.
-        
+
         Returns:
             Training system status and metrics
         """
@@ -280,14 +276,14 @@ class TrainingOrchestrator:
 
         return status
 
-    async def _ensure_database_services(self):
+    async def _ensure_database_services(self) -> None:
         """Ensure database services are available for orchestration."""
         if self._unified_session_manager is None:
             self._unified_session_manager = await get_database_services(
                 ManagerMode.MCP_SERVER
             )
 
-    async def _initialize_training_database(self):
+    async def _initialize_training_database(self) -> None:
         """Initialize database connections for training system."""
         self.logger.info("Initializing training database connections")
 
@@ -305,7 +301,7 @@ class TrainingOrchestrator:
 
         self.logger.info("Training database connections initialized")
 
-    async def _initialize_training_orchestrator(self):
+    async def _initialize_training_orchestrator(self) -> None:
         """Initialize ML Pipeline Orchestrator with training-focused configuration."""
         self.logger.info("Initializing training orchestrator")
 
@@ -321,7 +317,7 @@ class TrainingOrchestrator:
 
         self.logger.info("Training orchestrator initialized")
 
-    async def _initialize_training_analytics(self):
+    async def _initialize_training_analytics(self) -> None:
         """Initialize analytics service for training metrics."""
         self.logger.info("Initializing training analytics")
 
@@ -330,7 +326,7 @@ class TrainingOrchestrator:
 
         self.logger.info("Training analytics initialized")
 
-    async def _initialize_data_generator(self):
+    async def _initialize_data_generator(self) -> None:
         """Initialize synthetic data generator for training."""
         self.logger.info("Initializing synthetic data generator")
 
@@ -338,7 +334,7 @@ class TrainingOrchestrator:
 
         self.logger.info("Synthetic data generator initialized")
 
-    async def _verify_training_health(self) -> Dict[str, Any]:
+    async def _verify_training_health(self) -> dict[str, Any]:
         """Verify training system health and performance."""
         health_start = time.time()
 
@@ -363,7 +359,7 @@ class TrainingOrchestrator:
                 health_status["orchestrator_status"] = (
                     hasattr(self._orchestrator, "_is_initialized")
                     and self._orchestrator._is_initialized
-                    and self._orchestrator.state.name in ["IDLE", "RUNNING"]
+                    and self._orchestrator.state.name in {"IDLE", "RUNNING"}
                 )
 
             # Test analytics
@@ -383,12 +379,12 @@ class TrainingOrchestrator:
             health_status["response_time_ms"] = (time.time() - health_start) * 1000
 
         except Exception as e:
-            self.logger.error(f"Health check failed: {e}")
+            self.logger.exception(f"Health check failed: {e}")
             health_status["error"] = str(e)
 
         return health_status
 
-    async def _get_resource_usage(self) -> Dict[str, float]:
+    async def _get_resource_usage(self) -> dict[str, float]:
         """Get current resource usage for orchestration tracking."""
         try:
             import psutil
@@ -403,7 +399,7 @@ class TrainingOrchestrator:
         except ImportError:
             return {"memory_mb": 0, "cpu_percent": 0, "open_files": 0}
 
-    async def _cleanup_training_resources(self):
+    async def _cleanup_training_resources(self) -> None:
         """Cleanup training system resources during shutdown."""
         self.logger.info("Cleaning up training resources")
 
@@ -432,7 +428,7 @@ class TrainingOrchestrator:
                 "progress_preserved": self._training_session_id is not None,
             }
         except Exception as e:
-            self.logger.error(f"TrainingOrchestrator shutdown error: {e}")
+            self.logger.exception(f"TrainingOrchestrator shutdown error: {e}")
             return {
                 "status": "error",
                 "component": "TrainingOrchestrator",
@@ -469,7 +465,7 @@ class TrainingOrchestrator:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Emergency checkpoint creation failed: {e}")
+            self.logger.exception(f"Emergency checkpoint creation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def generate_training_status_report(self, signal_context):
@@ -493,7 +489,7 @@ class TrainingOrchestrator:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Status report generation failed: {e}")
+            self.logger.exception(f"Status report generation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def prepare_training_shutdown(self, signum, signal_name):
@@ -512,7 +508,7 @@ class TrainingOrchestrator:
                 "orchestrator_active": self._orchestrator is not None,
             }
         except Exception as e:
-            self.logger.error(f"Training shutdown preparation failed: {e}")
+            self.logger.exception(f"Training shutdown preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "TrainingOrchestrator",
@@ -533,14 +529,14 @@ class TrainingOrchestrator:
                 "can_resume": True,
             }
         except Exception as e:
-            self.logger.error(f"Training interruption preparation failed: {e}")
+            self.logger.exception(f"Training interruption preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "TrainingOrchestrator",
                 "error": str(e),
             }
 
-    async def _emergency_training_cleanup(self):
+    async def _emergency_training_cleanup(self) -> None:
         """Emergency cleanup for training resources during shutdown."""
         try:
             if self._orchestrator:
@@ -562,7 +558,7 @@ class TrainingOrchestrator:
 
             self.logger.info("Emergency training cleanup completed")
         except Exception as e:
-            self.logger.error(f"Emergency cleanup failed: {e}")
+            self.logger.exception(f"Emergency cleanup failed: {e}")
 
     # Properties for external access
     @property
@@ -571,30 +567,28 @@ class TrainingOrchestrator:
         return self._training_status
 
     @property
-    def training_session_id(self) -> Optional[str]:
+    def training_session_id(self) -> str | None:
         """Get current training session ID."""
         return self._training_session_id
 
     @property
-    def orchestrator(self) -> Optional[MLPipelineOrchestrator]:
+    def orchestrator(self) -> MLPipelineOrchestrator | None:
         """Get ML pipeline orchestrator instance."""
         return self._orchestrator
 
     # Add missing methods that the facade expects
-    async def get_system_status(self) -> Dict[str, Any]:
+    async def get_system_status(self) -> dict[str, Any]:
         """Get comprehensive system status."""
         return await self.get_training_status()
 
-    async def create_training_session(self, config: Dict[str, Any]) -> str:
+    async def create_training_session(self, config: dict[str, Any]) -> str:
         """Create training session via persistence service."""
         if self.persistence:
             return await self.persistence.create_training_session(config)
-        else:
-            raise RuntimeError("Persistence service not available")
+        raise RuntimeError("Persistence service not available")
 
-    async def get_active_sessions(self) -> List[Dict[str, Any]]:
+    async def get_active_sessions(self) -> list[dict[str, Any]]:
         """Get active sessions via persistence service."""
         if self.persistence:
             return await self.persistence.get_active_sessions()
-        else:
-            return []
+        return []

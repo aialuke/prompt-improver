@@ -1,4 +1,4 @@
-"""Core Metrics Module - Unified Metrics Interface for 2025 Best Practices
+"""Core Metrics Module - Unified Metrics Interface for 2025 Best Practices.
 
 This module provides a unified interface for metrics collection that follows
 2025 observability standards with OpenTelemetry as the primary backend.

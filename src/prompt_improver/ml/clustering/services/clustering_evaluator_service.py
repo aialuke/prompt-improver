@@ -13,15 +13,17 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 
 from . import ClusteringEvaluationProtocol, ClusteringMetrics
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+from prompt_improver.core.utils.lazy_ml_loader import get_sklearn_metrics, get_sklearn
 
 logger = logging.getLogger(__name__)
 
 # Optional ML metrics imports with fallbacks
 try:
-    from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+    from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
     SKLEARN_METRICS_AVAILABLE = True
 except ImportError:
     SKLEARN_METRICS_AVAILABLE = False
@@ -60,8 +62,8 @@ class ClusteringEvaluatorService:
         logger.info(f"ClusteringEvaluatorService initialized: weights={self.quality_weights}, "
                    f"stability={enable_stability_analysis}, adaptive={adaptive_thresholds}")
 
-    def assess_clustering_quality(self, X: np.ndarray, labels: np.ndarray, 
-                                probabilities: Optional[np.ndarray] = None) -> ClusteringMetrics:
+    def assess_clustering_quality(self, X: get_numpy().ndarray, labels: get_numpy().ndarray, 
+                                probabilities: Optional[get_numpy().ndarray] = None) -> ClusteringMetrics:
         """Assess comprehensive clustering quality."""
         start_time = time.time()
         
@@ -69,7 +71,7 @@ class ClusteringEvaluatorService:
             # Basic cluster analysis
             unique_labels = set(labels)
             n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
-            n_noise_points = int(np.sum(labels == -1))
+            n_noise_points = int(get_numpy().sum(labels == -1))
             noise_ratio = n_noise_points / len(labels) if len(labels) > 0 else 1.0
             
             # Initialize metrics with defaults
@@ -116,11 +118,11 @@ class ClusteringEvaluatorService:
             logger.error(f"Clustering quality assessment failed: {e}")
             return self._default_clustering_metrics(X, labels, start_time)
 
-    def compute_stability_score(self, X: np.ndarray, labels: np.ndarray) -> float:
+    def compute_stability_score(self, X: get_numpy().ndarray, labels: get_numpy().ndarray) -> float:
         """Compute cluster stability score."""
         return self._compute_stability_score_internal(X, labels)
 
-    def evaluate_clustering_success(self, X: np.ndarray, metrics: ClusteringMetrics) -> Tuple[str, str]:
+    def evaluate_clustering_success(self, X: get_numpy().ndarray, metrics: ClusteringMetrics) -> Tuple[str, str]:
         """Evaluate if clustering was successful with adaptive thresholds."""
         n_samples, n_features = X.shape
         
@@ -129,7 +131,7 @@ class ClusteringEvaluatorService:
         else:
             return self._standard_success_evaluation(metrics)
 
-    def _compute_sklearn_metrics(self, X: np.ndarray, labels: np.ndarray, 
+    def _compute_sklearn_metrics(self, X: get_numpy().ndarray, labels: get_numpy().ndarray, 
                                 n_clusters: int) -> Tuple[float, float, float]:
         """Compute scikit-learn clustering metrics."""
         silhouette = 0.0
@@ -139,7 +141,7 @@ class ClusteringEvaluatorService:
         try:
             # Filter out noise points for quality assessment
             mask = labels != -1
-            if np.sum(mask) > n_clusters and len(set(labels[mask])) > 1:
+            if get_numpy().sum(mask) > n_clusters and len(set(labels[mask])) > 1:
                 X_filtered = X[mask]
                 labels_filtered = labels[mask]
                 
@@ -166,17 +168,17 @@ class ClusteringEvaluatorService:
             
         return silhouette, calinski_harabasz, davies_bouldin
 
-    def _compute_stability_score_internal(self, X: np.ndarray, labels: np.ndarray, 
-                                        probabilities: Optional[np.ndarray] = None) -> float:
+    def _compute_stability_score_internal(self, X: get_numpy().ndarray, labels: get_numpy().ndarray, 
+                                        probabilities: Optional[get_numpy().ndarray] = None) -> float:
         """Compute cluster stability score based on within-cluster compactness."""
         try:
             # Use probabilities if available
             if probabilities is not None:
                 try:
                     if probabilities.ndim >= 2 and probabilities.shape[1] > 1:
-                        return float(np.mean(np.max(probabilities, axis=1)))
+                        return float(get_numpy().mean(get_numpy().max(probabilities, axis=1)))
                     elif probabilities.ndim == 1:
-                        return float(np.mean(probabilities))
+                        return float(get_numpy().mean(probabilities))
                 except (IndexError, ValueError) as e:
                     logger.debug(f"Error using probabilities for stability: {e}")
             
@@ -191,15 +193,15 @@ class ClusteringEvaluatorService:
                 
                 if len(cluster_points) > 1:
                     # Compute average distance from centroid
-                    center = np.mean(cluster_points, axis=0)
-                    distances = np.linalg.norm(cluster_points - center, axis=1)
-                    avg_distance = np.mean(distances)
+                    center = get_numpy().mean(cluster_points, axis=0)
+                    distances = get_numpy().linalg.norm(cluster_points - center, axis=1)
+                    avg_distance = get_numpy().mean(distances)
                     
                     # Convert to stability score (lower distance = higher stability)
                     stability = max(0.0, 1.0 - avg_distance / 10.0)
                     stability_scores.append(stability)
             
-            return float(np.mean(stability_scores)) if stability_scores else 0.0
+            return float(get_numpy().mean(stability_scores)) if stability_scores else 0.0
             
         except Exception as e:
             logger.warning(f"Stability score computation failed: {e}")
@@ -320,12 +322,12 @@ class ClusteringEvaluatorService:
         estimated_mb = (n_samples * n_features * 8) / (1024 * 1024) * 1.5  # 1.5x for overhead
         return max(1.0, estimated_mb)
 
-    def _default_clustering_metrics(self, X: np.ndarray, labels: np.ndarray, 
+    def _default_clustering_metrics(self, X: get_numpy().ndarray, labels: get_numpy().ndarray, 
                                   start_time: float) -> ClusteringMetrics:
         """Provide default metrics when full evaluation fails."""
         unique_labels = set(labels)
         n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
-        n_noise_points = int(np.sum(labels == -1))
+        n_noise_points = int(get_numpy().sum(labels == -1))
         noise_ratio = n_noise_points / len(labels) if len(labels) > 0 else 1.0
         
         return ClusteringMetrics(
@@ -342,8 +344,8 @@ class ClusteringEvaluatorService:
             stability_score=0.0
         )
 
-    def compare_clustering_results(self, X: np.ndarray, 
-                                 results: Dict[str, Tuple[np.ndarray, Optional[np.ndarray]]]) -> Dict[str, Any]:
+    def compare_clustering_results(self, X: get_numpy().ndarray, 
+                                 results: Dict[str, Tuple[get_numpy().ndarray, Optional[get_numpy().ndarray]]]) -> Dict[str, Any]:
         """Compare multiple clustering results."""
         comparison = {
             "results": {},
@@ -379,8 +381,8 @@ class ClusteringEvaluatorService:
         
         return comparison
 
-    def generate_evaluation_report(self, X: np.ndarray, labels: np.ndarray,
-                                 probabilities: Optional[np.ndarray] = None,
+    def generate_evaluation_report(self, X: get_numpy().ndarray, labels: get_numpy().ndarray,
+                                 probabilities: Optional[get_numpy().ndarray] = None,
                                  method_name: str = "Unknown") -> Dict[str, Any]:
         """Generate comprehensive clustering evaluation report."""
         metrics = self.assess_clustering_quality(X, labels, probabilities)
@@ -421,10 +423,10 @@ class ClusteringEvaluatorService:
         
         return report
 
-    def _get_largest_cluster_size(self, labels: np.ndarray) -> int:
+    def _get_largest_cluster_size(self, labels: get_numpy().ndarray) -> int:
         """Get size of the largest cluster."""
-        unique_labels, counts = np.unique(labels[labels != -1], return_counts=True)
-        return int(np.max(counts)) if len(counts) > 0 else 0
+        unique_labels, counts = get_numpy().unique(labels[labels != -1], return_counts=True)
+        return int(get_numpy().max(counts)) if len(counts) > 0 else 0
 
     def _get_quality_level(self, quality_score: float) -> str:
         """Get quality level description."""

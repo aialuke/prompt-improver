@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union
-from prompt_improver.core.protocols.ml_protocols import ComponentFactoryProtocol, ComponentRegistryProtocol, ComponentSpec
+from prompt_improver.shared.interfaces.protocols.ml import ComponentFactoryProtocol, ComponentRegistryProtocol, ComponentSpec
 from ..core.component_registry import ComponentInfo
 from ..shared.component_types import ComponentTier
 

@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     NewType,
     Protocol,
     TypeVar,
@@ -43,9 +42,11 @@ try:
 except ImportError:
     SQLMODEL_AVAILABLE = False
 
+
 if TYPE_CHECKING:
-    import numpy as np
     from numpy.typing import NDArray
+
+    from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -152,7 +153,6 @@ class CacheLevel(BaseEnum):
 
     L1 = "l1"
     L2 = "l2"
-    L3 = "l3"
     ALL = "all"
 
 
@@ -442,9 +442,9 @@ class PerformanceMonitor(Protocol):
 
 
 if TYPE_CHECKING:
-    MLFeatures = NDArray[np.float64]
-    MLLabels = NDArray[np.int64]
-    MLPredictions = Union[NDArray[np.float64], NDArray[np.int64]]
+    MLFeatures = NDArray[get_numpy().float64]
+    MLLabels = NDArray[get_numpy().int64]
+    MLPredictions = Union[NDArray[get_numpy().float64], NDArray[get_numpy().int64]]
 else:
     MLFeatures = Any
     MLLabels = Any
@@ -452,7 +452,7 @@ else:
 
 
 @runtime_checkable
-class MLModel(Protocol, Generic[T]):
+class MLModel[T](Protocol):
     """Protocol for ML models."""
 
     def fit(self, features: MLFeatures, labels: MLLabels) -> None:
@@ -485,7 +485,7 @@ class PromptImproverError(Exception):
         message: str,
         error_code: str | None = None,
         details: dict[str, str | int | float | bool] | None = None,
-    ):
+    ) -> None:
         self.message = message
         self.error_code = error_code or self.__class__.__name__
         self.details = details or {}
@@ -500,7 +500,7 @@ class ValidationError(PromptImproverError):
         message: str,
         field: str | None = None,
         value: str | int | float | bool | None = None,
-    ):
+    ) -> None:
         self.field = field
         self.value = value
         details = {"field": field} if field else {}
@@ -512,7 +512,7 @@ class ValidationError(PromptImproverError):
 class ConfigurationError(PromptImproverError):
     """Configuration error."""
 
-    def __init__(self, message: str, config_key: str | None = None):
+    def __init__(self, message: str, config_key: str | None = None) -> None:
         self.config_key = config_key
         super().__init__(message, "CONFIGURATION_ERROR", {"config_key": config_key})
 
@@ -522,7 +522,7 @@ class MLModelError(PromptImproverError):
 
     def __init__(
         self, message: str, model_id: str | None = None, operation: str | None = None
-    ):
+    ) -> None:
         self.model_id = model_id
         self.operation = operation
         super().__init__(

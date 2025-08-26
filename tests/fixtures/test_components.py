@@ -8,8 +8,7 @@ and Protocol compliance.
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_improver.utils.datetime_utils import aware_utc_now
 

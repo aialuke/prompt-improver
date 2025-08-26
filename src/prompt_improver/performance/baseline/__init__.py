@@ -1,4 +1,4 @@
-"""Automated Performance Baseline System
+"""Automated Performance Baseline System.
 
 This module provides comprehensive performance baseline collection, analysis,
 and regression detection for the prompt-improver system.
@@ -16,8 +16,8 @@ Key features:
 import asyncio
 import logging
 import uuid
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from prompt_improver.performance.baseline.automation import (
     BaselineAutomation,
@@ -133,7 +133,7 @@ class PerformanceBaselineSystem:
         enable_automation: bool = True,
         enable_reporting: bool = True,
         integration_with_existing_monitoring: bool = True,
-    ):
+    ) -> None:
         """Initialize the performance baseline system.
 
         Args:
@@ -244,7 +244,7 @@ class PerformanceBaselineSystem:
                     response_time_ms: float,
                     is_error: bool = False,
                     metadata: dict[str, Any] | None = None,
-                ):
+                ) -> None:
                     await original_record(
                         operation_name, response_time_ms, is_error, metadata
                     )
@@ -312,7 +312,7 @@ class PerformanceBaselineSystem:
             except ImportError:
                 logger.debug("Health check service not available for integration")
         except Exception as e:
-            logger.error(f"Failed to integrate with existing monitoring: {e}")
+            logger.exception(f"Failed to integrate with existing monitoring: {e}")
 
     async def record_production_traffic(
         self,
@@ -533,7 +533,7 @@ async def record_production_request(
 class track_production_operation:
     """Context manager for tracking production operations."""
 
-    def __init__(self, operation_name: str, **metadata):
+    def __init__(self, operation_name: str, **metadata) -> None:
         self.operation_name = operation_name
         self.metadata = metadata
         self.start_time = None

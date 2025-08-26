@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from collections.abc import Callable
 import uuid
 from sqlmodel import SQLModel, Field
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from prompt_improver.database.optimization_integration import DatabaseOptimizationManager
 from prompt_improver.ml.optimization.batch import UnifiedBatchProcessor
 from prompt_improver.performance.monitoring.health.background_manager import EnhancedBackgroundTaskManager, TaskPriority, get_background_task_manager
@@ -32,6 +32,7 @@ from .automated_deployment_pipeline import AutomatedDeploymentPipeline, Deployme
 from .enhanced_experiment_orchestrator import EnhancedExperimentConfig, EnhancedExperimentOrchestrator, ExperimentPriority, OptimizationStrategy, create_enhanced_orchestrator
 from .enhanced_model_registry import EnhancedModelRegistry, ModelMetadata, ModelStatus, SemanticVersion, create_enhanced_registry
 from .model_serving_infrastructure import ProductionModelServer, ScalingStrategy, ServingConfig, ServingStatus, create_model_server
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 logger = logging.getLogger(__name__)
 
 class PlatformStatus(Enum):
@@ -353,7 +354,7 @@ class MLPlatformIntegration:
         completed_workflows = [w for w in self.workflow_history if w.status == 'completed']
         deployment_workflows = [w for w in completed_workflows if w.workflow_type == WorkflowType.EXPERIMENT_TO_PRODUCTION]
         if deployment_workflows:
-            avg_deployment_time = np.mean([w.metrics.get('deployment_time_seconds', 0) for w in deployment_workflows])
+            avg_deployment_time = get_numpy().mean([w.metrics.get('deployment_time_seconds', 0) for w in deployment_workflows])
             baseline_deployment_time = 600
             improved_deployment_time = baseline_deployment_time * 0.6
             if avg_deployment_time <= improved_deployment_time:

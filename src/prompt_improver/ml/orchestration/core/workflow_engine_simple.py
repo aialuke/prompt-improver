@@ -3,7 +3,7 @@ Simple workflow engine implementation for testing.
 """
 import asyncio
 from typing import Any, Dict
-from prompt_improver.core.protocols.ml_protocols import WorkflowEngineProtocol
+from prompt_improver.shared.interfaces.protocols.ml import WorkflowEngineProtocol
 
 
 class SimpleWorkflowEngine:

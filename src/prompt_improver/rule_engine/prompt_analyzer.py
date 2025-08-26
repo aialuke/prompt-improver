@@ -14,19 +14,15 @@ Enhanced with:
 import logging
 import re
 import time
-from typing import Dict, List, Optional
-
-import numpy as np
-
-from prompt_improver.core.config.textstat import get_textstat_wrapper
-from prompt_improver.rule_engine.models import PromptCharacteristics
 
 # Heavy ML imports moved to TYPE_CHECKING and lazy loading
-from typing import TYPE_CHECKING
+import torch
+from transformers import AutoModel, AutoTokenizer, pipeline
 
-if TYPE_CHECKING:
-    import torch
-    from transformers import AutoModel, AutoTokenizer, pipeline
+from prompt_improver.core.config.textstat import get_textstat_wrapper
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+from prompt_improver.rule_engine.models import PromptCharacteristics
+
 
 def _get_ml_modules():
     """Lazy load ML modules when needed."""
@@ -43,6 +39,8 @@ def _get_ml_modules():
     except ImportError:
         logger.warning("Transformers not available, using fallback analysis")
         return {'available': False}
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +56,7 @@ class PromptAnalyzer:
     - Context dependency detection for rule optimization
     """
 
-    def __init__(self, enable_ml_analysis: bool = True):
+    def __init__(self, enable_ml_analysis: bool = True) -> None:
         """Initialize prompt analyzer with enhanced NLP models.
 
         Args:
@@ -530,12 +528,11 @@ class PromptAnalyzer:
         )
         word_count = len(prompt.split())
         length_context = min(1.0, word_count / 50.0)
-        context_score = (
+        return (
             min(1.0, context_count / 3.0) * 0.4
             + min(1.0, descriptive_words / 10.0) * 0.3
             + length_context * 0.3
         )
-        return context_score
 
     def _identify_task_type(self, prompt: str) -> str:
         """Identify the specific task type requested.
@@ -750,8 +747,7 @@ class PromptAnalyzer:
         time_constraints = sum(
             1 for pattern in time_patterns if re.search(pattern, prompt_lower)
         )
-        urgency_score = min(1.0, (urgency_count + time_constraints) / 3.0)
-        return urgency_score
+        return min(1.0, (urgency_count + time_constraints) / 3.0)
 
     def _analyze_formality(self, prompt: str) -> float:
         """Analyze formality level of the prompt (0.0 to 1.0).
@@ -799,8 +795,7 @@ class PromptAnalyzer:
         )
         if formal_count + informal_count == 0:
             return 0.5
-        formality_score = formal_count / (formal_count + informal_count)
-        return formality_score
+        return formal_count / (formal_count + informal_count)
 
     def _calculate_semantic_complexity(self, prompt: str) -> float | None:
         """Calculate semantic complexity using transformer embeddings.
@@ -822,8 +817,7 @@ class PromptAnalyzer:
                 embeddings = outputs.last_hidden_state.mean(dim=1)
             embedding_variance = torch.var(embeddings).item()
             embedding_magnitude = torch.norm(embeddings).item()
-            complexity = min(1.0, embedding_variance * embedding_magnitude / 10.0)
-            return complexity
+            return min(1.0, embedding_variance * embedding_magnitude / 10.0)
         except Exception as e:
             logger.warning(f"Semantic complexity calculation failed: {e}")
             return None
@@ -955,7 +949,7 @@ class PromptAnalyzer:
         features = {}
         words = prompt.split()
         features["avg_word_length"] = (
-            np.mean([len(word) for word in words]) if words else 0
+            get_numpy().mean([len(word) for word in words]) if words else 0
         )
         features["unique_word_ratio"] = len(set(words)) / len(words) if words else 0
         features["question_ratio"] = prompt.count("?") / len(words) if words else 0

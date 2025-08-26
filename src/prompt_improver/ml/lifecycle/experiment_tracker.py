@@ -19,11 +19,9 @@ import time
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from collections.abc import Callable
 from sqlmodel import SQLModel, Field
-import numpy as np
-from scipy.stats import norm
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import Matern
-from sklearn.model_selection import ParameterGrid
+# import numpy as np  # Converted to lazy loading
+# from get_scipy().stats import norm  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy, get_sklearn
 from prompt_improver.ml.types import OptimizationResult, TrainingBatch, features, hyper_parameters, labels, metrics_dict
 from prompt_improver.utils.datetime_utils import aware_utc_now
 try:
@@ -174,23 +172,23 @@ class BayesianOptimizer:
         self.X_observed.append(X)
         self.y_observed.append(y)
         if len(self.X_observed) >= 2:
-            self.gp.fit(np.array(self.X_observed), np.array(self.y_observed))
+            self.gp.fit(get_numpy().array(self.X_observed), get_numpy().array(self.y_observed))
 
     def _random_sample(self) -> dict[str, float]:
         """Generate random sample within bounds."""
         sample = {}
         for param, (low, high) in self.bounds.items():
-            sample[param] = np.random.uniform(low, high)
+            sample[param] = get_numpy().random.uniform(low, high)
         return sample
 
     def _optimize_acquisition(self) -> dict[str, float]:
         """Optimize acquisition function to find next point."""
 
         def acquisition(X):
-            X = np.atleast_2d(X)
+            X = get_numpy().atleast_2d(X)
             mu, sigma = self.gp.predict(X, return_std=True)
-            y_best = np.max(self.y_observed)
-            with np.errstate(divide='warn'):
+            y_best = get_numpy().max(self.y_observed)
+            with get_numpy().errstate(divide='warn'):
                 z = (mu - y_best) / sigma
                 ei = sigma * (z * norm.cdf(z) + norm.pdf(z))
                 ei[sigma == 0.0] = 0.0
@@ -199,7 +197,7 @@ class BayesianOptimizer:
         best_acq = float('inf')
         for _ in range(10):
             x0 = self._random_sample()
-            x0_array = np.array([x0[name] for name in self.param_names])
+            x0_array = get_numpy().array([x0[name] for name in self.param_names])
             result = x0_array
             acq_value = acquisition(result)
             if acq_value < best_acq:
@@ -328,6 +326,8 @@ class ExperimentTracker:
             trial.status = ExperimentStatus.FAILED
             trial.error_message = str(e)
             import traceback
+            from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+            from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
             trial.stack_trace = traceback.format_exc()
             logger.error('Trial {trial.trial_id} failed: %s', e)
         finally:
@@ -415,9 +415,9 @@ class ExperimentTracker:
                 trial_config = {}
                 for param, values in config.hyperparameter_space.items():
                     if isinstance(values, list):
-                        trial_config[param] = np.random.choice(values)
+                        trial_config[param] = get_numpy().random.choice(values)
                     elif isinstance(values, tuple) and len(values) == 2:
-                        trial_config[param] = np.random.uniform(values[0], values[1])
+                        trial_config[param] = get_numpy().random.uniform(values[0], values[1])
                 configs.append(trial_config)
             return configs
         elif config.optimization_strategy == OptimizationStrategy.BAYESIAN:
@@ -547,7 +547,7 @@ class ExperimentTracker:
         parameter_importance = None
         if len(completed_trials) >= 10:
             parameter_importance = self._calculate_parameter_importance(completed_trials, objective_metric)
-        results = ExperimentResults(experiment_id=experiment_id, total_trials=len(trials), successful_trials=len(completed_trials), failed_trials=len(failed_trials), best_trial_id=best_trial.trial_id, best_hyperparameters=best_trial.hyperparameters, best_metric_value=best_trial.metrics.get(objective_metric, 0.0), metric_mean=np.mean(objective_values), metric_std=np.std(objective_values), metric_min=np.min(objective_values), metric_max=np.max(objective_values), total_duration_seconds=total_duration, avg_trial_duration_seconds=np.mean([t.duration_seconds for t in completed_trials if t.duration_seconds]), parameter_importance=parameter_importance, early_stopped=len(trials) < config.max_trials)
+        results = ExperimentResults(experiment_id=experiment_id, total_trials=len(trials), successful_trials=len(completed_trials), failed_trials=len(failed_trials), best_trial_id=best_trial.trial_id, best_hyperparameters=best_trial.hyperparameters, best_metric_value=best_trial.metrics.get(objective_metric, 0.0), metric_mean=get_numpy().mean(objective_values), metric_std=get_numpy().std(objective_values), metric_min=get_numpy().min(objective_values), metric_max=get_numpy().max(objective_values), total_duration_seconds=total_duration, avg_trial_duration_seconds=get_numpy().mean([t.duration_seconds for t in completed_trials if t.duration_seconds]), parameter_importance=parameter_importance, early_stopped=len(trials) < config.max_trials)
         return results
 
     def _calculate_parameter_importance(self, trials: list[Trial], objective_metric: str) -> dict[str, float]:
@@ -556,7 +556,7 @@ class ExperimentTracker:
         param_names = set()
         for trial in trials:
             param_names.update(trial.hyperparameters.keys())
-        objective_values = np.array([t.metrics.get(objective_metric, 0.0) for t in trials])
+        objective_values = get_numpy().array([t.metrics.get(objective_metric, 0.0) for t in trials])
         for param in param_names:
             param_values = []
             for trial in trials:
@@ -566,7 +566,7 @@ class ExperimentTracker:
                 else:
                     param_values.append(hash(str(value)) % 1000)
             if len(set(param_values)) > 1:
-                correlation = abs(np.corrcoef(param_values, objective_values)[0, 1])
+                correlation = abs(get_numpy().corrcoef(param_values, objective_values)[0, 1])
                 importance[param] = float(correlation)
             else:
                 importance[param] = 0.0

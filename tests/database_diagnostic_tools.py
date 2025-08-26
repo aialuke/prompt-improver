@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 import asyncpg
 from sqlalchemy import text
@@ -186,7 +185,6 @@ class DatabaseDiagnostics:
         try:
             from prompt_improver.database import (
                 ManagerMode,
-                get_unified_manager,
             )
 
             manager = get_database_services(ManagerMode.ASYNC_MODERN)
@@ -454,7 +452,6 @@ class DatabaseDiagnostics:
         try:
             from prompt_improver.database import (
                 ManagerMode,
-                get_unified_manager,
             )
 
             start_time = asyncio.get_event_loop().time()
@@ -587,9 +584,9 @@ class DatabaseDiagnostics:
 
 async def main():
     """Run diagnostic tool."""
+    import json
     diagnostics = DatabaseDiagnostics()
     results = await diagnostics.run_comprehensive_check()
-    import json
 
     with open("database_diagnostic_results.json", "w") as f:
         json.dump(results, f, indent=2)

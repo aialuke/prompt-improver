@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enhanced Governance Validator - Claude Code Pre-Tool Hook
+"""Enhanced Governance Validator - Claude Code Pre-Tool Hook.
 
 This script enforces modern software engineering practices by:
 1. Scanning code for asyncio.create_task() patterns (Unified Async Infrastructure Protocol)
@@ -15,7 +15,7 @@ Research sources: Claude Code hooks, Clean Architecture patterns, SOLID principl
 import json
 import re
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 EXIT_SUCCESS = 0
 EXIT_VIOLATION = 1
@@ -88,7 +88,7 @@ def extract_code_content(tool_data: dict[str, Any]) -> tuple[str | None, str | N
     file_path: str | None = None
     code_content: str | None = None
 
-    if tool_name in ["Write", "Edit", "MultiEdit"]:
+    if tool_name in {"Write", "Edit", "MultiEdit"}:
         if "file_path" in tool_data.get("tool", {}).get("parameters", {}):
             file_path = tool_data["tool"]["parameters"]["file_path"]
 
@@ -147,9 +147,7 @@ def find_database_import_violations(code_content: str) -> list[tuple[int, str]]:
     lines = code_content.split("\n")
 
     for i, line in enumerate(lines, 1):
-        for pattern in PROHIBITED_DATABASE_IMPORTS:
-            if re.search(pattern, line):
-                violations.append((i, line.strip()))
+        violations.extend((i, line.strip()) for pattern in PROHIBITED_DATABASE_IMPORTS if re.search(pattern, line))
 
     return violations
 
@@ -165,9 +163,7 @@ def find_mock_violations(code_content: str, file_path: str | None) -> list[tuple
         lines = code_content.split("\n")
 
         for i, line in enumerate(lines, 1):
-            for pattern in PROHIBITED_MOCK_PATTERNS:
-                if re.search(pattern, line):
-                    violations.append((i, line.strip()))
+            violations.extend((i, line.strip()) for pattern in PROHIBITED_MOCK_PATTERNS if re.search(pattern, line))
 
         return violations
 
@@ -183,9 +179,7 @@ def find_legacy_pattern_violations(code_content: str) -> list[tuple[int, str]]:
     lines = code_content.split("\n")
 
     for i, line in enumerate(lines, 1):
-        for pattern in LEGACY_PATTERNS:
-            if re.search(pattern, line):
-                violations.append((i, line.strip()))
+        violations.extend((i, line.strip()) for pattern in LEGACY_PATTERNS if re.search(pattern, line))
 
     return violations
 
@@ -207,10 +201,10 @@ def format_violation_message(violation_type: str, violations: list[tuple[int, st
     message = f"\n🚫 {violation_type} VIOLATION DETECTED:\n"
     for line_num, line_content in violations[:3]:  # Show first 3 violations
         message += f"   Line {line_num}: {line_content}\n"
-    
+
     if len(violations) > 3:
         message += f"   ... and {len(violations) - 3} more violations\n"
-    
+
     message += f"\n💡 GUIDANCE: {guidance}\n"
     return message
 
@@ -262,10 +256,10 @@ def main() -> None:
 
     # 4. Check god object violations
     if check_god_object_violation(code_content):
-        message = f"\n🚫 GOD OBJECT VIOLATION DETECTED:\n" \
-                 f"   Class exceeds 500 lines (Single Responsibility Principle)\n" \
-                 f"\n💡 GUIDANCE: Decompose into focused services using facade patterns. " \
-                 f"Each class should have a single responsibility.\n"
+        message = "\n🚫 GOD OBJECT VIOLATION DETECTED:\n" \
+                 "   Class exceeds 500 lines (Single Responsibility Principle)\n" \
+                 "\n💡 GUIDANCE: Decompose into focused services using facade patterns. " \
+                 "Each class should have a single responsibility.\n"
         all_violations.append(message)
 
     # 5. Check legacy pattern violations
@@ -281,16 +275,16 @@ def main() -> None:
 
     # Output violations but don't block (educate instead of enforce)
     if all_violations:
-        print("\n" + "="*60, file=sys.stderr)
+        print("\n" + "=" * 60, file=sys.stderr)
         print("🏗️  ARCHITECTURAL GUIDANCE", file=sys.stderr)
-        print("="*60, file=sys.stderr)
-        
+        print("=" * 60, file=sys.stderr)
+
         for violation in all_violations:
             print(violation, file=sys.stderr)
-        
-        print("="*60, file=sys.stderr)
+
+        print("=" * 60, file=sys.stderr)
         print("💡 Consider these improvements for better architecture", file=sys.stderr)
-        print("="*60 + "\n", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
 
     # Always allow (educational mode, not blocking)
     sys.exit(EXIT_SUCCESS)

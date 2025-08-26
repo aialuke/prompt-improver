@@ -16,19 +16,14 @@ Security Test Coverage:
 - API input validation
 """
 
-import html
-import json
 import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from prompt_improver.core.services.security import PromptDataProtection
 from prompt_improver.security.input_sanitization import (
     InputSanitizer as RealInputSanitizer,
 )
@@ -423,11 +418,11 @@ class TestFileUploadSecurity:
 
     def test_file_content_validation(self):
         """Test file content validation"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        with tempfile.NamedTemporaryFile(encoding="utf-8", mode="w", suffix=".txt", delete=False) as f:
             f.write("This is safe text content")
             safe_file = f.name
         try:
-            with open(safe_file) as f:
+            with open(safe_file, encoding="utf-8") as f:
                 content = f.read()
             assert len(content) > 0
             assert len(content) < 1000000
@@ -494,12 +489,9 @@ class TestIntegrationWithMLComponents:
             {"epsilon": -1.0, "delta": 1e-06},
             {"epsilon": 1.0, "delta": 0.001},
         ]
-        valid_configs = []
-        for config in privacy_configs:
-            if sanitizer.validate_privacy_parameters(
+        valid_configs = [config for config in privacy_configs if sanitizer.validate_privacy_parameters(
                 config["epsilon"], config["delta"]
-            ):
-                valid_configs.append(config)
+            )]
         assert len(valid_configs) >= 2
         assert valid_configs[0]["epsilon"] == 1.0
         assert valid_configs[1]["epsilon"] == 0.5

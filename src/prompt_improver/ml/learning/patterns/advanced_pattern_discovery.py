@@ -11,23 +11,19 @@ import time
 from typing import Any, Optional
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 import pandas as pd
-from sklearn.cluster import DBSCAN
-from sklearn.metrics import calinski_harabasz_score, silhouette_score
-from sklearn.preprocessing import StandardScaler
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy, get_scipy_stats, get_sklearn
 from ....database import ManagerMode, get_database_services
 from ....database.models import RuleMetadata, RulePerformance
+from ....services.cache.cache_facade import CacheFacade
 from .apriori_analyzer import AprioriAnalyzer, AprioriConfig
 try:
     from concurrent.futures import ThreadPoolExecutor
-    import joblib
     import hdbscan
     HDBSCAN_AVAILABLE = True
-    JOBLIB_AVAILABLE = True
 except ImportError:
     HDBSCAN_AVAILABLE = False
-    JOBLIB_AVAILABLE = False
 try:
     from mlxtend.frequent_patterns import association_rules, fpgrowth
     from mlxtend.preprocessing import TransactionEncoder
@@ -92,7 +88,8 @@ class AdvancedPatternDiscovery:
             db_manager: Optional DatabaseManager instance for dependency injection.
                        If None, will be created lazily when first needed.
         """
-        self.scaler = StandardScaler()
+        sklearn = get_sklearn()
+        self.scaler = sklearn.preprocessing.StandardScaler()
         self.min_cluster_size = 5
         self.min_support = 0.1
         self.min_confidence = 0.5
@@ -104,7 +101,14 @@ class AdvancedPatternDiscovery:
         self._db_manager_lock = asyncio.Lock()
         self._apriori_analyzer_lock = asyncio.Lock()
         self._training_loader_lock = asyncio.Lock()
-        logger.info('AdvancedPatternDiscovery initialized with lazy loading strategy')
+        
+        # Initialize unified cache architecture for ML pattern caching
+        self._cache = CacheFacade(
+            l1_max_size=200,  # Optimized for pattern discovery results
+            l2_default_ttl=3600,  # 1 hour TTL for pattern caching
+            enable_l2=True
+        )
+        logger.info('AdvancedPatternDiscovery initialized with lazy loading strategy and unified cache')
 
     @property
     def db_manager(self):
@@ -221,6 +225,10 @@ class AdvancedPatternDiscovery:
         results['recommendations'] = recommendations
         results['discovery_metadata'].update({'execution_time': time.time() - start_time, 'algorithms_used': pattern_types, 'apriori_enabled': include_apriori and self.apriori_analyzer is not None, 'ensemble_validation': use_ensemble, 'timestamp': time.time()})
         logger.info('Pattern discovery completed in %ss with %s algorithms', format(results['discovery_metadata']['execution_time'], '.2f'), len(pattern_types))
+        # Cache pattern discovery results for performance optimization
+        cache_key = f"pattern_discovery:{hash(str(sorted(pattern_types)))}"
+        await self._cache.set(cache_key, results, l2_ttl=1800, l1_ttl=900)  # Cache for 30/15 minutes
+        
         return results
 
     async def _get_performance_data(self, db_session: AsyncSession, min_effectiveness: float) -> list[dict[str, Any]]:
@@ -254,7 +262,7 @@ class AdvancedPatternDiscovery:
                         data_indices.append(i)
             if len(param_features) < self.min_cluster_size:
                 return {'clusters': [], 'outliers': [], 'message': 'Insufficient parameter data'}
-            param_features = np.array(param_features)
+            param_features = get_numpy().array(param_features)
             param_features_scaled = self.scaler.fit_transform(param_features)
             if HDBSCAN_AVAILABLE:
                 clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size, min_samples=max(3, self.min_cluster_size // 3), metric='euclidean', algorithm='boruvka_kdtree', cluster_selection_method='eom', alpha=1.0, core_dist_n_jobs=self._get_optimal_n_jobs())
@@ -262,10 +270,11 @@ class AdvancedPatternDiscovery:
                 outlier_scores = clusterer.outlier_scores_
                 probabilities = clusterer.probabilities_
             else:
-                clusterer = DBSCAN(eps=0.5, min_samples=self.min_cluster_size)
+                sklearn = get_sklearn()
+                clusterer = sklearn.cluster.DBSCAN(eps=0.5, min_samples=self.min_cluster_size)
                 cluster_labels = clusterer.fit_predict(param_features_scaled)
-                outlier_scores = np.zeros(len(cluster_labels))
-                probabilities = np.ones(len(cluster_labels))
+                outlier_scores = get_numpy().zeros(len(cluster_labels))
+                probabilities = get_numpy().ones(len(cluster_labels))
             clusters = self._process_parameter_clusters(cluster_labels, performance_data, data_indices, outlier_scores, probabilities)
             outliers = self._identify_parameter_outliers(cluster_labels, performance_data, data_indices, outlier_scores)
             return {'clusters': clusters, 'outliers': outliers, 'algorithm': 'HDBSCAN' if HDBSCAN_AVAILABLE else 'DBSCAN', 'total_patterns': len(clusters), 'total_outliers': len(outliers), 'feature_dimensions': param_features.shape[1]}
@@ -335,19 +344,21 @@ class AdvancedPatternDiscovery:
                 perf_features.append(features)
             if len(perf_features) < self.min_cluster_size:
                 return {'clusters': [], 'message': 'Insufficient performance data'}
-            perf_features = np.array(perf_features)
+            perf_features = get_numpy().array(perf_features)
             perf_features_scaled = self.scaler.fit_transform(perf_features)
             if HDBSCAN_AVAILABLE:
                 clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size, min_samples=max(3, self.min_cluster_size // 3), algorithm='boruvka_kdtree', cluster_selection_method='eom', cluster_selection_epsilon=0.0, alpha=1.0, core_dist_n_jobs=self._get_optimal_n_jobs())
                 cluster_labels = clusterer.fit_predict(perf_features_scaled)
                 outlier_scores = clusterer.outlier_scores_
             else:
-                clusterer = DBSCAN(eps=0.3, min_samples=self.min_cluster_size)
+                sklearn = get_sklearn()
+                clusterer = sklearn.cluster.DBSCAN(eps=0.3, min_samples=self.min_cluster_size)
                 cluster_labels = clusterer.fit_predict(perf_features_scaled)
-                outlier_scores = np.zeros(len(cluster_labels))
+                outlier_scores = get_numpy().zeros(len(cluster_labels))
             if len(set(cluster_labels)) > 1:
-                silhouette_avg = silhouette_score(perf_features_scaled, cluster_labels)
-                calinski_score = calinski_harabasz_score(perf_features_scaled, cluster_labels)
+                sklearn = get_sklearn()
+                silhouette_avg = sklearn.metrics.silhouette_score(perf_features_scaled, cluster_labels)
+                calinski_score = sklearn.metrics.calinski_harabasz_score(perf_features_scaled, cluster_labels)
             else:
                 silhouette_avg = 0.0
                 calinski_score = 0.0
@@ -436,7 +447,7 @@ class AdvancedPatternDiscovery:
         frequent_patterns = [{'pattern': pattern, 'support': count / len(performance_data)} for pattern, count in pattern_counts.items() if count >= min_count]
         return {'frequent_patterns': frequent_patterns, 'association_rules': [], 'algorithm': 'Simple Frequency', 'total_patterns': len(frequent_patterns)}
 
-    def _process_parameter_clusters(self, cluster_labels: np.ndarray, performance_data: list[dict[str, Any]], data_indices: list[int], outlier_scores: np.ndarray, probabilities: np.ndarray) -> list[dict[str, Any]]:
+    def _process_parameter_clusters(self, cluster_labels: get_numpy().ndarray, performance_data: list[dict[str, Any]], data_indices: list[int], outlier_scores: get_numpy().ndarray, probabilities: get_numpy().ndarray) -> list[dict[str, Any]]:
         """Process parameter clusters into structured results"""
         clusters = []
         unique_labels = set(cluster_labels)
@@ -447,14 +458,14 @@ class AdvancedPatternDiscovery:
             cluster_indices = [data_indices[i] for i, mask in enumerate(cluster_mask) if mask]
             cluster_data = [performance_data[i] for i in cluster_indices]
             effectiveness_scores = [d['improvement_score'] for d in cluster_data]
-            avg_effectiveness = np.mean(effectiveness_scores)
-            std_effectiveness = np.std(effectiveness_scores)
+            avg_effectiveness = get_numpy().mean(effectiveness_scores)
+            std_effectiveness = get_numpy().std(effectiveness_scores)
             common_params = self._extract_common_parameters(cluster_data)
-            cluster_info = {'cluster_id': int(label), 'size': len(cluster_data), 'avg_effectiveness': float(avg_effectiveness), 'std_effectiveness': float(std_effectiveness), 'min_effectiveness': float(min(effectiveness_scores)), 'max_effectiveness': float(max(effectiveness_scores)), 'common_parameters': common_params, 'avg_outlier_score': float(np.mean(outlier_scores[cluster_mask])), 'avg_probability': float(np.mean(probabilities[cluster_mask])), 'sample_rules': [d['rule_name'] for d in cluster_data[:3]]}
+            cluster_info = {'cluster_id': int(label), 'size': len(cluster_data), 'avg_effectiveness': float(avg_effectiveness), 'std_effectiveness': float(std_effectiveness), 'min_effectiveness': float(min(effectiveness_scores)), 'max_effectiveness': float(max(effectiveness_scores)), 'common_parameters': common_params, 'avg_outlier_score': float(get_numpy().mean(outlier_scores[cluster_mask])), 'avg_probability': float(get_numpy().mean(probabilities[cluster_mask])), 'sample_rules': [d['rule_name'] for d in cluster_data[:3]]}
             clusters.append(cluster_info)
         return sorted(clusters, key=lambda x: x['avg_effectiveness'], reverse=True)
 
-    def _identify_parameter_outliers(self, cluster_labels: np.ndarray, performance_data: list[dict[str, Any]], data_indices: list[int], outlier_scores: np.ndarray) -> list[dict[str, Any]]:
+    def _identify_parameter_outliers(self, cluster_labels: get_numpy().ndarray, performance_data: list[dict[str, Any]], data_indices: list[int], outlier_scores: get_numpy().ndarray) -> list[dict[str, Any]]:
         """Identify high-value parameter outliers"""
         outliers = []
         for i, (label, score) in enumerate(zip(cluster_labels, outlier_scores, strict=False)):
@@ -475,9 +486,9 @@ class AdvancedPatternDiscovery:
             pattern_key = tuple(sorted(itemset))
             effectiveness_scores = effectiveness_map.get(pattern_key, [])
             if effectiveness_scores:
-                avg_effectiveness = np.mean(effectiveness_scores)
+                avg_effectiveness = get_numpy().mean(effectiveness_scores)
                 if avg_effectiveness >= self.min_effectiveness:
-                    pattern_info = {'itemset': list(itemset), 'support': float(support), 'avg_effectiveness': float(avg_effectiveness), 'effectiveness_count': len(effectiveness_scores), 'effectiveness_std': float(np.std(effectiveness_scores))}
+                    pattern_info = {'itemset': list(itemset), 'support': float(support), 'avg_effectiveness': float(avg_effectiveness), 'effectiveness_count': len(effectiveness_scores), 'effectiveness_std': float(get_numpy().std(effectiveness_scores))}
                     patterns.append(pattern_info)
         return sorted(patterns, key=lambda x: x['avg_effectiveness'], reverse=True)
 
@@ -494,12 +505,12 @@ class AdvancedPatternDiscovery:
             ant_effectiveness = effectiveness_map.get(ant_key, [])
             cons_effectiveness = effectiveness_map.get(cons_key, [])
             if ant_effectiveness and cons_effectiveness:
-                effectiveness_impact = np.mean(cons_effectiveness) - np.mean(ant_effectiveness)
+                effectiveness_impact = get_numpy().mean(cons_effectiveness) - get_numpy().mean(ant_effectiveness)
                 rule_info = {'antecedents': list(antecedents), 'consequents': list(consequents), 'confidence': float(confidence), 'lift': float(lift), 'effectiveness_impact': float(effectiveness_impact), 'support_antecedent': len(ant_effectiveness), 'support_consequent': len(cons_effectiveness)}
                 rule_patterns.append(rule_info)
         return sorted(rule_patterns, key=lambda x: x['effectiveness_impact'], reverse=True)
 
-    def _process_performance_clusters(self, cluster_labels: np.ndarray, performance_data: list[dict[str, Any]], features: np.ndarray, outlier_scores: np.ndarray) -> list[dict[str, Any]]:
+    def _process_performance_clusters(self, cluster_labels: get_numpy().ndarray, performance_data: list[dict[str, Any]], features: get_numpy().ndarray, outlier_scores: get_numpy().ndarray) -> list[dict[str, Any]]:
         """Process performance clusters"""
         clusters = []
         unique_labels = set(cluster_labels)
@@ -512,7 +523,7 @@ class AdvancedPatternDiscovery:
             effectiveness_scores = [d['improvement_score'] for d in cluster_data]
             execution_times = [d['execution_time_ms'] for d in cluster_data]
             satisfaction_scores = [d['user_satisfaction'] for d in cluster_data]
-            cluster_info = {'cluster_id': int(label), 'cluster_type': 'noise' if label == -1 else 'performance_cluster', 'size': len(cluster_data), 'characteristics': {'avg_effectiveness': float(np.mean(effectiveness_scores)), 'avg_execution_time': float(np.mean(execution_times)), 'avg_satisfaction': float(np.mean(satisfaction_scores)), 'effectiveness_range': [float(min(effectiveness_scores)), float(max(effectiveness_scores))], 'execution_time_range': [float(min(execution_times)), float(max(execution_times))]}, 'centroid': [float(x) for x in np.mean(cluster_features, axis=0)], 'avg_outlier_score': float(np.mean(outlier_scores[cluster_mask])), 'representative_rules': [d['rule_name'] for d in cluster_data[:3]]}
+            cluster_info = {'cluster_id': int(label), 'cluster_type': 'noise' if label == -1 else 'performance_cluster', 'size': len(cluster_data), 'characteristics': {'avg_effectiveness': float(get_numpy().mean(effectiveness_scores)), 'avg_execution_time': float(get_numpy().mean(execution_times)), 'avg_satisfaction': float(get_numpy().mean(satisfaction_scores)), 'effectiveness_range': [float(min(effectiveness_scores)), float(max(effectiveness_scores))], 'execution_time_range': [float(min(execution_times)), float(max(execution_times))]}, 'centroid': [float(x) for x in get_numpy().mean(cluster_features, axis=0)], 'avg_outlier_score': float(get_numpy().mean(outlier_scores[cluster_mask])), 'representative_rules': [d['rule_name'] for d in cluster_data[:3]]}
             clusters.append(cluster_info)
         return sorted(clusters, key=lambda x: x['characteristics']['avg_effectiveness'], reverse=True)
 
@@ -522,7 +533,7 @@ class AdvancedPatternDiscovery:
             effectiveness_scores = [d['improvement_score'] for d in data_points]
             execution_times = [d['execution_time_ms'] for d in data_points]
             common_chars = self._extract_common_characteristics(data_points)
-            pattern = {'category': category, 'sample_size': len(data_points), 'avg_effectiveness': float(np.mean(effectiveness_scores)), 'std_effectiveness': float(np.std(effectiveness_scores)), 'avg_execution_time': float(np.mean(execution_times)), 'common_characteristics': common_chars, 'top_performers': sorted(data_points, key=lambda x: x['improvement_score'], reverse=True)[:3]}
+            pattern = {'category': category, 'sample_size': len(data_points), 'avg_effectiveness': float(get_numpy().mean(effectiveness_scores)), 'std_effectiveness': float(get_numpy().std(effectiveness_scores)), 'avg_execution_time': float(get_numpy().mean(execution_times)), 'common_characteristics': common_chars, 'top_performers': sorted(data_points, key=lambda x: x['improvement_score'], reverse=True)[:3]}
             return pattern
         except Exception:
             return None
@@ -574,7 +585,7 @@ class AdvancedPatternDiscovery:
         """Extract common characteristics from data points"""
         characteristics = {}
         effectiveness_scores = [d['improvement_score'] for d in data_points]
-        characteristics['effectiveness_profile'] = {'min': float(min(effectiveness_scores)), 'max': float(max(effectiveness_scores)), 'avg': float(np.mean(effectiveness_scores)), 'std': float(np.std(effectiveness_scores))}
+        characteristics['effectiveness_profile'] = {'min': float(min(effectiveness_scores)), 'max': float(max(effectiveness_scores)), 'avg': float(get_numpy().mean(effectiveness_scores)), 'std': float(get_numpy().std(effectiveness_scores))}
         rule_names = [d['rule_name'] for d in data_points]
         characteristics['common_rule_patterns'] = Counter(rule_names).most_common(3)
         return characteristics
@@ -584,11 +595,12 @@ class AdvancedPatternDiscovery:
         try:
             eff1 = [d['improvement_score'] for d in data1]
             eff2 = [d['improvement_score'] for d in data2]
-            from scipy.stats import ttest_ind
-            ttest_result = ttest_ind(eff1, eff2)
+            # Using lazy loaded scipy stats
+            scipy_stats = get_scipy_stats()
+            ttest_result = scipy_stats.ttest_ind(eff1, eff2)
             stat_value = float(ttest_result.statistic)
             p_value = float(ttest_result.pvalue)
-            pattern = {'category_1': cat1, 'category_2': cat2, 'avg_effectiveness_1': float(np.mean(eff1)), 'avg_effectiveness_2': float(np.mean(eff2)), 'effectiveness_difference': float(np.mean(eff1) - np.mean(eff2)), 'statistical_significance': p_value, 'test_statistic': stat_value, 'sample_sizes': [len(data1), len(data2)]}
+            pattern = {'category_1': cat1, 'category_2': cat2, 'avg_effectiveness_1': float(get_numpy().mean(eff1)), 'avg_effectiveness_2': float(get_numpy().mean(eff2)), 'effectiveness_difference': float(get_numpy().mean(eff1) - get_numpy().mean(eff2)), 'statistical_significance': p_value, 'test_statistic': stat_value, 'sample_sizes': [len(data1), len(data2)]}
             return pattern if abs(pattern['effectiveness_difference']) > 0.1 else None
         except Exception:
             return None
@@ -634,7 +646,7 @@ class AdvancedPatternDiscovery:
                 mean_eff = cluster['avg_effectiveness']
                 std_eff = cluster['std_effectiveness']
                 n = cluster['size']
-                margin_error = 1.96 * (std_eff / np.sqrt(n))
+                margin_error = 1.96 * (std_eff / get_numpy().sqrt(n))
                 ci_lower = mean_eff - margin_error
                 ci_upper = mean_eff + margin_error
                 validation['cluster_stability'][cluster['cluster_id']] = {'confidence_interval': [float(ci_lower), float(ci_upper)], 'margin_of_error': float(margin_error), 'sample_size': n}
@@ -697,7 +709,7 @@ class AdvancedPatternDiscovery:
             Performance benchmark results
         """
         import time
-        from sklearn.datasets import make_blobs
+        
         if dataset_sizes is None:
             dataset_sizes = [100, 500, 1000, 2000, 5000, 10000]
         results = {}
@@ -705,7 +717,8 @@ class AdvancedPatternDiscovery:
             size_results = []
             for sample in range(sample_size):
                 try:
-                    blobs_result = make_blobs(n_samples=size, n_features=10, centers=5)
+                    sklearn = get_sklearn()
+                    blobs_result = sklearn.datasets.make_blobs(n_samples=size, n_features=10, centers=5)
                     data = blobs_result[0]
                     start_time = time.time()
                     if HDBSCAN_AVAILABLE:
@@ -719,7 +732,7 @@ class AdvancedPatternDiscovery:
                 except Exception as e:
                     logger.error('Benchmark failed for size {size}: %s', e)
             if size_results:
-                results[size] = {'avg_time': np.mean(size_results), 'min_time': min(size_results), 'max_time': max(size_results), 'samples': len(size_results)}
+                results[size] = {'avg_time': get_numpy().mean(size_results), 'min_time': min(size_results), 'max_time': max(size_results), 'samples': len(size_results)}
         return {'status': 'success', 'algorithm': 'HDBSCAN-Boruvka', 'parallel_jobs': self._get_optimal_n_jobs(), 'results': results, 'performance_summary': self._analyze_performance_results(results)}
 
     def _analyze_performance_results(self, results: dict) -> dict[str, Any]:
@@ -729,10 +742,11 @@ class AdvancedPatternDiscovery:
         sizes = list(results.keys())
         times = [results[size]['avg_time'] for size in sizes]
         if len(times) >= 3:
-            from scipy.stats import linregress
-            log_sizes = np.log(sizes)
-            log_times = np.log(times)
-            slope, intercept, r_value, p_value, std_err = linregress(log_sizes, log_times)
+            # Using lazy loaded scipy stats
+            scipy_stats = get_scipy_stats()
+            log_sizes = get_numpy().log(sizes)
+            log_times = get_numpy().log(times)
+            slope, intercept, r_value, p_value, std_err = scipy_stats.linregress(log_sizes, log_times)
             complexity_estimate = f'O(n^{slope:.2f})'
         else:
             complexity_estimate = 'Insufficient data'
@@ -813,7 +827,7 @@ class AdvancedPatternDiscovery:
 
     def _analyze_apriori_performance_context(self, performance_data: list[dict[str, Any]], apriori_results: dict[str, Any]) -> dict[str, Any]:
         """Analyze how Apriori patterns relate to performance data."""
-        context = {'performance_data_points': len(performance_data), 'average_effectiveness': np.mean([d.get('effectiveness', 0) for d in performance_data]), 'rule_coverage': self._calculate_rule_coverage(performance_data, apriori_results), 'pattern_validation': self._validate_apriori_against_performance(performance_data, apriori_results)}
+        context = {'performance_data_points': len(performance_data), 'average_effectiveness': get_numpy().mean([d.get('effectiveness', 0) for d in performance_data]), 'rule_coverage': self._calculate_rule_coverage(performance_data, apriori_results), 'pattern_validation': self._validate_apriori_against_performance(performance_data, apriori_results)}
         return context
 
     def _calculate_rule_coverage(self, performance_data: list[dict[str, Any]], apriori_results: dict[str, Any]) -> dict[str, float]:
@@ -848,8 +862,8 @@ class AdvancedPatternDiscovery:
             if rule['confidence'] >= 0.7 and rule['lift'] >= 1.5:
                 high_conf_patterns.append(rule)
         if high_conf_patterns:
-            avg_confidence = np.mean([p['confidence'] for p in high_conf_patterns])
-            avg_lift = np.mean([p['lift'] for p in high_conf_patterns])
+            avg_confidence = get_numpy().mean([p['confidence'] for p in high_conf_patterns])
+            avg_lift = get_numpy().mean([p['lift'] for p in high_conf_patterns])
             validation_results['pattern_accuracy'] = float(avg_confidence)
             validation_results['prediction_confidence'] = float(min(float(avg_confidence * avg_lift / 2), 1.0))
             validation_results['business_value_score'] = float(len(high_conf_patterns) / max(len(apriori_results.get('top_rules', [])), 1))
@@ -934,8 +948,8 @@ class AdvancedPatternDiscovery:
                 logger.warning('Insufficient training data for pattern discovery')
                 return {'status': 'insufficient_data', 'samples': training_data['metadata']['total_samples'], 'message': 'Insufficient training data for reliable pattern discovery'}
             results = {'status': 'success', 'training_metadata': training_data['metadata'], 'patterns': {}, 'insights': [], 'recommendations': []}
-            features = np.array(training_data['features'])
-            labels = np.array(training_data['labels'])
+            features = get_numpy().array(training_data['features'])
+            labels = get_numpy().array(training_data['labels'])
             if pattern_types is None:
                 pattern_types = ['clustering', 'feature_importance', 'effectiveness']
             if 'clustering' in pattern_types and use_clustering:
@@ -962,7 +976,7 @@ class AdvancedPatternDiscovery:
             logger.error('Error in training data pattern discovery: %s', e)
             return {'status': 'error', 'error': str(e), 'message': 'Failed to discover patterns in training data'}
 
-    async def _discover_training_clustering_patterns(self, features: np.ndarray, labels: np.ndarray, min_effectiveness: float) -> dict[str, Any]:
+    async def _discover_training_clustering_patterns(self, features: get_numpy().ndarray, labels: get_numpy().ndarray, min_effectiveness: float) -> dict[str, Any]:
         """Discover patterns using clustering analysis on training data"""
         try:
             if len(features) < 10:
@@ -971,7 +985,8 @@ class AdvancedPatternDiscovery:
             if HDBSCAN_AVAILABLE:
                 clusterer = hdbscan.HDBSCAN(min_cluster_size=max(5, len(features) // 20), min_samples=3, cluster_selection_epsilon=0.1)
             else:
-                clusterer = DBSCAN(eps=0.5, min_samples=5)
+                sklearn = get_sklearn()
+                clusterer = sklearn.cluster.DBSCAN(eps=0.5, min_samples=5)
             cluster_labels = clusterer.fit_predict(features_scaled)
             n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
             if n_clusters < 2:
@@ -982,25 +997,25 @@ class AdvancedPatternDiscovery:
                     continue
                 cluster_mask = cluster_labels == cluster_id
                 cluster_effectiveness = labels[cluster_mask]
-                cluster_info = {'cluster_id': int(cluster_id), 'size': int(np.sum(cluster_mask)), 'avg_effectiveness': float(np.mean(cluster_effectiveness)), 'std_effectiveness': float(np.std(cluster_effectiveness)), 'min_effectiveness': float(np.min(cluster_effectiveness)), 'max_effectiveness': float(np.max(cluster_effectiveness)), 'high_performance': float(np.mean(cluster_effectiveness >= min_effectiveness))}
+                cluster_info = {'cluster_id': int(cluster_id), 'size': int(get_numpy().sum(cluster_mask)), 'avg_effectiveness': float(get_numpy().mean(cluster_effectiveness)), 'std_effectiveness': float(get_numpy().std(cluster_effectiveness)), 'min_effectiveness': float(get_numpy().min(cluster_effectiveness)), 'max_effectiveness': float(get_numpy().max(cluster_effectiveness)), 'high_performance': float(get_numpy().mean(cluster_effectiveness >= min_effectiveness))}
                 cluster_analysis.append(cluster_info)
             cluster_analysis.sort(key=lambda x: x['avg_effectiveness'], reverse=True)
-            return {'status': 'success', 'n_clusters': n_clusters, 'noise_points': int(np.sum(cluster_labels == -1)), 'cluster_analysis': cluster_analysis, 'best_cluster': cluster_analysis[0] if cluster_analysis else None}
+            return {'status': 'success', 'n_clusters': n_clusters, 'noise_points': int(get_numpy().sum(cluster_labels == -1)), 'cluster_analysis': cluster_analysis, 'best_cluster': cluster_analysis[0] if cluster_analysis else None}
         except Exception as e:
             logger.error('Error in training clustering pattern discovery: %s', e)
             return {'status': 'error', 'error': str(e)}
 
-    async def _discover_feature_importance_patterns(self, features: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
+    async def _discover_feature_importance_patterns(self, features: get_numpy().ndarray, labels: get_numpy().ndarray) -> dict[str, Any]:
         """Discover feature importance patterns in training data"""
         try:
             if len(features) < 10 or features.shape[1] == 0:
                 return {'status': 'insufficient_data', 'samples': len(features)}
             feature_importance = []
             for i in range(features.shape[1]):
-                correlation = np.corrcoef(features[:, i], labels)[0, 1]
-                if np.isnan(correlation):
+                correlation = get_numpy().corrcoef(features[:, i], labels)[0, 1]
+                if get_numpy().isnan(correlation):
                     correlation = 0.0
-                feature_importance.append({'feature_index': i, 'correlation': float(correlation), 'abs_correlation': float(abs(correlation)), 'feature_std': float(np.std(features[:, i])), 'feature_mean': float(np.mean(features[:, i]))})
+                feature_importance.append({'feature_index': i, 'correlation': float(correlation), 'abs_correlation': float(abs(correlation)), 'feature_std': float(get_numpy().std(features[:, i])), 'feature_mean': float(get_numpy().mean(features[:, i]))})
             feature_importance.sort(key=lambda x: x['abs_correlation'], reverse=True)
             top_features = [f['feature_index'] for f in feature_importance[:10]]
             return {'status': 'success', 'feature_importance': feature_importance, 'top_features': top_features, 'max_correlation': feature_importance[0]['abs_correlation'] if feature_importance else 0.0, 'n_significant_features': sum(1 for f in feature_importance if f['abs_correlation'] > 0.1)}
@@ -1008,16 +1023,16 @@ class AdvancedPatternDiscovery:
             logger.error('Error in feature importance pattern discovery: %s', e)
             return {'status': 'error', 'error': str(e)}
 
-    async def _discover_effectiveness_patterns(self, features: np.ndarray, labels: np.ndarray, min_effectiveness: float) -> dict[str, Any]:
+    async def _discover_effectiveness_patterns(self, features: get_numpy().ndarray, labels: get_numpy().ndarray, min_effectiveness: float) -> dict[str, Any]:
         """Discover effectiveness-based patterns in training data"""
         try:
             if len(labels) < 10:
                 return {'status': 'insufficient_data', 'samples': len(labels)}
             high_effectiveness_mask = labels >= min_effectiveness
-            n_high_effectiveness = np.sum(high_effectiveness_mask)
-            effectiveness_stats = {'mean_effectiveness': float(np.mean(labels)), 'std_effectiveness': float(np.std(labels)), 'min_effectiveness': float(np.min(labels)), 'max_effectiveness': float(np.max(labels)), 'median_effectiveness': float(np.median(labels)), 'high_effectiveness_count': int(n_high_effectiveness), 'high_effectiveness_ratio': float(n_high_effectiveness / len(labels))}
+            n_high_effectiveness = get_numpy().sum(high_effectiveness_mask)
+            effectiveness_stats = {'mean_effectiveness': float(get_numpy().mean(labels)), 'std_effectiveness': float(get_numpy().std(labels)), 'min_effectiveness': float(get_numpy().min(labels)), 'max_effectiveness': float(get_numpy().max(labels)), 'median_effectiveness': float(get_numpy().median(labels)), 'high_effectiveness_count': int(n_high_effectiveness), 'high_effectiveness_ratio': float(n_high_effectiveness / len(labels))}
             percentiles = [25, 50, 75, 90, 95]
-            effectiveness_percentiles = {f'p{p}': float(np.percentile(labels, p)) for p in percentiles}
+            effectiveness_percentiles = {f'p{p}': float(get_numpy().percentile(labels, p)) for p in percentiles}
             return {'status': 'success', 'effectiveness_stats': effectiveness_stats, 'effectiveness_percentiles': effectiveness_percentiles, 'high_effectiveness_threshold': min_effectiveness}
         except Exception as e:
             logger.error('Error in effectiveness pattern discovery: %s', e)

@@ -1,4 +1,4 @@
-"""Unified Configuration with Facade Pattern - Reduced Coupling Implementation
+"""Unified Configuration with Facade Pattern - Reduced Coupling Implementation.
 
 This is the modernized version of core/config/__init__.py that uses facade patterns
 to reduce coupling from 12 to 1 internal imports while maintaining full functionality.
@@ -7,29 +7,31 @@ Key improvements:
 - 92% reduction in internal imports (12 → 1)
 - Facade-based configuration access
 - Protocol-based interfaces for loose coupling
-- Lazy initialization to minimize startup dependencies  
+- Lazy initialization to minimize startup dependencies
 - Zero circular import possibilities
 """
 
 import logging
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from prompt_improver.core.facades import get_config_facade
-from prompt_improver.core.protocols.facade_protocols import ConfigFacadeProtocol
+
+if TYPE_CHECKING:
+    from prompt_improver.shared.interfaces.protocols.cli import ConfigFacadeProtocol
 
 logger = logging.getLogger(__name__)
 
 
 class UnifiedConfigManager:
     """Unified configuration manager using facade pattern for loose coupling.
-    
+
     This manager provides the same interface as the original config module
     but with dramatically reduced coupling through facade patterns.
-    
+
     Coupling reduction: 12 → 1 internal imports (92% reduction)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the unified config manager."""
         self._config_facade: ConfigFacadeProtocol = get_config_facade()
         self._initialized = False
@@ -196,22 +198,21 @@ def setup_configuration_logging() -> None:
 __all__ = [
     # Manager class
     "UnifiedConfigManager",
-    "get_config_manager",
-    "reset_config_manager",
-    
+    "create_test_config",
     # Convenience functions
     "get_config",
+    "get_config_manager",
     "get_database_config",
-    "get_security_config", 
-    "get_monitoring_config",
-    "get_ml_config",
-    "create_test_config",
-    "validate_configuration",
-    "reload_config",
     "get_environment_name",
+    "get_ml_config",
+    "get_monitoring_config",
+    "get_security_config",
+    "get_service_config",
     "is_development",
     "is_production",
     "is_testing",
-    "get_service_config",
+    "reload_config",
+    "reset_config_manager",
     "setup_configuration_logging",
+    "validate_configuration",
 ]

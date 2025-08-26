@@ -241,6 +241,75 @@
       "review_date": "2025-11-13T17:11:03.673375+00:00Z",
       "status": "active",
       "title": "Test Decision"
+    },
+    {
+      "alternatives_considered": [
+        "Code-first optimization",
+        "Algorithm-first approaches",
+        "Technology-first solutions"
+      ],
+      "decided_by": [
+        "user",
+        "claude"
+      ],
+      "decision": "Adopt pragmatic development philosophy with 'Theory loses to practice' principle for all development work",
+      "decision_date": "2025-01-15T00:00:00Z",
+      "decision_id": "pragmatic_development_philosophy_2025",
+      "impact_areas": [
+        "development_methodology",
+        "problem_validation",
+        "solution_complexity"
+      ],
+      "rationale": "Real production problems require measurable solutions. Validate problem existence with user impact before building complex theoretical solutions",
+      "review_date": "2025-06-15T00:00:00Z",
+      "status": "active",
+      "title": "Pragmatic Development Philosophy 2025"
+    },
+    {
+      "alternatives_considered": [
+        "Flexible complexity limits",
+        "No indentation restrictions",
+        "Tool-based complexity analysis"
+      ],
+      "decided_by": [
+        "user",
+        "claude"
+      ],
+      "decision": "Enforce 3-level indentation maximum and eliminate special-case logic through better design",
+      "decision_date": "2025-01-15T00:00:00Z",
+      "decision_id": "code_simplicity_standards_2025",
+      "impact_areas": [
+        "code_quality",
+        "maintainability",
+        "debugging_efficiency"
+      ],
+      "rationale": "Complex code with deep nesting and special cases is unmaintainable and error-prone. Transform edge cases into normal patterns through better data structure design",
+      "review_date": "2025-06-15T00:00:00Z",
+      "status": "active",
+      "title": "Code Simplicity Standards 2025"
+    },
+    {
+      "alternatives_considered": [
+        "Algorithm optimization first",
+        "Performance tuning focus",
+        "Framework-specific optimizations"
+      ],
+      "decided_by": [
+        "user",
+        "claude"
+      ],
+      "decision": "Prioritize data structure design over code complexity - good programmers worry about data structures, not algorithms",
+      "decision_date": "2025-01-15T00:00:00Z",
+      "decision_id": "data_first_design_philosophy_2025",
+      "impact_areas": [
+        "architecture_design",
+        "performance_optimization",
+        "code_maintainability"
+      ],
+      "rationale": "Proper data modeling eliminates algorithmic complexity and drives performance improvements. Focus on clean data flow patterns, schema design, and resource modeling",
+      "review_date": "2025-06-15T00:00:00Z",
+      "status": "active",
+      "title": "Data-First Design Philosophy 2025"
     }
   ],
   "context_evolution": {

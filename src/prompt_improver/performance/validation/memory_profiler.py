@@ -1,4 +1,4 @@
-"""Advanced Memory Leak Detection Framework
+"""Advanced Memory Leak Detection Framework.
 
 This module provides comprehensive memory profiling and leak detection for
 validation operations, designed to handle 100k+ operations while maintaining
@@ -12,6 +12,7 @@ Key Features:
 5. Real-time memory monitoring with configurable thresholds
 """
 
+import argparse
 import asyncio
 import gc
 import json
@@ -25,10 +26,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 import aiofiles
 import psutil
+
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +151,7 @@ class GCStressTestResult:
 class MemoryTracker:
     """Real-time memory tracking and analysis."""
 
-    def __init__(self, max_snapshots: int = 1000):
+    def __init__(self, max_snapshots: int = 1000) -> None:
         self.max_snapshots = max_snapshots
         self.snapshots: deque = deque(maxlen=max_snapshots)
         self.operation_snapshots: dict[str, deque] = defaultdict(
@@ -240,8 +243,7 @@ class MemoryTracker:
         self.tracked_objects = {
             ref for ref in self.tracked_objects if ref() is not None
         }
-        cleaned_count = before_count - len(self.tracked_objects)
-        return cleaned_count
+        return before_count - len(self.tracked_objects)
 
     def get_memory_growth_rate(
         self, operation_context: str, hours: float = 1.0
@@ -274,9 +276,7 @@ class MemoryTracker:
         memory_diff_mb = (
             (last_snapshot.current_size - first_snapshot.current_size) / 1024 / 1024
         )
-        growth_rate = memory_diff_mb / time_diff_hours
-
-        return growth_rate
+        return memory_diff_mb / time_diff_hours
 
     def _get_current_memory_mb(self) -> float:
         """Get current memory usage in MB."""
@@ -290,7 +290,7 @@ class MemoryTracker:
 class MemoryLeakDetector:
     """Advanced memory leak detection and analysis."""
 
-    def __init__(self, data_dir: Path | None = None):
+    def __init__(self, data_dir: Path | None = None) -> None:
         self.data_dir = data_dir or Path("memory_analysis")
         self.data_dir.mkdir(exist_ok=True)
 
@@ -356,9 +356,7 @@ class MemoryLeakDetector:
             await asyncio.sleep(0.1)
 
         # Generate comprehensive report
-        comprehensive_report = await self._generate_leak_report(results)
-
-        return comprehensive_report
+        return await self._generate_leak_report(results)
 
     async def _detect_leaks_in_operation(
         self, operation_type: str, iterations: int
@@ -493,7 +491,7 @@ class MemoryLeakDetector:
             }
 
             # Simulate cache access patterns
-            for key, value in cache_data.items():
+            for value in cache_data.values():
                 _ = len(str(value))
 
         elif operation_type == "concurrent_validation":
@@ -584,11 +582,11 @@ class MemoryLeakDetector:
             return None
 
         try:
-            import numpy as np
-            from scipy import stats
+            # import numpy as np  # Converted to lazy loading
+            # from scipy import stats  # Converted to lazy loading
 
             # Linear regression
-            slope, intercept, r_value, p_value, std_err = stats.linregress(
+            slope, _intercept, r_value, p_value, _std_err = get_scipy_stats().linregress(
                 time_hours, memory_mb
             )
             r_squared = r_value**2
@@ -773,7 +771,7 @@ class MemoryLeakDetector:
             severity = pattern_info.get("severity", "LOW")
 
             if pattern == LeakPattern.LINEAR.value:
-                if severity in ["CRITICAL", "HIGH"]:
+                if severity in {"CRITICAL", "HIGH"}:
                     recommendations.extend([
                         f"URGENT: Linear memory leak detected in {operation_type}",
                         "Review object lifecycle management and ensure proper cleanup",
@@ -997,8 +995,6 @@ async def run_memory_leak_detection(
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Memory Leak Detection Framework")
     parser.add_argument(
         "--operations", type=int, default=100000, help="Operations per test type"

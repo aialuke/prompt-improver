@@ -14,9 +14,8 @@ import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-from sklearn.preprocessing import RobustScaler, StandardScaler
-from sklearn.feature_selection import VarianceThreshold
+# import numpy as np  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
 
 from . import ClusteringPreprocessorProtocol, ClusteringPreprocessingResult
 
@@ -31,8 +30,8 @@ except ImportError:
     warnings.warn("UMAP not available. Install with: pip install umap-learn")
 
 try:
-    from sklearn.feature_selection import SelectKBest, mutual_info_classif
-    from sklearn.decomposition import PCA
+    # Test if sklearn is available by trying to import it
+    sklearn = get_sklearn()
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -80,7 +79,7 @@ class ClusteringPreprocessorService:
         logger.info(f"ClusteringPreprocessorService initialized: scaling={scaling_method}, "
                    f"auto_reduction={auto_dimensionality_reduction}, target_dims={target_dimensions}")
 
-    def preprocess_features(self, X: np.ndarray, labels: Optional[np.ndarray] = None) -> ClusteringPreprocessingResult:
+    def preprocess_features(self, X: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None) -> ClusteringPreprocessingResult:
         """Preprocess features for optimal clustering."""
         start_time = time.time()
         original_shape = X.shape
@@ -120,7 +119,7 @@ class ClusteringPreprocessorService:
                 X_reduced = X_filtered
             
             # Final validation
-            if np.any(np.isnan(X_reduced)) or np.any(np.isinf(X_reduced)):
+            if get_numpy().any(get_numpy().isnan(X_reduced)) or get_numpy().any(get_numpy().isinf(X_reduced)):
                 return ClusteringPreprocessingResult(
                     status="failed",
                     features=X,
@@ -164,8 +163,8 @@ class ClusteringPreprocessorService:
                 preprocessing_time=time.time() - start_time
             )
 
-    def validate_inputs(self, X: np.ndarray, labels: Optional[np.ndarray] = None, 
-                       sample_weights: Optional[np.ndarray] = None) -> Dict[str, Any]:
+    def validate_inputs(self, X: get_numpy().ndarray, labels: Optional[get_numpy().ndarray] = None, 
+                       sample_weights: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Validate input data for clustering."""
         try:
             validation_result = {
@@ -188,18 +187,18 @@ class ClusteringPreprocessorService:
                 return {"valid": False, "error": f"Need at least 1 feature, got {n_features}"}
             
             # Check for invalid values
-            if np.any(np.isnan(X)):
-                validation_result["warnings"].append(f"Found {np.sum(np.isnan(X))} NaN values")
+            if get_numpy().any(get_numpy().isnan(X)):
+                validation_result["warnings"].append(f"Found {get_numpy().sum(get_numpy().isnan(X))} NaN values")
             
-            if np.any(np.isinf(X)):
-                validation_result["warnings"].append(f"Found {np.sum(np.isinf(X))} infinite values")
+            if get_numpy().any(get_numpy().isinf(X)):
+                validation_result["warnings"].append(f"Found {get_numpy().sum(get_numpy().isinf(X))} infinite values")
             
             # Clustering-specific validation
             validation_result["clustering_specific_checks"] = {
                 "sample_to_feature_ratio": n_samples / n_features,
                 "is_high_dimensional": n_features > 20,
                 "sufficient_samples_for_clustering": n_samples >= 10,
-                "constant_features_detected": np.sum(np.var(X, axis=0) < self.variance_threshold)
+                "constant_features_detected": get_numpy().sum(get_numpy().var(X, axis=0) < self.variance_threshold)
             }
             
             # Additional warnings for clustering
@@ -221,7 +220,7 @@ class ClusteringPreprocessorService:
             if sample_weights is not None:
                 if len(sample_weights) != n_samples:
                     return {"valid": False, "error": "Sample weights length mismatch with features"}
-                if np.any(sample_weights < 0):
+                if get_numpy().any(sample_weights < 0):
                     return {"valid": False, "error": "Sample weights must be non-negative"}
             
             return validation_result
@@ -229,7 +228,7 @@ class ClusteringPreprocessorService:
         except Exception as e:
             return {"valid": False, "error": f"Validation failed: {str(e)}"}
 
-    def apply_dimensionality_reduction(self, X: np.ndarray) -> np.ndarray:
+    def apply_dimensionality_reduction(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Apply UMAP dimensionality reduction for clustering."""
         if not self.auto_dimensionality_reduction or X.shape[1] <= self.target_dimensions:
             return X
@@ -238,43 +237,44 @@ class ClusteringPreprocessorService:
 
     def _create_scaler(self):
         """Create appropriate scaler based on configuration."""
+        sklearn = get_sklearn()
         if self.scaling_method == "robust":
-            return RobustScaler(quantile_range=(25.0, 75.0))
+            return sklearn.preprocessing.RobustScaler(quantile_range=(25.0, 75.0))
         elif self.scaling_method == "standard":
-            return StandardScaler()
+            return sklearn.preprocessing.StandardScaler()
         elif self.scaling_method == "none":
             return None
         else:
             logger.warning(f"Unknown scaling method '{self.scaling_method}', using robust")
-            return RobustScaler()
+            return sklearn.preprocessing.RobustScaler()
 
-    def _clean_data(self, X: np.ndarray) -> np.ndarray:
+    def _clean_data(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Clean data by handling missing values and invalid entries."""
         X_cleaned = X.copy()
         
         # Handle NaN values
-        if np.any(np.isnan(X_cleaned)):
+        if get_numpy().any(get_numpy().isnan(X_cleaned)):
             logger.info("Handling NaN values with median imputation")
             for col in range(X_cleaned.shape[1]):
                 col_data = X_cleaned[:, col]
-                if np.any(np.isnan(col_data)):
-                    median_value = np.nanmedian(col_data)
-                    X_cleaned[np.isnan(col_data), col] = median_value
+                if get_numpy().any(get_numpy().isnan(col_data)):
+                    median_value = get_numpy().nanmedian(col_data)
+                    X_cleaned[get_numpy().isnan(col_data), col] = median_value
         
         # Handle infinite values
-        if np.any(np.isinf(X_cleaned)):
+        if get_numpy().any(get_numpy().isinf(X_cleaned)):
             logger.info("Handling infinite values by clipping")
             for col in range(X_cleaned.shape[1]):
                 col_data = X_cleaned[:, col]
-                finite_data = col_data[np.isfinite(col_data)]
+                finite_data = col_data[get_numpy().isfinite(col_data)]
                 if len(finite_data) > 0:
-                    lower_bound = np.percentile(finite_data, 1)
-                    upper_bound = np.percentile(finite_data, 99)
-                    X_cleaned[:, col] = np.clip(col_data, lower_bound, upper_bound)
+                    lower_bound = get_numpy().percentile(finite_data, 1)
+                    upper_bound = get_numpy().percentile(finite_data, 99)
+                    X_cleaned[:, col] = get_numpy().clip(col_data, lower_bound, upper_bound)
         
         return X_cleaned
 
-    def _apply_scaling(self, X: np.ndarray) -> np.ndarray:
+    def _apply_scaling(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Apply feature scaling optimized for clustering."""
         if self.scaler is None:
             return X
@@ -284,7 +284,7 @@ class ClusteringPreprocessorService:
         else:
             return self.scaler.transform(X)
 
-    def _remove_constant_features(self, X: np.ndarray) -> Tuple[np.ndarray, int]:
+    def _remove_constant_features(self, X: get_numpy().ndarray) -> Tuple[get_numpy().ndarray, int]:
         """Remove constant and low-variance features."""
         if not SKLEARN_AVAILABLE:
             return X, 0
@@ -292,7 +292,8 @@ class ClusteringPreprocessorService:
         original_features = X.shape[1]
         
         if self.variance_selector is None:
-            self.variance_selector = VarianceThreshold(threshold=self.variance_threshold)
+            sklearn = get_sklearn()
+            self.variance_selector = sklearn.feature_selection.VarianceThreshold(threshold=self.variance_threshold)
             X_filtered = self.variance_selector.fit_transform(X)
         else:
             X_filtered = self.variance_selector.transform(X)
@@ -303,8 +304,8 @@ class ClusteringPreprocessorService:
         
         return X_filtered, removed_count
 
-    def _apply_dimensionality_reduction(self, X: np.ndarray, 
-                                      labels: Optional[np.ndarray] = None) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def _apply_dimensionality_reduction(self, X: get_numpy().ndarray, 
+                                      labels: Optional[get_numpy().ndarray] = None) -> Tuple[get_numpy().ndarray, Optional[get_numpy().ndarray]]:
         """Apply dimensionality reduction optimized for clustering."""
         # Prefer UMAP for clustering as it preserves local structure
         if UMAP_AVAILABLE:
@@ -315,7 +316,7 @@ class ClusteringPreprocessorService:
             logger.warning("No dimensionality reduction available")
             return X, None
 
-    def _apply_umap_reduction(self, X: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def _apply_umap_reduction(self, X: get_numpy().ndarray) -> Tuple[get_numpy().ndarray, Optional[get_numpy().ndarray]]:
         """Apply UMAP dimensionality reduction."""
         try:
             # Optimize UMAP parameters for clustering
@@ -342,11 +343,12 @@ class ClusteringPreprocessorService:
             logger.error(f"UMAP reduction failed: {e}")
             return X, None
 
-    def _apply_pca_reduction(self, X: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def _apply_pca_reduction(self, X: get_numpy().ndarray) -> Tuple[get_numpy().ndarray, Optional[get_numpy().ndarray]]:
         """Apply PCA dimensionality reduction as fallback."""
         try:
             if self.dimensionality_reducer is None:
-                self.dimensionality_reducer = PCA(
+                sklearn = get_sklearn()
+                self.dimensionality_reducer = sklearn.decomposition.PCA(
                     n_components=min(self.target_dimensions, X.shape[1]),
                     random_state=42
                 )
@@ -380,7 +382,7 @@ class ClusteringPreprocessorService:
             "min_dist": min_dist
         }
 
-    def _analyze_data_characteristics(self, X: np.ndarray) -> Dict[str, Any]:
+    def _analyze_data_characteristics(self, X: get_numpy().ndarray) -> Dict[str, Any]:
         """Analyze data characteristics relevant for clustering."""
         n_samples, n_features = X.shape
         
@@ -389,20 +391,20 @@ class ClusteringPreprocessorService:
             "n_features": n_features,
             "is_high_dimensional": n_features > 20,
             "feature_scale_range": {
-                "min": float(np.min(X)),
-                "max": float(np.max(X)),
-                "std": float(np.std(X))
+                "min": float(get_numpy().min(X)),
+                "max": float(get_numpy().max(X)),
+                "std": float(get_numpy().std(X))
             },
             "feature_variances": {
-                "mean_variance": float(np.mean(np.var(X, axis=0))),
-                "min_variance": float(np.min(np.var(X, axis=0))),
-                "max_variance": float(np.max(np.var(X, axis=0)))
+                "mean_variance": float(get_numpy().mean(get_numpy().var(X, axis=0))),
+                "min_variance": float(get_numpy().min(get_numpy().var(X, axis=0))),
+                "max_variance": float(get_numpy().max(get_numpy().var(X, axis=0)))
             },
             "sample_to_feature_ratio": n_samples / n_features,
             "estimated_clustering_difficulty": self._estimate_clustering_difficulty(X)
         }
 
-    def _estimate_clustering_difficulty(self, X: np.ndarray) -> str:
+    def _estimate_clustering_difficulty(self, X: get_numpy().ndarray) -> str:
         """Estimate clustering difficulty based on data characteristics."""
         n_samples, n_features = X.shape
         
@@ -423,8 +425,8 @@ class ClusteringPreprocessorService:
             difficulty_score += 2
         
         # Check data spread
-        feature_vars = np.var(X, axis=0)
-        if np.std(feature_vars) > np.mean(feature_vars):
+        feature_vars = get_numpy().var(X, axis=0)
+        if get_numpy().std(feature_vars) > get_numpy().mean(feature_vars):
             difficulty_score += 1  # High variance in feature variances
         
         if difficulty_score >= 4:
@@ -434,13 +436,13 @@ class ClusteringPreprocessorService:
         else:
             return "low"
 
-    def _compute_clustering_readiness_score(self, X: np.ndarray) -> float:
+    def _compute_clustering_readiness_score(self, X: get_numpy().ndarray) -> float:
         """Compute a score indicating how ready the data is for clustering."""
         try:
             score_components = []
             
             # Factor 1: No invalid values
-            has_invalid = np.any(np.isnan(X)) or np.any(np.isinf(X))
+            has_invalid = get_numpy().any(get_numpy().isnan(X)) or get_numpy().any(get_numpy().isinf(X))
             score_components.append(0.0 if has_invalid else 1.0)
             
             # Factor 2: Reasonable dimensionality
@@ -449,19 +451,19 @@ class ClusteringPreprocessorService:
             score_components.append(dim_ratio)
             
             # Factor 3: Feature variance distribution
-            feature_vars = np.var(X, axis=0)
+            feature_vars = get_numpy().var(X, axis=0)
             if len(feature_vars) > 0:
-                var_consistency = 1.0 - (np.std(feature_vars) / (np.mean(feature_vars) + 1e-8))
+                var_consistency = 1.0 - (get_numpy().std(feature_vars) / (get_numpy().mean(feature_vars) + 1e-8))
                 score_components.append(max(0.0, min(1.0, var_consistency)))
             
             # Factor 4: Data scale appropriateness
-            data_range = np.max(X) - np.min(X)
+            data_range = get_numpy().max(X) - get_numpy().min(X)
             scale_score = 1.0 if 0.1 <= data_range <= 10 else 0.5
             score_components.append(scale_score)
             
             # Compute overall score
-            overall_score = np.mean(score_components)
-            return float(np.clip(overall_score, 0.0, 1.0))
+            overall_score = get_numpy().mean(score_components)
+            return float(get_numpy().clip(overall_score, 0.0, 1.0))
             
         except Exception as e:
             logger.warning(f"Clustering readiness score computation failed: {e}")

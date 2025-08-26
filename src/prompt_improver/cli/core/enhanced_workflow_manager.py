@@ -5,9 +5,9 @@ Implements 2025 best practices for workflow monitoring and graceful shutdown.
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from rich.console import Console
 from rich.progress import (
@@ -61,12 +61,12 @@ class WorkflowService:
     - Rich progress monitoring with real-time updates
     - Graceful vs force shutdown modes
     - Comprehensive workflow status tracking
-    - Integration with signal handling for interruption
+    - Integration with signal handling for interruption.
     """
 
     def __init__(
         self, cli_orchestrator: CLIOrchestrator, console: Console | None = None
-    ):
+    ) -> None:
         self.cli_orchestrator = cli_orchestrator
         self.console = console or Console()
         self.logger = logging.getLogger(__name__)

@@ -3,15 +3,13 @@ Comprehensive Integration Tests for Advanced A/B Testing Framework
 Tests the complete pipeline from experiment setup to causal inference
 """
 
-import asyncio
+import contextlib
 from datetime import datetime, timedelta
 
 import numpy as np
 import pytest
-import sqlalchemy
 
 from prompt_improver.database.models import (
-    ABExperiment,
     PromptSession,
     RuleMetadata,
     RulePerformance,
@@ -21,7 +19,6 @@ from prompt_improver.evaluation.advanced_statistical_validator import (
 )
 from prompt_improver.evaluation.causal_inference_analyzer import (
     CausalInferenceAnalyzer,
-    TreatmentAssignment,
 )
 from prompt_improver.evaluation.experiment_orchestrator import (
     ExperimentArm,
@@ -140,10 +137,8 @@ class TestAdvancedABTestingComplete:
             hasattr(real_time_service, "redis_client")
             and real_time_service.redis_client
         ):
-            try:
+            with contextlib.suppress(Exception):
                 await real_time_service.redis_client.close()
-            except Exception:
-                pass
 
     @pytest.fixture
     def simple_ab_config(self):
@@ -414,11 +409,11 @@ class TestAdvancedABTestingComplete:
         assert analysis_result.analysis_id is not None
         assert analysis_result.timestamp is not None
         assert analysis_result.statistical_validation is not None
-        assert analysis_result.statistical_validation.primary_test.test_name in [
+        assert analysis_result.statistical_validation.primary_test.test_name in {
             "Welch's t-test",
             "Student's t-test",
             "Mann-Whitney U",
-        ]
+        }
         assert (
             0.0
             <= analysis_result.statistical_validation.validation_quality_score
@@ -435,13 +430,13 @@ class TestAdvancedABTestingComplete:
         assert "treatment" in analysis_result.arm_performance
         assert "control" in analysis_result.relative_performance
         assert "treatment" in analysis_result.relative_performance
-        assert analysis_result.stopping_recommendation in [
+        assert analysis_result.stopping_recommendation in {
             "STOP_FOR_SUCCESS",
             "STOP_WITH_CAUTION",
             "STOP_FOR_FUTILITY",
             "CONTINUE",
-        ]
-        assert analysis_result.business_decision in ["IMPLEMENT", "PILOT", "NO_ACTION"]
+        }
+        assert analysis_result.business_decision in {"IMPLEMENT", "PILOT", "NO_ACTION"}
         assert 0 <= analysis_result.confidence_level <= 1
         assert 0 <= analysis_result.data_quality_score <= 1
         assert 0 <= analysis_result.analysis_quality_score <= 1
@@ -477,7 +472,7 @@ class TestAdvancedABTestingComplete:
         )
         assert analysis_result.experiment_id == simple_ab_config.experiment_id
         assert "insufficient" in analysis_result.stopping_recommendation.lower()
-        assert analysis_result.business_decision in ["NO_ACTION", "WAIT"]
+        assert analysis_result.business_decision in {"NO_ACTION", "WAIT"}
         assert analysis_result.confidence_level == 0.0
         assert any(
             "insufficient" in insight.lower()
@@ -487,7 +482,7 @@ class TestAdvancedABTestingComplete:
     @pytest.mark.asyncio
     async def test_stopping_criteria_monitoring(self, orchestrator, simple_ab_config):
         """Test automated stopping criteria monitoring with real statistical significance"""
-        control_data, treatment_data = self.create_statistically_significant_data(
+        _control_data, _treatment_data = self.create_statistically_significant_data(
             orchestrator.db_session, "_stopping_test"
         )
         await orchestrator.db_session.commit()
@@ -524,7 +519,7 @@ class TestAdvancedABTestingComplete:
         self, orchestrator, simple_ab_config
     ):
         """Test experiment stopping and cleanup procedures with real analysis"""
-        control_data, treatment_data = self.create_statistically_significant_data(
+        _control_data, _treatment_data = self.create_statistically_significant_data(
             orchestrator.db_session, "_stopping_cleanup_test"
         )
         await orchestrator.db_session.commit()
@@ -544,12 +539,12 @@ class TestAdvancedABTestingComplete:
         final_analysis = stop_result["final_analysis"]
         assert final_analysis.experiment_id == experiment_id
         assert final_analysis.statistical_validation is not None
-        assert final_analysis.stopping_recommendation in [
+        assert final_analysis.stopping_recommendation in {
             "STOP_FOR_SUCCESS",
             "STOP_WITH_CAUTION",
             "STOP_FOR_FUTILITY",
             "CONTINUE",
-        ]
+        }
         assert experiment_id not in orchestrator.active_experiments
         assert experiment_id not in orchestrator.experiment_tasks
         assert experiment_id not in orchestrator.real_time_service.monitoring_tasks
@@ -619,7 +614,7 @@ class TestAdvancedABTestingComplete:
             status = await orchestrator.get_experiment_status(f"concurrent_test_{i}")
             assert status["active"]
         for i in range(3):
-            control_data, treatment_data = self.create_statistically_significant_data(
+            _control_data, _treatment_data = self.create_statistically_significant_data(
                 orchestrator.db_session, f"_concurrent_test_{i}"
             )
         await orchestrator.db_session.commit()
@@ -642,7 +637,7 @@ class TestAdvancedABTestingComplete:
         assert 0 <= analysis_result.data_quality_score <= 1
         assert 0 <= analysis_result.analysis_quality_score <= 1
         assert 0 <= analysis_result.overall_experiment_quality <= 1
-        assert analysis_result.business_decision in ["IMPLEMENT", "PILOT", "NO_ACTION"]
+        assert analysis_result.business_decision in {"IMPLEMENT", "PILOT", "NO_ACTION"}
         assert 0 <= analysis_result.confidence_level <= 1
 
     @pytest.mark.asyncio
@@ -717,7 +712,7 @@ class TestAdvancedABTestingEndToEnd:
             assert analysis_result.experiment_id == "end_to_end_test"
             assert analysis_result.statistical_validation.practical_significance
             assert analysis_result.confidence_level > 0.5
-            assert analysis_result.business_decision in ["IMPLEMENT", "PILOT"]
+            assert analysis_result.business_decision in {"IMPLEMENT", "PILOT"}
             assert len(analysis_result.actionable_insights) > 0
             assert len(analysis_result.next_steps) > 0
             stop_result = await orchestrator.stop_experiment(

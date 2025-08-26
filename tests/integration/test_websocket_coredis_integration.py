@@ -11,10 +11,7 @@ from unittest.mock import AsyncMock
 import coredis
 import pytest
 
-from prompt_improver.database import (
-    ManagerMode,
-    get_unified_manager,
-)
+from prompt_improver.services.cache.l2_redis_service import setup_redis_connection
 
 
 class MockWebSocket:

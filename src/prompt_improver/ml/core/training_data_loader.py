@@ -8,9 +8,10 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ...database.models import RuleMetadata, RulePerformance, TrainingPrompt
 from ...utils.datetime_utils import aware_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 logger = logging.getLogger(__name__)
 
 class TrainingDataLoader:
@@ -119,14 +120,14 @@ class TrainingDataLoader:
 
     def _validate_training_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Validate training data quality"""
-        features = np.array(data['features']) if data['features'] else np.array([])
-        labels = np.array(data['labels']) if data['labels'] else np.array([])
+        features = get_numpy().array(data['features']) if data['features'] else get_numpy().array([])
+        labels = get_numpy().array(data['labels']) if data['labels'] else get_numpy().array([])
         validation = {'is_valid': True, 'total_samples': len(features), 'has_minimum_samples': len(features) >= self.min_samples, 'feature_dimensions': features.shape[1] if len(features) > 0 else 0, 'label_distribution': {}, 'warnings': []}
         if len(features) < self.min_samples:
             validation['warnings'].append(f'Insufficient samples: {len(features)} < {self.min_samples}')
             validation['is_valid'] = False
         if len(features) > 0:
-            unique_labels, counts = np.unique(labels, return_counts=True)
+            unique_labels, counts = get_numpy().unique(labels, return_counts=True)
             validation['label_distribution'] = {f'class_{i}': int(count) for i, count in enumerate(counts)}
             if len(unique_labels) > 1:
                 imbalance_ratio = counts.max() / counts.min()

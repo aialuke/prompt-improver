@@ -9,8 +9,8 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from prompt_improver.performance.baseline.baseline_collector import BaselineCollector
 from prompt_improver.performance.baseline.models import BaselineMetrics, RegressionAlert
@@ -37,9 +37,10 @@ try:
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
+import os
+
 try:
     import websockets
-
     WEBSOCKETS_AVAILABLE = True
 except ImportError:
     WEBSOCKETS_AVAILABLE = False

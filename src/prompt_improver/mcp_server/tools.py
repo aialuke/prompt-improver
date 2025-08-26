@@ -14,14 +14,13 @@ import msgspec.json
 from mcp.server.fastmcp import Context
 from sqlmodel import Field
 
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
 from prompt_improver.mcp_server.middleware import MiddlewareContext
 from prompt_improver.security.structured_prompts import create_rule_application_prompt
 
 if TYPE_CHECKING:
-    from prompt_improver.mcp_server.protocols import MCPServerProtocol as APESMCPServer
+    from prompt_improver.shared.interfaces.protocols.mcp import (
+        MCPServerProtocol as APESMCPServer,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -576,7 +575,7 @@ async def _get_performance_status_impl(server: "APESMCPServer") -> dict[str, Any
             },
         }
     except Exception as e:
-        logger.error(f"Failed to get performance status: {e}")
+        logger.exception(f"Failed to get performance status: {e}")
         return {"error": str(e), "timestamp": time.time()}
 
 
@@ -598,7 +597,7 @@ async def _get_training_queue_size_impl(server: "APESMCPServer") -> dict[str, An
             "message": "Training queue information not available - MCP server maintains architectural separation from ML orchestrator",
         }
     except Exception as e:
-        logger.error(f"Failed to get training queue size: {e}")
+        logger.exception(f"Failed to get training queue size: {e}")
         return {
             "queue_size": 0,
             "status": "error",
@@ -806,7 +805,7 @@ async def _store_prompt_impl(
 
     except Exception as e:
         error_time = (time.time() - start_time) * 1000
-        logger.error(f"Failed to store prompt improvement session: {e}")
+        logger.exception(f"Failed to store prompt improvement session: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -848,8 +847,7 @@ async def _query_database_impl(
             column_names = []
             if result.returns_rows:
                 column_names = list(result.keys())
-                for row in result.fetchall():
-                    rows.append(dict(zip(column_names, row, strict=False)))
+                rows.extend(dict(zip(column_names, row, strict=False)) for row in result.fetchall())
 
             processing_time = (time.time() - start_time) * 1000
             logger.info(
@@ -868,7 +866,7 @@ async def _query_database_impl(
 
     except Exception as e:
         error_time = (time.time() - start_time) * 1000
-        logger.error(f"Failed to execute database query: {e}")
+        logger.exception(f"Failed to execute database query: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -886,11 +884,11 @@ async def _list_tables_impl(server: "APESMCPServer") -> dict[str, Any]:
             from sqlalchemy import text
 
             query = text("""
-                SELECT table_name, 
+                SELECT table_name,
                        table_type,
                        table_comment
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
                   AND table_name IN ('rule_metadata', 'rule_performance', 'rule_combinations')
                 ORDER BY table_name
             """)
@@ -928,7 +926,7 @@ async def _list_tables_impl(server: "APESMCPServer") -> dict[str, Any]:
 
     except Exception as e:
         error_time = (time.time() - start_time) * 1000
-        logger.error(f"Failed to list tables: {e}")
+        logger.exception(f"Failed to list tables: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -965,8 +963,8 @@ async def _describe_table_impl(
                        numeric_precision,
                        numeric_scale,
                        column_comment
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
                   AND table_name = :table_name
                 ORDER BY ordinal_position
             """)
@@ -989,22 +987,20 @@ async def _describe_table_impl(
 
             # Get constraints
             constraints_query = text("""
-                SELECT constraint_name, constraint_type 
-                FROM information_schema.table_constraints 
-                WHERE table_schema = 'public' 
+                SELECT constraint_name, constraint_type
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
                   AND table_name = :table_name
             """)
 
             constraints_result = await session.execute(
                 constraints_query, {"table_name": table_name}
             )
-            constraints = []
 
-            for row in constraints_result.fetchall():
-                constraints.append({
+            constraints = [{
                     "constraint_name": row[0],
                     "constraint_type": row[1],
-                })
+                } for row in constraints_result.fetchall()]
 
             processing_time = (time.time() - start_time) * 1000
             logger.info(
@@ -1028,7 +1024,7 @@ async def _describe_table_impl(
 
     except Exception as e:
         error_time = (time.time() - start_time) * 1000
-        logger.error(f"Failed to describe table '{table_name}': {e}")
+        logger.exception(f"Failed to describe table '{table_name}': {e}")
         return {
             "success": False,
             "error": str(e),
@@ -1078,20 +1074,17 @@ def _validates_table_access(query: str) -> bool:
     table_pattern = r"\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)"
     matches = re.findall(table_pattern, query_lower)
 
-    actual_tables = []
-    for table in matches:
-        if table in allowed_tables:
-            actual_tables.append(table)
+    actual_tables = [table for table in matches if table in allowed_tables]
 
     if actual_tables:
         for table in matches:
-            if table not in allowed_tables and table not in [
+            if table not in allowed_tables and table not in {
                 "cte",
                 "subq",
                 "t1",
                 "t2",
                 "alias",
-            ]:
+            }:
                 return False
         return True
 
@@ -1122,11 +1115,7 @@ def _validates_table_access(query: str) -> bool:
         "training_prompts",
     ]
 
-    for forbidden in forbidden_patterns:
-        if forbidden in query_lower:
-            return False
-
-    return True
+    return all(forbidden not in query_lower for forbidden in forbidden_patterns)
 
 
 def _get_table_purpose(table_name: str) -> str:

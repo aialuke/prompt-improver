@@ -11,7 +11,7 @@ import time
 import weakref
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 from weakref import WeakSet
 
 import psutil
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MemoryStats:
-    """Memory usage statistics"""
+    """Memory usage statistics."""
 
     current_memory_mb: float
     peak_memory_mb: float
@@ -36,9 +36,9 @@ class MemoryStats:
 
 
 class MemoryOptimizedBuffer:
-    """Memory-optimized buffer with automatic cleanup"""
+    """Memory-optimized buffer with automatic cleanup."""
 
-    def __init__(self, maxlen: int = 1000, cleanup_threshold: float = 0.8):
+    def __init__(self, maxlen: int = 1000, cleanup_threshold: float = 0.8) -> None:
         self.buffer = deque(maxlen=maxlen)
         self.maxlen = maxlen
         self.cleanup_threshold = cleanup_threshold
@@ -46,7 +46,7 @@ class MemoryOptimizedBuffer:
         self._lock = asyncio.Lock()
 
     async def append(self, item: Any):
-        """Add item to buffer with automatic cleanup"""
+        """Add item to buffer with automatic cleanup."""
         async with self._lock:
             self.buffer.append(item)
 
@@ -54,8 +54,8 @@ class MemoryOptimizedBuffer:
             if len(self.buffer) >= self.maxlen * self.cleanup_threshold:
                 await self._cleanup_old_items()
 
-    async def _cleanup_old_items(self):
-        """Remove oldest items to maintain performance"""
+    async def _cleanup_old_items(self) -> None:
+        """Remove oldest items to maintain performance."""
         cleanup_count = int(self.maxlen * 0.1)  # Remove 10% of items
 
         async with self._lock:
@@ -68,7 +68,7 @@ class MemoryOptimizedBuffer:
                 f"Buffer cleanup #{self.cleanup_count}: removed {cleanup_count} old items"
             )
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.buffer)
 
     def __iter__(self):
@@ -77,7 +77,7 @@ class MemoryOptimizedBuffer:
 
 
 class MemoryOptimizedAnalyticsService:
-    """Memory-optimized analytics service with efficient data structures"""
+    """Memory-optimized analytics service with efficient data structures."""
 
     def __init__(
         self,
@@ -85,7 +85,7 @@ class MemoryOptimizedAnalyticsService:
         memory_warning_threshold_mb: int = 300,
         event_buffer_size: int = 1000,
         anomaly_retention_per_experiment: int = 50,
-    ):
+    ) -> None:
         # Memory-optimized data structures
         self.event_buffer = MemoryOptimizedBuffer(maxlen=event_buffer_size)
         self.stream_windows_cache = defaultdict(
@@ -115,8 +115,8 @@ class MemoryOptimizedAnalyticsService:
         self._monitoring_task = None
         self._start_monitoring()
 
-    def _start_monitoring(self):
-        """Start the async monitoring task"""
+    def _start_monitoring(self) -> None:
+        """Start the async monitoring task."""
         try:
             loop = asyncio.get_running_loop()
             self._monitoring_task = loop.create_task(self._memory_monitoring_loop())
@@ -125,7 +125,7 @@ class MemoryOptimizedAnalyticsService:
             pass
 
     async def add_event_optimized(self, event: Any):
-        """Memory-optimized event addition with automatic cleanup"""
+        """Memory-optimized event addition with automatic cleanup."""
         # Ensure monitoring task is running
         if self._monitoring_task is None or self._monitoring_task.done():
             self._monitoring_task = asyncio.create_task(self._memory_monitoring_loop())
@@ -144,8 +144,8 @@ class MemoryOptimizedAnalyticsService:
         # Periodic memory cleanup (non-blocking)
         await self._periodic_memory_cleanup()
 
-    async def _periodic_memory_cleanup(self):
-        """Automatic memory cleanup based on thresholds and time"""
+    async def _periodic_memory_cleanup(self) -> None:
+        """Automatic memory cleanup based on thresholds and time."""
         current_time = time.time()
 
         # Check memory every 30 seconds
@@ -158,8 +158,8 @@ class MemoryOptimizedAnalyticsService:
             await self._memory_cleanup()
             self.last_gc_time = current_time
 
-    async def _check_memory_usage(self):
-        """Check current memory usage and trigger cleanup if needed"""
+    async def _check_memory_usage(self) -> None:
+        """Check current memory usage and trigger cleanup if needed."""
         try:
             process = psutil.process()
             memory_mb = process.memory_info().rss / 1024 / 1024
@@ -176,10 +176,10 @@ class MemoryOptimizedAnalyticsService:
                 logger.info(f"Memory usage {memory_mb:.1f}MB approaching threshold")
 
         except Exception as e:
-            logger.error(f"Memory check failed: {e}")
+            logger.exception(f"Memory check failed: {e}")
 
-    async def _memory_cleanup(self):
-        """Comprehensive memory cleanup with metrics"""
+    async def _memory_cleanup(self) -> None:
+        """Comprehensive memory cleanup with metrics."""
         try:
             # Get memory usage before cleanup
             process = psutil.process()
@@ -245,10 +245,10 @@ class MemoryOptimizedAnalyticsService:
             )
 
         except Exception as e:
-            logger.error(f"Memory cleanup failed: {e}")
+            logger.exception(f"Memory cleanup failed: {e}")
 
-    async def _memory_monitoring_loop(self):
-        """Background memory monitoring loop"""
+    async def _memory_monitoring_loop(self) -> None:
+        """Background memory monitoring loop."""
         while self._monitoring_active:
             try:
                 process = psutil.Process()
@@ -268,11 +268,11 @@ class MemoryOptimizedAnalyticsService:
                 await asyncio.sleep(10)  # Check every 10 seconds
 
             except Exception as e:
-                logger.error(f"Memory monitoring loop error: {e}")
+                logger.exception(f"Memory monitoring loop error: {e}")
                 await asyncio.sleep(30)  # Wait longer on error
 
-    def _sync_memory_cleanup(self):
-        """Synchronous memory cleanup for emergency situations"""
+    def _sync_memory_cleanup(self) -> None:
+        """Synchronous memory cleanup for emergency situations."""
         try:
             # Aggressive cleanup
             self.event_buffer.buffer.clear()
@@ -294,10 +294,10 @@ class MemoryOptimizedAnalyticsService:
             )
 
         except Exception as e:
-            logger.error(f"Emergency cleanup failed: {e}")
+            logger.exception(f"Emergency cleanup failed: {e}")
 
     def get_anomalies_optimized(self, experiment_id: str) -> list[dict[str, Any]]:
-        """O(1) anomaly retrieval using index with memory efficiency"""
+        """O(1) anomaly retrieval using index with memory efficiency."""
         anomalies_deque = self.anomaly_index.get(experiment_id)
         if not anomalies_deque:
             return []
@@ -329,7 +329,7 @@ class MemoryOptimizedAnalyticsService:
         return serialized_anomalies
 
     def get_memory_stats(self) -> MemoryStats:
-        """Get current memory usage statistics"""
+        """Get current memory usage statistics."""
         try:
             process = psutil.process()
             current_memory_mb = process.memory_info().rss / 1024 / 1024
@@ -351,7 +351,7 @@ class MemoryOptimizedAnalyticsService:
                 else 0,
             )
         except Exception as e:
-            logger.error(f"Failed to get memory stats: {e}")
+            logger.exception(f"Failed to get memory stats: {e}")
             return MemoryStats(
                 current_memory_mb=0.0,
                 peak_memory_mb=self.peak_memory_mb,
@@ -366,7 +366,7 @@ class MemoryOptimizedAnalyticsService:
             )
 
     def get_memory_efficiency_report(self) -> dict[str, Any]:
-        """Get comprehensive memory efficiency report"""
+        """Get comprehensive memory efficiency report."""
         stats = self.get_memory_stats()
 
         # Calculate efficiency metrics
@@ -397,7 +397,7 @@ class MemoryOptimizedAnalyticsService:
         }
 
     def _get_memory_recommendations(self, stats: MemoryStats) -> list[str]:
-        """Get memory optimization recommendations"""
+        """Get memory optimization recommendations."""
         recommendations = []
 
         memory_utilization = stats.current_memory_mb / stats.memory_threshold_mb
@@ -434,7 +434,7 @@ class MemoryOptimizedAnalyticsService:
         return recommendations
 
     def shutdown(self):
-        """Shutdown memory monitoring and cleanup"""
+        """Shutdown memory monitoring and cleanup."""
         self._monitoring_active = False
         if self._monitoring_task and not self._monitoring_task.done():
             self._monitoring_task.cancel()
@@ -451,7 +451,7 @@ _memory_optimizer: MemoryOptimizedAnalyticsService | None = None
 def get_memory_optimizer(
     memory_threshold_mb: int = 500, event_buffer_size: int = 1000
 ) -> MemoryOptimizedAnalyticsService:
-    """Get singleton memory optimizer instance"""
+    """Get singleton memory optimizer instance."""
     global _memory_optimizer
 
     if _memory_optimizer is None:
@@ -463,7 +463,7 @@ def get_memory_optimizer(
 
 
 def shutdown_memory_optimizer():
-    """Shutdown the global memory optimizer"""
+    """Shutdown the global memory optimizer."""
     global _memory_optimizer
 
     if _memory_optimizer is not None:

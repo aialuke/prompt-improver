@@ -4,29 +4,25 @@ This module implements 2025 best practices for PostgreSQL query optimization
 using the unified cache system for optimal performance.
 """
 
-import hashlib
-import json
 import logging
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import psutil
 except ImportError:
     psutil = None
-    
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.core.config import AppConfig
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
 )
-from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +30,18 @@ logger = logging.getLogger(__name__)
 def _get_performance_measure():
     """Lazy import performance measurement to avoid ML chain during database.models import."""
     try:
-        from prompt_improver.performance.optimization.performance_optimizer import measure_database_operation
+        from prompt_improver.performance.optimization.performance_optimizer import (
+            measure_database_operation,
+        )
         return measure_database_operation
     except ImportError:
         # Fallback context manager when performance optimization unavailable
         from contextlib import asynccontextmanager
-        
+
         @asynccontextmanager
         async def fallback_measure(operation_name):
             yield {"operation": operation_name, "available": False}
-        
+
         return fallback_measure
 
 
@@ -65,7 +63,7 @@ class QueryPerformanceMetrics:
 class PreparedStatementCache:
     """Cache for prepared statements to improve query performance."""
 
-    def __init__(self, max_size: int = 100):
+    def __init__(self, max_size: int = 100) -> None:
         self._statements: dict[str, str] = {}
         self._usage_count: dict[str, int] = {}
         self._max_size = max_size
@@ -251,7 +249,7 @@ class PreparedStatementCache:
 class OptimizedQueryExecutor:
     """High-performance query executor with caching and optimization."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._prepared_cache = PreparedStatementCache()
         self._query_cache = None  # Will be initialized on first use
         self._performance_metrics: list[QueryPerformanceMetrics] = []
@@ -286,15 +284,11 @@ class OptimizedQueryExecutor:
             cache_start = time.perf_counter()
             try:
                 if self._query_cache is None:
-                    from prompt_improver.services.cache.cache_coordinator_service import CacheCoordinatorService
-                    from prompt_improver.services.cache.l1_cache_service import L1CacheService
-                    # Initialize L1-only cache for fast prepared statement caching
-                    self._query_cache = CacheCoordinatorService(
-                        l1_cache=L1CacheService(),  # Memory cache for fast prepared statement access
-                        l2_cache=None,              # No Redis needed for query cache
-                        l3_cache=None,              # No database cache needed for query cache
-                        enable_warming=False        # No warming needed for query cache
+                    from prompt_improver.services.cache.cache_factory import (
+                        CacheFactory,
                     )
+                    # Initialize utility cache for fast prepared statement caching (L1+L2, no warming)
+                    self._query_cache = CacheFactory.get_utility_cache()
                 cached_result = await self._query_cache.get(cache_key, l1_ttl=cache_ttl)
                 if cached_result:
                     cache_time = (time.perf_counter() - cache_start) * 1000
@@ -302,15 +296,13 @@ class OptimizedQueryExecutor:
                     self._cache_stats["cache_time_saved_ms"] += max(0, 50 - cache_time)
                     # Calculate rows returned safely
                     try:
-                        if isinstance(cached_result, (list, tuple)):
-                            rows_returned = len(cached_result)
-                        elif hasattr(cached_result, '__len__'):
+                        if isinstance(cached_result, (list, tuple)) or hasattr(cached_result, '__len__'):
                             rows_returned = len(cached_result)
                         else:
                             rows_returned = 1
                     except (TypeError, AttributeError):
                         rows_returned = 1
-                    
+
                     query_metrics = QueryPerformanceMetrics(
                         query_hash=self._prepared_cache._hash_query_structure(query),
                         execution_time_ms=cache_time,
@@ -347,7 +339,7 @@ class OptimizedQueryExecutor:
                     try:
                         import json
 
-                        # Serialize rows safely 
+                        # Serialize rows safely
                         try:
                             serialized_rows = json.dumps(
                                 [
@@ -368,14 +360,11 @@ class OptimizedQueryExecutor:
                             logger.warning(f"JSON serialization failed: {serialization_error}, using string fallback")
                             serialized_rows = str(rows)
                         if self._query_cache is None:
-                            from prompt_improver.services.cache.cache_coordinator_service import CacheCoordinatorService
-                            from prompt_improver.services.cache.l1_cache_service import L1CacheService
-                            self._query_cache = CacheCoordinatorService(
-                                l1_cache=L1CacheService(),
-                                l2_cache=None,
-                                l3_cache=None,
-                                enable_warming=False
+                            from prompt_improver.services.cache.cache_factory import (
+                                CacheFactory,
                             )
+                            # Initialize utility cache for query result caching
+                            self._query_cache = CacheFactory.get_utility_cache()
                         await self._query_cache.set(
                             cache_key, serialized_rows, l1_ttl=cache_ttl
                         )
@@ -405,7 +394,7 @@ class OptimizedQueryExecutor:
                     "execution_time_ms": execution_time,
                 }
             except Exception as e:
-                logger.error(f"Query execution failed: {e}")
+                logger.exception(f"Query execution failed: {e}")
                 raise
 
     def _generate_cache_key(self, query: str, params: dict[str, Any]) -> str:
@@ -472,7 +461,7 @@ class OptimizedQueryExecutor:
 class DatabaseConnectionOptimizer:
     """Optimizer for database connection settings and pool configuration with dynamic resource detection."""
 
-    def __init__(self, event_bus=None):
+    def __init__(self, event_bus=None) -> None:
         """Initialize the optimizer with optional event bus integration."""
         self.event_bus = event_bus
 
@@ -566,13 +555,15 @@ class DatabaseConnectionOptimizer:
 
     async def _emit_optimization_event(
         self, applied_settings: list, system_resources: dict, memory_settings: dict
-    ):
+    ) -> None:
         """Emit database connection optimization event using protocol-based approach."""
-        from prompt_improver.database.services.optional_registry import get_optional_services_registry
         from prompt_improver.database.protocols.events import EventType
+        from prompt_improver.database.services.optional_registry import (
+            get_optional_services_registry,
+        )
 
         registry = get_optional_services_registry()
-        
+
         event_data = {
             "applied_settings": applied_settings,
             "system_resources": system_resources,
@@ -580,38 +571,40 @@ class DatabaseConnectionOptimizer:
             "optimization_timestamp": datetime.now().isoformat(),
             "source": "database_connection_optimizer",
         }
-        
+
         # Use optional registry - graceful degradation if ML services unavailable
         success = await registry.dispatch_event_if_available(
-            EventType.DATABASE_OPTIMIZATION_COMPLETED, 
+            EventType.DATABASE_OPTIMIZATION_COMPLETED,
             event_data
         )
-        
+
         if success:
             logger.debug("Database optimization event dispatched successfully")
         else:
             logger.debug("No ML event dispatcher available - optimization completed without ML integration")
 
-    async def _emit_index_creation_event(self, created_indexes: list):
+    async def _emit_index_creation_event(self, created_indexes: list) -> None:
         """Emit database index creation event using protocol-based approach."""
-        from prompt_improver.database.services.optional_registry import get_optional_services_registry
         from prompt_improver.database.protocols.events import EventType
+        from prompt_improver.database.services.optional_registry import (
+            get_optional_services_registry,
+        )
 
         registry = get_optional_services_registry()
-        
+
         event_data = {
             "created_indexes": created_indexes,
             "index_count": len(created_indexes),
             "creation_timestamp": datetime.now().isoformat(),
             "source": "database_connection_optimizer",
         }
-        
+
         # Use optional registry for graceful degradation
         success = await registry.dispatch_event_if_available(
-            EventType.DATABASE_OPTIMIZATION_COMPLETED, 
+            EventType.DATABASE_OPTIMIZATION_COMPLETED,
             event_data
         )
-        
+
         if success:
             logger.debug(f"Database index creation event dispatched for {len(created_indexes)} indexes")
         else:
@@ -619,26 +612,28 @@ class DatabaseConnectionOptimizer:
 
     async def _emit_resource_analysis_event(
         self, system_resources: dict, memory_settings: dict
-    ):
+    ) -> None:
         """Emit database resource analysis event using protocol-based approach."""
-        from prompt_improver.database.services.optional_registry import get_optional_services_registry
         from prompt_improver.database.protocols.events import EventType
+        from prompt_improver.database.services.optional_registry import (
+            get_optional_services_registry,
+        )
 
         registry = get_optional_services_registry()
-        
+
         event_data = {
             "system_resources": system_resources,
             "recommended_settings": memory_settings,
             "analysis_timestamp": datetime.now().isoformat(),
             "source": "database_connection_optimizer",
         }
-        
+
         # Use optional registry for graceful degradation
         success = await registry.dispatch_event_if_available(
-            EventType.DATABASE_OPTIMIZATION_COMPLETED, 
+            EventType.DATABASE_OPTIMIZATION_COMPLETED,
             event_data
         )
-        
+
         if success:
             logger.debug("Database resource analysis event dispatched successfully")
         else:

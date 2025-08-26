@@ -1,18 +1,17 @@
 """Database connection management services."""
 
-from .connection_metrics import ConnectionMetrics
-# Export decomposed components for direct access if needed
-from .connection_pool_core import ConnectionPoolCore
-from .pool_monitoring_service import PoolMonitoringService
-from .pool_protocols import (
-    ConnectionPoolCoreProtocol,
-    PoolManagerFacadeProtocol,
-    PoolMonitoringServiceProtocol,
-    PoolScalingManagerProtocol,
+from prompt_improver.database.services.connection.connection_metrics import (
+    ConnectionMetrics,
 )
-from .pool_scaling_manager import PoolScalingManager
-from .pool_shared_context import PoolSharedContext
-from .pool_scaler import (
+
+# Export decomposed components for direct access if needed
+from prompt_improver.database.services.connection.connection_pool_core import (
+    ConnectionPoolCore,
+)
+from prompt_improver.database.services.connection.pool_monitoring_service import (
+    PoolMonitoringService,
+)
+from prompt_improver.database.services.connection.pool_scaler import (
     BurstDetector,
     PoolScaler,
     PoolScalerProtocol,
@@ -22,7 +21,13 @@ from .pool_scaler import (
     ScalingMetrics,
     ScalingReason,
 )
-from .postgres_pool_manager import (
+from prompt_improver.database.services.connection.pool_scaling_manager import (
+    PoolScalingManager,
+)
+from prompt_improver.database.services.connection.pool_shared_context import (
+    PoolSharedContext,
+)
+from prompt_improver.database.services.connection.postgres_pool_manager import (
     ConnectionInfo,
     ConnectionMode,
     DatabaseConfig,
@@ -30,16 +35,11 @@ from .postgres_pool_manager import (
     PoolConfiguration,
     PoolState,
     PostgreSQLPoolManager,
-    PostgreSQLPoolManager as PostgresPoolManager,  # Alias for backward compatibility
+    PostgreSQLPoolManager as PostgresPoolManager,
 )
-from .redis_manager import (
-    RedisConfig,
-    RedisHealthStatus,
-    RedisManager,
-    RedisMode,
-    RedisNodeInfo,
-)
-from .sentinel_manager import (
+
+# RedisManager removed - use CacheFacade from services.cache for Redis operations
+from prompt_improver.database.services.connection.sentinel_manager import (
     FailoverEvent,
     FailoverEventInfo,
     MasterInfo,
@@ -48,35 +48,45 @@ from .sentinel_manager import (
     SentinelManager,
     SentinelState,
 )
+from prompt_improver.shared.interfaces.protocols.database import (
+    ConnectionPoolCoreProtocol,
+    PoolManagerFacadeProtocol,
+    PoolMonitoringServiceProtocol,
+    PoolScalingManagerProtocol,
+)
 
 __all__ = [
-    "ConnectionMetrics",
-    "PoolScaler",
-    "ScalingConfiguration",
-    "ScalingMetrics",
-    "ScalingDecision",
-    "ScalingAction",
-    "ScalingReason",
     "BurstDetector",
+    "ConnectionInfo",
+    "ConnectionMetrics",
+    "ConnectionMode",
+    "ConnectionPoolCore",
+    "ConnectionPoolCoreProtocol",
+    "DatabaseConfig",
+    "FailoverEvent",
+    "FailoverEventInfo",
+    "HealthStatus",
+    "MasterInfo",
+    "PoolConfiguration",
+    "PoolManagerFacadeProtocol",
+    "PoolMonitoringService",
+    "PoolMonitoringServiceProtocol",
+    "PoolScaler",
     "PoolScalerProtocol",
+    "PoolScalingManager",
+    "PoolScalingManagerProtocol",
+    "PoolSharedContext",
+    "PoolState",
     "PostgreSQLPoolManager",
     "PostgresPoolManager",  # Backward compatibility alias
-    "DatabaseConfig",
-    "PoolConfiguration",
-    "PoolState",
-    "HealthStatus",
-    "ConnectionMode",
-    "ConnectionInfo",
-    "RedisManager",
-    "RedisConfig",
-    "RedisMode",
-    "RedisHealthStatus",
-    "RedisNodeInfo",
-    "SentinelManager",
+    "ScalingAction",
+    "ScalingConfiguration",
+    "ScalingDecision",
+    "ScalingMetrics",
+    "ScalingReason",
     "SentinelConfig",
-    "SentinelState",
-    "FailoverEvent",
     "SentinelInfo",
-    "MasterInfo",
-    "FailoverEventInfo",
+    # "RedisManager" - removed, use CacheFacade from services.cache
+    "SentinelManager",
+    "SentinelState",
 ]

@@ -16,14 +16,33 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 import warnings
-import numpy as np
-from sklearn.datasets import make_classification
-logger = logging.getLogger(__name__)
-try:
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn, get_torch
+
+if TYPE_CHECKING:
+    from sklearn.datasets import make_classification
+    import numpy as np
     import torch
     import torch.nn as nn
     import torch.optim as optim
     from torch.utils.data import DataLoader, TensorDataset
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return sklearn.datasets.make_classification
+    
+    make_classification = _get_sklearn_imports()
+
+logger = logging.getLogger(__name__)
+
+# PyTorch imports with fallback
+try:
+    torch = get_torch()
+    nn = torch.nn
+    optim = torch.optim
+    DataLoader = torch.utils.data.DataLoader
+    TensorDataset = torch.utils.data.TensorDataset
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -91,12 +110,12 @@ class TabularGAN(nn.Module):
         disc_layers.extend([nn.Linear(prev_dim, 1), nn.Sigmoid()])
         self.discriminator = nn.Sequential(*disc_layers)
 
-    def generate(self, batch_size: int, device: torch.device):
+    def generate(self, batch_size: int, device: get_torch().device):
         """Generate synthetic samples"""
-        noise = torch.randn(batch_size, self.noise_dim, device=device)
+        noise = get_torch().randn(batch_size, self.noise_dim, device=device)
         return self.generator(noise)
 
-    def discriminate(self, data: torch.Tensor):
+    def discriminate(self, data: get_torch().Tensor):
         """Discriminate real vs fake data"""
         return self.discriminator(data)
 
@@ -145,8 +164,8 @@ class TabularVAE(nn.Module):
 
     def reparameterize(self, mu, logvar):
         """Reparameterization trick for VAE"""
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
+        std = get_torch().exp(0.5 * logvar)
+        eps = get_torch().randn_like(std)
         return mu + eps * std
 
     def decode(self, z):
@@ -160,15 +179,15 @@ class TabularVAE(nn.Module):
         recon = self.decode(z)
         return (recon, mu, logvar, z)
 
-    def generate(self, batch_size: int, device: torch.device):
+    def generate(self, batch_size: int, device: get_torch().device):
         """Generate synthetic samples"""
-        z = torch.randn(batch_size, self.latent_dim, device=device)
+        z = get_torch().randn(batch_size, self.latent_dim, device=device)
         return self.decode(z)
 
     def loss_function(self, recon_x, x, mu, logvar):
         """Enhanced VAE loss with β-VAE regularization (2025 best practice)"""
         recon_loss = nn.functional.mse_loss(recon_x, x, reduction='sum')
-        kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        kl_loss = -0.5 * get_torch().sum(1 + logvar - mu.pow(2) - logvar.exp())
         return (recon_loss + self.beta * kl_loss, recon_loss, kl_loss)
 
 class TabularDiffusion(nn.Module):
@@ -200,45 +219,45 @@ class TabularDiffusion(nn.Module):
         self.noise_predictor = nn.Sequential(*layers)
         self.register_buffer('betas', self._cosine_beta_schedule(timesteps))
         self.register_buffer('alphas', 1.0 - self.betas)
-        self.register_buffer('alphas_cumprod', torch.cumprod(self.alphas, dim=0))
+        self.register_buffer('alphas_cumprod', get_torch().cumprod(self.alphas, dim=0))
 
     def _cosine_beta_schedule(self, timesteps: int, s: float=0.008):
         """Cosine beta schedule for improved training stability"""
         steps = timesteps + 1
-        x = torch.linspace(0, timesteps, steps)
-        alphas_cumprod = torch.cos((x / timesteps + s) / (1 + s) * torch.pi * 0.5) ** 2
+        x = get_torch().linspace(0, timesteps, steps)
+        alphas_cumprod = get_torch().cos((x / timesteps + s) / (1 + s) * get_torch().pi * 0.5) ** 2
         alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
         betas = 1 - alphas_cumprod[1:] / alphas_cumprod[:-1]
-        return torch.clip(betas, 0.0001, 0.9999)
+        return get_torch().clip(betas, 0.0001, 0.9999)
 
     def forward(self, x, t):
         """Forward pass: predict noise given noisy data and timestep"""
         t_embed = self.time_embedding(t.float().unsqueeze(-1))
-        x_t = torch.cat([x, t_embed], dim=-1)
+        x_t = get_torch().cat([x, t_embed], dim=-1)
         return self.noise_predictor(x_t)
 
     def add_noise(self, x, t, noise=None):
         """Add noise to data according to diffusion schedule"""
         if noise is None:
-            noise = torch.randn_like(x)
-        sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod[t])
-        sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod[t])
+            noise = get_torch().randn_like(x)
+        sqrt_alphas_cumprod = get_torch().sqrt(self.alphas_cumprod[t])
+        sqrt_one_minus_alphas_cumprod = get_torch().sqrt(1.0 - self.alphas_cumprod[t])
         return sqrt_alphas_cumprod * x + sqrt_one_minus_alphas_cumprod * noise
 
-    def generate(self, batch_size: int, device: torch.device):
+    def generate(self, batch_size: int, device: get_torch().device):
         """Generate samples using DDPM sampling"""
-        x = torch.randn(batch_size, self.data_dim, device=device)
+        x = get_torch().randn(batch_size, self.data_dim, device=device)
         for t in reversed(range(self.timesteps)):
-            t_batch = torch.full((batch_size,), t, device=device, dtype=torch.long)
+            t_batch = get_torch().full((batch_size,), t, device=device, dtype=get_torch().long)
             predicted_noise = self.forward(x, t_batch)
             alpha = self.alphas[t]
             alpha_cumprod = self.alphas_cumprod[t]
             beta = self.betas[t]
             if t > 0:
-                noise = torch.randn_like(x)
+                noise = get_torch().randn_like(x)
             else:
-                noise = torch.zeros_like(x)
-            x = 1 / torch.sqrt(alpha) * (x - beta / torch.sqrt(1 - alpha_cumprod) * predicted_noise) + torch.sqrt(beta) * noise
+                noise = get_torch().zeros_like(x)
+            x = 1 / get_torch().sqrt(alpha) * (x - beta / get_torch().sqrt(1 - alpha_cumprod) * predicted_noise) + get_torch().sqrt(beta) * noise
         return x
 
 class HybridGenerationSystem:
@@ -264,13 +283,13 @@ class HybridGenerationSystem:
                 logger.warning('Failed to initialize some neural methods: %s', e)
         self.method_weights = {'statistical': 0.3, 'gan': 0.25, 'vae': 0.25, 'diffusion': 0.2}
 
-    def _get_device(self, device: str) -> torch.device:
+    def _get_device(self, device: str) -> get_torch().device:
         """Get appropriate device for computation"""
         if not TORCH_AVAILABLE:
             return None
         if device == 'auto':
-            return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        return torch.device(device)
+            return get_torch().device('cuda' if get_torch().cuda.is_available() else 'cpu')
+        return get_torch().device(device)
 
     async def generate_hybrid_data(self, batch_size: int, performance_gaps: dict[str, float], quality_threshold: float=0.7) -> dict[str, Any]:
         """Generate data using hybrid approach with quality filtering"""
@@ -335,7 +354,7 @@ class HybridGenerationSystem:
             return X.tolist()
         except Exception as e:
             logger.error('Statistical generation failed: %s', e)
-            return np.random.randn(sample_count, self.data_dim).tolist()
+            return get_numpy().random.randn(sample_count, self.data_dim).tolist()
 
     async def _generate_neural_samples(self, method: str, sample_count: int) -> list:
         """Generate samples using neural methods"""
@@ -344,7 +363,7 @@ class HybridGenerationSystem:
         try:
             model = self.methods[method]
             model.eval()
-            with torch.no_grad():
+            with get_torch().no_grad():
                 synthetic_data = model.generate(sample_count, self.device)
                 return synthetic_data.cpu().numpy().tolist()
         except Exception as e:
@@ -356,11 +375,11 @@ class HybridGenerationSystem:
         if not samples:
             return 0.0
         try:
-            data = np.array(samples)
-            variances = np.var(data, axis=0)
-            variance_quality = np.mean(variances > 0.01)
-            means = np.mean(data, axis=0)
-            mean_quality = np.mean(np.abs(means) < 5.0)
+            data = get_numpy().array(samples)
+            variances = get_numpy().var(data, axis=0)
+            variance_quality = get_numpy().mean(variances > 0.01)
+            means = get_numpy().mean(data, axis=0)
+            mean_quality = get_numpy().mean(get_numpy().abs(means) < 5.0)
             return (variance_quality + mean_quality) / 2
         except Exception:
             return 0.5
@@ -370,18 +389,18 @@ class HybridGenerationSystem:
         if len(samples) < 2:
             return 0.0
         try:
-            data = np.array(samples)
+            data = get_numpy().array(samples)
             n_samples = min(50, len(samples))
             subset = data[:n_samples]
             distances = []
             for i in range(n_samples):
                 for j in range(i + 1, n_samples):
-                    dist = np.linalg.norm(subset[i] - subset[j])
+                    dist = get_numpy().linalg.norm(subset[i] - subset[j])
                     distances.append(dist)
             if not distances:
                 return 0.0
-            mean_distance = np.mean(distances)
-            expected_distance = np.sqrt(self.data_dim)
+            mean_distance = get_numpy().mean(distances)
+            expected_distance = get_numpy().sqrt(self.data_dim)
             return min(1.0, mean_distance / expected_distance)
         except Exception:
             return 0.5

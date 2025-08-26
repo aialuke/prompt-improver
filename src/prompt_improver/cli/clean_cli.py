@@ -3,9 +3,9 @@ Implements complete replacement for 36-command legacy CLI.
 """
 
 import asyncio
-import signal
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, Optional
+import contextlib
+from datetime import UTC, datetime
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -151,7 +151,7 @@ def train(
     else:
         console.print("⚡ Single training run mode", style="blue")
 
-    async def run_training():
+    async def run_training() -> None:
         global current_training_session, shutdown_requested
         await setup_enhanced_signal_handling()
         try:
@@ -210,7 +210,7 @@ def train(
                     task = progress.add_task("Training in progress...", total=None)
                     import uuid
 
-                    from ...performance.monitoring.health.background_manager import (
+                    from prompt_improver.performance.monitoring.health.background_manager import (
                         TaskPriority,
                         get_background_task_manager,
                     )
@@ -247,10 +247,8 @@ def train(
                     )
                     for task in pending:
                         task.cancel()
-                        try:
+                        with contextlib.suppress(asyncio.CancelledError):
                             await task
-                        except asyncio.CancelledError:
-                            pass
                     if shutdown_task in done:
                         console.print(
                             "\n🛑 Enhanced graceful shutdown completed", style="green"
@@ -301,7 +299,7 @@ def status(
 ) -> None:
     """Show training system status and active workflows."""
 
-    async def show_status():
+    async def show_status() -> None:
         try:
             system_status = await training_manager.get_system_status()
             if json_output:
@@ -500,7 +498,7 @@ def status(
             f"🔄 Auto-refreshing every {refresh}s (Ctrl+C to stop)...", style="yellow"
         )
 
-        async def monitoring_loop():
+        async def monitoring_loop() -> None:
             try:
                 while True:
                     console.clear()
@@ -538,7 +536,7 @@ def why5(
       apes why5 "Database connection fails" --export --format json
     """
 
-    async def run_five_whys():
+    async def run_five_whys() -> None:
         """Execute the Five Whys analysis workflow."""
         try:
             if not issue:
@@ -625,7 +623,7 @@ def why5(
             console.print(f"\n❌ Analysis failed: {e}", style="red")
             raise typer.Exit(1)
 
-    async def export_analysis(results: dict[str, Any], export_format: str):
+    async def export_analysis(results: dict[str, Any], export_format: str) -> None:
         """Export analysis results to file."""
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -633,12 +631,12 @@ def why5(
                 import json
 
                 filename = f"five_whys_analysis_{timestamp}.json"
-                with open(filename, "w") as f:
+                with open(filename, "w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2)
                 console.print(f"📁 Analysis exported to: {filename}", style="cyan")
             elif export_format.lower() == "markdown":
                 filename = f"five_whys_analysis_{timestamp}.md"
-                with open(filename, "w") as f:
+                with open(filename, "w", encoding="utf-8") as f:
                     f.write("# Five Whys Analysis\n\n")
                     f.write(
                         f"**Problem Statement:** {results['problem_statement']}\n\n"
@@ -656,7 +654,7 @@ def why5(
                 console.print(f"📁 Analysis exported to: {filename}", style="cyan")
             else:
                 filename = f"five_whys_analysis_{timestamp}.txt"
-                with open(filename, "w") as f:
+                with open(filename, "w", encoding="utf-8") as f:
                     f.write("Five Whys Analysis\n")
                     f.write("==================\n\n")
                     f.write(f"Problem Statement: {results['problem_statement']}\n")
@@ -710,7 +708,7 @@ def stop(
     """
     console.print("🛑 Stopping APES Training System...", style="yellow")
 
-    async def enhanced_stop_training():
+    async def enhanced_stop_training() -> None:
         try:
             training_manager = TrainingOrchestrator(console)
             cli_orchestrator = CLIOrchestrator()

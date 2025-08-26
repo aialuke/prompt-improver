@@ -9,8 +9,9 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ...database.models import ImprovementSession, RulePerformance, UserFeedback
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 @dataclass
 class PerformanceGap:
@@ -115,19 +116,19 @@ class PerformanceGapAnalyzer:
             effectiveness_scores = [p.effectiveness_score for p in performances if p.effectiveness_score is not None]
             consistency_scores = [p.consistency_score for p in performances if p.consistency_score is not None]
             if effectiveness_scores:
-                current_effectiveness = np.mean(effectiveness_scores)
+                current_effectiveness = get_numpy().mean(effectiveness_scores)
                 target_effectiveness = self.config['effectiveness_threshold']
                 if current_effectiveness < target_effectiveness:
                     gap_magnitude = target_effectiveness - current_effectiveness
                     severity = min(gap_magnitude / target_effectiveness, 1.0)
-                    gaps.append(PerformanceGap(rule_id=rule_id, gap_type='effectiveness', severity=severity, current_performance=current_effectiveness, target_performance=target_effectiveness, gap_magnitude=gap_magnitude, improvement_potential=gap_magnitude * 0.8, confidence=self._calculate_confidence(effectiveness_scores), metadata={'sample_count': len(effectiveness_scores), 'std_dev': np.std(effectiveness_scores), 'trend': self._calculate_trend(effectiveness_scores)}))
+                    gaps.append(PerformanceGap(rule_id=rule_id, gap_type='effectiveness', severity=severity, current_performance=current_effectiveness, target_performance=target_effectiveness, gap_magnitude=gap_magnitude, improvement_potential=gap_magnitude * 0.8, confidence=self._calculate_confidence(effectiveness_scores), metadata={'sample_count': len(effectiveness_scores), 'std_dev': get_numpy().std(effectiveness_scores), 'trend': self._calculate_trend(effectiveness_scores)}))
             if consistency_scores:
-                current_consistency = np.mean(consistency_scores)
+                current_consistency = get_numpy().mean(consistency_scores)
                 target_consistency = self.config['consistency_threshold']
                 if current_consistency < target_consistency:
                     gap_magnitude = target_consistency - current_consistency
                     severity = min(gap_magnitude / target_consistency, 1.0)
-                    gaps.append(PerformanceGap(rule_id=rule_id, gap_type='consistency', severity=severity, current_performance=current_consistency, target_performance=target_consistency, gap_magnitude=gap_magnitude, improvement_potential=gap_magnitude * 0.7, confidence=self._calculate_confidence(consistency_scores), metadata={'sample_count': len(consistency_scores), 'std_dev': np.std(consistency_scores), 'variability': np.std(consistency_scores) / np.mean(consistency_scores)}))
+                    gaps.append(PerformanceGap(rule_id=rule_id, gap_type='consistency', severity=severity, current_performance=current_consistency, target_performance=target_consistency, gap_magnitude=gap_magnitude, improvement_potential=gap_magnitude * 0.7, confidence=self._calculate_confidence(consistency_scores), metadata={'sample_count': len(consistency_scores), 'std_dev': get_numpy().std(consistency_scores), 'variability': get_numpy().std(consistency_scores) / get_numpy().mean(consistency_scores)}))
         return gaps
 
     async def _analyze_correlation_patterns(self, performance_data: dict[str, Any]) -> float:
@@ -143,8 +144,8 @@ class PerformanceGapAnalyzer:
             if len(session_scores) < 3:
                 return 0.0
             time_indices = list(range(len(session_scores)))
-            correlation = np.corrcoef(time_indices, session_scores)[0, 1]
-            return abs(correlation) if not np.isnan(correlation) else 0.0
+            correlation = get_numpy().corrcoef(time_indices, session_scores)[0, 1]
+            return abs(correlation) if not get_numpy().isnan(correlation) else 0.0
         except Exception as e:
             self.logger.warning('Error calculating correlation patterns: %s', e)
             return 0.0
@@ -161,8 +162,8 @@ class PerformanceGapAnalyzer:
                     recent_scores.append(session.overall_improvement_score)
             if len(recent_scores) < self.config['plateau_window']:
                 return False
-            mean_score = np.mean(recent_scores)
-            std_score = np.std(recent_scores)
+            mean_score = get_numpy().mean(recent_scores)
+            std_score = get_numpy().std(recent_scores)
             if mean_score == 0:
                 return True
             coefficient_of_variation = std_score / mean_score
@@ -207,8 +208,8 @@ class PerformanceGapAnalyzer:
         """Calculate confidence score for performance measurements."""
         if len(scores) < 2:
             return 0.5
-        mean_score = np.mean(scores)
-        std_score = np.std(scores)
+        mean_score = get_numpy().mean(scores)
+        std_score = get_numpy().std(scores)
         if mean_score == 0:
             return 0.0
         cv = std_score / mean_score
@@ -221,8 +222,8 @@ class PerformanceGapAnalyzer:
             return 'insufficient_data'
         first_half = scores[:len(scores) // 2]
         second_half = scores[len(scores) // 2:]
-        first_mean = np.mean(first_half)
-        second_mean = np.mean(second_half)
+        first_mean = get_numpy().mean(first_half)
+        second_mean = get_numpy().mean(second_half)
         if second_mean > first_mean * 1.05:
             return 'improving'
         elif second_mean < first_mean * 0.95:
@@ -287,9 +288,9 @@ class PerformanceGapAnalyzer:
                     rule_hardness[rule_perf.rule_id].append(hardness)
             if not hardness_scores:
                 return {'optimal_threshold': 0.7, 'distribution': {}, 'recommendations': []}
-            hardness_array = np.array(hardness_scores)
-            optimal_threshold = np.percentile(hardness_array, 70)
-            distribution = {'mean': np.mean(hardness_array), 'std': np.std(hardness_array), 'median': np.median(hardness_array), 'q25': np.percentile(hardness_array, 25), 'q75': np.percentile(hardness_array, 75), 'hard_examples_ratio': np.sum(hardness_array > optimal_threshold) / len(hardness_array)}
+            hardness_array = get_numpy().array(hardness_scores)
+            optimal_threshold = get_numpy().percentile(hardness_array, 70)
+            distribution = {'mean': get_numpy().mean(hardness_array), 'std': get_numpy().std(hardness_array), 'median': get_numpy().median(hardness_array), 'q25': get_numpy().percentile(hardness_array, 25), 'q75': get_numpy().percentile(hardness_array, 75), 'hard_examples_ratio': get_numpy().sum(hardness_array > optimal_threshold) / len(hardness_array)}
             recommendations = []
             if distribution['hard_examples_ratio'] > 0.3:
                 recommendations.append('High proportion of hard examples - focus on neural generation methods')
@@ -374,7 +375,7 @@ class PerformanceGapAnalyzer:
             scores = [p.effectiveness_score for p in performances if p.effectiveness_score is not None]
             if len(scores) >= 2:
                 trend = 'improving' if scores[0] > scores[-1] else 'declining' if scores[0] < scores[-1] else 'stable'
-                stability = 1.0 - np.std(scores) / np.mean(scores) if np.mean(scores) > 0 else 0.0
+                stability = 1.0 - get_numpy().std(scores) / get_numpy().mean(scores) if get_numpy().mean(scores) > 0 else 0.0
             else:
                 trend = 'unknown'
                 stability = 0.5

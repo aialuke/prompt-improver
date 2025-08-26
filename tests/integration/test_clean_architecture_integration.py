@@ -5,15 +5,12 @@ and repository interfaces without direct infrastructure coupling.
 """
 
 import pytest
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List
 from sqlalchemy import text
 
 from prompt_improver.core.di.clean_container import (
     CleanDIContainer,
-    get_clean_container,
-    register_test_repositories,
 )
 from prompt_improver.core.services.persistence_service_clean import CleanPersistenceService
 from prompt_improver.core.services.rule_selection_service_clean import CleanRuleSelectionService
@@ -467,6 +464,8 @@ class TestCleanArchitectureIntegration:
         # Import the clean services and verify they load without infrastructure dependencies
         from prompt_improver.core.services.persistence_service_clean import CleanPersistenceService
         from prompt_improver.core.services.rule_selection_service_clean import CleanRuleSelectionService
+        from tests.utils.mocks import MockPersistenceRepository
+        from tests.utils.mocks import MockRulesRepository
         
         # These imports should work without importing database, cache, or monitoring modules
         # If they have infrastructure imports, the test will fail with import errors

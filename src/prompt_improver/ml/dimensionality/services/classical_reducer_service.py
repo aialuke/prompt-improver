@@ -15,12 +15,37 @@ import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-from sklearn.decomposition import PCA, FastICA, IncrementalPCA, KernelPCA, TruncatedSVD
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.manifold import TSNE, Isomap
-from sklearn.preprocessing import StandardScaler
-from sklearn.random_projection import GaussianRandomProjection, SparseRandomProjection
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
+
+if TYPE_CHECKING:
+    from sklearn.decomposition import PCA, FastICA, IncrementalPCA, KernelPCA, TruncatedSVD
+    from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+    from sklearn.manifold import TSNE, Isomap
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.random_projection import GaussianRandomProjection, SparseRandomProjection
+    import numpy as np
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return (
+            sklearn.decomposition.PCA,
+            sklearn.decomposition.FastICA, 
+            sklearn.decomposition.IncrementalPCA,
+            sklearn.decomposition.KernelPCA,
+            sklearn.decomposition.TruncatedSVD,
+            sklearn.discriminant_analysis.LinearDiscriminantAnalysis,
+            sklearn.manifold.TSNE,
+            sklearn.manifold.Isomap,
+            sklearn.preprocessing.StandardScaler,
+            sklearn.random_projection.GaussianRandomProjection,
+            sklearn.random_projection.SparseRandomProjection
+        )
+    
+    (PCA, FastICA, IncrementalPCA, KernelPCA, TruncatedSVD, 
+     LinearDiscriminantAnalysis, TSNE, Isomap, StandardScaler,
+     GaussianRandomProjection, SparseRandomProjection) = _get_sklearn_imports()
 
 from . import ReductionProtocol, ReductionResult
 
@@ -208,7 +233,7 @@ class ClassicalReducerService:
 
         return methods
 
-    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> 'ClassicalReducerService':
+    def fit(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> 'ClassicalReducerService':
         """Fit the classical dimensionality reducer."""
         start_time = time.time()
         
@@ -245,7 +270,7 @@ class ClassicalReducerService:
         logger.info(f"Classical reducer '{self.method}' fitted in {training_time:.2f}s")
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: get_numpy().ndarray) -> get_numpy().ndarray:
         """Transform data to lower dimensional space."""
         if not self.is_fitted:
             raise ValueError("Reducer must be fitted before transform")
@@ -261,7 +286,7 @@ class ClassicalReducerService:
         
         return X_reduced
 
-    def fit_transform(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> np.ndarray:
+    def fit_transform(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> get_numpy().ndarray:
         """Fit the reducer and transform the data."""
         return self.fit(X, y).transform(X)
 
@@ -277,20 +302,20 @@ class ClassicalReducerService:
         })
         return method_info
 
-    def get_feature_importance(self) -> Optional[np.ndarray]:
+    def get_feature_importance(self) -> Optional[get_numpy().ndarray]:
         """Get feature importance if available from the fitted reducer."""
         if not self.is_fitted:
             return None
 
         # For linear methods like PCA, use component magnitudes
         if hasattr(self.reducer, "components_"):
-            return np.abs(self.reducer.components_).mean(axis=0)
+            return get_numpy().abs(self.reducer.components_).mean(axis=0)
         elif hasattr(self.reducer, "feature_importances_"):
             return self.reducer.feature_importances_
         else:
             return None
 
-    def get_explained_variance_ratio(self) -> Optional[np.ndarray]:
+    def get_explained_variance_ratio(self) -> Optional[get_numpy().ndarray]:
         """Get explained variance ratio if available."""
         if not self.is_fitted:
             return None
@@ -300,7 +325,7 @@ class ClassicalReducerService:
         else:
             return None
 
-    def get_reconstruction_error(self, X: np.ndarray) -> float:
+    def get_reconstruction_error(self, X: get_numpy().ndarray) -> float:
         """Calculate reconstruction error for methods that support it."""
         if not self.is_fitted:
             return 0.0
@@ -315,12 +340,12 @@ class ClassicalReducerService:
                 if self.scaler is not None:
                     X_reconstructed = self.scaler.inverse_transform(X_reconstructed)
                 
-                error = np.mean(np.square(X - X_reconstructed))
+                error = get_numpy().mean(get_numpy().square(X - X_reconstructed))
                 return float(error)
 
             # For PCA-like methods, use explained variance
             if hasattr(self.reducer, "explained_variance_ratio_"):
-                return float(1.0 - np.sum(self.reducer.explained_variance_ratio_))
+                return float(1.0 - get_numpy().sum(self.reducer.explained_variance_ratio_))
 
             return 0.5  # Default moderate error for methods without reconstruction
 
@@ -328,7 +353,7 @@ class ClassicalReducerService:
             logger.warning(f"Could not calculate reconstruction error: {e}")
             return 0.5
 
-    def _adjust_parameters_for_data(self, X: np.ndarray, params: Dict[str, Any], 
+    def _adjust_parameters_for_data(self, X: get_numpy().ndarray, params: Dict[str, Any], 
                                   method_info: Dict[str, Any]) -> Dict[str, Any]:
         """Adjust method parameters based on data characteristics."""
         n_samples, n_features = X.shape

@@ -5,7 +5,7 @@ Provides infrastructure for testing with actual services instead of mocks.
 
 Features:
 - PostgreSQL testcontainer for database testing
-- Redis testcontainer for cache testing  
+- Redis testcontainer for cache testing
 - ML model testing with real data scenarios
 - Network failure simulation for retry testing
 - Error injection for error handling testing
@@ -14,7 +14,7 @@ Features:
 
 Performance Targets:
 - Database operations: <10ms for simple queries, <100ms for complex operations
-- Cache operations: L1 <1ms, L2 <10ms, L3 <50ms
+- Cache operations: L1 <1ms, L2 <10ms
 - ML operations: <100ms for predictions, <5000ms for training
 - API endpoints: <100ms for P95, <500ms for P99
 """

@@ -15,9 +15,9 @@ import statistics
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +171,11 @@ class ScalingDecision:
     @property
     def is_scaling_action(self) -> bool:
         """Check if this is an actual scaling action."""
-        return self.action in [
+        return self.action in {
             ScalingAction.SCALE_UP,
             ScalingAction.SCALE_DOWN,
             ScalingAction.EMERGENCY_SCALE,
-        ]
+        }
 
 
 class PoolScalerProtocol(Protocol):
@@ -206,7 +206,7 @@ class PoolScaler:
     - Anti-thrashing safeguards with cooldown periods
     """
 
-    def __init__(self, config: ScalingConfiguration, service_name: str = "pool_scaler"):
+    def __init__(self, config: ScalingConfiguration, service_name: str = "pool_scaler") -> None:
         self.config = config
         self.service_name = service_name
 
@@ -220,7 +220,7 @@ class PoolScaler:
         self.performance_window = deque(maxlen=100)
 
         # Pattern detection
-        self.time_patterns: Dict[int, float] = {}  # hour -> typical utilization
+        self.time_patterns: dict[int, float] = {}  # hour -> typical utilization
         self.burst_detector = BurstDetector(window_minutes=5)
 
         # Decision tracking
@@ -280,7 +280,7 @@ class PoolScaler:
 
     async def execute_scaling_decision(
         self, decision: ScalingDecision, pool: PoolScalerProtocol
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a scaling decision on the pool.
 
         Args:
@@ -342,16 +342,15 @@ class PoolScaler:
                     "duration_ms": scaling_event["duration_ms"],
                     "estimated_benefit": decision.estimated_benefit,
                 }
-            else:
-                logger.error("Pool scaling failed - pool implementation returned false")
-                return {
-                    "status": "failed",
-                    "reason": "pool_implementation_error",
-                    "current_size": decision.current_size,
-                }
+            logger.error("Pool scaling failed - pool implementation returned false")
+            return {
+                "status": "failed",
+                "reason": "pool_implementation_error",
+                "current_size": decision.current_size,
+            }
 
         except Exception as e:
-            logger.error(f"Failed to execute scaling decision: {e}")
+            logger.exception(f"Failed to execute scaling decision: {e}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -362,7 +361,6 @@ class PoolScaler:
         self, metrics: ScalingMetrics, pool: PoolScalerProtocol
     ) -> ScalingDecision:
         """Evaluate normal scaling needs based on multiple factors."""
-
         # Collect scaling factors
         factors = []
 
@@ -403,7 +401,7 @@ class PoolScaler:
 
     def _evaluate_utilization_factor(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on connection utilization."""
         utilization = metrics.utilization_ratio
 
@@ -415,7 +413,7 @@ class PoolScaler:
                 "confidence": 0.8,
                 "target_increment": self.config.scale_up_increment,
             }
-        elif utilization <= self.config.scale_down_threshold:
+        if utilization <= self.config.scale_down_threshold:
             return {
                 "action": ScalingAction.SCALE_DOWN,
                 "reason": ScalingReason.LOW_UTILIZATION,
@@ -429,7 +427,7 @@ class PoolScaler:
 
     def _evaluate_performance_factor(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on performance metrics."""
         if metrics.avg_response_time_ms > self.config.max_response_time_ms:
             severity = metrics.avg_response_time_ms / self.config.max_response_time_ms
@@ -445,7 +443,7 @@ class PoolScaler:
 
     def _evaluate_queue_factor(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on waiting requests."""
         if metrics.waiting_requests > 0:
             queue_ratio = metrics.waiting_requests / max(metrics.current_pool_size, 1)
@@ -463,9 +461,8 @@ class PoolScaler:
 
     def _evaluate_resource_constraints(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on resource constraints."""
-
         # Check if we're hitting resource limits that prevent scaling up
         if (
             metrics.cpu_utilization > self.config.max_cpu_utilization
@@ -483,7 +480,7 @@ class PoolScaler:
 
     def _evaluate_predictive_factor(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on predictive patterns."""
         if len(self.metrics_history) < 10:
             return None
@@ -502,7 +499,7 @@ class PoolScaler:
                 "confidence": 0.6,
                 "target_increment": self.config.scale_up_increment,
             }
-        elif trend < -0.05 and metrics.utilization_ratio < 0.4:  # Declining trend
+        if trend < -0.05 and metrics.utilization_ratio < 0.4:  # Declining trend
             return {
                 "action": ScalingAction.SCALE_DOWN,
                 "reason": ScalingReason.LOW_UTILIZATION,
@@ -515,7 +512,7 @@ class PoolScaler:
 
     def _evaluate_time_factor(
         self, metrics: ScalingMetrics
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Evaluate scaling based on time-based patterns."""
         current_hour = datetime.now(UTC).hour
 
@@ -535,10 +532,9 @@ class PoolScaler:
         return None
 
     def _combine_scaling_factors(
-        self, factors: List[Dict[str, Any]], metrics: ScalingMetrics
+        self, factors: list[dict[str, Any]], metrics: ScalingMetrics
     ) -> ScalingDecision:
         """Combine multiple scaling factors into a final decision."""
-
         if not factors:
             return ScalingDecision(
                 action=ScalingAction.NO_ACTION,
@@ -600,7 +596,7 @@ class PoolScaler:
                 metrics_snapshot=metrics,
             )
 
-        elif scale_down_score > 0.5:
+        if scale_down_score > 0.5:
             # Scale down
             increment = int(
                 statistics.mean([
@@ -697,7 +693,7 @@ class PoolScaler:
         else:
             self._statistics["no_action_count"] += 1
 
-    def _calculate_trend(self, values: List[float]) -> float:
+    def _calculate_trend(self, values: list[float]) -> float:
         """Calculate trend in a series of values using linear regression."""
         if len(values) < 2:
             return 0.0
@@ -709,7 +705,7 @@ class PoolScaler:
         x_mean = sum(x_values) / n
         y_mean = sum(values) / n
 
-        numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_values, values))
+        numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_values, values, strict=False))
         denominator = sum((x - x_mean) ** 2 for x in x_values)
 
         if denominator == 0:
@@ -717,7 +713,7 @@ class PoolScaler:
 
         return numerator / denominator
 
-    def get_scaling_statistics(self) -> Dict[str, Any]:
+    def get_scaling_statistics(self) -> dict[str, Any]:
         """Get scaling statistics and analysis."""
         recent_decisions = (
             list(self.decision_history)[-50:] if self.decision_history else []
@@ -762,7 +758,7 @@ class PoolScaler:
 class BurstDetector:
     """Detects burst traffic patterns for intelligent scaling."""
 
-    def __init__(self, window_minutes: int = 5):
+    def __init__(self, window_minutes: int = 5) -> None:
         self.window_size = window_minutes * 60  # Convert to seconds
         self.events = deque(maxlen=1000)
 

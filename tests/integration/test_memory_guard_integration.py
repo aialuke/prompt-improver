@@ -6,9 +6,6 @@ and verify resource management works correctly across the orchestration system.
 """
 
 import asyncio
-import logging
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock
 
 import numpy as np
 import pytest
@@ -18,9 +15,6 @@ from prompt_improver.ml.orchestration.config.orchestrator_config import (
 )
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator,
-)
-from prompt_improver.ml.orchestration.integration.component_invoker import (
-    ComponentInvoker,
 )
 from prompt_improver.ml.orchestration.integration.direct_component_loader import (
     DirectComponentLoader,

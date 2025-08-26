@@ -1,4 +1,4 @@
-"""ML Contract Validation Script for Pre-commit Hook"""
+"""ML Contract Validation Script for Pre-commit Hook."""
 
 import ast
 import os

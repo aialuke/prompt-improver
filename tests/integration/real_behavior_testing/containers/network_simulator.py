@@ -9,17 +9,17 @@ import logging
 import random
 import time
 import uuid
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
-from contextlib import asynccontextmanager
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class FailureType(Enum):
     """Types of network failures to simulate."""
-    
+
     CONNECTION_TIMEOUT = "connection_timeout"
     CONNECTION_REFUSED = "connection_refused"
     DNS_RESOLUTION_FAILURE = "dns_resolution_failure"
@@ -34,13 +34,13 @@ class FailureType(Enum):
 @dataclass
 class FailureScenario:
     """Configuration for a specific failure scenario."""
-    
+
     failure_type: FailureType
     probability: float = 0.5  # 0.0 = never, 1.0 = always
-    duration_ms: Optional[int] = None  # Duration for timeouts/delays
+    duration_ms: int | None = None  # Duration for timeouts/delays
     error_message: str = ""
-    custom_exception: Optional[Exception] = None
-    
+    custom_exception: Exception | None = None
+
     # Pattern control
     pattern: str = "random"  # random, sequential, burst
     burst_count: int = 3  # For burst pattern
@@ -50,28 +50,28 @@ class FailureScenario:
 @dataclass
 class NetworkOperation:
     """Represents a network operation for simulation."""
-    
+
     operation_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     operation_name: str = "unknown"
     target_host: str = "localhost"
     target_port: int = 80
     operation_type: str = "http_request"  # http_request, database_connection, api_call
-    
+
     # Execution context
     start_time: float = field(default_factory=time.perf_counter)
-    end_time: Optional[float] = None
-    duration_ms: Optional[float] = None
-    
+    end_time: float | None = None
+    duration_ms: float | None = None
+
     # Result
     success: bool = False
-    failure_type: Optional[FailureType] = None
+    failure_type: FailureType | None = None
     error_message: str = ""
     retry_count: int = 0
 
 
 class NetworkSimulator:
     """Network failure simulator for comprehensive retry testing.
-    
+
     Simulates various network failure conditions to test:
     - Retry mechanisms and backoff strategies
     - Circuit breaker behavior under different failure modes
@@ -79,26 +79,26 @@ class NetworkSimulator:
     - Timeout handling and connection pooling behavior
     """
 
-    def __init__(self, simulator_id: Optional[str] = None):
+    def __init__(self, simulator_id: str | None = None):
         """Initialize network simulator.
-        
+
         Args:
             simulator_id: Optional custom simulator identifier
         """
         self.simulator_id = simulator_id or str(uuid.uuid4())[:8]
-        
+
         # Active failure scenarios
-        self._active_scenarios: Dict[str, FailureScenario] = {}
-        self._scenario_states: Dict[str, Dict[str, Any]] = {}
-        
+        self._active_scenarios: dict[str, FailureScenario] = {}
+        self._scenario_states: dict[str, dict[str, Any]] = {}
+
         # Operation tracking
-        self._operations: Dict[str, NetworkOperation] = {}
-        self._operation_stats: Dict[FailureType, int] = {ft: 0 for ft in FailureType}
-        
+        self._operations: dict[str, NetworkOperation] = {}
+        self._operation_stats: dict[FailureType, int] = dict.fromkeys(FailureType, 0)
+
         # Simulator state
         self._is_running = False
-        self._background_task: Optional[asyncio.Task] = None
-        
+        self._background_task: asyncio.Task | None = None
+
         logger.info(f"NetworkSimulator initialized: {self.simulator_id}")
 
     async def start(self):
@@ -106,31 +106,29 @@ class NetworkSimulator:
         if self._is_running:
             logger.warning("Network simulator already running")
             return
-        
+
         self._is_running = True
         self._background_task = asyncio.create_task(self._background_simulation_loop())
-        
+
         logger.info(f"Network simulator started: {self.simulator_id}")
 
     async def stop(self):
         """Stop the network simulator and clean up resources."""
         if not self._is_running:
             return
-        
+
         self._is_running = False
-        
+
         if self._background_task and not self._background_task.done():
             self._background_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._background_task
-            except asyncio.CancelledError:
-                pass
-        
+
         # Clear scenarios and operations
         self._active_scenarios.clear()
         self._scenario_states.clear()
         self._operations.clear()
-        
+
         logger.info(f"Network simulator stopped: {self.simulator_id}")
 
     def add_failure_scenario(
@@ -138,12 +136,12 @@ class NetworkSimulator:
         scenario_name: str,
         failure_type: FailureType,
         probability: float = 0.5,
-        duration_ms: Optional[int] = None,
+        duration_ms: int | None = None,
         pattern: str = "random",
         **kwargs
     ) -> None:
         """Add a failure scenario to the simulator.
-        
+
         Args:
             scenario_name: Unique name for the scenario
             failure_type: Type of failure to simulate
@@ -162,7 +160,7 @@ class NetworkSimulator:
             burst_count=kwargs.get('burst_count', 3),
             recovery_time_ms=kwargs.get('recovery_time_ms', 1000),
         )
-        
+
         self._active_scenarios[scenario_name] = scenario
         self._scenario_states[scenario_name] = {
             "last_failure_time": 0,
@@ -170,15 +168,15 @@ class NetworkSimulator:
             "in_burst": False,
             "operations_since_last": 0,
         }
-        
+
         logger.info(f"Added failure scenario: {scenario_name} ({failure_type.value})")
 
     def remove_failure_scenario(self, scenario_name: str) -> bool:
         """Remove a failure scenario.
-        
+
         Args:
             scenario_name: Name of scenario to remove
-            
+
         Returns:
             True if scenario was removed, False if not found
         """
@@ -197,13 +195,13 @@ class NetworkSimulator:
         operation_type: str = "http_request"
     ) -> NetworkOperation:
         """Simulate a network operation with potential failures.
-        
+
         Args:
             operation_name: Name of the operation
             target_host: Target host for the operation
             target_port: Target port
             operation_type: Type of network operation
-            
+
         Returns:
             NetworkOperation result with success/failure information
         """
@@ -213,56 +211,55 @@ class NetworkSimulator:
             target_port=target_port,
             operation_type=operation_type,
         )
-        
+
         self._operations[operation.operation_id] = operation
-        
+
         try:
             # Check all active scenarios for potential failures
             for scenario_name, scenario in self._active_scenarios.items():
                 should_fail, failure_details = await self._should_operation_fail(
                     scenario_name, scenario, operation
                 )
-                
+
                 if should_fail:
                     # Apply failure
                     operation.success = False
                     operation.failure_type = scenario.failure_type
                     operation.error_message = failure_details.get('error_message', scenario.error_message)
-                    
+
                     # Update statistics
                     self._operation_stats[scenario.failure_type] += 1
-                    
+
                     # Simulate failure delay if specified
                     if scenario.duration_ms:
                         await asyncio.sleep(scenario.duration_ms / 1000.0)
-                    
+
                     operation.end_time = time.perf_counter()
                     operation.duration_ms = (operation.end_time - operation.start_time) * 1000
-                    
+
                     # Raise appropriate exception if specified
                     if scenario.custom_exception:
                         raise scenario.custom_exception
-                    elif scenario.failure_type == FailureType.CONNECTION_TIMEOUT:
-                        raise asyncio.TimeoutError(operation.error_message)
-                    elif scenario.failure_type == FailureType.CONNECTION_REFUSED:
+                    if scenario.failure_type == FailureType.CONNECTION_TIMEOUT:
+                        raise TimeoutError(operation.error_message)
+                    if scenario.failure_type == FailureType.CONNECTION_REFUSED:
                         raise ConnectionRefusedError(operation.error_message)
-                    elif scenario.failure_type == FailureType.DNS_RESOLUTION_FAILURE:
+                    if scenario.failure_type == FailureType.DNS_RESOLUTION_FAILURE:
                         raise OSError(f"DNS resolution failed: {operation.error_message}")
-                    else:
-                        raise RuntimeError(operation.error_message)
-            
+                    raise RuntimeError(operation.error_message)
+
             # If no failure occurred, simulate successful operation
             operation.success = True
-            
+
             # Simulate successful operation delay (small random delay)
             success_delay = random.uniform(0.01, 0.05)  # 10-50ms
             await asyncio.sleep(success_delay)
-            
+
             operation.end_time = time.perf_counter()
             operation.duration_ms = (operation.end_time - operation.start_time) * 1000
-            
+
             return operation
-            
+
         except Exception as e:
             operation.end_time = time.perf_counter()
             operation.duration_ms = (operation.end_time - operation.start_time) * 1000
@@ -274,66 +271,63 @@ class NetworkSimulator:
         scenario_name: str,
         scenario: FailureScenario,
         operation: NetworkOperation
-    ) -> tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Determine if an operation should fail based on scenario configuration.
-        
+
         Args:
             scenario_name: Name of the scenario
             scenario: Failure scenario configuration
             operation: Network operation to check
-            
+
         Returns:
             Tuple of (should_fail, failure_details)
         """
         state = self._scenario_states[scenario_name]
         current_time = time.perf_counter() * 1000  # Convert to milliseconds
-        
+
         failure_details = {
             "error_message": scenario.error_message,
             "scenario_name": scenario_name,
         }
-        
+
         # Check pattern-based failure logic
         if scenario.pattern == "random":
             return random.random() < scenario.probability, failure_details
-        
-        elif scenario.pattern == "sequential":
+
+        if scenario.pattern == "sequential":
             # Fail every N operations based on probability
             state["operations_since_last"] += 1
             operations_threshold = int(1.0 / scenario.probability) if scenario.probability > 0 else float('inf')
-            
+
             if state["operations_since_last"] >= operations_threshold:
                 state["operations_since_last"] = 0
                 return True, failure_details
-            
+
             return False, failure_details
-        
-        elif scenario.pattern == "burst":
+
+        if scenario.pattern == "burst":
             # Create bursts of failures followed by recovery periods
             if state["in_burst"]:
                 if state["burst_counter"] < scenario.burst_count:
                     state["burst_counter"] += 1
                     return True, failure_details
-                else:
-                    # End burst, start recovery period
-                    state["in_burst"] = False
-                    state["burst_counter"] = 0
-                    state["last_failure_time"] = current_time
-                    return False, failure_details
-            else:
-                # Check if recovery time has passed
-                if current_time - state["last_failure_time"] > scenario.recovery_time_ms:
-                    # Start new burst based on probability
-                    if random.random() < scenario.probability:
-                        state["in_burst"] = True
-                        state["burst_counter"] = 1
-                        return True, failure_details
-                
+                # End burst, start recovery period
+                state["in_burst"] = False
+                state["burst_counter"] = 0
+                state["last_failure_time"] = current_time
                 return False, failure_details
-        
-        else:
-            # Unknown pattern, default to random
-            return random.random() < scenario.probability, failure_details
+            # Check if recovery time has passed
+            if current_time - state["last_failure_time"] > scenario.recovery_time_ms:
+                # Start new burst based on probability
+                if random.random() < scenario.probability:
+                    state["in_burst"] = True
+                    state["burst_counter"] = 1
+                    return True, failure_details
+
+            return False, failure_details
+
+        # Unknown pattern, default to random
+        return random.random() < scenario.probability, failure_details
 
     @asynccontextmanager
     async def temporary_failure_scenario(
@@ -341,10 +335,10 @@ class NetworkSimulator:
         scenario_name: str,
         failure_type: FailureType,
         probability: float = 1.0,
-        duration_ms: Optional[int] = None
+        duration_ms: int | None = None
     ):
         """Temporarily add a failure scenario for testing.
-        
+
         Args:
             scenario_name: Name for temporary scenario
             failure_type: Type of failure to simulate
@@ -358,7 +352,7 @@ class NetworkSimulator:
             probability=probability,
             duration_ms=duration_ms,
         )
-        
+
         try:
             yield
         finally:
@@ -372,12 +366,12 @@ class NetworkSimulator:
         timeout_ms: int = 5000
     ) -> NetworkOperation:
         """Simulate HTTP request with potential failures.
-        
+
         Args:
             url: URL for the request
             method: HTTP method
             timeout_ms: Request timeout
-            
+
         Returns:
             NetworkOperation result
         """
@@ -395,12 +389,12 @@ class NetworkSimulator:
         database: str = "test_db"
     ) -> NetworkOperation:
         """Simulate database connection with potential failures.
-        
+
         Args:
             host: Database host
             port: Database port
             database: Database name
-            
+
         Returns:
             NetworkOperation result
         """
@@ -418,12 +412,12 @@ class NetworkSimulator:
         operation: str = "get"
     ) -> NetworkOperation:
         """Simulate Redis operation with potential failures.
-        
+
         Args:
             host: Redis host
             port: Redis port
             operation: Redis operation type
-            
+
         Returns:
             NetworkOperation result
         """
@@ -434,16 +428,16 @@ class NetworkSimulator:
             operation_type="redis_operation"
         )
 
-    def get_failure_statistics(self) -> Dict[str, Any]:
+    def get_failure_statistics(self) -> dict[str, Any]:
         """Get comprehensive failure statistics.
-        
+
         Returns:
             Dictionary with failure statistics and scenarios
         """
         total_operations = len(self._operations)
         successful_operations = sum(1 for op in self._operations.values() if op.success)
         failed_operations = total_operations - successful_operations
-        
+
         return {
             "simulator_id": self.simulator_id,
             "is_running": self._is_running,
@@ -464,19 +458,19 @@ class NetworkSimulator:
             "scenario_states": dict(self._scenario_states),
         }
 
-    def get_operation_history(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_operation_history(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get recent operation history.
-        
+
         Args:
             limit: Maximum number of operations to return
-            
+
         Returns:
             List of operation details
         """
         operations = list(self._operations.values())
         # Sort by start time, most recent first
         operations.sort(key=lambda op: op.start_time, reverse=True)
-        
+
         return [
             {
                 "operation_id": op.operation_id,
@@ -497,30 +491,30 @@ class NetworkSimulator:
             try:
                 # Update scenario states periodically
                 current_time = time.perf_counter() * 1000
-                
+
                 for scenario_name, state in self._scenario_states.items():
                     scenario = self._active_scenarios[scenario_name]
-                    
+
                     # Reset burst state if recovery time exceeded
-                    if (state["in_burst"] and 
+                    if (state["in_burst"] and
                         current_time - state["last_failure_time"] > scenario.recovery_time_ms):
                         state["in_burst"] = False
                         state["burst_counter"] = 0
-                
+
                 # Sleep for state update interval
                 await asyncio.sleep(1.0)  # Update every second
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Background simulation loop error: {e}")
+                logger.exception(f"Background simulation loop error: {e}")
                 await asyncio.sleep(1.0)
 
     async def reset_statistics(self):
         """Reset all statistics and operation history."""
         self._operations.clear()
-        self._operation_stats = {ft: 0 for ft in FailureType}
-        
+        self._operation_stats = dict.fromkeys(FailureType, 0)
+
         # Reset scenario states
         for state in self._scenario_states.values():
             state.update({
@@ -529,12 +523,12 @@ class NetworkSimulator:
                 "in_burst": False,
                 "operations_since_last": 0,
             })
-        
+
         logger.info("Network simulator statistics reset")
 
-    def create_common_failure_scenarios(self) -> Dict[str, str]:
+    def create_common_failure_scenarios(self) -> dict[str, str]:
         """Create common failure scenarios for testing.
-        
+
         Returns:
             Dictionary mapping scenario names to descriptions
         """
@@ -545,7 +539,7 @@ class NetworkSimulator:
             "intermittent_errors": "Simulates intermittent network errors",
             "burst_failures": "Simulates burst failure patterns",
         }
-        
+
         # Add common scenarios
         self.add_failure_scenario(
             "connection_timeout",
@@ -554,21 +548,21 @@ class NetworkSimulator:
             duration_ms=5000,
             pattern="random"
         )
-        
+
         self.add_failure_scenario(
             "connection_refused",
             FailureType.CONNECTION_REFUSED,
             probability=0.2,
             pattern="sequential"
         )
-        
+
         self.add_failure_scenario(
             "dns_failure",
             FailureType.DNS_RESOLUTION_FAILURE,
             probability=0.1,
             pattern="random"
         )
-        
+
         self.add_failure_scenario(
             "intermittent_errors",
             FailureType.INTERMITTENT_ERRORS,
@@ -577,7 +571,7 @@ class NetworkSimulator:
             burst_count=3,
             recovery_time_ms=2000
         )
-        
+
         self.add_failure_scenario(
             "burst_failures",
             FailureType.HTTP_ERRORS,
@@ -586,6 +580,6 @@ class NetworkSimulator:
             burst_count=5,
             recovery_time_ms=3000
         )
-        
+
         logger.info("Created common failure scenarios")
         return scenarios

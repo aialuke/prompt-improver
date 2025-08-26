@@ -6,9 +6,7 @@ Real behavior testing for OpenTelemetry system metrics collection.
 Replaces prometheus-based system metrics tests with OTel-native validation.
 """
 
-import asyncio
 import time
-from typing import Any, Dict
 
 import pytest
 

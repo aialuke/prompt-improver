@@ -8,9 +8,8 @@ Migrated from mock-based testing to real behavior testing following 2025 best pr
 - Document real behavior including shutdown failures
 """
 
-import asyncio
+import contextlib
 import logging
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -28,17 +27,13 @@ class TestStartupOrchestration:
 
     async def setup_method(self):
         """Ensure clean state before each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     async def teardown_method(self):
         """Ensure clean state after each test."""
-        try:
+        with contextlib.suppress(Exception):
             await shutdown_startup_tasks(timeout=5.0)
-        except Exception:
-            pass
 
     @pytest.mark.asyncio
     async def test_init_startup_tasks_success(self):
@@ -124,7 +119,7 @@ class TestStartupOrchestration:
         health_monitor = result["component_refs"]["health_monitor"]
         assert health_monitor is not None
         health_result = await health_monitor.run_health_check()
-        assert health_result.overall_status.value in ["healthy", "warning", "failed"]
+        assert health_result.overall_status.value in {"healthy", "warning", "failed"}
         await shutdown_startup_tasks()
 
     @pytest.mark.asyncio
@@ -143,7 +138,7 @@ class TestStartupOrchestration:
         assert batch_processor.config.batch_size == 3
         assert batch_processor.config.batch_timeout == 5
         assert batch_processor.config.max_attempts == 1
-        assert batch_processor.config.dry_run == True
+        assert batch_processor.config.dry_run
         await shutdown_startup_tasks()
 
     @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-"""Plugin Adapters for Health Checkers
+"""Plugin Adapters for Health Checkers.
 
 Converts existing health checkers to the unified plugin system:
 - EnhancedMLServiceHealthChecker
@@ -8,18 +8,10 @@ Converts existing health checkers to the unified plugin system:
 - API endpoint health checkers
 """
 
-import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
-# Direct protocol imports used throughout this module
-from prompt_improver.core.protocols.health_protocol import (
-    HealthCheckResult,
-    HealthStatus,
-)
-from prompt_improver.core.protocols.ml_protocols import EventBusProtocol
-from prompt_improver.ml.orchestration.events.adaptive_event_bus import AdaptiveEventBus
 from prompt_improver.performance.monitoring.health.base import (
     HealthResult,
     HealthStatus as BaseHealthStatus,
@@ -56,6 +48,12 @@ from prompt_improver.performance.monitoring.health.unified_health_system import 
     HealthCheckPluginConfig,
 )
 
+# Direct protocol imports used throughout this module
+from prompt_improver.shared.interfaces.protocols.monitoring import (
+    HealthCheckResult,
+    HealthStatus,
+)
+
 # Feature availability flags
 try:
     from prompt_improver.database.health.database_health_monitor import (
@@ -79,13 +77,12 @@ logger = logging.getLogger(__name__)
 
 
 def _get_database_health_checker():
-    """Lazy import DatabaseHealthChecker"""
-
+    """Lazy import DatabaseHealthChecker."""
     return DatabaseHealthChecker
 
 
 def _get_ml_service_health_checker():
-    """Lazy import EnhancedMLServiceHealthChecker"""
+    """Lazy import EnhancedMLServiceHealthChecker."""
     from prompt_improver.performance.monitoring.health.enhanced_checkers import (
         EnhancedMLServiceHealthChecker,
     )
@@ -94,7 +91,7 @@ def _get_ml_service_health_checker():
 
 
 def _get_analytics_service_health_checker():
-    """Lazy import EnhancedAnalyticsServiceHealthChecker"""
+    """Lazy import EnhancedAnalyticsServiceHealthChecker."""
     from prompt_improver.performance.monitoring.health.enhanced_checkers import (
         EnhancedAnalyticsServiceHealthChecker,
     )
@@ -103,7 +100,7 @@ def _get_analytics_service_health_checker():
 
 
 def _get_redis_health_checker():
-    """Lazy import RedisHealthChecker"""
+    """Lazy import RedisHealthChecker."""
     from prompt_improver.performance.monitoring.health.checkers import (
         RedisHealthChecker,
     )
@@ -112,7 +109,7 @@ def _get_redis_health_checker():
 
 
 def _get_system_resources_health_checker():
-    """Lazy import SystemResourcesHealthChecker"""
+    """Lazy import SystemResourcesHealthChecker."""
     from prompt_improver.performance.monitoring.health.checkers import (
         SystemResourcesHealthChecker,
     )
@@ -121,7 +118,7 @@ def _get_system_resources_health_checker():
 
 
 def _get_queue_health_checker():
-    """Lazy import QueueHealthChecker"""
+    """Lazy import QueueHealthChecker."""
     from prompt_improver.performance.monitoring.health.checkers import (
         QueueHealthChecker,
     )
@@ -130,7 +127,7 @@ def _get_queue_health_checker():
 
 
 def _get_mcp_server_health_checker():
-    """Lazy import MCPServerHealthChecker"""
+    """Lazy import MCPServerHealthChecker."""
     from prompt_improver.performance.monitoring.health.checkers import (
         MCPServerHealthChecker,
     )
@@ -139,7 +136,7 @@ def _get_mcp_server_health_checker():
 
 
 def _get_enhanced_ml_service_health_checker():
-    """Lazy import EnhancedMLServiceHealthChecker"""
+    """Lazy import EnhancedMLServiceHealthChecker."""
     from prompt_improver.performance.monitoring.health.enhanced_checkers import (
         EnhancedMLServiceHealthChecker,
     )
@@ -148,7 +145,7 @@ def _get_enhanced_ml_service_health_checker():
 
 
 def _get_enhanced_analytics_service_health_checker():
-    """Lazy import EnhancedAnalyticsServiceHealthChecker"""
+    """Lazy import EnhancedAnalyticsServiceHealthChecker."""
     from prompt_improver.performance.monitoring.health.enhanced_checkers import (
         EnhancedAnalyticsServiceHealthChecker,
     )
@@ -157,7 +154,7 @@ def _get_enhanced_analytics_service_health_checker():
 
 
 def _get_ml_model_health_checker():
-    """Lazy import MLModelHealthChecker"""
+    """Lazy import MLModelHealthChecker."""
     from prompt_improver.performance.monitoring.health.ml_specific_checkers import (
         MLModelHealthChecker,
     )
@@ -166,7 +163,7 @@ def _get_ml_model_health_checker():
 
 
 def _get_ml_data_quality_checker():
-    """Lazy import MLDataQualityChecker"""
+    """Lazy import MLDataQualityChecker."""
     from prompt_improver.performance.monitoring.health.ml_specific_checkers import (
         MLDataQualityChecker,
     )
@@ -175,7 +172,7 @@ def _get_ml_data_quality_checker():
 
 
 def _get_ml_training_health_checker():
-    """Lazy import MLTrainingHealthChecker"""
+    """Lazy import MLTrainingHealthChecker."""
     from prompt_improver.performance.monitoring.health.ml_specific_checkers import (
         MLTrainingHealthChecker,
     )
@@ -184,7 +181,7 @@ def _get_ml_training_health_checker():
 
 
 def _get_ml_performance_health_checker():
-    """Lazy import MLPerformanceHealthChecker"""
+    """Lazy import MLPerformanceHealthChecker."""
     from prompt_improver.performance.monitoring.health.ml_specific_checkers import (
         MLPerformanceHealthChecker,
     )
@@ -193,7 +190,7 @@ def _get_ml_performance_health_checker():
 
 
 def _get_database_health_service():
-    """Lazy import DatabaseHealthService using new decomposed architecture"""
+    """Lazy import DatabaseHealthService using new decomposed architecture."""
     try:
         from prompt_improver.database.health.services import (
             get_database_health_service,
@@ -205,7 +202,7 @@ def _get_database_health_service():
 
 
 def _get_detailed_redis_health_checker():
-    """Lazy import detailed RedisHealthChecker"""
+    """Lazy import detailed RedisHealthChecker."""
     try:
         from prompt_improver.cache.redis_health import (
             RedisHealthMonitor,
@@ -218,8 +215,8 @@ def _get_detailed_redis_health_checker():
 
 
 def _get_health_protocol_types():
-    """Lazy import health protocol types to avoid circular imports"""
-    from prompt_improver.core.protocols.health_protocol import (
+    """Lazy import health protocol types to avoid circular imports."""
+    from prompt_improver.shared.interfaces.protocols.monitoring import (
         HealthCheckResult,
         HealthMonitorProtocol,
         HealthStatus,
@@ -235,7 +232,7 @@ def _create_health_check_result(
     check_name: str = "",
     duration_ms: float = 0.0,
 ) -> HealthCheckResult:
-    """Helper to build a HealthCheckResult"""
+    """Helper to build a HealthCheckResult."""
     return HealthCheckResult(
         status=status,
         message=message,
@@ -246,8 +243,7 @@ def _create_health_check_result(
 
 
 def _convert_health_result(health_result: HealthResult):
-    """Convert HealthResult to HealthCheckResult"""
-
+    """Convert HealthResult to HealthCheckResult."""
     status_mapping = {
         BaseHealthStatus.HEALTHY: HealthStatus.HEALTHY,
         BaseHealthStatus.WARNING: HealthStatus.DEGRADED,
@@ -263,8 +259,7 @@ def _convert_health_result(health_result: HealthResult):
 
 
 def _convert_health_status(status: BaseHealthStatus):
-    """Convert base health status to protocol health status"""
-
+    """Convert base health status to protocol health status."""
     if status == BaseHealthStatus.HEALTHY:
         return HealthStatus.HEALTHY
     if status == BaseHealthStatus.WARNING:
@@ -275,9 +270,9 @@ def _convert_health_status(status: BaseHealthStatus):
 
 
 class MLServicePlugin(HealthCheckPlugin):
-    """ML Service health check plugin"""
+    """ML Service health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_service",
             category=HealthCheckCategory.ML,
@@ -300,9 +295,9 @@ class MLServicePlugin(HealthCheckPlugin):
 
 
 class EnhancedMLServicePlugin(HealthCheckPlugin):
-    """Enhanced ML Service health check plugin with 2025 features"""
+    """Enhanced ML Service health check plugin with 2025 features."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="enhanced_ml_service",
             category=HealthCheckCategory.ML,
@@ -325,9 +320,9 @@ class EnhancedMLServicePlugin(HealthCheckPlugin):
 
 
 class MLModelPlugin(HealthCheckPlugin):
-    """ML Model health check plugin"""
+    """ML Model health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_model",
             category=HealthCheckCategory.ML,
@@ -350,9 +345,9 @@ class MLModelPlugin(HealthCheckPlugin):
 
 
 class MLDataQualityPlugin(HealthCheckPlugin):
-    """ML Data Quality health check plugin"""
+    """ML Data Quality health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_data_quality",
             category=HealthCheckCategory.ML,
@@ -374,9 +369,9 @@ class MLDataQualityPlugin(HealthCheckPlugin):
 
 
 class MLTrainingPlugin(HealthCheckPlugin):
-    """ML Training health check plugin"""
+    """ML Training health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_training",
             category=HealthCheckCategory.ML,
@@ -398,9 +393,9 @@ class MLTrainingPlugin(HealthCheckPlugin):
 
 
 class MLPerformancePlugin(HealthCheckPlugin):
-    """ML Performance health check plugin"""
+    """ML Performance health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_performance",
             category=HealthCheckCategory.ML,
@@ -422,9 +417,9 @@ class MLPerformancePlugin(HealthCheckPlugin):
 
 
 class MLOrchestratorPlugin(HealthCheckPlugin):
-    """ML Orchestrator health check plugin"""
+    """ML Orchestrator health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_orchestrator",
             category=HealthCheckCategory.ML,
@@ -447,9 +442,9 @@ class MLOrchestratorPlugin(HealthCheckPlugin):
 
 
 class MLComponentRegistryPlugin(HealthCheckPlugin):
-    """ML Component Registry health check plugin"""
+    """ML Component Registry health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_component_registry",
             category=HealthCheckCategory.ML,
@@ -471,9 +466,9 @@ class MLComponentRegistryPlugin(HealthCheckPlugin):
 
 
 class MLResourceManagerPlugin(HealthCheckPlugin):
-    """ML Resource Manager health check plugin"""
+    """ML Resource Manager health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_resource_manager",
             category=HealthCheckCategory.ML,
@@ -495,9 +490,9 @@ class MLResourceManagerPlugin(HealthCheckPlugin):
 
 
 class MLWorkflowEnginePlugin(HealthCheckPlugin):
-    """ML Workflow Engine health check plugin"""
+    """ML Workflow Engine health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_workflow_engine",
             category=HealthCheckCategory.ML,
@@ -519,9 +514,9 @@ class MLWorkflowEnginePlugin(HealthCheckPlugin):
 
 
 class MLEventBusPlugin(HealthCheckPlugin):
-    """ML Event Bus health check plugin"""
+    """ML Event Bus health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="ml_event_bus",
             category=HealthCheckCategory.ML,
@@ -543,9 +538,9 @@ class MLEventBusPlugin(HealthCheckPlugin):
 
 
 class DatabasePlugin(HealthCheckPlugin):
-    """Enhanced comprehensive database health check plugin with <10ms performance target"""
+    """Enhanced comprehensive database health check plugin with <10ms performance target."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="database",
             category=HealthCheckCategory.DATABASE,
@@ -557,7 +552,7 @@ class DatabasePlugin(HealthCheckPlugin):
         self._cached_monitor = None
 
     def _get_monitor(self):
-        """Get database health monitor with lazy loading and caching"""
+        """Get database health monitor with lazy loading and caching."""
         if self._cached_monitor is None:
             try:
                 from prompt_improver.database.health.database_health_monitor import (
@@ -638,9 +633,9 @@ class DatabasePlugin(HealthCheckPlugin):
 
 
 class DatabaseConnectionPoolPlugin(HealthCheckPlugin):
-    """Database connection pool health check plugin - integrated with DatabaseServices"""
+    """Database connection pool health check plugin - integrated with DatabaseServices."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="database_connection_pool",
             category=HealthCheckCategory.DATABASE,
@@ -686,9 +681,9 @@ class DatabaseConnectionPoolPlugin(HealthCheckPlugin):
 
 
 class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
-    """Database query performance health check plugin"""
+    """Database query performance health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="database_query_performance",
             category=HealthCheckCategory.DATABASE,
@@ -727,9 +722,9 @@ class DatabaseQueryPerformancePlugin(HealthCheckPlugin):
 
 
 class DatabaseIndexHealthPlugin(HealthCheckPlugin):
-    """Enhanced database index health check plugin with <10ms performance target"""
+    """Enhanced database index health check plugin with <10ms performance target."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="database_index_health",
             category=HealthCheckCategory.DATABASE,
@@ -741,7 +736,7 @@ class DatabaseIndexHealthPlugin(HealthCheckPlugin):
         self._cached_monitor = None
 
     def _get_monitor(self):
-        """Get database health monitor with lazy loading and caching"""
+        """Get database health monitor with lazy loading and caching."""
         if self._cached_monitor is None:
             try:
                 from prompt_improver.database.health.database_health_monitor import (
@@ -832,9 +827,9 @@ class DatabaseIndexHealthPlugin(HealthCheckPlugin):
 
 
 class DatabaseBloatPlugin(HealthCheckPlugin):
-    """Enhanced database table bloat detection plugin with <10ms performance target"""
+    """Enhanced database table bloat detection plugin with <10ms performance target."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="database_bloat",
             category=HealthCheckCategory.DATABASE,
@@ -846,7 +841,7 @@ class DatabaseBloatPlugin(HealthCheckPlugin):
         self._cached_monitor = None
 
     def _get_monitor(self):
-        """Get database health monitor with lazy loading and caching"""
+        """Get database health monitor with lazy loading and caching."""
         if self._cached_monitor is None:
             try:
                 from prompt_improver.database.health.database_health_monitor import (
@@ -933,9 +928,9 @@ class DatabaseBloatPlugin(HealthCheckPlugin):
 
 
 class RedisPlugin(HealthCheckPlugin):
-    """Basic Redis health check plugin"""
+    """Basic Redis health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="redis",
             category=HealthCheckCategory.REDIS,
@@ -958,9 +953,9 @@ class RedisPlugin(HealthCheckPlugin):
 
 
 class RedisDetailedPlugin(HealthCheckPlugin):
-    """Detailed Redis health check plugin with comprehensive metrics"""
+    """Detailed Redis health check plugin with comprehensive metrics."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="redis_detailed",
             category=HealthCheckCategory.REDIS,
@@ -980,7 +975,7 @@ class RedisDetailedPlugin(HealthCheckPlugin):
             status_text = health_report.get("status", "failed")
             if status_text == "healthy":
                 status = HealthStatus.HEALTHY
-            elif status_text in ("warning", "degraded"):
+            elif status_text in {"warning", "degraded"}:
                 status = HealthStatus.DEGRADED
             else:
                 status = HealthStatus.UNHEALTHY
@@ -1000,9 +995,9 @@ class RedisDetailedPlugin(HealthCheckPlugin):
 
 
 class RedisMemoryPlugin(HealthCheckPlugin):
-    """Redis memory usage health check plugin"""
+    """Redis memory usage health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="redis_memory",
             category=HealthCheckCategory.REDIS,
@@ -1061,9 +1056,9 @@ class RedisMemoryPlugin(HealthCheckPlugin):
 
 
 class AnalyticsServicePlugin(HealthCheckPlugin):
-    """Analytics Service health check plugin"""
+    """Analytics Service health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="analytics_service",
             category=HealthCheckCategory.API,
@@ -1086,9 +1081,9 @@ class AnalyticsServicePlugin(HealthCheckPlugin):
 
 
 class EnhancedAnalyticsServicePlugin(HealthCheckPlugin):
-    """Enhanced Analytics Service health check plugin"""
+    """Enhanced Analytics Service health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="enhanced_analytics_service",
             category=HealthCheckCategory.API,
@@ -1111,9 +1106,9 @@ class EnhancedAnalyticsServicePlugin(HealthCheckPlugin):
 
 
 class MCPServerPlugin(HealthCheckPlugin):
-    """MCP Server health check plugin"""
+    """MCP Server health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="mcp_server",
             category=HealthCheckCategory.API,
@@ -1136,9 +1131,9 @@ class MCPServerPlugin(HealthCheckPlugin):
 
 
 class SystemResourcesPlugin(HealthCheckPlugin):
-    """System resources health check plugin"""
+    """System resources health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="system_resources",
             category=HealthCheckCategory.SYSTEM,
@@ -1160,9 +1155,9 @@ class SystemResourcesPlugin(HealthCheckPlugin):
 
 
 class QueuePlugin(HealthCheckPlugin):
-    """Queue health check plugin"""
+    """Queue health check plugin."""
 
-    def __init__(self, config: HealthCheckPluginConfig | None = None):
+    def __init__(self, config: HealthCheckPluginConfig | None = None) -> None:
         super().__init__(
             name="queue_service",
             category=HealthCheckCategory.SYSTEM,
@@ -1184,7 +1179,7 @@ class QueuePlugin(HealthCheckPlugin):
 
 
 def create_ml_plugins() -> list[HealthCheckPlugin]:
-    """Create all ML-related health check plugins"""
+    """Create all ML-related health check plugins."""
     return [
         MLServicePlugin(),
         EnhancedMLServicePlugin(),
@@ -1201,7 +1196,7 @@ def create_ml_plugins() -> list[HealthCheckPlugin]:
 
 
 def create_database_plugins() -> list[HealthCheckPlugin]:
-    """Create all database-related health check plugins"""
+    """Create all database-related health check plugins."""
     return [
         DatabasePlugin(),
         DatabaseConnectionPoolPlugin(),
@@ -1212,12 +1207,12 @@ def create_database_plugins() -> list[HealthCheckPlugin]:
 
 
 def create_redis_plugins() -> list[HealthCheckPlugin]:
-    """Create all Redis-related health check plugins"""
+    """Create all Redis-related health check plugins."""
     return [RedisPlugin(), RedisDetailedPlugin(), RedisMemoryPlugin()]
 
 
 def create_api_plugins() -> list[HealthCheckPlugin]:
-    """Create all API-related health check plugins"""
+    """Create all API-related health check plugins."""
     return [
         AnalyticsServicePlugin(),
         EnhancedAnalyticsServicePlugin(),
@@ -1226,12 +1221,12 @@ def create_api_plugins() -> list[HealthCheckPlugin]:
 
 
 def create_system_plugins() -> list[HealthCheckPlugin]:
-    """Create all system-related health check plugins"""
+    """Create all system-related health check plugins."""
     return [SystemResourcesPlugin(), QueuePlugin()]
 
 
 def create_all_plugins() -> list[HealthCheckPlugin]:
-    """Create all available health check plugins"""
+    """Create all available health check plugins."""
     plugins = []
     plugins.extend(create_ml_plugins())
     plugins.extend(create_database_plugins())
@@ -1242,7 +1237,7 @@ def create_all_plugins() -> list[HealthCheckPlugin]:
 
 
 def register_all_plugins(monitor) -> int:
-    """Register all plugins with the unified health monitor"""
+    """Register all plugins with the unified health monitor."""
     plugins = create_all_plugins()
     registered_count = 0
     for plugin in plugins:
@@ -1250,6 +1245,6 @@ def register_all_plugins(monitor) -> int:
             if monitor.register_plugin(plugin):
                 registered_count += 1
         except Exception as e:
-            logger.error(f"Failed to register plugin {plugin.name}: {e}")
+            logger.exception(f"Failed to register plugin {plugin.name}: {e}")
     logger.info(f"Registered {registered_count}/{len(plugins)} health check plugins")
     return registered_count

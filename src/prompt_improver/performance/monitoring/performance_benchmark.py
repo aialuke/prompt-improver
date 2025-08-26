@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiofiles
 
@@ -180,7 +180,8 @@ class MCPPerformanceBenchmark:
             session_id = f"benchmark_{int(time.time() * 1000)}"
             # Use unified cache facade instead of direct session_store access
             from prompt_improver.services.cache.cache_facade import CacheFacade
-            cache_facade = CacheFacade(l1_max_size=1000, enable_l2=False, enable_l3=False)
+            from prompt_improver.database import get_session
+            cache_facade = CacheFacade(l1_max_size=1000, enable_l2=False)
             
             await cache_facade.set_session(session_id, {"test": "data"}, ttl=3600)
             await cache_facade.get_session(session_id)

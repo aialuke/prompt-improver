@@ -20,11 +20,22 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-import numpy as np
-from scipy import stats
-from scipy.stats import mannwhitneyu, pearsonr, spearmanr, ttest_ind
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats, get_sklearn
+
+if TYPE_CHECKING:
+    # Import types for static analysis
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+    from scipy.stats import mannwhitneyu, pearsonr, spearmanr, ttest_ind
+    import numpy as np
+else:
+    # Runtime lazy loading
+    def _get_ml_imports():
+        sklearn = get_sklearn()
+        return sklearn.cluster.KMeans, sklearn.preprocessing.StandardScaler
+    
+    KMeans, StandardScaler = _get_ml_imports()
 from ...database.models import GenerationSession, TrainingIteration, TrainingSession
 from ...utils.datetime_utils import naive_utc_now
 # PerformanceImprovementCalculator is available in the local ml.analytics module
@@ -131,6 +142,9 @@ class SessionComparisonAnalyzer:
         - Multi-dimensional analysis
         """
         try:
+            # Load numpy once for this method
+            np = get_numpy()
+            
             session_a_task = self._get_session_with_iterations(session_a_id)
             session_b_task = self._get_session_with_iterations(session_b_id)
             session_a_data, session_b_data = await asyncio.gather(session_a_task, session_b_task)
@@ -282,6 +296,9 @@ class SessionComparisonAnalyzer:
     async def _extract_comparison_metrics(self, session: TrainingSession, iterations: list[TrainingIteration], dimension: ComparisonDimension) -> list[float]:
         """Extract metrics for comparison based on dimension"""
         try:
+            # Load numpy once for this method
+            np = get_numpy()
+            
             metrics = []
             if dimension == ComparisonDimension.PERFORMANCE:
                 for iteration in iterations:
@@ -330,10 +347,14 @@ class SessionComparisonAnalyzer:
     async def _perform_statistical_comparison(self, metrics_a: list[float], metrics_b: list[float], method: ComparisonMethod) -> dict[str, Any]:
         """Perform statistical comparison between two metric sets"""
         try:
+            # Load numpy and scipy.stats once for this method
+            np = get_numpy()
+            stats = get_scipy_stats()
+            
             if not metrics_a or not metrics_b:
                 return {'significant': False, 'p_value': 1.0, 'effect_size': 0.0, 'confidence_interval': (0.0, 0.0)}
             if method == ComparisonMethod.T_TEST:
-                statistic, p_value = ttest_ind(metrics_a, metrics_b)
+                statistic, p_value = stats.ttest_ind(metrics_a, metrics_b)
                 pooled_std = np.sqrt(((len(metrics_a) - 1) * np.var(metrics_a, ddof=1) + (len(metrics_b) - 1) * np.var(metrics_b, ddof=1)) / (len(metrics_a) + len(metrics_b) - 2))
                 cohens_d = (np.mean(metrics_b) - np.mean(metrics_a)) / pooled_std if pooled_std > 0 else 0.0
                 diff_mean = np.mean(metrics_b) - np.mean(metrics_a)
@@ -342,14 +363,14 @@ class SessionComparisonAnalyzer:
                 ci_upper = diff_mean + 1.96 * se_diff
                 return {'significant': p_value < self.significance_level, 'p_value': p_value, 'effect_size': abs(cohens_d), 'confidence_interval': (ci_lower, ci_upper)}
             elif method == ComparisonMethod.MANN_WHITNEY:
-                statistic, p_value = mannwhitneyu(metrics_a, metrics_b, alternative='two-sided')
+                statistic, p_value = stats.mannwhitneyu(metrics_a, metrics_b, alternative='two-sided')
                 n1, n2 = (len(metrics_a), len(metrics_b))
                 z_score = abs(statistic - n1 * n2 / 2) / np.sqrt(n1 * n2 * (n1 + n2 + 1) / 12)
                 effect_size = z_score / np.sqrt(n1 + n2)
                 return {'significant': p_value < self.significance_level, 'p_value': p_value, 'effect_size': effect_size, 'confidence_interval': (0.0, 0.0)}
             elif method == ComparisonMethod.CORRELATION:
                 if len(metrics_a) == len(metrics_b):
-                    correlation, p_value = pearsonr(metrics_a, metrics_b)
+                    correlation, p_value = stats.pearsonr(metrics_a, metrics_b)
                     return {'significant': p_value < self.significance_level, 'p_value': p_value, 'effect_size': abs(correlation), 'confidence_interval': (0.0, 0.0)}
                 else:
                     return {'significant': False, 'p_value': 1.0, 'effect_size': 0.0, 'confidence_interval': (0.0, 0.0)}
@@ -362,6 +383,9 @@ class SessionComparisonAnalyzer:
     async def _extract_session_features(self, session: TrainingSession, iterations: list[TrainingIteration]) -> dict[str, float]:
         """Extract comprehensive features for session analysis"""
         try:
+            # Load numpy once for this method
+            np = get_numpy()
+            
             features = {}
             features['total_iterations'] = len(iterations)
             features['duration_hours'] = session.total_training_time_seconds / 3600 if session.total_training_time_seconds else 0.0
@@ -509,8 +533,8 @@ class SessionComparisonAnalyzer:
             all_scores = [features.get('final_performance', 0.0) for features in session_features.values()]
             if not all_scores:
                 return {'high_performers': [], 'low_performers': [], 'outliers': [], 'success_patterns': [], 'failure_patterns': []}
-            high_threshold = np.percentile(all_scores, 80)
-            low_threshold = np.percentile(all_scores, 20)
+            high_threshold = get_numpy().percentile(all_scores, 80)
+            low_threshold = get_numpy().percentile(all_scores, 20)
             high_performers = []
             low_performers = []
             outliers = []
@@ -520,25 +544,25 @@ class SessionComparisonAnalyzer:
                     high_performers.append(session_id)
                 elif score <= low_threshold:
                     low_performers.append(session_id)
-                if features.get('duration_hours', 0.0) > np.percentile([f.get('duration_hours', 0.0) for f in session_features.values()], 95) or features.get('total_iterations', 0) > np.percentile([f.get('total_iterations', 0) for f in session_features.values()], 95):
+                if features.get('duration_hours', 0.0) > get_numpy().percentile([f.get('duration_hours', 0.0) for f in session_features.values()], 95) or features.get('total_iterations', 0) > get_numpy().percentile([f.get('total_iterations', 0) for f in session_features.values()], 95):
                     outliers.append(session_id)
             success_patterns = []
             if high_performers:
                 high_perf_features = [session_features[sid] for sid in high_performers]
-                avg_success_rate = np.mean([f.get('success_rate', 0.0) for f in high_perf_features])
-                avg_efficiency = np.mean([f.get('avg_efficiency', 0.0) for f in high_perf_features])
+                avg_success_rate = get_numpy().mean([f.get('success_rate', 0.0) for f in high_perf_features])
+                avg_efficiency = get_numpy().mean([f.get('avg_efficiency', 0.0) for f in high_perf_features])
                 if avg_success_rate > 0.9:
                     success_patterns.append({'pattern': 'high_success_rate', 'value': avg_success_rate})
-                if avg_efficiency > np.mean([f.get('avg_efficiency', 0.0) for f in session_features.values()]):
+                if avg_efficiency > get_numpy().mean([f.get('avg_efficiency', 0.0) for f in session_features.values()]):
                     success_patterns.append({'pattern': 'high_efficiency', 'value': avg_efficiency})
             failure_patterns = []
             if low_performers:
                 low_perf_features = [session_features[sid] for sid in low_performers]
-                avg_success_rate = np.mean([f.get('success_rate', 0.0) for f in low_perf_features])
-                avg_duration = np.mean([f.get('duration_hours', 0.0) for f in low_perf_features])
+                avg_success_rate = get_numpy().mean([f.get('success_rate', 0.0) for f in low_perf_features])
+                avg_duration = get_numpy().mean([f.get('duration_hours', 0.0) for f in low_perf_features])
                 if avg_success_rate < 0.7:
                     failure_patterns.append({'pattern': 'low_success_rate', 'value': avg_success_rate})
-                if avg_duration > np.mean([f.get('duration_hours', 0.0) for f in session_features.values()]) * 1.5:
+                if avg_duration > get_numpy().mean([f.get('duration_hours', 0.0) for f in session_features.values()]) * 1.5:
                     failure_patterns.append({'pattern': 'excessive_duration', 'value': avg_duration})
             return {'high_performers': high_performers, 'low_performers': low_performers, 'outliers': outliers, 'success_patterns': success_patterns, 'failure_patterns': failure_patterns}
         except Exception as e:
@@ -583,8 +607,8 @@ class SessionComparisonAnalyzer:
             for features in session_features.values():
                 feature_vector = [features.get(name, 0.0) for name in feature_names]
                 feature_matrix.append(feature_vector)
-            feature_matrix = np.array(feature_matrix)
-            correlation_matrix = np.corrcoef(feature_matrix.T)
+            feature_matrix = get_numpy().array(feature_matrix)
+            correlation_matrix = get_numpy().corrcoef(feature_matrix.T)
             result = {}
             for i, name_i in enumerate(feature_names):
                 result[name_i] = {}
@@ -601,7 +625,7 @@ class SessionComparisonAnalyzer:
             performance_scores = [features.get('final_performance', 0.0) for features in session_features.values()]
             if not performance_scores:
                 return {}
-            return {'mean': float(np.mean(performance_scores)), 'median': float(np.median(performance_scores)), 'std': float(np.std(performance_scores)), 'min': float(np.min(performance_scores)), 'max': float(np.max(performance_scores)), 'q25': float(np.percentile(performance_scores, 25)), 'q75': float(np.percentile(performance_scores, 75))}
+            return {'mean': float(get_numpy().mean(performance_scores)), 'median': float(get_numpy().median(performance_scores)), 'std': float(get_numpy().std(performance_scores)), 'min': float(get_numpy().min(performance_scores)), 'max': float(get_numpy().max(performance_scores)), 'q25': float(get_numpy().percentile(performance_scores, 25)), 'q75': float(get_numpy().percentile(performance_scores, 75))}
         except Exception as e:
             self.logger.error('Error calculating performance distribution: %s', e)
             return {}
@@ -612,8 +636,8 @@ class SessionComparisonAnalyzer:
             recommendations = []
             if patterns['high_performers']:
                 high_perf_features = [session_features[sid] for sid in patterns['high_performers']]
-                avg_success_rate = np.mean([f.get('success_rate', 0.0) for f in high_perf_features])
-                avg_efficiency = np.mean([f.get('avg_efficiency', 0.0) for f in high_perf_features])
+                avg_success_rate = get_numpy().mean([f.get('success_rate', 0.0) for f in high_perf_features])
+                avg_efficiency = get_numpy().mean([f.get('avg_efficiency', 0.0) for f in high_perf_features])
                 if avg_success_rate > 0.9:
                     recommendations.append(f'Target success rate above {avg_success_rate:.1%} based on high-performing sessions')
                 if avg_efficiency > 0.1:
@@ -627,7 +651,7 @@ class SessionComparisonAnalyzer:
             if len(clusters) > 1:
                 recommendations.append('Consider different optimization strategies for different session types')
             all_scores = [f.get('final_performance', 0.0) for f in session_features.values()]
-            if all_scores and np.std(all_scores) > 0.1:
+            if all_scores and get_numpy().std(all_scores) > 0.1:
                 recommendations.append('High performance variance detected - standardize training procedures')
             return recommendations
         except Exception as e:
@@ -641,13 +665,13 @@ class SessionComparisonAnalyzer:
                 return {'performance': 50.0, 'efficiency': 50.0, 'speed': 50.0}
             historical_performance = [f.get('final_performance', 0.0) for f in historical_features.values()]
             target_performance = target_features.get('final_performance', 0.0)
-            performance_percentile = stats.percentileofscore(historical_performance, target_performance)
+            performance_percentile = get_scipy_stats().percentileofscore(historical_performance, target_performance)
             historical_efficiency = [f.get('avg_efficiency', 0.0) for f in historical_features.values()]
             target_efficiency = target_features.get('avg_efficiency', 0.0)
-            efficiency_percentile = stats.percentileofscore(historical_efficiency, target_efficiency)
+            efficiency_percentile = get_scipy_stats().percentileofscore(historical_efficiency, target_efficiency)
             historical_speed = [1.0 / max(f.get('avg_iteration_duration', 1.0), 1.0) for f in historical_features.values()]
             target_speed = 1.0 / max(target_features.get('avg_iteration_duration', 1.0), 1.0)
-            speed_percentile = stats.percentileofscore(historical_speed, target_speed)
+            speed_percentile = get_scipy_stats().percentileofscore(historical_speed, target_speed)
             return {'performance': performance_percentile, 'efficiency': efficiency_percentile, 'speed': speed_percentile}
         except Exception as e:
             self.logger.error('Error calculating percentile rankings: %s', e)
@@ -658,17 +682,17 @@ class SessionComparisonAnalyzer:
         try:
             if not historical_features:
                 return {'vs_average': {}, 'vs_best': {}, 'vs_recent': {}}
-            avg_performance = np.mean([f.get('final_performance', 0.0) for f in historical_features.values()])
-            avg_efficiency = np.mean([f.get('avg_efficiency', 0.0) for f in historical_features.values()])
-            avg_improvement = np.mean([f.get('total_improvement', 0.0) for f in historical_features.values()])
+            avg_performance = get_numpy().mean([f.get('final_performance', 0.0) for f in historical_features.values()])
+            avg_efficiency = get_numpy().mean([f.get('avg_efficiency', 0.0) for f in historical_features.values()])
+            avg_improvement = get_numpy().mean([f.get('total_improvement', 0.0) for f in historical_features.values()])
             best_performance = max([f.get('final_performance', 0.0) for f in historical_features.values()])
             best_efficiency = max([f.get('avg_efficiency', 0.0) for f in historical_features.values()])
             best_improvement = max([f.get('total_improvement', 0.0) for f in historical_features.values()])
             recent_count = max(1, len(historical_features) // 4)
             recent_sessions = list(historical_features.values())[-recent_count:]
-            recent_performance = np.mean([f.get('final_performance', 0.0) for f in recent_sessions])
-            recent_efficiency = np.mean([f.get('avg_efficiency', 0.0) for f in recent_sessions])
-            recent_improvement = np.mean([f.get('total_improvement', 0.0) for f in recent_sessions])
+            recent_performance = get_numpy().mean([f.get('final_performance', 0.0) for f in recent_sessions])
+            recent_efficiency = get_numpy().mean([f.get('avg_efficiency', 0.0) for f in recent_sessions])
+            recent_improvement = get_numpy().mean([f.get('total_improvement', 0.0) for f in recent_sessions])
             target_performance = target_features.get('final_performance', 0.0)
             target_efficiency = target_features.get('avg_efficiency', 0.0)
             target_improvement = target_features.get('total_improvement', 0.0)
@@ -687,7 +711,7 @@ class SessionComparisonAnalyzer:
             for features in historical_features.values():
                 score = features.get('final_performance', 0.0) * 0.4 + features.get('total_improvement', 0.0) * 0.3 + features.get('avg_efficiency', 0.0) * 0.2 + features.get('success_rate', 0.0) * 0.1
                 historical_scores.append(score)
-            percentile = stats.percentileofscore(historical_scores, target_score)
+            percentile = get_scipy_stats().percentileofscore(historical_scores, target_score)
             if percentile >= 90:
                 return 'excellent'
             elif percentile >= 75:
@@ -730,7 +754,7 @@ class SessionComparisonAnalyzer:
                 historical_values = [f.get(feature, 0.0) for f in historical_features.values()]
                 target_value = target_features.get(feature, 0.0)
                 if historical_values:
-                    percentile = stats.percentileofscore(historical_values, target_value)
+                    percentile = get_scipy_stats().percentileofscore(historical_values, target_value)
                     if percentile >= 80:
                         strengths.append(f"High {feature.replace('_', ' ')}: {percentile:.0f}th percentile")
                     elif percentile <= 20:
@@ -761,11 +785,11 @@ class SessionComparisonAnalyzer:
             if not historical_features:
                 return recommendations
             target_success_rate = target_features.get('success_rate', 0.0)
-            avg_success_rate = np.mean([f.get('success_rate', 0.0) for f in historical_features.values()])
+            avg_success_rate = get_numpy().mean([f.get('success_rate', 0.0) for f in historical_features.values()])
             if target_success_rate < avg_success_rate * 0.8:
                 recommendations.append('Investigate and address iteration failure causes')
             target_efficiency = target_features.get('avg_efficiency', 0.0)
-            avg_efficiency = np.mean([f.get('avg_efficiency', 0.0) for f in historical_features.values()])
+            avg_efficiency = get_numpy().mean([f.get('avg_efficiency', 0.0) for f in historical_features.values()])
             if target_efficiency < avg_efficiency * 0.8:
                 recommendations.append('Optimize resource utilization and training speed')
             return recommendations

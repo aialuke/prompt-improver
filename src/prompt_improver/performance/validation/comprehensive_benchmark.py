@@ -1,4 +1,4 @@
-"""Comprehensive Validation Performance Benchmarking System
+"""Comprehensive Validation Performance Benchmarking System.
 
 This module provides detailed performance analysis and benchmarking for validation
 bottlenecks identified in the Validation_Consolidation.md analysis.
@@ -17,6 +17,7 @@ This benchmarking system provides:
 """
 
 import asyncio
+import contextlib
 import gc
 import json
 import logging
@@ -24,9 +25,9 @@ import statistics
 import time
 import tracemalloc
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import aiofiles
 import psutil
@@ -118,7 +119,7 @@ class MemoryProfile:
 class ValidationBenchmarkFramework:
     """Comprehensive validation performance benchmarking framework."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.results_dir = Path("benchmark_results")
         self.results_dir.mkdir(exist_ok=True)
 
@@ -291,7 +292,7 @@ class ValidationBenchmarkFramework:
             )
 
         except Exception as e:
-            logger.error(f"MCP message decode benchmark failed: {e}")
+            logger.exception(f"MCP message decode benchmark failed: {e}")
             return None
 
     async def _benchmark_config_instantiation(
@@ -320,10 +321,8 @@ class ValidationBenchmarkFramework:
 
             # Warmup
             for _ in range(10):
-                try:
+                with contextlib.suppress(Exception):
                     config = AppConfig(**config_scenarios[0])
-                except Exception:
-                    pass
 
             start_time = time.perf_counter()
 
@@ -365,7 +364,7 @@ class ValidationBenchmarkFramework:
             )
 
         except Exception as e:
-            logger.error(f"Config instantiation benchmark failed: {e}")
+            logger.exception(f"Config instantiation benchmark failed: {e}")
             return None
 
     async def _benchmark_metrics_collection(
@@ -376,11 +375,8 @@ class ValidationBenchmarkFramework:
             from prompt_improver.metrics.api_metrics import (
                 APIMetricsCollector,
                 APIUsageMetric,
-                AuthenticationMethod,
                 EndpointCategory,
                 HTTPMethod,
-                UserJourneyMetric,
-                UserJourneyStage,
             )
 
             collector = APIMetricsCollector()
@@ -443,7 +439,7 @@ class ValidationBenchmarkFramework:
             )
 
         except Exception as e:
-            logger.error(f"Metrics collection benchmark failed: {e}")
+            logger.exception(f"Metrics collection benchmark failed: {e}")
             return None
 
     async def _benchmark_high_frequency_operations(
@@ -501,7 +497,7 @@ class ValidationBenchmarkFramework:
             )
 
         except Exception as e:
-            logger.error(f"High frequency operations benchmark failed: {e}")
+            logger.exception(f"High frequency operations benchmark failed: {e}")
             return None
 
     async def _benchmark_memory_usage(
@@ -683,7 +679,7 @@ class ValidationBenchmarkFramework:
             )
 
         except Exception as e:
-            logger.error(f"Concurrent validation benchmark failed: {e}")
+            logger.exception(f"Concurrent validation benchmark failed: {e}")
             return None
 
     def _create_benchmark_result(
@@ -791,7 +787,7 @@ class ValidationBenchmarkFramework:
                         )
 
         except Exception as e:
-            logger.error(f"Error detecting regressions: {e}")
+            logger.exception(f"Error detecting regressions: {e}")
 
     async def _save_baseline(
         self, results: dict[str, ValidationBenchmarkResult]
@@ -917,8 +913,7 @@ class ValidationBenchmarkFramework:
             "-" * 20,
         ])
 
-        for recommendation in report_data["recommendations"]:
-            lines.append(f"  • {recommendation}")
+        lines.extend(f"  • {recommendation}" for recommendation in report_data["recommendations"])
 
         lines.extend(["", "=" * 80])
 

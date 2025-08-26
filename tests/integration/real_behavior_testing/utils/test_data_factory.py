@@ -4,14 +4,12 @@ Generates realistic test data for comprehensive testing scenarios across all dec
 Provides domain-specific data generation for ML, database, API, and validation testing.
 """
 
-import asyncio
 import logging
 import random
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
-import json
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,51 +17,51 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TestDataset:
     """Structured test dataset for various testing scenarios."""
-    
+
     dataset_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str = ""
     description: str = ""
     size: str = "small"  # small, medium, large
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
     # Dataset content
-    data: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
+    data: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     # Statistics
     record_count: int = 0
-    domains: List[str] = field(default_factory=list)
-    categories: List[str] = field(default_factory=list)
+    domains: list[str] = field(default_factory=list)
+    categories: list[str] = field(default_factory=list)
 
 
 class TestDataFactory:
     """Factory for generating comprehensive test data for real behavior testing."""
-    
+
     def __init__(self):
         """Initialize test data factory."""
         self.factory_id = str(uuid.uuid4())[:8]
         logger.info(f"TestDataFactory initialized: {self.factory_id}")
-    
+
     async def create_ml_test_dataset(
         self,
         size: str = "small",
-        domains: List[str] = None,
+        domains: list[str] | None = None,
         include_effectiveness_scores: bool = True,
         include_context: bool = True
     ) -> TestDataset:
         """Create ML test dataset for intelligence services testing.
-        
+
         Args:
             size: Dataset size ("small", "medium", "large")
             domains: List of domains to include
             include_effectiveness_scores: Include effectiveness scoring data
             include_context: Include contextual information
-            
+
         Returns:
             TestDataset for ML testing
         """
         domains = domains or ["general", "technical", "creative"]
-        
+
         # Size configuration
         size_config = {
             "small": {"sessions": 100, "rules": 10, "patterns": 20},
@@ -71,7 +69,7 @@ class TestDataFactory:
             "large": {"sessions": 2000, "rules": 50, "patterns": 100},
         }
         config = size_config.get(size, size_config["small"])
-        
+
         dataset = TestDataset(
             name=f"ml_test_dataset_{size}",
             description=f"ML intelligence services test dataset ({size})",
@@ -79,14 +77,14 @@ class TestDataFactory:
             domains=domains,
             categories=["prompts", "improvements", "sessions", "rules"]
         )
-        
+
         # Generate test data
         test_data = []
-        
+
         # Generate rule data
         rules = self._generate_rule_data(config["rules"], domains)
         test_data.extend(rules)
-        
+
         # Generate session data
         sessions = await self._generate_session_data(
             config["sessions"],
@@ -95,11 +93,11 @@ class TestDataFactory:
             include_context
         )
         test_data.extend(sessions)
-        
+
         # Generate pattern data
         patterns = self._generate_pattern_data(config["patterns"], domains)
         test_data.extend(patterns)
-        
+
         dataset.data = test_data
         dataset.record_count = len(test_data)
         dataset.metadata = {
@@ -109,15 +107,15 @@ class TestDataFactory:
             "domains": domains,
             "size_config": config,
         }
-        
+
         logger.info(f"Created ML test dataset: {dataset.record_count} records across {len(domains)} domains")
-        
+
         return dataset
-    
-    def _generate_rule_data(self, count: int, domains: List[str]) -> List[Dict[str, Any]]:
+
+    def _generate_rule_data(self, count: int, domains: list[str]) -> list[dict[str, Any]]:
         """Generate rule data for ML intelligence testing."""
         rules = []
-        
+
         rule_templates = {
             "general": [
                 "Improve clarity and conciseness",
@@ -141,14 +139,14 @@ class TestDataFactory:
                 "Develop character motivation and conflict",
             ],
         }
-        
+
         for i in range(count):
             domain = domains[i % len(domains)]
             templates = rule_templates.get(domain, rule_templates["general"])
-            
+
             rule_id = f"rule_{domain}_{i:03d}"
             rule_text = templates[i % len(templates)]
-            
+
             rule = {
                 "type": "rule",
                 "rule_id": rule_id,
@@ -158,28 +156,28 @@ class TestDataFactory:
                 "effectiveness_score": random.uniform(0.6, 0.95),
                 "usage_count": random.randint(10, 200),
                 "success_rate": random.uniform(0.7, 0.9),
-                "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 365))).isoformat(),
+                "created_at": (datetime.now(UTC) - timedelta(days=random.randint(1, 365))).isoformat(),
                 "metadata": {
                     "complexity": random.choice(["simple", "moderate", "complex"]),
                     "applicability": random.choice(["general", "specific", "contextual"]),
                     "priority": random.randint(1, 5),
                 }
             }
-            
+
             rules.append(rule)
-        
+
         return rules
-    
+
     async def _generate_session_data(
         self,
         count: int,
-        domains: List[str],
+        domains: list[str],
         include_effectiveness: bool,
         include_context: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Generate session data for ML intelligence testing."""
         sessions = []
-        
+
         prompt_templates = {
             "general": [
                 "Write a summary about {topic}",
@@ -203,26 +201,26 @@ class TestDataFactory:
                 "Craft dialogue that reveals {topic}",
             ],
         }
-        
+
         topics = {
             "general": ["teamwork", "innovation", "leadership", "communication", "problem-solving"],
             "technical": ["microservices", "machine learning", "database optimization", "API design", "security"],
             "creative": ["adventure", "mystery", "friendship", "discovery", "transformation"],
         }
-        
+
         for i in range(count):
             domain = domains[i % len(domains)]
             session_id = f"session_{domain}_{i:05d}"
-            
+
             # Select templates and topics
             templates = prompt_templates.get(domain, prompt_templates["general"])
             topic_list = topics.get(domain, topics["general"])
-            
+
             prompt_template = templates[i % len(templates)]
             topic = topic_list[i % len(topic_list)]
-            
+
             original_prompt = prompt_template.format(topic=topic)
-            
+
             # Generate improved prompt
             improvements = [
                 f"Enhanced {original_prompt.lower()} with specific examples",
@@ -231,7 +229,7 @@ class TestDataFactory:
                 f"Structured {original_prompt.lower()} with clear objectives",
             ]
             improved_prompt = improvements[i % len(improvements)]
-            
+
             session = {
                 "type": "session",
                 "session_id": session_id,
@@ -239,17 +237,17 @@ class TestDataFactory:
                 "improved_prompt": improved_prompt,
                 "domain": domain,
                 "topic": topic,
-                "created_at": (datetime.now(timezone.utc) - timedelta(hours=random.randint(1, 8760))).isoformat(),
+                "created_at": (datetime.now(UTC) - timedelta(hours=random.randint(1, 8760))).isoformat(),
                 "rules_applied": [f"rule_{domain}_{random.randint(0, 9):03d}" for _ in range(random.randint(1, 3))],
             }
-            
+
             if include_effectiveness:
                 session.update({
                     "effectiveness_score": random.uniform(0.65, 0.95),
                     "improvement_rating": random.uniform(0.7, 0.9),
                     "user_satisfaction": random.uniform(0.8, 1.0),
                 })
-            
+
             if include_context:
                 session.update({
                     "context": {
@@ -265,21 +263,21 @@ class TestDataFactory:
                         "improvement_type": random.choice(["clarity", "detail", "structure", "examples"]),
                     }
                 })
-            
+
             sessions.append(session)
-        
+
         return sessions
-    
-    def _generate_pattern_data(self, count: int, domains: List[str]) -> List[Dict[str, Any]]:
+
+    def _generate_pattern_data(self, count: int, domains: list[str]) -> list[dict[str, Any]]:
         """Generate pattern data for pattern discovery testing."""
         patterns = []
-        
+
         pattern_types = ["structural", "linguistic", "contextual", "behavioral", "semantic"]
-        
+
         for i in range(count):
             domain = domains[i % len(domains)]
             pattern_id = f"pattern_{domain}_{i:03d}"
-            
+
             pattern = {
                 "type": "pattern",
                 "pattern_id": pattern_id,
@@ -290,9 +288,9 @@ class TestDataFactory:
                 "support": random.uniform(0.1, 0.8),
                 "confidence": random.uniform(0.6, 0.95),
                 "description": f"Pattern {i:03d} in {domain} domain showing {pattern_types[i % len(pattern_types)]} characteristics",
-                "discovered_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90))).isoformat(),
+                "discovered_at": (datetime.now(UTC) - timedelta(days=random.randint(1, 90))).isoformat(),
                 "examples": [
-                    f"Example {j+1} for pattern {pattern_id}"
+                    f"Example {j + 1} for pattern {pattern_id}"
                     for j in range(random.randint(2, 5))
                 ],
                 "metadata": {
@@ -302,41 +300,41 @@ class TestDataFactory:
                     "outlier_ratio": random.uniform(0.05, 0.3),
                 }
             }
-            
+
             patterns.append(pattern)
-        
+
         return patterns
-    
+
     async def create_comprehensive_rule_dataset(
         self,
         rule_count: int = 20,
         session_count_per_rule: int = 50,
-        domains: List[str] = None
-    ) -> Dict[str, Any]:
+        domains: list[str] | None = None
+    ) -> dict[str, Any]:
         """Create comprehensive rule dataset for rule analysis testing.
-        
+
         Args:
             rule_count: Number of rules to generate
             session_count_per_rule: Sessions per rule
             domains: List of domains
-            
+
         Returns:
             Comprehensive rule dataset
         """
         domains = domains or ["general", "technical", "creative"]
-        
+
         # Generate rules
         rules = self._generate_rule_data(rule_count, domains)
         rule_ids = [rule["rule_id"] for rule in rules]
-        
+
         # Generate sessions for each rule
         sessions_by_rule = {}
         all_sessions = []
-        
+
         for rule in rules:
             rule_id = rule["rule_id"]
             domain = rule["domain"]
-            
+
             # Generate sessions for this rule
             rule_sessions = await self._generate_session_data(
                 session_count_per_rule,
@@ -344,15 +342,15 @@ class TestDataFactory:
                 include_effectiveness=True,
                 include_context=True
             )
-            
+
             # Associate sessions with rule
             for session in rule_sessions:
                 session["primary_rule"] = rule_id
                 session["rule_effectiveness"] = rule["effectiveness_score"]
-            
+
             sessions_by_rule[rule_id] = rule_sessions
             all_sessions.extend(rule_sessions)
-        
+
         return {
             "rule_ids": rule_ids,
             "rules": rules,
@@ -363,50 +361,50 @@ class TestDataFactory:
                 "total_sessions": len(all_sessions),
                 "sessions_per_rule": session_count_per_rule,
                 "domains": domains,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
         }
-    
+
     async def create_batch_processing_data(
         self,
         batch_size: int = 100,
-        operation_types: List[str] = None
-    ) -> List[Dict[str, Any]]:
+        operation_types: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """Create batch processing data for batch service testing.
-        
+
         Args:
             batch_size: Size of the batch
             operation_types: Types of operations to include
-            
+
         Returns:
             List of batch processing items
         """
         operation_types = operation_types or ["rule_analysis", "pattern_discovery", "prediction"]
-        
+
         batch_data = []
-        
+
         for i in range(batch_size):
             operation_type = operation_types[i % len(operation_types)]
-            
+
             item = {
                 "batch_item_id": f"batch_item_{i:05d}",
                 "operation_type": operation_type,
                 "priority": random.randint(1, 5),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "estimated_processing_time_ms": random.uniform(10, 200),
             }
-            
+
             # Add operation-specific data
             if operation_type == "rule_analysis":
                 item.update({
                     "rule_id": f"rule_{random.randint(1, 50):03d}",
                     "analysis_type": random.choice(["effectiveness", "usage", "combination"]),
                     "data_range": {
-                        "start_date": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
-                        "end_date": datetime.now(timezone.utc).isoformat(),
+                        "start_date": (datetime.now(UTC) - timedelta(days=30)).isoformat(),
+                        "end_date": datetime.now(UTC).isoformat(),
                     }
                 })
-            
+
             elif operation_type == "pattern_discovery":
                 item.update({
                     "data_source": random.choice(["sessions", "feedback", "usage_logs"]),
@@ -414,26 +412,26 @@ class TestDataFactory:
                     "min_support": random.uniform(0.1, 0.3),
                     "min_confidence": random.uniform(0.6, 0.8),
                 })
-            
+
             elif operation_type == "prediction":
                 item.update({
                     "prediction_target": random.choice(["effectiveness", "usage", "satisfaction"]),
                     "input_features": random.sample(["domain", "complexity", "context", "history"], 3),
                     "model_type": random.choice(["classification", "regression", "clustering"]),
                 })
-            
+
             batch_data.append(item)
-        
+
         return batch_data
-    
-    def create_error_test_scenarios(self) -> List[Dict[str, Any]]:
+
+    def create_error_test_scenarios(self) -> list[dict[str, Any]]:
         """Create error test scenarios for error handling services.
-        
+
         Returns:
             List of error test scenarios
         """
         scenarios = []
-        
+
         # Database error scenarios
         database_scenarios = [
             {
@@ -475,7 +473,7 @@ class TestDataFactory:
                 "expected_category": "performance_error",
             },
         ]
-        
+
         # Network error scenarios
         network_scenarios = [
             {
@@ -519,7 +517,7 @@ class TestDataFactory:
                 "expected_category": "client_error",
             },
         ]
-        
+
         # Validation error scenarios
         validation_scenarios = [
             {
@@ -547,27 +545,27 @@ class TestDataFactory:
                 "expected_category": "security_violation",
             },
         ]
-        
+
         scenarios.extend(database_scenarios)
         scenarios.extend(network_scenarios)
         scenarios.extend(validation_scenarios)
-        
+
         # Add unique IDs and metadata
         for i, scenario in enumerate(scenarios):
             scenario.update({
                 "scenario_id": f"error_scenario_{i:03d}",
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "test_priority": random.randint(1, 3),
             })
-        
+
         return scenarios
-    
-    def create_performance_test_data(self, size: str = "medium") -> Dict[str, Any]:
+
+    def create_performance_test_data(self, size: str = "medium") -> dict[str, Any]:
         """Create performance test data for benchmarking.
-        
+
         Args:
             size: Size of test data ("small", "medium", "large")
-            
+
         Returns:
             Performance test data
         """
@@ -577,7 +575,7 @@ class TestDataFactory:
             "large": {"operations": 10000, "concurrent": 50, "data_size_kb": 100},
         }
         config = size_config.get(size, size_config["medium"])
-        
+
         # Generate test operations
         operations = []
         for i in range(config["operations"]):
@@ -590,7 +588,7 @@ class TestDataFactory:
                 "concurrent_group": i % config["concurrent"],
             }
             operations.append(operation)
-        
+
         return {
             "size": size,
             "config": config,
@@ -599,6 +597,6 @@ class TestDataFactory:
                 "total_operations": len(operations),
                 "concurrent_groups": config["concurrent"],
                 "avg_payload_size": sum(op["payload_size_bytes"] for op in operations) / len(operations),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
         }

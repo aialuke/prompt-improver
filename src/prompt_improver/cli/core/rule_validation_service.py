@@ -4,14 +4,14 @@ Validates existing seeded rules, loads rule metadata, and ensures rule parameter
 
 import json
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import RuleMetadata
+from prompt_improver.shared.interfaces.protocols.database import SessionManagerProtocol
 
 
 class RuleValidationService:
@@ -25,7 +25,7 @@ class RuleValidationService:
     - Intelligent rule recommendations
     """
 
-    def __init__(self, session_manager: SessionManagerProtocol):
+    def __init__(self, session_manager: SessionManagerProtocol) -> None:
         self.session_manager = session_manager
         self.logger = logging.getLogger("apes.rule_validation")
         self.expected_rules = {
@@ -120,7 +120,7 @@ class RuleValidationService:
                 else:
                     validation_report["overall_status"] = "needs_attention"
         except Exception as e:
-            self.logger.error(f"Rule validation failed: {e}")
+            self.logger.exception(f"Rule validation failed: {e}")
             validation_report["overall_status"] = "error"
             validation_report["error"] = str(e)
         validation_end = datetime.now(UTC)
@@ -356,7 +356,7 @@ class RuleValidationService:
                 else 0.0
             )
         except Exception as e:
-            self.logger.error(f"Performance analysis failed: {e}")
+            self.logger.exception(f"Performance analysis failed: {e}")
             performance_analysis["error"] = str(e)
         return performance_analysis
 

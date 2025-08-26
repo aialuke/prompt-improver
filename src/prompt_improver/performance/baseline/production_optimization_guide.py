@@ -7,7 +7,7 @@ techniques for running the baseline system efficiently in production environment
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class ProductionOptimizationGuide:
     for production deployment with minimal performance impact.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.environment_configs = self._create_environment_configs()
         self.optimization_strategies = self._define_optimization_strategies()
         self.monitoring_recommendations = self._create_monitoring_recommendations()
@@ -258,7 +258,7 @@ class ProductionOptimizationGuide:
                 "real_time_dashboard": env_config.enable_real_time_dashboard,
                 "load_testing": env_config.enable_load_testing,
                 "advanced_analytics": env_config.optimization_level
-                in [OptimizationLevel.COMPREHENSIVE, OptimizationLevel.ENTERPRISE],
+                in {OptimizationLevel.COMPREHENSIVE, OptimizationLevel.ENTERPRISE},
             },
             "alerts": {
                 "sensitivity": env_config.alert_sensitivity,

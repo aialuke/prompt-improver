@@ -169,7 +169,7 @@ class RoleBasedPromptingRule(BasePromptRule):
     - Configurable expertise depth and credentials
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = {
             "auto_detect_domain": True,
             "use_system_prompts": True,
@@ -183,12 +183,12 @@ class RoleBasedPromptingRule(BasePromptRule):
         self.priority = 6
 
     def configure(self, params: dict[str, Any]):
-        """Configure rule parameters from database"""
+        """Configure rule parameters from database."""
         self.config.update(params)
 
     @property
     def metadata(self):
-        """Enhanced metadata with research foundation"""
+        """Enhanced metadata with research foundation."""
         return {
             "name": "Expert Role Assignment Rule",
             "type": "Context",
@@ -205,7 +205,7 @@ class RoleBasedPromptingRule(BasePromptRule):
         }
 
     def check(self, prompt: str, context=None) -> RuleCheckResult:
-        """Check if prompt would benefit from expert role assignment"""
+        """Check if prompt would benefit from expert role assignment."""
         role_metrics = self._analyze_role_requirements(prompt)
         applies = (
             role_metrics["domain"] != "general"
@@ -228,7 +228,7 @@ class RoleBasedPromptingRule(BasePromptRule):
         )
 
     def apply(self, prompt: str, context=None) -> TransformationResult:
-        """Apply expert role assignment enhancement"""
+        """Apply expert role assignment enhancement."""
         check_result = self.check(prompt, context)
         if not check_result.applies:
             return TransformationResult(
@@ -256,11 +256,11 @@ class RoleBasedPromptingRule(BasePromptRule):
         )
 
     def to_llm_instruction(self) -> str:
-        """Generate research-based LLM instruction for role assignment"""
+        """Generate research-based LLM instruction for role assignment."""
         return '\n<instruction>\nApply expert role assignment using Anthropic research patterns:\n\n1. DOMAIN DETECTION:\n   - Identify the primary subject area and expertise required\n   - Match task complexity with appropriate expertise level\n   - Consider specialized knowledge requirements\n\n2. PERSONA ASSIGNMENT:\n   - Assign specific expert persona with relevant credentials\n   - Include years of experience and specialization areas\n   - Maintain consistency with domain requirements\n\n3. PERSONA CONSISTENCY:\n   - Use expert voice and terminology throughout response\n   - Apply domain-specific knowledge and insights\n   - Maintain professional tone appropriate to expertise level\n\n4. SYSTEM PROMPT INTEGRATION:\n   - Begin with clear role statement: "You are [expert persona]"\n   - Include relevant credentials and experience\n   - Set expectation for expert-level response quality\n\nFocus on authentic expertise that enhances response quality and credibility.\n</instruction>\n'
 
     def _analyze_role_requirements(self, prompt: str) -> dict[str, Any]:
-        """Analyze prompt to determine expert role requirements"""
+        """Analyze prompt to determine expert role requirements."""
         domain = (
             self._detect_domain(prompt)
             if self.config["auto_detect_domain"]
@@ -314,7 +314,7 @@ class RoleBasedPromptingRule(BasePromptRule):
         }
 
     def _detect_domain(self, prompt: str) -> str:
-        """Detect the primary domain from prompt content"""
+        """Detect the primary domain from prompt content."""
         prompt_lower = prompt.lower()
         domain_scores = {}
         for domain, patterns in DOMAIN_PATTERNS.items():
@@ -330,7 +330,7 @@ class RoleBasedPromptingRule(BasePromptRule):
         return "general"
 
     def _assess_task_complexity(self, prompt: str) -> float:
-        """Assess the complexity of the task to determine expertise level needed"""
+        """Assess the complexity of the task to determine expertise level needed."""
         words = prompt.lower().split()
         complex_indicators = [
             "complex",
@@ -366,13 +366,12 @@ class RoleBasedPromptingRule(BasePromptRule):
         base_complexity = complexity_count / max(len(words), 1) * 10
         scope_complexity = scope_count / max(len(words), 1) * 5
         length_complexity = min(0.3, len(words) / 100)
-        total_complexity = min(
+        return min(
             1.0, base_complexity + scope_complexity + length_complexity
         )
-        return total_complexity
 
     def _get_expert_persona(self, domain: str, expertise_level: str) -> str | None:
-        """Get appropriate expert persona for domain and expertise level"""
+        """Get appropriate expert persona for domain and expertise level."""
         if domain == "general" or domain not in EXPERT_PERSONAS:
             return None
         personas = EXPERT_PERSONAS.get(domain, {})
@@ -384,7 +383,7 @@ class RoleBasedPromptingRule(BasePromptRule):
     def _assess_credential_requirements(
         self, prompt: str, domain: str
     ) -> dict[str, Any]:
-        """Assess what credentials or qualifications should be emphasized"""
+        """Assess what credentials or qualifications should be emphasized."""
         requirements = {
             "certifications": False,
             "education": False,
@@ -406,10 +405,10 @@ class RoleBasedPromptingRule(BasePromptRule):
             word in prompt_lower for word in ["award", "recognition", "achievement"]
         ):
             requirements["awards"] = True
-        if domain in ["academic", "scientific"]:
+        if domain in {"academic", "scientific"}:
             requirements["education"] = True
             requirements["publications"] = True
-        elif domain in ["legal", "medical"]:
+        elif domain in {"legal", "medical"}:
             requirements["certifications"] = True
             requirements["education"] = True
         return requirements
@@ -417,7 +416,7 @@ class RoleBasedPromptingRule(BasePromptRule):
     def _apply_role_assignment(
         self, prompt: str, persona: str, domain: str, metrics: dict
     ) -> tuple[str, list[dict]]:
-        """Apply role assignment with appropriate formatting"""
+        """Apply role assignment with appropriate formatting."""
         if not persona:
             return (prompt, [])
         transformations = []
@@ -449,14 +448,14 @@ class RoleBasedPromptingRule(BasePromptRule):
     def _generate_credential_emphasis(
         self, domain: str, requirements: dict[str, Any]
     ) -> str:
-        """Generate credential emphasis based on domain and requirements"""
+        """Generate credential emphasis based on domain and requirements."""
         credential_parts = []
-        if requirements.get("education") and domain in [
+        if requirements.get("education") and domain in {
             "academic",
             "scientific",
             "medical",
             "legal",
-        ]:
+        }:
             education_emphasis = {
                 "academic": "with a PhD in your field",
                 "scientific": "with advanced degrees and research credentials",
@@ -466,7 +465,7 @@ class RoleBasedPromptingRule(BasePromptRule):
             credential_parts.append(education_emphasis.get(domain, ""))
         if requirements.get("certifications"):
             credential_parts.append("holding relevant professional certifications")
-        if requirements.get("publications") and domain in ["academic", "scientific"]:
+        if requirements.get("publications") and domain in {"academic", "scientific"}:
             credential_parts.append("with numerous peer-reviewed publications")
         if requirements.get("awards"):
             credential_parts.append("recognized for excellence in your field")

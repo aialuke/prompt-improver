@@ -1,4 +1,4 @@
-"""SLO/SLA Framework - Core definitions and models following Google SRE practices
+"""SLO/SLA Framework - Core definitions and models following Google SRE practices.
 
 Implements Service Level Objectives (SLOs) and Service Level Agreements (SLAs)
 with error budget tracking, burn rate calculation, and multi-window monitoring.
@@ -7,7 +7,6 @@ with error budget tracking, burn rate calculation, and multi-window monitoring.
 import logging
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class SLOType(Enum):
-    """Types of SLO measurements"""
+    """Types of SLO measurements."""
 
     AVAILABILITY = "availability"
     LATENCY = "latency"
@@ -25,7 +24,7 @@ class SLOType(Enum):
 
 
 class SLOTimeWindow(Enum):
-    """Time windows for SLO calculations"""
+    """Time windows for SLO calculations."""
 
     HOUR_1 = "1h"
     HOUR_6 = "6h"
@@ -38,7 +37,7 @@ class SLOTimeWindow(Enum):
 
     @property
     def seconds(self) -> int:
-        """Convert time window to seconds"""
+        """Convert time window to seconds."""
         mapping = {
             "1h": 3600,
             "6h": 21600,
@@ -53,7 +52,7 @@ class SLOTimeWindow(Enum):
 
     @property
     def human_readable(self) -> str:
-        """Human readable time window"""
+        """Human readable time window."""
         mapping = {
             "1h": "1 hour",
             "6h": "6 hours",
@@ -68,7 +67,7 @@ class SLOTimeWindow(Enum):
 
 
 class SLOTarget(BaseModel):
-    """Defines a specific SLO target with thresholds and alerting"""
+    """Defines a specific SLO target with thresholds and alerting."""
 
     name: str = Field(min_length=1, max_length=255)
     slo_type: SLOType
@@ -87,7 +86,7 @@ class SLOTarget(BaseModel):
     labels: dict[str, str] = Field(default_factory=dict)
 
     def __post_init__(self):
-        """Validate SLO target configuration"""
+        """Validate SLO target configuration."""
         if self.target_value <= 0 or self.target_value > 100:
             raise ValueError(f"SLO target must be 0-100, got {self.target_value}")
         if self.warning_threshold < self.critical_threshold:
@@ -95,7 +94,7 @@ class SLOTarget(BaseModel):
 
 
 class ErrorBudget(BaseModel):
-    """Error budget tracking for an SLO"""
+    """Error budget tracking for an SLO."""
 
     slo_target: SLOTarget
     time_window: SLOTimeWindow
@@ -110,7 +109,7 @@ class ErrorBudget(BaseModel):
     last_updated: datetime | None = Field(default=None)
 
     def calculate_budget(self, total_requests: int, failed_requests: int) -> None:
-        """Calculate error budget based on actual traffic"""
+        """Calculate error budget based on actual traffic."""
         if total_requests == 0:
             return
         availability_target = self.slo_target.target_value / 100.0
@@ -125,7 +124,7 @@ class ErrorBudget(BaseModel):
         self.last_updated = datetime.now(UTC)
 
     def calculate_burn_rate(self, measurement_period_seconds: int) -> float:
-        """Calculate current burn rate (how fast we're consuming budget)"""
+        """Calculate current burn rate (how fast we're consuming budget)."""
         if self.total_budget <= 0 or measurement_period_seconds <= 0:
             return 0.0
         window_seconds = self.time_window.seconds
@@ -142,11 +141,11 @@ class ErrorBudget(BaseModel):
         return self.current_burn_rate
 
     def is_budget_exhausted(self) -> bool:
-        """Check if error budget is completely exhausted"""
+        """Check if error budget is completely exhausted."""
         return self.remaining_budget <= 0.0
 
     def time_to_exhaustion(self) -> timedelta | None:
-        """Estimate time until budget exhaustion at current burn rate"""
+        """Estimate time until budget exhaustion at current burn rate."""
         if self.current_burn_rate <= 0 or self.remaining_budget <= 0:
             return None
         seconds_remaining = self.remaining_budget / (self.current_burn_rate / 3600)
@@ -154,7 +153,7 @@ class ErrorBudget(BaseModel):
 
 
 class BurnRate(BaseModel):
-    """Burn rate calculation and alerting"""
+    """Burn rate calculation and alerting."""
 
     multiplier: float = Field(ge=0.1, le=1000.0)
     threshold: float = Field(ge=0.0, le=100.0)
@@ -165,7 +164,7 @@ class BurnRate(BaseModel):
     alert_count: int = Field(default=0, ge=0)
 
     def should_alert(self, current_burn_rate: float) -> bool:
-        """Determine if this burn rate threshold should trigger an alert"""
+        """Determine if this burn rate threshold should trigger an alert."""
         was_alerting = self.is_alerting
         self.current_rate = current_burn_rate
         exceeds_threshold = current_burn_rate >= self.threshold * self.multiplier
@@ -181,7 +180,7 @@ class BurnRate(BaseModel):
 
 
 class SLODefinition(BaseModel):
-    """Complete SLO definition with all configuration"""
+    """Complete SLO definition with all configuration."""
 
     name: str = Field(min_length=1, max_length=255)
     service_name: str = Field(min_length=1, max_length=255)
@@ -197,33 +196,33 @@ class SLODefinition(BaseModel):
     tags: dict[str, str] = Field(default_factory=dict)
 
     def add_target(self, target: SLOTarget) -> None:
-        """Add an SLO target to this definition"""
+        """Add an SLO target to this definition."""
         target.service_name = self.service_name
         self.targets.append(target)
         self.updated_at = datetime.now(UTC)
 
     def get_target(self, name: str) -> SLOTarget | None:
-        """Get SLO target by name"""
+        """Get SLO target by name."""
         for target in self.targets:
             if target.name == name:
                 return target
         return None
 
     def get_targets_by_type(self, slo_type: SLOType) -> list[SLOTarget]:
-        """Get all targets of a specific type"""
+        """Get all targets of a specific type."""
         return [t for t in self.targets if t.slo_type == slo_type]
 
     def get_targets_by_window(self, window: SLOTimeWindow) -> list[SLOTarget]:
-        """Get all targets for a specific time window"""
+        """Get all targets for a specific time window."""
         return [t for t in self.targets if t.time_window == window]
 
 
 class SLOTemplates:
-    """Common SLO templates for different service types"""
+    """Common SLO templates for different service types."""
 
     @staticmethod
     def web_service_availability(service_name: str) -> SLODefinition:
-        """Standard availability SLO for web services"""
+        """Standard availability SLO for web services."""
         slo_def = SLODefinition(
             name=f"{service_name}_availability",
             service_name=service_name,
@@ -250,7 +249,7 @@ class SLOTemplates:
 
     @staticmethod
     def api_latency(service_name: str) -> SLODefinition:
-        """Standard latency SLO for API services"""
+        """Standard latency SLO for API services."""
         slo_def = SLODefinition(
             name=f"{service_name}_latency",
             service_name=service_name,
@@ -274,7 +273,7 @@ class SLOTemplates:
 
     @staticmethod
     def error_rate(service_name: str) -> SLODefinition:
-        """Standard error rate SLO"""
+        """Standard error rate SLO."""
         slo_def = SLODefinition(
             name=f"{service_name}_error_rate",
             service_name=service_name,

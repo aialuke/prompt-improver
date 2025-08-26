@@ -1,4 +1,4 @@
-"""Unified Validation Framework - Phase 4 Development Infrastructure Consolidation
+"""Unified Validation Framework - Phase 4 Development Infrastructure Consolidation.
 
 Consolidates 25+ duplicate validation frameworks identified in Phase 4 analysis:
 - Phase1MetricsValidator → UnifiedValidator
@@ -17,25 +17,22 @@ import json
 import logging
 import sys
 import time
-from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from tests.utils.async_helpers import (
     UnifiedAsyncValidator,
-    UnifiedPerformanceTimer,
     UnifiedValidationResult,
     test_async_database_connection,
-    test_async_redis_connection,
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 logger = logging.getLogger(__name__)
 
 
-class ValidationCategory(str, Enum):
+class ValidationCategory(StrEnum):
     """Categories of validation tests."""
 
     PERFORMANCE = "performance"
@@ -67,7 +64,7 @@ class ValidationReport:
 
     def save_to_file(self, file_path: Path) -> None:
         """Save report to JSON file."""
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(self.to_json())
 
 
@@ -83,7 +80,7 @@ class UnifiedValidationFramework:
     - 20+ other validation scripts
     """
 
-    def __init__(self, name: str = "unified_validation"):
+    def __init__(self, name: str = "unified_validation") -> None:
         self.name = name
         self.validators: dict[ValidationCategory, UnifiedAsyncValidator] = {}
         self.results: list[UnifiedValidationResult] = []
@@ -109,7 +106,7 @@ class UnifiedValidationFramework:
                 duration_ms = (time.perf_counter() - start_time) * 1000
                 return connection_result and duration_ms < 50.0
             except Exception as e:
-                logger.error("Database performance test failed: %s", e)
+                logger.exception("Database performance test failed: %s", e)
                 return False
 
         result = await validator.validate_async(
@@ -140,7 +137,7 @@ class UnifiedValidationFramework:
                 )
                 return status.result.value == "authentication_required"
             except Exception as e:
-                logger.error("Security integration test failed: %s", e)
+                logger.exception("Security integration test failed: %s", e)
                 return False
 
         result = await validator.validate_async(
@@ -157,14 +154,14 @@ class UnifiedValidationFramework:
             try:
                 from tests.utils.async_helpers import measure_async_performance
 
-                async def sample_operation():
+                async def sample_operation() -> str:
                     await asyncio.sleep(0.001)
                     return "completed"
 
                 result, duration_ms = await measure_async_performance(sample_operation)
                 return result == "completed" and duration_ms < 5.0
             except Exception as e:
-                logger.error("Performance benchmark test failed: %s", e)
+                logger.exception("Performance benchmark test failed: %s", e)
                 return False
 
         result = await validator.validate_async(
@@ -177,7 +174,7 @@ class UnifiedValidationFramework:
         """Validate integration patterns (consolidates integration validation patterns)."""
         validator = self.validators[ValidationCategory.INTEGRATION]
 
-        async def integration_patterns_test():
+        async def integration_patterns_test() -> bool | None:
             try:
                 from prompt_improver.database.unified_connection_manager import (
                     get_unified_manager,
@@ -189,11 +186,9 @@ class UnifiedValidationFramework:
                 from tests.utils.async_helpers import ensure_event_loop
 
                 loop = ensure_event_loop()
-                if not loop or loop.is_closed():
-                    return False
-                return True
+                return not (not loop or loop.is_closed())
             except Exception as e:
-                logger.error("Integration patterns test failed: %s", e)
+                logger.exception("Integration patterns test failed: %s", e)
                 return False
 
         result = await validator.validate_async(
@@ -206,7 +201,7 @@ class UnifiedValidationFramework:
         """Validate infrastructure consolidation (consolidates infrastructure validation patterns)."""
         validator = self.validators[ValidationCategory.INFRASTRUCTURE]
 
-        async def infrastructure_consolidation_test():
+        async def infrastructure_consolidation_test() -> bool | None:
             try:
                 from tests.utils.async_helpers import (
                     UnifiedPerformanceTimer,
@@ -223,12 +218,12 @@ class UnifiedValidationFramework:
                     return False
 
                 @async_test_wrapper
-                async def sample_async_test():
+                async def sample_async_test() -> bool:
                     return True
 
                 return True
             except Exception as e:
-                logger.error("Infrastructure consolidation test failed: %s", e)
+                logger.exception("Infrastructure consolidation test failed: %s", e)
                 return False
 
         result = await validator.validate_async(
@@ -301,7 +296,7 @@ async def main():
         print("❌ Validation failed - success rate below threshold")
         return 1
     except Exception as e:
-        logger.error("Unified validation framework failed: %s", e)
+        logger.exception("Unified validation framework failed: %s", e)
         print(f"❌ Framework execution failed: {e}")
         return 1
 
@@ -310,4 +305,4 @@ if __name__ == "__main__":
     import asyncio
 
     exit_code = asyncio.run(main())
-    exit(exit_code)
+    sys.exit(exit_code)

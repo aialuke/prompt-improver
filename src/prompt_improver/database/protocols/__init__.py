@@ -1,28 +1,28 @@
 """Database Protocol Interfaces.
 
-Provides protocol-based interfaces for database layer to interact with 
+Provides protocol-based interfaces for database layer to interact with
 application services without creating circular dependencies.
 
 Clean Architecture compliance:
 - Database (Infrastructure) defines protocols
-- Application services implement protocols  
+- Application services implement protocols
 - No direct imports from Infrastructure to Application layer
 """
 
-from .events import (
+from prompt_improver.database.protocols.database_services import (
+    DatabaseServicesProtocol,
+)
+from prompt_improver.database.protocols.events import (
     DatabaseEventProtocol,
-    OptimizationEventProtocol,
     EventData,
     EventType,
+    OptimizationEventProtocol,
 )
-from .database_services import DatabaseServicesProtocol
-from .database_config import DatabaseConfigProtocol
 
 __all__ = [
     "DatabaseEventProtocol",
-    "OptimizationEventProtocol", 
+    "DatabaseServicesProtocol",
     "EventData",
     "EventType",
-    "DatabaseServicesProtocol",
-    "DatabaseConfigProtocol",
+    "OptimizationEventProtocol",
 ]

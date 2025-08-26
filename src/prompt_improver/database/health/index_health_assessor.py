@@ -11,14 +11,15 @@ Provides comprehensive index health analysis including:
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import text
 
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
+    get_session_context,
 )
 
 logger = logging.getLogger(__name__)

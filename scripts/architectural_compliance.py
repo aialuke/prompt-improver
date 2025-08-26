@@ -1,25 +1,23 @@
-"""Automated Architectural Compliance Testing Framework
+"""Automated Architectural Compliance Testing Framework.
 
 Continuously monitors the codebase for architectural violations and
 ensures compliance with defined patterns and principles.
 """
 
 import argparse
-import ast
 import json
-import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
-from analyze_dependencies import ArchitecturalLayers, DependencyAnalyzer
+from analyze_dependencies import DependencyAnalyzer
 
 
 @dataclass
 class ComplianceRule:
-    """Definition of an architectural compliance rule"""
+    """Definition of an architectural compliance rule."""
 
     name: str
     description: str
@@ -30,7 +28,7 @@ class ComplianceRule:
 
 @dataclass
 class ComplianceViolation:
-    """A specific compliance violation"""
+    """A specific compliance violation."""
 
     rule_name: str
     severity: str
@@ -42,7 +40,7 @@ class ComplianceViolation:
 
 @dataclass
 class ComplianceReport:
-    """Comprehensive compliance report"""
+    """Comprehensive compliance report."""
 
     timestamp: str
     total_files_analyzed: int
@@ -54,21 +52,21 @@ class ComplianceReport:
 
 
 class ArchitecturalComplianceChecker:
-    """Main compliance checking engine"""
+    """Main compliance checking engine."""
 
-    def __init__(self, src_path: Path, rules_config_path: Path | None = None):
+    def __init__(self, src_path: Path, rules_config_path: Path | None = None) -> None:
         self.src_path = src_path
         self.dependency_analyzer = DependencyAnalyzer(src_path)
         self.violations: list[ComplianceViolation] = []
         if rules_config_path and rules_config_path.exists():
-            with open(rules_config_path) as f:
+            with open(rules_config_path, encoding="utf-8") as f:
                 rules_data = json.load(f)
                 self.rules = [ComplianceRule(**rule) for rule in rules_data["rules"]]
         else:
             self.rules = self._get_default_rules()
 
     def _get_default_rules(self) -> list[ComplianceRule]:
-        """Get default architectural compliance rules"""
+        """Get default architectural compliance rules."""
         return [
             ComplianceRule(
                 name="no_circular_dependencies",
@@ -124,46 +122,35 @@ class ArchitecturalComplianceChecker:
     def check_circular_dependencies(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check for circular dependencies"""
-        violations = []
+        """Check for circular dependencies."""
         cycles = self.dependency_analyzer.detect_circular_dependencies()
-        for cycle in cycles:
-            violations.append(
-                ComplianceViolation(
+        return [ComplianceViolation(
                     rule_name="no_circular_dependencies",
                     severity="error",
                     message=f"Circular dependency detected: {' -> '.join(cycle)}",
                     file_path="",
                     line_number=None,
                     details={"cycle": cycle},
-                )
-            )
-        return violations
+                ) for cycle in cycles]
 
     def check_layer_dependencies(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check architectural layer dependency violations"""
-        violations = []
+        """Check architectural layer dependency violations."""
         arch_violations = self.dependency_analyzer.find_architectural_violations()
-        for violation in arch_violations:
-            if violation["severity"] in ["critical", "error"]:
-                violations.append(
-                    ComplianceViolation(
+        return [ComplianceViolation(
                         rule_name="layer_dependency_direction",
                         severity="error",
                         message=f"Layer violation: {violation['from_layer']} -> {violation['to_layer']}",
                         file_path=violation["from_module"],
                         line_number=None,
                         details=violation,
-                    )
-                )
-        return violations
+                    ) for violation in arch_violations if violation["severity"] in {"critical", "error"}]
 
     def check_coupling_limits(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check for excessive coupling"""
+        """Check for excessive coupling."""
         violations = []
         max_deps = parameters.get("max_dependencies", 15)
         high_coupling = self.dependency_analyzer.identify_high_coupling_modules(
@@ -185,7 +172,7 @@ class ArchitecturalComplianceChecker:
     def check_interface_protocols(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check for missing protocol interfaces"""
+        """Check for missing protocol interfaces."""
         violations = []
         min_dependents = parameters.get("min_dependents", 5)
         for module, dependents in self.dependency_analyzer.reverse_dependencies.items():
@@ -210,7 +197,7 @@ class ArchitecturalComplianceChecker:
     def check_security_isolation(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check security module isolation"""
+        """Check security module isolation."""
         violations = []
         for module, deps in self.dependency_analyzer.dependencies.items():
             if ".security." in module:
@@ -221,7 +208,7 @@ class ArchitecturalComplianceChecker:
                     dep_layer = self.dependency_analyzer.module_to_layer.get(
                         dep, "unknown"
                     )
-                    if dep_layer in ["application", "interface", "external"]:
+                    if dep_layer in {"application", "interface", "external"}:
                         violations.append(
                             ComplianceViolation(
                                 rule_name="security_import_restrictions",
@@ -237,7 +224,7 @@ class ArchitecturalComplianceChecker:
     def check_test_isolation(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check test module isolation"""
+        """Check test module isolation."""
         violations = []
         for module, dependents in self.dependency_analyzer.reverse_dependencies.items():
             if ".test_" in module or "tests." in module:
@@ -262,7 +249,7 @@ class ArchitecturalComplianceChecker:
     def check_utility_stability(
         self, parameters: dict[str, Any]
     ) -> list[ComplianceViolation]:
-        """Check utility module stability"""
+        """Check utility module stability."""
         violations = []
         max_external_deps = parameters.get("max_external_deps", 3)
         for module, deps in self.dependency_analyzer.dependencies.items():
@@ -271,8 +258,7 @@ class ArchitecturalComplianceChecker:
                     dep
                     for dep in deps
                     if not (
-                        dep.startswith("prompt_improver.utils")
-                        or dep.startswith("prompt_improver.core")
+                        dep.startswith(("prompt_improver.utils", "prompt_improver.core"))
                     )
                 ]
                 if len(external_deps) > max_external_deps:
@@ -292,7 +278,7 @@ class ArchitecturalComplianceChecker:
         return violations
 
     def _find_protocol_for_module(self, module: str) -> Path | None:
-        """Check if a protocol interface exists for a module"""
+        """Check if a protocol interface exists for a module."""
         protocol_patterns = [
             f"*{module.split('.')[-1]}_protocol.py",
             f"*{module.split('.')[-1]}Protocol.py",
@@ -306,7 +292,7 @@ class ArchitecturalComplianceChecker:
         return None
 
     def run_all_checks(self) -> ComplianceReport:
-        """Run all compliance checks and generate report"""
+        """Run all compliance checks and generate report."""
         self.violations = []
         for rule in self.rules:
             try:
@@ -339,20 +325,20 @@ class ArchitecturalComplianceChecker:
 
 
 def generate_rules_config(output_path: Path):
-    """Generate default rules configuration file"""
+    """Generate default rules configuration file."""
     checker = ArchitecturalComplianceChecker(Path())
     rules_data = {
         "version": "1.0",
         "description": "Architectural compliance rules for prompt-improver",
         "rules": [asdict(rule) for rule in checker.rules],
     }
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(rules_data, f, indent=2)
     print(f"Rules configuration generated: {output_path}")
 
 
 def main():
-    """Main entry point for compliance checking"""
+    """Main entry point for compliance checking."""
     parser = argparse.ArgumentParser(description="Check architectural compliance")
     parser.add_argument(
         "--src-path",
@@ -393,12 +379,12 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if args.format == "json":
         output_file = args.output_dir / f"compliance_report_{timestamp}.json"
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(asdict(report), f, indent=2)
         print(f"JSON report saved to: {output_file}")
     else:
         output_file = args.output_dir / f"compliance_report_{timestamp}.txt"
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write("ARCHITECTURAL COMPLIANCE REPORT\n")
             f.write(f"Generated: {report.timestamp}\n")
             f.write("=" * 50 + "\n\n")

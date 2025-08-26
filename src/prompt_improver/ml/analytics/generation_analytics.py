@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 from ...database.models import GenerationBatch, GenerationMethodPerformance, GenerationSession
 from ...database.services.generation_service import GenerationDatabaseService
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 logger = logging.getLogger(__name__)
 
 class GenerationHistoryTracker:
@@ -68,7 +69,7 @@ class GenerationAnalytics:
         diversity_trend = self._calculate_trend(timestamps, diversity_scores)
         success_trend = self._calculate_trend(timestamps, success_rates)
         efficiency_trend = self._calculate_trend(timestamps, [-t for t in generation_times])
-        return {'period_days': days_back, 'method_name': method_name, 'total_executions': len(performance_history), 'trends': {'quality_trend': quality_trend, 'diversity_trend': diversity_trend, 'success_trend': success_trend, 'efficiency_trend': efficiency_trend}, 'current_averages': {'quality_score': np.mean(quality_scores), 'diversity_score': np.mean(diversity_scores), 'success_rate': np.mean(success_rates), 'avg_generation_time': np.mean(generation_times)}, 'performance_ranges': {'quality_range': [min(quality_scores), max(quality_scores)], 'diversity_range': [min(diversity_scores), max(diversity_scores)], 'success_range': [min(success_rates), max(success_rates)]}}
+        return {'period_days': days_back, 'method_name': method_name, 'total_executions': len(performance_history), 'trends': {'quality_trend': quality_trend, 'diversity_trend': diversity_trend, 'success_trend': success_trend, 'efficiency_trend': efficiency_trend}, 'current_averages': {'quality_score': get_numpy().mean(quality_scores), 'diversity_score': get_numpy().mean(diversity_scores), 'success_rate': get_numpy().mean(success_rates), 'avg_generation_time': get_numpy().mean(generation_times)}, 'performance_ranges': {'quality_range': [min(quality_scores), max(quality_scores)], 'diversity_range': [min(diversity_scores), max(diversity_scores)], 'success_range': [min(success_rates), max(success_rates)]}}
 
     async def get_method_comparison(self, days_back: int=30) -> dict[str, Any]:
         """Compare performance across different generation methods"""
@@ -82,7 +83,7 @@ class GenerationAnalytics:
                 success_rates = [p.success_rate for p in performance_history]
                 generation_times = [p.generation_time_seconds for p in performance_history]
                 samples_generated = [p.samples_generated for p in performance_history]
-                method_stats[method] = {'executions': len(performance_history), 'avg_quality': np.mean(quality_scores), 'avg_diversity': np.mean(diversity_scores), 'avg_success_rate': np.mean(success_rates), 'avg_generation_time': np.mean(generation_times), 'total_samples': sum(samples_generated), 'efficiency_score': sum(samples_generated) / sum(generation_times) if sum(generation_times) > 0 else 0}
+                method_stats[method] = {'executions': len(performance_history), 'avg_quality': get_numpy().mean(quality_scores), 'avg_diversity': get_numpy().mean(diversity_scores), 'avg_success_rate': get_numpy().mean(success_rates), 'avg_generation_time': get_numpy().mean(generation_times), 'total_samples': sum(samples_generated), 'efficiency_score': sum(samples_generated) / sum(generation_times) if sum(generation_times) > 0 else 0}
             else:
                 method_stats[method] = {'executions': 0, 'avg_quality': 0.0, 'avg_diversity': 0.0, 'avg_success_rate': 0.0, 'avg_generation_time': 0.0, 'total_samples': 0, 'efficiency_score': 0.0}
         method_rankings = {}
@@ -110,8 +111,8 @@ class GenerationAnalytics:
         if len(x_values) < 2 or len(y_values) < 2:
             return 0.0
         try:
-            correlation = np.corrcoef(x_values, y_values)[0, 1]
-            return correlation if not np.isnan(correlation) else 0.0
+            correlation = get_numpy().corrcoef(x_values, y_values)[0, 1]
+            return correlation if not get_numpy().isnan(correlation) else 0.0
         except Exception:
             return 0.0
 

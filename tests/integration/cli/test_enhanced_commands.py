@@ -5,6 +5,8 @@ following 2025 CLI testing best practices with strategic mocking only for extern
 Updated to use real behavior instead of mock data following 2025 best practices.
 """
 
+import builtins
+import contextlib
 import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -785,10 +787,8 @@ class TestCLIComprehensiveErrorScenarios:
             result = cli_runner.invoke(app, ["train", "--config", str(config_file)])
             assert result.exit_code != 0
         finally:
-            try:
-                os.chmod(config_file, 420)
-            except:
-                pass
+            with contextlib.suppress(builtins.BaseException):
+                os.chmod(config_file, 0o644)
 
     def test_discover_patterns_insufficient_disk_space_simulation(
         self, cli_runner, test_data_dir
@@ -813,19 +813,18 @@ class TestCLIComprehensiveErrorScenarios:
 
         with patch(
             "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
-        ) as mock_run:
-            with patch("prompt_improver.cli.discover_patterns") as mock_cmd:
-                mock_cmd.side_effect = OSError("No space left on device")
-                result = cli_runner.invoke(
-                    app,
-                    [
-                        "discover-patterns",
-                        "--input-file",
-                        str(large_input_file),
-                        "--export-patterns",
-                    ],
-                )
-                assert result.exit_code != 0
+        ) as mock_run, patch("prompt_improver.cli.discover_patterns") as mock_cmd:
+            mock_cmd.side_effect = OSError("No space left on device")
+            result = cli_runner.invoke(
+                app,
+                [
+                    "discover-patterns",
+                    "--input-file",
+                    str(large_input_file),
+                    "--export-patterns",
+                ],
+            )
+            assert result.exit_code != 0
 
     def test_ml_status_with_corrupted_state_files(self, cli_runner, test_data_dir):
         """Test ML status command with corrupted state files."""
@@ -850,13 +849,12 @@ class TestCLIComprehensiveErrorScenarios:
 
         with patch(
             "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
-        ) as mock_run:
-            with patch("prompt_improver.cli.ml_status") as mock_cmd:
-                mock_cmd.side_effect = Exception("Corrupted state files detected")
-                result = cli_runner.invoke(
-                    app, ["ml-status", "--state-dir", str(state_dir)]
-                )
-                assert result.exit_code != 0
+        ) as mock_run, patch("prompt_improver.cli.ml_status") as mock_cmd:
+            mock_cmd.side_effect = Exception("Corrupted state files detected")
+            result = cli_runner.invoke(
+                app, ["ml-status", "--state-dir", str(state_dir)]
+            )
+            assert result.exit_code != 0
 
     def test_optimize_rules_network_timeout_simulation(self, cli_runner):
         """Test optimize rules command with simulated network timeouts."""
@@ -866,23 +864,22 @@ class TestCLIComprehensiveErrorScenarios:
 
         with patch(
             "prompt_improver.cli.asyncio.run", side_effect=mock_asyncio_run
-        ) as mock_run:
-            with patch("prompt_improver.cli.optimize_rules") as mock_cmd:
-                mock_cmd.side_effect = TimeoutError("MLflow server connection timeout")
-                result = cli_runner.invoke(
-                    app,
-                    [
-                        "optimize-rules",
-                        "--rule",
-                        "clarity_rule",
-                        "--remote-optimization",
-                    ],
-                )
-                assert result.exit_code != 0
-                assert any(
-                    word in result.output.lower()
-                    for word in ["timeout", "connection", "error"]
-                )
+        ) as mock_run, patch("prompt_improver.cli.optimize_rules") as mock_cmd:
+            mock_cmd.side_effect = TimeoutError("MLflow server connection timeout")
+            result = cli_runner.invoke(
+                app,
+                [
+                    "optimize-rules",
+                    "--rule",
+                    "clarity_rule",
+                    "--remote-optimization",
+                ],
+            )
+            assert result.exit_code != 0
+            assert any(
+                word in result.output.lower()
+                for word in ["timeout", "connection", "error"]
+            )
 
     @given(
         command_args=st.lists(
@@ -893,7 +890,7 @@ class TestCLIComprehensiveErrorScenarios:
     )
     def test_cli_malformed_arguments_handling(self, cli_runner, command_args):
         """Property-based testing of malformed CLI arguments."""
-        full_command = ["train"] + command_args
+        full_command = ["train", *command_args]
         result = cli_runner.invoke(app, full_command)
         assert isinstance(result.exit_code, int)
         assert result.exit_code >= 0
@@ -1044,9 +1041,9 @@ class TestCLIEndToEndWorkflows:
             captured_outputs.append(training_results)
             model_file = results_dir / "trained_model.pkl"
             metrics_file = results_dir / "training_metrics.json"
-            with open(model_file, "w") as f:
+            with open(model_file, "w", encoding="utf-8") as f:
                 f.write(f"# Model data for {training_results['model_id']}\n")
-            with open(metrics_file, "w") as f:
+            with open(metrics_file, "w", encoding="utf-8") as f:
                 json.dump(training_results["metrics"], f)
             return training_results
 

@@ -1,23 +1,22 @@
-"""Redis Metrics Collector Service
+"""Redis Metrics Collector Service.
 
 Focused Redis performance metrics collection service for throughput analysis and monitoring.
 Designed for comprehensive metrics gathering with <25ms operations following SRE best practices.
 """
 
 import asyncio
+import contextlib
 import logging
-import re
-import statistics
 import time
-from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import coredis
 
+from prompt_improver.monitoring.redis.health.types import PerformanceMetrics
 from prompt_improver.performance.monitoring.metrics_registry import get_metrics_registry
-
-from .protocols import RedisClientProviderProtocol, RedisMetricsCollectorProtocol
-from .types import PerformanceMetrics
+from prompt_improver.shared.interfaces.protocols.monitoring import (
+    RedisClientProviderProtocol,
+)
 
 logger = logging.getLogger(__name__)
 _metrics_registry = get_metrics_registry()
@@ -55,20 +54,20 @@ REDIS_SLOW_QUERIES = _metrics_registry.get_or_create_counter(
 
 class RedisMetricsCollector:
     """Redis metrics collector service for performance monitoring and analysis.
-    
+
     Provides comprehensive performance metrics collection including memory usage,
     throughput analysis, slow query monitoring, and trend analysis for SRE monitoring.
     """
-    
+
     def __init__(
         self,
         client_provider: RedisClientProviderProtocol,
         collection_interval: float = 30.0,
         slow_query_threshold_ms: float = 100.0,
         max_metrics_history: int = 100
-    ):
+    ) -> None:
         """Initialize Redis metrics collector.
-        
+
         Args:
             client_provider: Redis client provider for connections
             collection_interval: Interval for metrics collection in seconds
@@ -79,70 +78,70 @@ class RedisMetricsCollector:
         self.collection_interval = collection_interval
         self.slow_query_threshold_ms = slow_query_threshold_ms
         self.max_metrics_history = max_metrics_history
-        
+
         # Metrics state
-        self._last_metrics: Optional[PerformanceMetrics] = None
-        self._metrics_history: List[PerformanceMetrics] = []
-        
+        self._last_metrics: PerformanceMetrics | None = None
+        self._metrics_history: list[PerformanceMetrics] = []
+
         # Tracking state
         self._last_command_count = 0
         self._last_collection_time = 0.0
         self._is_collecting = False
-        self._collection_task: Optional[asyncio.Task] = None
-        
+        self._collection_task: asyncio.Task | None = None
+
         # Key sampling for memory analysis
         self._key_sample_size = 1000
         self._large_key_threshold_bytes = 1024 * 1024  # 1MB
-        
+
     async def collect_performance_metrics(self) -> PerformanceMetrics:
         """Collect comprehensive performance metrics.
-        
+
         Returns:
             Current performance metrics with detailed analysis
         """
         start_time = time.time()
-        
+
         try:
             metrics = PerformanceMetrics()
-            
+
             client = await self.client_provider.get_client()
             if not client:
                 return metrics
-            
+
             # Collect Redis info
             info = await client.info()
-            
+
             # Command performance metrics
             await self._collect_command_metrics(info, metrics)
-            
-            # Cache performance metrics  
+
+            # Cache performance metrics
             await self._collect_cache_metrics(info, metrics)
-            
+
             # Memory metrics
             await self._collect_memory_metrics(info, metrics)
-            
+
             # Latency sampling
             await self._collect_latency_metrics(client, metrics)
-            
+
             # Update Prometheus metrics
             self._update_prometheus_metrics(metrics)
-            
+
             # Cache metrics and update history
             self._last_metrics = metrics
             self._update_metrics_history(metrics)
-            
+
             collection_duration = (time.time() - start_time) * 1000
             logger.debug(f"Metrics collection completed in {collection_duration:.2f}ms")
-            
+
             return metrics
-            
+
         except Exception as e:
-            logger.error(f"Failed to collect performance metrics: {e}")
+            logger.exception(f"Failed to collect performance metrics: {e}")
             return PerformanceMetrics()
-    
-    async def collect_memory_metrics(self) -> Dict[str, Any]:
+
+    async def collect_memory_metrics(self) -> dict[str, Any]:
         """Collect memory usage and fragmentation metrics.
-        
+
         Returns:
             Detailed memory metrics dictionary
         """
@@ -150,9 +149,9 @@ class RedisMetricsCollector:
             client = await self.client_provider.get_client()
             if not client:
                 return {"error": "Redis client not available"}
-            
+
             info = await client.info()
-            
+
             memory_metrics = {
                 "used_memory": {
                     "bytes": self._safe_int(info.get("used_memory", 0)),
@@ -163,8 +162,8 @@ class RedisMetricsCollector:
                 },
                 "fragmentation": {
                     "ratio": self._safe_float(info.get("mem_fragmentation_ratio", 1.0)),
-                    "fragmentation_bytes": max(0, 
-                        self._safe_int(info.get("used_memory_rss", 0)) - 
+                    "fragmentation_bytes": max(0,
+                        self._safe_int(info.get("used_memory_rss", 0)) -
                         self._safe_int(info.get("used_memory", 0))
                     ),
                 },
@@ -180,7 +179,7 @@ class RedisMetricsCollector:
                     "dataset_percentage": 0.0,
                 },
             }
-            
+
             # Calculate dataset percentage
             total_memory = memory_metrics["used_memory"]["bytes"]
             if total_memory > 0:
@@ -188,23 +187,23 @@ class RedisMetricsCollector:
                 memory_metrics["dataset"]["dataset_percentage"] = (
                     dataset_memory / total_memory * 100
                 )
-            
+
             # Calculate memory usage percentage if maxmemory is set
             maxmemory = memory_metrics["system"]["maxmemory"]
             if maxmemory > 0:
                 memory_metrics["usage_percentage"] = (
                     memory_metrics["used_memory"]["bytes"] / maxmemory * 100
                 )
-            
+
             return memory_metrics
-            
+
         except Exception as e:
-            logger.error(f"Failed to collect memory metrics: {e}")
+            logger.exception(f"Failed to collect memory metrics: {e}")
             return {"error": str(e)}
-    
-    async def collect_throughput_metrics(self) -> Dict[str, Any]:
+
+    async def collect_throughput_metrics(self) -> dict[str, Any]:
         """Collect throughput and command statistics.
-        
+
         Returns:
             Throughput metrics dictionary
         """
@@ -212,10 +211,10 @@ class RedisMetricsCollector:
             client = await self.client_provider.get_client()
             if not client:
                 return {"error": "Redis client not available"}
-            
+
             info = await client.info()
             current_time = time.time()
-            
+
             # Basic throughput metrics
             throughput_metrics = {
                 "instantaneous_ops_per_sec": self._safe_int(
@@ -231,25 +230,25 @@ class RedisMetricsCollector:
                     info.get("rejected_connections", 0)
                 ),
             }
-            
+
             # Calculate average ops per second
             if hasattr(self, "_last_command_count") and self._last_collection_time > 0:
                 time_diff = current_time - self._last_collection_time
                 command_diff = (
                     throughput_metrics["total_commands_processed"] - self._last_command_count
                 )
-                
+
                 if time_diff > 0:
                     throughput_metrics["avg_ops_per_sec"] = command_diff / time_diff
                 else:
                     throughput_metrics["avg_ops_per_sec"] = 0.0
             else:
                 throughput_metrics["avg_ops_per_sec"] = 0.0
-            
+
             # Update tracking state
             self._last_command_count = throughput_metrics["total_commands_processed"]
             self._last_collection_time = current_time
-            
+
             # Get command stats if available
             try:
                 command_stats = await client.info("commandstats")
@@ -257,16 +256,16 @@ class RedisMetricsCollector:
             except Exception as e:
                 logger.debug(f"Failed to get command stats: {e}")
                 throughput_metrics["command_statistics"] = {}
-            
+
             return throughput_metrics
-            
+
         except Exception as e:
-            logger.error(f"Failed to collect throughput metrics: {e}")
+            logger.exception(f"Failed to collect throughput metrics: {e}")
             return {"error": str(e)}
-    
-    async def analyze_slow_queries(self) -> List[Dict[str, Any]]:
+
+    async def analyze_slow_queries(self) -> list[dict[str, Any]]:
         """Analyze slow queries for performance optimization.
-        
+
         Returns:
             List of slow query analysis results
         """
@@ -274,13 +273,13 @@ class RedisMetricsCollector:
             client = await self.client_provider.get_client()
             if not client:
                 return []
-            
+
             # Get slow log entries
             slow_entries = await client.slowlog_get(100)  # Last 100 entries
-            
+
             slow_queries = []
             current_time = time.time()
-            
+
             for entry in slow_entries:
                 try:
                     slow_query = {
@@ -295,104 +294,102 @@ class RedisMetricsCollector:
                         },
                         "age_seconds": current_time - self._safe_int(entry[1]),
                     }
-                    
+
                     # Command analysis
                     if slow_query["command"]:
                         slow_query["command_type"] = slow_query["command"][0].upper()
                         slow_query["command_summary"] = " ".join(
                             str(cmd) for cmd in slow_query["command"][:5]
                         )
-                    
+
                     # Performance analysis
                     if slow_query["duration_ms"] > self.slow_query_threshold_ms:
                         slow_queries.append(slow_query)
-                        
+
                         # Update metrics
                         REDIS_SLOW_QUERIES.labels(
                             command=slow_query.get("command_type", "UNKNOWN")
                         ).inc()
-                
+
                 except (IndexError, TypeError, ValueError) as e:
                     logger.debug(f"Failed to parse slow log entry: {e}")
                     continue
-            
+
             # Sort by duration descending
             slow_queries.sort(key=lambda x: x["duration_ms"], reverse=True)
-            
+
             return slow_queries
-            
+
         except Exception as e:
-            logger.error(f"Failed to analyze slow queries: {e}")
+            logger.exception(f"Failed to analyze slow queries: {e}")
             return []
-    
-    def get_metrics_history(self, duration_minutes: int = 10) -> List[PerformanceMetrics]:
+
+    def get_metrics_history(self, duration_minutes: int = 10) -> list[PerformanceMetrics]:
         """Get metrics history for trend analysis.
-        
+
         Args:
             duration_minutes: How far back to retrieve metrics
-            
+
         Returns:
             List of historical performance metrics
         """
         if not self._metrics_history:
             return []
-        
+
         # Filter by time window
         cutoff_time = time.time() - (duration_minutes * 60)
-        
+
         # Note: This is a simplified implementation
         # In production, you'd want to add timestamps to PerformanceMetrics
         return self._metrics_history[-duration_minutes:]  # Simplified approach
-    
+
     async def start_collection(self) -> None:
         """Start continuous metrics collection."""
         if self._is_collecting:
             logger.warning("Metrics collection already started")
             return
-        
+
         self._is_collecting = True
         self._collection_task = asyncio.create_task(self._collection_loop())
         logger.info("Redis metrics collection started")
-    
+
     async def stop_collection(self) -> None:
         """Stop continuous metrics collection."""
         if not self._is_collecting:
             return
-        
+
         self._is_collecting = False
-        
+
         if self._collection_task:
             self._collection_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._collection_task
-            except asyncio.CancelledError:
-                pass
             self._collection_task = None
-        
+
         logger.info("Redis metrics collection stopped")
-    
+
     async def _collection_loop(self) -> None:
         """Continuous metrics collection loop."""
         logger.info("Starting Redis metrics collection loop")
-        
+
         while self._is_collecting:
             try:
                 await self.collect_performance_metrics()
                 await asyncio.sleep(self.collection_interval)
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in metrics collection loop: {e}")
+                logger.exception(f"Error in metrics collection loop: {e}")
                 await asyncio.sleep(5)  # Brief delay on error
-    
+
     async def _collect_command_metrics(
-        self, 
-        info: Dict[str, Any], 
+        self,
+        info: dict[str, Any],
         metrics: PerformanceMetrics
     ) -> None:
         """Collect command performance metrics.
-        
+
         Args:
             info: Redis info dictionary
             metrics: PerformanceMetrics object to populate
@@ -401,44 +398,44 @@ class RedisMetricsCollector:
         metrics.instantaneous_ops_per_sec = self._safe_int(
             info.get("instantaneous_ops_per_sec", 0)
         )
-        
+
         # Calculate average ops per second
         current_time = time.time()
         if self._last_command_count > 0 and self._last_collection_time > 0:
             time_diff = current_time - self._last_collection_time
             command_diff = metrics.total_commands - self._last_command_count
-            
+
             if time_diff > 0:
                 metrics.avg_ops_per_sec = command_diff / time_diff
-        
+
         # Update tracking
         self._last_command_count = metrics.total_commands
         self._last_collection_time = current_time
-    
+
     async def _collect_cache_metrics(
-        self, 
-        info: Dict[str, Any], 
+        self,
+        info: dict[str, Any],
         metrics: PerformanceMetrics
     ) -> None:
         """Collect cache performance metrics.
-        
+
         Args:
             info: Redis info dictionary
             metrics: PerformanceMetrics object to populate
         """
         metrics.keyspace_hits = self._safe_int(info.get("keyspace_hits", 0))
         metrics.keyspace_misses = self._safe_int(info.get("keyspace_misses", 0))
-        
+
         # Calculate hit rate
         metrics.calculate_hit_rate()
-    
+
     async def _collect_memory_metrics(
-        self, 
-        info: Dict[str, Any], 
+        self,
+        info: dict[str, Any],
         metrics: PerformanceMetrics
     ) -> None:
         """Collect memory metrics.
-        
+
         Args:
             info: Redis info dictionary
             metrics: PerformanceMetrics object to populate
@@ -448,19 +445,19 @@ class RedisMetricsCollector:
         metrics.fragmentation_ratio = self._safe_float(
             info.get("mem_fragmentation_ratio", 1.0)
         )
-        
+
         # Calculate fragmentation bytes
         rss_memory = self._safe_int(info.get("used_memory_rss", 0))
         if rss_memory > metrics.used_memory_bytes:
             metrics.fragmentation_bytes = rss_memory - metrics.used_memory_bytes
-    
+
     async def _collect_latency_metrics(
-        self, 
-        client: coredis.Redis, 
+        self,
+        client: coredis.Redis,
         metrics: PerformanceMetrics
     ) -> None:
         """Collect latency metrics through sampling.
-        
+
         Args:
             client: Redis client instance
             metrics: PerformanceMetrics object to populate
@@ -468,27 +465,27 @@ class RedisMetricsCollector:
         try:
             # Sample latency with ping commands
             latency_samples = []
-            
+
             for _ in range(5):  # Take 5 samples
                 start_time = time.time()
                 await client.ping()
                 end_time = time.time()
-                
+
                 latency_ms = (end_time - start_time) * 1000
                 latency_samples.append(latency_ms)
-                
+
                 # Add to metrics
                 metrics.add_latency_sample(latency_ms)
-                
+
                 # Update Prometheus histogram
                 REDIS_LATENCY_PERCENTILES.labels(operation="ping").observe(latency_ms)
-            
+
         except Exception as e:
             logger.debug(f"Failed to collect latency metrics: {e}")
-    
+
     def _update_prometheus_metrics(self, metrics: PerformanceMetrics) -> None:
         """Update Prometheus metrics registry.
-        
+
         Args:
             metrics: PerformanceMetrics to update in registry
         """
@@ -497,44 +494,44 @@ class RedisMetricsCollector:
             REDIS_OPERATIONS_TOTAL.labels(operation_type="total").inc(
                 metrics.total_commands - REDIS_OPERATIONS_TOTAL.labels(operation_type="total")._value.get()
             )
-            
+
             # Update memory metrics
             REDIS_MEMORY_USAGE.labels(memory_type="used").set(metrics.used_memory_bytes)
             REDIS_MEMORY_USAGE.labels(memory_type="peak").set(metrics.peak_memory_bytes)
-            
+
             # Update hit rate
             REDIS_HIT_RATE.set(metrics.hit_rate_percentage)
-            
+
         except Exception as e:
             logger.debug(f"Failed to update Prometheus metrics: {e}")
-    
+
     def _update_metrics_history(self, metrics: PerformanceMetrics) -> None:
         """Update metrics history for trend analysis.
-        
+
         Args:
             metrics: Current metrics to add to history
         """
         self._metrics_history.append(metrics)
-        
+
         # Keep history size manageable
         if len(self._metrics_history) > self.max_metrics_history:
             self._metrics_history = self._metrics_history[-self.max_metrics_history:]
-    
-    def _parse_command_stats(self, command_stats: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _parse_command_stats(self, command_stats: dict[str, Any]) -> dict[str, Any]:
         """Parse Redis command statistics.
-        
+
         Args:
             command_stats: Raw command stats from Redis
-            
+
         Returns:
             Parsed command statistics
         """
         parsed_stats = {}
-        
+
         for key, value in command_stats.items():
             if key.startswith("cmdstat_"):
                 cmd_name = key[8:]  # Remove "cmdstat_" prefix
-                
+
                 # Parse the stats string: "calls=X,usec=Y,usec_per_call=Z"
                 stats = {}
                 if isinstance(value, str):
@@ -542,36 +539,36 @@ class RedisMetricsCollector:
                         if "=" in stat:
                             stat_key, stat_value = stat.split("=", 1)
                             stats[stat_key] = self._safe_float(stat_value)
-                
+
                 parsed_stats[cmd_name] = stats
-        
+
         return parsed_stats
-    
+
     def _safe_int(self, value: Any, default: int = 0) -> int:
         """Safely convert value to int."""
         try:
             return int(value) if value is not None else default
         except (ValueError, TypeError):
             return default
-    
+
     def _safe_float(self, value: Any, default: float = 0.0) -> float:
         """Safely convert value to float."""
         try:
             return float(value) if value is not None else default
         except (ValueError, TypeError):
             return default
-    
-    def get_performance_summary(self) -> Dict[str, Any]:
+
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get performance summary for quick analysis.
-        
+
         Returns:
             Performance summary dictionary
         """
         if not self._last_metrics:
             return {"error": "No metrics available"}
-        
+
         metrics = self._last_metrics
-        
+
         return {
             "throughput": {
                 "instantaneous_ops_per_sec": metrics.instantaneous_ops_per_sec,

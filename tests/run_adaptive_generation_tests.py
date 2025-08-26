@@ -5,17 +5,14 @@ Executes comprehensive real behavior tests for Week 5 implementation.
 
 import asyncio
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
 
 from prompt_improver.database import get_sessionmanager
 from prompt_improver.database.models import (
     ImprovementSession,
     RulePerformance,
     TrainingSession,
-    UserFeedback,
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -145,7 +142,6 @@ async def test_difficulty_distribution():
         DifficultyDistributionAnalyzer,
     )
     from prompt_improver.ml.analysis.performance_gap_analyzer import (
-        PerformanceGap,
         PerformanceGapAnalyzer,
     )
 

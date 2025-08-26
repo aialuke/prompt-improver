@@ -11,8 +11,8 @@ Following 2025 best practices:
 - Easy mocking for testing
 """
 
-from datetime import UTC, datetime, timezone
-from typing import Optional, Protocol
+from datetime import UTC, datetime
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 
@@ -114,7 +114,7 @@ class MockDateTimeService:
     that implements the DateTimeServiceProtocol.
     """
 
-    def __init__(self, fixed_time: datetime | None = None):
+    def __init__(self, fixed_time: datetime | None = None) -> None:
         """Initialize mock service.
 
         Args:

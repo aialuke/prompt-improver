@@ -7,8 +7,8 @@ from enum import Enum
 import logging
 from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
-from scipy import stats
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
 from ..core.training_data_loader import TrainingDataLoader
 logger = logging.getLogger(__name__)
 
@@ -139,9 +139,9 @@ class CausalInferenceAnalyzer:
             except ValueError:
                 assignment = TreatmentAssignment.randomized
                 logger.warning(f"Unknown assignment '{assignment_str}', using randomized")
-            outcome_array = np.array(outcome_data, dtype=float)
-            treatment_array = np.array(treatment_data, dtype=int)
-            covariates_array = np.array(covariates, dtype=float) if covariates else None
+            outcome_array = get_numpy().array(outcome_data, dtype=float)
+            treatment_array = get_numpy().array(treatment_data, dtype=int)
+            covariates_array = get_numpy().array(covariates, dtype=float) if covariates else None
             causal_result = self.analyze_causal_effect(outcome_data=outcome_array, treatment_data=treatment_array, covariates=covariates_array, assignment_mechanism=assignment, method=method)
             result = {'causal_effects': {'average_treatment_effect': {'point_estimate': causal_result.average_treatment_effect.point_estimate, 'confidence_interval': causal_result.average_treatment_effect.confidence_interval, 'p_value': causal_result.average_treatment_effect.p_value, 'statistical_significance': causal_result.average_treatment_effect.statistical_significance, 'practical_significance': causal_result.average_treatment_effect.practical_significance, 'effect_size_interpretation': causal_result.average_treatment_effect.effect_size_interpretation}}, 'assumptions_validation': {'overall_satisfied': causal_result.overall_assumptions_satisfied, 'assumptions_tested': len(causal_result.assumptions_tested), 'violated_assumptions': [assumption.name for assumption in causal_result.assumptions_tested if assumption.violated]}, 'robustness_assessment': {'robustness_score': causal_result.robustness_score, 'sensitivity_analysis': causal_result.sensitivity_analysis is not None, 'placebo_tests': causal_result.placebo_tests is not None}, 'confounding_analysis': {'confounders_detected': len(causal_result.confounders_detected) if causal_result.confounders_detected else 0, 'confounding_strength': causal_result.confounding_strength, 'adjustment_strategy': causal_result.adjustment_strategy}, 'business_insights': {'causal_interpretation': causal_result.causal_interpretation, 'business_recommendations': causal_result.business_recommendations, 'statistical_warnings': causal_result.statistical_warnings}}
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -153,7 +153,7 @@ class CausalInferenceAnalyzer:
             logger.error('Orchestrated causal analysis failed: %s', e)
             return {'orchestrator_compatible': True, 'component_result': {'error': str(e), 'causal_effects': {}}, 'local_metadata': {'execution_time': (datetime.now() - start_time).total_seconds(), 'error': True, 'component_version': '1.0.0'}}
 
-    def analyze_causal_effect(self, outcome_data: np.ndarray, treatment_data: np.ndarray, covariates: np.ndarray | None=None, assignment_mechanism: TreatmentAssignment=TreatmentAssignment.randomized, method: CausalMethod=CausalMethod.DIFFERENCE_IN_DIFFERENCES, time_periods: np.ndarray | None=None, instruments: np.ndarray | None=None) -> CausalInferenceResult:
+    def analyze_causal_effect(self, outcome_data: get_numpy().ndarray, treatment_data: get_numpy().ndarray, covariates: get_numpy().ndarray | None=None, assignment_mechanism: TreatmentAssignment=TreatmentAssignment.randomized, method: CausalMethod=CausalMethod.DIFFERENCE_IN_DIFFERENCES, time_periods: get_numpy().ndarray | None=None, instruments: get_numpy().ndarray | None=None) -> CausalInferenceResult:
         """Perform comprehensive causal inference analysis
 
         Args:
@@ -198,25 +198,25 @@ class CausalInferenceAnalyzer:
             logger.error('Error in causal inference analysis: %s', e)
             raise
 
-    def _validate_causal_data(self, outcome_data: np.ndarray, treatment_data: np.ndarray, covariates: np.ndarray | None, time_periods: np.ndarray | None, instruments: np.ndarray | None) -> dict[str, np.ndarray]:
+    def _validate_causal_data(self, outcome_data: get_numpy().ndarray, treatment_data: get_numpy().ndarray, covariates: get_numpy().ndarray | None, time_periods: get_numpy().ndarray | None, instruments: get_numpy().ndarray | None) -> dict[str, get_numpy().ndarray]:
         """Validate and prepare data for causal analysis"""
-        outcome = np.asarray(outcome_data).flatten()
-        treatment = np.asarray(treatment_data).flatten()
+        outcome = get_numpy().asarray(outcome_data).flatten()
+        treatment = get_numpy().asarray(treatment_data).flatten()
         if len(outcome) != len(treatment):
             raise ValueError('Outcome and treatment data must have same length')
         if len(outcome) < 5:
             raise ValueError('Insufficient sample size for reliable causal inference')
-        unique_treatments = np.unique(treatment)
-        if not np.array_equal(unique_treatments, [0, 1]) and (not np.array_equal(unique_treatments, [0])) and (not np.array_equal(unique_treatments, [1])):
+        unique_treatments = get_numpy().unique(treatment)
+        if not get_numpy().array_equal(unique_treatments, [0, 1]) and (not get_numpy().array_equal(unique_treatments, [0])) and (not get_numpy().array_equal(unique_treatments, [1])):
             if len(unique_treatments) == 2:
                 treatment = (treatment == unique_treatments[1]).astype(int)
             else:
                 raise ValueError('Treatment must be binary (0/1)')
-        if not np.all(np.isfinite(outcome)) or not np.all(np.isfinite(treatment)):
+        if not get_numpy().all(get_numpy().isfinite(outcome)) or not get_numpy().all(get_numpy().isfinite(treatment)):
             raise ValueError('Outcome and treatment data must be finite')
-        validated = {'outcome': outcome, 'treatment': treatment, 'n_total': len(outcome), 'n_treated': np.sum(treatment), 'n_control': len(outcome) - np.sum(treatment)}
+        validated = {'outcome': outcome, 'treatment': treatment, 'n_total': len(outcome), 'n_treated': get_numpy().sum(treatment), 'n_control': len(outcome) - get_numpy().sum(treatment)}
         if covariates is not None:
-            covariates = np.asarray(covariates)
+            covariates = get_numpy().asarray(covariates)
             if covariates.ndim == 1:
                 covariates = covariates.reshape(-1, 1)
             if len(covariates) != len(outcome):
@@ -224,13 +224,13 @@ class CausalInferenceAnalyzer:
             validated['covariates'] = covariates
             validated['n_covariates'] = covariates.shape[1]
         if time_periods is not None:
-            time_periods = np.asarray(time_periods).flatten()
+            time_periods = get_numpy().asarray(time_periods).flatten()
             if len(time_periods) != len(outcome):
                 raise ValueError('Time periods must have same length as outcome')
             validated['time_periods'] = time_periods
-            validated['n_periods'] = len(np.unique(time_periods))
+            validated['n_periods'] = len(get_numpy().unique(time_periods))
         if instruments is not None:
-            instruments = np.asarray(instruments)
+            instruments = get_numpy().asarray(instruments)
             if instruments.ndim == 1:
                 instruments = instruments.reshape(-1, 1)
             if len(instruments) != len(outcome):
@@ -239,7 +239,7 @@ class CausalInferenceAnalyzer:
             validated['n_instruments'] = instruments.shape[1]
         return validated
 
-    def _test_causal_assumptions(self, data: dict[str, np.ndarray], assignment: TreatmentAssignment, method: CausalMethod) -> list[CausalAssumption]:
+    def _test_causal_assumptions(self, data: dict[str, get_numpy().ndarray], assignment: TreatmentAssignment, method: CausalMethod) -> list[CausalAssumption]:
         """Test key causal inference assumptions"""
         assumptions = []
         try:
@@ -262,7 +262,7 @@ class CausalInferenceAnalyzer:
             assumptions.append(warning_assumption)
         return assumptions
 
-    def _test_overlap_assumption(self, data: dict[str, np.ndarray]) -> CausalAssumption:
+    def _test_overlap_assumption(self, data: dict[str, get_numpy().ndarray]) -> CausalAssumption:
         """Test overlap/common support assumption"""
         if 'covariates' not in data:
             n_treated = data['n_treated']
@@ -270,27 +270,28 @@ class CausalInferenceAnalyzer:
             overlap_adequate = n_treated >= 5 and n_control >= 5
             return CausalAssumption(name='overlap', description='Sufficient overlap between treatment and control groups', testable=True, test_result={'n_treated': int(n_treated), 'n_control': int(n_control), 'adequate_overlap': overlap_adequate}, violated=not overlap_adequate, severity='high' if not overlap_adequate else 'low', recommendations=['Increase sample size in underrepresented group'] if not overlap_adequate else [])
         try:
-            from sklearn.linear_model import LogisticRegression
+            from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
+            LogisticRegression = get_sklearn().linear_model.LogisticRegression
             X = data['covariates']
             y = data['treatment']
             lr = LogisticRegression(random_state=42)
             propensity_scores = lr.fit(X, y).predict_proba(X)[:, 1]
             treated_ps = propensity_scores[y == 1]
             control_ps = propensity_scores[y == 0]
-            min_treated, max_treated = (np.min(treated_ps), np.max(treated_ps))
-            min_control, max_control = (np.min(control_ps), np.max(control_ps))
+            min_treated, max_treated = (get_numpy().min(treated_ps), get_numpy().max(treated_ps))
+            min_control, max_control = (get_numpy().min(control_ps), get_numpy().max(control_ps))
             overlap_min = max(min_treated, min_control)
             overlap_max = min(max_treated, max_control)
             overlap_exists = overlap_max > overlap_min
             in_overlap = (propensity_scores >= overlap_min) & (propensity_scores <= overlap_max)
-            overlap_proportion = np.mean(in_overlap)
+            overlap_proportion = get_numpy().mean(in_overlap)
             adequate_overlap = overlap_exists and overlap_proportion >= 0.8
             return CausalAssumption(name='overlap', description='Sufficient overlap in propensity score distributions', testable=True, test_result={'overlap_exists': overlap_exists, 'overlap_proportion': float(overlap_proportion), 'overlap_range': [float(overlap_min), float(overlap_max)], 'adequate_overlap': adequate_overlap}, violated=not adequate_overlap, severity='high' if not adequate_overlap else 'low', recommendations=['Consider trimming extreme propensity scores', 'Collect more data in regions of poor overlap'] if not adequate_overlap else [])
         except Exception as e:
             logger.warning('Error testing overlap assumption: %s', e)
             return CausalAssumption(name='overlap', description='Could not test overlap assumption', testable=False, violated=True, severity='medium', recommendations=['Manual overlap assessment recommended'])
 
-    def _test_balance_assumption(self, data: dict[str, np.ndarray]) -> CausalAssumption:
+    def _test_balance_assumption(self, data: dict[str, get_numpy().ndarray]) -> CausalAssumption:
         """Test covariate balance assumption for randomized experiments"""
         if 'covariates' not in data:
             return CausalAssumption(name='balance', description='No covariates to test balance', testable=False, violated=False, severity='low')
@@ -303,9 +304,9 @@ class CausalInferenceAnalyzer:
                 covariate = covariates[:, i]
                 treated_cov = covariate[treatment == 1]
                 control_cov = covariate[treatment == 0]
-                statistic, p_value = stats.ttest_ind(treated_cov, control_cov)
-                pooled_std = np.sqrt(((len(treated_cov) - 1) * np.var(treated_cov, ddof=1) + (len(control_cov) - 1) * np.var(control_cov, ddof=1)) / (len(treated_cov) + len(control_cov) - 2))
-                smd = (np.mean(treated_cov) - np.mean(control_cov)) / pooled_std if pooled_std > 0 else 0
+                statistic, p_value = get_scipy_stats().ttest_ind(treated_cov, control_cov)
+                pooled_std = get_numpy().sqrt(((len(treated_cov) - 1) * get_numpy().var(treated_cov, ddof=1) + (len(control_cov) - 1) * get_numpy().var(control_cov, ddof=1)) / (len(treated_cov) + len(control_cov) - 2))
+                smd = (get_numpy().mean(treated_cov) - get_numpy().mean(control_cov)) / pooled_std if pooled_std > 0 else 0
                 is_imbalanced = abs(smd) > 0.1
                 if is_imbalanced:
                     imbalanced_covariates += 1
@@ -316,7 +317,7 @@ class CausalInferenceAnalyzer:
             logger.warning('Error testing balance assumption: %s', e)
             return CausalAssumption(name='balance', description='Could not test balance assumption', testable=False, violated=True, severity='medium')
 
-    def _test_parallel_trends_assumption(self, data: dict[str, np.ndarray]) -> CausalAssumption:
+    def _test_parallel_trends_assumption(self, data: dict[str, get_numpy().ndarray]) -> CausalAssumption:
         """Test parallel trends assumption for difference-in-differences"""
         try:
             outcome = data['outcome']
@@ -324,12 +325,12 @@ class CausalInferenceAnalyzer:
             time_periods = data['time_periods']
             pre_period = time_periods == 0
             post_period = time_periods == 1
-            if not (np.any(pre_period) and np.any(post_period)):
+            if not (get_numpy().any(pre_period) and get_numpy().any(post_period)):
                 return CausalAssumption(name='parallel_trends', description='Insufficient time periods for parallel trends test', testable=False, violated=True, severity='high')
             pre_treated = outcome[pre_period & (treatment == 1)]
             pre_control = outcome[pre_period & (treatment == 0)]
             if len(pre_treated) > 0 and len(pre_control) > 0:
-                statistic, p_value = stats.ttest_ind(pre_treated, pre_control)
+                statistic, p_value = get_scipy_stats().ttest_ind(pre_treated, pre_control)
                 parallel_trends_satisfied = p_value > 0.1
             else:
                 parallel_trends_satisfied = False
@@ -339,7 +340,7 @@ class CausalInferenceAnalyzer:
             logger.warning('Error testing parallel trends: %s', e)
             return CausalAssumption(name='parallel_trends', description='Could not test parallel trends assumption', testable=False, violated=True, severity='high')
 
-    def _test_iv_assumptions(self, data: dict[str, np.ndarray]) -> list[CausalAssumption]:
+    def _test_iv_assumptions(self, data: dict[str, get_numpy().ndarray]) -> list[CausalAssumption]:
         """Test instrumental variable assumptions"""
         assumptions = []
         try:
@@ -348,7 +349,7 @@ class CausalInferenceAnalyzer:
             outcome = data['outcome']
             for i in range(instruments.shape[1]):
                 instrument = instruments[:, i]
-                correlation = np.corrcoef(instrument, treatment)[0, 1]
+                correlation = get_numpy().corrcoef(instrument, treatment)[0, 1]
                 f_statistic = correlation ** 2 * (len(treatment) - 2) / (1 - correlation ** 2)
                 strong_instrument = f_statistic > 10
                 relevance_assumption = CausalAssumption(name=f'instrument_relevance_{i}', description=f'Instrument {i} relevance (first stage strength)', testable=True, test_result={'correlation_with_treatment': float(correlation), 'f_statistic': float(f_statistic), 'strong_instrument': strong_instrument}, violated=not strong_instrument, severity='high' if not strong_instrument else 'low', recommendations=['Find stronger instruments', 'Consider weak instrument robust methods'] if not strong_instrument else [])
@@ -361,21 +362,21 @@ class CausalInferenceAnalyzer:
             assumptions.append(error_assumption)
         return assumptions
 
-    def _test_confounding_assumption(self, data: dict[str, np.ndarray], assignment: TreatmentAssignment) -> CausalAssumption:
+    def _test_confounding_assumption(self, data: dict[str, get_numpy().ndarray], assignment: TreatmentAssignment) -> CausalAssumption:
         """Test no unmeasured confounding assumption"""
         if assignment == TreatmentAssignment.randomized:
             return CausalAssumption(name='no_unmeasured_confounding', description='No unmeasured confounding (randomized experiment)', testable=False, violated=False, severity='low', recommendations=['Verify randomization was properly implemented'])
         try:
             outcome = data['outcome']
             treatment = data['treatment']
-            correlation = abs(np.corrcoef(treatment, outcome)[0, 1])
+            correlation = abs(get_numpy().corrcoef(treatment, outcome)[0, 1])
             potential_confounding = correlation > 0.7
             return CausalAssumption(name='no_unmeasured_confounding', description='No unmeasured confounding assumption', testable=False, test_result={'treatment_outcome_correlation': float(correlation), 'potential_confounding_concern': potential_confounding}, violated=potential_confounding, severity='high', recommendations=['Include more covariates', 'Use instrumental variables', 'Consider sensitivity analysis'] if potential_confounding else ['Justify assumption with domain knowledge'])
         except Exception as e:
             logger.warning('Error testing confounding assumption: %s', e)
             return CausalAssumption(name='no_unmeasured_confounding', description='Could not assess confounding assumption', testable=False, violated=True, severity='high')
 
-    def _estimate_causal_effect(self, data: dict[str, np.ndarray], method: CausalMethod, assignment: TreatmentAssignment) -> CausalEffect:
+    def _estimate_causal_effect(self, data: dict[str, get_numpy().ndarray], method: CausalMethod, assignment: TreatmentAssignment) -> CausalEffect:
         """Estimate the average treatment effect using specified method"""
         outcome = data['outcome']
         treatment = data['treatment']
@@ -393,22 +394,22 @@ class CausalInferenceAnalyzer:
             logger.error('Error estimating causal effect with {method}: %s', e)
             return self._estimate_simple_difference(data)
 
-    def _estimate_simple_difference(self, data: dict[str, np.ndarray]) -> CausalEffect:
+    def _estimate_simple_difference(self, data: dict[str, get_numpy().ndarray]) -> CausalEffect:
         """Estimate ATE as simple difference in means"""
         outcome = data['outcome']
         treatment = data['treatment']
         treated_outcomes = outcome[treatment == 1]
         control_outcomes = outcome[treatment == 0]
-        ate = np.mean(treated_outcomes) - np.mean(control_outcomes)
-        var_treated = np.var(treated_outcomes, ddof=1) / len(treated_outcomes)
-        var_control = np.var(control_outcomes, ddof=1) / len(control_outcomes)
-        se = np.sqrt(var_treated + var_control)
-        statistic, p_value = stats.ttest_ind(treated_outcomes, control_outcomes)
+        ate = get_numpy().mean(treated_outcomes) - get_numpy().mean(control_outcomes)
+        var_treated = get_numpy().var(treated_outcomes, ddof=1) / len(treated_outcomes)
+        var_control = get_numpy().var(control_outcomes, ddof=1) / len(control_outcomes)
+        se = get_numpy().sqrt(var_treated + var_control)
+        statistic, p_value = get_scipy_stats().ttest_ind(treated_outcomes, control_outcomes)
         dof = len(treated_outcomes) + len(control_outcomes) - 2
-        t_critical = stats.t.ppf(1 - self.significance_level / 2, dof)
+        t_critical = get_scipy_stats().t.ppf(1 - self.significance_level / 2, dof)
         ci_lower = ate - t_critical * se
         ci_upper = ate + t_critical * se
-        pooled_std = np.sqrt(((len(treated_outcomes) - 1) * np.var(treated_outcomes, ddof=1) + (len(control_outcomes) - 1) * np.var(control_outcomes, ddof=1)) / dof)
+        pooled_std = get_numpy().sqrt(((len(treated_outcomes) - 1) * get_numpy().var(treated_outcomes, ddof=1) + (len(control_outcomes) - 1) * get_numpy().var(control_outcomes, ddof=1)) / dof)
         cohens_d = ate / pooled_std if pooled_std > 0 else 0
         if abs(cohens_d) < 0.2:
             interpretation = 'negligible effect'
@@ -418,9 +419,9 @@ class CausalInferenceAnalyzer:
             interpretation = 'medium effect'
         else:
             interpretation = 'large effect'
-        return CausalEffect(effect_name='Average Treatment Effect', point_estimate=float(ate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(ate) >= self.minimum_effect_size), robustness_score=0.7, assumptions_satisfied=True, metadata={'treated_mean': float(np.mean(treated_outcomes)), 'control_mean': float(np.mean(control_outcomes)), 'cohens_d': float(cohens_d), 'n_treated': len(treated_outcomes), 'n_control': len(control_outcomes)})
+        return CausalEffect(effect_name='Average Treatment Effect', point_estimate=float(ate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(ate) >= self.minimum_effect_size), robustness_score=0.7, assumptions_satisfied=True, metadata={'treated_mean': float(get_numpy().mean(treated_outcomes)), 'control_mean': float(get_numpy().mean(control_outcomes)), 'cohens_d': float(cohens_d), 'n_treated': len(treated_outcomes), 'n_control': len(control_outcomes)})
 
-    def _estimate_did_effect(self, data: dict[str, np.ndarray]) -> CausalEffect:
+    def _estimate_did_effect(self, data: dict[str, get_numpy().ndarray]) -> CausalEffect:
         """Estimate difference-in-differences effect"""
         if 'time_periods' not in data:
             logger.warning('No time periods provided for DiD, falling back to simple difference')
@@ -431,20 +432,20 @@ class CausalInferenceAnalyzer:
         pre_period = (time_periods == 0).astype(int)
         post_period = (time_periods == 1).astype(int)
         try:
-            X = np.column_stack([np.ones(len(outcome)), treatment, post_period, treatment * post_period])
-            beta_hat = np.linalg.lstsq(X, outcome, rcond=None)[0]
+            X = get_numpy().column_stack([get_numpy().ones(len(outcome)), treatment, post_period, treatment * post_period])
+            beta_hat = get_numpy().linalg.lstsq(X, outcome, rcond=None)[0]
             did_estimate = beta_hat[3]
             residuals = outcome - X @ beta_hat
-            mse = np.sum(residuals ** 2) / (len(outcome) - X.shape[1])
-            var_cov_matrix = mse * np.linalg.inv(X.T @ X)
-            se = np.sqrt(var_cov_matrix[3, 3])
+            mse = get_numpy().sum(residuals ** 2) / (len(outcome) - X.shape[1])
+            var_cov_matrix = mse * get_numpy().linalg.inv(X.T @ X)
+            se = get_numpy().sqrt(var_cov_matrix[3, 3])
             t_stat = did_estimate / se
             dof = len(outcome) - X.shape[1]
-            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), dof))
-            t_critical = stats.t.ppf(1 - self.significance_level / 2, dof)
+            p_value = 2 * (1 - get_scipy_stats().t.cdf(abs(t_stat), dof))
+            t_critical = get_scipy_stats().t.ppf(1 - self.significance_level / 2, dof)
             ci_lower = did_estimate - t_critical * se
             ci_upper = did_estimate + t_critical * se
-            outcome_std = np.std(outcome, ddof=1)
+            outcome_std = get_numpy().std(outcome, ddof=1)
             standardized_effect = did_estimate / outcome_std if outcome_std > 0 else 0
             if abs(standardized_effect) < 0.2:
                 interpretation = 'negligible effect'
@@ -454,12 +455,12 @@ class CausalInferenceAnalyzer:
                 interpretation = 'medium effect'
             else:
                 interpretation = 'large effect'
-            return CausalEffect(effect_name='Difference-in-Differences Estimate', point_estimate=float(did_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(did_estimate) >= self.minimum_effect_size), robustness_score=0.8, assumptions_satisfied=True, metadata={'standardized_effect': float(standardized_effect), 'regression_coefficients': beta_hat.tolist(), 'residual_std_error': float(np.sqrt(mse))})
+            return CausalEffect(effect_name='Difference-in-Differences Estimate', point_estimate=float(did_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.DIFFERENCE_IN_DIFFERENCES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(did_estimate) >= self.minimum_effect_size), robustness_score=0.8, assumptions_satisfied=True, metadata={'standardized_effect': float(standardized_effect), 'regression_coefficients': beta_hat.tolist(), 'residual_std_error': float(get_numpy().sqrt(mse))})
         except Exception as e:
             logger.error('Error in DiD estimation: %s', e)
             return self._estimate_simple_difference(data)
 
-    def _estimate_iv_effect(self, data: dict[str, np.ndarray]) -> CausalEffect:
+    def _estimate_iv_effect(self, data: dict[str, get_numpy().ndarray]) -> CausalEffect:
         """Estimate instrumental variables effect using 2SLS"""
         if 'instruments' not in data:
             logger.warning('No instruments provided for IV, falling back to simple difference')
@@ -468,23 +469,23 @@ class CausalInferenceAnalyzer:
         treatment = data['treatment']
         instruments = data['instruments']
         try:
-            x1 = np.column_stack([np.ones(len(treatment)), instruments])
-            first_stage_coef = np.linalg.lstsq(x1, treatment, rcond=None)[0]
+            x1 = get_numpy().column_stack([get_numpy().ones(len(treatment)), instruments])
+            first_stage_coef = get_numpy().linalg.lstsq(x1, treatment, rcond=None)[0]
             treatment_fitted = x1 @ first_stage_coef
-            x2 = np.column_stack([np.ones(len(outcome)), treatment_fitted])
-            second_stage_coef = np.linalg.lstsq(x2, outcome, rcond=None)[0]
+            x2 = get_numpy().column_stack([get_numpy().ones(len(outcome)), treatment_fitted])
+            second_stage_coef = get_numpy().linalg.lstsq(x2, outcome, rcond=None)[0]
             iv_estimate = second_stage_coef[1]
             residuals2 = outcome - x2 @ second_stage_coef
-            mse2 = np.sum(residuals2 ** 2) / (len(outcome) - x2.shape[1])
-            var_cov_matrix2 = mse2 * np.linalg.inv(x2.T @ x2)
-            se = np.sqrt(var_cov_matrix2[1, 1])
+            mse2 = get_numpy().sum(residuals2 ** 2) / (len(outcome) - x2.shape[1])
+            var_cov_matrix2 = mse2 * get_numpy().linalg.inv(x2.T @ x2)
+            se = get_numpy().sqrt(var_cov_matrix2[1, 1])
             t_stat = iv_estimate / se
             dof = len(outcome) - x2.shape[1]
-            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), dof))
-            t_critical = stats.t.ppf(1 - self.significance_level / 2, dof)
+            p_value = 2 * (1 - get_scipy_stats().t.cdf(abs(t_stat), dof))
+            t_critical = get_scipy_stats().t.ppf(1 - self.significance_level / 2, dof)
             ci_lower = iv_estimate - t_critical * se
             ci_upper = iv_estimate + t_critical * se
-            outcome_std = np.std(outcome, ddof=1)
+            outcome_std = get_numpy().std(outcome, ddof=1)
             standardized_effect = iv_estimate / outcome_std if outcome_std > 0 else 0
             if abs(standardized_effect) < 0.2:
                 interpretation = 'negligible effect'
@@ -494,12 +495,12 @@ class CausalInferenceAnalyzer:
                 interpretation = 'medium effect'
             else:
                 interpretation = 'large effect'
-            return CausalEffect(effect_name='Instrumental Variables Estimate (2SLS)', point_estimate=float(iv_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.INSTRUMENTAL_VARIABLES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(iv_estimate) >= self.minimum_effect_size), robustness_score=0.9, assumptions_satisfied=True, metadata={'first_stage_f_stat': float(np.var(treatment_fitted) / np.var(treatment - treatment_fitted)), 'standardized_effect': float(standardized_effect)})
+            return CausalEffect(effect_name='Instrumental Variables Estimate (2SLS)', point_estimate=float(iv_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.INSTRUMENTAL_VARIABLES, sample_size=len(outcome), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(iv_estimate) >= self.minimum_effect_size), robustness_score=0.9, assumptions_satisfied=True, metadata={'first_stage_f_stat': float(get_numpy().var(treatment_fitted) / get_numpy().var(treatment - treatment_fitted)), 'standardized_effect': float(standardized_effect)})
         except Exception as e:
             logger.error('Error in IV estimation: %s', e)
             return self._estimate_simple_difference(data)
 
-    def _estimate_psm_effect(self, data: dict[str, np.ndarray]) -> CausalEffect:
+    def _estimate_psm_effect(self, data: dict[str, get_numpy().ndarray]) -> CausalEffect:
         """Estimate effect using propensity score matching"""
         if 'covariates' not in data:
             logger.warning('No covariates provided for PSM, falling back to simple difference')
@@ -508,12 +509,14 @@ class CausalInferenceAnalyzer:
         treatment = data['treatment']
         covariates = data['covariates']
         try:
-            from sklearn.linear_model import LogisticRegression
-            from sklearn.neighbors import NearestNeighbors
+            from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
+            LogisticRegression = get_sklearn().linear_model.LogisticRegression
+            from prompt_improver.core.utils.lazy_ml_loader import get_sklearn
+            NearestNeighbors = get_sklearn().neighbors.NearestNeighbors
             lr = LogisticRegression(random_state=42)
             propensity_scores = lr.fit(covariates, treatment).predict_proba(covariates)[:, 1]
-            treated_indices = np.where(treatment == 1)[0]
-            control_indices = np.where(treatment == 0)[0]
+            treated_indices = get_numpy().where(treatment == 1)[0]
+            control_indices = get_numpy().where(treatment == 0)[0]
             if len(treated_indices) == 0 or len(control_indices) == 0:
                 return self._estimate_simple_difference(data)
             nn = NearestNeighbors(n_neighbors=1)
@@ -522,22 +525,22 @@ class CausalInferenceAnalyzer:
             matched_controls = control_indices[matched_control_idx.flatten()]
             treated_outcomes = outcome[treated_indices]
             matched_control_outcomes = outcome[matched_controls]
-            att_estimate = np.mean(treated_outcomes - matched_control_outcomes)
+            att_estimate = get_numpy().mean(treated_outcomes - matched_control_outcomes)
             n_bootstrap = min(self.bootstrap_samples, 1000)
             bootstrap_estimates = []
             for _ in range(n_bootstrap):
-                boot_indices = np.random.choice(len(treated_indices), len(treated_indices), replace=True)
+                boot_indices = get_numpy().random.choice(len(treated_indices), len(treated_indices), replace=True)
                 boot_treated = treated_outcomes[boot_indices]
                 boot_matched_control = matched_control_outcomes[boot_indices]
-                boot_att = np.mean(boot_treated - boot_matched_control)
+                boot_att = get_numpy().mean(boot_treated - boot_matched_control)
                 bootstrap_estimates.append(boot_att)
-            se = np.std(bootstrap_estimates)
+            se = get_numpy().std(bootstrap_estimates)
             t_stat = att_estimate / se if se > 0 else 0
             dof = len(treated_indices) - 1
-            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), dof)) if se > 0 else 0.5
-            ci_lower = np.percentile(bootstrap_estimates, 2.5)
-            ci_upper = np.percentile(bootstrap_estimates, 97.5)
-            outcome_std = np.std(outcome, ddof=1)
+            p_value = 2 * (1 - get_scipy_stats().t.cdf(abs(t_stat), dof)) if se > 0 else 0.5
+            ci_lower = get_numpy().percentile(bootstrap_estimates, 2.5)
+            ci_upper = get_numpy().percentile(bootstrap_estimates, 97.5)
+            outcome_std = get_numpy().std(outcome, ddof=1)
             standardized_effect = att_estimate / outcome_std if outcome_std > 0 else 0
             if abs(standardized_effect) < 0.2:
                 interpretation = 'negligible effect'
@@ -547,12 +550,12 @@ class CausalInferenceAnalyzer:
                 interpretation = 'medium effect'
             else:
                 interpretation = 'large effect'
-            return CausalEffect(effect_name='Propensity Score Matching Estimate (ATT)', point_estimate=float(att_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.PROPENSITY_SCORE_MATCHING, sample_size=len(treated_indices), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(att_estimate) >= self.minimum_effect_size), robustness_score=0.7, assumptions_satisfied=True, metadata={'n_matched_pairs': len(treated_indices), 'mean_propensity_score_treated': float(np.mean(propensity_scores[treated_indices])), 'mean_propensity_score_control': float(np.mean(propensity_scores[matched_controls])), 'standardized_effect': float(standardized_effect)})
+            return CausalEffect(effect_name='Propensity Score Matching Estimate (ATT)', point_estimate=float(att_estimate), confidence_interval=(float(ci_lower), float(ci_upper)), standard_error=float(se), p_value=float(p_value), method=CausalMethod.PROPENSITY_SCORE_MATCHING, sample_size=len(treated_indices), effect_size_interpretation=interpretation, statistical_significance=bool(p_value < self.significance_level), practical_significance=bool(abs(att_estimate) >= self.minimum_effect_size), robustness_score=0.7, assumptions_satisfied=True, metadata={'n_matched_pairs': len(treated_indices), 'mean_propensity_score_treated': float(get_numpy().mean(propensity_scores[treated_indices])), 'mean_propensity_score_control': float(get_numpy().mean(propensity_scores[matched_controls])), 'standardized_effect': float(standardized_effect)})
         except Exception as e:
             logger.error('Error in PSM estimation: %s', e)
             return self._estimate_simple_difference(data)
 
-    def _estimate_doubly_robust_effect(self, data: dict[str, np.ndarray]) -> CausalEffect:
+    def _estimate_doubly_robust_effect(self, data: dict[str, get_numpy().ndarray]) -> CausalEffect:
         """Estimate effect using doubly robust method"""
         if 'covariates' not in data:
             logger.warning('No covariates provided for doubly robust, falling back to simple difference')
@@ -561,7 +564,10 @@ class CausalInferenceAnalyzer:
         treatment = data['treatment']
         covariates = data['covariates']
         try:
-            from sklearn.linear_model import LinearRegression, LogisticRegression
+            from prompt_improver.core.utils.lazy_ml_loader import get_sklearn, get_numpy, get_scipy_stats
+            sklearn = get_sklearn()
+            LinearRegression = sklearn.linear_model.LinearRegression
+            LogisticRegression = sklearn.linear_model.LogisticRegression
             lr = LogisticRegression(random_state=42)
             propensity_scores = lr.fit(covariates, treatment).predict_proba(covariates)[:, 1]
             treated_mask = treatment == 1
@@ -572,49 +578,49 @@ class CausalInferenceAnalyzer:
             outcome_reg_control = LinearRegression()
             outcome_reg_control.fit(covariates[control_mask], outcome[control_mask])
             mu0_hat = outcome_reg_control.predict(covariates)
-            propensity_scores = np.clip(propensity_scores, 0.01, 0.99)
-            regression_component = np.mean(mu1_hat - mu0_hat)
+            propensity_scores = get_numpy().clip(propensity_scores, 0.01, 0.99)
+            regression_component = get_numpy().mean(mu1_hat - mu0_hat)
             ipw_treated = treatment * (outcome - mu1_hat) / propensity_scores
             ipw_control = (1 - treatment) * (outcome - mu0_hat) / (1 - propensity_scores)
-            ipw_component = np.mean(ipw_treated - ipw_control)
+            ipw_component = get_numpy().mean(ipw_treated - ipw_control)
             dr_estimate = regression_component + ipw_component
             n_bootstrap = min(self.bootstrap_samples, 1000)
             bootstrap_estimates = []
             for _ in range(n_bootstrap):
                 n = len(outcome)
-                boot_indices = np.random.choice(n, n, replace=True)
+                boot_indices = get_numpy().random.choice(n, n, replace=True)
                 boot_outcome = outcome[boot_indices]
                 boot_treatment = treatment[boot_indices]
                 boot_covariates = covariates[boot_indices]
                 try:
                     boot_ps = LogisticRegression(random_state=42).fit(boot_covariates, boot_treatment).predict_proba(boot_covariates)[:, 1]
-                    boot_ps = np.clip(boot_ps, 0.01, 0.99)
+                    boot_ps = get_numpy().clip(boot_ps, 0.01, 0.99)
                     boot_treated_mask = boot_treatment == 1
                     boot_control_mask = boot_treatment == 0
-                    if np.sum(boot_treated_mask) > 0 and np.sum(boot_control_mask) > 0:
+                    if get_numpy().sum(boot_treated_mask) > 0 and get_numpy().sum(boot_control_mask) > 0:
                         boot_mu1 = LinearRegression().fit(boot_covariates[boot_treated_mask], boot_outcome[boot_treated_mask]).predict(boot_covariates)
                         boot_mu0 = LinearRegression().fit(boot_covariates[boot_control_mask], boot_outcome[boot_control_mask]).predict(boot_covariates)
-                        boot_reg = np.mean(boot_mu1 - boot_mu0)
+                        boot_reg = get_numpy().mean(boot_mu1 - boot_mu0)
                         boot_ipw_treated = boot_treatment * (boot_outcome - boot_mu1) / boot_ps
                         boot_ipw_control = (1 - boot_treatment) * (boot_outcome - boot_mu0) / (1 - boot_ps)
-                        boot_ipw = np.mean(boot_ipw_treated - boot_ipw_control)
+                        boot_ipw = get_numpy().mean(boot_ipw_treated - boot_ipw_control)
                         boot_dr = boot_reg + boot_ipw
                         bootstrap_estimates.append(boot_dr)
                 except:
                     continue
             if len(bootstrap_estimates) > 10:
-                se = np.std(bootstrap_estimates)
-                ci_lower = np.percentile(bootstrap_estimates, 2.5)
-                ci_upper = np.percentile(bootstrap_estimates, 97.5)
+                se = get_numpy().std(bootstrap_estimates)
+                ci_lower = get_numpy().percentile(bootstrap_estimates, 2.5)
+                ci_upper = get_numpy().percentile(bootstrap_estimates, 97.5)
             else:
-                se = np.sqrt(np.var(outcome) / len(outcome))
-                t_critical = stats.t.ppf(1 - self.significance_level / 2, len(outcome) - 1)
+                se = get_numpy().sqrt(get_numpy().var(outcome) / len(outcome))
+                t_critical = get_scipy_stats().t.ppf(1 - self.significance_level / 2, len(outcome) - 1)
                 ci_lower = dr_estimate - t_critical * se
                 ci_upper = dr_estimate + t_critical * se
             t_stat = dr_estimate / se if se > 0 else 0
             dof = len(outcome) - 1
-            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), dof)) if se > 0 else 0.5
-            outcome_std = np.std(outcome, ddof=1)
+            p_value = 2 * (1 - get_scipy_stats().t.cdf(abs(t_stat), dof)) if se > 0 else 0.5
+            outcome_std = get_numpy().std(outcome, ddof=1)
             standardized_effect = dr_estimate / outcome_std if outcome_std > 0 else 0
             if abs(standardized_effect) < 0.2:
                 interpretation = 'negligible effect'
@@ -629,7 +635,7 @@ class CausalInferenceAnalyzer:
             logger.error('Error in doubly robust estimation: %s', e)
             return self._estimate_simple_difference(data)
 
-    def _estimate_conditional_effects(self, data: dict[str, np.ndarray], method: CausalMethod) -> CausalEffect | None:
+    def _estimate_conditional_effects(self, data: dict[str, get_numpy().ndarray], method: CausalMethod) -> CausalEffect | None:
         """Estimate conditional average treatment effects (CATE)"""
         if 'covariates' not in data:
             return None
@@ -639,43 +645,43 @@ class CausalInferenceAnalyzer:
             covariates = data['covariates']
             if covariates.shape[1] == 0:
                 return None
-            median_cov = np.median(covariates[:, 0])
+            median_cov = get_numpy().median(covariates[:, 0])
             high_cov = covariates[:, 0] >= median_cov
             low_cov = covariates[:, 0] < median_cov
             high_treated = outcome[high_cov & (treatment == 1)]
             high_control = outcome[high_cov & (treatment == 0)]
             if len(high_treated) > 5 and len(high_control) > 5:
-                high_effect = np.mean(high_treated) - np.mean(high_control)
-                high_se = np.sqrt(np.var(high_treated, ddof=1) / len(high_treated) + np.var(high_control, ddof=1) / len(high_control))
+                high_effect = get_numpy().mean(high_treated) - get_numpy().mean(high_control)
+                high_se = get_numpy().sqrt(get_numpy().var(high_treated, ddof=1) / len(high_treated) + get_numpy().var(high_control, ddof=1) / len(high_control))
             else:
                 high_effect = 0
                 high_se = 0
             low_treated = outcome[low_cov & (treatment == 1)]
             low_control = outcome[low_cov & (treatment == 0)]
             if len(low_treated) > 5 and len(low_control) > 5:
-                low_effect = np.mean(low_treated) - np.mean(low_control)
-                low_se = np.sqrt(np.var(low_treated, ddof=1) / len(low_treated) + np.var(low_control, ddof=1) / len(low_control))
+                low_effect = get_numpy().mean(low_treated) - get_numpy().mean(low_control)
+                low_se = get_numpy().sqrt(get_numpy().var(low_treated, ddof=1) / len(low_treated) + get_numpy().var(low_control, ddof=1) / len(low_control))
             else:
                 low_effect = 0
                 low_se = 0
-            n_high = np.sum(high_cov)
-            n_low = np.sum(low_cov)
+            n_high = get_numpy().sum(high_cov)
+            n_low = get_numpy().sum(low_cov)
             if n_high > 0 and n_low > 0:
                 cate_estimate = (n_high * high_effect + n_low * low_effect) / (n_high + n_low)
-                cate_se = np.sqrt((n_high * high_se ** 2 + n_low * low_se ** 2) / (n_high + n_low))
+                cate_se = get_numpy().sqrt((n_high * high_se ** 2 + n_low * low_se ** 2) / (n_high + n_low))
                 heterogeneity = abs(high_effect - low_effect)
                 return CausalEffect(effect_name='Conditional Average Treatment Effect', point_estimate=float(cate_estimate), confidence_interval=(float(cate_estimate - 1.96 * cate_se), float(cate_estimate + 1.96 * cate_se)), standard_error=float(cate_se), p_value=0.5, method=method, sample_size=len(outcome), effect_size_interpretation='varies by subgroup', statistical_significance=True, practical_significance=bool(abs(cate_estimate) >= self.minimum_effect_size), robustness_score=0.6, assumptions_satisfied=True, metadata={'high_group_effect': float(high_effect), 'low_group_effect': float(low_effect), 'heterogeneity': float(heterogeneity), 'subgroup_split_variable': 'covariate_0', 'split_threshold': float(median_cov)})
         except Exception as e:
             logger.warning('Error estimating conditional effects: %s', e)
         return None
 
-    def _perform_sensitivity_analysis(self, data: dict[str, np.ndarray], method: CausalMethod) -> dict[str, Any]:
+    def _perform_sensitivity_analysis(self, data: dict[str, get_numpy().ndarray], method: CausalMethod) -> dict[str, Any]:
         """Perform sensitivity analysis for unmeasured confounding"""
         try:
             outcome = data['outcome']
             treatment = data['treatment']
             baseline_effect = self._estimate_simple_difference(data).point_estimate
-            confounder_effects = np.linspace(0, abs(baseline_effect), 10)
+            confounder_effects = get_numpy().linspace(0, abs(baseline_effect), 10)
             adjusted_effects = []
             for confounder_effect in confounder_effects:
                 bias = confounder_effect * 0.5
@@ -691,7 +697,7 @@ class CausalInferenceAnalyzer:
             logger.warning('Error in sensitivity analysis: %s', e)
             return {'error': str(e)}
 
-    def _perform_placebo_tests(self, data: dict[str, np.ndarray], method: CausalMethod) -> dict[str, Any]:
+    def _perform_placebo_tests(self, data: dict[str, get_numpy().ndarray], method: CausalMethod) -> dict[str, Any]:
         """Perform placebo tests to check for spurious effects"""
         try:
             outcome = data['outcome']
@@ -700,13 +706,13 @@ class CausalInferenceAnalyzer:
             n_permutations = min(100, self.bootstrap_samples // 10)
             permutation_effects = []
             for _ in range(n_permutations):
-                permuted_treatment = np.random.permutation(treatment)
+                permuted_treatment = get_numpy().random.permutation(treatment)
                 permuted_data = data.copy()
                 permuted_data['treatment'] = permuted_treatment
                 placebo_effect = self._estimate_simple_difference(permuted_data).point_estimate
                 permutation_effects.append(placebo_effect)
             original_effect = self._estimate_simple_difference(data).point_estimate
-            p_value_permutation = np.mean(np.abs(permutation_effects) >= abs(original_effect))
+            p_value_permutation = get_numpy().mean(get_numpy().abs(permutation_effects) >= abs(original_effect))
             placebo_tests.append({'test_name': 'random_permutation', 'p_value': float(p_value_permutation), 'passes': p_value_permutation < 0.05, 'description': 'Treatment permutation test'})
             if 'time_periods' in data:
                 placebo_tests.append({'test_name': 'pre_treatment_placebo', 'p_value': 0.5, 'passes': True, 'description': 'Pre-treatment placebo test'})
@@ -715,20 +721,20 @@ class CausalInferenceAnalyzer:
             logger.warning('Error in placebo tests: %s', e)
             return {'error': str(e)}
 
-    def _assess_confounding(self, data: dict[str, np.ndarray], assignment: TreatmentAssignment) -> dict[str, Any]:
+    def _assess_confounding(self, data: dict[str, get_numpy().ndarray], assignment: TreatmentAssignment) -> dict[str, Any]:
         """Assess potential for unmeasured confounding"""
         outcome = data['outcome']
         treatment = data['treatment']
         assessment = {'assignment_mechanism': assignment.value, 'confounding_risk': 'low' if assignment == TreatmentAssignment.randomized else 'high'}
         try:
-            treated_outcome_mean = np.mean(outcome[treatment == 1])
-            control_outcome_mean = np.mean(outcome[treatment == 0])
-            overall_outcome_mean = np.mean(outcome)
-            extreme_difference = abs(treated_outcome_mean - control_outcome_mean) > 2 * np.std(outcome)
+            treated_outcome_mean = get_numpy().mean(outcome[treatment == 1])
+            control_outcome_mean = get_numpy().mean(outcome[treatment == 0])
+            overall_outcome_mean = get_numpy().mean(outcome)
+            extreme_difference = abs(treated_outcome_mean - control_outcome_mean) > 2 * get_numpy().std(outcome)
             assessment.update({'treated_outcome_mean': float(treated_outcome_mean), 'control_outcome_mean': float(control_outcome_mean), 'overall_outcome_mean': float(overall_outcome_mean), 'extreme_difference_detected': extreme_difference, 'potential_confounding_indicators': []})
             if extreme_difference:
                 assessment['potential_confounding_indicators'].append('Extreme outcome differences')
-            treatment_prevalence = np.mean(treatment)
+            treatment_prevalence = get_numpy().mean(treatment)
             if treatment_prevalence < 0.1 or treatment_prevalence > 0.9:
                 assessment['potential_confounding_indicators'].append('Unbalanced treatment assignment')
             assessment['treatment_prevalence'] = float(treatment_prevalence)
@@ -737,7 +743,7 @@ class CausalInferenceAnalyzer:
             assessment['error'] = str(e)
         return assessment
 
-    def _assess_covariate_balance(self, data: dict[str, np.ndarray]) -> dict[str, Any]:
+    def _assess_covariate_balance(self, data: dict[str, get_numpy().ndarray]) -> dict[str, Any]:
         """Assess balance of covariates between treatment groups"""
         if 'covariates' not in data:
             return {'no_covariates': True}
@@ -749,9 +755,9 @@ class CausalInferenceAnalyzer:
                 covariate = covariates[:, i]
                 treated_cov = covariate[treatment == 1]
                 control_cov = covariate[treatment == 0]
-                pooled_std = np.sqrt(((len(treated_cov) - 1) * np.var(treated_cov, ddof=1) + (len(control_cov) - 1) * np.var(control_cov, ddof=1)) / (len(treated_cov) + len(control_cov) - 2))
-                smd = (np.mean(treated_cov) - np.mean(control_cov)) / pooled_std if pooled_std > 0 else 0
-                statistic, p_value = stats.ttest_ind(treated_cov, control_cov)
+                pooled_std = get_numpy().sqrt(((len(treated_cov) - 1) * get_numpy().var(treated_cov, ddof=1) + (len(control_cov) - 1) * get_numpy().var(control_cov, ddof=1)) / (len(treated_cov) + len(control_cov) - 2))
+                smd = (get_numpy().mean(treated_cov) - get_numpy().mean(control_cov)) / pooled_std if pooled_std > 0 else 0
+                statistic, p_value = get_scipy_stats().ttest_ind(treated_cov, control_cov)
                 balance_results.append({'covariate_index': i, 'standardized_mean_difference': float(smd), 'p_value': float(p_value), 'balanced': abs(smd) < 0.1})
             n_imbalanced = sum(1 for r in balance_results if not r['balanced'])
             overall_balanced = n_imbalanced / len(balance_results) <= 0.05
@@ -797,7 +803,7 @@ class CausalInferenceAnalyzer:
             confounding_score = 0.4
         return (assumption_score + confounding_score) / 2
 
-    def _calculate_external_validity_score(self, data: dict[str, np.ndarray], method: CausalMethod) -> float:
+    def _calculate_external_validity_score(self, data: dict[str, get_numpy().ndarray], method: CausalMethod) -> float:
         """Calculate external validity score"""
         score_components = []
         n_total = data['n_total']
@@ -967,16 +973,16 @@ class CausalInferenceAnalyzer:
             logger.error('Error in parameter optimization causal analysis: %s', e)
             return self._create_error_result('parameter_optimization_causality', str(e))
 
-    async def _extract_causal_data_from_training(self, training_data: dict[str, Any], rule_id: str | None, outcome_metric: str, treatment_variable: str) -> dict[str, np.ndarray] | None:
+    async def _extract_causal_data_from_training(self, training_data: dict[str, Any], rule_id: str | None, outcome_metric: str, treatment_variable: str) -> dict[str, get_numpy().ndarray] | None:
         """Extract causal analysis data from training features"""
         try:
-            features = np.array(training_data['features'])
-            labels = np.array(training_data['labels'])
+            features = get_numpy().array(training_data['features'])
+            labels = get_numpy().array(training_data['labels'])
             metadata = training_data['metadata']
             if len(features) == 0:
                 return None
             outcomes = labels
-            median_score = np.median(outcomes)
+            median_score = get_numpy().median(outcomes)
             treatments = (outcomes > median_score).astype(int)
             covariates = features if features.shape[1] > 0 else None
             return {'outcomes': outcomes, 'treatments': treatments, 'covariates': covariates, 'metadata': metadata}
@@ -984,28 +990,28 @@ class CausalInferenceAnalyzer:
             logger.error('Error extracting causal data from training: %s', e)
             return None
 
-    async def _extract_rule_effectiveness_data(self, training_data: dict[str, Any], intervention_rules: list[str], control_rules: list[str]) -> dict[str, np.ndarray] | None:
+    async def _extract_rule_effectiveness_data(self, training_data: dict[str, Any], intervention_rules: list[str], control_rules: list[str]) -> dict[str, get_numpy().ndarray] | None:
         """Extract rule effectiveness comparison data"""
         try:
-            features = np.array(training_data['features'])
-            labels = np.array(training_data['labels'])
+            features = get_numpy().array(training_data['features'])
+            labels = get_numpy().array(training_data['labels'])
             if len(features) == 0:
                 return None
             n_samples = len(labels)
-            treatments = np.random.binomial(1, 0.5, n_samples)
+            treatments = get_numpy().random.binomial(1, 0.5, n_samples)
             return {'outcomes': labels, 'treatments': treatments, 'covariates': features, 'intervention_rules': intervention_rules, 'control_rules': control_rules}
         except Exception as e:
             logger.error('Error extracting rule effectiveness data: %s', e)
             return None
 
-    async def _extract_parameter_optimization_data(self, training_data: dict[str, Any], parameter_name: str, threshold_value: float) -> dict[str, np.ndarray] | None:
+    async def _extract_parameter_optimization_data(self, training_data: dict[str, Any], parameter_name: str, threshold_value: float) -> dict[str, get_numpy().ndarray] | None:
         """Extract parameter optimization data"""
         try:
-            features = np.array(training_data['features'])
-            labels = np.array(training_data['labels'])
+            features = get_numpy().array(training_data['features'])
+            labels = get_numpy().array(training_data['labels'])
             if len(features) == 0:
                 return None
-            parameter_values = features[:, 0] if features.shape[1] > 0 else np.random.random(len(labels))
+            parameter_values = features[:, 0] if features.shape[1] > 0 else get_numpy().random.random(len(labels))
             treatments = (parameter_values >= threshold_value).astype(int)
             discontinuity_detected = self._detect_discontinuity(parameter_values, labels, threshold_value)
             return {'outcomes': labels, 'treatments': treatments, 'covariates': features[:, 1:] if features.shape[1] > 1 else None, 'parameter_values': parameter_values, 'discontinuity_detected': discontinuity_detected}
@@ -1013,22 +1019,22 @@ class CausalInferenceAnalyzer:
             logger.error('Error extracting parameter optimization data: %s', e)
             return None
 
-    def _detect_discontinuity(self, parameter_values: np.ndarray, outcomes: np.ndarray, threshold: float) -> bool:
+    def _detect_discontinuity(self, parameter_values: get_numpy().ndarray, outcomes: get_numpy().ndarray, threshold: float) -> bool:
         """Detect if there's a discontinuity at the threshold"""
         try:
             below_threshold = outcomes[parameter_values < threshold]
             above_threshold = outcomes[parameter_values >= threshold]
             if len(below_threshold) < 5 or len(above_threshold) < 5:
                 return False
-            _, p_value = stats.ttest_ind(below_threshold, above_threshold)
+            _, p_value = get_scipy_stats().ttest_ind(below_threshold, above_threshold)
             return p_value < 0.05
         except Exception:
             return False
 
-    def _enhance_result_with_training_insights(self, result: CausalInferenceResult, training_data: dict[str, Any], causal_data: dict[str, np.ndarray]) -> CausalInferenceResult:
+    def _enhance_result_with_training_insights(self, result: CausalInferenceResult, training_data: dict[str, Any], causal_data: dict[str, get_numpy().ndarray]) -> CausalInferenceResult:
         """Enhance causal result with training data insights"""
         try:
-            training_metadata = {'training_samples': training_data['metadata']['total_samples'], 'real_samples': training_data['metadata']['real_samples'], 'synthetic_samples': training_data['metadata']['synthetic_samples'], 'feature_dimensions': len(training_data['features'][0]) if training_data['features'] else 0, 'outcome_range': (float(np.min(causal_data['outcomes'])), float(np.max(causal_data['outcomes'])))}
+            training_metadata = {'training_samples': training_data['metadata']['total_samples'], 'real_samples': training_data['metadata']['real_samples'], 'synthetic_samples': training_data['metadata']['synthetic_samples'], 'feature_dimensions': len(training_data['features'][0]) if training_data['features'] else 0, 'outcome_range': (float(get_numpy().min(causal_data['outcomes'])), float(get_numpy().max(causal_data['outcomes'])))}
             result.average_treatment_effect.metadata.update(training_metadata)
             training_recs = [f"💡 Training Insight: Analysis based on {training_metadata['training_samples']} training samples", f"📊 Data Quality: {training_metadata['real_samples']} real + {training_metadata['synthetic_samples']} synthetic samples"]
             if result.average_treatment_effect.practical_significance:
@@ -1039,7 +1045,7 @@ class CausalInferenceAnalyzer:
             logger.warning('Error enhancing result with training insights: %s', e)
             return result
 
-    def _enhance_result_with_rule_insights(self, result: CausalInferenceResult, intervention_rules: list[str], control_rules: list[str], effectiveness_data: dict[str, np.ndarray]) -> CausalInferenceResult:
+    def _enhance_result_with_rule_insights(self, result: CausalInferenceResult, intervention_rules: list[str], control_rules: list[str], effectiveness_data: dict[str, get_numpy().ndarray]) -> CausalInferenceResult:
         """Enhance result with rule-specific insights"""
         try:
             rule_metadata = {'intervention_rules': intervention_rules, 'control_rules': control_rules, 'n_intervention_rules': len(intervention_rules), 'n_control_rules': len(control_rules)}
@@ -1051,7 +1057,7 @@ class CausalInferenceAnalyzer:
             logger.warning('Error enhancing result with rule insights: %s', e)
             return result
 
-    def _enhance_result_with_parameter_insights(self, result: CausalInferenceResult, parameter_name: str, threshold_value: float, param_data: dict[str, np.ndarray]) -> CausalInferenceResult:
+    def _enhance_result_with_parameter_insights(self, result: CausalInferenceResult, parameter_name: str, threshold_value: float, param_data: dict[str, get_numpy().ndarray]) -> CausalInferenceResult:
         """Enhance result with parameter-specific insights"""
         try:
             param_metadata = {'parameter_name': parameter_name, 'threshold_value': threshold_value, 'discontinuity_detected': param_data.get('discontinuity_detected', False)}
@@ -1083,8 +1089,8 @@ def quick_causal_analysis(outcome_data: list[float], treatment_data: list[int], 
         method_map = {'simple_difference': CausalMethod.DIFFERENCE_IN_DIFFERENCES, 'did': CausalMethod.DIFFERENCE_IN_DIFFERENCES, 'iv': CausalMethod.INSTRUMENTAL_VARIABLES, 'psm': CausalMethod.PROPENSITY_SCORE_MATCHING, 'doubly_robust': CausalMethod.DOUBLY_ROBUST}
         causal_method = method_map.get(method, CausalMethod.DIFFERENCE_IN_DIFFERENCES)
         assignment = TreatmentAssignment.randomized if covariates is None else TreatmentAssignment.QUASI_EXPERIMENTAL
-        cov_array = np.array(covariates) if covariates else None
-        result = analyzer.analyze_causal_effect(outcome_data=np.array(outcome_data), treatment_data=np.array(treatment_data), covariates=cov_array, assignment_mechanism=assignment, method=causal_method)
+        cov_array = get_numpy().array(covariates) if covariates else None
+        result = analyzer.analyze_causal_effect(outcome_data=get_numpy().array(outcome_data), treatment_data=get_numpy().array(treatment_data), covariates=cov_array, assignment_mechanism=assignment, method=causal_method)
         return {'causal_effect': result.average_treatment_effect.point_estimate, 'confidence_interval': result.average_treatment_effect.confidence_interval, 'p_value': result.average_treatment_effect.p_value, 'statistical_significance': result.average_treatment_effect.statistical_significance, 'practical_significance': result.average_treatment_effect.practical_significance, 'effect_interpretation': result.average_treatment_effect.effect_size_interpretation, 'causal_interpretation': result.causal_interpretation, 'business_recommendations': result.business_recommendations, 'robustness_score': result.robustness_score, 'overall_quality': result.overall_quality_score, 'assumptions_satisfied': result.overall_assumptions_satisfied, 'warnings': result.statistical_warnings}
     except Exception as e:
         return {'error': str(e), 'causal_effect': 0.0, 'statistical_significance': False}

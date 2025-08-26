@@ -14,14 +14,12 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, Optional, Union
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel
-from sqlmodel import SQLModel
 
 from prompt_improver.core.common.config_utils import ConfigMixin
-from prompt_improver.core.common.logging_utils import LoggerMixin
 from prompt_improver.core.common.metrics_utils import MetricsMixin
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
@@ -29,7 +27,7 @@ from prompt_improver.performance.monitoring.health.background_manager import (
 )
 
 
-class ServiceState(str, Enum):
+class ServiceState(StrEnum):
     """Common service state enumeration."""
 
     INITIALIZING = "initializing"
@@ -40,7 +38,7 @@ class ServiceState(str, Enum):
     STOPPED = "stopped"
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Common health status enumeration."""
 
     HEALTHY = "healthy"
@@ -240,7 +238,7 @@ class BaseHealthChecker(MetricsMixin, ABC):
                 critical=self.critical,
             )
             self.last_result = result
-            self.logger.error(f"Health check {self.name} failed: {e}")
+            self.logger.exception(f"Health check {self.name} failed: {e}")
             self._record_health_metrics(result)
             return result
 
@@ -370,7 +368,7 @@ class BaseMonitor(BaseService):
             )
         task_manager = get_background_task_manager()
         task_status = await task_manager.get_task_status(self.monitoring_task_id)
-        if not task_status or task_status.get("status") not in ["running", "pending"]:
+        if not task_status or task_status.get("status") not in {"running", "pending"}:
             return HealthCheckResult(
                 status=HealthStatus.UNHEALTHY,
                 message="Monitoring task is not running",
@@ -416,7 +414,7 @@ class BaseMonitor(BaseService):
                 result = await checker.check()
                 results[name] = result
             except Exception as e:
-                self.logger.error(f"Failed to check {name}: {e}")
+                self.logger.exception(f"Failed to check {name}: {e}")
                 results[name] = HealthCheckResult(
                     status=HealthStatus.UNHEALTHY,
                     message=f"Check failed: {e}",

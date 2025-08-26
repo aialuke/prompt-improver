@@ -32,7 +32,7 @@ class Role(Enum):
 class AuthorizationService:
     """Real authorization service that implements RBAC (Role-Based Access Control)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.role_permissions: dict[Role, set[Permission]] = {
             Role.user: {Permission.READ_MODELS, Permission.VIEW_USERS},
             Role.ML_ENGINEER: {

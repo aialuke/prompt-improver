@@ -6,15 +6,14 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select, text
 
 from prompt_improver.cli.core.signal_handler import SignalOperation
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
 from prompt_improver.database.models import (
     DiscoveredPattern,
     RuleMetadata,
@@ -22,6 +21,7 @@ from prompt_improver.database.models import (
     TrainingIteration,
     TrainingSession,
 )
+from prompt_improver.shared.interfaces.protocols.database import SessionManagerProtocol
 
 
 @dataclass
@@ -56,7 +56,7 @@ class ProgressService:
     - Performance metrics preservation
     """
 
-    def __init__(self, session_manager: SessionManagerProtocol, backup_dir: Path | None = None):
+    def __init__(self, session_manager: SessionManagerProtocol, backup_dir: Path | None = None) -> None:
         self.session_manager = session_manager
         self.logger = logging.getLogger(__name__)
         self.backup_dir = backup_dir or Path("./training_backups")
@@ -69,7 +69,7 @@ class ProgressService:
         self.checkpoint_interval = 5
         self._init_signal_handlers()
 
-    def _init_signal_handlers(self):
+    def _init_signal_handlers(self) -> None:
         """Initialize signal handler with lazy import to avoid circular dependency."""
         try:
             try:
@@ -100,7 +100,7 @@ class ProgressService:
         except ImportError as e:
             self.logger.warning(f"Signal handling integration not available: {e}")
 
-    def _register_signal_handlers(self):
+    def _register_signal_handlers(self) -> None:
         """Register ProgressPreservationManager-specific signal handlers."""
         if self.signal_handler is None:
             self.logger.warning(
@@ -170,7 +170,7 @@ class ProgressService:
                 "cleaned_backup_files": cleaned_files,
             }
         except Exception as e:
-            self.logger.error(f"ProgressPreservationManager shutdown error: {e}")
+            self.logger.exception(f"ProgressPreservationManager shutdown error: {e}")
             return {
                 "status": "error",
                 "component": "ProgressPreservationManager",
@@ -218,7 +218,7 @@ class ProgressService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Emergency progress save failed: {e}")
+            self.logger.exception(f"Emergency progress save failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def generate_progress_status_report(self, signal_context):
@@ -253,14 +253,14 @@ class ProgressService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
-            self.logger.error(f"Progress status report generation failed: {e}")
+            self.logger.exception(f"Progress status report generation failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def prepare_progress_preservation(self, signum, signal_name):
         """Prepare progress preservation for coordinated shutdown."""
         self.logger.info(f"Preparing progress preservation ({signal_name})")
         try:
-            preparation_status = {
+            return {
                 "prepared": True,
                 "component": "ProgressPreservationManager",
                 "active_sessions": len(self.active_sessions),
@@ -268,9 +268,8 @@ class ProgressService:
                 "backup_directory_exists": self.backup_dir.exists(),
                 "ready_for_emergency_save": True,
             }
-            return preparation_status
         except Exception as e:
-            self.logger.error(f"Progress preservation preparation failed: {e}")
+            self.logger.exception(f"Progress preservation preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "ProgressPreservationManager",
@@ -281,7 +280,7 @@ class ProgressService:
         """Prepare progress preservation for user interruption (Ctrl+C)."""
         self.logger.info(f"Preparing progress interruption handling ({signal_name})")
         try:
-            interruption_preparation = {
+            return {
                 "prepared": True,
                 "component": "ProgressPreservationManager",
                 "interruption_type": "user_requested",
@@ -289,16 +288,15 @@ class ProgressService:
                 "immediate_save_ready": True,
                 "export_on_interrupt": True,
             }
-            return interruption_preparation
         except Exception as e:
-            self.logger.error(f"Progress interruption preparation failed: {e}")
+            self.logger.exception(f"Progress interruption preparation failed: {e}")
             return {
                 "prepared": False,
                 "component": "ProgressPreservationManager",
                 "error": str(e),
             }
 
-    async def _ensure_database_services(self):
+    async def _ensure_database_services(self) -> None:
         """Ensure database services are available."""
         if self._unified_session_manager is None:
             from prompt_improver.database import (
@@ -385,7 +383,7 @@ class ProgressService:
             )
             return unified_success and True
         except Exception as e:
-            self.logger.error(f"Failed to save training progress: {e}")
+            self.logger.exception(f"Failed to save training progress: {e}")
             return False
 
     async def _save_to_database(self, snapshot: ProgressSnapshot) -> None:
@@ -432,7 +430,7 @@ class ProgressService:
                         f"Training session {snapshot.session_id} not found in database"
                     )
         except Exception as e:
-            self.logger.error(f"Failed to save progress to database: {e}")
+            self.logger.exception(f"Failed to save progress to database: {e}")
 
     async def preserve_rule_optimizations(
         self, session_id: str, rule_optimizations: dict[str, Any]
@@ -490,7 +488,7 @@ class ProgressService:
                 )
                 return True
         except Exception as e:
-            self.logger.error(f"Failed to preserve rule optimizations: {e}")
+            self.logger.exception(f"Failed to preserve rule optimizations: {e}")
             return False
 
     async def preserve_discovered_patterns(
@@ -526,7 +524,7 @@ class ProgressService:
                 )
                 return True
         except Exception as e:
-            self.logger.error(f"Failed to preserve discovered patterns: {e}")
+            self.logger.exception(f"Failed to preserve discovered patterns: {e}")
             return False
 
     async def _save_to_backup_file(self, snapshot: ProgressSnapshot) -> None:
@@ -535,14 +533,14 @@ class ProgressService:
         try:
             backup_data = {"snapshots": []}
             if backup_file.exists():
-                with open(backup_file) as f:
+                with open(backup_file, encoding="utf-8") as f:
                     backup_data = json.load(f)
             snapshot_data = asdict(snapshot)
             snapshot_data["timestamp"] = snapshot.timestamp.isoformat()
             backup_data["snapshots"].append(snapshot_data)
             if len(backup_data["snapshots"]) > 50:
                 backup_data["snapshots"] = backup_data["snapshots"][-50:]
-            with open(backup_file, "w") as f:
+            with open(backup_file, "w", encoding="utf-8") as f:
                 json.dump(backup_data, f, indent=2)
         except Exception as e:
             self.logger.warning(f"Failed to save backup file: {e}")
@@ -606,12 +604,12 @@ class ProgressService:
                     "iterations": [],
                 }
                 checkpoint_file = self.backup_dir / f"{checkpoint_id}.json"
-                with open(checkpoint_file, "w") as f:
+                with open(checkpoint_file, "w", encoding="utf-8") as f:
                     json.dump(checkpoint_data, f, indent=2)
                 self.logger.info(f"Checkpoint created: {checkpoint_id}")
                 return checkpoint_id
         except Exception as e:
-            self.logger.error(f"Failed to create checkpoint: {e}")
+            self.logger.exception(f"Failed to create checkpoint: {e}")
             return None
 
     async def recover_session_progress(
@@ -652,7 +650,7 @@ class ProgressService:
                     return snapshot
             backup_file = self.backup_dir / f"{session_id}_progress.json"
             if backup_file.exists():
-                with open(backup_file) as f:
+                with open(backup_file, encoding="utf-8") as f:
                     backup_data = json.load(f)
                 if backup_data.get("snapshots"):
                     latest_snapshot_data = backup_data["snapshots"][-1]
@@ -664,7 +662,7 @@ class ProgressService:
             self.logger.warning(f"No recovery data found for session {session_id}")
             return None
         except Exception as e:
-            self.logger.error(f"Failed to recover session progress: {e}")
+            self.logger.exception(f"Failed to recover session progress: {e}")
             return None
 
     async def cleanup_resources(self, session_id: str) -> bool:
@@ -692,7 +690,7 @@ class ProgressService:
             self.logger.info(f"Resource cleanup completed for session {session_id}")
             return True
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to cleanup resources for session {session_id}: {e}"
             )
             return False
@@ -756,7 +754,7 @@ class ProgressService:
             pid_file = self.backup_dir / f"{session_id}.pid"
             if pid_file.exists():
                 try:
-                    with open(pid_file) as f:
+                    with open(pid_file, encoding="utf-8") as f:
                         old_pid = int(f.read().strip())
                     try:
                         os.kill(old_pid, 0)
@@ -772,14 +770,14 @@ class ProgressService:
                 except (ValueError, FileNotFoundError):
                     pid_file.unlink()
             current_pid = os.getpid()
-            with open(pid_file, "w") as f:
+            with open(pid_file, "w", encoding="utf-8") as f:
                 f.write(str(current_pid))
             self.logger.info(
                 f"Created PID file for session {session_id} with PID {current_pid}"
             )
             return True
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to create PID file for session {session_id}: {e}"
             )
             return False
@@ -800,7 +798,7 @@ class ProgressService:
                 self.logger.info(f"Removed PID file for session {session_id}")
             return True
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to remove PID file for session {session_id}: {e}"
             )
             return False
@@ -816,7 +814,7 @@ class ProgressService:
             for pid_file in self.backup_dir.glob("*.pid"):
                 session_id = pid_file.stem
                 try:
-                    with open(pid_file) as f:
+                    with open(pid_file, encoding="utf-8") as f:
                         pid = int(f.read().strip())
                     try:
                         os.kill(pid, 0)
@@ -831,7 +829,7 @@ class ProgressService:
                         f"Found invalid PID file for session: {session_id}"
                     )
         except Exception as e:
-            self.logger.error(f"Failed to check for orphaned sessions: {e}")
+            self.logger.exception(f"Failed to check for orphaned sessions: {e}")
         return orphaned_sessions
 
     async def cleanup_orphaned_sessions(self) -> int:
@@ -849,7 +847,7 @@ class ProgressService:
                 cleaned_count += 1
                 self.logger.info(f"Cleaned up orphaned session: {session_id}")
             except Exception as e:
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to cleanup orphaned session {session_id}: {e}"
                 )
         return cleaned_count
@@ -899,7 +897,7 @@ class ProgressService:
                 self.logger.error(f"Unsupported export format: {export_format}")
                 return None
         except Exception as e:
-            self.logger.error(f"Failed to export session results: {e}")
+            self.logger.exception(f"Failed to export session results: {e}")
             return None
 
     async def _export_json(
@@ -923,7 +921,6 @@ class ProgressService:
                 "completed_at": session.completed_at.isoformat()
                 if session.completed_at
                 else None,
-                "max_iterations": session.max_iterations,
                 "current_iteration": session.current_iteration,
                 "best_performance": session.best_performance,
                 "performance_history": session.performance_history,
@@ -944,7 +941,7 @@ class ProgressService:
                 for iter_data in sorted(session.iterations, key=lambda x: x.iteration)
             ]
         export_file = self.backup_dir / f"{session.session_id}_export_{timestamp}.json"
-        with open(export_file, "w") as f:
+        with open(export_file, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2)
         self.logger.info(f"Session exported to JSON: {export_file}")
         return str(export_file)
@@ -956,7 +953,7 @@ class ProgressService:
         import csv
 
         export_file = self.backup_dir / f"{session.session_id}_export_{timestamp}.csv"
-        with open(export_file, "w", newline="") as csvfile:
+        with open(export_file, "w", encoding="utf-8", newline="") as csvfile:
             if include_iterations and session.iterations:
                 fieldnames = [
                     "session_id",
@@ -969,8 +966,7 @@ class ProgressService:
                 ]
                 if session.iterations:
                     sample_metrics = session.iterations[0].performance_metrics or {}
-                    for metric_name in sample_metrics.keys():
-                        fieldnames.append(f"metric_{metric_name}")
+                    fieldnames.extend(f"metric_{metric_name}" for metric_name in sample_metrics)
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 for iter_data in sorted(session.iterations, key=lambda x: x.iteration):
@@ -1039,5 +1035,5 @@ class ProgressService:
                 self.logger.info(f"Cleaned up {cleaned_count} old backup files")
             return cleaned_count
         except Exception as e:
-            self.logger.error(f"Failed to cleanup old backups: {e}")
+            self.logger.exception(f"Failed to cleanup old backups: {e}")
             return 0

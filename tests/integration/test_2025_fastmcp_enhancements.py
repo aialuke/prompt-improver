@@ -8,26 +8,20 @@ Tests the actual implementation of:
 """
 
 import asyncio
-import json
 import logging
 import time
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp.server.fastmcp import Context
 
 from prompt_improver.mcp_server.middleware import (
-    DetailedTimingMiddleware,
     ErrorHandlingMiddleware,
     MiddlewareContext,
     RateLimitingMiddleware,
-    StructuredLoggingMiddleware,
     TimingMiddleware,
     create_default_middleware_stack,
 )
 from prompt_improver.mcp_server.server import APESMCPServer
-from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +61,7 @@ class TestMiddlewareStack:
             return {"success": True}
 
         context = MiddlewareContext(method="test_method")
-        for i in range(3):
+        for _i in range(3):
             result = await middleware(context, test_handler)
             assert result["success"] is True
         from mcp import McpError

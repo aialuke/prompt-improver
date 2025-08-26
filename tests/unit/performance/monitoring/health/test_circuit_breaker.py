@@ -4,8 +4,6 @@ No mocks - testing actual circuit breaker behavior
 """
 
 import asyncio
-import time
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -36,7 +34,7 @@ class TestCircuitBreaker:
             raise ValueError(f"Intentional failure {call_count}")
 
         assert breaker.state == CircuitState.CLOSED
-        for i in range(config.failure_threshold):
+        for _i in range(config.failure_threshold):
             with pytest.raises(ValueError):
                 await breaker.call(failing_function)
         assert breaker.state == CircuitState.OPEN
@@ -86,7 +84,7 @@ class TestCircuitBreaker:
             await asyncio.sleep(0.1)
             return "slow_success"
 
-        for i in range(config.failure_threshold):
+        for _i in range(config.failure_threshold):
             result = await breaker.call(slow_function)
             assert result == "slow_success"
         assert breaker.state == CircuitState.OPEN

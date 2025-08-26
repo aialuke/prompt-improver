@@ -105,7 +105,7 @@ class SecureSubprocessManager:
     - Audit logging
     """
 
-    def __init__(self, default_timeout: int = 300, enable_audit_logging: bool = True):
+    def __init__(self, default_timeout: int = 300, enable_audit_logging: bool = True) -> None:
         """Initialize the secure subprocess manager.
 
         Args:
@@ -215,7 +215,7 @@ class SecureSubprocessManager:
         if not args:
             raise ValueError("Command arguments cannot be empty")
         validated_executable = self._validate_executable_path(args[0])
-        validated_args = [validated_executable] + self._validate_arguments(args[1:])
+        validated_args = [validated_executable, *self._validate_arguments(args[1:])]
         secure_kwargs = {
             "shell": False,
             "timeout": timeout or self.default_timeout,
@@ -231,21 +231,21 @@ class SecureSubprocessManager:
             secure_kwargs["cwd"] = str(cwd_path.resolve())
         self._log_subprocess_call(validated_args, operation)
         try:
-            result = subprocess.run(validated_args, **secure_kwargs)
+            result = subprocess.run(validated_args, check=False, **secure_kwargs)
             if self.enable_audit_logging:
                 logger.info(f"Subprocess completed successfully: {operation}")
             return result
         except subprocess.TimeoutExpired as e:
-            logger.error(f"Subprocess timeout in {operation}: {e}")
+            logger.exception(f"Subprocess timeout in {operation}: {e}")
             raise
         except subprocess.CalledProcessError as e:
-            logger.error(f"Subprocess failed in {operation}: {e}")
+            logger.exception(f"Subprocess failed in {operation}: {e}")
             raise
         except (FileNotFoundError, PermissionError, OSError) as e:
-            logger.error(f"System error in {operation}: {e}")
+            logger.exception(f"System error in {operation}: {e}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in {operation}: {e}")
+            logger.exception(f"Unexpected error in {operation}: {e}")
             raise
 
     def popen_secure(
@@ -278,7 +278,7 @@ class SecureSubprocessManager:
         if not args:
             raise ValueError("Command arguments cannot be empty")
         validated_executable = self._validate_executable_path(args[0])
-        validated_args = [validated_executable] + self._validate_arguments(args[1:])
+        validated_args = [validated_executable, *self._validate_arguments(args[1:])]
         secure_kwargs = {
             "shell": False,
             "stdout": stdout,
@@ -293,10 +293,10 @@ class SecureSubprocessManager:
                 logger.info(f"Subprocess Popen started: {operation}")
             return process
         except (FileNotFoundError, PermissionError, OSError) as e:
-            logger.error(f"System error starting {operation}: {e}")
+            logger.exception(f"System error starting {operation}: {e}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error starting {operation}: {e}")
+            logger.exception(f"Unexpected error starting {operation}: {e}")
             raise
 
 

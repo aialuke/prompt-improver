@@ -1,0 +1,131 @@
+[importlinter]
+root_package = prompt_improver
+include_external_packages = true
+
+# ===================================================================
+# CRITICAL: Test Infrastructure Domain Boundaries (Post-Decomposition)
+# ===================================================================
+
+[importlinter.contracts.test_fixture_layers]
+name = "Test fixture domain layer boundaries"
+type = "layers"
+layers = [
+    "tests.fixtures.business",
+    "tests.fixtures.application",
+    "tests.fixtures.foundation"
+]
+
+[importlinter.contracts.test_helper_isolation]
+name = "Test helper module isolation"
+type = "independence"
+modules = [
+    "tests.services",
+    "tests.containers",
+    "tests.utils",
+    "tests.database_helpers"
+]
+
+# ===================================================================
+# Protocol-Based Dependency Injection Enforcement (Enhanced)
+# ===================================================================
+
+[importlinter.contracts.protocol_independence]
+name = "Protocol Consolidation Independence"
+type = "independence" 
+modules = [
+    "prompt_improver.shared.interfaces.protocols"
+]
+
+[importlinter.contracts.protocol_database_access]
+name = "Protocol-based database access enforcement"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.application",
+    "prompt_improver.api", 
+    "prompt_improver.cli",
+    "prompt_improver.ml",
+    "tests.fixtures.application",
+    "tests.fixtures.business"
+]
+forbidden_modules = [
+    "prompt_improver.database.models",
+    "prompt_improver.database.services.connection",
+    "sqlalchemy.orm.session"
+]
+allow_indirect = false
+
+# ===================================================================
+# Clean Architecture Layer Boundaries
+# ===================================================================
+
+[importlinter.contracts.clean_architecture]
+name = "Clean Architecture layers"
+type = "layers"
+layers = [
+    "prompt_improver.api",
+    "prompt_improver.cli", 
+    "prompt_improver.application",
+    "prompt_improver.ml",
+    "prompt_improver.database",
+    "prompt_improver.services",
+    "prompt_improver.core"
+]
+
+# ===================================================================
+# Circular Import Prevention (Critical Security)
+# ===================================================================
+
+[importlinter.contracts.prevent_test_cycles]
+name = "Prevent test infrastructure cycles"
+type = "forbidden"
+source_modules = [
+    "tests.services",
+    "tests.containers",
+    "tests.utils", 
+    "tests.database_helpers"
+]
+forbidden_modules = [
+    "tests.conftest"
+]
+
+[importlinter.contracts.prevent_core_cycles]
+name = "Prevent core framework cycles"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.core"
+]
+forbidden_modules = [
+    "prompt_improver.api",
+    "prompt_improver.application",
+    "prompt_improver.ml"
+]
+
+# ===================================================================
+# Security & Cache Architecture Boundaries
+# ===================================================================
+
+[importlinter.contracts.security_isolation]
+name = "Security service isolation"  
+type = "layers"
+layers = [
+    "prompt_improver.api",
+    "prompt_improver.application",
+    "prompt_improver.security.services",
+    "prompt_improver.security"
+]
+
+[importlinter.contracts.cache_facade_enforcement]
+name = "Cache service layer isolation"
+type = "forbidden"
+source_modules = [
+    "prompt_improver.application",
+    "prompt_improver.api",
+    "prompt_improver.ml"
+]
+forbidden_modules = [
+    "redis",
+    "coredis"
+]
+ignore_imports = [
+    "prompt_improver.services.cache.cache_facade"
+]

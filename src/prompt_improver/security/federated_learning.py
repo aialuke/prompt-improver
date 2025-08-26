@@ -11,7 +11,7 @@ from cryptography.fernet import Fernet
 class FederatedLearningService:
     """Real federated learning service that implements secure multi-party computation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.registered_clients: dict[str, dict[str, Any]] = {}
         self.client_updates: dict[str, list[dict[str, Any]]] = {}
         self.aggregation_rounds = 0
@@ -188,7 +188,7 @@ class FederatedLearningService:
         for update in updates:
             gradients = update["decrypted_data"]["gradients"]
             total_norm = 0.0
-            for layer_name, gradient in gradients.items():
+            for gradient in gradients.values():
                 layer_norm = sum(x * x for x in gradient) ** 0.5
                 total_norm += layer_norm
             gradient_norms.append(total_norm)
@@ -198,7 +198,7 @@ class FederatedLearningService:
             sum((x - mean_norm) ** 2 for x in gradient_norms) / len(gradient_norms)
         ) ** 0.5
         outlier_threshold = 2.0
-        for i, (client_id, norm) in enumerate(
+        for _i, (client_id, norm) in enumerate(
             zip(client_ids, gradient_norms, strict=False)
         ):
             deviation = abs(norm - mean_norm)

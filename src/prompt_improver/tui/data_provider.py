@@ -46,7 +46,7 @@ class APESDataProvider:
     Integrates with existing services to provide unified data access.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.analytics_service = None
         self.health_monitor = None
         self.real_time_analytics = None
@@ -78,8 +78,6 @@ class APESDataProvider:
                 self.service_manager = apes_service_manager()
         except Exception:
             pass
-        self._cache: dict[str, dict[str, Any]] = {}
-        self._cache_ttl = 5
 
     async def initialize(self) -> None:
         """Initialize all services."""
@@ -95,8 +93,6 @@ class APESDataProvider:
 
     async def get_system_overview(self) -> dict[str, Any]:
         """Get system overview data."""
-        if self._is_cached("system_overview"):
-            return self._cache["system_overview"]["data"]
         try:
             if self.health_monitor and hasattr(
                 self.health_monitor, "get_overall_health"
@@ -115,7 +111,7 @@ class APESDataProvider:
                     "cpu": {},
                     "disk": {},
                 }
-            system_info = {
+            return {
                 "status": "online"
                 if health_data.get("status") == "healthy"
                 else "warning",
@@ -132,11 +128,6 @@ class APESDataProvider:
                 "cpu_usage": health_data.get("cpu", {}).get("usage_percent", 0),
                 "disk_usage": health_data.get("disk", {}).get("usage_percent", 0),
             }
-            self._cache["system_overview"] = {
-                "data": system_info,
-                "timestamp": datetime.now(),
-            }
-            return system_info
         except Exception as e:
             return {
                 "status": "error",
@@ -153,8 +144,6 @@ class APESDataProvider:
 
     async def get_automl_status(self) -> dict[str, Any]:
         """Get AutoML optimization status."""
-        if self._is_cached("automl_status"):
-            return self._cache["automl_status"]["data"]
         try:
             if self.automl_orchestrator and hasattr(
                 self.automl_orchestrator, "get_optimization_status"
@@ -162,7 +151,7 @@ class APESDataProvider:
                 status = await self.automl_orchestrator.get_optimization_status()
             else:
                 status = {"status": "idle", "current_trial": 0, "total_trials": 0}
-            automl_data = {
+            return {
                 "status": status.get("status", "idle"),
                 "current_trial": status.get("current_trial", 0),
                 "total_trials": status.get("total_trials", 0),
@@ -175,11 +164,6 @@ class APESDataProvider:
                 "eta_completion": status.get("eta_completion"),
                 "recent_scores": status.get("recent_scores", []),
             }
-            self._cache["automl_status"] = {
-                "data": automl_data,
-                "timestamp": datetime.now(),
-            }
-            return automl_data
         except Exception as e:
             return {
                 "status": "error",
@@ -198,8 +182,6 @@ class APESDataProvider:
 
     async def get_ab_testing_results(self) -> dict[str, Any]:
         """Get A/B testing experiment results."""
-        if self._is_cached("ab_testing"):
-            return self._cache["ab_testing"]["data"]
         try:
             if self.experiment_orchestrator:
                 experiments = (
@@ -252,7 +234,6 @@ class APESDataProvider:
                     "effect_size": exp.get("results", {}).get("effect_size", 0),
                 }
                 ab_data["experiments"].append(experiment_data)
-            self._cache["ab_testing"] = {"data": ab_data, "timestamp": datetime.now()}
             return ab_data
         except Exception as e:
             return {
@@ -267,8 +248,6 @@ class APESDataProvider:
 
     async def get_performance_metrics(self) -> dict[str, Any]:
         """Get system performance metrics."""
-        if self._is_cached("performance_metrics"):
-            return self._cache["performance_metrics"]["data"]
         try:
             if self.real_time_analytics and hasattr(
                 self.real_time_analytics, "get_current_metrics"
@@ -280,7 +259,7 @@ class APESDataProvider:
                     "requests_per_second": 45.2,
                     "error_rate": 0.02,
                 }
-            performance_data = {
+            return {
                 "response_time": metrics.get("avg_response_time", 0),
                 "throughput": metrics.get("requests_per_second", 0),
                 "error_rate": metrics.get("error_rate", 0),
@@ -292,11 +271,6 @@ class APESDataProvider:
                 "recent_response_times": metrics.get("recent_response_times", []),
                 "recent_throughput": metrics.get("recent_throughput", []),
             }
-            self._cache["performance_metrics"] = {
-                "data": performance_data,
-                "timestamp": datetime.now(),
-            }
-            return performance_data
         except Exception as e:
             return {
                 "response_time": 0,
@@ -314,8 +288,6 @@ class APESDataProvider:
 
     async def get_service_status(self) -> dict[str, Any]:
         """Get service control status."""
-        if self._is_cached("service_status"):
-            return self._cache["service_status"]["data"]
         try:
             if self.service_manager and hasattr(
                 self.service_manager, "get_all_service_status"
@@ -335,7 +307,7 @@ class APESDataProvider:
                         "uptime": "2h 15m",
                     },
                 }
-            service_data = {
+            return {
                 "services": services,
                 "total_services": len(services),
                 "running_services": len([
@@ -347,11 +319,6 @@ class APESDataProvider:
                 "system_load": 0.65,
                 "auto_restart_enabled": True,
             }
-            self._cache["service_status"] = {
-                "data": service_data,
-                "timestamp": datetime.now(),
-            }
-            return service_data
         except Exception as e:
             return {
                 "services": {},
@@ -391,13 +358,6 @@ class APESDataProvider:
             return False
         except Exception:
             return False
-
-    def _is_cached(self, key: str) -> bool:
-        """Check if data is cached and not expired."""
-        if key not in self._cache:
-            return False
-        elapsed = (datetime.now() - self._cache[key]["timestamp"]).total_seconds()
-        return elapsed < self._cache_ttl
 
     def _calculate_uptime(self) -> str:
         """Calculate system uptime."""

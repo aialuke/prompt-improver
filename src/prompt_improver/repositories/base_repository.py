@@ -8,14 +8,13 @@ management, and connection handling.
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 from sqlmodel import SQLModel
 
-from prompt_improver.core.protocols.database_protocol import DatabaseSessionProtocol
 from prompt_improver.database import DatabaseServices
 from prompt_improver.repositories.protocols.base_repository_protocol import (
     BaseRepositoryProtocol,
@@ -72,7 +71,7 @@ class QueryBuilder(QueryBuilderProtocol):
 class TransactionManager(TransactionManagerProtocol):
     """Transaction manager implementation."""
 
-    def __init__(self, connection_manager: DatabaseServices):
+    def __init__(self, connection_manager: DatabaseServices) -> None:
         self.connection_manager = connection_manager
 
     @asynccontextmanager
@@ -107,7 +106,7 @@ class TransactionManager(TransactionManagerProtocol):
             await savepoint.rollback()
 
 
-class BaseRepository(BaseRepositoryProtocol[T], Generic[T]):
+class BaseRepository[T: SQLModel](BaseRepositoryProtocol[T]):
     """Base repository implementation with common database operations."""
 
     def __init__(
@@ -116,7 +115,7 @@ class BaseRepository(BaseRepositoryProtocol[T], Generic[T]):
         connection_manager: DatabaseServices,
         create_model_class: type[CreateT] | None = None,
         update_model_class: type[UpdateT] | None = None,
-    ):
+    ) -> None:
         self.model_class = model_class
         self.connection_manager = connection_manager
         self.create_model_class = create_model_class
@@ -317,7 +316,7 @@ class BaseRepository(BaseRepositoryProtocol[T], Generic[T]):
                     "connection_status": "active",
                 }
         except Exception as e:
-            logger.error(f"Health check failed for {self.model_class.__name__}: {e}")
+            logger.exception(f"Health check failed for {self.model_class.__name__}: {e}")
             return {
                 "status": "unhealthy",
                 "model": self.model_class.__name__,

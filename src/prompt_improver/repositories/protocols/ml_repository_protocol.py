@@ -9,7 +9,7 @@ Defines the interface for ML-specific data access operations, including:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -357,73 +357,73 @@ class MLRepositoryProtocol(Protocol):
     async def archive_completed_sessions(self, days_old: int = 30) -> int:
         """Archive completed sessions older than specified days."""
         ...
-    
+
     # Intelligence Processing Methods (migrated from MLIntelligenceProcessor)
-    
+
     async def get_prompt_characteristics_batch(
         self, batch_size: int = 100
     ) -> list[dict[str, Any]]:
         """Get batch of prompt characteristics for ML processing."""
         ...
-    
+
     async def get_rule_performance_data(
         self, batch_size: int = 100
     ) -> list[dict[str, Any]]:
         """Get rule performance data for intelligence processing."""
         ...
-    
+
     async def cache_rule_intelligence(
         self, intelligence_data: list[dict[str, Any]]
     ) -> None:
         """Cache rule intelligence results with upsert logic."""
         ...
-    
+
     async def get_rule_combinations_data(
         self, batch_size: int = 100
     ) -> list[dict[str, Any]]:
         """Get rule combination data for analysis."""
         ...
-    
+
     async def cache_combination_intelligence(
         self, combination_data: list[dict[str, Any]]
     ) -> None:
         """Cache rule combination intelligence results."""
         ...
-    
+
     async def cache_pattern_discovery(
         self, pattern_data: dict[str, Any]
     ) -> None:
         """Cache pattern discovery results."""
         ...
-    
+
     async def cleanup_expired_cache(self) -> dict[str, Any]:
         """Clean up expired intelligence cache entries."""
         ...
-    
+
     async def check_rule_intelligence_freshness(
         self, rule_id: str
     ) -> bool:
         """Check if rule intelligence cache is fresh."""
         ...
-    
+
     async def get_rule_historical_performance(
         self, rule_id: str
     ) -> list[dict[str, Any]]:
         """Get historical performance data for rule."""
         ...
-    
+
     async def process_ml_predictions_batch(
         self, batch_data: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         """Process ML predictions for batch of data."""
         ...
-    
+
     async def update_rule_intelligence_incremental(
         self, rule_id: str, performance_data: dict[str, Any]
     ) -> None:
         """Update rule intelligence with incremental data."""
         ...
-    
+
     async def get_intelligence_processing_stats(self) -> dict[str, Any]:
         """Get statistics for intelligence processing operations."""
         ...

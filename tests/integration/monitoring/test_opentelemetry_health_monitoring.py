@@ -6,9 +6,7 @@ Real behavior testing for OpenTelemetry health monitoring integration.
 Replaces prometheus-based health monitoring tests with OTel-native validation.
 """
 
-import asyncio
 import time
-from typing import Any, Dict
 
 import pytest
 
@@ -201,7 +199,7 @@ class TestOpenTelemetryHealthMonitoring:
     def test_health_monitoring_real_behavior(self):
         """Test health monitoring with real behavior patterns."""
         for minute in range(5):
-            for check in range(2):
+            for _check in range(2):
                 self.http_metrics.record_request(
                     method="GET",
                     endpoint="/health",

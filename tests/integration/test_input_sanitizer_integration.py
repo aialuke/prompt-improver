@@ -6,9 +6,7 @@ and verify input validation works correctly across the orchestration system.
 """
 
 import asyncio
-import logging
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+import contextlib
 
 import numpy as np
 import pytest
@@ -18,9 +16,6 @@ from prompt_improver.ml.orchestration.config.orchestrator_config import (
 )
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator,
-)
-from prompt_improver.ml.orchestration.integration.component_invoker import (
-    ComponentInvoker,
 )
 from prompt_improver.ml.orchestration.integration.direct_component_loader import (
     DirectComponentLoader,
@@ -256,10 +251,8 @@ class TestInputSanitizerIntegration:
             np.array([np.nan, 1.0, 2.0]),
         ]
         for test_input in test_cases:
-            try:
+            with contextlib.suppress(SecurityError):
                 await orchestrator.validate_input_secure(test_input)
-            except SecurityError:
-                pass
         final_stats = orchestrator.input_sanitizer.get_security_stats()
         assert final_stats["total_validations"] > initial_stats["total_validations"]
         assert final_stats["threats_detected"] >= initial_stats["threats_detected"]

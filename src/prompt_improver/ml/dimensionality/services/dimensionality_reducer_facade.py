@@ -15,13 +15,14 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 import asyncio
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
 
 from . import ReductionResult, EvaluationMetrics
 from .data_preprocessor_service import DataPreprocessorService, DataPreprocessorServiceFactory
 from .classical_reducer_service import ClassicalReducerService, ClassicalReducerServiceFactory  
 from .neural_reducer_service import NeuralReducerService, NeuralReducerServiceFactory
 from .reduction_evaluator_service import ReductionEvaluatorService, ReductionEvaluatorServiceFactory
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class DimensionalityReducerFacade:
             except ImportError:
                 logger.warning("Neural methods not available (PyTorch not installed)")
 
-    async def reduce_dimensions(self, X: np.ndarray, y: Optional[np.ndarray] = None, 
+    async def reduce_dimensions(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None, 
                               method: Optional[str] = None) -> ReductionResult:
         """Reduce dimensionality of input data with optimal method selection.
         
@@ -198,7 +199,7 @@ class DimensionalityReducerFacade:
             logger.error(f"Dimensionality reduction failed: {e}", exc_info=True)
             raise
 
-    async def _select_optimal_method(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> str:
+    async def _select_optimal_method(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> str:
         """Intelligently select the optimal dimensionality reduction method."""
         n_samples, n_features = X.shape
         
@@ -217,10 +218,10 @@ class DimensionalityReducerFacade:
         if self.method_performance:
             best_performing_method = max(
                 (m for m in suitable_methods if m in self.method_performance),
-                key=lambda m: np.mean(self.method_performance[m]),
+                key=lambda m: get_numpy().mean(self.method_performance[m]),
                 default=None
             )
-            if best_performing_method and np.mean(self.method_performance[best_performing_method]) > 0.7:
+            if best_performing_method and get_numpy().mean(self.method_performance[best_performing_method]) > 0.7:
                 return best_performing_method
         
         # Apply heuristic selection rules
@@ -280,7 +281,7 @@ class DimensionalityReducerFacade:
         
         return "pca"  # Safe default
 
-    async def _apply_reduction_method(self, X: np.ndarray, y: Optional[np.ndarray], method: str) -> ReductionResult:
+    async def _apply_reduction_method(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray], method: str) -> ReductionResult:
         """Apply specific dimensionality reduction method."""
         method_info = self.method_services[method]
         
@@ -323,7 +324,7 @@ class DimensionalityReducerFacade:
             if hasattr(service, 'get_explained_variance_ratio'):
                 explained_variance = service.get_explained_variance_ratio()
                 if explained_variance is not None:
-                    variance_preserved = np.sum(explained_variance)
+                    variance_preserved = get_numpy().sum(explained_variance)
             
             # Get feature importance if available
             feature_importance = None
@@ -347,7 +348,7 @@ class DimensionalityReducerFacade:
             logger.error(f"Failed to apply method '{method}': {e}")
             raise
 
-    def _create_identity_result(self, X: np.ndarray, start_time: float) -> ReductionResult:
+    def _create_identity_result(self, X: get_numpy().ndarray, start_time: float) -> ReductionResult:
         """Create identity result when no reduction is needed."""
         return ReductionResult(
             method="identity",
@@ -395,8 +396,8 @@ class DimensionalityReducerFacade:
         if method in self.method_performance:
             scores = self.method_performance[method]
             method_info["performance"] = {
-                "avg_quality": float(np.mean(scores)),
-                "std_quality": float(np.std(scores)),
+                "avg_quality": float(get_numpy().mean(scores)),
+                "std_quality": float(get_numpy().std(scores)),
                 "usage_count": len(scores)
             }
         
@@ -413,10 +414,10 @@ class DimensionalityReducerFacade:
             "status": "available",
             "total_reductions": len(self.reduction_history),
             "recent_performance": {
-                "avg_quality_score": float(np.mean([r.quality_score for r in recent_results])),
-                "avg_processing_time": float(np.mean([r.processing_time for r in recent_results])),
-                "avg_variance_preserved": float(np.mean([r.variance_preserved for r in recent_results])),
-                "avg_dimensionality_reduction": float(np.mean([
+                "avg_quality_score": float(get_numpy().mean([r.quality_score for r in recent_results])),
+                "avg_processing_time": float(get_numpy().mean([r.processing_time for r in recent_results])),
+                "avg_variance_preserved": float(get_numpy().mean([r.variance_preserved for r in recent_results])),
+                "avg_dimensionality_reduction": float(get_numpy().mean([
                     (r.original_dimensions - r.reduced_dimensions) / r.original_dimensions
                     for r in recent_results
                 ]))
@@ -429,15 +430,15 @@ class DimensionalityReducerFacade:
         for method, scores in self.method_performance.items():
             if scores:
                 summary["method_performance"][method] = {
-                    "avg_quality": float(np.mean(scores)),
-                    "std_quality": float(np.std(scores)),
+                    "avg_quality": float(get_numpy().mean(scores)),
+                    "std_quality": float(get_numpy().std(scores)),
                     "usage_count": len(scores),
-                    "reliability": float(np.mean([s > 0.5 for s in scores]))
+                    "reliability": float(get_numpy().mean([s > 0.5 for s in scores]))
                 }
         
         return summary
 
-    def recommend_method(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> Dict[str, Any]:
+    def recommend_method(self, X: get_numpy().ndarray, y: Optional[get_numpy().ndarray] = None) -> Dict[str, Any]:
         """Recommend the best method for given data characteristics."""
         n_samples, n_features = X.shape
         

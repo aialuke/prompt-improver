@@ -12,13 +12,14 @@ Key responsibilities:
 """
 
 import asyncio
+import contextlib
 import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from .types import ManagerMode, PoolConfiguration, ServiceConfiguration
+from prompt_improver.database.types import ManagerMode, ServiceConfiguration
 
 logger = logging.getLogger(__name__)
 
@@ -51,18 +52,18 @@ class SecurityContext:
     created_at: float = field(default_factory=time.time)
     authentication_method: str = "none"
     authentication_timestamp: float = field(default_factory=time.time)
-    session_id: Optional[str] = None
-    permissions: List[str] = field(default_factory=list)
+    session_id: str | None = None
+    permissions: list[str] = field(default_factory=list)
     validation_result: Optional["SecurityValidationResult"] = None
     threat_score: Optional["SecurityThreatScore"] = None
     performance_metrics: Optional["SecurityPerformanceMetrics"] = None
-    audit_metadata: Dict[str, Any] = field(default_factory=dict)
-    compliance_tags: List[str] = field(default_factory=list)
+    audit_metadata: dict[str, Any] = field(default_factory=dict)
+    compliance_tags: list[str] = field(default_factory=list)
     security_level: str = "basic"
     zero_trust_validated: bool = False
-    encryption_context: Optional[Dict[str, str]] = None
-    expires_at: Optional[float] = None
-    max_operations: Optional[int] = None
+    encryption_context: dict[str, str] | None = None
+    expires_at: float | None = None
+    max_operations: int | None = None
     operations_count: int = 0
     last_used: float = field(default_factory=time.time)
 
@@ -77,23 +78,23 @@ class SecurityContext:
 
         # Initialize validation result if not provided
         if self.validation_result is None:
-            from .types import SecurityValidationResult
+            from prompt_improver.database.types import SecurityValidationResult
 
             self.validation_result = SecurityValidationResult()
 
         # Initialize threat score if not provided
         if self.threat_score is None:
-            from .types import SecurityThreatScore
+            from prompt_improver.database.types import SecurityThreatScore
 
             self.threat_score = SecurityThreatScore()
 
         # Initialize performance metrics if not provided
         if self.performance_metrics is None:
-            from .types import SecurityPerformanceMetrics
+            from prompt_improver.database.types import SecurityPerformanceMetrics
 
             self.performance_metrics = SecurityPerformanceMetrics()
 
-    def _get_tier_permissions(self) -> List[str]:
+    def _get_tier_permissions(self) -> list[str]:
         """Get permissions based on security tier."""
         base_permissions = ["cache_read"]
 
@@ -118,9 +119,7 @@ class SecurityContext:
         current_time = time.time()
         if self.expires_at and current_time > self.expires_at:
             return False
-        if self.max_operations and self.operations_count >= self.max_operations:
-            return False
-        return True
+        return not (self.max_operations and self.operations_count >= self.max_operations)
 
     def is_expired(self) -> bool:
         """Check if security context has expired."""
@@ -139,7 +138,7 @@ class SecurityContext:
 
 
 # Global security context cache
-_security_contexts: Dict[str, SecurityContext] = {}
+_security_contexts: dict[str, SecurityContext] = {}
 _context_lock = asyncio.Lock()
 
 
@@ -147,8 +146,8 @@ async def create_security_context(
     agent_id: str,
     tier: str,
     authenticated: bool = True,
-    session_id: Optional[str] = None,
-    custom_permissions: Optional[Dict[str, bool]] = None,
+    session_id: str | None = None,
+    custom_permissions: dict[str, bool] | None = None,
 ) -> SecurityContext:
     """Create a new security context for service operations.
 
@@ -186,8 +185,8 @@ async def create_security_context(
 
 
 async def get_security_context(
-    agent_id: str, tier: str, session_id: Optional[str] = None
-) -> Optional[SecurityContext]:
+    agent_id: str, tier: str, session_id: str | None = None
+) -> SecurityContext | None:
     """Get existing security context if available and not expired.
 
     Args:
@@ -204,7 +203,7 @@ async def get_security_context(
 
         if context and not context.is_expired():
             return context
-        elif context:
+        if context:
             # Remove expired context
             del _security_contexts[context_key]
 
@@ -212,7 +211,7 @@ async def get_security_context(
 
 
 async def create_service_configuration(
-    mode: ManagerMode, overrides: Optional[Dict[str, Any]] = None
+    mode: ManagerMode, overrides: dict[str, Any] | None = None
 ) -> ServiceConfiguration:
     """Create service configuration for a specific manager mode.
 
@@ -295,7 +294,7 @@ async def cleanup_security_contexts():
 
 
 # Periodic cleanup task management
-_cleanup_task: Optional[asyncio.Task] = None
+_cleanup_task: asyncio.Task | None = None
 
 
 async def start_security_context_cleanup():
@@ -305,7 +304,7 @@ async def start_security_context_cleanup():
     if _cleanup_task and not _cleanup_task.done():
         return
 
-    async def cleanup_loop():
+    async def cleanup_loop() -> None:
         while True:
             try:
                 await asyncio.sleep(300)  # 5 minutes
@@ -313,7 +312,7 @@ async def start_security_context_cleanup():
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in security context cleanup: {e}")
+                logger.exception(f"Error in security context cleanup: {e}")
 
     _cleanup_task = asyncio.create_task(cleanup_loop())
     logger.info("Started security context cleanup task")
@@ -325,10 +324,8 @@ async def stop_security_context_cleanup():
 
     if _cleanup_task and not _cleanup_task.done():
         _cleanup_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await _cleanup_task
-        except asyncio.CancelledError:
-            pass
         _cleanup_task = None
         logger.info("Stopped security context cleanup task")
 
@@ -337,7 +334,7 @@ async def create_security_context_from_auth_result(
     agent_id: str,
     tier: str,
     authenticated: bool = True,
-    auth_result: Optional[Dict[str, Any]] = None,
+    auth_result: dict[str, Any] | None = None,
 ) -> SecurityContext:
     """Create security context from authentication result.
 

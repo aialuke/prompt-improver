@@ -16,7 +16,7 @@ from prompt_improver.ml.analysis.generation_strategy_analyzer import GenerationS
 from prompt_improver.ml.analysis.performance_gap_analyzer import PerformanceGap, PerformanceGapAnalyzer
 from prompt_improver.ml.orchestration.coordinators.adaptive_training_coordinator import AdaptiveTrainingCoordinator
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import MLPipelineOrchestrator
-from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
+from prompt_improver.ml.preprocessing.orchestrator import ProductionSyntheticDataGenerator
 
 @pytest.fixture
 async def real_database_session():

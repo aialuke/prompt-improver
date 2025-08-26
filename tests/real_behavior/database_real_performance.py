@@ -19,34 +19,22 @@ import logging
 import os
 import random
 import sys
-import tempfile
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-import asyncpg
 import numpy as np
-import pandas as pd
 import psutil
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from prompt_improver.database.models import (
-    ABExperiment,
-    RulePerformance,
     TrainingPrompt,
 )
 from prompt_improver.database.performance_monitor import DatabasePerformanceMonitor
-from prompt_improver.database.query_optimizer import (
-    DatabaseConnectionOptimizer,
-    OptimizedQueryExecutor,
-)
-from prompt_improver.database import (
-    ManagerMode,
-    get_unified_manager,
-)
+from prompt_improver.database.query_optimizer import OptimizedQueryExecutor
+from prompt_improver.services.cache.l2_redis_service import RedisCache
 
 sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
 logger = logging.getLogger(__name__)

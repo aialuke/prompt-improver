@@ -1,4 +1,4 @@
-"""SLO Monitoring and Alerting Components
+"""SLO Monitoring and Alerting Components.
 =====================================
 
 Implements comprehensive SLO monitoring, error budget tracking, and burn rate alerting
@@ -12,14 +12,12 @@ from collections import deque
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from prompt_improver.database import (
-    ManagerMode,
     create_security_context,
-    get_database_services,
 )
 from prompt_improver.monitoring.slo.calculator import (
     MultiWindowSLICalculator,
@@ -36,15 +34,12 @@ from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
 )
-from prompt_improver.performance.monitoring.health.sla_monitor import (
-    SLAMonitor,  # re-export for compatibility
-)
 
 logger = logging.getLogger(__name__)
 
 
 class AlertSeverity(Enum):
-    """Alert severity levels"""
+    """Alert severity levels."""
 
     INFO = "info"
     WARNING = "warning"
@@ -53,7 +48,7 @@ class AlertSeverity(Enum):
 
 
 class AlertState(Enum):
-    """Alert state tracking"""
+    """Alert state tracking."""
 
     OK = "ok"
     PENDING = "pending"
@@ -62,7 +57,7 @@ class AlertState(Enum):
 
 
 class Alert(BaseModel):
-    """SLO alert definition"""
+    """SLO alert definition."""
 
     id: str = Field(min_length=1, max_length=255)
     slo_name: str = Field(min_length=1, max_length=255)
@@ -81,7 +76,7 @@ class Alert(BaseModel):
     annotations: dict[str, str] = Field(default_factory=dict)
 
     def model_dump(self) -> dict[str, Any]:
-        """Convert alert to dictionary format"""
+        """Convert alert to dictionary format."""
         return {
             "id": self.id,
             "slo_name": self.slo_name,
@@ -104,14 +99,14 @@ class Alert(BaseModel):
 
 
 class BurnRateAlert:
-    """Burn rate alerting with multiple thresholds following Google SRE practices"""
+    """Burn rate alerting with multiple thresholds following Google SRE practices."""
 
     def __init__(
         self,
         slo_target: SLOTarget,
         short_window: SLOTimeWindow = SLOTimeWindow.HOUR_1,
         long_window: SLOTimeWindow = SLOTimeWindow.DAY_1,
-    ):
+    ) -> None:
         self.slo_target = slo_target
         self.short_window = short_window
         self.long_window = long_window
@@ -130,7 +125,7 @@ class BurnRateAlert:
     def evaluate_burn_rate(
         self, short_result: SLIResult, long_result: SLIResult
     ) -> list[Alert]:
-        """Evaluate burn rate and generate alerts if necessary"""
+        """Evaluate burn rate and generate alerts if necessary."""
         self.last_evaluation = datetime.now(UTC)
         new_alerts = []
         short_burn_rate = self._calculate_burn_rate(short_result)
@@ -198,7 +193,7 @@ class BurnRateAlert:
         return new_alerts
 
     def _calculate_burn_rate(self, result: SLIResult) -> float:
-        """Calculate burn rate from SLI result"""
+        """Calculate burn rate from SLI result."""
         if result.measurement_count == 0:
             return 0.0
         if self.slo_target.slo_type == SLOType.AVAILABILITY:
@@ -230,15 +225,15 @@ class BurnRateAlert:
         long_rate: float,
         severity: AlertSeverity,
     ) -> str:
-        """Generate human-readable burn rate alert message"""
+        """Generate human-readable burn rate alert message."""
         return f"SLO burn rate alert ({severity.value}): {self.slo_target.service_name}/{self.slo_target.name} burning error budget at {short_rate:.1f}x rate (threshold: {threshold:.1f}x, short window: {short_rate:.1f}x, long window: {long_rate:.1f}x)"
 
     def get_active_alerts(self) -> list[Alert]:
-        """Get all currently active alerts"""
+        """Get all currently active alerts."""
         return list(self.active_alerts.values())
 
     def get_alert_summary(self) -> dict[str, Any]:
-        """Get summary of alert status"""
+        """Get summary of alert status."""
         return {
             "active_alert_count": len(self.active_alerts),
             "active_alerts": [
@@ -252,9 +247,9 @@ class BurnRateAlert:
 
 
 class ErrorBudgetMonitor:
-    """Monitor error budget consumption and policy enforcement"""
+    """Monitor error budget consumption and policy enforcement."""
 
-    def __init__(self, slo_definition: SLODefinition, unified_manager=None):
+    def __init__(self, slo_definition: SLODefinition, unified_manager=None) -> None:
         self.slo_definition = slo_definition
         if unified_manager:
             self._unified_manager = unified_manager
@@ -270,7 +265,7 @@ class ErrorBudgetMonitor:
         self.is_monitoring = False
 
     async def _ensure_security_context(self):
-        """Ensure security context exists for Redis operations"""
+        """Ensure security context exists for Redis operations."""
         if self._security_context is None:
             self._security_context = await create_security_context(
                 agent_id=f"slo_error_budget_monitor_{self.slo_definition.service_name}",
@@ -280,11 +275,11 @@ class ErrorBudgetMonitor:
         return self._security_context
 
     def register_policy_action(self, action_name: str, callback: Callable) -> None:
-        """Register a policy action callback"""
+        """Register a policy action callback."""
         self.policy_actions[action_name] = callback
 
     def register_exhaustion_callback(self, callback: Callable) -> None:
-        """Register callback for error budget exhaustion"""
+        """Register callback for error budget exhaustion."""
         self.exhaustion_callbacks.append(callback)
 
     async def update_error_budget(
@@ -294,7 +289,7 @@ class ErrorBudgetMonitor:
         failed_requests: int,
         time_window: SLOTimeWindow,
     ) -> ErrorBudget:
-        """Update error budget for SLO target"""
+        """Update error budget for SLO target."""
         budget_key = f"{slo_target.name}_{time_window.value}"
         if budget_key not in self.error_budgets:
             self.error_budgets[budget_key] = ErrorBudget(
@@ -318,7 +313,7 @@ class ErrorBudgetMonitor:
         return budget
 
     async def _store_budget_unified(self, budget_key: str, budget: ErrorBudget) -> None:
-        """Store error budget in unified cache system"""
+        """Store error budget in unified cache system."""
         try:
             if not self._initialized:
                 await self._unified_manager.initialize()
@@ -352,7 +347,7 @@ class ErrorBudgetMonitor:
             logger.warning(f"Failed to store error budget in unified cache: {e}")
 
     async def _check_budget_exhaustion(self, budget: ErrorBudget) -> None:
-        """Check for error budget exhaustion and enforce policies"""
+        """Check for error budget exhaustion and enforce policies."""
         if budget.is_budget_exhausted():
             logger.critical(f"Error budget exhausted for {budget.slo_target.name} ({budget.time_window.value} window)")
             policy = self.slo_definition.error_budget_policy
@@ -369,12 +364,12 @@ class ErrorBudgetMonitor:
                     else:
                         callback(budget)
                 except Exception as e:
-                    logger.error(f"Error budget exhaustion callback failed: {e}")
+                    logger.exception(f"Error budget exhaustion callback failed: {e}")
 
     async def _execute_policy_action(
         self, action_name: str, budget: ErrorBudget
     ) -> None:
-        """Execute registered policy action"""
+        """Execute registered policy action."""
         if action_name in self.policy_actions:
             try:
                 callback = self.policy_actions[action_name]
@@ -384,12 +379,12 @@ class ErrorBudgetMonitor:
                     callback(budget)
                 logger.info(f"Executed policy action: {action_name}")
             except Exception as e:
-                logger.error(f"Policy action {action_name} failed: {e}")
+                logger.exception(f"Policy action {action_name} failed: {e}")
         else:
             logger.warning(f"Policy action {action_name} not registered")
 
     def get_budget_status(self) -> dict[str, Any]:
-        """Get comprehensive error budget status"""
+        """Get comprehensive error budget status."""
         status = {
             "service_name": self.slo_definition.service_name,
             "slo_name": self.slo_definition.name,
@@ -425,7 +420,7 @@ class ErrorBudgetMonitor:
         return status
 
     async def start_monitoring(self) -> None:
-        """Start continuous error budget monitoring"""
+        """Start continuous error budget monitoring."""
         if self.is_monitoring:
             return
         self.is_monitoring = True
@@ -443,7 +438,7 @@ class ErrorBudgetMonitor:
         logger.info("Started error budget monitoring")
 
     async def stop_monitoring(self) -> None:
-        """Stop error budget monitoring"""
+        """Stop error budget monitoring."""
         self.is_monitoring = False
         if self.monitoring_task_id:
             task_manager = get_background_task_manager()
@@ -452,7 +447,7 @@ class ErrorBudgetMonitor:
         logger.info("Stopped error budget monitoring")
 
     async def _monitoring_loop(self) -> None:
-        """Continuous monitoring loop"""
+        """Continuous monitoring loop."""
         while self.is_monitoring:
             try:
                 for budget in self.error_budgets.values():
@@ -461,18 +456,18 @@ class ErrorBudgetMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in budget monitoring loop: {e}")
+                logger.exception(f"Error in budget monitoring loop: {e}")
                 await asyncio.sleep(self.check_interval_seconds)
 
 
 class SLOMonitor:
-    """Comprehensive SLO monitoring orchestrator"""
+    """Comprehensive SLO monitoring orchestrator."""
 
     def __init__(
         self,
         slo_definition: SLODefinition,
         alert_callbacks: list[Callable] | None = None,
-    ):
+    ) -> None:
         self.slo_definition = slo_definition
         self.alert_callbacks = alert_callbacks or []
         self._unified_manager = None  # Will be initialized async
@@ -501,7 +496,7 @@ class SLOMonitor:
         labels: dict[str, str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Add measurement to specific SLO target"""
+        """Add measurement to specific SLO target."""
         if target_name in self.calculators:
             self.calculators[target_name].add_measurement(
                 value=value,
@@ -514,7 +509,7 @@ class SLOMonitor:
             logger.warning(f"SLO target {target_name} not found")
 
     async def evaluate_slos(self) -> dict[str, Any]:
-        """Evaluate all SLOs and generate alerts"""
+        """Evaluate all SLOs and generate alerts."""
         evaluation_results = {
             "service_name": self.slo_definition.service_name,
             "evaluation_time": datetime.now(UTC).isoformat(),
@@ -571,7 +566,7 @@ class SLOMonitor:
                         target, total_requests, failed_requests, SLOTimeWindow.DAY_1
                     )
             except Exception as e:
-                logger.error(f"Failed to evaluate SLO target {target_name}: {e}")
+                logger.exception(f"Failed to evaluate SLO target {target_name}: {e}")
                 evaluation_results["slo_results"][target_name] = {"error": str(e)}
         evaluation_results["error_budget_status"] = (
             self.error_budget_monitor.get_budget_status()
@@ -585,7 +580,7 @@ class SLOMonitor:
         return evaluation_results
 
     async def _send_alert(self, alert: Alert) -> None:
-        """Send alert through registered callbacks"""
+        """Send alert through registered callbacks."""
         for callback in self.alert_callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
@@ -593,14 +588,14 @@ class SLOMonitor:
                 else:
                     callback(alert)
             except Exception as e:
-                logger.error(f"Alert callback failed: {e}")
+                logger.exception(f"Alert callback failed: {e}")
 
     def register_alert_callback(self, callback: Callable) -> None:
-        """Register alert callback"""
+        """Register alert callback."""
         self.alert_callbacks.append(callback)
 
     async def start_monitoring(self) -> None:
-        """Start continuous SLO monitoring"""
+        """Start continuous SLO monitoring."""
         if self.is_monitoring:
             return
         self.is_monitoring = True
@@ -619,7 +614,7 @@ class SLOMonitor:
         logger.info(f"Started SLO monitoring for {self.slo_definition.service_name}")
 
     async def stop_monitoring(self) -> None:
-        """Stop SLO monitoring"""
+        """Stop SLO monitoring."""
         self.is_monitoring = False
         await self.error_budget_monitor.stop_monitoring()
         if self.monitoring_task_id:
@@ -629,7 +624,7 @@ class SLOMonitor:
         logger.info(f"Stopped SLO monitoring for {self.slo_definition.service_name}")
 
     async def _monitoring_loop(self) -> None:
-        """Main monitoring loop"""
+        """Main monitoring loop."""
         while self.is_monitoring:
             try:
                 await self.evaluate_slos()
@@ -637,11 +632,11 @@ class SLOMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in SLO monitoring loop: {e}")
+                logger.exception(f"Error in SLO monitoring loop: {e}")
                 await asyncio.sleep(self.check_interval_seconds)
 
     def get_status(self) -> dict[str, Any]:
-        """Get comprehensive monitoring status"""
+        """Get comprehensive monitoring status."""
         return {
             "service_name": self.slo_definition.service_name,
             "slo_name": self.slo_definition.name,
@@ -657,14 +652,14 @@ class SLOMonitor:
 
 
 class AlertAggregator:
-    """Aggregate and deduplicate alerts to reduce noise"""
+    """Aggregate and deduplicate alerts to reduce noise."""
 
-    def __init__(self, aggregation_window_seconds: int = 300):
+    def __init__(self, aggregation_window_seconds: int = 300) -> None:
         self.aggregation_window_seconds = aggregation_window_seconds
         self.recent_alerts: deque = deque()
 
     def aggregate_alerts(self, alerts: list[Alert]) -> list[Alert]:
-        """Aggregate similar alerts within time window"""
+        """Aggregate similar alerts within time window."""
         current_time = datetime.now(UTC)
         cutoff_time = current_time - timedelta(seconds=self.aggregation_window_seconds)
         self.recent_alerts = deque([
@@ -683,7 +678,7 @@ class AlertAggregator:
         return unique_alerts
 
     def _are_similar_alerts(self, alert1: Alert, alert2: Alert) -> bool:
-        """Check if two alerts are similar enough to be considered duplicates"""
+        """Check if two alerts are similar enough to be considered duplicates."""
         return (
             alert1.slo_name == alert2.slo_name
             and alert1.service_name == alert2.service_name

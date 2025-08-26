@@ -3,13 +3,15 @@
 import math
 import random
 
-import numpy as np
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+
+# import numpy as np  # Converted to lazy loading
 
 
 class DifferentialPrivacyService:
     """Real differential privacy service that implements secure privacy-preserving mechanisms."""
 
-    def __init__(self, initial_epsilon: float = 1.0, initial_delta: float = 1e-06):
+    def __init__(self, initial_epsilon: float = 1.0, initial_delta: float = 1e-06) -> None:
         self.initial_epsilon = initial_epsilon
         self.initial_delta = initial_delta
         self.epsilon = initial_epsilon
@@ -24,9 +26,7 @@ class DifferentialPrivacyService:
         """Check if sufficient privacy budget remains for the requested operation."""
         if self.query_count >= self.max_queries:
             return False
-        if self.privacy_spent + requested_epsilon > self.epsilon:
-            return False
-        return True
+        return not self.privacy_spent + requested_epsilon > self.epsilon
 
     def consume_privacy_budget(
         self, epsilon_used: float, operation: str = "query"
@@ -47,7 +47,7 @@ class DifferentialPrivacyService:
         return True
 
     def add_laplace_noise(
-        self, value: float, sensitivity: float = 1.0, epsilon: float = None
+        self, value: float, sensitivity: float = 1.0, epsilon: float | None = None
     ) -> float:
         """Add Laplace noise for differential privacy."""
         if epsilon is None:
@@ -55,7 +55,7 @@ class DifferentialPrivacyService:
         if not self.consume_privacy_budget(epsilon, "laplace_noise"):
             raise ValueError("Insufficient privacy budget")
         scale = sensitivity / epsilon
-        rng = np.random.default_rng()
+        rng = get_numpy().random.default_rng()
         noise = rng.laplace(0, scale)
         return float(value + noise)
 
@@ -63,8 +63,8 @@ class DifferentialPrivacyService:
         self,
         value: float,
         sensitivity: float = 1.0,
-        epsilon: float = None,
-        delta: float = None,
+        epsilon: float | None = None,
+        delta: float | None = None,
     ) -> float:
         """Add Gaussian noise for (epsilon, delta)-differential privacy."""
         if epsilon is None:
@@ -74,7 +74,7 @@ class DifferentialPrivacyService:
         if not self.consume_privacy_budget(epsilon, "gaussian_noise"):
             raise ValueError("Insufficient privacy budget")
         sigma = math.sqrt(2 * math.log(1.25 / delta)) * sensitivity / epsilon
-        rng = np.random.default_rng()
+        rng = get_numpy().random.default_rng()
         noise = rng.normal(0, sigma)
         return float(value + noise)
 
@@ -89,7 +89,7 @@ class DifferentialPrivacyService:
         raise ValueError(f"Unknown mechanism: {mechanism}")
 
     def private_count(
-        self, data: list[int | float], threshold: float = None, epsilon: float = None
+        self, data: list[int | float], threshold: float | None = None, epsilon: float | None = None
     ) -> int:
         """Return private count of data points above threshold."""
         if epsilon is None:
@@ -100,13 +100,13 @@ class DifferentialPrivacyService:
         noisy_count = self.add_laplace_noise(
             true_count, sensitivity=1.0, epsilon=epsilon
         )
-        return max(0, int(round(noisy_count)))
+        return max(0, round(noisy_count))
 
     def private_sum(
         self,
         data: list[int | float],
         clipping_bound: float = 1.0,
-        epsilon: float = None,
+        epsilon: float | None = None,
     ) -> float:
         """Return private sum with clipping for bounded sensitivity."""
         if epsilon is None:
@@ -121,7 +121,7 @@ class DifferentialPrivacyService:
         self,
         data: list[int | float],
         clipping_bound: float = 1.0,
-        epsilon: float = None,
+        epsilon: float | None = None,
     ) -> float:
         """Return private mean with clipping."""
         if len(data) == 0:
@@ -143,7 +143,7 @@ class DifferentialPrivacyService:
         candidates: list[any],
         utility_scores: list[float],
         sensitivity: float = 1.0,
-        epsilon: float = None,
+        epsilon: float | None = None,
     ) -> any:
         """Select candidate using exponential mechanism."""
         if len(candidates) != len(utility_scores):
@@ -167,7 +167,7 @@ class DifferentialPrivacyService:
                 return candidates[i]
         return candidates[-1]
 
-    def reset_privacy_budget(self, new_epsilon: float = None, new_delta: float = None):
+    def reset_privacy_budget(self, new_epsilon: float | None = None, new_delta: float | None = None):
         """Reset privacy budget (use with caution in production)."""
         if new_epsilon is not None:
             self.epsilon = new_epsilon
@@ -197,7 +197,7 @@ class DifferentialPrivacyService:
         return self.privacy_log.copy()
 
     def compose_privacy_parameters(
-        self, epsilons: list[float], deltas: list[float] = None
+        self, epsilons: list[float], deltas: list[float] | None = None
     ) -> dict[str, float]:
         """Compute composed privacy parameters for multiple mechanisms."""
         if deltas is None:

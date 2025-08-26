@@ -17,9 +17,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import psutil
 
-import numpy as np
+# import numpy as np  # Converted to lazy loading
+from ...core.utils.lazy_ml_loader import get_numpy
 
 from ...utils.datetime_utils import aware_utc_now
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -589,9 +591,9 @@ class MLHealthMonitor:
                     "min_ms": min(latencies) if latencies else 0,
                     "max_ms": max(latencies) if latencies else 0,
                     "avg_ms": sum(latencies) / len(latencies) if latencies else 0,
-                    "p50_ms": np.percentile(latencies, 50) if latencies else 0,
-                    "p95_ms": np.percentile(latencies, 95) if latencies else 0,
-                    "p99_ms": np.percentile(latencies, 99) if latencies else 0
+                    "p50_ms": get_numpy().percentile(latencies, 50) if latencies else 0,
+                    "p95_ms": get_numpy().percentile(latencies, 95) if latencies else 0,
+                    "p99_ms": get_numpy().percentile(latencies, 99) if latencies else 0
                 },
                 "error_types": error_types,
                 "model_breakdown": {

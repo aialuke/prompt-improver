@@ -5,7 +5,7 @@ Provides WebSocket and REST endpoints for live experiment monitoring
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -16,12 +16,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
-from prompt_improver.repositories.protocols.session_manager_protocol import (
-    SessionManagerProtocol,
-)
 
 # Removed direct database imports - now using repository pattern
 from prompt_improver.repositories.factory import (
@@ -34,6 +29,8 @@ from prompt_improver.repositories.protocols.analytics_repository_protocol import
 from prompt_improver.repositories.protocols.health_repository_protocol import (
     HealthRepositoryProtocol,
 )
+from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+from prompt_improver.database.types import ManagerMode
 
 redis_available = True
 try:
@@ -180,7 +177,7 @@ async def get_realtime_database_services() -> DatabaseServices:
 
 
 # Import shared WebSocket connection manager
-from .websocket_manager import websocket_manager as connection_manager
+from prompt_improver.api.websocket_manager import websocket_manager as connection_manager
 
 real_time_router = APIRouter(
     prefix="/api/v1/experiments/real-time", tags=["real-time-analytics"]
@@ -740,7 +737,7 @@ async def setup_real_time_system(redis_url: str = None):
         if redis_available:
             if redis_url is None:
                 import os
-
+                from prompt_improver.services.cache.l2_redis_service import setup_redis_connection
                 redis_url = os.getenv(
                     "REDIS_URL", "redis://redis.external.service:6379/0"
                 )

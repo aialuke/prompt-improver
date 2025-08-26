@@ -13,7 +13,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
@@ -22,7 +22,7 @@ import dns.resolver
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 
-from prompt_improver.core.config import AppConfig, get_config
+from prompt_improver.core.config import get_config
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
@@ -32,6 +32,7 @@ from prompt_improver.performance.monitoring.health.circuit_breaker import (
     CircuitBreakerConfig,
     circuit_breaker_registry,
 )
+from prompt_improver.services.cache.l2_redis_service import redis_client
 
 logger = logging.getLogger(__name__)
 

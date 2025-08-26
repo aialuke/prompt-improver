@@ -10,7 +10,7 @@ interfaces, and dependency injection.
 The package is organized into four focused services:
 
 1. **DatabaseConnectionService** - Connection pool monitoring and health assessment
-2. **HealthMetricsService** - Performance metrics collection and analysis  
+2. **HealthMetricsService** - Performance metrics collection and analysis
 3. **AlertingService** - Health alerting, issue identification, and recommendations
 4. **HealthReportingService** - Historical analysis, reporting, and trend tracking
 
@@ -30,7 +30,7 @@ interface while maintaining backward compatibility.
 ### Basic Usage
 ```python
 from prompt_improver.database.health.services import DatabaseHealthService
-from prompt_improver.repositories.protocols import SessionManagerProtocol
+from prompt_improver.shared.interfaces.protocols.database import SessionManagerProtocol
 
 # Create with dependency injection
 health_service = DatabaseHealthService(session_manager)
@@ -181,63 +181,66 @@ maintainability characteristics.
 """
 
 # Core service classes
-from .database_connection_service import DatabaseConnectionService
-from .health_metrics_service import HealthMetricsService
-from .alerting_service import AlertingService
-from .health_reporting_service import HealthReportingService
-from .database_health_service import DatabaseHealthService
-
-# Protocol interfaces
-from .health_protocols import (
-    DatabaseConnectionServiceProtocol,
-    HealthMetricsServiceProtocol,
-    AlertingServiceProtocol,
-    HealthReportingServiceProtocol,
-    DatabaseHealthServiceProtocol,
-)
-
-# Data types and structures
-from .health_types import (
-    DatabaseHealthMetrics,
-    ConnectionHealthMetrics,
-    QueryPerformanceMetrics,
-    HealthAlert,
-    HealthRecommendation,
-    HealthTrend,
-    HealthThreshold,
+from prompt_improver.database.health.services.alerting_service import AlertingService
+from prompt_improver.database.health.services.database_connection_service import (
+    DatabaseConnectionService,
 )
 
 # Factory functions and utilities
-from .database_health_service import (
+from prompt_improver.database.health.services.database_health_service import (
+    DatabaseHealthService,
     create_database_health_service,
     get_database_health_service,
+)
+from prompt_improver.database.health.services.health_metrics_service import (
+    HealthMetricsService,
+)
+
+# Protocol interfaces
+from prompt_improver.database.health.services.health_protocols import (
+    AlertingServiceProtocol,
+    DatabaseConnectionServiceProtocol,
+    DatabaseHealthServiceProtocol,
+    HealthMetricsServiceProtocol,
+    HealthReportingServiceProtocol,
+)
+from prompt_improver.database.health.services.health_reporting_service import (
+    HealthReportingService,
+)
+
+# Data types and structures
+from prompt_improver.database.health.services.health_types import (
+    ConnectionHealthMetrics,
+    DatabaseHealthMetrics,
+    HealthAlert,
+    HealthRecommendation,
+    HealthThreshold,
+    HealthTrend,
+    QueryPerformanceMetrics,
 )
 
 # Public API exports
 __all__ = [
+    "AlertingService",
+    "AlertingServiceProtocol",
+    "ConnectionHealthMetrics",
     # Main service classes
     "DatabaseConnectionService",
-    "HealthMetricsService", 
-    "AlertingService",
-    "HealthReportingService",
-    "DatabaseHealthService",
-    
     # Protocol interfaces
     "DatabaseConnectionServiceProtocol",
-    "HealthMetricsServiceProtocol",
-    "AlertingServiceProtocol", 
-    "HealthReportingServiceProtocol",
-    "DatabaseHealthServiceProtocol",
-    
     # Data types
     "DatabaseHealthMetrics",
-    "ConnectionHealthMetrics",
-    "QueryPerformanceMetrics",
+    "DatabaseHealthService",
+    "DatabaseHealthServiceProtocol",
     "HealthAlert",
+    "HealthMetricsService",
+    "HealthMetricsServiceProtocol",
     "HealthRecommendation",
-    "HealthTrend",
+    "HealthReportingService",
+    "HealthReportingServiceProtocol",
     "HealthThreshold",
-    
+    "HealthTrend",
+    "QueryPerformanceMetrics",
     # Factory functions
     "create_database_health_service",
     "get_database_health_service",
@@ -247,10 +250,11 @@ __all__ = [
 __version__ = "2025.1.0"
 __architecture__ = "decomposed_focused_services"
 
+
 # Service composition for backward compatibility
 def get_health_monitor_compatibility():
     """Get backward compatibility interface.
-    
+
     Returns:
         Function that creates DatabaseHealthService with original interface
     """

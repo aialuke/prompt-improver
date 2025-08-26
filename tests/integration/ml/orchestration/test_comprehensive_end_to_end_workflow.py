@@ -28,14 +28,14 @@ from typing import Any, Dict, List, Optional
 import pytest
 import numpy as np
 from prompt_improver.core.factories.ml_pipeline_factory import MLPipelineFactory
-from prompt_improver.core.protocols.ml_protocols import ComponentLoaderProtocol, EventBusProtocol, ServiceContainerProtocol
+from prompt_improver.shared.interfaces.protocols.ml import ComponentLoaderProtocol, EventBusProtocol, ServiceContainerProtocol
 from prompt_improver.database import get_session_context
 from prompt_improver.ml.core.training_data_loader import TrainingDataLoader
 from prompt_improver.ml.orchestration.config.orchestrator_config import OrchestratorConfig
 from prompt_improver.ml.orchestration.coordinators.data_pipeline_coordinator import DataPipelineConfig, DataPipelineCoordinator
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import PipelineState
 from prompt_improver.ml.preprocessing.synthetic_data_generator import ProductionSyntheticDataGenerator
-from tests.conftest import redis_client
+# Removed unused redis_client import
 
 class TestRealBehaviorEndToEndWorkflow:
     """Real behavior end-to-end integration tests - NO MOCKS, authentic component testing."""

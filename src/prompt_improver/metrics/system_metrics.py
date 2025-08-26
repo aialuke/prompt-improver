@@ -1,4 +1,4 @@
-"""Comprehensive System Metrics Implementation - Phase 1 Missing Metrics
+"""Comprehensive System Metrics Implementation - Phase 1 Missing Metrics.
 
 Provides real-time tracking of:
 1. Connection Age Tracking - Real connection lifecycle monitoring
@@ -11,15 +11,15 @@ This implementation uses OpenTelemetry for modern observability patterns.
 """
 
 import asyncio
+import contextlib
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
 import psutil
 from opentelemetry import metrics
-from opentelemetry.metrics import Counter, Histogram, UpDownCounter
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class SystemMetricsCollector:
     cache performance, and request processing metrics.
     """
 
-    def __init__(self, config: SystemMetricsConfig | None = None):
+    def __init__(self, config: SystemMetricsConfig | None = None) -> None:
         self.config = config or SystemMetricsConfig()
         self._meter = metrics.get_meter(__name__)
         self._start_time = time.time()
@@ -170,10 +170,8 @@ class SystemMetricsCollector:
         self._is_collecting = False
         if self._collection_task:
             self._collection_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._collection_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Stopped system metrics collection")
 
     async def _collection_loop(self) -> None:
@@ -185,7 +183,7 @@ class SystemMetricsCollector:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in metrics collection: {e}")
+                logger.exception(f"Error in metrics collection: {e}")
                 await asyncio.sleep(self.config.collection_interval)
 
     async def _collect_all_metrics(self) -> None:
@@ -209,7 +207,7 @@ class SystemMetricsCollector:
             self.memory_metrics.swap_used_mb = swap.used / (1024 * 1024)
             self.memory_metrics.swap_percent = swap.percent
         except Exception as e:
-            logger.error(f"Error collecting memory metrics: {e}")
+            logger.exception(f"Error collecting memory metrics: {e}")
 
     async def _collect_system_health_metrics(self) -> None:
         """Collect system health indicators."""
@@ -224,7 +222,7 @@ class SystemMetricsCollector:
                 self.system_health.load_average = 0.0
             self.system_health.uptime_seconds = time.time() - self._start_time
         except Exception as e:
-            logger.error(f"Error collecting system health metrics: {e}")
+            logger.exception(f"Error collecting system health metrics: {e}")
 
     async def _update_opentelemetry_metrics(self) -> None:
         """Update OpenTelemetry metrics with current values."""
@@ -238,7 +236,7 @@ class SystemMetricsCollector:
                 self.system_health.disk_usage_percent, {"resource": "disk"}
             )
         except Exception as e:
-            logger.error(f"Error updating OpenTelemetry metrics: {e}")
+            logger.exception(f"Error updating OpenTelemetry metrics: {e}")
 
     def record_connection_event(
         self, event_type: str, connection_age: float | None = None
@@ -258,7 +256,7 @@ class SystemMetricsCollector:
             elif event_type == "error":
                 self.connection_metrics.connection_errors += 1
         except Exception as e:
-            logger.error(f"Error recording connection event: {e}")
+            logger.exception(f"Error recording connection event: {e}")
 
     def record_cache_event(self, event_type: str) -> None:
         """Record cache-related events."""
@@ -279,7 +277,7 @@ class SystemMetricsCollector:
                     self.cache_metrics.cache_hits / total_requests
                 )
         except Exception as e:
-            logger.error(f"Error recording cache event: {e}")
+            logger.exception(f"Error recording cache event: {e}")
 
     def record_request_duration(
         self, duration_seconds: float, status: str = "success"
@@ -293,7 +291,7 @@ class SystemMetricsCollector:
             else:
                 self.request_metrics.failed_requests += 1
         except Exception as e:
-            logger.error(f"Error recording request duration: {e}")
+            logger.exception(f"Error recording request duration: {e}")
 
     def get_metrics_summary(self) -> dict[str, Any]:
         """Get a summary of all collected metrics."""

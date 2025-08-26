@@ -53,21 +53,15 @@ Based on research of AutoML testing patterns and Optuna integration best practic
 """
 
 import asyncio
+import contextlib
 import uuid
 from datetime import datetime
-from unittest.mock import patch
 
 import optuna
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 # Clean architecture: Use repository pattern instead of direct database access
-from prompt_improver.repositories.factory import get_ml_repository, get_analytics_repository
-from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
-from prompt_improver.repositories.protocols.analytics_repository_protocol import AnalyticsRepositoryProtocol
-from prompt_improver.repositories.protocols.session_manager_protocol import SessionManagerProtocol
-from prompt_improver.database import DatabaseServices, ManagerMode, create_database_services
+from prompt_improver.database import ManagerMode, create_database_services
 from prompt_improver.ml.automl.orchestrator import (
     AutoMLConfig,
     AutoMLMode,
@@ -77,6 +71,9 @@ from prompt_improver.performance.analytics.real_time_analytics import (
     RealTimeAnalyticsService,
 )
 from prompt_improver.performance.testing.ab_testing_service import ABTestingService
+from prompt_improver.services.prompt.facade import (
+    PromptServiceFacade as PromptImprovementService,
+)
 
 
 class TestAutoMLEndToEndWorkflow:
@@ -203,14 +200,14 @@ class TestAutoMLEndToEndWorkflow:
         assert hasattr(analytics_service, "ab_testing_service")
         assert analytics_service.ab_testing_service is not None
         assert orchestrator.config is not None
-        assert orchestrator.config.enable_real_time_feedback in [True, False]
+        assert orchestrator.config.enable_real_time_feedback in {True, False}
         callbacks = orchestrator._setup_callbacks()
         assert isinstance(callbacks, list)
-        assert analytics_service.ab_testing_service.enable_early_stopping in [
+        assert analytics_service.ab_testing_service.enable_early_stopping in {
             True,
             False,
-        ]
-        assert analytics_service.ab_testing_service.enable_bandits in [True, False]
+        }
+        assert analytics_service.ab_testing_service.enable_bandits in {True, False}
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -353,17 +350,15 @@ class TestAutoMLServiceIntegration:
         """Test complete optimization lifecycle through service."""
         services = await create_database_services(ManagerMode.ASYNC_MODERN)
         if hasattr(real_prompt_service, "initialize_automl"):
-            try:
+            with contextlib.suppress(Exception):
                 await real_prompt_service.initialize_automl(services)
-            except Exception:
-                pass
         if hasattr(real_prompt_service, "start_automl_optimization"):
             assert callable(real_prompt_service.start_automl_optimization)
         if hasattr(real_prompt_service, "get_automl_status"):
             assert callable(real_prompt_service.get_automl_status)
         if hasattr(real_prompt_service, "stop_automl_optimization"):
             assert callable(real_prompt_service.stop_automl_optimization)
-        assert real_prompt_service.enable_automl in [True, False]
+        assert real_prompt_service.enable_automl in {True, False}
 
     @pytest.fixture
     async def database_services_2(self):

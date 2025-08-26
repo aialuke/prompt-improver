@@ -9,10 +9,10 @@ from datetime import datetime
 import logging
 import re
 from typing import Any, Dict, List
-import numpy as np
-from scipy import stats
-from sklearn.cluster import DBSCAN
-from sklearn.feature_extraction.text import TfidfVectorizer
+# import numpy as np  # Converted to lazy loading
+# from scipy import stats  # Converted to lazy loading
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_sklearn
+from prompt_improver.core.utils.lazy_ml_loader import get_scipy_stats
 logger = logging.getLogger(__name__)
 
 class PatternDetector:
@@ -52,7 +52,7 @@ class PatternDetector:
             context_failures[context_key].append(failure)
         for context_key, context_group in context_failures.items():
             if len(context_group) >= self.config.min_pattern_size:
-                avg_score = np.mean([f.get('overallImprovement', 0) or f.get('improvementScore', 0) for f in context_group])
+                avg_score = get_numpy().mean([f.get('overallImprovement', 0) or f.get('improvementScore', 0) for f in context_group])
                 pattern = {'pattern_id': f'context_{hash(context_key) % 10000}', 'type': 'context', 'description': f'Failures in {context_key} context', 'frequency': len(context_group), 'severity': 1 - avg_score, 'characteristics': {'context': context_key, 'avg_failure_score': avg_score, 'common_issues': self._extract_common_issues(context_group)}, 'examples': context_group[:3]}
                 patterns.append(pattern)
         return patterns
@@ -65,14 +65,14 @@ class PatternDetector:
             return patterns
         lengths = [len(text.split()) for text in prompt_texts]
         if lengths:
-            avg_length = np.mean(lengths)
-            std_length = np.std(lengths)
+            avg_length = get_numpy().mean(lengths)
+            std_length = get_numpy().std(lengths)
             short_prompts = [i for i, length in enumerate(lengths) if length < 5]
             if len(short_prompts) >= self.config.min_pattern_size:
-                patterns.append({'pattern_id': 'prompt_too_short', 'type': 'prompt_characteristic', 'description': 'Failures with very short prompts (< 5 words)', 'frequency': len(short_prompts), 'severity': 0.7, 'characteristics': {'avg_length': np.mean([lengths[i] for i in short_prompts]), 'threshold': '< 5 words'}, 'examples': [failures[i] for i in short_prompts[:3]]})
+                patterns.append({'pattern_id': 'prompt_too_short', 'type': 'prompt_characteristic', 'description': 'Failures with very short prompts (< 5 words)', 'frequency': len(short_prompts), 'severity': 0.7, 'characteristics': {'avg_length': get_numpy().mean([lengths[i] for i in short_prompts]), 'threshold': '< 5 words'}, 'examples': [failures[i] for i in short_prompts[:3]]})
             long_prompts = [i for i, length in enumerate(lengths) if length > 100]
             if len(long_prompts) >= self.config.min_pattern_size:
-                patterns.append({'pattern_id': 'prompt_too_long', 'type': 'prompt_characteristic', 'description': 'Failures with very long prompts (> 100 words)', 'frequency': len(long_prompts), 'severity': 0.6, 'characteristics': {'avg_length': np.mean([lengths[i] for i in long_prompts]), 'threshold': '> 100 words'}, 'examples': [failures[i] for i in long_prompts[:3]]})
+                patterns.append({'pattern_id': 'prompt_too_long', 'type': 'prompt_characteristic', 'description': 'Failures with very long prompts (> 100 words)', 'frequency': len(long_prompts), 'severity': 0.6, 'characteristics': {'avg_length': get_numpy().mean([lengths[i] for i in long_prompts]), 'threshold': '> 100 words'}, 'examples': [failures[i] for i in long_prompts[:3]]})
         if len(prompt_texts) >= 10:
             try:
                 vectors = self.text_vectorizer.fit_transform(prompt_texts)
@@ -80,7 +80,7 @@ class PatternDetector:
                 clusters = clustering.fit_predict(vectors.toarray())
                 for cluster_id in set(clusters):
                     if cluster_id != -1:
-                        cluster_indices = np.where(clusters == cluster_id)[0]
+                        cluster_indices = get_numpy().where(clusters == cluster_id)[0]
                         if len(cluster_indices) >= self.config.min_pattern_size:
                             cluster_prompts = [prompt_texts[i] for i in cluster_indices]
                             common_terms = self._find_common_terms(cluster_prompts)
@@ -105,7 +105,7 @@ class PatternDetector:
                         rule_combinations[combo_key].append(failure)
         for combo_key, combo_failures in rule_combinations.items():
             if len(combo_failures) >= self.config.min_pattern_size:
-                avg_score = np.mean([f.get('overallImprovement', 0) or f.get('improvementScore', 0) for f in combo_failures])
+                avg_score = get_numpy().mean([f.get('overallImprovement', 0) or f.get('improvementScore', 0) for f in combo_failures])
                 pattern = {'pattern_id': f'rule_{hash(combo_key) % 10000}', 'type': 'rule_application', 'description': f'Failures when applying {combo_key}', 'frequency': len(combo_failures), 'severity': 1 - avg_score, 'characteristics': {'rule_combination': combo_key, 'avg_failure_score': avg_score, 'is_combination': '+' in combo_key}, 'examples': combo_failures[:3]}
                 patterns.append(pattern)
         return patterns
@@ -130,7 +130,7 @@ class PatternDetector:
             delta = (timestamps[i][0] - timestamps[i - 1][0]).total_seconds()
             time_deltas.append(delta)
         if time_deltas:
-            median_delta = np.median(time_deltas)
+            median_delta = get_numpy().median(time_deltas)
             burst_threshold = median_delta / 3
             bursts = []
             current_burst = [timestamps[0]]
@@ -163,10 +163,10 @@ class PatternDetector:
             if len(failure_values) >= 3 and len(success_values) >= 3:
                 try:
                     if self._is_numeric_characteristic(failure_values):
-                        statistic, p_value = stats.ttest_ind(failure_values, success_values)
-                        effect_size = (np.mean(failure_values) - np.mean(success_values)) / np.sqrt((np.var(failure_values) + np.var(success_values)) / 2)
+                        statistic, p_value = get_scipy_stats().ttest_ind(failure_values, success_values)
+                        effect_size = (get_numpy().mean(failure_values) - get_numpy().mean(success_values)) / get_numpy().sqrt((get_numpy().var(failure_values) + get_numpy().var(success_values)) / 2)
                         if p_value < 0.05 and abs(effect_size) > 0.5:
-                            root_causes.append({'cause_id': f'numeric_{characteristic}', 'type': 'statistical_difference', 'description': f'Significant difference in {characteristic}', 'affected_failures': len(failure_values), 'correlation_strength': abs(effect_size), 'evidence': [f'Failure mean: {np.mean(failure_values):.3f}', f'Success mean: {np.mean(success_values):.3f}', f'P-value: {p_value:.3f}', f'Effect size: {effect_size:.3f}'], 'statistical_significance': p_value < 0.05})
+                            root_causes.append({'cause_id': f'numeric_{characteristic}', 'type': 'statistical_difference', 'description': f'Significant difference in {characteristic}', 'affected_failures': len(failure_values), 'correlation_strength': abs(effect_size), 'evidence': [f'Failure mean: {get_numpy().mean(failure_values):.3f}', f'Success mean: {get_numpy().mean(success_values):.3f}', f'P-value: {p_value:.3f}', f'Effect size: {effect_size:.3f}'], 'statistical_significance': p_value < 0.05})
                     else:
                         failure_counts = Counter(failure_values)
                         success_counts = Counter(success_values)
@@ -221,14 +221,14 @@ class PatternDetector:
                 feature_names.append('rule_count')
             numeric_features.append(features)
         if len(numeric_features) >= 5:
-            features_array = np.array(numeric_features)
+            features_array = get_numpy().array(numeric_features)
             for i, feature_name in enumerate(feature_names):
                 feature_values = features_array[:, i]
-                z_scores = np.abs(stats.zscore(feature_values))
-                outliers = np.where(z_scores > self.config.outlier_threshold)[0]
+                z_scores = get_numpy().abs(get_scipy_stats().zscore(feature_values))
+                outliers = get_numpy().where(z_scores > self.config.outlier_threshold)[0]
                 if len(outliers) >= 2:
                     outlier_failures = [failures[idx] for idx in outliers]
-                    edge_cases.append({'case_id': f'edge_case_{feature_name}', 'type': 'statistical_outlier', 'description': f'Extreme values in {feature_name}', 'affected_failures': len(outliers), 'characteristics': {'feature': feature_name, 'outlier_values': feature_values[outliers].tolist(), 'normal_range': [float(np.percentile(feature_values, 5)), float(np.percentile(feature_values, 95))]}, 'examples': outlier_failures[:3]})
+                    edge_cases.append({'case_id': f'edge_case_{feature_name}', 'type': 'statistical_outlier', 'description': f'Extreme values in {feature_name}', 'affected_failures': len(outliers), 'characteristics': {'feature': feature_name, 'outlier_values': feature_values[outliers].tolist(), 'normal_range': [float(get_numpy().percentile(feature_values, 5)), float(get_numpy().percentile(feature_values, 95))]}, 'examples': outlier_failures[:3]})
         return edge_cases
 
     async def find_systematic_issues(self, failures: list[dict[str, Any]], all_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -243,7 +243,7 @@ class PatternDetector:
                 rule_performance[rule_id].append(score)
         for rule_id, scores in rule_performance.items():
             if len(scores) >= 10:
-                avg_score = np.mean(scores)
+                avg_score = get_numpy().mean(scores)
                 failure_rate = sum(1 for s in scores if s < self.config.failure_threshold) / len(scores)
                 if failure_rate > 0.4:
                     systematic_issues.append({'issue_id': f'systematic_rule_{rule_id}', 'type': 'poor_rule_performance', 'scope': 'rule_specific', 'description': f'Rule {rule_id} has high failure rate', 'affected_rules': [rule_id], 'impact_magnitude': failure_rate, 'evidence': [f'Failure rate: {failure_rate:.3f}', f'Average score: {avg_score:.3f}', f'Sample size: {len(scores)}'], 'priority': 'critical' if failure_rate > 0.6 else 'high'})
@@ -310,7 +310,7 @@ class PatternDetector:
         """Suggest what types of rules might address these failures"""
         suggestions = []
         prompt_lengths = [len(f.get('originalPrompt', '').split()) for f in failures]
-        avg_length = np.mean(prompt_lengths) if prompt_lengths else 0
+        avg_length = get_numpy().mean(prompt_lengths) if prompt_lengths else 0
         if avg_length < 10:
             suggestions.append('prompt_expansion')
         elif avg_length > 50:
@@ -328,7 +328,7 @@ class PatternDetector:
             vectorizer = TfidfVectorizer(max_features=50, stop_words='english')
             tfidf_matrix = vectorizer.fit_transform(texts)
             feature_names = vectorizer.get_feature_names_out()
-            mean_scores = np.mean(tfidf_matrix.toarray(), axis=0)
+            mean_scores = get_numpy().mean(tfidf_matrix.toarray(), axis=0)
             term_scores = list(zip(feature_names, mean_scores, strict=False))
             term_scores.sort(key=lambda x: x[1], reverse=True)
             return [term for term, score in term_scores[:10] if score > 0.1]

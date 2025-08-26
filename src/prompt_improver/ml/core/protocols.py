@@ -4,11 +4,11 @@ Defines clean interfaces between ML service components to enable
 loose coupling and proper dependency injection.
 """
 
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Protocol, TYPE_CHECKING
 
-from sqlalchemy.ext.asyncio import AsyncSession
+# Import heavy dependencies only for type checking to optimize startup performance
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 class ModelRegistryProtocol(Protocol):
     """Protocol for model registry implementations."""
@@ -46,7 +46,7 @@ class TrainingServiceProtocol(Protocol):
     async def optimize_rules(
         self,
         training_data: Dict[str, List],
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         rule_ids: List[str] | None = None
     ) -> Dict[str, Any]:
         """Optimize rule parameters using ML training."""
@@ -55,7 +55,7 @@ class TrainingServiceProtocol(Protocol):
     async def optimize_ensemble_rules(
         self,
         training_data: Dict[str, List],
-        db_session: AsyncSession
+        db_session: "AsyncSession"
     ) -> Dict[str, Any]:
         """Optimize rules using ensemble methods."""
         ...
@@ -136,7 +136,7 @@ class PatternDiscoveryServiceProtocol(Protocol):
     
     async def discover_patterns(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         min_effectiveness: float = 0.7,
         min_support: int = 5,
         use_advanced_discovery: bool = True,
@@ -148,7 +148,7 @@ class PatternDiscoveryServiceProtocol(Protocol):
     async def get_contextualized_patterns(
         self,
         context_items: List[str],
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         min_confidence: float = 0.6
     ) -> Dict[str, Any]:
         """Get patterns relevant to specific context."""
@@ -175,7 +175,7 @@ class MLServiceProtocol(Protocol):
     async def optimize_rules(
         self,
         training_data: Dict[str, List],
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         rule_ids: List[str] | None = None
     ) -> Dict[str, Any]:
         ...
@@ -183,7 +183,7 @@ class MLServiceProtocol(Protocol):
     async def optimize_ensemble_rules(
         self,
         training_data: Dict[str, List],
-        db_session: AsyncSession
+        db_session: "AsyncSession"
     ) -> Dict[str, Any]:
         ...
         
@@ -198,7 +198,7 @@ class MLServiceProtocol(Protocol):
     # Pattern discovery methods
     async def discover_patterns(
         self,
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         min_effectiveness: float = 0.7,
         min_support: int = 5,
         use_advanced_discovery: bool = True,
@@ -209,7 +209,7 @@ class MLServiceProtocol(Protocol):
     async def get_contextualized_patterns(
         self,
         context_items: List[str],
-        db_session: AsyncSession,
+        db_session: "AsyncSession",
         min_confidence: float = 0.6
     ) -> Dict[str, Any]:
         ...

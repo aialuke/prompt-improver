@@ -8,18 +8,11 @@ Covers:
 5) End-to-end HTTP flow
 """
 
-import asyncio
-import os
-import time
-from collections.abc import Callable
 
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from src.prompt_improver.metrics.api_metrics import (
-    APIMetricsCollector,
-    EndpointCategory,
-    HTTPMethod,
     get_api_metrics_collector,
 )
 from src.prompt_improver.monitoring.opentelemetry.metrics import (
@@ -90,7 +83,7 @@ def test_user_journey_cardinality_modes(mode: str, app_factory):
     j = bm._test_last_journey
     if mode == "none":
         # In our middleware, 'none' still emits with anonymous ids
-        assert j["user_id"] in ("anonymous", None)
+        assert j["user_id"] in {"anonymous", None}
     elif mode == "hashed":
         assert j["user_id"] is not None and j["user_id"] != "userA"
         assert len(j["user_id"]) == 16  # sha256 truncated

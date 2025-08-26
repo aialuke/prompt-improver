@@ -7,7 +7,6 @@ rate limiting, and security components that replaced JWT authentication.
 import asyncio
 import sys
 import time
-from typing import Any, Dict
 
 
 async def test_input_validation_real_behavior():
@@ -100,7 +99,7 @@ async def test_rate_limiting_real_behavior():
             print(f"\nTesting {tier.value} tier:")
             allowed_count = 0
             blocked_count = 0
-            for i in range(20):
+            for _i in range(20):
                 status = await middleware.check_rate_limit(
                     agent_id=f"test_agent_{tier.value}",
                     rate_limit_tier=tier,
@@ -162,8 +161,8 @@ async def test_mcp_server_real_behavior():
 async def test_prompt_improvement_real_behavior():
     """Test prompt improvement service functionality."""
     try:
-        from prompt_improver.services.prompt.facade import PromptServiceFacade as (
-            PromptImprovementService,
+        from prompt_improver.services.prompt.facade import (
+            PromptServiceFacade as PromptImprovementService,
         )
 
         service = PromptImprovementService()
@@ -243,8 +242,7 @@ async def test_performance_without_jwt():
         avg_time_per_validation = total_time / 100
         print(f"100 validation cycles completed in {total_time:.1f}ms")
         print(f"Average time per validation: {avg_time_per_validation:.2f}ms")
-        is_fast = avg_time_per_validation < 10
-        return is_fast
+        return avg_time_per_validation < 10
     except Exception as e:
         print(f"Performance test failed: {e}")
         return False

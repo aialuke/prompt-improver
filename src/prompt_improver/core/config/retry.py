@@ -1,4 +1,4 @@
-"""Shared Retry Configuration - Circular Import Safe
+"""Shared Retry Configuration - Circular Import Safe.
 
 This module provides shared retry configuration classes that can be imported
 by both ML orchestration and performance monitoring without circular dependencies.
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class RetryStrategy(Enum):
-    """Retry strategy enumeration"""
+    """Retry strategy enumeration."""
 
     EXPONENTIAL_BACKOFF = "exponential_backoff"
     LINEAR_BACKOFF = "linear_backoff"
@@ -52,7 +52,7 @@ class RetryConfig:
     recovery_timeout: float = 30.0
 
     def __post_init__(self):
-        """Validate configuration after initialization"""
+        """Validate configuration after initialization."""
         if self.max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
         if self.base_delay < 0:
@@ -95,7 +95,7 @@ class RetryConfig:
         return delay
 
     def _fibonacci(self, n: int) -> int:
-        """Calculate nth Fibonacci number"""
+        """Calculate nth Fibonacci number."""
         if n <= 1:
             return n
         a, b = (0, 1)
@@ -119,13 +119,11 @@ class RetryConfig:
             isinstance(exception, exc_type) for exc_type in self.retry_on_exceptions
         ):
             return False
-        if self.retry_condition and (not self.retry_condition(exception)):
-            return False
-        return True
+        return not (self.retry_condition and not self.retry_condition(exception))
 
 
 class StandardRetryConfigs:
-    """Standard retry configurations for common scenarios"""
+    """Standard retry configurations for common scenarios."""
 
     FAST_OPERATION = RetryConfig(
         max_attempts=3,

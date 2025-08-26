@@ -145,7 +145,7 @@ def benchmark_library(
             tracemalloc.stop()
             return BenchmarkResult(name, float("inf"), 0, float("inf"))
 
-    current, peak = tracemalloc.get_traced_memory()
+    current, _peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
     # Ensure instances aren't garbage collected during measurement
@@ -182,18 +182,18 @@ def run_serialization_benchmark():
 
     # Pydantic serialization
     serialization_results.append(
-        time_operation("Pydantic model_dump()", lambda: pydantic_obj.model_dump())
+        time_operation("Pydantic model_dump()", pydantic_obj.model_dump)
     )
 
     serialization_results.append(
         time_operation(
-            "Pydantic model_dump_json()", lambda: pydantic_obj.model_dump_json()
+            "Pydantic model_dump_json()", pydantic_obj.model_dump_json
         )
     )
 
     # SQLModel serialization
     serialization_results.append(
-        time_operation("SQLModel model_dump()", lambda: sqlmodel_obj.model_dump())
+        time_operation("SQLModel model_dump()", sqlmodel_obj.model_dump)
     )
 
     # msgspec serialization
@@ -338,7 +338,7 @@ def main():
     }
 
     try:
-        with open(baseline_file, "w") as f:
+        with open(baseline_file, "w", encoding="utf-8") as f:
             json.dump(baseline_data, f, indent=2)
         print(f"\n📁 Baseline results saved to: {baseline_file}")
     except Exception as e:

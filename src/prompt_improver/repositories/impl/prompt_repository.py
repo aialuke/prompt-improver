@@ -6,12 +6,10 @@ discovered patterns, and cross-domain analytics.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlmodel import select as sqlmodel_select
 
 from prompt_improver.database.models import (
     ABExperiment,
@@ -26,7 +24,6 @@ from prompt_improver.repositories.protocols.prompt_repository_protocol import (
     ExperimentFilter,
     OptimizationData,
     PatternFilter,
-    PromptRepositoryProtocol,
     SessionAnalytics,
     SessionFilter,
 )
@@ -38,7 +35,7 @@ logger = logging.getLogger(__name__)
 class PromptRepository:
     """Concrete implementation of PromptRepositoryProtocol."""
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory) -> None:
         """Initialize repository with session factory."""
         self._session_factory = session_factory
 
@@ -622,7 +619,7 @@ class PromptRepository:
                 s.confidence_level for s in sessions if s.confidence_level
             ]
 
-            analysis = {
+            return {
                 "total_sessions": len(sessions),
                 "sessions_with_improvement_score": len(improvement_scores),
                 "avg_improvement_score": sum(improvement_scores)
@@ -636,8 +633,6 @@ class PromptRepository:
                     1 for s in sessions if s.user_context
                 ),
             }
-
-            return analysis
 
     async def get_pattern_experiment_candidates(
         self,

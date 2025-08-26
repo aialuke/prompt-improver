@@ -4,17 +4,14 @@ Tests high-dimensional clustering optimization, memory efficiency,
 parameter tuning, and performance monitoring capabilities.
 """
 
-import asyncio
 import time
 
 import numpy as np
 import pytest
 from sklearn.datasets import make_blobs, make_classification
-from sklearn.preprocessing import StandardScaler
 
 from prompt_improver.ml.optimization.algorithms.clustering_optimizer import (
     ClusteringConfig,
-    ClusteringMetrics,
     ClusteringOptimizer,
     get_clustering_optimizer,
 )
@@ -58,7 +55,7 @@ def linguistic_like_features():
     np.random.seed(42)
     n_samples = 300
     features = []
-    for i in range(n_samples):
+    for _i in range(n_samples):
         feature_vector = []
         feature_vector.extend(np.random.beta(2, 2, 5))
         feature_vector.append(np.random.beta(3, 2))
@@ -100,7 +97,7 @@ async def test_high_dimensional_clustering_optimization(
     clustering_config, high_dimensional_data
 ):
     """Test clustering optimization on high-dimensional data."""
-    X, y = high_dimensional_data
+    X, _y = high_dimensional_data
     optimizer = ClusteringOptimizer(clustering_config)
     result = await optimizer.optimize_clustering(X)
     assert result["status"] == "success"
@@ -158,7 +155,7 @@ async def test_memory_efficient_processing(clustering_config):
     start_time = time.time()
     result = await optimizer.optimize_clustering(X)
     processing_time = time.time() - start_time
-    assert result["status"] in ["success", "success_with_warnings", "low_quality"]
+    assert result["status"] in {"success", "success_with_warnings", "low_quality"}
     assert processing_time < 60.0
     memory_info = result["memory_usage"]
     assert "initial_mb" in memory_info
@@ -192,8 +189,8 @@ async def test_parameter_optimization():
         random_state=43,
     )
     large_result = await optimizer.optimize_clustering(large_X)
-    assert small_result["status"] in ["success", "success_with_warnings", "low_quality"]
-    assert large_result["status"] in ["success", "success_with_warnings", "low_quality"]
+    assert small_result["status"] in {"success", "success_with_warnings", "low_quality"}
+    assert large_result["status"] in {"success", "success_with_warnings", "low_quality"}
     small_params = small_result["optimal_parameters"]["hdbscan"]
     large_params = large_result["optimal_parameters"]["hdbscan"]
     assert small_params["min_cluster_size"] <= large_params["min_cluster_size"]
@@ -342,7 +339,7 @@ async def test_performance_recommendations():
     config = ClusteringConfig(min_silhouette_score=0.8, max_noise_ratio=0.1)
     optimizer = ClusteringOptimizer(config)
     result = await optimizer.optimize_clustering(X)
-    assert result["status"] in ["success", "success_with_warnings", "low_quality"]
+    assert result["status"] in {"success", "success_with_warnings", "low_quality"}
     performance_analysis = result["performance_analysis"]
     assert "performance_summary" in performance_analysis
     assert "quality_assessment" in performance_analysis

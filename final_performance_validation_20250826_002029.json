@@ -1,0 +1,226 @@
+{
+  "validation_passed": false,
+  "performance_results": {
+    "l1_cache": "PerformanceResult(operation_name='L1_Cache_Operations', target_ms=1.0, achieved_ms=0.046745053958147764, target_met=True, improvement_factor=21.39263762312329, sample_count=1000, p95_ms=0.05037919108872301, p99_ms=0.06656116835074498, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 27, 374293, tzinfo=datetime.timezone.utc))",
+    "l2_cache": "PerformanceResult(operation_name='L2_Cache_Operations', target_ms=10.0, achieved_ms=10.0, target_met=True, improvement_factor=1.0, sample_count=500, p95_ms=10.0, p99_ms=10.0, success_rate=0.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 27, 411220, tzinfo=datetime.timezone.utc))",
+    "cache_coordination": "PerformanceResult(operation_name='Cache_Coordination', target_ms=50.0, achieved_ms=0.04610911440977361, target_met=True, improvement_factor=1084.3843053598455, sample_count=200, p95_ms=0.04925414687022567, p99_ms=0.05672132887411861, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 27, 420545, tzinfo=datetime.timezone.utc))",
+    "multi_level_integration": "PerformanceResult(operation_name='Multi_Level_Integration', target_ms=100.0, achieved_ms=11.206972746779988, target_met=True, improvement_factor=8.923016255994039, sample_count=150, p95_ms=11.469108546589268, p99_ms=12.120645915565547, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 29, 102189, tzinfo=datetime.timezone.utc))",
+    "cache_hit_rates": {
+      "operation_name": "Cache_Hit_Rates",
+      "target_percent": 95.0,
+      "achieved_percent": 100.0,
+      "target_met": true,
+      "hits": 100,
+      "misses": 0,
+      "total_requests": 100,
+      "performance_stats": {
+        "cache_stats": "not_available"
+      },
+      "monitoring_stats": {
+        "monitoring": "not_available"
+      },
+      "timestamp": "2025-08-26T00:20:29.114561+00:00"
+    },
+    "memory_efficiency": {
+      "operation_name": "Memory_Efficiency",
+      "target_kb_per_entry": 1.0,
+      "achieved_kb_per_entry": 0.272,
+      "target_met": true,
+      "baseline_memory_mb": 146.234375,
+      "cached_memory_mb": 146.5,
+      "memory_increase_mb": 0.265625,
+      "test_entries": 1000,
+      "timestamp": "2025-08-26T00:20:29.166758+00:00"
+    },
+    "concurrent_load": "PerformanceResult(operation_name='Concurrent_Operations', target_ms=200.0, achieved_ms=0.45531091862358153, target_met=True, improvement_factor=439.2602764822903, sample_count=50, p95_ms=0.4906796479190234, p99_ms=0.4929462488507852, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 29, 167596, tzinfo=datetime.timezone.utc))",
+    "fault_tolerance": {
+      "operation_name": "Fault_Tolerance",
+      "scenarios": [
+        {
+          "scenario": "normal_operation",
+          "success": true,
+          "response_time_ms": 0.0618330086581409
+        },
+        {
+          "scenario": "cache_clear_recovery",
+          "success": true,
+          "response_time_ms": 0.22912501299288124
+        },
+        {
+          "scenario": "pattern_invalidation",
+          "success": true,
+          "response_time_ms": 0.13545798719860613,
+          "invalidated_count": 2
+        }
+      ],
+      "overall_success": true,
+      "target_met": true,
+      "timestamp": "2025-08-26T00:20:29.168147+00:00"
+    },
+    "production_scenarios": {
+      "operation_name": "Production_Scenarios",
+      "error": "'CacheFacade' object has no attribute 'warm_cache'",
+      "target_met": false,
+      "timestamp": "2025-08-26T00:20:29.177237+00:00"
+    }
+  },
+  "validation_report": {
+    "overall_success": false,
+    "success_rate": 88.88888888888889,
+    "total_tests": 9,
+    "passed_tests": 8,
+    "failed_tests": 1,
+    "performance_results": [
+      {
+        "operation_name": "L1_Cache_Operations",
+        "target_ms": 1.0,
+        "achieved_ms": 0.046745053958147764,
+        "target_met": true,
+        "improvement_factor": 21.39263762312329,
+        "sample_count": 1000,
+        "p95_ms": 0.05037919108872301,
+        "p99_ms": 0.06656116835074498,
+        "success_rate": 1.0,
+        "timestamp": "2025-08-26T00:20:27.374293+00:00"
+      },
+      {
+        "operation_name": "L2_Cache_Operations",
+        "target_ms": 10.0,
+        "achieved_ms": 10.0,
+        "target_met": true,
+        "improvement_factor": 1.0,
+        "sample_count": 500,
+        "p95_ms": 10.0,
+        "p99_ms": 10.0,
+        "success_rate": 0.0,
+        "timestamp": "2025-08-26T00:20:27.411220+00:00"
+      },
+      {
+        "operation_name": "Cache_Coordination",
+        "target_ms": 50.0,
+        "achieved_ms": 0.04610911440977361,
+        "target_met": true,
+        "improvement_factor": 1084.3843053598455,
+        "sample_count": 200,
+        "p95_ms": 0.04925414687022567,
+        "p99_ms": 0.05672132887411861,
+        "success_rate": 1.0,
+        "timestamp": "2025-08-26T00:20:27.420545+00:00"
+      },
+      {
+        "operation_name": "Multi_Level_Integration",
+        "target_ms": 100.0,
+        "achieved_ms": 11.206972746779988,
+        "target_met": true,
+        "improvement_factor": 8.923016255994039,
+        "sample_count": 150,
+        "p95_ms": 11.469108546589268,
+        "p99_ms": 12.120645915565547,
+        "success_rate": 1.0,
+        "timestamp": "2025-08-26T00:20:29.102189+00:00"
+      },
+      {
+        "operation_name": "Concurrent_Operations",
+        "target_ms": 200.0,
+        "achieved_ms": 0.45531091862358153,
+        "target_met": true,
+        "improvement_factor": 439.2602764822903,
+        "sample_count": 50,
+        "p95_ms": 0.4906796479190234,
+        "p99_ms": 0.4929462488507852,
+        "success_rate": 1.0,
+        "timestamp": "2025-08-26T00:20:29.167596+00:00"
+      }
+    ],
+    "other_results": [
+      {
+        "name": "cache_hit_rates",
+        "data": {
+          "operation_name": "Cache_Hit_Rates",
+          "target_percent": 95.0,
+          "achieved_percent": 100.0,
+          "target_met": true,
+          "hits": 100,
+          "misses": 0,
+          "total_requests": 100,
+          "performance_stats": {
+            "cache_stats": "not_available"
+          },
+          "monitoring_stats": {
+            "monitoring": "not_available"
+          },
+          "timestamp": "2025-08-26T00:20:29.114561+00:00"
+        },
+        "target_met": true
+      },
+      {
+        "name": "memory_efficiency",
+        "data": {
+          "operation_name": "Memory_Efficiency",
+          "target_kb_per_entry": 1.0,
+          "achieved_kb_per_entry": 0.272,
+          "target_met": true,
+          "baseline_memory_mb": 146.234375,
+          "cached_memory_mb": 146.5,
+          "memory_increase_mb": 0.265625,
+          "test_entries": 1000,
+          "timestamp": "2025-08-26T00:20:29.166758+00:00"
+        },
+        "target_met": true
+      },
+      {
+        "name": "fault_tolerance",
+        "data": {
+          "operation_name": "Fault_Tolerance",
+          "scenarios": [
+            {
+              "scenario": "normal_operation",
+              "success": true,
+              "response_time_ms": 0.0618330086581409
+            },
+            {
+              "scenario": "cache_clear_recovery",
+              "success": true,
+              "response_time_ms": 0.22912501299288124
+            },
+            {
+              "scenario": "pattern_invalidation",
+              "success": true,
+              "response_time_ms": 0.13545798719860613,
+              "invalidated_count": 2
+            }
+          ],
+          "overall_success": true,
+          "target_met": true,
+          "timestamp": "2025-08-26T00:20:29.168147+00:00"
+        },
+        "target_met": true
+      },
+      {
+        "name": "production_scenarios",
+        "data": {
+          "operation_name": "Production_Scenarios",
+          "error": "'CacheFacade' object has no attribute 'warm_cache'",
+          "target_met": false,
+          "timestamp": "2025-08-26T00:20:29.177237+00:00"
+        },
+        "target_met": false
+      }
+    ],
+    "performance_highlights": {
+      "avg_improvement_factor": "311.0x",
+      "avg_response_time_ms": "4.351",
+      "best_performance": "PerformanceResult(operation_name='Cache_Coordination', target_ms=50.0, achieved_ms=0.04610911440977361, target_met=True, improvement_factor=1084.3843053598455, sample_count=200, p95_ms=0.04925414687022567, p99_ms=0.05672132887411861, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 27, 420545, tzinfo=datetime.timezone.utc))",
+      "fastest_operation": "PerformanceResult(operation_name='Cache_Coordination', target_ms=50.0, achieved_ms=0.04610911440977361, target_met=True, improvement_factor=1084.3843053598455, sample_count=200, p95_ms=0.04925414687022567, p99_ms=0.05672132887411861, success_rate=1.0, timestamp=datetime.datetime(2025, 8, 26, 0, 20, 27, 420545, tzinfo=datetime.timezone.utc))"
+    },
+    "recommendations": [
+      "Review production_scenarios configuration and performance"
+    ],
+    "slo_compliance": {
+      "overall_slo_compliance": false,
+      "individual_slos": {}
+    },
+    "validation_timestamp": "2025-08-26T00:20:29.177315+00:00"
+  },
+  "timestamp": "2025-08-26T00:20:29.177317+00:00"
+}

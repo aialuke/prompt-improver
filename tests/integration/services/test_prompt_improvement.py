@@ -10,21 +10,22 @@ Migration from mock-based testing to real behavior testing:
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlmodel import select
 
-from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
 from prompt_improver.database.models import (
     ABExperiment,
-    DiscoveredPattern,
     MLModelPerformance,
     PromptSession,
     RuleMetadata,
     RulePerformance,
     UserFeedback,
+)
+from prompt_improver.services.prompt.facade import (
+    PromptServiceFacade as PromptImprovementService,
 )
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
@@ -41,10 +42,7 @@ async def real_ml_test_data(real_db_session):
     import uuid
 
     test_id = str(uuid.uuid4())[:8]
-    prompt_sessions = []
-    for i in range(25):
-        prompt_sessions.append(
-            PromptSession(
+    prompt_sessions = [PromptSession(
                 session_id=f"ml_session_{test_id}_{i}",
                 original_prompt=f"Original prompt {i} for ML optimization",
                 improved_prompt=f"Improved prompt {i} with ML enhancements",
@@ -54,8 +52,7 @@ async def real_ml_test_data(real_db_session):
                 confidence_level=0.9,
                 created_at=aware_utc_now() - timedelta(days=30, hours=i),
                 updated_at=aware_utc_now() - timedelta(days=30, hours=i),
-            )
-        )
+            ) for i in range(25)]
     rule_metadata = [
         RuleMetadata(
             rule_id="clarity_rule",
@@ -92,10 +89,7 @@ async def real_ml_test_data(real_db_session):
             updated_at=aware_utc_now() - timedelta(days=30),
         ),
     ]
-    user_feedback = []
-    for i in range(5):
-        user_feedback.append(
-            UserFeedback(
+    user_feedback = [UserFeedback(
                 session_id=f"ml_session_{test_id}_{i}",
                 user_id=f"user_{i}",
                 feedback_type="improvement",
@@ -105,8 +99,7 @@ async def real_ml_test_data(real_db_session):
                 model_id=None,
                 created_at=aware_utc_now() - timedelta(days=25, hours=i),
                 updated_at=aware_utc_now() - timedelta(days=25, hours=i),
-            )
-        )
+            ) for i in range(5)]
     rule_performance = []
     for i in range(25):
         rule_id = "clarity_rule" if i % 2 == 0 else "specificity_rule"
@@ -163,7 +156,7 @@ class TestTriggerOptimization:
         result = await real_db_session.execute(feedback_query)
         feedback = result.scalar_one()
         feedback_id = feedback.id
-        
+
         with patch(
             "prompt_improver.services.ml_integration.get_ml_service",
             return_value=real_ml_service_for_testing,
@@ -175,14 +168,14 @@ class TestTriggerOptimization:
         assert "performance_score" in result
         assert "training_samples" in result
         assert "model_id" in result
-        
+
         # Verify feedback was updated in database
         updated_feedback_query = select(UserFeedback).where(
             UserFeedback.id == feedback_id
         )
         updated_result = await real_db_session.execute(updated_feedback_query)
         updated_feedback = updated_result.scalar_one()
-        assert updated_feedback.ml_optimized == True
+        assert updated_feedback.ml_optimized
         assert updated_feedback.model_id is not None
 
     @pytest.mark.asyncio
@@ -314,10 +307,7 @@ class TestRunMLOptimization:
             updated_at=aware_utc_now() - timedelta(days=30),
         )
         real_db_session.add(ensemble_rule)
-        ensemble_sessions = []
-        for i in range(30):
-            ensemble_sessions.append(
-                PromptSession(
+        ensemble_sessions = [PromptSession(
                     session_id=f"ensemble_session_{i}",
                     original_prompt=f"Ensemble test prompt {i}",
                     improved_prompt=f"Enhanced ensemble prompt {i}",
@@ -327,14 +317,10 @@ class TestRunMLOptimization:
                     confidence_level=0.88,
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(30)]
         for session in ensemble_sessions:
             real_db_session.add(session)
-        additional_performance = []
-        for i in range(30):
-            additional_performance.append(
-                RulePerformance(
+        additional_performance = [RulePerformance(
                     rule_id="ensemble_test_rule",
                     session_id=f"ensemble_session_{i}",
                     improvement_score=0.8 + i * 0.003,
@@ -344,8 +330,7 @@ class TestRunMLOptimization:
                     parameters_used={"weight": 1.0, "threshold": 0.7},
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(30)]
         for perf in additional_performance:
             real_db_session.add(perf)
         await real_db_session.commit()
@@ -388,10 +373,7 @@ class TestRunMLOptimization:
             updated_at=aware_utc_now() - timedelta(days=30),
         )
         real_db_session.add(insufficient_rule)
-        insufficient_sessions = []
-        for i in range(15):
-            insufficient_sessions.append(
-                PromptSession(
+        insufficient_sessions = [PromptSession(
                     session_id=f"insufficient_session_{i}",
                     original_prompt=f"Insufficient test prompt {i}",
                     improved_prompt=f"Insufficient improved prompt {i}",
@@ -401,14 +383,10 @@ class TestRunMLOptimization:
                     confidence_level=0.75,
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(15)]
         for session in insufficient_sessions:
             real_db_session.add(session)
-        insufficient_data = []
-        for i in range(15):
-            insufficient_data.append(
-                RulePerformance(
+        insufficient_data = [RulePerformance(
                     rule_id="insufficient_rule",
                     session_id=f"insufficient_session_{i}",
                     improvement_score=0.7 + i * 0.01,
@@ -418,8 +396,7 @@ class TestRunMLOptimization:
                     parameters_used={"weight": 0.8, "threshold": 0.6},
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(15)]
         for perf in insufficient_data:
             real_db_session.add(perf)
         await real_db_session.commit()
@@ -515,10 +492,7 @@ class TestDiscoverPatterns:
             updated_at=aware_utc_now() - timedelta(days=30),
         )
         real_db_session.add(minimal_rule)
-        minimal_sessions = []
-        for i in range(3):
-            minimal_sessions.append(
-                PromptSession(
+        minimal_sessions = [PromptSession(
                     session_id=f"minimal_pattern_session_{i}",
                     original_prompt=f"Minimal pattern test prompt {i}",
                     improved_prompt=f"Minimal pattern improved prompt {i}",
@@ -528,14 +502,10 @@ class TestDiscoverPatterns:
                     confidence_level=0.82,
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(3)]
         for session in minimal_sessions:
             real_db_session.add(session)
-        minimal_performance = []
-        for i in range(3):
-            minimal_performance.append(
-                RulePerformance(
+        minimal_performance = [RulePerformance(
                     rule_id="minimal_pattern_rule",
                     session_id=f"minimal_pattern_session_{i}",
                     improvement_score=0.85,
@@ -545,8 +515,7 @@ class TestDiscoverPatterns:
                     parameters_used={"weight": 0.8 + i * 0.05, "threshold": 0.7},
                     created_at=aware_utc_now() - timedelta(hours=i),
                     updated_at=aware_utc_now() - timedelta(hours=i),
-                )
-            )
+                ) for i in range(3)]
         for perf in minimal_performance:
             real_db_session.add(perf)
         await real_db_session.commit()
@@ -613,7 +582,7 @@ class TestPhase3HelperMethods:
         )
         updated_result = await real_db_session.execute(updated_feedback_query)
         updated_feedback = updated_result.scalar_one()
-        assert updated_feedback.ml_optimized == True
+        assert updated_feedback.ml_optimized
         assert updated_feedback.model_id == "model_456"
 
     @pytest.mark.asyncio

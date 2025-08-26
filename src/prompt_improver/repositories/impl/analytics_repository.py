@@ -9,13 +9,13 @@ Enhanced with multi-level caching for dashboard queries (target: <50ms response 
 import hashlib
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy import and_, desc, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.services.error_handling.facade import ErrorHandlingFacadeProtocol, ErrorServiceType
 from prompt_improver.database import DatabaseServices
+from prompt_improver.database.query_optimizer import execute_optimized_query
 from prompt_improver.services.cache.cache_facade import (
     CacheFacade as CacheManager,
 )
@@ -436,7 +436,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 # Initialize cache for query results
                 import hashlib
                 import json
-                cache = CacheFacade(l1_max_size=500, l2_default_ttl=300, enable_l2=True, enable_l3=False)
+                cache = CacheFacade(l1_max_size=500, l2_default_ttl=300, enable_l2=True)
                 
                 # Generate cache key
                 cache_data = {
@@ -808,7 +808,6 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                from prompt_improver.services.cache.cache_facade import CacheFacade
                 
                 histogram_query = text("""
                     WITH performance_data AS (
@@ -930,7 +929,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                from prompt_improver.services.cache.cache_facade import CacheFacade
+                import time
                 
                 correlation_query = text("""
                     WITH session_metrics AS (

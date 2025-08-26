@@ -1,7 +1,7 @@
-"""Redis Health Monitoring Components
+"""Redis Health Monitoring Components.
 
 Decomposed Redis health monitoring components:
-- RedisHealthChecker: Basic connectivity and health validation  
+- RedisHealthChecker: Basic connectivity and health validation
 - RedisConnectionMonitor: Connection pool monitoring and metrics
 - RedisMetricsCollector: Performance and operational metrics
 - RedisAlerting: Health alerting and notifications
@@ -10,27 +10,31 @@ Decomposed Redis health monitoring components:
 Each component is focused on a single responsibility with <350 lines.
 """
 
-from .alerting import RedisAlerting
-from .connection_monitor import RedisConnectionMonitor
-from .facade import RedisHealthFacade
-from .health_checker import RedisHealthChecker
-from .metrics_collector import RedisMetricsCollector
+from prompt_improver.services.health.redis.alerting import RedisAlerting
+from prompt_improver.services.health.redis.connection_monitor import (
+    RedisConnectionMonitor,
+)
 
 # Backwards compatibility exports
-from .facade import (
-    RedisHealthMonitor,  # Legacy compatibility
-    create_redis_health_checker,  # Legacy compatibility
-    get_redis_health_summary,  # Legacy compatibility
+from prompt_improver.services.health.redis.facade import (
+    RedisHealthFacade,
+    RedisHealthMonitor,
+    create_redis_health_checker,
+    get_redis_health_summary,
+)
+from prompt_improver.services.health.redis.health_checker import RedisHealthChecker
+from prompt_improver.services.health.redis.metrics_collector import (
+    RedisMetricsCollector,
 )
 
 __all__ = [
     "RedisAlerting",
-    "RedisConnectionMonitor", 
+    "RedisConnectionMonitor",
     "RedisHealthChecker",
     "RedisHealthFacade",
-    "RedisMetricsCollector",
     # Legacy compatibility
     "RedisHealthMonitor",
+    "RedisMetricsCollector",
     "create_redis_health_checker",
     "get_redis_health_summary",
 ]

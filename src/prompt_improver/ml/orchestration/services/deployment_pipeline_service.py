@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from ....core.protocols.ml_protocols import EventBusProtocol
+from ....shared.interfaces.protocols.ml import EventBusProtocol
 from ..config.external_services_config import ExternalServicesConfig
 from ..core.orchestrator_service_protocols import DeploymentPipelineServiceProtocol
 from ..events.event_types import EventType, MLEvent

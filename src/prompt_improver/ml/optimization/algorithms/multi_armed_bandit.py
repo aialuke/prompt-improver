@@ -25,9 +25,20 @@ import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
-from scipy import stats
-from sklearn.linear_model import Ridge
+from typing import TYPE_CHECKING
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats, get_sklearn
+
+if TYPE_CHECKING:
+    import numpy as np
+    from scipy import stats
+    from sklearn.linear_model import Ridge
+else:
+    # Runtime lazy loading
+    def _get_sklearn_imports():
+        sklearn = get_sklearn()
+        return sklearn.linear_model.Ridge
+    
+    Ridge = _get_sklearn_imports()
 logger = logging.getLogger(__name__)
 
 class BanditAlgorithm(Enum):
@@ -71,7 +82,7 @@ class ArmResult:
     """Result from pulling a bandit arm"""
     arm_id: str
     reward: float
-    context: np.ndarray | None = None
+    context: get_numpy().ndarray | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
     confidence: float = 0.0
@@ -88,7 +99,7 @@ class BanditState:
     confidence_interval: tuple[float, float] = (0.0, 0.0)
     alpha: float = 1.0
     beta: float = 1.0
-    context_features: np.ndarray | None = None
+    context_features: get_numpy().ndarray | None = None
     last_update: datetime = field(default_factory=datetime.utcnow)
 
 @dataclass
@@ -125,7 +136,7 @@ class BaseBandit(ABC):
             self.arm_states[arm].beta = config.prior_beta
 
     @abstractmethod
-    async def select_arm(self, context: np.ndarray | None=None) -> str:
+    async def select_arm(self, context: get_numpy().ndarray | None=None) -> str:
         """Select an arm to pull
 
         Args:
@@ -135,7 +146,7 @@ class BaseBandit(ABC):
             Selected arm identifier
         """
 
-    async def update(self, arm_id: str, reward: float, context: np.ndarray | None=None) -> None:
+    async def update(self, arm_id: str, reward: float, context: get_numpy().ndarray | None=None) -> None:
         """Update arm statistics with observed reward
 
         Args:
@@ -156,7 +167,7 @@ class BaseBandit(ABC):
             state.variance = ((state.pulls - 2) * state.variance + delta * delta) / (state.pulls - 1)
         if state.pulls > 1:
             std_error = math.sqrt(state.variance / state.pulls)
-            z_score = stats.norm.ppf(1 - (1 - self.config.confidence_level) / 2)
+            z_score = get_scipy_stats().norm.ppf(1 - (1 - self.config.confidence_level) / 2)
             margin = z_score * std_error
             state.confidence_interval = (state.mean_reward - margin, state.mean_reward + margin)
         state.last_update = datetime.utcnow()
@@ -186,24 +197,24 @@ class EpsilonGreedyBandit(BaseBandit):
         super().__init__(arms, config)
         self.current_epsilon = config.epsilon
 
-    async def select_arm(self, context: np.ndarray | None=None) -> str:
+    async def select_arm(self, context: get_numpy().ndarray | None=None) -> str:
         """Select arm using epsilon-greedy strategy"""
         if self.total_trials < self.config.warmup_trials:
-            return np.random.choice(self.arms)
+            return get_numpy().random.choice(self.arms)
         if self.config.algorithm == BanditAlgorithm.EPSILON_DECAY:
             self.current_epsilon = max(self.config.min_epsilon, self.current_epsilon * self.config.epsilon_decay)
-        if np.random.random() < self.current_epsilon:
-            return np.random.choice(self.arms)
+        if get_numpy().random.random() < self.current_epsilon:
+            return get_numpy().random.choice(self.arms)
         return self.get_best_arm()
 
 class UCBBandit(BaseBandit):
     """Upper Confidence Bound bandit"""
 
-    async def select_arm(self, context: np.ndarray | None=None) -> str:
+    async def select_arm(self, context: get_numpy().ndarray | None=None) -> str:
         """Select arm using ucb strategy"""
         unpulled_arms = [arm for arm in self.arms if self.arm_states[arm].pulls == 0]
         if unpulled_arms:
-            return np.random.choice(unpulled_arms)
+            return get_numpy().random.choice(unpulled_arms)
         ucb_values = {}
         for arm in self.arms:
             state = self.arm_states[arm]
@@ -217,7 +228,7 @@ class UCBBandit(BaseBandit):
 class ThompsonSamplingBandit(BaseBandit):
     """Thompson Sampling bandit using Beta distributions"""
 
-    async def update(self, arm_id: str, reward: float, context: np.ndarray | None=None) -> None:
+    async def update(self, arm_id: str, reward: float, context: get_numpy().ndarray | None=None) -> None:
         """Update arm with Bayesian updating"""
         await super().update(arm_id, reward, context)
         state = self.arm_states[arm_id]
@@ -226,12 +237,12 @@ class ThompsonSamplingBandit(BaseBandit):
         else:
             state.beta += 1
 
-    async def select_arm(self, context: np.ndarray | None=None) -> str:
+    async def select_arm(self, context: get_numpy().ndarray | None=None) -> str:
         """Select arm using Thompson Sampling"""
         sampled_values = {}
         for arm in self.arms:
             state = self.arm_states[arm]
-            sampled_values[arm] = np.random.beta(state.alpha, state.beta)
+            sampled_values[arm] = get_numpy().random.beta(state.alpha, state.beta)
         return max(sampled_values.keys(), key=lambda arm: sampled_values[arm])
 
 class ContextualBandit(BaseBandit):
@@ -244,26 +255,26 @@ class ContextualBandit(BaseBandit):
         self.reward_history = {arm: [] for arm in arms}
         self.is_fitted = dict.fromkeys(arms, False)
 
-    async def update(self, arm_id: str, reward: float, context: np.ndarray | None=None) -> None:
+    async def update(self, arm_id: str, reward: float, context: get_numpy().ndarray | None=None) -> None:
         """Update contextual model with observed reward"""
         await super().update(arm_id, reward, context)
         if context is not None:
             self.context_history[arm_id].append(context)
             self.reward_history[arm_id].append(reward)
             if len(self.context_history[arm_id]) >= self.config.min_samples_per_arm:
-                X = np.array(self.context_history[arm_id])
-                y = np.array(self.reward_history[arm_id])
+                X = get_numpy().array(self.context_history[arm_id])
+                y = get_numpy().array(self.reward_history[arm_id])
                 self.models[arm_id].fit(X, y)
                 self.is_fitted[arm_id] = True
 
-    async def select_arm(self, context: np.ndarray | None=None) -> str:
+    async def select_arm(self, context: get_numpy().ndarray | None=None) -> str:
         """Select arm using contextual information"""
         if context is None:
-            if np.random.random() < self.config.epsilon:
-                return np.random.choice(self.arms)
+            if get_numpy().random.random() < self.config.epsilon:
+                return get_numpy().random.choice(self.arms)
             return self.get_best_arm()
         if self.total_trials < self.config.warmup_trials:
-            return np.random.choice(self.arms)
+            return get_numpy().random.choice(self.arms)
         predictions = {}
         for arm in self.arms:
             if self.is_fitted[arm]:
@@ -328,7 +339,7 @@ class MultiarmedBanditFramework:
                 await self._initialize_with_historical_data(experiment_id, reward_data)
             optimization_results = await self._run_bandit_simulation(experiment_id, num_trials, context_data)
             experiment_stats = self._get_experiment_statistics(experiment_id)
-            result = {'experiment_summary': {'experiment_id': experiment_id, 'experiment_name': experiment_name, 'algorithm_used': algorithm.value, 'total_arms': len(arms), 'total_trials': num_trials, 'best_arm': optimization_results['best_arm'], 'best_arm_reward': optimization_results['best_arm_reward'], 'convergence_trial': optimization_results.get('convergence_trial', num_trials)}, 'arm_performance': {arm_id: {'total_pulls': stats['pulls'], 'mean_reward': stats['mean_reward'], 'confidence_interval': stats.get('confidence_interval', [0, 0]), 'regret': stats.get('regret', 0.0), 'selection_probability': stats['pulls'] / num_trials if num_trials > 0 else 0} for arm_id, stats in experiment_stats.items()}, 'optimization_metrics': {'total_regret': optimization_results.get('total_regret', 0.0), 'cumulative_regret': optimization_results.get('cumulative_regret', []), 'exploration_rate': optimization_results.get('exploration_rate', 0.0), 'convergence_achieved': optimization_results.get('convergence_achieved', False), 'algorithm_efficiency': optimization_results.get('algorithm_efficiency', 0.0)}, 'recommendations': {'recommended_arm': optimization_results['best_arm'], 'confidence_level': optimization_results.get('confidence_level', 0.0), 'continue_exploration': optimization_results.get('continue_exploration', False), 'suggested_next_trials': optimization_results.get('suggested_next_trials', 0)}}
+            result = {'experiment_summary': {'experiment_id': experiment_id, 'experiment_name': experiment_name, 'algorithm_used': algorithm.value, 'total_arms': len(arms), 'total_trials': num_trials, 'best_arm': optimization_results['best_arm'], 'best_arm_reward': optimization_results['best_arm_reward'], 'convergence_trial': optimization_results.get('convergence_trial', num_trials)}, 'arm_performance': {arm_id: {'total_pulls': stats['pulls'], 'mean_reward': stats['mean_reward'], 'confidence_interval': get_scipy_stats().get('confidence_interval', [0, 0]), 'regret': get_scipy_stats().get('regret', 0.0), 'selection_probability': stats['pulls'] / num_trials if num_trials > 0 else 0} for arm_id, stats in experiment_stats.items()}, 'optimization_metrics': {'total_regret': optimization_results.get('total_regret', 0.0), 'cumulative_regret': optimization_results.get('cumulative_regret', []), 'exploration_rate': optimization_results.get('exploration_rate', 0.0), 'convergence_achieved': optimization_results.get('convergence_achieved', False), 'algorithm_efficiency': optimization_results.get('algorithm_efficiency', 0.0)}, 'recommendations': {'recommended_arm': optimization_results['best_arm'], 'confidence_level': optimization_results.get('confidence_level', 0.0), 'continue_exploration': optimization_results.get('continue_exploration', False), 'suggested_next_trials': optimization_results.get('suggested_next_trials', 0)}}
             execution_time = (datetime.now() - start_time).total_seconds()
             return {'orchestrator_compatible': True, 'component_result': result, 'local_metadata': {'output_path': output_path, 'execution_time': execution_time, 'experiment_id': experiment_id, 'algorithm_used': algorithm.value, 'arms_count': len(arms), 'trials_completed': num_trials, 'contextual_bandit': context_data is not None, 'component_version': '1.0.0'}}
         except ValueError as e:
@@ -418,7 +429,7 @@ class MultiarmedBanditFramework:
             experiment.regret_history.append(current_regret)
         self.logger.debug('Updated experiment %s: total_trials=%s, total_reward=%s', experiment_id, experiment.total_trials, format(experiment.total_reward, '.3f'))
 
-    def _context_to_array(self, context: dict[str, Any]) -> np.ndarray:
+    def _context_to_array(self, context: dict[str, Any]) -> get_numpy().ndarray:
         """Convert context dictionary to numpy array"""
         features = []
         for key, value in context.items():
@@ -430,7 +441,7 @@ class MultiarmedBanditFramework:
                 features.append(float(hash(value) % 1000) / 1000.0)
         while len(features) < self.config.context_dim:
             features.append(0.0)
-        return np.array(features[:self.config.context_dim])
+        return get_numpy().array(features[:self.config.context_dim])
 
     def _calculate_confidence(self, state: BanditState) -> float:
         """Calculate confidence in arm selection"""
@@ -501,7 +512,7 @@ class MultiarmedBanditFramework:
             if context_data and trial < len(context_data):
                 context_dict = context_data[trial]
                 if context_dict:
-                    context = np.array(list(context_dict.values()), dtype=float)
+                    context = get_numpy().array(list(context_dict.values()), dtype=float)
             selected_arm = await bandit.select_arm(context)
             arm_selections.append(selected_arm)
             simulated_reward = self._simulate_reward(selected_arm, context)
@@ -517,15 +528,15 @@ class MultiarmedBanditFramework:
         convergence_achieved = convergence_trial < num_trials * 0.8
         return {'best_arm': best_arm, 'best_arm_reward': best_arm_stats.mean_reward, 'total_regret': total_regret, 'cumulative_regret': cumulative_regret, 'convergence_trial': convergence_trial, 'convergence_achieved': convergence_achieved, 'exploration_rate': self._calculate_exploration_rate(arm_selections), 'algorithm_efficiency': 1.0 - total_regret / (num_trials * 1.0), 'confidence_level': self._calculate_confidence_level(bandit, best_arm), 'continue_exploration': not convergence_achieved, 'suggested_next_trials': max(0, int(num_trials * 0.2)) if not convergence_achieved else 0}
 
-    def _simulate_reward(self, arm_id: str, context: np.ndarray | None=None) -> float:
+    def _simulate_reward(self, arm_id: str, context: get_numpy().ndarray | None=None) -> float:
         """Simulate reward for an arm (for testing/simulation purposes)"""
         arm_rewards = {'arm_0': 0.3, 'arm_1': 0.5, 'arm_2': 0.7, 'arm_3': 0.4, 'rule_1': 0.6, 'rule_2': 0.8, 'rule_3': 0.4, 'rule_4': 0.7, 'strategy_a': 0.5, 'strategy_b': 0.7, 'strategy_c': 0.6}
         base_reward = arm_rewards.get(arm_id, 0.5)
         if context is not None and len(context) > 0:
-            context_influence = np.mean(context) * 0.1
+            context_influence = get_numpy().mean(context) * 0.1
             base_reward += context_influence
-        noise = np.random.normal(0, 0.1)
-        reward = np.clip(base_reward + noise, 0, 1)
+        noise = get_numpy().random.normal(0, 0.1)
+        reward = get_numpy().clip(base_reward + noise, 0, 1)
         return float(reward)
 
     def _calculate_convergence_trial(self, arm_selections: list[str], best_arm: str) -> int:
@@ -566,8 +577,8 @@ class MultiarmedBanditFramework:
         stats = {}
         for arm_id in bandit.arms:
             arm_state = bandit.arm_states[arm_id]
-            stats[arm_id] = {'pulls': arm_state.pulls, 'mean_reward': arm_state.mean_reward, 'total_reward': arm_state.total_reward, 'confidence_interval': [max(0, arm_state.mean_reward - 1.96 * np.sqrt(arm_state.variance / max(1, arm_state.pulls))), min(1, arm_state.mean_reward + 1.96 * np.sqrt(arm_state.variance / max(1, arm_state.pulls)))] if hasattr(arm_state, 'variance') and arm_state.variance is not None else [0, 0], 'regret': 0.0}
-        best_mean = max(stats[arm]['mean_reward'] for arm in stats.keys()) if stats else 0
+            stats[arm_id] = {'pulls': arm_state.pulls, 'mean_reward': arm_state.mean_reward, 'total_reward': arm_state.total_reward, 'confidence_interval': [max(0, arm_state.mean_reward - 1.96 * get_numpy().sqrt(arm_state.variance / max(1, arm_state.pulls))), min(1, arm_state.mean_reward + 1.96 * get_numpy().sqrt(arm_state.variance / max(1, arm_state.pulls)))] if hasattr(arm_state, 'variance') and arm_state.variance is not None else [0, 0], 'regret': 0.0}
+        best_mean = max(stats[arm]['mean_reward'] for arm in get_scipy_stats().keys()) if stats else 0
         for arm_id in stats:
             stats[arm_id]['regret'] = best_mean - stats[arm_id]['mean_reward']
         return stats
