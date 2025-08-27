@@ -1,8 +1,9 @@
 """OpenTelemetry Integration for Distributed Tracing
-2025 Best Practices for Microservices Observability
+2025 Best Practices for Microservices Observability.
 """
 
 import logging
+import os
 import time
 from contextlib import contextmanager
 from functools import wraps
@@ -33,7 +34,7 @@ HEALTH_CHECK_KIND = "internal"
 
 
 class TelemetryProvider:
-    """Manages OpenTelemetry instrumentation for health checks"""
+    """Manages OpenTelemetry instrumentation for health checks."""
 
     def __init__(
         self,
@@ -41,7 +42,7 @@ class TelemetryProvider:
         service_version: str = "1.0.0",
         environment: str = "production",
         otlp_endpoint: str | None = None,
-    ):
+    ) -> None:
         self.service_name = service_name
         self.service_version = service_version
         self.environment = environment
@@ -54,8 +55,8 @@ class TelemetryProvider:
             self.tracer = None
             self.meter = None
 
-    def _setup_telemetry(self):
-        """Initialize OpenTelemetry providers"""
+    def _setup_telemetry(self) -> None:
+        """Initialize OpenTelemetry providers."""
         resource = Resource.create({
             "service.name": self.service_name,
             "service.version": self.service_version,
@@ -79,8 +80,8 @@ class TelemetryProvider:
         self.meter = metrics.get_meter(self.service_name, self.service_version)
         self._create_metrics_instruments()
 
-    def _create_metrics_instruments(self):
-        """Create reusable metrics instruments"""
+    def _create_metrics_instruments(self) -> None:
+        """Create reusable metrics instruments."""
         if not self.meter:
             return
         self.health_check_duration = self.meter.create_histogram(
@@ -115,7 +116,7 @@ def init_telemetry(
     environment: str = "production",
     otlp_endpoint: str | None = None,
 ) -> TelemetryProvider:
-    """Initialize global telemetry provider"""
+    """Initialize global telemetry provider."""
     global _telemetry_provider
     _telemetry_provider = TelemetryProvider(
         service_name, service_version, environment, otlp_endpoint
@@ -124,7 +125,7 @@ def init_telemetry(
 
 
 def get_telemetry() -> TelemetryProvider | None:
-    """Get global telemetry provider"""
+    """Get global telemetry provider."""
     return _telemetry_provider
 
 
@@ -134,7 +135,7 @@ def health_check_span(
     check_type: str = "health_check",
     attributes: dict[str, Any] | None = None,
 ):
-    """Context manager for creating health check spans"""
+    """Context manager for creating health check spans."""
     provider = get_telemetry()
     if not provider or not provider.tracer:
         yield None
@@ -146,8 +147,9 @@ def health_check_span(
         span.set_attribute("health_check.type", check_type)
         span.set_attribute("service.name", provider.service_name)
         try:
-            from middleware.correlation_context import get_correlation_id
             import os
+
+            from middleware.correlation_context import get_correlation_id
             correlation_id = get_correlation_id()
             if correlation_id:
                 span.set_attribute("correlation.id", correlation_id)
@@ -167,7 +169,7 @@ def health_check_span(
 
 
 def instrument_health_check(component_name: str, check_type: str = "health_check"):
-    """Decorator to automatically instrument health check methods with OpenTelemetry"""
+    """Decorator to automatically instrument health check methods with OpenTelemetry."""
 
     def decorator(func):
         @wraps(func)
@@ -239,16 +241,16 @@ def instrument_health_check(component_name: str, check_type: str = "health_check
 
 
 class TelemetryContext:
-    """Helper class for managing telemetry context in health checks"""
+    """Helper class for managing telemetry context in health checks."""
 
-    def __init__(self, component_name: str):
+    def __init__(self, component_name: str) -> None:
         self.component_name = component_name
         self.provider = get_telemetry()
         self._span_stack = []
 
     @contextmanager
     def span(self, operation: str, **attributes):
-        """Create a nested span for sub-operations"""
+        """Create a nested span for sub-operations."""
         if not self.provider or not self.provider.tracer:
             yield None
             return
@@ -266,19 +268,19 @@ class TelemetryContext:
                 self._span_stack.pop()
 
     def add_event(self, name: str, attributes: dict[str, Any] | None = None):
-        """Add an event to the current span"""
+        """Add an event to the current span."""
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.add_event(name, attributes=attributes or {})
 
     def set_attribute(self, key: str, value: Any):
-        """Set attribute on current span"""
+        """Set attribute on current span."""
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.set_attribute(key, value)
 
     def record_exception(self, exception: Exception):
-        """Record exception in current span"""
+        """Record exception in current span."""
         if self._span_stack:
             current_span = self._span_stack[-1]
             current_span.record_exception(exception)
@@ -287,7 +289,7 @@ class TelemetryContext:
 def create_health_check_span(
     component_name: str, operation: str = "check"
 ) -> Any | None:
-    """Create a span for manual instrumentation"""
+    """Create a span for manual instrumentation."""
     provider = get_telemetry()
     if not provider or not provider.tracer:
         return None

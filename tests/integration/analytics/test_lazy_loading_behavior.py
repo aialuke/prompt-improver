@@ -29,7 +29,6 @@ from prompt_improver.analytics.unified.session_analytics_component import (
     _get_numpy,
     _get_scipy_stats,
 )
-from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
 
 
 class TestAnalyticsLazyLoadingBehavior:

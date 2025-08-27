@@ -21,10 +21,10 @@ from hypothesis import (
     strategies as st,
 )
 
+from prompt_improver.analytics import AnalyticsServiceFacade
 from prompt_improver.database import get_session_context
 from prompt_improver.database.models import ImprovementSession, RulePerformance
 from prompt_improver.rule_engine import RuleEngine
-from prompt_improver.services.analytics import AnalyticsService
 from prompt_improver.services.cache.cache_facade import CacheFacade
 from prompt_improver.services.prompt.facade import (
     PromptServiceFacade as PromptImprovementService,
@@ -45,7 +45,7 @@ class PerformanceTester:
 
     async def setup_services(self):
         """Initialize real services for performance testing"""
-        self.analytics_service = AnalyticsService()
+        self.analytics_service = AnalyticsServiceFacade()
         self.rule_engine = RuleEngine()
         self.improvement_service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False

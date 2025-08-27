@@ -3,6 +3,7 @@ Comprehensive monitoring for Phase 2 <50ms query time and 90% cache hit ratio re
 """
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -14,10 +15,12 @@ from prompt_improver.database import (
     get_database_services,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class QueryPerformanceMetric:
-    """Individual query performance metric"""
+    """Individual query performance metric."""
 
     query_text: str
     calls: int
@@ -31,7 +34,7 @@ class QueryPerformanceMetric:
 
 @dataclass
 class DatabasePerformanceSnapshot:
-    """Complete database performance snapshot"""
+    """Complete database performance snapshot."""
 
     timestamp: datetime
     cache_hit_ratio: float
@@ -56,7 +59,7 @@ class DatabasePerformanceMonitor:
     - Event-driven monitoring with orchestrator integration
     """
 
-    def __init__(self, client=None, event_bus=None):
+    def __init__(self, client=None, event_bus=None) -> None:
         self.client = client
         self.event_bus = event_bus
         self._monitoring = False
@@ -64,19 +67,19 @@ class DatabasePerformanceMonitor:
         self._last_alert_times = {}
 
     async def get_client(self):
-        """Get database client"""
+        """Get database client."""
         if self.client is None:
             return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def get_client(self):
-        """Get database client - using DatabaseServices"""
+        """Get database client - using DatabaseServices."""
         if self.client is None:
             return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def get_cache_hit_ratio(self) -> float:
-        """Get current cache hit ratio from pg_stat_database"""
+        """Get current cache hit ratio from pg_stat_database."""
         manager = await get_database_services(ManagerMode.ASYNC_MODERN)
         query = "\n        SELECT\n            CASE\n                WHEN (blks_hit + blks_read) = 0 THEN 0\n                ELSE ROUND(blks_hit::numeric / (blks_hit + blks_read) * 100, 2)\n            END as cache_hit_ratio\n        FROM pg_stat_database\n        WHERE datname = current_database()\n        "
         async with manager.get_session() as session:
@@ -85,7 +88,7 @@ class DatabasePerformanceMonitor:
             return float(row[0]) if row else 0.0
 
     async def get_index_hit_ratio(self) -> float:
-        """Get index hit ratio for table access patterns"""
+        """Get index hit ratio for table access patterns."""
         client = await self.get_client()
         query = "\n        SELECT\n            CASE\n                WHEN (idx_blks_hit + idx_blks_read) = 0 THEN 0\n                ELSE ROUND(idx_blks_hit::numeric / (idx_blks_hit + idx_blks_read) * 100, 2)\n            END as index_hit_ratio\n        FROM pg_statio_user_indexes\n        "
         result = await client.fetch_raw(query)
@@ -94,14 +97,14 @@ class DatabasePerformanceMonitor:
         return 0.0
 
     async def get_active_connections(self) -> int:
-        """Get current active connection count"""
+        """Get current active connection count."""
         client = await self.get_client()
         query = "\n        SELECT count(*) as active_connections\n        FROM pg_stat_activity\n        WHERE state = 'active' AND datname = current_database()\n        "
         result = await client.fetch_raw(query)
         return int(result[0]["active_connections"]) if result else 0
 
     async def get_database_size(self) -> float:
-        """Get database size in MB"""
+        """Get database size in MB."""
         client = await self.get_client()
         query = "\n        SELECT\n            ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 2) as size_mb\n        "
         result = await client.fetch_raw(query)
@@ -120,10 +123,7 @@ class DatabasePerformanceMonitor:
         if has_extension:
             query = "\n            SELECT\n                query as query_text,\n                calls,\n                total_exec_time,\n                mean_exec_time,\n                max_exec_time,\n                min_exec_time,\n                rows\n            FROM pg_stat_statements\n            WHERE calls >= %s\n            AND query NOT LIKE '%%pg_stat_statements%%'\n            ORDER BY mean_exec_time DESC\n            LIMIT 10\n            "
             result = await client.fetch_raw(query, {"calls": min_calls})
-            metrics = []
-            for row in result:
-                metrics.append(
-                    QueryPerformanceMetric(
+            return [QueryPerformanceMetric(
                         query_text=row["query_text"][:200] + "..."
                         if len(row["query_text"]) > 200
                         else row["query_text"],
@@ -134,9 +134,7 @@ class DatabasePerformanceMonitor:
                         min_exec_time=row["min_exec_time"],
                         rows_affected=row["rows"],
                         cache_hit_ratio=0.0,
-                    )
-                )
-            return metrics
+                    ) for row in result]
         client_stats = await client.get_performance_stats()
         return [
             QueryPerformanceMetric(
@@ -153,7 +151,7 @@ class DatabasePerformanceMonitor:
         ]
 
     async def take_performance_snapshot(self) -> DatabasePerformanceSnapshot:
-        """Take a complete performance snapshot"""
+        """Take a complete performance snapshot."""
         client = await self.get_client()
         (
             cache_hit_ratio,
@@ -188,7 +186,7 @@ class DatabasePerformanceMonitor:
         return snapshot
 
     async def start_monitoring(self, interval_seconds: int = 30):
-        """Start continuous monitoring"""
+        """Start continuous monitoring."""
         self._monitoring = True
         while self._monitoring:
             try:
@@ -207,11 +205,11 @@ class DatabasePerformanceMonitor:
                 await asyncio.sleep(interval_seconds)
 
     def stop_monitoring(self):
-        """Stop continuous monitoring"""
+        """Stop continuous monitoring."""
         self._monitoring = False
 
     async def get_performance_summary(self, hours: int = 24) -> dict[str, Any]:
-        """Get performance summary for the last N hours"""
+        """Get performance summary for the last N hours."""
         cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
         recent_snapshots = [s for s in self._snapshots if s.timestamp >= cutoff_time]
         if not recent_snapshots:
@@ -242,7 +240,7 @@ class DatabasePerformanceMonitor:
         }
 
     async def get_recommendations(self) -> list[str]:
-        """Get performance optimization recommendations"""
+        """Get performance optimization recommendations."""
         if not self._snapshots:
             return ["No performance data available. Run monitoring first."]
         latest = self._snapshots[-1]
@@ -269,15 +267,17 @@ class DatabasePerformanceMonitor:
 
     async def _emit_performance_snapshot_event(
         self, snapshot: DatabasePerformanceSnapshot
-    ):
+    ) -> None:
         """Emit performance snapshot event for orchestrator coordination."""
         if not self.event_bus:
             return
-        from prompt_improver.database.services.optional_registry import get_optional_services_registry
         from prompt_improver.database.protocols.events import EventType
+        from prompt_improver.database.services.optional_registry import (
+            get_optional_services_registry,
+        )
 
         registry = get_optional_services_registry()
-        
+
         event_data = {
             "snapshot": {
                 "timestamp": snapshot.timestamp.isoformat(),
@@ -291,13 +291,13 @@ class DatabasePerformanceMonitor:
             },
             "source": "database_performance_monitor",
         }
-        
+
         # Use optional registry for graceful degradation
         success = await registry.dispatch_event_if_available(
-            EventType.DATABASE_OPTIMIZATION_COMPLETED, 
+            EventType.DATABASE_OPTIMIZATION_COMPLETED,
             event_data
         )
-        
+
         if success:
             logger.debug("Database performance snapshot event dispatched successfully")
         else:
@@ -305,17 +305,20 @@ class DatabasePerformanceMonitor:
 
     async def _check_and_emit_performance_alerts(
         self, snapshot: DatabasePerformanceSnapshot
-    ):
+    ) -> None:
         """Check performance thresholds and emit alerts using protocol-based approach."""
-        from datetime import timedelta
-        from prompt_improver.database.services.optional_registry import get_optional_services_registry
-        from prompt_improver.database.protocols.events import EventType
         import logging
+        from datetime import timedelta
+
+        from prompt_improver.database.protocols.events import EventType
+        from prompt_improver.database.services.optional_registry import (
+            get_optional_services_registry,
+        )
         logger = logging.getLogger(__name__)
 
         registry = get_optional_services_registry()
         current_time = datetime.now(UTC)
-        
+
         # Check cache hit ratio threshold
         if snapshot.cache_hit_ratio < 90.0:
             last_alert = self._last_alert_times.get("cache_hit_ratio")
@@ -327,12 +330,12 @@ class DatabasePerformanceMonitor:
                     "source": "database_performance_monitor",
                 }
                 await registry.dispatch_event_if_available(
-                    EventType.DATABASE_CACHE_HIT_RATIO_LOW, 
+                    EventType.DATABASE_CACHE_HIT_RATIO_LOW,
                     event_data
                 )
                 self._last_alert_times["cache_hit_ratio"] = current_time
-                
-        # Check slow query threshold  
+
+        # Check slow query threshold
         if snapshot.avg_query_time_ms > 50.0:
             last_alert = self._last_alert_times.get("slow_queries")
             if not last_alert or current_time - last_alert > timedelta(minutes=5):
@@ -344,11 +347,11 @@ class DatabasePerformanceMonitor:
                     "source": "database_performance_monitor",
                 }
                 await registry.dispatch_event_if_available(
-                    EventType.DATABASE_SLOW_QUERY_DETECTED, 
+                    EventType.DATABASE_SLOW_QUERY_DETECTED,
                     event_data
                 )
                 self._last_alert_times["slow_queries"] = current_time
-                
+
         # Check for critical performance issues
         performance_issues = []
         if snapshot.cache_hit_ratio < 80.0:
@@ -357,7 +360,7 @@ class DatabasePerformanceMonitor:
             performance_issues.append("critical_query_time")
         if snapshot.active_connections > 25:
             performance_issues.append("high_connection_count")
-            
+
         if performance_issues:
             last_alert = self._last_alert_times.get("performance_degraded")
             if not last_alert or current_time - last_alert > timedelta(minutes=10):
@@ -372,7 +375,7 @@ class DatabasePerformanceMonitor:
                     "source": "database_performance_monitor",
                 }
                 await registry.dispatch_event_if_available(
-                    EventType.DATABASE_PERFORMANCE_DEGRADED, 
+                    EventType.DATABASE_PERFORMANCE_DEGRADED,
                     event_data
                 )
                 self._last_alert_times["performance_degraded"] = current_time
@@ -382,7 +385,7 @@ _monitor: DatabasePerformanceMonitor | None = None
 
 
 async def get_performance_monitor(event_bus=None) -> DatabasePerformanceMonitor:
-    """Get or create global performance monitor with optional event bus integration"""
+    """Get or create global performance monitor with optional event bus integration."""
     global _monitor
     if _monitor is None:
         _monitor = DatabasePerformanceMonitor(event_bus=event_bus)

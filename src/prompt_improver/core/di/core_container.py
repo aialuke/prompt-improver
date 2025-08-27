@@ -226,7 +226,7 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         """
         # Handle interface name for logging/error messages
         interface_name = self._get_interface_name(interface)
-        
+
         if interface not in self._services:
             raise KeyError(f"Service not registered: {interface_name}")
 
@@ -275,16 +275,16 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
 
     def _get_interface_name(self, interface: Any) -> str:
         """Get a readable name for an interface, handling Union types and other special cases.
-        
+
         Args:
             interface: Interface type or annotation
-            
+
         Returns:
             str: Readable interface name
         """
         if hasattr(interface, "__name__"):
             return interface.__name__
-        
+
         # Handle Union types (Python 3.10+ syntax like `logging.Logger | None`)
         if hasattr(interface, "__args__"):
             args_names = []
@@ -294,15 +294,15 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                 else:
                     args_names.append(str(arg))
             return f"Union[{', '.join(args_names)}]"
-        
+
         return str(interface)
 
     def _is_optional_parameter(self, annotation: Any) -> tuple[bool, Any]:
         """Check if parameter annotation is optional (Union with None).
-        
+
         Args:
             annotation: Parameter annotation
-            
+
         Returns:
             tuple: (is_optional, non_none_type_if_optional)
         """
@@ -313,7 +313,7 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                 # This is Optional[T] or T | None
                 non_none_type = next(arg for arg in args if arg is not type(None))
                 return True, non_none_type
-        
+
         return False, annotation
 
     async def _create_from_class(self, implementation: type[Any]) -> Any:
@@ -333,11 +333,11 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         for param_name, param in sig.parameters.items():
             if param_name == "self":
                 continue
-                
+
             if param.annotation != inspect.Parameter.empty:
                 # Check if this is an optional parameter
                 is_optional, actual_type = self._is_optional_parameter(param.annotation)
-                
+
                 try:
                     # Try to resolve the actual type (non-None part for optional parameters)
                     dependency = await self._resolve_service(actual_type)
@@ -414,7 +414,9 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
                 return UnifiedConfig()
             except ImportError:
                 try:
-                    from prompt_improver.core.facades.minimal_config_facade import MinimalConfigFacade
+                    from prompt_improver.core.facades.minimal_config_facade import (
+                        MinimalConfigFacade,
+                    )
                     return MinimalConfigFacade()
                 except ImportError:
                     # Simple fallback using dictionary
@@ -467,18 +469,18 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
             except ImportError:
                 # Simple fallback feature flags
                 class SimpleFeatureFlags:
-                    def __init__(self):
+                    def __init__(self) -> None:
                         self.flags = {}
-                    
+
                     def is_enabled(self, flag_name: str) -> bool:
                         return self.flags.get(flag_name, False)
-                    
-                    def enable(self, flag_name: str):
+
+                    def enable(self, flag_name: str) -> None:
                         self.flags[flag_name] = True
-                    
-                    def disable(self, flag_name: str):
+
+                    def disable(self, flag_name: str) -> None:
                         self.flags[flag_name] = False
-                
+
                 return SimpleFeatureFlags()
 
         self.register_factory(
@@ -649,7 +651,7 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
     # ContainerRegistryProtocol implementation
     def register_container(self, name: str, container: Any) -> None:
         """Register a container with the registry.
-        
+
         Args:
             name: Container identifier
             container: Container instance to register
@@ -657,26 +659,26 @@ class CoreContainer(CoreContainerProtocol, ContainerRegistryProtocol):
         # For now, core container doesn't maintain other containers
         # This could be extended if needed for container orchestration
         self.logger.debug(f"Container registration not implemented for core container: {name}")
-        
+
     def get_container(self, name: str) -> Any:
         """Get a container from the registry.
-        
+
         Args:
             name: Container identifier
-            
+
         Returns:
             Container instance
-            
+
         Raises:
             KeyError: If container not found
         """
         if name == self.name:
             return self
         raise KeyError(f"Container not found: {name}")
-        
+
     def list_containers(self) -> list[str]:
         """List all registered container names.
-        
+
         Returns:
             List of container names
         """

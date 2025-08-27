@@ -33,7 +33,6 @@ from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
-import httpx
 import requests
 
 from prompt_improver.core.services.resilience.retry_service_facade import (
@@ -190,12 +189,6 @@ class NetworkErrorService:
         aiohttp.ClientSSLError: (NetworkErrorCategory.SSL_CERTIFICATE_ERROR, NetworkErrorSeverity.HIGH),
         aiohttp.ClientProxyConnectionError: (NetworkErrorCategory.PROXY_ERROR, NetworkErrorSeverity.MEDIUM),
         aiohttp.ClientPayloadError: (NetworkErrorCategory.PROTOCOL_ERROR, NetworkErrorSeverity.MEDIUM),
-
-        # httpx exceptions
-        httpx.ConnectTimeout: (NetworkErrorCategory.CONNECTION_TIMEOUT, NetworkErrorSeverity.MEDIUM),
-        httpx.ReadTimeout: (NetworkErrorCategory.CONNECTION_TIMEOUT, NetworkErrorSeverity.MEDIUM),
-        httpx.ConnectError: (NetworkErrorCategory.CONNECTION_REFUSED, NetworkErrorSeverity.HIGH),
-        httpx.HTTPStatusError: (NetworkErrorCategory.HTTP_SERVER_ERROR, NetworkErrorSeverity.HIGH),
 
         # requests exceptions
         requests.exceptions.ConnectionError: (NetworkErrorCategory.CONNECTION_REFUSED, NetworkErrorSeverity.HIGH),

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import WebSocket
 
-from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+from prompt_improver.database.composition import get_database_services
 from prompt_improver.database.types import ManagerMode
 
 
@@ -127,7 +127,7 @@ class TestWebSocketBroadcastingOptimization:
         await connection_manager.connect_to_group(ws, "rate_test_group", "user1")
         message = {"type": "test", "data": "rate_limit_test"}
         messages_sent = 0
-        for i in range(10):
+        for _i in range(10):
             await connection_manager.broadcast_to_group("rate_test_group", message)
             messages_sent += 1
         assert ws.send_text.call_count <= connection_manager.MAX_MESSAGES_PER_SECOND + 2

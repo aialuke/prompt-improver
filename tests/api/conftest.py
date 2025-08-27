@@ -17,12 +17,13 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator, Generator
 
+import aiohttp
+
 # unittest.mock eliminated - using real service integration only
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 from prompt_improver.api.app import create_test_app
 from prompt_improver.core.di.container_orchestrator import (
@@ -106,10 +107,15 @@ def real_api_client(real_api_app: FastAPI) -> Generator[TestClient, None, None]:
 
 
 @pytest_asyncio.fixture(scope="session")
-async def real_async_api_client(real_api_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
+async def real_async_api_client(real_api_app: FastAPI) -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Create async HTTP client for real API integration testing."""
-    async with AsyncClient(app=real_api_app, base_url="http://testserver") as client:
-        yield client
+    # For testing FastAPI with aiohttp, we'll use the TestClient for most tests
+    # and create a direct aiohttp session for async HTTP testing
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(limit=100),
+        timeout=aiohttp.ClientTimeout(total=30)
+    ) as session:
+        yield session
 
 
 @pytest.fixture

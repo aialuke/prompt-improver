@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel
+from scipy.stats import norm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prompt_improver.analytics.unified.protocols import (
@@ -22,7 +23,7 @@ from prompt_improver.analytics.unified.protocols import (
     ComponentHealth,
     ExperimentResult,
 )
-from prompt_improver.core.utils.lazy_ml_loader import get_numpy, get_scipy
+from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 logger = logging.getLogger(__name__)
 
@@ -682,9 +683,7 @@ class ABTestingComponent(ABTestingProtocol, AnalyticsComponentProtocol):
             first_treatment_key = next(iter(treatment_data.keys()))
             treatment = treatment_data[first_treatment_key]
 
-            control_conversions = control_data["conversions"]
             control_samples = control_data["sample_size"]
-            treatment_conversions = treatment["conversions"]
             treatment_samples = treatment["sample_size"]
 
             if control_samples == 0 or treatment_samples == 0:

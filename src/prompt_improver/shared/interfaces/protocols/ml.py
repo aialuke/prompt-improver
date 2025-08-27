@@ -23,6 +23,8 @@ from typing import (
 
 if TYPE_CHECKING:
     # Type hints available during type checking without runtime import
+    from pathlib import Path
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 # =============================================================================
@@ -473,7 +475,7 @@ class FeatureStoreProtocol(Protocol):
     async def get_historical_features(
         self,
         feature_names: list[str],
-        entity_ids: list[str], 
+        entity_ids: list[str],
         timestamp_range: tuple[datetime, datetime],
     ) -> dict[str, Any]:
         """Get historical features."""

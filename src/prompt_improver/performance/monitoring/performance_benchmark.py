@@ -12,7 +12,12 @@ from typing import Any
 
 import aiofiles
 
-from prompt_improver.core.events.ml_event_bus import get_ml_event_bus, MLEventType, MLEvent
+from prompt_improver.core.events.ml_event_bus import (
+    MLEvent,
+    MLEventType,
+    get_ml_event_bus,
+)
+from prompt_improver.database import get_session
 from prompt_improver.performance.optimization.performance_optimizer import (
     PerformanceBaseline,
     get_performance_optimizer,
@@ -32,7 +37,7 @@ logger = logging.getLogger(__name__)
 class MCPPerformanceBenchmark:
     """Comprehensive benchmark suite for MCP operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.optimizer = get_performance_optimizer()
         self._mcp_server = None
         # Event bus for decoupled analytics communication
@@ -71,6 +76,7 @@ class MCPPerformanceBenchmark:
             {"domain": "data_science", "tool": "pandas"},
             {"domain": "devops", "platform": "aws"},
         ]
+        return None
 
     async def run_baseline_benchmark(
         self, samples_per_operation: int = 50
@@ -108,7 +114,7 @@ class MCPPerformanceBenchmark:
         """Benchmark the improve_prompt operation."""
         logger.info("Benchmarking improve_prompt operation")
 
-        async def improve_prompt_operation():
+        async def improve_prompt_operation() -> None:
             prompt = self.test_prompts[
                 len(self.optimizer._measurements.get("improve_prompt", []))
                 % len(self.test_prompts)
@@ -134,7 +140,7 @@ class MCPPerformanceBenchmark:
         """Benchmark database query operations."""
         logger.info("Benchmarking database operations")
 
-        async def database_operation():
+        async def database_operation() -> None:
             get_session = _get_database_session()
             async with get_session() as db_session:
                 from sqlalchemy import text
@@ -152,14 +158,14 @@ class MCPPerformanceBenchmark:
         """Benchmark analytics query operations."""
         logger.info("Benchmarking analytics operations")
 
-        async def analytics_operation():
+        async def analytics_operation() -> None:
             # Use event-driven approach instead of direct analytics dependency
             event_bus = await self._get_event_bus()
             performance_request = MLEvent(
                 event_type=MLEventType.PERFORMANCE_METRICS_REQUEST,
                 source="performance_benchmark",
                 data={
-                    "metric_type": "rule_effectiveness", 
+                    "metric_type": "rule_effectiveness",
                     "days": 7,
                     "min_usage_count": 1
                 }
@@ -176,13 +182,12 @@ class MCPPerformanceBenchmark:
         """Benchmark session management operations using unified cache architecture."""
         logger.info("Benchmarking session operations (unified cache)")
 
-        async def session_operation():
+        async def session_operation() -> None:
             session_id = f"benchmark_{int(time.time() * 1000)}"
             # Use unified cache facade instead of direct session_store access
             from prompt_improver.services.cache.cache_facade import CacheFacade
-            from prompt_improver.database import get_session
             cache_facade = CacheFacade(l1_max_size=1000, enable_l2=False)
-            
+
             await cache_facade.set_session(session_id, {"test": "data"}, ttl=3600)
             await cache_facade.get_session(session_id)
             await cache_facade.set_session(session_id, {"test": "data", "updated": True}, ttl=3600)
@@ -235,7 +240,7 @@ class MCPPerformanceBenchmark:
                 content = await f.read()
                 baseline_data = json.loads(content)
         except FileNotFoundError:
-            logger.error(f"Baseline file {baseline_filepath} not found")
+            logger.exception(f"Baseline file {baseline_filepath} not found")
             return {"error": "Baseline file not found"}
         current_baselines = await self.optimizer.get_all_baselines()
         comparison = {

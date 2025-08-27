@@ -1,20 +1,17 @@
 """Individual health checker implementations for APES components.
-PHASE 3: Health Check Consolidation - Component Checkers
+PHASE 3: Health Check Consolidation - Component Checkers.
 """
 
 import asyncio
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from prompt_improver.performance.monitoring.health.base import (
     HealthChecker,
     HealthResult,
     HealthStatus,
 )
-
-if TYPE_CHECKING:
-    pass
 
 try:
     from prompt_improver.performance.monitoring.health.redis_monitor import (
@@ -38,6 +35,7 @@ except Exception:
 BATCH_PROCESSOR_AVAILABLE = None
 batch_processor = None
 
+
 def _get_batch_processor():
     """Lazy load batch processor to avoid ML dependencies during module import."""
     global BATCH_PROCESSOR_AVAILABLE, batch_processor
@@ -53,10 +51,13 @@ def _get_batch_processor():
             batch_processor = None
             print(f"batch_processor import failed: {e}")
     return batch_processor if BATCH_PROCESSOR_AVAILABLE else None
+
+
 def _queue_services_available():
     """Check if queue services are available (lazy evaluation)."""
     batch_available = _get_batch_processor() is not None
     return BACKGROUND_MANAGER_AVAILABLE or batch_available
+
 
 QUEUE_SERVICES_AVAILABLE = BACKGROUND_MANAGER_AVAILABLE  # Conservative default
 try:
@@ -71,14 +72,14 @@ except Exception:
 
 
 class DatabaseHealthChecker(HealthChecker):
-    """Database connectivity and performance health checker"""
+    """Database connectivity and performance health checker."""
 
-    def __init__(self, health_repository: HealthRepositoryProtocol | None = None):
+    def __init__(self, health_repository: HealthRepositoryProtocol | None = None) -> None:
         super().__init__("database")
         self.health_repository = health_repository
 
     async def check(self) -> HealthResult:
-        """Check database connectivity and performance"""
+        """Check database connectivity and performance."""
         if not HEALTH_REPOSITORY_AVAILABLE or self.health_repository is None:
             return HealthResult(
                 status=HealthStatus.WARNING,
@@ -91,7 +92,7 @@ class DatabaseHealthChecker(HealthChecker):
             # Use repository for database health checking
             health_status = await self.health_repository.check_database_health()
             response_time = (time.time() - start_time) * 1000
-            
+
             # Map repository health status to our status enum
             status_mapping = {
                 "healthy": HealthStatus.HEALTHY,
@@ -99,16 +100,16 @@ class DatabaseHealthChecker(HealthChecker):
                 "critical": HealthStatus.FAILED,
                 "unknown": HealthStatus.WARNING,
             }
-            
+
             mapped_status = status_mapping.get(health_status.status, HealthStatus.FAILED)
-            
+
             # Get additional database metrics for details
             db_metrics = None
             try:
                 db_metrics = await self.health_repository.get_database_metrics()
             except Exception:
                 pass  # Metrics are optional
-            
+
             details = health_status.details or {}
             if db_metrics:
                 details.update({
@@ -116,7 +117,7 @@ class DatabaseHealthChecker(HealthChecker):
                     "connection_utilization": db_metrics.connection_utilization,
                     "slow_query_count": db_metrics.slow_query_count,
                 })
-            
+
             return HealthResult(
                 status=mapped_status,
                 component=self.name,
@@ -134,13 +135,13 @@ class DatabaseHealthChecker(HealthChecker):
 
 
 class MCPServerHealthChecker(HealthChecker):
-    """MCP server performance health checker"""
+    """MCP server performance health checker."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("mcp_server")
 
     async def check(self) -> HealthResult:
-        """Check MCP server performance"""
+        """Check MCP server performance."""
         try:
             try:
                 from prompt_improver.performance.mcp_server.server import APESMCPServer
@@ -182,14 +183,14 @@ class MCPServerHealthChecker(HealthChecker):
 
 
 class QueueHealthChecker(HealthChecker):
-    """Queue systems health checker for monitoring queue metrics"""
+    """Queue systems health checker for monitoring queue metrics."""
 
-    def __init__(self, batch_processor: batch_processor | None = None):
+    def __init__(self, batch_processor = None) -> None:
         super().__init__("queue")
         self.batch_processor = batch_processor
 
     async def check(self) -> HealthResult:
-        """Check queue health including length, retry backlog, and latency"""
+        """Check queue health including length, retry backlog, and latency."""
         if not QUEUE_SERVICES_AVAILABLE:
             return HealthResult(
                 status=HealthStatus.WARNING,
@@ -222,7 +223,7 @@ class QueueHealthChecker(HealthChecker):
             )
 
     async def _collect_queue_metrics(self) -> dict[str, Any]:
-        """Collect comprehensive queue metrics"""
+        """Collect comprehensive queue metrics."""
         metrics = {}
         if self.batch_processor:
             metrics.update(await self._get_batch_processor_metrics())
@@ -231,7 +232,7 @@ class QueueHealthChecker(HealthChecker):
         return metrics
 
     async def _get_batch_processor_metrics(self) -> dict[str, Any]:
-        """Get metrics from batch processor"""
+        """Get metrics from batch processor."""
         try:
             processor_metrics = {}
             processor_metrics["training_queue_size"] = (
@@ -273,7 +274,7 @@ class QueueHealthChecker(HealthChecker):
             return {"batch_processor_error": str(e)}
 
     async def _get_background_task_metrics(self) -> dict[str, Any]:
-        """Get metrics from background task manager"""
+        """Get metrics from background task manager."""
         try:
             task_manager = get_background_task_manager()
             background_metrics = {}
@@ -297,7 +298,7 @@ class QueueHealthChecker(HealthChecker):
             return {"background_task_error": str(e)}
 
     def _calculate_derived_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
-        """Calculate derived metrics from collected data"""
+        """Calculate derived metrics from collected data."""
         derived = {}
         training_queue = metrics.get("training_queue_size", 0)
         background_queue = metrics.get("background_queue_size", 0)
@@ -329,7 +330,7 @@ class QueueHealthChecker(HealthChecker):
         return derived
 
     def _evaluate_queue_health(self, metrics: dict[str, Any]) -> HealthStatus:
-        """Evaluate overall queue health based on metrics"""
+        """Evaluate overall queue health based on metrics."""
         if "batch_processor_error" in metrics or "background_task_error" in metrics:
             return HealthStatus.FAILED
         capacity_utilization = metrics.get("queue_capacity_utilization", 0.0)
@@ -353,7 +354,7 @@ class QueueHealthChecker(HealthChecker):
         return HealthStatus.HEALTHY
 
     def _get_status_message(self, status: HealthStatus, metrics: dict[str, Any]) -> str:
-        """Get human-readable status message"""
+        """Get human-readable status message."""
         total_backlog = metrics.get("total_queue_backlog", 0)
         capacity_util = metrics.get("queue_capacity_utilization", 0.0)
         success_rate = metrics.get("success_rate", 1.0)
@@ -365,13 +366,13 @@ class QueueHealthChecker(HealthChecker):
 
 
 class SystemResourcesHealthChecker(HealthChecker):
-    """System resource usage health checker"""
+    """System resource usage health checker."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("system_resources")
 
     async def check(self) -> HealthResult:
-        """Check system resource usage"""
+        """Check system resource usage."""
         try:
             import psutil
 
@@ -485,15 +486,18 @@ class SystemResourcesHealthChecker(HealthChecker):
 
 
 class RedisHealthChecker(HealthChecker):
-    """Comprehensive Redis health checker using the advanced monitoring system"""
+    """Comprehensive Redis health checker using the advanced monitoring system."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("redis")
 
     async def check(self) -> HealthResult:
-        """Check Redis health using comprehensive monitoring"""
+        """Check Redis health using comprehensive monitoring."""
         try:
-            from prompt_improver.monitoring.redis.health import RedisHealthManager, DefaultRedisClientProvider
+            from prompt_improver.monitoring.redis.health import (
+                DefaultRedisClientProvider,
+                RedisHealthManager,
+            )
 
             client_provider = DefaultRedisClientProvider()
             health_manager = RedisHealthManager(client_provider)
@@ -544,9 +548,10 @@ class RedisHealthChecker(HealthChecker):
             )
 
     async def _basic_redis_check(self) -> HealthResult:
-        """Basic Redis connectivity check as fallback"""
+        """Basic Redis connectivity check as fallback."""
         try:
             import time
+
             from prompt_improver.services.cache.l2_redis_service import redis_client
             start_time = time.time()
             await redis_client.ping()

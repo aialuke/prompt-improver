@@ -10,19 +10,21 @@ from the database services's pooling and health monitoring.
 import asyncio
 import contextlib
 import logging
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import os
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
 )
-from prompt_improver.database.composition import DatabaseServices
+
+if TYPE_CHECKING:
+    from prompt_improver.database.composition import DatabaseServices
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ class DatabaseTestAdapter:
     - Health check compatibility across both patterns
     """
 
-    def __init__(self, config: TestConnectionConfig | None = None):
+    def __init__(self, config: TestConnectionConfig | None = None) -> None:
         """Initialize the test adapter with optional configuration."""
         self.config = config or TestConnectionConfig()
         self._manager = None
@@ -104,7 +106,7 @@ class DatabaseTestAdapter:
                 "recommended": True,
             }
         except Exception as e:
-            logger.error(f"Unified health check failed: {e}")
+            logger.exception(f"Unified health check failed: {e}")
             return {
                 "method": "unified_manager",
                 "status": "failed",
@@ -128,7 +130,7 @@ class DatabaseTestAdapter:
                     "recommended": False,
                 }
         except Exception as e:
-            logger.error(f"Direct health check failed: {e}")
+            logger.exception(f"Direct health check failed: {e}")
             return {
                 "method": "direct_connection",
                 "status": "failed",
@@ -145,9 +147,9 @@ class DatabaseTestAdapter:
         overall_status = "healthy"
         if unified_result["status"] == "failed" and direct_result["status"] == "failed":
             overall_status = "failed"
-        elif unified_result["status"] in ["failed", "degraded"] or direct_result[
+        elif unified_result["status"] in {"failed", "degraded"} or direct_result[
             "status"
-        ] in ["failed", "degraded"]:
+        ] in {"failed", "degraded"}:
             overall_status = "degraded"
         return {
             "overall_status": overall_status,
@@ -172,7 +174,7 @@ class DatabaseTestAdapter:
                 elapsed = (asyncio.get_event_loop().time() - start_time) * 1000
                 unified_times.append(elapsed)
             except Exception as e:
-                logger.error(f"Unified benchmark iteration failed: {e}")
+                logger.exception(f"Unified benchmark iteration failed: {e}")
         for _ in range(iterations):
             start_time = asyncio.get_event_loop().time()
             try:
@@ -181,7 +183,7 @@ class DatabaseTestAdapter:
                 elapsed = (asyncio.get_event_loop().time() - start_time) * 1000
                 direct_times.append(elapsed)
             except Exception as e:
-                logger.error(f"Direct benchmark iteration failed: {e}")
+                logger.exception(f"Direct benchmark iteration failed: {e}")
         return {
             "iterations": iterations,
             "unified_manager": {

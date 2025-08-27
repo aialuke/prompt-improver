@@ -198,11 +198,11 @@ class TestMCPFlow:
             assert "content" in result
             assert len(result["content"]) > 0
             await asyncio.sleep(3)
+            from prompt_improver.analytics import AnalyticsServiceFacade
             from prompt_improver.database import get_session
-            from prompt_improver.services.analytics import AnalyticsService
 
             async with get_session() as db_session:
-                analytics_service = AnalyticsService()
+                analytics_service = AnalyticsServiceFacade()
                 trends = await analytics_service.get_performance_trends(
                     db_session=db_session, days=1
                 )

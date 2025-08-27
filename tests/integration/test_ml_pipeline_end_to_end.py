@@ -12,7 +12,19 @@ from datetime import datetime
 from typing import Any
 
 import numpy as np
-from tests.conftest import requires_otel, requires_real_db, requires_sklearn
+import pytest
+from tests.fixtures.foundation.utils import requires_sklearn
+
+# Test markers
+requires_otel = pytest.mark.skipif(
+    True,  # OTEL is disabled in tests
+    reason="OpenTelemetry disabled in test environment"
+)
+
+requires_real_db = pytest.mark.skipif(
+    False,  # Real DB is available in tests
+    reason="Real database not available"
+)
 
 from prompt_improver.ml.failure_analyzer import FailureAnalyzer
 from prompt_improver.ml.failure_classifier import FailureClassifier

@@ -10,11 +10,8 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from prompt_improver.repositories.protocols.ml_repository_protocol import (
-    UserFeedbackCreate,
-)
 from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
@@ -23,14 +20,20 @@ from prompt_improver.repositories.factory import (
     RepositoryFactory,
     get_repository_factory,
 )
-from prompt_improver.repositories.protocols.analytics_repository_protocol import (
-    AnalyticsRepositoryProtocol,
+from prompt_improver.database.models import (
+    UserFeedbackCreate,
 )
 from prompt_improver.repositories.protocols.user_feedback_repository_protocol import (
     FeedbackFilter,
     UserFeedbackRepositoryProtocol,
 )
 from prompt_improver.utils.datetime_utils import aware_utc_now
+
+if TYPE_CHECKING:
+    from prompt_improver.repositories.protocols.analytics_repository_protocol import (
+        AnalyticsRepositoryProtocol,
+    )
+    from prompt_improver.database import DatabaseServices
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +96,7 @@ class MCPMLDataCollector:
     - Performance analytics or predictions
     """
 
-    def __init__(self, database_services: DatabaseServices | None = None):
+    def __init__(self, database_services = None) -> None:
         """Initialize MCP ML data collector.
 
         Uses repository layer for all database operations following clean architecture.
@@ -155,7 +158,7 @@ class MCPMLDataCollector:
                 database_services = DatabaseServices()
                 self._repository_factory = get_repository_factory(database_services)
             except Exception as e:
-                logger.error(f"Failed to initialize repository factory: {e}")
+                logger.exception(f"Failed to initialize repository factory: {e}")
                 raise RuntimeError(
                     "Repository factory not available and could not be initialized"
                 )
@@ -228,7 +231,7 @@ class MCPMLDataCollector:
             self.quality_metrics["successful_collections"] += 1
             return application_id
         except Exception as e:
-            logger.error(f"Failed to collect rule application data: {e}")
+            logger.exception(f"Failed to collect rule application data: {e}")
             self.quality_metrics["failed_collections"] += 1
             raise
 
@@ -265,10 +268,9 @@ class MCPMLDataCollector:
                 improvement_suggestions=improvement_suggestions or [],
                 timestamp=aware_utc_now(),
             )
-            feedback_id = await self._store_user_feedback(feedback_data)
-            return feedback_id
+            return await self._store_user_feedback(feedback_data)
         except Exception as e:
-            logger.error(f"Failed to collect user feedback: {e}")
+            logger.exception(f"Failed to collect user feedback: {e}")
             raise
 
     async def prepare_ml_data_package(
@@ -310,7 +312,7 @@ class MCPMLDataCollector:
             )
             return ml_package
         except Exception as e:
-            logger.error(f"Failed to prepare ML data package: {e}")
+            logger.exception(f"Failed to prepare ML data package: {e}")
             return None
 
     async def _collection_loop(self) -> None:
@@ -324,7 +326,7 @@ class MCPMLDataCollector:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in collection loop: {e}")
+                logger.exception(f"Error in collection loop: {e}")
                 await asyncio.sleep(60)
 
     async def _store_rule_application(self, data: RuleApplicationData) -> str:
@@ -339,7 +341,6 @@ class MCPMLDataCollector:
             # Create ImprovementSession directly using the database connection
             # Since there's no direct create method in analytics repo, we'll use the base repo functionality
             from prompt_improver.database.models import ImprovementSession
-            from prompt_improver.database.composition import DatabaseServices
 
             improvement_session = ImprovementSession(
                 session_id=data.session_id,
@@ -367,7 +368,7 @@ class MCPMLDataCollector:
                 return str(improvement_session.id)
 
         except Exception as e:
-            logger.error(f"Failed to store rule application via repository: {e}")
+            logger.exception(f"Failed to store rule application via repository: {e}")
             raise
 
     async def _store_user_feedback(self, data: UserFeedbackData) -> str:
@@ -387,7 +388,7 @@ class MCPMLDataCollector:
                 improvement_areas=data.improvement_suggestions,
                 applied_rules=[
                     data.rule_application_id
-                ],  # Store as list for compatibility
+                ],
                 is_processed=False,
                 ml_optimized=False,
             )
@@ -399,7 +400,7 @@ class MCPMLDataCollector:
             return str(feedback_record.id)
 
         except Exception as e:
-            logger.error(f"Failed to store user feedback via repository: {e}")
+            logger.exception(f"Failed to store user feedback via repository: {e}")
             raise
 
     async def _get_rule_applications(
@@ -448,7 +449,7 @@ class MCPMLDataCollector:
             return applications
 
         except Exception as e:
-            logger.error(f"Failed to get rule applications via repository: {e}")
+            logger.exception(f"Failed to get rule applications via repository: {e}")
             raise
 
     async def _get_user_feedback(self, start_time: datetime) -> list[UserFeedbackData]:
@@ -474,10 +475,7 @@ class MCPMLDataCollector:
             )
 
             # Map feedback records to UserFeedbackData
-            feedback_list: list[UserFeedbackData] = []
-            for record in feedback_records:
-                feedback_list.append(
-                    UserFeedbackData(
+            feedback_list: list[UserFeedbackData] = [UserFeedbackData(
                         feedback_id=str(record.id),
                         rule_application_id=record.session_id,
                         user_rating=float(record.rating),
@@ -486,13 +484,12 @@ class MCPMLDataCollector:
                         feedback_text=record.feedback_text,
                         improvement_suggestions=record.improvement_areas or [],
                         timestamp=record.created_at,
-                    )
-                )
+                    ) for record in feedback_records]
 
             return feedback_list
 
         except Exception as e:
-            logger.error(f"Failed to get user feedback via repository: {e}")
+            logger.exception(f"Failed to get user feedback via repository: {e}")
             raise
 
     def _calculate_data_quality(
@@ -532,7 +529,7 @@ class MCPMLDataCollector:
                 f"ML data package {package_id} ready: {len(ml_package.rule_applications)} applications, {len(ml_package.user_feedback)} feedback items, quality: {ml_package.data_quality_metrics}"
             )
         except Exception as e:
-            logger.error(f"Failed to signal ML pipeline: {e}")
+            logger.exception(f"Failed to signal ML pipeline: {e}")
 
     def get_collection_statistics(self) -> dict[str, Any]:
         """Get data collection statistics."""

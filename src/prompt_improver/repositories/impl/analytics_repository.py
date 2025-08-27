@@ -8,17 +8,14 @@ Enhanced with multi-level caching for dashboard queries (target: <50ms response 
 
 import hashlib
 import logging
+import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy import and_, desc, func, select
 
-from prompt_improver.services.error_handling.facade import ErrorHandlingFacadeProtocol, ErrorServiceType
 from prompt_improver.database import DatabaseServices
-from prompt_improver.database.query_optimizer import execute_optimized_query
-from prompt_improver.services.cache.cache_facade import (
-    CacheFacade as CacheManager,
-)
+
 # CacheManagerConfig removed - use CacheFacade constructor parameters instead
 from prompt_improver.database.models import (
     ImprovementSession,
@@ -26,6 +23,7 @@ from prompt_improver.database.models import (
     RuleEffectivenessStats,
     UserSatisfactionStats,
 )
+from prompt_improver.database.query_optimizer import execute_optimized_query
 from prompt_improver.repositories.base_repository import BaseRepository
 from prompt_improver.repositories.protocols.analytics_repository_protocol import (
     AnalyticsRepositoryProtocol,
@@ -34,6 +32,13 @@ from prompt_improver.repositories.protocols.analytics_repository_protocol import
     SessionAnalytics,
     TimeGranularity,
     TimeSeriesPoint,
+)
+from prompt_improver.services.cache.cache_facade import (
+    CacheFacade as CacheManager,
+)
+from prompt_improver.services.error_handling.facade import (
+    ErrorHandlingFacadeProtocol,
+    ErrorServiceType,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,22 +67,22 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
     """Analytics repository implementation with comprehensive analytics operations and caching."""
 
     def __init__(
-        self, 
+        self,
         connection_manager: DatabaseServices,
         error_handler: ErrorHandlingFacadeProtocol,
-        cache_manager: Optional[CacheManager] = None
-    ):
+        cache_manager: CacheManager | None = None
+    ) -> None:
         super().__init__(
             model_class=PromptSession,
             connection_manager=connection_manager,
         )
         self.connection_manager = connection_manager
         self.error_handler = error_handler
-        
+
         # Performance optimization - multi-level caching for dashboard queries
         self.cache_manager = cache_manager
         self._cache_enabled = cache_manager is not None
-        
+
         # Performance metrics
         self._performance_metrics = {
             "query_count": 0,
@@ -85,7 +90,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             "cache_misses": 0,
             "avg_query_time_ms": 0.0,
         }
-        
+
         logger.info(f"Analytics repository initialized (caching: {self._cache_enabled})")
 
     # Session Analytics Implementation
@@ -99,7 +104,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         """Get comprehensive session analytics for a date range with caching."""
         start_time = time.time()
         self._performance_metrics["query_count"] += 1
-        
+
         # Generate cache key for this analytics request
         cache_key = None
         if self._cache_enabled:
@@ -107,7 +112,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             filters_str = str(sorted((filters or {}).items()))
             content = f"session_analytics:{start_date.isoformat()}:{end_date.isoformat()}:{filters_str}"
             cache_key = f"analytics_query:{hashlib.md5(content.encode()).hexdigest()}"
-            
+
             # Check cache first (target: <5ms)
             try:
                 cached_result = await self.cache_manager.get(cache_key)
@@ -116,12 +121,12 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                     self._update_query_metrics(start_time)
                     logger.debug(f"Cache hit for session analytics: {start_date} to {end_date}")
                     return cached_result
-                    
+
             except Exception as e:
                 logger.warning(f"Cache lookup failed for session analytics: {e}")
-            
+
             self._performance_metrics["cache_misses"] += 1
-        
+
         async with self.get_session() as session:
             try:
                 # Build base query for sessions in date range
@@ -206,24 +211,24 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                     top_performing_rules=top_rules,
                     performance_distribution=distribution,
                 )
-                
+
                 # Cache successful results (TTL: 5 minutes for dashboard data)
                 if self._cache_enabled and cache_key:
                     try:
                         await self.cache_manager.set(
-                            cache_key, 
-                            analytics_result, 
+                            cache_key,
+                            analytics_result,
                             ttl_seconds=300  # 5 minutes
                         )
                         logger.debug("Cached session analytics result")
                     except Exception as e:
                         logger.warning(f"Failed to cache session analytics: {e}")
-                
+
                 self._update_query_metrics(start_time)
                 return analytics_result
 
             except Exception as e:
-                logger.error(f"Error getting session analytics: {e}")
+                logger.exception(f"Error getting session analytics: {e}")
                 raise
 
     @handle_repository_errors()
@@ -259,7 +264,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting prompt sessions: {e}")
+                logger.exception(f"Error getting prompt sessions: {e}")
                 raise
 
     @handle_repository_errors()
@@ -296,7 +301,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting improvement sessions: {e}")
+                logger.exception(f"Error getting improvement sessions: {e}")
                 raise
 
     # Performance Trending Implementation
@@ -363,7 +368,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 )
 
             except Exception as e:
-                logger.error(f"Error getting performance trend: {e}")
+                logger.exception(f"Error getting performance trend: {e}")
                 raise
 
     @handle_repository_errors()
@@ -376,48 +381,49 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         aggregation: str = "avg",
     ) -> list[TimeSeriesPoint]:
         """Get time-series data for any metric with advanced statistical analysis.
-        
+
         Migrated from analytics_query_interface.py for better separation of concerns.
         """
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
+
                 from prompt_improver.services.cache.cache_facade import CacheFacade
-                
+
                 # Map granularity to PostgreSQL date_trunc format
                 truncation_map = {
                     TimeGranularity.HOUR: "hour",
-                    TimeGranularity.DAY: "day", 
+                    TimeGranularity.DAY: "day",
                     TimeGranularity.WEEK: "week",
                     TimeGranularity.MONTH: "month",
                 }
-                
+
                 # Advanced time-series query with statistical functions
                 time_series_query = text("""
                     WITH time_series_data AS (
-                        SELECT 
+                        SELECT
                             date_trunc(:granularity, ps.created_at) as time_bucket,
                             ps.improvement_score,
                             ps.quality_score,
                             ps.confidence_level
                         FROM prompt_sessions ps
-                        WHERE ps.created_at >= :start_date 
+                        WHERE ps.created_at >= :start_date
                             AND ps.created_at <= :end_date
                             AND ps.improvement_score IS NOT NULL
                     ),
                     aggregated_data AS (
-                        SELECT 
+                        SELECT
                             time_bucket,
-                            CASE 
+                            CASE
                                 WHEN :metric_name = 'performance' THEN avg(improvement_score)
                                 WHEN :metric_name = 'efficiency' THEN avg(quality_score)
                                 ELSE avg(improvement_score)
                             END as value,
                             count(*) as data_points,
                             stddev(
-                                CASE 
+                                CASE
                                     WHEN :metric_name = 'performance' THEN improvement_score
-                                    WHEN :metric_name = 'efficiency' THEN quality_score  
+                                    WHEN :metric_name = 'efficiency' THEN quality_score
                                     ELSE improvement_score
                                 END
                             ) as std_dev
@@ -425,19 +431,19 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         GROUP BY time_bucket
                         ORDER BY time_bucket
                     )
-                    SELECT 
+                    SELECT
                         time_bucket,
                         COALESCE(value, 0.0) as value,
                         COALESCE(data_points, 0) as data_points,
                         COALESCE(std_dev, 0.0) as std_dev
                     FROM aggregated_data
                 """)
-                
+
                 # Initialize cache for query results
                 import hashlib
                 import json
                 cache = CacheFacade(l1_max_size=500, l2_default_ttl=300, enable_l2=True)
-                
+
                 # Generate cache key
                 cache_data = {
                     "query": str(time_series_query),
@@ -450,7 +456,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 }
                 cache_string = json.dumps(cache_data, sort_keys=True)
                 cache_key = f"analytics:time_series:{hashlib.md5(cache_string.encode()).hexdigest()}"
-                
+
                 # Try cache first
                 cached_result = await cache.get(cache_key)
                 if cached_result is not None:
@@ -464,21 +470,21 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         "metric_name": metric_name
                     })
                     result_rows = query_result.fetchall()
-                    
+
                     # Cache the result
                     serializable_rows = [
-                        {k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v 
-                         for k, v in row._asdict().items()} 
+                        {k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v
+                         for k, v in row._asdict().items()}
                         for row in result_rows
                     ]
                     await cache.set(cache_key, serializable_rows, l2_ttl=300)
-                
+
                 return [
                     TimeSeriesPoint(
                         timestamp=row.time_bucket,
                         value=float(row.value or 0),
                         metadata={
-                            "metric": metric_name, 
+                            "metric": metric_name,
                             "aggregation": aggregation,
                             "data_points": int(row.data_points or 0),
                             "std_dev": float(row.std_dev or 0)
@@ -488,7 +494,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 ]
 
             except Exception as e:
-                logger.error(f"Error getting time series data: {e}")
+                logger.exception(f"Error getting time series data: {e}")
                 raise
 
     # Rule Effectiveness Analysis Implementation
@@ -519,7 +525,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting rule effectiveness stats: {e}")
+                logger.exception(f"Error getting rule effectiveness stats: {e}")
                 raise
 
     @handle_repository_errors()
@@ -546,7 +552,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 return comparison
 
             except Exception as e:
-                logger.error(f"Error getting rule performance comparison: {e}")
+                logger.exception(f"Error getting rule performance comparison: {e}")
                 raise
 
     # User Satisfaction Analytics Implementation
@@ -576,7 +582,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 return list(result.scalars().all())
 
             except Exception as e:
-                logger.error(f"Error getting user satisfaction stats: {e}")
+                logger.exception(f"Error getting user satisfaction stats: {e}")
                 raise
 
     @handle_repository_errors()
@@ -595,7 +601,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 "satisfaction_vs_efficiency": 0.72,
             }
         except Exception as e:
-            logger.error(f"Error getting satisfaction correlation: {e}")
+            logger.exception(f"Error getting satisfaction correlation: {e}")
             raise
 
     # Dashboard Aggregations Implementation
@@ -637,7 +643,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 }
 
             except Exception as e:
-                logger.error(f"Error getting dashboard summary: {e}")
+                logger.exception(f"Error getting dashboard summary: {e}")
                 raise
 
     async def get_top_performers(
@@ -689,7 +695,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 ]
 
             except Exception as e:
-                logger.error(f"Error getting top performers: {e}")
+                logger.exception(f"Error getting top performers: {e}")
                 raise
 
     async def get_anomaly_detection(
@@ -713,7 +719,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 }
             ]
         except Exception as e:
-            logger.error(f"Error detecting anomalies: {e}")
+            logger.exception(f"Error detecting anomalies: {e}")
             raise
 
     # Performance Optimization Insights
@@ -728,7 +734,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             # This would require query performance monitoring
             return []
         except Exception as e:
-            logger.error(f"Error analyzing slow queries: {e}")
+            logger.exception(f"Error analyzing slow queries: {e}")
             raise
 
     async def get_resource_usage_patterns(
@@ -746,7 +752,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 "database_connections": [],
             }
         except Exception as e:
-            logger.error(f"Error getting resource usage patterns: {e}")
+            logger.exception(f"Error getting resource usage patterns: {e}")
             raise
 
     # Export and Reporting
@@ -762,7 +768,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             # This would implement actual export logic
             return b"Exported data placeholder"
         except Exception as e:
-            logger.error(f"Error exporting analytics data: {e}")
+            logger.exception(f"Error exporting analytics data: {e}")
             raise
 
     async def generate_analytics_report(
@@ -790,11 +796,11 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 "generated_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error generating analytics report: {e}")
+            logger.exception(f"Error generating analytics report: {e}")
             raise
-    
+
     # Advanced Analytics Methods (migrated from analytics_query_interface.py)
-    
+
     async def get_performance_distribution_analysis(
         self,
         start_date: datetime,
@@ -802,13 +808,13 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         bucket_count: int = 20,
     ) -> dict[str, Any]:
         """Get performance distribution analysis with histogram data.
-        
+
         Migrated from analytics_query_interface.py - uses PostgreSQL histogram functions.
         """
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                
+
                 histogram_query = text("""
                     WITH performance_data AS (
                         SELECT
@@ -841,7 +847,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         frequency::float / sum(frequency) OVER () AS probability
                     FROM histogram_data
                 """)
-                
+
                 result = await execute_optimized_query(
                     session,
                     str(histogram_query),
@@ -852,18 +858,16 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                     },
                     cache_ttl=900,  # 15 minutes cache for expensive queries
                 )
-                
-                histogram = []
-                for row in result:
-                    histogram.append({
+
+                histogram = [{
                         "bucket": row.bucket,
                         "frequency": row.frequency,
                         "min_value": float(row.min_val) if row.min_val else 0.0,
                         "max_value": float(row.max_val) if row.max_val else 0.0,
                         "avg_value": float(row.avg_val) if row.avg_val else 0.0,
                         "probability": float(row.probability) if row.probability else 0.0,
-                    })
-                
+                    } for row in result]
+
                 # Get statistical summary
                 stats_query = text("""
                     SELECT
@@ -880,16 +884,16 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         AND created_at <= :end_date
                         AND improvement_score IS NOT NULL
                 """)
-                
+
                 stats_result = await execute_optimized_query(
                     session,
                     str(stats_query),
                     params={"start_date": start_date, "end_date": end_date},
                     cache_ttl=900,
                 )
-                
+
                 stats_row = stats_result[0] if stats_result else None
-                
+
                 return {
                     "histogram": histogram,
                     "statistics": {
@@ -911,11 +915,11 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         "end": end_date.isoformat(),
                     },
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting performance distribution analysis: {e}")
+                logger.exception(f"Error getting performance distribution analysis: {e}")
                 raise
-    
+
     async def get_correlation_analysis(
         self,
         metrics: list[str],
@@ -923,14 +927,13 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
         end_date: datetime,
     ) -> dict[str, Any]:
         """Get correlation analysis between different session metrics.
-        
+
         Migrated from analytics_query_interface.py - uses PostgreSQL statistical functions.
         """
         async with self.get_session() as session:
             try:
                 from sqlalchemy import text
-                import time
-                
+
                 correlation_query = text("""
                     WITH session_metrics AS (
                         SELECT
@@ -963,17 +966,17 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         AND duration_hours IS NOT NULL
                         AND success_rate IS NOT NULL
                 """)
-                
+
                 result = await execute_optimized_query(
                     session,
                     str(correlation_query),
                     params={"start_date": start_date, "end_date": end_date},
                     cache_ttl=900,
                 )
-                
+
                 if not result:
                     return {"correlations": {}, "sample_size": 0}
-                
+
                 row = result[0]
                 correlations = {
                     "performance_vs_improvement": float(row.perf_improvement_corr) if row.perf_improvement_corr else 0.0,
@@ -984,7 +987,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                     "duration_vs_success_rate": float(row.duration_success_corr) if row.duration_success_corr else 0.0,
                     "iteration_duration_vs_success_rate": float(row.iter_duration_success_corr) if row.iter_duration_success_corr else 0.0,
                 }
-                
+
                 # Generate interpretations
                 interpretations = {}
                 for pair, corr_value in correlations.items():
@@ -997,14 +1000,14 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         strength = "weak"
                     else:
                         strength = "negligible"
-                    
+
                     direction = "positive" if corr_value > 0 else "negative" if corr_value < 0 else "none"
                     interpretations[pair] = {
                         "strength": strength,
                         "direction": direction,
                         "value": corr_value,
                     }
-                
+
                 return {
                     "correlations": correlations,
                     "interpretations": interpretations,
@@ -1014,31 +1017,31 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                         "end": end_date.isoformat(),
                     },
                 }
-                
+
             except Exception as e:
-                logger.error(f"Error getting correlation analysis: {e}")
+                logger.exception(f"Error getting correlation analysis: {e}")
                 raise
 
     def _update_query_metrics(self, start_time: float) -> None:
         """Update query performance metrics for monitoring."""
         duration_ms = (time.time() - start_time) * 1000
-        
+
         # Update rolling average query time
         total_queries = self._performance_metrics["query_count"]
         current_avg = self._performance_metrics["avg_query_time_ms"]
-        
+
         self._performance_metrics["avg_query_time_ms"] = (
             (current_avg * (total_queries - 1) + duration_ms) / total_queries
         )
-    
-    async def get_performance_metrics(self) -> Dict[str, Any]:
+
+    async def get_performance_metrics(self) -> dict[str, Any]:
         """Get analytics repository performance metrics."""
         total_requests = self._performance_metrics["query_count"]
         cache_hit_rate = (
-            self._performance_metrics["cache_hits"] / 
+            self._performance_metrics["cache_hits"] /
             max(total_requests, 1)
         )
-        
+
         metrics = {
             "service": "analytics_repository",
             "performance": dict(self._performance_metrics),
@@ -1046,7 +1049,7 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
             "cache_enabled": self._cache_enabled,
             "timestamp": time.time(),
         }
-        
+
         # Add cache manager stats if available
         if self.cache_manager:
             try:
@@ -1054,5 +1057,5 @@ class AnalyticsRepository(BaseRepository[PromptSession], AnalyticsRepositoryProt
                 metrics["cache_stats"] = cache_stats
             except Exception as e:
                 logger.warning(f"Failed to get cache stats: {e}")
-        
+
         return metrics

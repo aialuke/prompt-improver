@@ -1,5 +1,5 @@
 """External API Health Monitoring - 2025 SRE Best Practices
-Real connectivity monitoring with response time tracking, rate limit awareness, and circuit breaker integration
+Real connectivity monitoring with response time tracking, rate limit awareness, and circuit breaker integration.
 """
 
 import asyncio
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class APIStatus(Enum):
-    """API health status levels"""
+    """API health status levels."""
 
     HEALTHY = "healthy"
     DEGRADED = "degraded"
@@ -47,7 +47,7 @@ class APIStatus(Enum):
 
 
 class SLACompliance(Enum):
-    """SLA compliance levels"""
+    """SLA compliance levels."""
 
     EXCEEDING = "exceeding"
     MEETING = "meeting"
@@ -56,7 +56,7 @@ class SLACompliance(Enum):
 
 @dataclass
 class APIEndpoint:
-    """Configuration for an external API endpoint"""
+    """Configuration for an external API endpoint."""
 
     name: str
     url: str
@@ -78,7 +78,7 @@ class APIEndpoint:
 
 @dataclass
 class ResponseMetrics:
-    """Response time and status metrics"""
+    """Response time and status metrics."""
 
     timestamp: datetime
     response_time_ms: float
@@ -93,7 +93,7 @@ class ResponseMetrics:
 
 @dataclass
 class DNSMetrics:
-    """DNS resolution metrics"""
+    """DNS resolution metrics."""
 
     timestamp: datetime
     resolution_time_ms: float
@@ -104,7 +104,7 @@ class DNSMetrics:
 
 @dataclass
 class SSLMetrics:
-    """SSL certificate metrics"""
+    """SSL certificate metrics."""
 
     timestamp: datetime
     certificate_expiry: datetime
@@ -117,7 +117,7 @@ class SSLMetrics:
 
 @dataclass
 class APIHealthSnapshot:
-    """Complete health snapshot for an API"""
+    """Complete health snapshot for an API."""
 
     endpoint_name: str
     status: APIStatus
@@ -139,21 +139,21 @@ class APIHealthSnapshot:
 
 
 class RollingWindow:
-    """Rolling window for time-series metrics"""
+    """Rolling window for time-series metrics."""
 
-    def __init__(self, window_size_minutes: int = 60):
+    def __init__(self, window_size_minutes: int = 60) -> None:
         self.window_size = timedelta(minutes=window_size_minutes)
         self.data: deque = deque()
 
     def add(self, metric: ResponseMetrics | DNSMetrics | SSLMetrics):
-        """Add a metric to the rolling window"""
+        """Add a metric to the rolling window."""
         now = datetime.now(UTC)
         while self.data and now - self.data[0].timestamp > self.window_size:
             self.data.popleft()
         self.data.append(metric)
 
     def get_percentiles(self, percentiles: list[float]) -> dict[str, float]:
-        """Calculate response time percentiles"""
+        """Calculate response time percentiles."""
         response_times = [
             m.response_time_ms
             for m in self.data
@@ -177,7 +177,7 @@ class RollingWindow:
         return result
 
     def get_availability(self) -> float:
-        """Calculate availability percentage"""
+        """Calculate availability percentage."""
         if not self.data:
             return 1.0
         response_metrics = [m for m in self.data if isinstance(m, ResponseMetrics)]
@@ -187,11 +187,11 @@ class RollingWindow:
         return successful / len(response_metrics)
 
     def get_success_count(self) -> int:
-        """Get count of successful requests"""
+        """Get count of successful requests."""
         return sum(1 for m in self.data if isinstance(m, ResponseMetrics) and m.success)
 
     def get_failure_count(self) -> int:
-        """Get count of failed requests"""
+        """Get count of failed requests."""
         return sum(
             1 for m in self.data if isinstance(m, ResponseMetrics) and (not m.success)
         )
@@ -199,10 +199,10 @@ class RollingWindow:
 
 class ExternalAPIHealthMonitor:
     """Comprehensive external API health monitoring system
-    Implements real connectivity tests with SLA tracking and circuit breaker integration
+    Implements real connectivity tests with SLA tracking and circuit breaker integration.
     """
 
-    def __init__(self, config_endpoints: list[APIEndpoint] | None = None):
+    def __init__(self, config_endpoints: list[APIEndpoint] | None = None) -> None:
         self.endpoints = config_endpoints or self._get_default_endpoints()
         self.metrics_windows: dict[str, RollingWindow] = {}
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
@@ -224,7 +224,7 @@ class ExternalAPIHealthMonitor:
                 )
 
     def _get_default_endpoints(self) -> list[APIEndpoint]:
-        """Get default API endpoints from configuration"""
+        """Get default API endpoints from configuration."""
         config = get_config()
         endpoints = []
         endpoints.append(
@@ -275,7 +275,7 @@ class ExternalAPIHealthMonitor:
 
     async def check_all_endpoints(self) -> dict[str, APIHealthSnapshot]:
         """Perform health checks on all configured endpoints in parallel
-        Returns comprehensive health snapshots
+        Returns comprehensive health snapshots.
         """
         logger.info(f"Starting health checks for {len(self.endpoints)} external APIs")
         task_manager = get_background_task_manager()
@@ -313,7 +313,7 @@ class ExternalAPIHealthMonitor:
         return health_snapshots
 
     async def _check_single_endpoint(self, endpoint: APIEndpoint) -> APIHealthSnapshot:
-        """Perform comprehensive health check for a single endpoint"""
+        """Perform comprehensive health check for a single endpoint."""
         start_time = time.time()
         dns_metrics = None
         if endpoint.dns_check_enabled:
@@ -400,7 +400,7 @@ class ExternalAPIHealthMonitor:
         return snapshot
 
     async def _perform_http_check(self, endpoint: APIEndpoint) -> ResponseMetrics:
-        """Perform HTTP connectivity check with response time monitoring"""
+        """Perform HTTP connectivity check with response time monitoring."""
         start_time = time.time()
         headers = endpoint.headers.copy()
         if endpoint.auth_header:
@@ -456,7 +456,7 @@ class ExternalAPIHealthMonitor:
             )
 
     async def _check_dns(self, url: str) -> DNSMetrics:
-        """Check DNS resolution time and IP addresses"""
+        """Check DNS resolution time and IP addresses."""
         start_time = time.time()
         parsed = urlparse(url)
         hostname = parsed.hostname
@@ -489,7 +489,7 @@ class ExternalAPIHealthMonitor:
             )
 
     async def _check_ssl_certificate(self, url: str) -> SSLMetrics:
-        """Check SSL certificate validity and expiration"""
+        """Check SSL certificate validity and expiration."""
         parsed = urlparse(url)
         hostname = parsed.hostname
         port = parsed.port or 443
@@ -543,7 +543,7 @@ class ExternalAPIHealthMonitor:
             )
 
     def _parse_rate_limit(self, headers: dict[str, str], limit_type: str) -> int | None:
-        """Parse rate limit information from response headers"""
+        """Parse rate limit information from response headers."""
         patterns = {
             "remaining": [
                 "x-ratelimit-remaining",
@@ -568,7 +568,7 @@ class ExternalAPIHealthMonitor:
         return None
 
     def _parse_rate_limit_reset(self, headers: dict[str, str]) -> datetime | None:
-        """Parse rate limit reset time from response headers"""
+        """Parse rate limit reset time from response headers."""
         reset_patterns = [
             "x-ratelimit-reset",
             "x-rate-limit-reset",
@@ -589,7 +589,7 @@ class ExternalAPIHealthMonitor:
         return None
 
     def _extract_rate_limit_info(self, metrics: ResponseMetrics) -> dict[str, Any]:
-        """Extract rate limit information from response metrics"""
+        """Extract rate limit information from response metrics."""
         if not metrics:
             return {}
         info = {}
@@ -619,7 +619,7 @@ class ExternalAPIHealthMonitor:
         availability: float,
         percentiles: dict[str, float],
     ) -> APIStatus:
-        """Determine overall API status based on metrics"""
+        """Determine overall API status based on metrics."""
         if not metrics:
             return APIStatus.UNKNOWN
         if not metrics.success:
@@ -639,7 +639,7 @@ class ExternalAPIHealthMonitor:
     def _determine_sla_compliance(
         self, endpoint: APIEndpoint, percentiles: dict[str, float], availability: float
     ) -> SLACompliance:
-        """Determine SLA compliance level"""
+        """Determine SLA compliance level."""
         if availability < endpoint.availability_target:
             return SLACompliance.VIOLATED
         p50 = percentiles.get("p50", 0.0)
@@ -662,7 +662,7 @@ class ExternalAPIHealthMonitor:
     def _create_error_snapshot(
         self, endpoint: APIEndpoint, error: str
     ) -> APIHealthSnapshot:
-        """Create health snapshot for failed health check"""
+        """Create health snapshot for failed health check."""
         return APIHealthSnapshot(
             endpoint_name=endpoint.name,
             status=APIStatus.UNKNOWN,
@@ -683,8 +683,8 @@ class ExternalAPIHealthMonitor:
             circuit_breaker_metrics={},
         )
 
-    async def _store_health_snapshots(self, snapshots: dict[str, APIHealthSnapshot]):
-        """Store health snapshots in Redis for historical tracking"""
+    async def _store_health_snapshots(self, snapshots: dict[str, APIHealthSnapshot]) -> None:
+        """Store health snapshots in Redis for historical tracking."""
         try:
             timestamp = datetime.now(UTC).isoformat()
 
@@ -734,7 +734,7 @@ class ExternalAPIHealthMonitor:
 
     async def discover_dependencies(self) -> set[str]:
         """Automatically discover external dependencies by scanning code
-        Returns set of discovered URLs/domains
+        Returns set of discovered URLs/domains.
         """
         if self._last_dependency_scan and datetime.now(
             UTC
@@ -745,9 +745,7 @@ class ExternalAPIHealthMonitor:
         config = get_config()
         for attr in dir(config):
             if (
-                attr.endswith("_url")
-                or attr.endswith("_uri")
-                or "endpoint" in attr.lower()
+                attr.endswith(("_url", "_uri")) or "endpoint" in attr.lower()
             ):
                 value = getattr(config, attr, None)
                 if isinstance(value, str) and value.startswith(("http://", "https://")):
@@ -769,7 +767,7 @@ class ExternalAPIHealthMonitor:
     async def get_historical_metrics(
         self, endpoint_name: str, hours_back: int = 24
     ) -> list[dict[str, Any]]:
-        """Get historical metrics for an endpoint from Redis"""
+        """Get historical metrics for an endpoint from Redis."""
         try:
             cutoff_time = datetime.now(UTC) - timedelta(hours=hours_back)
             pattern = f"external_api_health:{endpoint_name}:*"

@@ -1,4 +1,4 @@
-"""Modern SQLAlchemy 2025 Registry Manager
+"""Modern SQLAlchemy 2025 Registry Manager.
 
 This module provides a centralized registry solution to prevent the
 "Multiple classes found for path" error that occurs when SQLAlchemy
@@ -56,7 +56,7 @@ class RegistryService:
     - Resolve class path conflicts
     """
 
-    def __init__(self, base_class: type[DeclarativeBase] = PromptImproverBase):
+    def __init__(self, base_class: type[DeclarativeBase] = PromptImproverBase) -> None:
         self.base_class = base_class
         self.registry = base_class.registry
 
@@ -71,7 +71,7 @@ class RegistryService:
             self.registry.metadata.clear()
             logger.info("Registry cleared successfully")
         except Exception as e:
-            logger.error(f"Failed to clear registry: {e}")
+            logger.exception(f"Failed to clear registry: {e}")
             raise
 
     def get_registered_classes(self) -> dict[str, type]:
@@ -113,7 +113,7 @@ class RegistryService:
         Returns:
             Fully qualified class path
         """
-        if class_name in ["RulePerformance", "PromptSession", "RuleMetadata"]:
+        if class_name in {"RulePerformance", "PromptSession", "RuleMetadata"}:
             return f"prompt_improver.database.models.{class_name}"
         return class_name
 
@@ -158,19 +158,19 @@ class RegistryService:
         }
 
 
-_registry_manager: RegistryManager | None = None
+_registry_manager: RegistryService | None = None
 
 
-def get_registry_manager() -> RegistryManager:
+def get_registry_manager() -> RegistryService:
     """Get the global registry manager instance.
 
     Returns:
-        RegistryManager instance
+        RegistryService instance
     """
     global _registry_manager
     if _registry_manager is None:
         patch_sqlmodel_registry()
-        _registry_manager = RegistryManager()
+        _registry_manager = RegistryService()
     return _registry_manager
 
 
@@ -181,12 +181,8 @@ def clear_registry() -> None:
     """
     get_registry_manager().clear_registry()
     import sys
-    from prompt_improver.core.services.service_registry import RegistryManager
 
-    modules_to_clear = []
-    for module_name in list(sys.modules.keys()):
-        if "prompt_improver.database.models" in module_name:
-            modules_to_clear.append(module_name)
+    modules_to_clear = [module_name for module_name in list(sys.modules.keys()) if "prompt_improver.database.models" in module_name]
     for module_name in modules_to_clear:
         if module_name in sys.modules:
             del sys.modules[module_name]

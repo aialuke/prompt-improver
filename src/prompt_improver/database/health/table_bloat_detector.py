@@ -1,4 +1,4 @@
-"""Table Bloat Detector with Advanced PostgreSQL Analytics
+"""Table Bloat Detector with Advanced PostgreSQL Analytics.
 
 Provides comprehensive table bloat detection including:
 - Table and index bloat estimation algorithms
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TableBloatInfo:
-    """Table bloat information and statistics"""
+    """Table bloat information and statistics."""
 
     schema_name: str
     table_name: str
@@ -77,7 +77,7 @@ class TableBloatInfo:
 
 @dataclass
 class IndexBloatInfo:
-    """Index bloat information"""
+    """Index bloat information."""
 
     schema_name: str
     table_name: str
@@ -101,7 +101,7 @@ class IndexBloatInfo:
 
 @dataclass
 class BloatDetectionReport:
-    """Comprehensive bloat detection report"""
+    """Comprehensive bloat detection report."""
 
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -130,10 +130,10 @@ class BloatDetectionReport:
 
 class TableBloatDetector:
     """Detect and analyze table and index bloat using PostgreSQL statistics
-    and estimation algorithms
+    and estimation algorithms.
     """
 
-    def __init__(self, client: Any | None = None):
+    def __init__(self, client: Any | None = None) -> None:
         self.client = client
 
         # Bloat thresholds
@@ -154,13 +154,13 @@ class TableBloatDetector:
         self.alignment = 8
 
     async def get_client(self):
-        """Get database client"""
+        """Get database client."""
         if self.client is None:
             return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def detect_table_bloat(self) -> dict[str, Any]:
-        """Comprehensive table bloat detection and analysis"""
+        """Comprehensive table bloat detection and analysis."""
         logger.debug("Starting table bloat detection")
         start_time = time.perf_counter()
 
@@ -256,7 +256,7 @@ class TableBloatDetector:
             }
 
         except Exception as e:
-            logger.error(f"Table bloat detection failed: {e}")
+            logger.exception(f"Table bloat detection failed: {e}")
             return {
                 "error": str(e),
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -264,10 +264,10 @@ class TableBloatDetector:
             }
 
     async def _analyze_table_bloat(self) -> list[TableBloatInfo]:
-        """Analyze table bloat using pg_stat_user_tables and size estimation"""
+        """Analyze table bloat using pg_stat_user_tables and size estimation."""
         async with get_session_context() as session:
             query = text("""
-                SELECT 
+                SELECT
                     schemaname,
                     tablename,
                     pg_total_relation_size(schemaname||'.'||tablename) as total_size,
@@ -356,10 +356,10 @@ class TableBloatDetector:
             return table_bloat_list
 
     async def _analyze_index_bloat(self) -> list[IndexBloatInfo]:
-        """Analyze index bloat using pg_stat_user_indexes and estimation algorithms"""
+        """Analyze index bloat using pg_stat_user_indexes and estimation algorithms."""
         async with get_session_context() as session:
             query = text("""
-                SELECT 
+                SELECT
                     schemaname,
                     tablename,
                     indexname,
@@ -408,7 +408,7 @@ class TableBloatDetector:
     def _estimate_table_bloat(
         self, table_info: TableBloatInfo, relpages: int, relallvisible: int
     ) -> tuple[int, float]:
-        """Estimate table bloat using page statistics and tuple counts
+        """Estimate table bloat using page statistics and tuple counts.
 
         This is a simplified estimation. For production use, consider using
         pgstattuple extension for more accurate bloat calculations.
@@ -463,7 +463,7 @@ class TableBloatDetector:
     def _estimate_index_bloat(
         self, index_info: IndexBloatInfo, idx_scan: int, idx_tup_read: int
     ) -> tuple[int, float]:
-        """Estimate index bloat (simplified approach)
+        """Estimate index bloat (simplified approach).
 
         For production use, consider using pgstattuple extension or
         more sophisticated bloat estimation queries.
@@ -500,7 +500,7 @@ class TableBloatDetector:
             return 0, 0.0
 
     def _assess_maintenance_needs(self, table_info: TableBloatInfo) -> None:
-        """Assess whether table needs VACUUM or ANALYZE"""
+        """Assess whether table needs VACUUM or ANALYZE."""
         now = datetime.now(UTC)
 
         # Check VACUUM needs
@@ -557,7 +557,7 @@ class TableBloatDetector:
         )
 
     def _generate_table_recommendations(self, table_info: TableBloatInfo) -> list[str]:
-        """Generate specific recommendations for table maintenance"""
+        """Generate specific recommendations for table maintenance."""
         recommendations = []
 
         # VACUUM recommendations
@@ -603,7 +603,7 @@ class TableBloatDetector:
         return recommendations
 
     def _generate_index_recommendations(self, index_info: IndexBloatInfo) -> list[str]:
-        """Generate specific recommendations for index maintenance"""
+        """Generate specific recommendations for index maintenance."""
         recommendations = []
 
         if index_info.bloat_ratio_percent > self.index_bloat_threshold_percent:
@@ -618,7 +618,7 @@ class TableBloatDetector:
         return recommendations
 
     def _determine_maintenance_priority(self, table_info: TableBloatInfo) -> str:
-        """Determine maintenance priority based on bloat and impact"""
+        """Determine maintenance priority based on bloat and impact."""
         # Critical priority
         if (
             table_info.bloat_ratio_percent > 60
@@ -647,7 +647,7 @@ class TableBloatDetector:
         return "low"
 
     def _generate_immediate_actions(self, report: BloatDetectionReport) -> list[str]:
-        """Generate immediate action recommendations"""
+        """Generate immediate action recommendations."""
         actions = []
 
         # Critical bloat tables
@@ -663,7 +663,7 @@ class TableBloatDetector:
         high_priority_vacuum = [
             t
             for t in report.tables_needing_vacuum
-            if t.maintenance_priority in ["critical", "high"]
+            if t.maintenance_priority in {"critical", "high"}
         ]
         if high_priority_vacuum:
             table_names = [
@@ -687,7 +687,7 @@ class TableBloatDetector:
     def _generate_scheduled_maintenance(
         self, report: BloatDetectionReport
     ) -> list[str]:
-        """Generate scheduled maintenance recommendations"""
+        """Generate scheduled maintenance recommendations."""
         maintenance = []
 
         # Regular vacuum schedule
@@ -722,7 +722,7 @@ class TableBloatDetector:
         return maintenance
 
     def _calculate_bloat_health_score(self, report: BloatDetectionReport) -> float:
-        """Calculate overall bloat health score (0-100)"""
+        """Calculate overall bloat health score (0-100)."""
         if report.total_tables_analyzed == 0:
             return 100.0
 
@@ -752,7 +752,7 @@ class TableBloatDetector:
         return max(0.0, min(100.0, score))
 
     def _format_bytes(self, bytes_value: int) -> str:
-        """Format bytes in human-readable format"""
+        """Format bytes in human-readable format."""
         for unit in ["B", "KB", "MB", "GB", "TB"]:
             if bytes_value < 1024.0:
                 return f"{bytes_value:.1f} {unit}"
@@ -760,7 +760,7 @@ class TableBloatDetector:
         return f"{bytes_value:.1f} PB"
 
     async def get_bloat_summary(self) -> dict[str, Any]:
-        """Get a concise summary of bloat status"""
+        """Get a concise summary of bloat status."""
         try:
             bloat_data = await self.detect_table_bloat()
 
@@ -794,7 +794,7 @@ class TableBloatDetector:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get bloat summary: {e}")
+            logger.exception(f"Failed to get bloat summary: {e}")
             return {
                 "status": "error",
                 "error": str(e),

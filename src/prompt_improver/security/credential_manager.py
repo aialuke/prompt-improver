@@ -52,7 +52,7 @@ class CredentialProvider(ABC):
 class EnvironmentCredentialProvider(CredentialProvider):
     """Environment variable credential provider."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.accessed_credentials = set()
 
     async def get_credential(self, name: str) -> str | None:
@@ -83,7 +83,7 @@ class EnvironmentCredentialProvider(CredentialProvider):
 class FileCredentialProvider(CredentialProvider):
     """File-based credential provider for development."""
 
-    def __init__(self, secrets_dir: Path = Path("/run/secrets")):
+    def __init__(self, secrets_dir: Path = Path("/run/secrets")) -> None:
         self.secrets_dir = secrets_dir
         self.secrets_dir.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +98,7 @@ class FileCredentialProvider(CredentialProvider):
             logger.warning(f"Credential file '{name}' not found in {self.secrets_dir}")
             return None
         except Exception as e:
-            logger.error(f"Failed to read credential '{name}' from file: {e}")
+            logger.exception(f"Failed to read credential '{name}' from file: {e}")
             return None
 
     async def set_credential(self, name: str, value: str) -> bool:
@@ -110,7 +110,7 @@ class FileCredentialProvider(CredentialProvider):
             logger.info(f"Stored credential '{name}' to file")
             return True
         except Exception as e:
-            logger.error(f"Failed to store credential '{name}' to file: {e}")
+            logger.exception(f"Failed to store credential '{name}' to file: {e}")
             return False
 
     async def rotate_credential(self, name: str) -> bool:
@@ -129,7 +129,7 @@ class CredentialService:
     - Fail-secure design patterns
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.providers: dict[str, CredentialProvider] = {}
         self.metadata: dict[str, CredentialMetadata] = {}
         self.access_log: list[dict[str, Any]] = []
@@ -179,7 +179,7 @@ class CredentialService:
                     )
                     return value
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Provider '{provider_name}' failed to get credential '{name}': {e}"
                 )
                 continue
@@ -211,7 +211,7 @@ class CredentialService:
         """Get recent credential access log entries."""
         return self.access_log[-limit:]
 
-    def _log_access(self, name: str, provider: str, success: bool, duration: float):
+    def _log_access(self, name: str, provider: str, success: bool, duration: float) -> None:
         """Log credential access for audit purposes."""
         log_entry: dict[str, Any] = {
             "timestamp": time.time(),
@@ -265,14 +265,14 @@ class CredentialService:
         return health_status
 
 
-_credential_manager: CredentialManager | None = None
+_credential_manager: CredentialService | None = None
 
 
-def get_credential_manager() -> CredentialManager:
+def get_credential_manager() -> CredentialService:
     """Get the global credential manager instance."""
     global _credential_manager
     if _credential_manager is None:
-        _credential_manager = CredentialManager()
+        _credential_manager = CredentialService()
     return _credential_manager
 
 
@@ -327,13 +327,14 @@ async def migrate_hardcoded_credential(old_value: str, credential_name: str) -> 
         )
         return old_value
     except Exception as e:
-        logger.error(f"Failed to migrate credential '{credential_name}': {e}")
+        logger.exception(f"Failed to migrate credential '{credential_name}': {e}")
         return old_value
 
 
 if __name__ == "__main__":
     import asyncio
-    from prompt_improver.security.credential_manager import CredentialManager
+
+    from prompt_improver.security.credential_manager import CredentialService
 
     async def test_credential_manager():
         """Test the credential manager functionality."""

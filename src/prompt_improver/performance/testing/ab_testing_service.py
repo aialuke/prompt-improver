@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field
 
-from prompt_improver.core.utils.lazy_ml_loader import (, get_numpy, get_scipy_stats, get_sklearn_utils
+from prompt_improver.core.utils.lazy_ml_loader import (
     get_numpy,
     get_scipy_stats,
     get_sklearn_utils,

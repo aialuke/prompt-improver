@@ -23,7 +23,6 @@ from prompt_improver.analytics.unified.performance_analytics_component import (
 from prompt_improver.analytics.unified.session_analytics_component import (
     SessionAnalyticsComponent,
 )
-from prompt_improver.core.utils.lazy_ml_loader import get_numpy
 
 
 class TestUnifiedAnalyticsComponentsFunctionality:

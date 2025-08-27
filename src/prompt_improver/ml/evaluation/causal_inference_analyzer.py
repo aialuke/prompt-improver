@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 # import numpy as np  # Converted to lazy loading
 # from scipy import stats  # Converted to lazy loading
+from ...core.utils.lazy_ml_loader import get_numpy, get_scipy_stats
 from ..core.training_data_loader import TrainingDataLoader
 logger = logging.getLogger(__name__)
 

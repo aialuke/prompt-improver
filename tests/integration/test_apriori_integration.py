@@ -163,7 +163,8 @@ class TestAprioriAnalyzer:
     async def test_association_rule_generation(self):
         """Test generation of association rules from frequent itemsets"""
         import pandas as pd
-        from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+
+        from prompt_improver.database.composition import get_database_services
         from prompt_improver.database.types import ManagerMode
 
         db_manager = get_database_services(ManagerMode.ML_TRAINING)
@@ -361,7 +362,7 @@ class TestEndToEndWorkflow:
             include_apriori=True,
         )
         assert "status" in discovery_results
-        assert discovery_results["status"] in ["success", "error"]
+        assert discovery_results["status"] in {"success", "error"}
         if discovery_results["status"] == "success":
             assert "discovery_metadata" in discovery_results
             assert "algorithms_used" in discovery_results["discovery_metadata"]

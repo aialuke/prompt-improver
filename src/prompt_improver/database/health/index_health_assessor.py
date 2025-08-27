@@ -1,4 +1,4 @@
-"""Index Health Assessor with PostgreSQL System Catalog Analysis
+"""Index Health Assessor with PostgreSQL System Catalog Analysis.
 
 Provides comprehensive index health analysis including:
 - Index usage statistics and efficiency
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class IndexStats:
-    """Index statistics and health information"""
+    """Index statistics and health information."""
 
     schema_name: str
     table_name: str
@@ -62,7 +62,7 @@ class IndexStats:
 
 @dataclass
 class IndexHealthReport:
-    """Comprehensive index health report"""
+    """Comprehensive index health report."""
 
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -86,9 +86,9 @@ class IndexHealthReport:
 
 
 class IndexHealthAssessor:
-    """Assess PostgreSQL index health using system catalogs and statistics"""
+    """Assess PostgreSQL index health using system catalogs and statistics."""
 
-    def __init__(self, client: Any | None = None):
+    def __init__(self, client: Any | None = None) -> None:
         self.client = client
 
         # Health thresholds
@@ -103,13 +103,13 @@ class IndexHealthAssessor:
         self._cache_duration_seconds = 300  # 5 minutes
 
     async def get_client(self):
-        """Get database client"""
+        """Get database client."""
         if self.client is None:
             return await get_database_services(ManagerMode.ASYNC_MODERN)
         return self.client
 
     async def assess_index_health(self) -> IndexHealthReport:
-        """Perform comprehensive index health assessment"""
+        """Perform comprehensive index health assessment."""
         logger.debug("Starting index health assessment")
         start_time = time.perf_counter()
 
@@ -154,16 +154,16 @@ class IndexHealthAssessor:
             return report
 
         except Exception as e:
-            logger.error(f"Index health assessment failed: {e}")
+            logger.exception(f"Index health assessment failed: {e}")
             report = IndexHealthReport()
             report.maintenance_recommendations = [f"Assessment failed: {e}"]
             return report
 
     async def _get_all_index_stats(self) -> list[IndexStats]:
-        """Get comprehensive statistics for all indexes"""
+        """Get comprehensive statistics for all indexes."""
         async with get_session_context() as session:
             query = text("""
-                SELECT 
+                SELECT
                     n.nspname as schema_name,
                     t.relname as table_name,
                     i.relname as index_name,
@@ -188,9 +188,9 @@ class IndexHealthAssessor:
                 LEFT JOIN pg_stat_user_tables ts ON ts.relid = t.oid
                 WHERE n.nspname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
                     AND i.relkind = 'i'
-                GROUP BY 
-                    n.nspname, t.relname, i.relname, am.amname, ix.indisunique, 
-                    ix.indisprimary, i.oid, s.idx_scan, s.idx_tup_read, 
+                GROUP BY
+                    n.nspname, t.relname, i.relname, am.amname, ix.indisunique,
+                    ix.indisprimary, i.oid, s.idx_scan, s.idx_tup_read,
                     s.idx_tup_fetch, ts.seq_scan, ts.idx_scan, t.reltuples
                 ORDER BY pg_relation_size(i.oid) DESC
             """)
@@ -229,7 +229,7 @@ class IndexHealthAssessor:
             return indexes
 
     def _assess_individual_index_health(self, index: IndexStats) -> None:
-        """Assess health of individual index and set status flags"""
+        """Assess health of individual index and set status flags."""
         recommendations = []
 
         # Check if index is unused
@@ -275,14 +275,14 @@ class IndexHealthAssessor:
         index.recommendations = recommendations
 
     async def _suggest_missing_indexes(self) -> list[dict[str, Any]]:
-        """Suggest missing indexes based on query patterns and table statistics"""
+        """Suggest missing indexes based on query patterns and table statistics."""
         suggestions = []
 
         try:
             async with get_session_context() as session:
                 # Find tables with high sequential scan ratios
                 seq_scan_query = text("""
-                    SELECT 
+                    SELECT
                         schemaname,
                         tablename,
                         seq_scan,
@@ -348,7 +348,7 @@ class IndexHealthAssessor:
                         AND n.nspname NOT IN ('information_schema', 'pg_catalog')
                         AND NOT EXISTS (
                             SELECT 1 FROM pg_index i
-                            WHERE i.indrelid = t.oid 
+                            WHERE i.indrelid = t.oid
                                 AND a.attnum = ANY(i.indkey)
                                 AND i.indkey[0] = a.attnum  -- Column is first in index
                         )
@@ -372,12 +372,12 @@ class IndexHealthAssessor:
                     suggestions.append(suggestion)
 
         except Exception as e:
-            logger.error(f"Failed to generate missing index suggestions: {e}")
+            logger.exception(f"Failed to generate missing index suggestions: {e}")
 
         return suggestions
 
     def _calculate_index_health_score(self, report: IndexHealthReport) -> float:
-        """Calculate overall index health score (0-100)"""
+        """Calculate overall index health score (0-100)."""
         if report.total_indexes == 0:
             return 100.0
 
@@ -406,7 +406,7 @@ class IndexHealthAssessor:
         return max(0.0, min(100.0, score))
 
     def _calculate_space_savings(self, report: IndexHealthReport) -> int:
-        """Calculate potential space savings from removing unused/redundant indexes"""
+        """Calculate potential space savings from removing unused/redundant indexes."""
         savings = 0
 
         # Space from unused indexes
@@ -422,7 +422,7 @@ class IndexHealthAssessor:
     def _generate_maintenance_recommendations(
         self, report: IndexHealthReport
     ) -> list[str]:
-        """Generate actionable maintenance recommendations"""
+        """Generate actionable maintenance recommendations."""
         recommendations = []
 
         # Unused indexes
@@ -482,7 +482,7 @@ class IndexHealthAssessor:
         return recommendations
 
     async def get_index_health_summary(self) -> dict[str, Any]:
-        """Get a concise summary of index health"""
+        """Get a concise summary of index health."""
         try:
             report = await self.assess_index_health()
 
@@ -509,7 +509,7 @@ class IndexHealthAssessor:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get index health summary: {e}")
+            logger.exception(f"Failed to get index health summary: {e}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -517,13 +517,13 @@ class IndexHealthAssessor:
             }
 
     async def analyze_index_redundancy(self) -> dict[str, Any]:
-        """Detailed analysis of potentially redundant indexes"""
+        """Detailed analysis of potentially redundant indexes."""
         try:
             async with get_session_context() as session:
                 # Find indexes that might be redundant (same leading columns)
                 redundancy_query = text("""
                     WITH index_columns AS (
-                        SELECT 
+                        SELECT
                             n.nspname as schema_name,
                             t.relname as table_name,
                             i.relname as index_name,
@@ -540,7 +540,7 @@ class IndexHealthAssessor:
                             AND i.relkind = 'i'
                         GROUP BY n.nspname, t.relname, i.relname, ix.indisunique, ix.indisprimary, i.oid
                     )
-                    SELECT 
+                    SELECT
                         i1.schema_name,
                         i1.table_name,
                         i1.index_name as index1,
@@ -549,14 +549,14 @@ class IndexHealthAssessor:
                         i2.columns as columns2,
                         i1.size_bytes as size1,
                         i2.size_bytes as size2,
-                        CASE 
+                        CASE
                             WHEN i1.columns <@ i2.columns THEN 'i1_subset_of_i2'
                             WHEN i2.columns <@ i1.columns THEN 'i2_subset_of_i1'
                             WHEN i1.columns = i2.columns THEN 'identical'
                             ELSE 'partial_overlap'
                         END as relationship
                     FROM index_columns i1
-                    JOIN index_columns i2 ON i1.schema_name = i2.schema_name 
+                    JOIN index_columns i2 ON i1.schema_name = i2.schema_name
                         AND i1.table_name = i2.table_name
                         AND i1.index_name < i2.index_name  -- Avoid duplicates
                     WHERE (i1.columns && i2.columns)  -- Have overlapping columns
@@ -595,11 +595,11 @@ class IndexHealthAssessor:
                 }
 
         except Exception as e:
-            logger.error(f"Index redundancy analysis failed: {e}")
+            logger.exception(f"Index redundancy analysis failed: {e}")
             return {"error": str(e)}
 
     def _get_redundancy_recommendation(self, row) -> str:
-        """Generate recommendation for redundant index pair"""
+        """Generate recommendation for redundant index pair."""
         relationship = row[8]
         size1, size2 = row[6], row[7]
 
@@ -613,7 +613,7 @@ class IndexHealthAssessor:
         return "Review usage patterns to determine if one can be dropped"
 
     def _format_bytes(self, bytes_value: int) -> str:
-        """Format bytes in human-readable format"""
+        """Format bytes in human-readable format."""
         for unit in ["B", "KB", "MB", "GB", "TB"]:
             if bytes_value < 1024.0:
                 return f"{bytes_value:.1f} {unit}"

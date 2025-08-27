@@ -20,8 +20,8 @@ from prompt_improver.ml.services.intelligence.protocols.intelligence_service_pro
     MLCircuitBreakerServiceProtocol,
 )
 from prompt_improver.repositories.protocols.ml_repository_protocol import MLRepositoryProtocol
-from prompt_improver.performance.monitoring.metrics_registry import (
 from prompt_improver.core.utils.lazy_ml_loader import get_numpy
+from prompt_improver.performance.monitoring.metrics_registry import (
     StandardMetrics,
     get_metrics_registry,
 )

@@ -312,9 +312,9 @@ class EnhancedAnalyticsServiceHealthChecker(EnhancedHealthChecker):
         start_time = time.time()
         try:
             with self.telemetry_context.span("import_analytics"):
-                from prompt_improver.analytics import AnalyticsService
+                from prompt_improver.analytics import AnalyticsServiceFacade
 
-                analytics = AnalyticsService()
+                analytics = AnalyticsServiceFacade()
             with self.telemetry_context.span("test_performance_trends"):
                 trends_result = await self._test_performance_trends(analytics)
             with self.telemetry_context.span("check_data_freshness"):

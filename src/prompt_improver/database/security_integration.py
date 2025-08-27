@@ -1,4 +1,4 @@
-"""Database Security Integration - Unified Security Across Database and Application Layers
+"""Database Security Integration - Unified Security Across Database and Application Layers.
 
 Provides seamless integration between UnifiedSecurityManager, UnifiedAuthenticationManager,
 and DatabaseServices SecurityContext for unified security enforcement.
@@ -25,15 +25,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from prompt_improver.database.types import (
-    ManagerMode,
-    SecurityValidationResult,
-)
+from prompt_improver.database.composition import get_database_services
 from prompt_improver.database.factories import (
     SecurityContext,
     create_security_context,
 )
-from prompt_improver.database.composition import get_database_services
+from prompt_improver.database.types import (
+    ManagerMode,
+    SecurityValidationResult,
+)
 
 try:
     from opentelemetry import metrics, trace
@@ -97,7 +97,7 @@ async def create_security_context_from_security_manager(
             encryption_required=True,
             audit_trail_id=f"sm_{int(current_time * 1000000)}",
         )
-        
+
         # Create basic security context
         return create_security_context(
             agent_id=agent_id,
@@ -106,7 +106,7 @@ async def create_security_context_from_security_manager(
             validation_result=validation_result,
         )
     except Exception as e:
-        logger.error(f"Failed to create security context from manager: {e}")
+        logger.exception(f"Failed to create security context from manager: {e}")
         # Fallback to basic security context
         return create_security_context(
             agent_id=agent_id,
@@ -172,7 +172,7 @@ class DatabaseSecurityValidator:
     def __init__(
         self,
         integration_mode: SecurityIntegrationMode = SecurityIntegrationMode.STANDARD,
-    ):
+    ) -> None:
         """Initialize database security validator.
 
         Args:
@@ -216,18 +216,17 @@ class DatabaseSecurityValidator:
                     security_warnings=["Invalid security context"],
                     audit_metadata={"validation_failed": "invalid_security_context"},
                 )
-            if operation_type in [
+            if operation_type in {
                 DatabaseOperationType.WRITE,
                 DatabaseOperationType.DELETE,
                 DatabaseOperationType.ADMIN,
-            ]:
-                if not security_context.authenticated:
-                    return self._create_denied_result(
-                        security_context,
-                        start_time,
-                        "Authentication required for operation",
-                        [],
-                    )
+            } and not security_context.authenticated:
+                return self._create_denied_result(
+                    security_context,
+                    start_time,
+                    "Authentication required for operation",
+                    [],
+                )
             for policy in applicable_policies:
                 policy_result = await self._validate_against_policy(
                     policy, security_context, operation_type, operation_details
@@ -292,7 +291,7 @@ class DatabaseSecurityValidator:
                 )
             return result
         except Exception as e:
-            self.logger.error(f"Database security validation error: {e}")
+            self.logger.exception(f"Database security validation error: {e}")
             return self._create_denied_result(
                 security_context, start_time, f"Validation system error: {e!s}", []
             )
@@ -478,7 +477,7 @@ class UnifiedSecurityIntegration:
         integration_mode: SecurityIntegrationMode = SecurityIntegrationMode.STANDARD,
         enable_context_caching: bool = True,
         enable_performance_monitoring: bool = True,
-    ):
+    ) -> None:
         """Initialize unified security integration.
 
         Args:
@@ -524,13 +523,12 @@ class UnifiedSecurityIntegration:
             from prompt_improver.security.services import (
                 get_api_security_manager,
             )
-            from prompt_improver.core.domain.enums import SecurityMode
 
             self._security_manager = await get_api_security_manager()
 
             self.logger.info("UnifiedSecurityIntegration async initialization complete")
         except Exception as e:
-            self.logger.error(f"Failed to initialize UnifiedSecurityIntegration: {e}")
+            self.logger.exception(f"Failed to initialize UnifiedSecurityIntegration: {e}")
             raise
 
     async def create_authenticated_security_context(
@@ -610,7 +608,7 @@ class UnifiedSecurityIntegration:
             ) / total_ops
             return validation_result
         except Exception as e:
-            self.logger.error(f"Database operation validation failed: {e}")
+            self.logger.exception(f"Database operation validation failed: {e}")
             self._integration_metrics["security_violations"] += 1
             return DatabaseSecurityValidationResult(
                 allowed=False,
@@ -678,7 +676,7 @@ class UnifiedSecurityIntegration:
                 },
             }
         except Exception as e:
-            self.logger.error(f"Secure database operation failed: {e}")
+            self.logger.exception(f"Secure database operation failed: {e}")
             security_context.add_audit_event(
                 "database_operation_failed",
                 {

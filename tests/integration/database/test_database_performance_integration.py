@@ -10,6 +10,7 @@ Following 2025 best practices:
 """
 
 import asyncio
+import contextlib
 
 import asyncpg
 import pytest
@@ -27,7 +28,7 @@ class TestDatabasePerformanceIntegration:
     async def db_connection(self):
         """Create database connection using DatabaseServices for real behavior testing."""
         try:
-            from prompt_improver.database.composition import get_database_services, create_database_services, DatabaseServices
+            from prompt_improver.database.composition import get_database_services
             from prompt_improver.database.types import ManagerMode
 
             manager = get_database_services(ManagerMode.ASYNC_MODERN)
@@ -210,7 +211,7 @@ class TestDatabasePerformanceIntegration:
         event_bus.subscribe(EventType.DATABASE_SLOW_QUERY_DETECTED, event_collector)
         baseline_snapshot = await performance_monitor.take_performance_snapshot()
         async with get_session() as session:
-            for i in range(5):
+            for _i in range(5):
                 result = await session.execute("SELECT pg_sleep(0.01)")
                 await result.fetchone()
         second_snapshot = await performance_monitor.take_performance_snapshot()
@@ -220,11 +221,11 @@ class TestDatabasePerformanceIntegration:
             e
             for e in emitted_events
             if e.event_type
-            in [
+            in {
                 EventType.DATABASE_PERFORMANCE_DEGRADED,
                 EventType.DATABASE_CACHE_HIT_RATIO_LOW,
                 EventType.DATABASE_SLOW_QUERY_DETECTED,
-            ]
+            }
         ]
         assert isinstance(performance_events, list)
 
@@ -237,10 +238,8 @@ class TestDatabasePerformanceIntegration:
         await asyncio.sleep(2.5)
         await performance_monitor.stop_monitoring()
         monitoring_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await monitoring_task
-        except asyncio.CancelledError:
-            pass
         assert len(performance_monitor._snapshots) >= 2
         timestamps = [s.timestamp for s in performance_monitor._snapshots]
         for i in range(1, len(timestamps)):

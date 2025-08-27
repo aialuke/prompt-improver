@@ -106,7 +106,7 @@ class RegressionAlert:
 class PerformanceTimer:
     """High-precision performance timer with context management."""
 
-    def __init__(self, operation_name: str, component: str = "unknown"):
+    def __init__(self, operation_name: str, component: str = "unknown") -> None:
         self.operation_name = operation_name
         self.component = component
         self.start_time: float | None = None
@@ -132,7 +132,7 @@ class PerformanceTimer:
         if not tracemalloc.is_tracing():
             tracemalloc.start()
         self.start_time = time.perf_counter()
-        current, peak = tracemalloc.get_traced_memory()
+        current, _peak = tracemalloc.get_traced_memory()
         self.start_memory = current
         process = psutil.Process()
         self.cpu_start = process.cpu_percent()
@@ -176,7 +176,7 @@ class PerformanceTimer:
 class CodeAnalyzer:
     """Analyzes code quality and complexity metrics."""
 
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self, logger: logging.Logger | None = None) -> None:
         super().__init__()
         self.logger = logger or logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ class CodeAnalyzer:
             metrics.type_coverage = self._calculate_type_coverage(tree)
             return metrics
         except Exception as e:
-            self.logger.error(f"Error analyzing {file_path}: {e}")
+            self.logger.exception(f"Error analyzing {file_path}: {e}")
             return CodeQualityMetrics(module_name=file_path.stem)
 
     def _calculate_cyclomatic_complexity(self, tree: ast.AST) -> int:
@@ -341,7 +341,7 @@ class CodeAnalyzer:
 class DependencyAnalyzer:
     """Analyzes project dependencies for optimization opportunities."""
 
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self, logger: logging.Logger | None = None) -> None:
         super().__init__()
         self.logger = logger or logging.getLogger(__name__)
 
@@ -405,7 +405,7 @@ class DependencyAnalyzer:
         def dfs(node: str, path: list[str]) -> None:
             if node in rec_stack:
                 cycle_start = path.index(node)
-                cycles.append(path[cycle_start:] + [node])
+                cycles.append([*path[cycle_start:], node])
                 return
             if node in visited:
                 return
@@ -497,7 +497,7 @@ class DependencyAnalyzer:
     def _path_to_module(self, file_path: Path, root_path: Path) -> str:
         """Convert file path to module name."""
         relative_path = file_path.relative_to(root_path)
-        module_parts = list(relative_path.parts[:-1]) + [relative_path.stem]
+        module_parts = [*list(relative_path.parts[:-1]), relative_path.stem]
         return ".".join(module_parts)
 
 
@@ -508,7 +508,7 @@ class PerformanceRegressor:
         self,
         baseline_storage: dict[str, PerformanceBaseline] | None = None,
         logger: logging.Logger | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self.baselines = baseline_storage or {}
         self.logger = logger or logging.getLogger(__name__)
@@ -618,7 +618,7 @@ class PerformanceAnalyzer:
 
     def __init__(
         self, root_path: Path | None = None, logger: logging.Logger | None = None
-    ):
+    ) -> None:
         self.root_path = root_path or Path("src")
         self.logger = logger or logging.getLogger(__name__)
         self.code_analyzer = CodeAnalyzer(logger)
@@ -750,7 +750,6 @@ class PerformanceAnalyzer:
             return self._generate_text_report(analysis)
         if format == "json":
             import json
-            from prompt_improver.ml.core.imports import get_numpy
 
             return json.dumps(analysis, indent=2, default=str)
         raise ValueError(f"Unsupported format: {format}")

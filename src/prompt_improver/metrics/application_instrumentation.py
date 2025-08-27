@@ -5,6 +5,7 @@ to collect real business metrics without requiring manual code changes.
 """
 
 import asyncio
+import contextlib
 import inspect
 import logging
 import time
@@ -111,12 +112,10 @@ def track_feature_usage(
                 try:
                     return await fn(*f_args, **f_kwargs)
                 finally:
-                    try:
+                    with contextlib.suppress(Exception):
                         get_business_metrics().record_feature_usage(
                             feature=feature_name, user_tier=feature_category.value
                         )
-                    except Exception:
-                        pass
 
             return wrapper
 
@@ -125,12 +124,10 @@ def track_feature_usage(
             try:
                 return fn(*f_args, **f_kwargs)
             finally:
-                try:
+                with contextlib.suppress(Exception):
                     get_business_metrics().record_feature_usage(
                         feature=feature_name, user_tier=feature_category.value
                     )
-                except Exception:
-                    pass
 
         return wrapper
 
@@ -352,11 +349,11 @@ class DatabaseInstrumentation:
             if hasattr(db_class, method_name):
                 original_method = getattr(db_class, method_name)
                 operation_type = DatabaseOperation.SELECT
-                if method_name in ["insert", "create"]:
+                if method_name in {"insert", "create"}:
                     operation_type = DatabaseOperation.INSERT
-                elif method_name in ["update", "alter"]:
+                elif method_name in {"update", "alter"}:
                     operation_type = DatabaseOperation.UPDATE
-                elif method_name in ["delete", "drop"]:
+                elif method_name in {"delete", "drop"}:
                     operation_type = DatabaseOperation.DELETE
 
                 async def instrumented_method(
@@ -406,7 +403,7 @@ class DatabaseInstrumentation:
                     finally:
                         end_time = time.time()
                         execution_time_ms = (end_time - start_time) * 1000
-                        try:
+                        with contextlib.suppress(Exception):
                             get_database_metrics().record_query(
                                 operation=operation_type.value
                                 if hasattr(operation_type, "value")
@@ -415,8 +412,6 @@ class DatabaseInstrumentation:
                                 duration_ms=execution_time_ms,
                                 success=success,
                             )
-                        except Exception:
-                            pass
                     return result
 
                 if not inspect.iscoroutinefunction(original_method):
@@ -459,8 +454,8 @@ class DatabaseInstrumentation:
                             end_time = time.time()
                             execution_time_ms = (end_time - start_time) * 1000
 
-                            async def submit_db_tracking():
-                                try:
+                            async def submit_db_tracking() -> None:
+                                with contextlib.suppress(Exception):
                                     get_database_metrics().record_query(
                                         operation=operation_type.value
                                         if hasattr(operation_type, "value")
@@ -469,8 +464,6 @@ class DatabaseInstrumentation:
                                         duration_ms=execution_time_ms,
                                         success=success,
                                     )
-                                except Exception:
-                                    pass
 
                             loop = asyncio.get_event_loop()
                             loop.create_task(submit_db_tracking())
@@ -547,7 +540,7 @@ class CacheInstrumentation:
                             end_time = time.time()
                             response_time_ms = (end_time - start_time) * 1000
 
-                            async def submit_cache_tracking():
+                            async def submit_cache_tracking() -> None:
                                 task_manager = get_background_task_manager()
                                 await task_manager.submit_enhanced_task(
                                     task_id=f"cache_track_{method_name}_{str(uuid.uuid4())[:8]}",
@@ -667,7 +660,9 @@ def instrument_application_startup():
     try:
         logger.info("Starting application instrumentation for business metrics...")
         try:
-            from prompt_improver.services.prompt.facade import PromptServiceFacade as PromptImprovementService
+            from prompt_improver.services.prompt.facade import (
+                PromptServiceFacade as PromptImprovementService,
+            )
 
             PromptImprovementInstrumentation.instrument_prompt_service(
                 PromptImprovementService
@@ -712,7 +707,7 @@ def instrument_application_startup():
             logger.debug("RedisCache not found")
         logger.info("Application instrumentation completed successfully")
     except Exception as e:
-        logger.error(f"Failed to instrument application: {e}")
+        logger.exception(f"Failed to instrument application: {e}")
 
 
 def create_custom_instrumentor(

@@ -1,4 +1,4 @@
-"""Enhanced Canary Testing Service - 2025 Edition
+"""Enhanced Canary Testing Service - 2025 Edition.
 
 Advanced canary deployment with 2025 best practices:
 - Progressive delivery with ring-based deployments
@@ -11,6 +11,7 @@ Advanced canary deployment with 2025 best practices:
 """
 
 import asyncio
+import logging
 import statistics
 import uuid
 from collections import defaultdict, deque
@@ -27,6 +28,9 @@ from prompt_improver.performance.monitoring.health.background_manager import (
     TaskPriority,
     get_background_task_manager,
 )
+from prompt_improver.services.cache.l2_redis_service import redis_client
+
+logger = logging.getLogger(__name__)
 
 try:
     from opentelemetry import metrics, trace
@@ -64,7 +68,7 @@ console = Console()
 
 
 class DeploymentStrategy(Enum):
-    """Progressive delivery strategies"""
+    """Progressive delivery strategies."""
 
     CANARY = "canary"
     BLUE_GREEN = "blue_green"
@@ -74,7 +78,7 @@ class DeploymentStrategy(Enum):
 
 
 class RollbackTrigger(Enum):
-    """Rollback trigger types"""
+    """Rollback trigger types."""
 
     SLO_VIOLATION = "slo_violation"
     ERROR_RATE_SPIKE = "error_rate_spike"
@@ -85,7 +89,7 @@ class RollbackTrigger(Enum):
 
 
 class CanaryPhase(Enum):
-    """Canary deployment phases"""
+    """Canary deployment phases."""
 
     INITIALIZING = "initializing"
     RAMPING_UP = "ramping_up"
@@ -98,7 +102,7 @@ class CanaryPhase(Enum):
 
 @dataclass
 class SLITarget:
-    """Service Level Indicator target"""
+    """Service Level Indicator target."""
 
     name: str
     target_value: float
@@ -107,7 +111,7 @@ class SLITarget:
     description: str = ""
 
     def evaluate(self, actual_value: float) -> bool:
-        """Evaluate if actual value meets SLI target"""
+        """Evaluate if actual value meets SLI target."""
         if self.operator == ">=":
             return actual_value >= self.target_value
         if self.operator == "<=":
@@ -125,7 +129,7 @@ class SLITarget:
 
 @dataclass
 class CanaryMetrics:
-    """Enhanced metrics for canary testing"""
+    """Enhanced metrics for canary testing."""
 
     total_requests: int
     successful_requests: int
@@ -165,7 +169,7 @@ class CanaryMetrics:
 
 @dataclass
 class ContextualRule:
-    """Context-aware feature flag rule"""
+    """Context-aware feature flag rule."""
 
     name: str
     condition: str
@@ -174,7 +178,7 @@ class ContextualRule:
     priority: int = 0
 
     def evaluate_context(self, context: dict[str, Any]) -> bool:
-        """Evaluate if context matches rule condition"""
+        """Evaluate if context matches rule condition."""
         try:
             return eval(self.condition, {"__builtins__": {}}, context)
         except (SyntaxError, NameError, TypeError, ValueError, ZeroDivisionError) as e:
@@ -184,7 +188,7 @@ class ContextualRule:
 
 @dataclass
 class CanaryGroup:
-    """Enhanced configuration for a canary group"""
+    """Enhanced configuration for a canary group."""
 
     name: str
     percentage: float
@@ -232,7 +236,7 @@ class CanaryGroup:
 
 @dataclass
 class RollbackEvent:
-    """Rollback event record"""
+    """Rollback event record."""
 
     event_id: str
     canary_name: str
@@ -277,7 +281,7 @@ else:
 
 
 class EnhancedCanaryTestingService:
-    """Enhanced canary testing service with 2025 best practices
+    """Enhanced canary testing service with 2025 best practices.
 
     features:
     - Progressive delivery with ring-based deployments
@@ -294,7 +298,7 @@ class EnhancedCanaryTestingService:
         enable_gitops: bool = True,
         enable_sli_monitoring: bool = True,
         config_file: str = "canary_config.yaml",
-    ):
+    ) -> None:
         self.config = self._load_config()
         self.redis_client = redis_client
         self.enable_service_mesh = enable_service_mesh and ISTIO_AVAILABLE
@@ -316,7 +320,7 @@ class EnhancedCanaryTestingService:
         self.logger.info("Enhanced canary testing service initialized")
 
     def _load_config(self) -> dict:
-        """Load canary testing configuration from Redis config"""
+        """Load canary testing configuration from Redis config."""
         try:
             from prompt_improver.core.config import AppConfig
 
@@ -334,8 +338,8 @@ class EnhancedCanaryTestingService:
             console.print(f"❌ YAML parsing error: {e}", style="red")
             return {}
 
-    async def _monitor_deployment(self, deployment_name: str):
-        """Monitor deployment progress and health with real metrics collection"""
+    async def _monitor_deployment(self, deployment_name: str) -> None:
+        """Monitor deployment progress and health with real metrics collection."""
         try:
             deployment = self.active_deployments.get(deployment_name)
             if not deployment:
@@ -347,7 +351,7 @@ class EnhancedCanaryTestingService:
                 f"Starting real monitoring for deployment {deployment_name}"
             )
             while (
-                canary_group.phase not in [CanaryPhase.COMPLETED, CanaryPhase.FAILED]
+                canary_group.phase not in {CanaryPhase.COMPLETED, CanaryPhase.FAILED}
                 and monitoring_cycles < max_cycles
             ):
                 monitoring_cycles += 1
@@ -384,11 +388,11 @@ class EnhancedCanaryTestingService:
                     break
                 await self._progress_deployment(deployment_name)
                 await asyncio.sleep(0.5)
-            if canary_group.phase not in [CanaryPhase.FAILED]:
+            if canary_group.phase not in {CanaryPhase.FAILED}:
                 canary_group.phase = CanaryPhase.COMPLETED
                 self.logger.info(f"Deployment {deployment_name} completed successfully")
         except Exception as e:
-            self.logger.error(f"Real monitoring error for {deployment_name}: {e}")
+            self.logger.exception(f"Real monitoring error for {deployment_name}: {e}")
             if deployment_name in self.active_deployments:
                 self.active_deployments[deployment_name][
                     "canary_group"
@@ -400,8 +404,8 @@ class EnhancedCanaryTestingService:
         trigger: RollbackTrigger,
         reason: str,
         metrics: CanaryMetrics,
-    ):
-        """Trigger rollback for deployment"""
+    ) -> None:
+        """Trigger rollback for deployment."""
         rollback_event = RollbackEvent(
             event_id=str(uuid.uuid4()),
             canary_name=deployment_name,
@@ -415,8 +419,8 @@ class EnhancedCanaryTestingService:
             CANARY_ROLLBACKS.add(1, {"trigger": trigger.value})
         self.logger.warning(f"Rollback triggered for {deployment_name}: {reason}")
 
-    async def _progress_deployment(self, deployment_name: str):
-        """Progress deployment to next phase"""
+    async def _progress_deployment(self, deployment_name: str) -> None:
+        """Progress deployment to next phase."""
         deployment = self.active_deployments.get(deployment_name)
         if not deployment:
             return
@@ -433,18 +437,17 @@ class EnhancedCanaryTestingService:
                 )
 
     async def collect_enhanced_metrics(self, deployment_name: str) -> CanaryMetrics:
-        """Collect real enhanced metrics for deployment"""
+        """Collect real enhanced metrics for deployment."""
         import random
         import time
 
         import psutil
-        from prompt_improver.services.cache.l2_redis_service import redis_client
 
         start_time = time.time()
         request_times = []
         successful_requests = 0
         failed_requests = 0
-        for i in range(100):
+        for _i in range(100):
             request_start = time.time()
             processing_time = random.normalvariate(0.05, 0.02)
             await asyncio.sleep(max(0.001, processing_time))
@@ -526,11 +529,11 @@ class EnhancedCanaryTestingService:
         )
 
     def add_sli_evaluator(self, name: str, evaluator: Callable[[CanaryMetrics], float]):
-        """Add custom SLI evaluator function"""
+        """Add custom SLI evaluator function."""
         self.sli_evaluators[name] = evaluator
 
     def add_context_provider(self, name: str, provider: Callable[[], dict[str, Any]]):
-        """Add context provider for feature flag evaluation"""
+        """Add context provider for feature flag evaluation."""
         self.context_providers[name] = provider
 
     async def start_progressive_deployment(
@@ -542,7 +545,7 @@ class EnhancedCanaryTestingService:
         ramp_duration_minutes: int = 60,
         sli_targets: list[SLITarget] | None = None,
     ) -> dict[str, Any]:
-        """Start a progressive deployment with 2025 best practices"""
+        """Start a progressive deployment with 2025 best practices."""
         with tracer.start_span("start_progressive_deployment") as span:
             span.set_attribute("deployment_name", deployment_name)
             span.set_attribute("strategy", strategy.value)
@@ -597,7 +600,7 @@ class EnhancedCanaryTestingService:
             }
 
     def _get_default_sli_targets(self) -> list[SLITarget]:
-        """Get default SLI targets for deployments"""
+        """Get default SLI targets for deployments."""
         return [
             SLITarget(
                 name="availability",
@@ -624,8 +627,8 @@ class EnhancedCanaryTestingService:
 
     async def _setup_service_mesh_traffic_split(
         self, deployment_name: str, percentage: float
-    ):
-        """Setup service mesh traffic splitting"""
+    ) -> None:
+        """Setup service mesh traffic splitting."""
         if not self.enable_service_mesh:
             return
         try:
@@ -665,10 +668,10 @@ class EnhancedCanaryTestingService:
                 f"Service mesh traffic split configured for {deployment_name}: {percentage}%%"
             )
         except Exception as e:
-            self.logger.error(f"Failed to setup service mesh traffic split: {e}")
+            self.logger.exception(f"Failed to setup service mesh traffic split: {e}")
 
     async def run_orchestrated_analysis(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Orchestrator-compatible interface for canary testing (2025 pattern)"""
+        """Orchestrator-compatible interface for canary testing (2025 pattern)."""
         start_time = datetime.now(UTC)
         await asyncio.sleep(0.02)
         try:
@@ -732,7 +735,7 @@ class EnhancedCanaryTestingService:
                 },
             }
         except Exception as e:
-            self.logger.error(f"Orchestrated canary testing failed: {e}")
+            self.logger.exception(f"Orchestrated canary testing failed: {e}")
             return {
                 "orchestrator_compatible": True,
                 "component_result": {"error": str(e), "canary_summary": {}},
@@ -744,7 +747,7 @@ class EnhancedCanaryTestingService:
             }
 
     async def _collect_comprehensive_canary_data(self) -> dict[str, Any]:
-        """Collect comprehensive canary testing data"""
+        """Collect comprehensive canary testing data."""
         return {
             "canary_groups": {
                 name: group.model_dump() for name, group in self.canary_groups.items()

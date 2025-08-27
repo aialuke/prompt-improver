@@ -1,4 +1,4 @@
-"""Apriori Algorithm API Endpoints
+"""Apriori Algorithm API Endpoints.
 
 This module provides REST API endpoints for Apriori association rule mining
 and pattern discovery, integrating with the ML pipeline for comprehensive
@@ -10,22 +10,33 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from prompt_improver.database.composition import DatabaseServices
-from prompt_improver.database import get_database_services, create_database_services, ManagerMode
-from prompt_improver.shared.interfaces.protocols.application import (
-    AprioriApplicationServiceProtocol,
-    PatternApplicationServiceProtocol,
-)
 from prompt_improver.application.services.apriori_application_service import (
     AprioriApplicationService,
 )
 from prompt_improver.application.services.pattern_application_service import (
     PatternApplicationService,
 )
+from prompt_improver.database import (
+    ManagerMode,
+    create_database_services,
+    get_database_services,
+)
+from prompt_improver.database.composition import DatabaseServices
+from prompt_improver.database.models import (
+    AprioriAnalysisRequest,
+    AprioriAnalysisResponse,
+    PatternDiscoveryRequest,
+    PatternDiscoveryResponse,
+)
+
 # Cache manager handled through dependency injection
 from prompt_improver.repositories.factory import get_apriori_repository
 from prompt_improver.repositories.protocols.apriori_repository_protocol import (
     AprioriRepositoryProtocol,
+)
+from prompt_improver.shared.interfaces.protocols.application import (
+    AprioriApplicationServiceProtocol,
+    PatternApplicationServiceProtocol,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +59,7 @@ apriori_router = APIRouter(
 async def get_apriori_repository_dep(
     db_manager: DatabaseServices = Depends(get_ml_database_services),
 ) -> AprioriRepositoryProtocol:
-    """Get apriori repository with database services"""
+    """Get apriori repository with database services."""
     return await get_apriori_repository(db_manager)
 
 
@@ -56,13 +67,13 @@ async def get_apriori_application_service(
     db_manager: DatabaseServices = Depends(get_ml_database_services),
     apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
 ) -> AprioriApplicationServiceProtocol:
-    """Get Apriori application service with proper dependencies"""
-    from prompt_improver.repositories.factory import get_ml_repository
+    """Get Apriori application service with proper dependencies."""
     from prompt_improver.core.caching import create_cache_manager
-    
+    from prompt_improver.repositories.factory import get_ml_repository
+
     ml_repository = await get_ml_repository(db_manager)
     cache_manager = await create_cache_manager()
-    
+
     service = AprioriApplicationService(
         db_services=db_manager,
         apriori_repository=apriori_repository,
@@ -77,13 +88,13 @@ async def get_pattern_application_service(
     db_manager: DatabaseServices = Depends(get_ml_database_services),
     apriori_repository: AprioriRepositoryProtocol = Depends(get_apriori_repository_dep),
 ) -> PatternApplicationServiceProtocol:
-    """Get Pattern application service with proper dependencies"""
-    from prompt_improver.repositories.factory import get_ml_repository
+    """Get Pattern application service with proper dependencies."""
     from prompt_improver.core.caching import create_cache_manager
-    
+    from prompt_improver.repositories.factory import get_ml_repository
+
     ml_repository = await get_ml_repository(db_manager)
     cache_manager = await create_cache_manager()
-    
+
     service = PatternApplicationService(
         db_services=db_manager,
         apriori_repository=apriori_repository,
@@ -121,18 +132,18 @@ async def run_apriori_analysis(
 
         # Use application service for orchestrated analysis
         result = await apriori_service.execute_apriori_analysis(request)
-        
+
         if result.status == "error":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Apriori analysis failed: {result.error}",
             )
-            
+
         return result
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Apriori analysis failed: {e}")
+        logger.exception(f"Apriori analysis failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal error during Apriori analysis: {e!s}",
@@ -168,21 +179,21 @@ async def comprehensive_pattern_discovery(
         logger.info(
             f"Starting comprehensive pattern discovery: {request.model_dump()}"
         )
-        
+
         # Use application service for orchestrated pattern discovery
         result = await pattern_service.execute_comprehensive_pattern_discovery(request)
-        
+
         if result.status == "error":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Pattern discovery failed: {result.business_insights.get('error', 'Unknown error')}",
             )
-            
+
         return result
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Comprehensive pattern discovery failed: {e}")
+        logger.exception(f"Comprehensive pattern discovery failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal error during pattern discovery: {e!s}",
@@ -210,7 +221,9 @@ async def get_association_rules(
         List of association rules with metrics and insights
     """
     try:
-        from prompt_improver.repositories.protocols.apriori_repository_protocol import AssociationRuleFilter
+        from prompt_improver.repositories.protocols.apriori_repository_protocol import (
+            AssociationRuleFilter,
+        )
 
         # Create filter from parameters
         filters = AssociationRuleFilter(
@@ -230,7 +243,7 @@ async def get_association_rules(
         logger.info(f"Retrieved {len(rule_list)} association rules")
         return rule_list
     except Exception as e:
-        logger.error(f"Error retrieving association rules: {e}")
+        logger.exception(f"Error retrieving association rules: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving association rules: {e!s}",
@@ -259,16 +272,15 @@ async def get_contextualized_patterns(
     """
     try:
         logger.info(f"Getting contextualized patterns for: {context_items}")
-        
+
         # Use application service for contextualized pattern analysis
-        results = await apriori_service.get_contextualized_patterns(
+        return await apriori_service.get_contextualized_patterns(
             context_items=context_items,
             min_confidence=min_confidence,
         )
-        
-        return results
+
     except Exception as e:
-        logger.error(f"Error getting contextualized patterns: {e}")
+        logger.exception(f"Error getting contextualized patterns: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error analyzing contextualized patterns: {e!s}",
@@ -292,8 +304,9 @@ async def get_discovery_runs(
         List of discovery run metadata
     """
     try:
-        from prompt_improver.repositories.protocols.apriori_repository_protocol import PatternDiscoveryFilter
-        from prompt_improver.ml.types import PatternDiscoveryResponse
+        from prompt_improver.repositories.protocols.apriori_repository_protocol import (
+            PatternDiscoveryFilter,
+        )
 
         # Create filter from parameters
         filters = (
@@ -301,16 +314,15 @@ async def get_discovery_runs(
         )
 
         # Use application service to get discovery runs
-        run_list = await pattern_service.get_pattern_discoveries(
+        return await pattern_service.get_pattern_discoveries(
             filters=filters,
             sort_by="created_at",
             sort_desc=True,
             limit=limit,
         )
-        
-        return run_list
+
     except Exception as e:
-        logger.error(f"Error retrieving discovery runs: {e}")
+        logger.exception(f"Error retrieving discovery runs: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving discovery runs: {e!s}",
@@ -333,16 +345,15 @@ async def get_discovery_insights(
     """
     try:
         # Use application service to get comprehensive discovery results summary
-        insights = await pattern_service.get_discovery_insights(discovery_run_id)
-        
-        return insights
+        return await pattern_service.get_discovery_insights(discovery_run_id)
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
     except Exception as e:
-        logger.error(f"Error retrieving discovery insights: {e}")
+        logger.exception(f"Error retrieving discovery insights: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving insights: {e!s}",

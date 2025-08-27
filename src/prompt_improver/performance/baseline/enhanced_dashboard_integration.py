@@ -37,6 +37,7 @@ try:
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
+import contextlib
 import os
 
 try:
@@ -68,7 +69,7 @@ class PerformanceDashboard:
         collector: BaselineCollector | None = None,
         analyzer: StatisticalAnalyzer | None = None,
         detector: RegressionDetector | None = None,
-    ):
+    ) -> None:
         self.config = config or DashboardConfig()
         self.collector = collector or BaselineCollector()
         self.analyzer = analyzer or StatisticalAnalyzer()
@@ -120,7 +121,7 @@ class PerformanceDashboard:
         try:
             await self._run_dashboard_loop()
         except Exception as e:
-            logger.error(f"Dashboard server error: {e}")
+            logger.exception(f"Dashboard server error: {e}")
         finally:
             await task_manager.cancel_task(data_task_id)
             if websocket_task_id:
@@ -176,7 +177,7 @@ class PerformanceDashboard:
                 await self._broadcast_real_time_update()
                 await asyncio.sleep(self.config.refresh_interval_seconds)
             except Exception as e:
-                logger.error(f"Error collecting real-time data: {e}")
+                logger.exception(f"Error collecting real-time data: {e}")
                 await asyncio.sleep(self.config.refresh_interval_seconds)
 
     async def _check_and_process_alerts(self, baseline: BaselineMetrics) -> None:
@@ -197,14 +198,14 @@ class PerformanceDashboard:
                         })
                         logger.warning(f"New alert: {alert.message}")
         except Exception as e:
-            logger.error(f"Error checking alerts: {e}")
+            logger.exception(f"Error checking alerts: {e}")
 
     async def _start_websocket_server(self, port: int) -> None:
         """Start WebSocket server for real-time updates."""
         if not WEBSOCKETS_AVAILABLE:
             return
 
-        async def handle_websocket(websocket, path):
+        async def handle_websocket(websocket, path) -> None:
             self.websocket_connections.append(websocket)
             try:
                 await websocket.wait_closed()
@@ -217,7 +218,7 @@ class PerformanceDashboard:
             )
             logger.info(f"WebSocket server started on port {port}")
         except Exception as e:
-            logger.error(f"Failed to start WebSocket server: {e}")
+            logger.exception(f"Failed to start WebSocket server: {e}")
 
     async def _broadcast_real_time_update(self) -> None:
         """Broadcast real-time updates to WebSocket clients."""
@@ -291,7 +292,7 @@ class PerformanceDashboard:
             try:
                 await asyncio.sleep(self.config.refresh_interval_seconds)
             except Exception as e:
-                logger.error(f"Dashboard loop error: {e}")
+                logger.exception(f"Dashboard loop error: {e}")
                 await asyncio.sleep(1)
 
     def create_performance_charts(self) -> dict[str, Any]:
@@ -307,7 +308,7 @@ class PerformanceDashboard:
                     y=self.real_time_data["response_times"],
                     mode="lines+markers",
                     name="Response Time",
-                    line=dict(color="#00D4AA", width=2),
+                    line={"color": "#00D4AA", "width": 2},
                 )
             )
             fig_response.add_hline(
@@ -338,7 +339,7 @@ class PerformanceDashboard:
                     y=self.real_time_data["cpu_utilization"],
                     mode="lines",
                     name="CPU %",
-                    line=dict(color="#FF6B6B"),
+                    line={"color": "#FF6B6B"},
                 ),
                 row=1,
                 col=1,
@@ -349,7 +350,7 @@ class PerformanceDashboard:
                     y=self.real_time_data["memory_utilization"],
                     mode="lines",
                     name="Memory %",
-                    line=dict(color="#4ECDC4"),
+                    line={"color": "#4ECDC4"},
                 ),
                 row=2,
                 col=1,
@@ -375,7 +376,7 @@ class PerformanceDashboard:
                     y=self.real_time_data["error_rates"],
                     mode="lines+markers",
                     name="Error Rate %",
-                    line=dict(color="#FF4757"),
+                    line={"color": "#FF4757"},
                 ),
                 row=1,
                 col=1,
@@ -386,7 +387,7 @@ class PerformanceDashboard:
                     y=self.real_time_data["throughput"],
                     mode="lines",
                     name="Requests/sec",
-                    line=dict(color="#5352ED"),
+                    line={"color": "#5352ED"},
                 ),
                 row=2,
                 col=1,
@@ -478,10 +479,8 @@ class PerformanceDashboard:
         """Stop the dashboard and cleanup resources."""
         self.running = False
         for websocket in self.websocket_connections:
-            try:
+            with contextlib.suppress(Exception):
                 await websocket.close()
-            except Exception:
-                pass
         self.websocket_connections.clear()
         logger.info("Dashboard stopped")
 
@@ -490,8 +489,7 @@ def create_streamlit_dashboard_app():
     """Create Streamlit dashboard application."""
     if not STREAMLIT_AVAILABLE:
         return None
-    dashboard_code = '\nimport streamlit as st\nimport plotly.graph_objects as go\nfrom datetime import datetime, timedelta\nimport asyncio\nfrom enhanced_dashboard_integration import PerformanceDashboard\n\n# Configure Streamlit page\nst.set_page_config(\n    page_title="Performance Baseline Dashboard",\n    page_icon="📊",\n    layout="wide",\n    initial_sidebar_state="expanded"\n)\n\n# Initialize dashboard\n@st.cache_resource\ndef get_dashboard():\n    return PerformanceDashboard()\n\ndashboard = get_dashboard()\n\n# Sidebar controls\nst.sidebar.title("Dashboard Controls")\nrefresh_rate = st.sidebar.selectbox("Refresh Rate", [5, 10, 30, 60], index=0)\nauto_refresh = st.sidebar.checkbox("Auto Refresh", value=True)\n\nif st.sidebar.button("Manual Refresh"):\n    st.rerun()\n\n# Main dashboard\nst.title("🚀 Performance Baseline Dashboard")\n\n# Status indicators\nstatus = dashboard.get_current_status()\n\ncol1, col2, col3, col4 = st.columns(4)\n\nwith col1:\n    health_color = {\n        "healthy": "green",\n        "warning": "orange", \n        "critical": "red"\n    }.get(status["health_status"], "gray")\n    \n    st.metric(\n        "System Health",\n        status["health_status"].title(),\n        delta_color="inverse"\n    )\n\nwith col2:\n    st.metric(\n        "Response Time",\n        f"{status[\'latest_metrics\'][\'response_times\']:.1f}ms",\n        delta=f"Target: 200ms"\n    )\n\nwith col3:\n    st.metric(\n        "CPU Usage",\n        f"{status[\'latest_metrics\'][\'cpu_utilization\']:.1f}%",\n        delta_color="inverse"\n    )\n\nwith col4:\n    st.metric(\n        "Active Alerts",\n        status["active_alerts"],\n        delta_color="inverse"\n    )\n\n# Charts\ncharts = dashboard.create_performance_charts()\n\nif "response_time" in charts:\n    st.plotly_chart(charts["response_time"], use_container_width=True)\n\nif "resources" in charts:\n    st.plotly_chart(charts["resources"], use_container_width=True)\n\nif "errors_throughput" in charts:\n    st.plotly_chart(charts["errors_throughput"], use_container_width=True)\n\n# Performance Summary\nst.subheader("Performance Summary (Last 24 Hours)")\nsummary = dashboard.get_performance_summary(24)\nif "metrics_summary" in summary:\n    for metric, data in summary["metrics_summary"].items():\n        with st.expander(f"{metric.replace(\'_\', \' \').title()}"):\n            col1, col2, col3, col4 = st.columns(4)\n            col1.metric("Current", f"{data[\'current\']:.2f}")\n            col2.metric("Average", f"{data[\'average\']:.2f}")\n            col3.metric("Maximum", f"{data[\'maximum\']:.2f}")\n            col4.metric("Minimum", f"{data[\'minimum\']:.2f}")\n\n# Auto-refresh using Streamlit timer\nif auto_refresh:\n    # Use st.empty() and JavaScript for non-blocking refresh\n    refresh_placeholder = st.empty()\n    with refresh_placeholder.container():\n        st.write(f"Auto-refreshing every {refresh_rate} seconds")\n        # Note: For production, consider using st.rerun() with session state timer\n        # This template avoids blocking sleep calls\n'
-    return dashboard_code
+    return '\nimport streamlit as st\nimport plotly.graph_objects as go\nfrom datetime import datetime, timedelta\nimport asyncio\nfrom enhanced_dashboard_integration import PerformanceDashboard\n\n# Configure Streamlit page\nst.set_page_config(\n    page_title="Performance Baseline Dashboard",\n    page_icon="📊",\n    layout="wide",\n    initial_sidebar_state="expanded"\n)\n\n# Initialize dashboard\n@st.cache_resource\ndef get_dashboard():\n    return PerformanceDashboard()\n\ndashboard = get_dashboard()\n\n# Sidebar controls\nst.sidebar.title("Dashboard Controls")\nrefresh_rate = st.sidebar.selectbox("Refresh Rate", [5, 10, 30, 60], index=0)\nauto_refresh = st.sidebar.checkbox("Auto Refresh", value=True)\n\nif st.sidebar.button("Manual Refresh"):\n    st.rerun()\n\n# Main dashboard\nst.title("🚀 Performance Baseline Dashboard")\n\n# Status indicators\nstatus = dashboard.get_current_status()\n\ncol1, col2, col3, col4 = st.columns(4)\n\nwith col1:\n    health_color = {\n        "healthy": "green",\n        "warning": "orange", \n        "critical": "red"\n    }.get(status["health_status"], "gray")\n    \n    st.metric(\n        "System Health",\n        status["health_status"].title(),\n        delta_color="inverse"\n    )\n\nwith col2:\n    st.metric(\n        "Response Time",\n        f"{status[\'latest_metrics\'][\'response_times\']:.1f}ms",\n        delta=f"Target: 200ms"\n    )\n\nwith col3:\n    st.metric(\n        "CPU Usage",\n        f"{status[\'latest_metrics\'][\'cpu_utilization\']:.1f}%",\n        delta_color="inverse"\n    )\n\nwith col4:\n    st.metric(\n        "Active Alerts",\n        status["active_alerts"],\n        delta_color="inverse"\n    )\n\n# Charts\ncharts = dashboard.create_performance_charts()\n\nif "response_time" in charts:\n    st.plotly_chart(charts["response_time"], use_container_width=True)\n\nif "resources" in charts:\n    st.plotly_chart(charts["resources"], use_container_width=True)\n\nif "errors_throughput" in charts:\n    st.plotly_chart(charts["errors_throughput"], use_container_width=True)\n\n# Performance Summary\nst.subheader("Performance Summary (Last 24 Hours)")\nsummary = dashboard.get_performance_summary(24)\nif "metrics_summary" in summary:\n    for metric, data in summary["metrics_summary"].items():\n        with st.expander(f"{metric.replace(\'_\', \' \').title()}"):\n            col1, col2, col3, col4 = st.columns(4)\n            col1.metric("Current", f"{data[\'current\']:.2f}")\n            col2.metric("Average", f"{data[\'average\']:.2f}")\n            col3.metric("Maximum", f"{data[\'maximum\']:.2f}")\n            col4.metric("Minimum", f"{data[\'minimum\']:.2f}")\n\n# Auto-refresh using Streamlit timer\nif auto_refresh:\n    # Use st.empty() and JavaScript for non-blocking refresh\n    refresh_placeholder = st.empty()\n    with refresh_placeholder.container():\n        st.write(f"Auto-refreshing every {refresh_rate} seconds")\n        # Note: For production, consider using st.rerun() with session state timer\n        # This template avoids blocking sleep calls\n'
 
 
 _performance_dashboard: PerformanceDashboard | None = None

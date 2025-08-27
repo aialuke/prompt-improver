@@ -44,7 +44,7 @@ class TestPromptServiceIntegration:
         sample_rule_performance,
     ):
         """Test rule effectiveness calculation with real performance data."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
 
         for session in sample_prompt_sessions:
             test_db_session.add(session)
@@ -55,7 +55,7 @@ class TestPromptServiceIntegration:
         for perf in sample_rule_performance:
             test_db_session.add(perf)
         await test_db_session.commit()
-        analytics = AnalyticsService()
+        analytics = AnalyticsServiceFacade()
         effectiveness = await analytics.get_rule_effectiveness(
             db_session=test_db_session
         )
@@ -71,8 +71,8 @@ class TestPromptServiceIntegration:
         self, test_db_session, sample_prompt_sessions, sample_rule_metadata
     ):
         """Test performance monitoring with real database operations."""
+        from prompt_improver.analytics import AnalyticsServiceFacade
         from prompt_improver.database.models import RulePerformance
-        from prompt_improver.services.analytics import AnalyticsService
 
         for session in sample_prompt_sessions:
             test_db_session.add(session)
@@ -80,7 +80,7 @@ class TestPromptServiceIntegration:
         for rule in sample_rule_metadata:
             test_db_session.add(rule)
         await test_db_session.commit()
-        analytics = AnalyticsService()
+        analytics = AnalyticsServiceFacade()
         start_time = datetime.utcnow()
         await asyncio.sleep(0.01)
         perf_record = RulePerformance(
@@ -173,9 +173,9 @@ class TestPerformanceIntegration:
         for perf in large_dataset:
             test_db_session.add(perf)
         await test_db_session.commit()
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
 
-        analytics = AnalyticsService()
+        analytics = AnalyticsServiceFacade()
         start_time = asyncio.get_event_loop().time()
         summary = await analytics.get_performance_summary(db_session=test_db_session)
         effectiveness = await analytics.get_rule_effectiveness(
@@ -238,9 +238,9 @@ class TestErrorHandlingIntegration:
 
     async def test_database_connection_recovery(self):
         """Test system behavior during database connection issues."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
 
-        analytics = AnalyticsService()
+        analytics = AnalyticsServiceFacade()
         result = await analytics.get_performance_summary(db_session=None)
         assert result["total_sessions"] == 0
 

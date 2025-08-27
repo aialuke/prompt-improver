@@ -34,7 +34,9 @@ class MonitoringRepository:
 
         if self._security_context is None:
             # Use delayed imports to avoid circular dependencies
-            from prompt_improver.database.security_integration import create_security_context
+            from prompt_improver.database.security_integration import (
+                create_security_context,
+            )
             self._security_context = await create_security_context(
                 agent_id="monitoring_repository",
                 tier="basic"

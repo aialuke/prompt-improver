@@ -15,6 +15,11 @@ from prompt_improver.performance.monitoring.metrics_registry import (
     StandardMetrics,
     get_metrics_registry,
 )
+from prompt_improver.shared.interfaces.protocols.core import (
+    RetryableErrorType,
+    RetryConfig,
+    RetryStrategy,
+)
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
@@ -168,7 +173,6 @@ def create_database_error_classifier():
 
     def classify_for_retry(error: Exception):
         """Classify database error for retry manager."""
-
         category, _ = DatabaseErrorClassifier.classify_error(error)
         category_mapping = {
             ErrorCategory.connection: RetryableErrorType.NETWORK,
@@ -183,7 +187,6 @@ def create_database_error_classifier():
 
 def get_default_database_retry_config():
     """Get default retry configuration for database operations."""
-
     return RetryConfig(
         max_attempts=3,
         strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
@@ -208,8 +211,9 @@ def get_default_database_retry_config():
 
 async def execute_with_database_retry(operation, operation_name: str):
     """Execute database operation with unified retry logic."""
-    from prompt_improver.core.services.resilience.retry_service_facade import get_retry_service as get_retry_manager
-    from prompt_improver.core.domain.enums import RetryableErrorType
+    from prompt_improver.core.services.resilience.retry_service_facade import (
+        get_retry_service as get_retry_manager,
+    )
     retry_manager = get_retry_manager()
     config = get_default_database_retry_config()
     config.operation_name = operation_name

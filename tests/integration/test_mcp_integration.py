@@ -222,8 +222,8 @@ class TestServiceIntegration:
         self, test_db_session, sample_rule_performance
     ):
         """Test analytics service with real database interactions following 2025 best practices."""
+        from prompt_improver.analytics import AnalyticsServiceFacade
         from prompt_improver.database.models import PromptSession, RuleMetadata
-        from prompt_improver.services.analytics import AnalyticsService
 
         created_sessions = set()
         created_rules = set()
@@ -252,7 +252,7 @@ class TestServiceIntegration:
                 created_sessions.add(perf.session_id)
             test_db_session.add(perf)
         await test_db_session.commit()
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsServiceFacade()
         trends = await analytics_service.get_performance_trends(
             db_session=test_db_session
         )
@@ -290,7 +290,7 @@ class TestEndToEndWorkflow:
         self, test_db_session, sample_rule_metadata
     ):
         """Test complete prompt improvement workflow using real services following 2025 best practices."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
         from prompt_improver.services.prompt.facade import (
             PromptServiceFacade as PromptImprovementService,
         )
@@ -301,7 +301,7 @@ class TestEndToEndWorkflow:
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
         )
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsServiceFacade()
         original_prompt = "Help me code"
         result = await service.improve_prompt(
             prompt=original_prompt,
@@ -921,9 +921,9 @@ class TestRealServiceErrorHandling:
 
     async def test_analytics_service_error_handling(self, test_db_session):
         """Test error handling in AnalyticsService with real database operations."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
 
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsServiceFacade()
         trends = await analytics_service.get_performance_trends(
             db_session=test_db_session
         )
@@ -1134,7 +1134,7 @@ class TestRealBehaviorValidation:
 
     async def test_real_vs_mock_behavior_comparison(self, test_db_session):
         """Compare real service behavior against expected patterns to validate migration success."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
         from prompt_improver.services.prompt.facade import (
             PromptServiceFacade as PromptImprovementService,
         )
@@ -1142,7 +1142,7 @@ class TestRealBehaviorValidation:
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
         )
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsServiceFacade()
         test_prompt = "Help me write better code"
         results = []
         for i in range(3):
@@ -1177,7 +1177,7 @@ class TestRealBehaviorValidation:
 
     async def test_migration_completeness_validation(self, test_db_session):
         """Validate that the migration from mocks to real behavior is complete and effective."""
-        from prompt_improver.services.analytics import AnalyticsService
+        from prompt_improver.analytics import AnalyticsServiceFacade
         from prompt_improver.services.prompt.facade import (
             PromptServiceFacade as PromptImprovementService,
         )
@@ -1185,7 +1185,7 @@ class TestRealBehaviorValidation:
         service = PromptImprovementService(
             enable_bandit_optimization=False, enable_automl=False
         )
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsServiceFacade()
         assert service is not None
         assert analytics_service is not None
         result = await service.improve_prompt(
