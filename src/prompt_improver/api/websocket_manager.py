@@ -158,7 +158,7 @@ class WebSocketConnectionManager:
         """Disconnect WebSocket and clean up."""
         try:
             await websocket.close()
-        except:
+        except Exception:
             pass  # Connection might already be closed
 
         # Find and remove connection from all data structures

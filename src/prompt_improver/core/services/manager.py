@@ -137,7 +137,7 @@ class OrchestrationService:
     - Process management with graceful shutdown handling
 
     Replaces and consolidates:
-    - APESServiceManager (service lifecycle)
+    - OrchestrationService (service lifecycle)
     - ResourceManager (resource orchestration)
     - WorkflowManager (workflow coordination)
     - ProcessManager (process management)
@@ -432,6 +432,10 @@ class OrchestrationService:
         self.logger.info("Performance monitoring initialized")
 
         # Create monitoring task using enhanced task management
+        from prompt_improver.performance.monitoring.health.background_manager import (
+            get_background_task_manager,
+        )
+        
         task_manager = get_background_task_manager()
         task_id = await task_manager.submit_enhanced_task(
             task_id=f"service_health_monitoring_{id(self)}",
@@ -881,7 +885,3 @@ class OrchestrationService:
             status["error"] = str(e)
 
         return status
-
-
-# Backward compatibility alias - to be removed in future version
-APESServiceManager = OrchestrationService

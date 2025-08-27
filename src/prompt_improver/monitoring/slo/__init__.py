@@ -25,6 +25,7 @@ from prompt_improver.monitoring.slo.framework import (
     SLOTimeWindow,
     SLOType,
 )
+from prompt_improver.monitoring.slo.integration import MetricsCollector
 from prompt_improver.monitoring.slo.monitor import (
     BurnRateAlert,
     ErrorBudgetMonitor,

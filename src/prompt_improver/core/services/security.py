@@ -14,14 +14,15 @@ from typing import Any
 from rich.console import Console
 
 from prompt_improver.core.domain.enums import PrivacyTechnique
-from prompt_improver.core.services.analytics_factory import get_analytics_interface
+from prompt_improver.core.services.analytics_factory import create_analytics_service
 
 
 def _get_sessionmanager():
     """Lazy import of sessionmanager to avoid circular imports."""
     # Database session manager will be injected via constructor
-
-    return get_sessionmanager
+    from prompt_improver.database import get_session
+    
+    return get_session
 
 
 class SecurityLevel(Enum):
@@ -448,10 +449,10 @@ class PromptDataProtection:
     async def get_security_audit_report(self, days: int = 30) -> dict[str, Any]:
         """Generate security audit report using existing analytics framework."""
         try:
-            analytics_factory = get_analytics_interface()
-            analytics = analytics_factory() if analytics_factory else None
             get_sessionmanager = _get_sessionmanager()
             async with get_sessionmanager().session() as db_session:
+                # Use modern analytics service pattern
+                analytics = await create_analytics_service(db_session)
                 from sqlalchemy import text
 
                 audit_query = text(

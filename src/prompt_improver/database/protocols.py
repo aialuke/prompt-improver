@@ -10,7 +10,8 @@ Following research-validated best practices:
 - Support for async operations throughout
 """
 
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Protocol
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Any, Protocol
 
 # Import heavy dependencies only for type checking to optimize startup performance
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ class DatabaseServiceProtocol(Protocol):
 
     async def get_session(
         self, mode: ConnectionMode = ConnectionMode.READ_WRITE
-    ) -> AsyncContextManager["AsyncSession"]:
+    ) -> AbstractAsyncContextManager["AsyncSession"]:
         """Get a database session with specified access mode."""
         ...
 

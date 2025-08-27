@@ -11,7 +11,7 @@ from prompt_improver.performance.monitoring.health.base import (
     HealthResult,
     HealthStatus,
 )
-from prompt_improver.performance.monitoring.health.metrics import (
+from prompt_improver.performance.monitoring.health.telemetry import (
     instrument_health_check,
 )
 
@@ -105,9 +105,9 @@ class MLModelHealthChecker(HealthChecker):
     async def _check_deployed_models(self) -> dict[str, Any]:
         """Check the health of deployed models."""
         try:
-            from prompt_improver.ml.core import MLModelService  # Now points to facade
+            from prompt_improver.ml.core import MLModelServiceFacade
 
-            ml_service = MLModelService()
+            ml_service = MLModelServiceFacade()
             cache_stats = ml_service.get_cache_stats()
             return {
                 "healthy": True,
@@ -121,9 +121,9 @@ class MLModelHealthChecker(HealthChecker):
     async def _check_model_cache(self) -> dict[str, Any]:
         """Check the health of model cache."""
         try:
-            from prompt_improver.ml.core import MLModelService  # Now points to facade
+            from prompt_improver.ml.core import MLModelServiceFacade
 
-            ml_service = MLModelService()
+            ml_service = MLModelServiceFacade()
             cache_stats = ml_service.get_cache_stats()
             cache_utilization = cache_stats.get("cache_utilization", 0.0)
             memory_pressure = cache_utilization > 0.9
@@ -488,11 +488,15 @@ class MLPerformanceHealthChecker(HealthChecker):
         """Check the health of analytics integration."""
         try:
             from prompt_improver.core.services.analytics_factory import (
-                get_analytics_interface,
+                create_analytics_service,
             )
+            from prompt_improver.database import get_sessionmanager
 
-            analytics_factory = get_analytics_interface()
-            analytics = analytics_factory() if analytics_factory else None
-            return {"healthy": True, "analytics_available": True}
+            # Test analytics service creation with database session
+            async with get_sessionmanager().session() as db_session:
+                analytics = await create_analytics_service(db_session)
+                analytics_available = analytics is not None
+
+            return {"healthy": True, "analytics_available": analytics_available}
         except Exception as e:
             return {"healthy": False, "error": str(e), "analytics_available": False}

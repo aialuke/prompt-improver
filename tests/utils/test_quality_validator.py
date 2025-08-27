@@ -14,7 +14,7 @@ class TestQualityValidator:
     Validates fixture behavior, Protocol compliance, and integration patterns
     to maintain high-quality test infrastructure.
     """
-    
+
     def __init__(self):
         self.validation_results = []
 

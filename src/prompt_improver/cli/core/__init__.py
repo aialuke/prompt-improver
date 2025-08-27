@@ -22,7 +22,7 @@ from prompt_improver.cli.core.signal_handler import (
 from prompt_improver.cli.core.system_state_reporter import SystemStateReporter
 from prompt_improver.cli.core.unified_process_manager import ProcessService
 from prompt_improver.cli.services.training_orchestrator import (
-    TrainingOrchestrator as TrainingService,
+    TrainingOrchestrator,
 )
 from prompt_improver.performance.monitoring.health.background_manager import (
     get_background_task_manager,
@@ -108,7 +108,7 @@ __all__ = [
     "ShutdownReason",
     "SignalAwareComponent",
     "SystemStateReporter",
-    "TrainingService",
+    "TrainingOrchestrator",
     "WorkflowService",
     "get_background_manager",
     "get_shared_signal_handler",

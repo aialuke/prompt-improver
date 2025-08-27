@@ -49,7 +49,6 @@ class ServerServices(BaseModel):
 
     config: Any
     security_facade: Any  # SecurityServiceFacade - main entry point
-    security_manager: Any  # SecurityServiceFacade (backward compatibility)
     validation_manager: Any  # ValidationComponent via facade
     authentication_manager: Any  # AuthenticationComponent via facade
     authorization_manager: Any  # AuthorizationComponent via facade
@@ -137,8 +136,7 @@ class ServerServiceFactory:
 
             services = ServerServices(
                 config=config,
-                security_facade=security_services["security_manager"],
-                security_manager=security_services["security_manager"],
+                security_facade=security_services["security_facade"],
                 validation_manager=security_services["validation_manager"],
                 authentication_manager=security_services["authentication_manager"],
                 authorization_manager=security_services["authorization_manager"],
@@ -284,7 +282,7 @@ class APESMCPServer:
                 self._resources_setup = True
 
             # Validate security status
-            security_status = await self.services.security_manager.get_security_status()
+            security_status = await self.services.security_facade.get_security_status()
             logger.info(f"Security validation completed: {security_status['mode']}")
 
             logger.info("MCP Server async initialization completed successfully")
@@ -301,15 +299,11 @@ class APESMCPServer:
                 f"Failed to initialize MCP server with modular architecture: {e}"
             )
 
-    # Tools are now setup by the tools module
-    # This method is kept for backward compatibility but delegates to the tools module
     def _setup_tools(self) -> None:
         """Setup all MCP tools using the tools module."""
         logger.info("Setting up tools using modular architecture...")
         setup_tools(self)
 
-    # Resources are now setup by the resources module
-    # This method is kept for backward compatibility but delegates to the resources module
     def _setup_resources(self) -> None:
         """Setup all MCP resources using the resources module."""
         logger.info("Setting up resources using modular architecture...")
@@ -568,12 +562,7 @@ def get_server_factory() -> ServerFactoryProtocol:
     return get_mcp_server_factory()
 
 
-# Global server instance for compatibility
-server = None
-
-
 # The initialize_server() function and main() entry point are now in lifecycle.py
-# This maintains backward compatibility while organizing code properly
 
 if __name__ == "__main__":
     # Server should not be run directly anymore

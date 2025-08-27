@@ -140,7 +140,7 @@ class ExperimentOrchestrator:
             statistical_validator: Advanced statistical validator
             pattern_analyzer: Pattern significance analyzer
             causal_analyzer: Causal inference analyzer
-            real_time_service: Real-time analytics service (deprecated - use analytics_router instead)
+            analytics_router: Real-time analytics service
             task_manager: Enhanced background task manager for centralized task management
         """
         self.db_session = db_session

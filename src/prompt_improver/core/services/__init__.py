@@ -22,11 +22,11 @@ from typing import TYPE_CHECKING
 # MIGRATION NOTE: AnalyticsService now points to unified service
 # Move to TYPE_CHECKING to break circular import chain
 if TYPE_CHECKING:
-    from prompt_improver.analytics import AnalyticsServiceFacade as AnalyticsService
+    pass
 else:
     AnalyticsService = None
 from prompt_improver.core.services.manager import (
-    OrchestrationService as APESServiceManager,
+    OrchestrationService,
 )
 
 if TYPE_CHECKING:
@@ -36,6 +36,7 @@ else:
 # CLEAN ARCHITECTURE 2025: RuleSelectionService moved to application layer
 # REMOVED: Direct import violates layer separation and causes circular imports
 # Applications should import from application layer directly
+from prompt_improver.analytics import AnalyticsServiceFacade
 from prompt_improver.core.services.cli_service_factory import CLIServiceFactory
 from prompt_improver.core.services.persistence_service import PersistenceService
 
@@ -57,9 +58,8 @@ from prompt_improver.core.services.startup import (
 
 __all__ = [
     # Main services
-    "APESServiceManager",
     # Decomposed services
-    "AnalyticsService",
+    "AnalyticsServiceFacade",
     # "RuleSelectionService",  # REMOVED: Moved to application layer
     # ServiceRegistry integration (2025 Migration)
     "CLIServiceFactory",
@@ -69,6 +69,7 @@ __all__ = [
     "IPersistenceService",
     "IRuleSelectionService",
     "MLEventingService",
+    "OrchestrationService",
     "PersistenceService",
     "PromptDataProtection",
     # "PromptImprovementService", # Moved to services.prompt.facade

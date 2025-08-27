@@ -13,6 +13,7 @@ Key improvements:
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from prompt_improver.core.facades import get_performance_facade

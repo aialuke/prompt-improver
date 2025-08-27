@@ -7,8 +7,8 @@ management, health monitoring, and factory patterns.
 import asyncio
 import logging
 from collections.abc import Callable
-from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, TypeVar
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Any, TypeVar
 
 from prompt_improver.shared.interfaces.protocols.core import EventBusProtocol
 from prompt_improver.shared.interfaces.protocols.ml import (
@@ -257,7 +257,7 @@ class MLServiceContainer:
         return self._is_initialized
 
     @asynccontextmanager
-    async def managed_container(self) -> AsyncContextManager["MLServiceContainer"]:
+    async def managed_container(self) -> AbstractAsyncContextManager["MLServiceContainer"]:
         """Context manager for automatic service lifecycle management."""
         try:
             await self.initialize_all_services()

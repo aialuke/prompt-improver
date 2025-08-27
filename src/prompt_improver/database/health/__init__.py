@@ -18,8 +18,8 @@ This package provides decomposed service architecture for health monitoring:
 
 **Usage:**
 ```python
-from prompt_improver.database.health.services import get_database_health_service
-service = get_database_health_service(session_manager)
+from prompt_improver.database.health.services import create_database_health_service
+service = create_database_health_service(session_manager)
 metrics = await service.collect_comprehensive_metrics()
 ```
 
@@ -27,7 +27,7 @@ The new architecture provides:
 - 60-80% better performance through parallel execution
 - Clean separation of concerns with focused services
 - Protocol-based interfaces for better testing and extensibility
-- Maintained backward compatibility
+- Modern clean architecture without legacy compatibility layer
 
 ## Import Patterns
 
@@ -73,7 +73,6 @@ from prompt_improver.database.health.services import (
     HealthTrend,
     QueryPerformanceMetrics,
     create_database_health_service,
-    get_database_health_service,
 )
 from prompt_improver.database.health.table_bloat_detector import TableBloatDetector
 
@@ -103,7 +102,6 @@ __all__ = [
     "QueryPerformanceMetrics",
     "TableBloatDetector",
     "create_database_health_service",
-    "get_database_health_service",
 ]
 
 # Version and architecture information

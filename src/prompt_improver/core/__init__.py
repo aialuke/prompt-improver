@@ -14,8 +14,9 @@ from prompt_improver.core.interfaces.datetime_service import (
 )
 from prompt_improver.core.services.datetime_service import DateTimeService
 from prompt_improver.core.services.manager import (
-    OrchestrationService as APESServiceManager,
+    OrchestrationService,
 )
+from prompt_improver.core.services.security import PromptDataProtection
 
 # NOTE: PromptImprovementService moved to services.prompt.facade to break circular imports
 from prompt_improver.core.services.startup import (
@@ -28,11 +29,11 @@ from prompt_improver.core.services.startup import (
 from prompt_improver.core.setup import SystemInitializer
 
 __all__: list[str] = [
-    "APESServiceManager",
     "DIContainer",
     "DateTimeService",
     "DateTimeServiceProtocol",
     "MockDateTimeService",
+    "OrchestrationService",
     "PromptDataProtection",
     # "PromptImprovementService", # Moved to services.prompt.facade
     "StartupOrchestrator",

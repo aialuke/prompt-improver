@@ -49,8 +49,7 @@ class CacheFacade:
         l1_max_size: int = 1000,
         l2_default_ttl: int = 3600,
         enable_l2: bool = True,
-        enable_warming: bool = True,  # DEPRECATED: No coordination layer for warming
-        session_manager: Any = None,  # DEPRECATED: Ignored for backward compatibility
+        enable_warming: bool = False,
         session_encryption_key: str | None = None,
     ) -> None:
         """Initialize cache facade with direct L1+L2 services.
@@ -59,8 +58,7 @@ class CacheFacade:
             l1_max_size: Maximum size for L1 cache
             l2_default_ttl: Default TTL for L2 cache
             enable_l2: Enable L2 (Redis) cache
-            enable_warming: DEPRECATED - No coordination layer for warming
-            session_manager: DEPRECATED - Ignored (database caching eliminated)
+            enable_warming: Enable cache warming (reserved for future use)
             session_encryption_key: Encryption key for session data (auto-generated if None)
         """
         super().__init__()
@@ -68,6 +66,9 @@ class CacheFacade:
         # Initialize direct cache services (no coordination layer)
         self._l1_cache = L1CacheService(max_size=l1_max_size)
         self._l2_cache = L2RedisService() if enable_l2 else None
+
+        # Store warming preference for future implementation
+        self._enable_warming = enable_warming
 
         # Configuration
         self._l2_default_ttl = l2_default_ttl
@@ -613,7 +614,3 @@ async def cached_set(
     """Set value in optimized cache instance."""
     cache = get_cache(cache_type)
     await cache.set(key, value, l2_ttl=ttl, l1_ttl=ttl // 2)
-
-
-# Alias for backward compatibility
-MultiLevelCache = CacheFacade

@@ -76,7 +76,7 @@ from prompt_improver.core.config.schema import (
     ConfigurationSchema,
     UnifiedConfigService,
     migrate_configuration,
-    schema_manager,
+    unified_config_manager,
 )
 from prompt_improver.core.config.security_config import SecurityConfig
 from prompt_improver.core.config.textstat import (
@@ -93,7 +93,6 @@ from prompt_improver.core.config.validation import (
     validate_configuration,
 )
 from prompt_improver.core.config.validator import (
-    ConfigurationValidator,
     save_validation_report,
     validate_startup_configuration,
 )
@@ -144,9 +143,9 @@ __all__ = [
     "migrate_configuration",
     "reload_config",
     "save_validation_report",
-    "schema_manager",
     "setup_config_logging",
     "text_analysis",
+    "unified_config_manager",
     "validate_config_file",
     "validate_configuration",
     "validate_startup_configuration",

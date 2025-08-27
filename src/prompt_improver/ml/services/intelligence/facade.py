@@ -533,5 +533,3 @@ def create_ml_intelligence_service_facade(
     )
 
 
-# Backward compatibility alias
-MLIntelligenceProcessor = MLIntelligenceServiceFacade

@@ -206,9 +206,7 @@ class PostgreSQLAuthorizationDB:
                     if owner_id == user_id:
                         return True
                     user_permissions = self.fetch_user_permissions(user_id)
-                    if Permission.SYSTEM_ADMIN in user_permissions:
-                        return True
-                    return False
+                    return Permission.SYSTEM_ADMIN in user_permissions
                 return True
 
     def set_resource_owner(self, resource_id: str, owner_id: str):

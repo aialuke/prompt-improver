@@ -44,7 +44,7 @@ async def _get_monitoring_facade() -> UnifiedMonitoringFacade:
 
 
 # These individual check functions are replaced by the unified monitoring facade
-# but kept for backward compatibility if needed
+# but available for direct access if needed
 
 
 # Health data formatting and persistence is now handled by the unified monitoring facade

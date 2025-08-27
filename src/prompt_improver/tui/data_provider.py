@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 try:
-    from prompt_improver.core.services.analytics_factory import get_analytics_interface
+    from prompt_improver.core.services.analytics_factory import create_analytics_service
 
-    analytics_service = get_analytics_interface
+    analytics_service = create_analytics_service
 except ImportError:
     analytics_service = None
 try:
@@ -53,11 +53,8 @@ class APESDataProvider:
         self.automl_orchestrator = None
         self.experiment_orchestrator = None
         self.service_manager = None
-        try:
-            if analytics_service:
-                self.analytics_service = analytics_service()
-        except Exception:
-            pass
+        # Analytics service will be initialized async in initialize() method
+        self.analytics_service = None
         try:
             if health_monitor:
                 self.health_monitor = health_monitor()
@@ -82,6 +79,12 @@ class APESDataProvider:
     async def initialize(self) -> None:
         """Initialize all services."""
         try:
+            # Initialize analytics service with database session
+            if analytics_service:
+                from prompt_improver.database import get_sessionmanager
+                async with get_sessionmanager().session() as db_session:
+                    self.analytics_service = await analytics_service(db_session)
+
             if self.health_monitor and hasattr(self.health_monitor, "initialize"):
                 await self.health_monitor.initialize()
             if self.real_time_analytics and hasattr(

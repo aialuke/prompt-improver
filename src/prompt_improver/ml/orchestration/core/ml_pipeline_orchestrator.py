@@ -1,10 +1,10 @@
 """
 Central ML Pipeline Orchestrator (Decomposed Architecture)
 
-This module provides backward compatibility for the MLPipelineOrchestrator
-while internally using the new decomposed architecture with focused services.
+Modern ML pipeline orchestrator using decomposed architecture with focused services.
+Provides comprehensive ML workflow coordination through specialized components.
 
-The original 1,043-line god object has been decomposed into 5 focused services:
+Architecture: 5 focused services replacing the original 1,043-line monolith:
 1. WorkflowOrchestrator - Core workflow execution and pipeline coordination  
 2. ComponentManager - Component loading, lifecycle management, and registry operations
 3. SecurityIntegrationService - Security validation, input sanitization, and access control
@@ -15,7 +15,7 @@ The original 1,043-line god object has been decomposed into 5 focused services:
 # Import shared types to avoid circular imports
 from .orchestrator_types import PipelineState, WorkflowInstance
 
-# Re-export the facade as the main orchestrator for backward compatibility  
+# Export the primary orchestrator facade
 from .ml_pipeline_orchestrator_facade import MLPipelineOrchestrator
 
 # Export the classes that other modules expect

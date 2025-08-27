@@ -451,7 +451,7 @@ class MemoryLeakDetector:
             config = AppConfig(
                 environment="testing",
                 debug=iteration % 2 == 0,
-                database=DatabaseConfig(database_pool_size=10 + (iteration % 5)),
+                database=DatabaseConfig(pool_max_size=10 + (iteration % 5)),
                 redis=RedisConfig(redis_max_connections=100 + (iteration % 10)),
             )
 

@@ -37,7 +37,7 @@ from prompt_improver.shared.types.core import SecurityContext
 
 # SQLModel availability check
 try:
-    import sqlmodel
+    import sqlmodel  # noqa: F401
     SQLMODEL_AVAILABLE = True
 except ImportError:
     SQLMODEL_AVAILABLE = False

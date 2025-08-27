@@ -269,7 +269,7 @@ class FeatureFlagService:
         }
         try:
             return eval(condition, {"__builtins__": {}}, context_dict)
-        except:
+        except Exception:
             return False
 
     async def _update_metrics(self, result: EvaluationResult) -> None:

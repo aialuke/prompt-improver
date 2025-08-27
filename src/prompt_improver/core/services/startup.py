@@ -205,7 +205,7 @@ async def init_startup_tasks(
                 components["batch_processor"] = batch_processor
                 logger.info("✅ Batch Processor initialized via ServiceRegistry")
             except Exception:
-                # Fallback if service not registered (backward compatibility)
+                # Fallback if service not registered
                 BatchProcessorConfig, BatchProcessor = _get_batch_processor_classes()
                 if BatchProcessorConfig is None or BatchProcessor is None:
                     logger.warning("❌ Batch Processor not available, skipping...")
@@ -233,10 +233,21 @@ async def init_startup_tasks(
         # Step 4: Start Periodic Batch Processing Task
         logger.info("🔄 Starting periodic batch processing...")
         try:
+            # Simple periodic batch processing coroutine
+            async def periodic_batch_processor():
+                """Periodic batch processing coroutine."""
+                while True:
+                    try:
+                        if batch_processor and hasattr(batch_processor, 'process_batch'):
+                            await batch_processor.process_batch()
+                        await asyncio.sleep(60)  # Process every minute
+                    except Exception as e:
+                        logger.warning(f"Batch processor error: {e}")
+                        await asyncio.sleep(30)  # Shorter retry interval on error
+            
             task_id = await background_manager.submit_task(
                 "periodic_batch_processor",
-                periodic_batch_processor_coroutine,
-                batch_processor=batch_processor,
+                periodic_batch_processor(),
             )
             # Get the actual asyncio task from the background manager
             bg_task = background_manager.tasks.get(task_id)

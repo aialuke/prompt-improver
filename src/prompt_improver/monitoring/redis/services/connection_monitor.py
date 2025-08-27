@@ -193,7 +193,7 @@ class RedisConnectionMonitor:
                 if sentinel_info:
                     status["sentinel_configured"] = True
                     status["sentinel_masters"] = int(sentinel_info.get("sentinel_masters", 0))
-            except:
+            except Exception:
                 # Sentinel info not available - not necessarily an error
                 pass
 

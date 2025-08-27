@@ -622,33 +622,3 @@ def create_lock_manager(
         **kwargs,
     )
     return DistributedLockManager(l2_redis_service, config)
-
-
-# Legacy factory function for backward compatibility during migration
-def create_lock_manager_legacy(
-    redis_client,
-    default_timeout_seconds: int = 30,
-    retry_attempts: int = 3,
-    enable_metrics: bool = True,
-    **kwargs,
-) -> DistributedLockManager:
-    """Legacy factory function for backward compatibility.
-
-    DEPRECATED: Use create_lock_manager with L2RedisService instead.
-    This function creates a temporary L2RedisService wrapper.
-    """
-    logger.warning(
-        "create_lock_manager_legacy is deprecated. "
-        "Migrate to create_lock_manager with L2RedisService."
-    )
-
-    # Create temporary L2RedisService for legacy support
-    l2_redis_service = L2RedisService()
-
-    config = LockConfig(
-        default_timeout_seconds=default_timeout_seconds,
-        retry_attempts=retry_attempts,
-        enable_metrics=enable_metrics,
-        **kwargs,
-    )
-    return DistributedLockManager(l2_redis_service, config)

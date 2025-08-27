@@ -468,9 +468,6 @@ class DatabaseContainer(DatabaseContainerProtocol, ContainerRegistryProtocol):
                 from prompt_improver.database.services.session_manager import (
                     DatabaseSessionManager,
                 )
-                from prompt_improver.shared.interfaces.protocols.database import (
-                    SessionManagerProtocol,
-                )
                 return DatabaseSessionManager()
             except ImportError:
                 # Fallback to basic session manager

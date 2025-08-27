@@ -266,7 +266,7 @@ class CacheFactory:
         }
 
 
-# Convenience functions for backward compatibility
+# Convenience functions for streamlined cache access
 def get_cache(config_key: str = "default", **config_overrides: Any) -> CacheFacade:
     """Get cache instance using factory pattern.
 

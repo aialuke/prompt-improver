@@ -5,7 +5,7 @@ Enhanced ClusteringOptimizer with merged ContextClusteringEngine features.
 """
 from ...clustering.services.clustering_optimizer_facade import ClusteringOptimizerFacade as ContextClusteringEngine
 from ...clustering.services import ClusteringResult
-# Define config for backward compatibility
+# Define config for clustering operations
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 

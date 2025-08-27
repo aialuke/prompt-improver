@@ -748,3 +748,19 @@ class L2RedisService:
                 "stats": self.get_stats(),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
+
+
+# Global Redis client instance
+_redis_service_instance = None
+
+
+def get_redis_service() -> L2RedisService:
+    """Get the global Redis service instance."""
+    global _redis_service_instance
+    if _redis_service_instance is None:
+        _redis_service_instance = L2RedisService()
+    return _redis_service_instance
+
+
+# Backward compatibility alias for external_api_health and other modules
+redis_client = get_redis_service()

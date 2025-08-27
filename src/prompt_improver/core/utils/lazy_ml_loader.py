@@ -173,7 +173,7 @@ def check_ml_availability() -> dict[str, bool]:
             # Check if it's not a mock
             module = _ML_MODULE_CACHE.get(module_name)
             availability[module_name] = module and not hasattr(module, '__getattr__')
-        except:
+        except Exception:
             availability[module_name] = False
 
     return availability

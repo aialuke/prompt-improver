@@ -29,39 +29,5 @@ async def create_analytics_service(
         return None
 
 
-def get_analytics_interface() -> Any | None:
-    """Get the AnalyticsServiceFacade class for direct instantiation.
-
-    DEPRECATED: Use create_analytics_service() for the unified service instead.
-    """
-    logger.warning("get_analytics_interface() is deprecated. Use create_analytics_service() instead.")
-    try:
-        from prompt_improver.analytics.unified.analytics_service_facade import (
-            AnalyticsServiceFacade,
-        )
-
-        return AnalyticsServiceFacade
-    except ImportError as e:
-        logger.exception(f"Failed to import AnalyticsServiceFacade: {e}")
-        return None
-
-
-def get_session_reporter() -> Any | None:
-    """Get the SessionSummaryReporter class for direct instantiation.
-
-    DEPRECATED: Use create_analytics_service() for the unified service instead.
-    """
-    logger.warning("get_session_reporter() is deprecated. Use create_analytics_service() instead.")
-    try:
-        from prompt_improver.ml.analytics.session_summary_reporter import (
-            SessionSummaryReporter,
-        )
-
-        return SessionSummaryReporter
-    except ImportError as e:
-        logger.exception(f"Failed to import SessionSummaryReporter: {e}")
-        return None
-
-
 # Note: get_analytics_router() moved to api.factories.analytics_api_factory
 # to respect Clean Architecture - API components belong in presentation layer

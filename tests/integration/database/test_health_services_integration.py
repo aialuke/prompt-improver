@@ -26,7 +26,6 @@ from prompt_improver.database.health.services import (
     HealthMetricsService,
     HealthReportingService,
     create_database_health_service,
-    get_database_health_service,
 )
 
 
@@ -694,31 +693,6 @@ class TestDatabaseHealthService:
         assert trends["status"] in {"insufficient_data", "success", "error"}
 
     @pytest.mark.asyncio
-    async def test_backward_compatibility_methods(self, health_service):
-        """Test backward compatibility interface methods."""
-        # Test original method names
-        pool_metrics = await health_service.get_pool_metrics()
-        assert isinstance(pool_metrics, dict)
-
-        pool_summary = await health_service.get_connection_pool_health_summary()
-        assert isinstance(pool_summary, dict)
-        assert "status" in pool_summary
-
-        query_analysis = await health_service.analyze_query_performance()
-        assert isinstance(query_analysis, dict)
-
-        # Test calculation methods
-        test_metrics = {"health_score": 85.0}
-        score = health_service.calculate_health_score(test_metrics)
-        assert isinstance(score, float)
-
-        issues = health_service.identify_health_issues(test_metrics)
-        assert isinstance(issues, list)
-
-        recommendations = health_service.generate_recommendations(test_metrics)
-        assert isinstance(recommendations, list)
-
-    @pytest.mark.asyncio
     async def test_service_composition(self, session_manager):
         """Test service composition with custom components."""
         # Create custom services
@@ -773,23 +747,6 @@ class TestServiceFactories:
         assert isinstance(service.metrics_service, HealthMetricsService)
         assert isinstance(service.alerting_service, AlertingService)
         assert isinstance(service.reporting_service, HealthReportingService)
-
-    def test_get_database_health_service(self, session_manager):
-        """Test global service instance management."""
-        # Reset global instance for testing
-        import prompt_improver.database.health.services.database_health_service as service_module
-        service_module._global_health_service = None
-
-        # First call should require session_manager
-        service1 = get_database_health_service(session_manager)
-        assert isinstance(service1, DatabaseHealthService)
-
-        # Second call should return same instance
-        service2 = get_database_health_service()
-        assert service1 is service2
-
-        # Reset for other tests
-        service_module._global_health_service = None
 
 
 @pytest.mark.asyncio

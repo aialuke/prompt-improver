@@ -716,7 +716,7 @@ def _get_global_facade() -> ErrorHandlingFacade:
     return _global_facade
 
 
-# Decorator functions for backward compatibility
+# Decorator functions for streamlined error handling
 def handle_common_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator for common error handling."""
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:

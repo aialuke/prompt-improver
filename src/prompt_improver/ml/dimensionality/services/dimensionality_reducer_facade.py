@@ -7,7 +7,7 @@ Replaces the monolithic AdvancedDimensionalityReducer with a facade that orchest
 - NeuralReducerService: Neural network architectures
 - ReductionEvaluatorService: Quality evaluation and metrics
 
-Maintains backward compatibility while providing improved modularity and testability.
+Provides improved modularity and testability through focused service components.
 """
 
 import logging

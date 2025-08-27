@@ -11,7 +11,7 @@ from prompt_improver.performance.monitoring.health.base import (
     HealthResult,
     HealthStatus,
 )
-from prompt_improver.performance.monitoring.health.metrics import (
+from prompt_improver.performance.monitoring.health.telemetry import (
     instrument_health_check,
 )
 

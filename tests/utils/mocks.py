@@ -4,7 +4,7 @@ Provides mock objects and utilities for test scenarios with consistent
 interfaces matching production protocols.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 
@@ -12,8 +12,8 @@ class MockRedisClient:
     """Mock Redis client for testing scenarios."""
 
     def __init__(self):
-        self._data: Dict[str, Any] = {}
-        self._ttl_data: Dict[str, int] = {}
+        self._data: dict[str, Any] = {}
+        self._ttl_data: dict[str, int] = {}
         self.is_connected = True
         self.call_count = 0
 
@@ -22,7 +22,7 @@ class MockRedisClient:
         self.call_count += 1
         return self._data.get(key)
 
-    async def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: Any, ex: int | None = None) -> bool:
         """Mock Redis SET operation with optional expiration."""
         self.call_count += 1
         self._data[key] = value
@@ -61,7 +61,7 @@ class MockRedisClient:
         self._ttl_data.clear()
         return True
 
-    async def info(self, section: Optional[str] = None) -> Dict[str, Any]:
+    async def info(self, section: str | None = None) -> dict[str, Any]:
         """Mock Redis INFO operation."""
         self.call_count += 1
         return {
@@ -87,12 +87,12 @@ class MockDatabaseSession:
     """Mock database session for testing."""
 
     def __init__(self):
-        self.data: List[Dict[str, Any]] = []
+        self.data: list[dict[str, Any]] = []
         self.committed = False
         self.rolled_back = False
         self.closed = False
 
-    async def execute(self, query: str, parameters: Optional[Dict[str, Any]] = None) -> Any:
+    async def execute(self, query: str, parameters: dict[str, Any] | None = None) -> Any:
         """Mock database execute operation."""
         # Simple mock that returns predefined data
         result = MagicMock()
@@ -140,7 +140,7 @@ class MockCacheService:
             self.miss_count += 1
         return value
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Mock cache set operation."""
         await self.redis.set(key, value, ex=ttl)
 
@@ -169,12 +169,12 @@ class MockMLModel:
         # Return simple mock prediction
         return {"prediction": 0.85, "confidence": 0.92}
 
-    async def predict_batch(self, inputs: List[Any]) -> List[Any]:
+    async def predict_batch(self, inputs: list[Any]) -> list[Any]:
         """Mock batch prediction."""
         self.prediction_count += len(inputs)
         return [await self.predict(inp) for inp in inputs]
 
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         """Mock model info."""
         return {
             "model_id": self.model_id,
@@ -192,7 +192,7 @@ class MockHealthChecker:
         self.is_healthy = True
         self.check_count = 0
 
-    async def check_health(self) -> Dict[str, Any]:
+    async def check_health(self) -> dict[str, Any]:
         """Mock health check."""
         self.check_count += 1
         return {

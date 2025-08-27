@@ -155,7 +155,7 @@ class DatabaseHealthServiceProtocol(Protocol):
     """Protocol for unified database health monitoring service.
 
     Combines all health monitoring components into a single interface
-    that maintains backward compatibility with the original god object.
+    with modern clean architecture and optimal performance.
     """
 
     async def collect_comprehensive_metrics(self) -> dict[str, Any]:

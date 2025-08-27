@@ -138,12 +138,11 @@ class LinguisticFeatureExtractor:
         self._feature_names = ['readability_score', 'lexical_diversity', 'entity_density', 'syntactic_complexity', 'sentence_structure_quality', 'technical_term_ratio', 'avg_sentence_length_norm', 'instruction_clarity', 'has_examples', 'overall_linguistic_quality']
         logger.info('LinguisticFeatureExtractor initialized', extra={'component': 'linguistic_feature_extractor', 'config': self.config.model_dump(), 'correlation_id': self._correlation_id})
 
-    async def extract_features(self, request: FeatureExtractionRequest | str, context: dict[str, Any] | None=None) -> FeatureExtractionResponse:
+    async def extract_features(self, request: FeatureExtractionRequest | str) -> FeatureExtractionResponse:
         """Extract linguistic features asynchronously with full validation and monitoring.
         
         Args:
             request: Either a FeatureExtractionRequest object or text string
-            context: Optional context for extraction (deprecated, use request object)
             
         Returns:
             FeatureExtractionResponse with features and metadata

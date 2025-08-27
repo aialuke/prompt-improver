@@ -13,6 +13,7 @@ from prompt_improver.core.domain.types import (
     AprioriAnalysisRequestData,
     AprioriAnalysisResponseData,
 )
+from prompt_improver.ml.learning.patterns.apriori_analyzer import AprioriConfig
 
 # Removed direct ML analyzer import - handled through repository
 from prompt_improver.repositories.protocols.apriori_repository_protocol import (

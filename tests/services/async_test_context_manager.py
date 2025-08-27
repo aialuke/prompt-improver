@@ -7,8 +7,10 @@ to maintain clean architecture and separation of concerns.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, Callable
+from typing import Any
+
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ class AsyncTestContextManager:
     Provides automatic setup/teardown coordination, resource tracking,
     and error handling for complex async test scenarios.
     """
-    
+
     def __init__(self):
         self.active_contexts = {}
         self.resource_registry = {}
@@ -40,12 +42,9 @@ class AsyncTestContextManager:
             "status": "initializing",
         }
         try:
-            init_tasks = []
-            for service in services:
-                if hasattr(service, "initialize") and asyncio.iscoroutinefunction(
+            init_tasks = [service.initialize() for service in services if hasattr(service, "initialize") and asyncio.iscoroutinefunction(
                     service.initialize
-                ):
-                    init_tasks.append(service.initialize())
+                )]
             if init_tasks:
                 await asyncio.gather(*init_tasks)
             self.active_contexts[context_id]["status"] = "running"
@@ -62,12 +61,9 @@ class AsyncTestContextManager:
             self.active_contexts[context_id]["error"] = str(e)
             raise
         finally:
-            cleanup_tasks = []
-            for service in reversed(services):
-                if hasattr(service, "shutdown") and asyncio.iscoroutinefunction(
+            cleanup_tasks = [service.shutdown() for service in reversed(services) if hasattr(service, "shutdown") and asyncio.iscoroutinefunction(
                     service.shutdown
-                ):
-                    cleanup_tasks.append(service.shutdown())
+                )]
             if cleanup_tasks:
                 try:
                     await asyncio.wait_for(

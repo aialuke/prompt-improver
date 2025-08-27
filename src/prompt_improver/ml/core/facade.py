@@ -1,8 +1,8 @@
-"""ML Service Facade for backward compatibility with performance optimizations.
+"""ML Service Facade with performance optimizations.
 
-Maintains the original MLModelService interface while delegating to 
-individual focused services. Ensures existing code continues to work
-without modification after the God Object breakdown.
+Unified interface that coordinates individual focused services for
+comprehensive ML operations. Provides clean API while maintaining
+high performance through advanced caching and optimization.
 
 Enhanced with:
 - Multi-level caching for inference results (target: <10ms response time)
@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 class MLModelServiceFacade(MLServiceProtocol):
-    """Facade maintaining backward compatibility with original MLModelService interface.
+    """Primary ML service facade coordinating focused service components.
     
-    This facade delegates to individual focused services while preserving
-    the exact same public API that existing code expects.
+    This facade delegates to individual focused services providing a unified
+    API for all ML operations including training, inference, and pattern discovery.
     """
 
     def __init__(

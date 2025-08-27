@@ -14,7 +14,7 @@ from sqlalchemy import select, text, update
 
 from prompt_improver.cli.core.progress_preservation import ProgressService
 from prompt_improver.cli.services.training_orchestrator import (
-    TrainingOrchestrator as TrainingService,
+    TrainingOrchestrator,
 )
 from prompt_improver.database.models import TrainingSession
 
@@ -68,7 +68,7 @@ class SessionService:
     - Session state classification and recovery assessment
     - Workflow state reconstruction from database records
     - Data integrity verification for safe resume operations
-    - Integration with TrainingService and ProgressService
+    - Integration with TrainingOrchestrator and ProgressService
     - Comprehensive resume coordination and monitoring
     """
 
@@ -429,7 +429,7 @@ class SessionService:
     async def resume_training_session(
         self,
         session_id: str,
-        training_manager: TrainingService,
+        training_manager: TrainingOrchestrator,
         force_resume: bool = False,
     ) -> dict[str, Any]:
         """Resume interrupted training session with full workflow reconstruction.
@@ -558,7 +558,7 @@ class SessionService:
         session_id: str,
         context: SessionResumeContext,
         workflow_state: WorkflowState,
-        training_manager: TrainingService,
+        training_manager: TrainingOrchestrator,
     ) -> dict[str, Any]:
         """Perform the actual resume operation."""
         try:

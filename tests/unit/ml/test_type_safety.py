@@ -2,9 +2,9 @@
 from typing import TYPE_CHECKING
 import pytest
 import numpy as np
-from ..models.model_manager import ModelManager, model_config
-from ..optimization.algorithms.clustering_optimizer import ClusteringConfig, ClusteringOptimizer
-from ..types import ClusteringResult, OptimizationResult, TrainingBatch, cluster_labels, ensure_features, ensure_labels, features, is_valid_features, is_valid_labels, labels
+from prompt_improver.ml.models.model_manager import ModelManager, model_config
+from prompt_improver.ml.clustering.services.clustering_optimizer_facade import ClusteringOptimizerFacade
+from prompt_improver.ml.types import ClusteringResult, OptimizationResult, TrainingBatch, cluster_labels, ensure_features, ensure_labels, features, is_valid_features, is_valid_labels, labels
 
 class TestMLTypes:
     """Test ML type definitions and type safety."""

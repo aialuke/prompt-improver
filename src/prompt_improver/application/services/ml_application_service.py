@@ -18,7 +18,7 @@ from prompt_improver.core.domain.types import (
     PatternDiscoveryRequestData,
     PatternDiscoveryResponseData,
 )
-from prompt_improver.ml.core import MLModelService  # Now points to facade
+from prompt_improver.ml.core import MLModelServiceFacade
 from prompt_improver.ml.learning.patterns.advanced_pattern_discovery import (
     AdvancedPatternDiscovery,
 )
@@ -47,7 +47,7 @@ class MLApplicationService:
         db_services: "DatabaseServices",
         ml_repository: MLRepositoryProtocol,
         ml_service_container: MLServiceContainer,
-        ml_model_service: MLModelService,
+        ml_model_service: MLModelServiceFacade,
         apriori_analyzer: AprioriAnalyzer,
         pattern_discovery: AdvancedPatternDiscovery,
     ) -> None:

@@ -232,7 +232,7 @@ class StartupPerformanceTracker:
                 try:
                     process = psutil.Process()
                     memory_before = process.memory_info().rss / 1024 / 1024
-                except:
+                except Exception:
                     pass
 
             try:
@@ -247,7 +247,7 @@ class StartupPerformanceTracker:
                     try:
                         memory_after = psutil.Process().memory_info().rss / 1024 / 1024
                         self.memory_peak = max(self.memory_peak, memory_after)
-                    except:
+                    except Exception:
                         pass
 
                 memory_delta = memory_after - memory_before

@@ -49,7 +49,7 @@ class UnifiedMonitoringFacade:
     - Cross-service coordination
 
     Now uses decomposed services (all <500 lines) with orchestrated coordination
-    while maintaining the same external interface for backwards compatibility.
+    providing a clean, unified external interface for all monitoring operations.
     """
 
     def __init__(
@@ -75,7 +75,7 @@ class UnifiedMonitoringFacade:
         self.health_reporter = self.orchestrator.get_health_reporter()
         self.cache_monitor = self.orchestrator.get_cache_monitor()
 
-        # Cache for performance (maintained for backwards compatibility)
+        # Cache for performance optimization
         self._last_health_summary: SystemHealthSummary | None = None
         self._last_health_check_time: float | None = None
 

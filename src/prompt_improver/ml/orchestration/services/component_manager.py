@@ -239,7 +239,7 @@ class ComponentService:
         for component_name in core_components:
             if component_name in loaded_components:
                 try:
-                    # Special initialization for APESServiceManager with event bus
+                    # Special initialization for OrchestrationService with event bus
                     if component_name == "apes_service_manager":
                         success = await self.component_loader.initialize_component(
                             component_name,

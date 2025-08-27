@@ -28,10 +28,10 @@ from src.prompt_improver.core.di import (
     get_monitoring_container,
     get_security_container,
 )
-from src.prompt_improver.core.di.core_container import CoreContainer
 from src.prompt_improver.core.di.container_orchestrator import (
     shutdown_container,
 )
+from src.prompt_improver.core.di.core_container import CoreContainer
 from tests.containers.postgres_container import PostgreSQLTestContainer
 from tests.containers.real_redis_container import RealRedisTestContainer
 

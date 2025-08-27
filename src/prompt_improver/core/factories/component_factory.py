@@ -470,8 +470,8 @@ async def register_default_component_specs(factory: ComponentFactory) -> None:
         ),
         ComponentSpec(
             name="ml_integration",
-            module_path="prompt_improver.ml.core.ml_integration",
-            class_name="MLModelService",
+            module_path="prompt_improver.ml.core.facade",
+            class_name="MLModelServiceFacade",
             tier="TIER_1",
             dependencies={
                 "db_service": "database_service",

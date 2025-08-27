@@ -166,7 +166,7 @@ class WorkflowExecutor:
 
     async def _get_component_info(self, component_name: str):
         """Get component info from registry. Placeholder for registry injection."""
-        known_components = {'training_data_loader': {'file_path': 'ml/core/training_data_loader.py', 'class_name': 'TrainingDataLoader'}, 'ml_integration': {'file_path': 'ml/core/ml_integration.py', 'class_name': 'MLModelService'}, 'rule_optimizer': {'file_path': 'ml/optimization/algorithms/rule_optimizer.py', 'class_name': 'RuleOptimizer'}}
+        known_components = {'training_data_loader': {'file_path': 'ml/core/training_data_loader.py', 'class_name': 'TrainingDataLoader'}, 'ml_integration': {'file_path': 'ml/core/facade.py', 'class_name': 'MLModelServiceFacade'}, 'rule_optimizer': {'file_path': 'ml/optimization/algorithms/rule_optimizer.py', 'class_name': 'RuleOptimizer'}}
         return known_components.get(component_name)
 
     async def _execute_component(self, component_info: dict[str, Any], parameters: dict[str, Any]) -> Any:

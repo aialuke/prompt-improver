@@ -132,7 +132,7 @@ def create_training_system(console=None) -> TrainingOrchestratorProtocol:
     return _training_service_factory.create_complete_training_system(console)
 
 
-# Individual service creation functions for backwards compatibility
+# Individual service creation functions
 def create_training_validator() -> TrainingValidatorProtocol:
     """Create training validator service.
 

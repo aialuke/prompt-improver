@@ -7,7 +7,8 @@ established factory pattern architecture.
 
 import asyncio
 import logging
-from typing import Any, AsyncContextManager, TypeVar, cast
+from contextlib import AbstractAsyncContextManager
+from typing import Any, TypeVar, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,7 +122,7 @@ class DatabaseServiceAdapter:
         """
         self._get_session_func = get_session_func
 
-    async def get_session(self) -> AsyncContextManager[AsyncSession]:
+    async def get_session(self) -> AbstractAsyncContextManager[AsyncSession]:
         """Get database session.
 
         Returns:
@@ -284,7 +285,7 @@ class SessionStoreServiceAdapter:
 class NoOpDatabaseService:
     """No-op database service for testing."""
 
-    async def get_session(self) -> AsyncContextManager[AsyncSession]:
+    async def get_session(self) -> AbstractAsyncContextManager[AsyncSession]:
         """Return no-op session context manager."""
         from contextlib import asynccontextmanager
 

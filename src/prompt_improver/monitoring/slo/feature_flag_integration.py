@@ -63,12 +63,9 @@ class SLOFeatureFlagIntegration:
     def __init__(
         self,
         core_flag_manager: CoreFeatureFlagService | None = None,
-        redis_url: str | None = None,  # Deprecated: L2RedisService uses environment configuration
         default_rollback_timeout: int = 3600,
     ) -> None:
         self.core_flag_manager = core_flag_manager or get_feature_flag_manager()
-        if redis_url is not None:
-            logger.warning("redis_url parameter is deprecated. L2RedisService uses environment variables for configuration.")
         self.default_rollback_timeout = default_rollback_timeout
         self._l2_redis = L2RedisService()
         self.rollback_history: list[dict[str, Any]] = []

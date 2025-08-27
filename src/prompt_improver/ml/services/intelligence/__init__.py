@@ -19,7 +19,6 @@ from prompt_improver.ml.services.intelligence.prediction_service import MLPredic
 from prompt_improver.ml.services.intelligence.batch_processing_service import BatchProcessingService
 from prompt_improver.ml.services.intelligence.facade import (
     MLIntelligenceServiceFacade,
-    MLIntelligenceProcessor,  # Backward compatibility alias
     create_ml_intelligence_service_facade,
 )
 
@@ -30,7 +29,6 @@ __all__ = [
     "MLPredictionService",
     "BatchProcessingService",
     "MLIntelligenceServiceFacade",
-    "MLIntelligenceProcessor",  # Backward compatibility
     "create_ml_intelligence_service_facade",
 ]
 

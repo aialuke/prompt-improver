@@ -217,6 +217,7 @@ class APESInitializer:
     async def apply_performance_optimizations(self):
         """Apply PostgreSQL performance optimizations."""
         try:
+            from prompt_improver.database import get_session
             async with get_session() as session:
                 optimizations = [
                     "SET shared_preload_libraries = 'pg_stat_statements'",
@@ -321,6 +322,7 @@ class APESInitializer:
             )
             return
         try:
+            from prompt_improver.database import get_session
             async with get_session() as session:
                 schema_sql = schema_file.read_text()
                 statements = [
@@ -350,6 +352,7 @@ class APESInitializer:
             )
             return
         try:
+            from prompt_improver.database import get_session
             async with get_session() as session:
                 with open(config_file, encoding="utf-8") as f:
                     config = yaml.safe_load(f)
@@ -414,6 +417,7 @@ class APESInitializer:
     async def generate_initial_training_data(self):
         """Bootstrap with enhanced synthetic training data using research-driven generator."""
         try:
+            from prompt_improver.database import get_session
             async with get_session() as session:
                 from prompt_improver.database.models import TrainingPrompt
 
@@ -492,7 +496,7 @@ class APESInitializer:
         try:
             from sqlalchemy import text
 
-            from prompt_improver.database import scalar
+            from prompt_improver.database import get_session, scalar
 
             async with get_session() as session:
                 await scalar(session, text("SELECT 1"))

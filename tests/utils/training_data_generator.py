@@ -4,14 +4,16 @@ Training data generation utilities for ML testing.
 This module contains training data generation utilities extracted from conftest.py
 to maintain clean architecture and separation of concerns.
 """
-from typing import Any, Dict
+from typing import Any
+
 import numpy as np
+
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 
 class TrainingDataGenerator:
     """Generate synthetic training data for ML testing."""
-    
+
     def __init__(self, random_seed: int = 42):
         self.rng = np.random.RandomState(random_seed)
 
@@ -20,7 +22,7 @@ class TrainingDataGenerator:
         n_samples: int = 100,
         n_rules: int = 5,
         effectiveness_distribution: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate rule performance training data."""
         rule_ids = [f"rule_{i}" for i in range(n_rules)]
         features = []
@@ -80,7 +82,7 @@ class TrainingDataGenerator:
         control_samples: int = 150,
         treatment_samples: int = 150,
         effect_size: float = 0.1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate A/B test data with specified effect size."""
         control_scores = self.rng.normal(0.65, 0.15, control_samples)
         control_scores = np.clip(control_scores, 0.0, 1.0)
@@ -88,7 +90,7 @@ class TrainingDataGenerator:
             0.65 + effect_size, 0.15, treatment_samples
         )
         treatment_scores = np.clip(treatment_scores, 0.0, 1.0)
-        
+
         return {
             "control_group": {
                 "scores": control_scores.tolist(),

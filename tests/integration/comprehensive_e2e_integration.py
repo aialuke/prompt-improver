@@ -39,7 +39,6 @@ from scripts.production_readiness_validation import ProductionReadinessValidator
 from prompt_improver.database import (
     get_session_context,
 )
-from prompt_improver.services.cache.cache_facade import CacheFacade
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     ChunkingStrategy,
     StreamingBatchConfig,
@@ -51,6 +50,7 @@ from prompt_improver.ml.orchestration.config.orchestrator_config import (
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator,
 )
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 
@@ -458,7 +458,7 @@ class TestComprehensiveE2EIntegration:
                 for _ in range(5):
                     query_start = time.perf_counter()
                     result = await cache_layer.get(
-                        f"query_{hash(query)}_{hash(str(params))}", 
+                        f"query_{hash(query)}_{hash(str(params))}",
                         lambda q=query, p=params: execute_cached_query(q, p)
                     )
                     was_cached = True  # Assume cached for comprehensive testing
@@ -532,16 +532,14 @@ class TestComprehensiveE2EIntegration:
         try:
             print("📊 Measuring batch processing improvements...")
             test_data_size = 10000
-            test_data = []
-            for i in range(test_data_size):
-                test_data.append({
+            test_data = [{
                     "id": i,
                     "features": np.random.random(20).tolist(),
                     "label": np.random.randint(0, 3),
                     "timestamp": datetime.now(UTC).isoformat(),
-                })
+                } for i in range(test_data_size)]
             with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".jsonl", delete=False
+                encoding="utf-8", mode="w", suffix=".jsonl", delete=False
             ) as f:
                 for item in test_data:
                     f.write(json.dumps(item) + "\n")
@@ -564,7 +562,7 @@ class TestComprehensiveE2EIntegration:
 
                 baseline_processed = 0
                 chunk_size = 1000
-                with open(temp_file) as f:
+                with open(temp_file, encoding="utf-8") as f:
                     chunk = []
                     for line in f:
                         chunk.append(json.loads(line))
@@ -865,7 +863,7 @@ class TestComprehensiveE2EIntegration:
                     elapsed = 0
                     while elapsed < max_wait_time:
                         status = await ml_orchestrator.get_workflow_status(workflow_id)
-                        if status.state.value in ["COMPLETED", "ERROR"]:
+                        if status.state.value in {"COMPLETED", "ERROR"}:
                             break
                         await asyncio.sleep(check_interval)
                         elapsed += check_interval
@@ -908,7 +906,7 @@ class TestComprehensiveE2EIntegration:
                         "experiment_id": exp_id,
                         "workflow_id": workflow_id,
                         "status": status.state.value,
-                        "success": status.state.value in ["RUNNING", "COMPLETED"],
+                        "success": status.state.value in {"RUNNING", "COMPLETED"},
                     }
                 except Exception as e:
                     return {"experiment_id": exp_id, "error": str(e), "success": False}
@@ -1058,7 +1056,7 @@ class TestComprehensiveE2EIntegration:
                 try:
                     import resource
 
-                    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+                    _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
                     platform_tests["macos_resource_limits"] = hard > 0
                 except Exception:
                     platform_tests["macos_resource_limits"] = False
@@ -1155,7 +1153,7 @@ class TestComprehensiveE2EIntegration:
                 else 0
             )
             production_ready = (
-                report.overall_status.value in ["PASS", "WARNING"]
+                report.overall_status.value in {"PASS", "WARNING"}
                 and failed_validations == 0
                 and (success_rate >= 80)
             )
@@ -1373,7 +1371,7 @@ class TestComprehensiveE2EIntegration:
         report_content = metrics.generate_comprehensive_report()
         timestamp = int(time.time())
         report_path = Path(f"comprehensive_integration_report_{timestamp}.md")
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(report_content)
         print(f"✅ Comprehensive report saved to: {report_path}")
         success_rate = metrics.calculate_overall_success_rate()

@@ -18,10 +18,18 @@ os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 from tests.containers.postgres_container import PostgreSQLTestContainer
-from tests.integration.real_behavior_testing.containers.ml_test_container import MLTestContainer
-from tests.integration.real_behavior_testing.containers.network_simulator import NetworkSimulator
-from tests.integration.real_behavior_testing.containers.real_redis_container import RealRedisTestContainer
-from tests.integration.real_behavior_testing.performance.benchmark_suite import BenchmarkSuite
+from tests.integration.real_behavior_testing.containers.ml_test_container import (
+    MLTestContainer,
+)
+from tests.integration.real_behavior_testing.containers.network_simulator import (
+    NetworkSimulator,
+)
+from tests.integration.real_behavior_testing.containers.real_redis_container import (
+    RealRedisTestContainer,
+)
+from tests.integration.real_behavior_testing.performance.benchmark_suite import (
+    BenchmarkSuite,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +147,9 @@ def performance_tracker():
 @pytest.fixture(scope="function")
 async def error_injector():
     """Error injection utility for testing error handling services."""
-    from tests.integration.real_behavior_testing.utils.error_injection import ErrorInjector
+    from tests.integration.real_behavior_testing.utils.error_injection import (
+        ErrorInjector,
+    )
 
     injector = ErrorInjector()
     yield injector
@@ -149,7 +159,9 @@ async def error_injector():
 @pytest.fixture(scope="function")
 def test_data_factory():
     """Factory for generating realistic test data scenarios."""
-    from tests.integration.real_behavior_testing.utils.test_data_factory import TestDataFactory
+    from tests.integration.real_behavior_testing.utils.test_data_factory import (
+        TestDataFactory,
+    )
 
     return TestDataFactory()
 

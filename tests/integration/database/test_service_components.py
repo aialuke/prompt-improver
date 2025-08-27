@@ -15,7 +15,7 @@ from prompt_improver.database import (
 )
 
 
-class TestPostgresPoolManager:
+class TestPostgreSQLPoolManager:
     """Test PostgreSQL pool manager with real database."""
 
     @pytest.mark.asyncio

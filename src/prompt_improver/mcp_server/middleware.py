@@ -37,8 +37,6 @@ from prompt_improver.security.services.security_service_facade import (
     get_security_service_facade,
 )
 
-# Legacy unified_security_stack removed - using modern SecurityServiceFacade
-
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -1137,12 +1135,8 @@ class AdaptivePerformanceMiddleware(Middleware):
 
 # Security middleware integration
 async def create_unified_security_middleware():
-    """Create unified security middleware from security stack."""
-    from prompt_improver.security.unified_security_stack import (
-        get_unified_security_stack,
-    )
-
-    return await get_unified_security_stack()
+    """Create unified security middleware from security facade."""
+    return await get_security_service_facade()
 
 
 async def create_mcp_server_security_middleware():

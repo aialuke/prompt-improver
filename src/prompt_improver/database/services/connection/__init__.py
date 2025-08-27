@@ -35,7 +35,6 @@ from prompt_improver.database.services.connection.postgres_pool_manager import (
     PoolConfiguration,
     PoolState,
     PostgreSQLPoolManager,
-    PostgreSQLPoolManager as PostgresPoolManager,
 )
 
 # RedisManager removed - use CacheFacade from services.cache for Redis operations
@@ -78,7 +77,6 @@ __all__ = [
     "PoolSharedContext",
     "PoolState",
     "PostgreSQLPoolManager",
-    "PostgresPoolManager",  # Backward compatibility alias
     "ScalingAction",
     "ScalingConfiguration",
     "ScalingDecision",

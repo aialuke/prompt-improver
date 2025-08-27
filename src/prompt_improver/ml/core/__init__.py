@@ -3,12 +3,11 @@
 Central components for ML pipeline orchestration, training data management,
 and model integration.
 
-MIGRATION NOTE: MLModelService now points to the unified facade for better architecture.
+2025 Architecture:
+- Decomposed god object into focused services with clean boundaries
+- Direct facade pattern with MLModelServiceFacade as primary interface
 """
-from .facade import MLModelServiceFacade as MLModelService
+from .facade import MLModelServiceFacade
 from .training_data_loader import TrainingDataLoader, get_training_data_stats
 
-# Export both facade and legacy name for compatibility
-from .facade import MLModelServiceFacade
-
-__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelService', 'MLModelServiceFacade']
+__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelServiceFacade']

@@ -19,6 +19,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
+from prompt_improver.database.types import (
+    SecurityPerformanceMetrics,
+    SecurityThreatScore,
+    SecurityValidationResult,
+)
+
 from prompt_improver.database.types import ManagerMode, ServiceConfiguration
 
 logger = logging.getLogger(__name__)

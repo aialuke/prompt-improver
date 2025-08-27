@@ -91,7 +91,7 @@ class MLPipelineOrchestrator:
         self.config = config
         self.external_services_config = external_services_config
         
-        # Create component loader and invoker for backward compatibility
+        # Create component loader and invoker for orchestration
         self.component_loader = DirectComponentLoader()
         self.component_invoker = ComponentInvoker(component_loader=self.component_loader)
         

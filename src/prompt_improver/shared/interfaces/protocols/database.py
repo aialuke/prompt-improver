@@ -390,7 +390,7 @@ class PoolManagerFacadeProtocol(Protocol):
     """Protocol for the unified pool manager facade.
 
     Combines all pool management components into a single interface
-    that maintains backward compatibility with the original implementation.
+    that orchestrates clean architecture components efficiently.
     """
 
     async def initialize(self) -> bool:
@@ -609,7 +609,7 @@ class DatabaseHealthServiceProtocol(Protocol):
     """Protocol for unified database health monitoring service.
 
     Combines all health monitoring components into a single interface
-    that maintains backward compatibility with the original implementation.
+    that orchestrates clean architecture components efficiently.
     """
 
     async def collect_comprehensive_metrics(self) -> dict[str, Any]:

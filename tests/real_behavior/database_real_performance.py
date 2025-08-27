@@ -459,7 +459,7 @@ class DatabaseRealPerformanceTestSuite:
                 connection_wait_times = []
 
                 async def load_worker(worker_id: int):
-                    for request in range(5):
+                    for _request in range(5):
                         try:
                             conn_start = time.time()
                             async with self.db_connection.get_session() as session:
@@ -559,7 +559,7 @@ class DatabaseRealPerformanceTestSuite:
                     pool_timeout=0.1,
                     pool_recycle=1,
                 )
-                for i in range(5):
+                for _i in range(5):
                     try:
                         async with short_timeout_engine.begin() as conn:
                             await conn.execute(text("SELECT 1"))
@@ -656,7 +656,7 @@ class DatabaseRealPerformanceTestSuite:
             optimization_results = {}
             for query_type, query_sql in test_queries:
                 query_times = []
-                for iteration in range(5):
+                for _iteration in range(5):
                     query_start = time.time()
                     async with self.db_connection.get_session() as session:
                         result = await session.execute(text(query_sql))

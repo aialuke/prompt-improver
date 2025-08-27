@@ -14,7 +14,12 @@ from rich.console import Console
 from sqlalchemy import text
 
 from prompt_improver.cli.core.signal_handler import SignalOperation
-from prompt_improver.core.services.analytics_factory import get_analytics_interface
+from prompt_improver.cli.services.training_protocols import (
+    TrainingMetricsProtocol,
+    TrainingPersistenceProtocol,
+    TrainingValidatorProtocol,
+)
+from prompt_improver.core.services.analytics_factory import create_analytics_service
 from prompt_improver.database import (
     ManagerMode,
     get_database_services,
@@ -28,11 +33,6 @@ from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
 )
 from prompt_improver.ml.preprocessing.orchestrator import (
     ProductionSyntheticDataGenerator,
-)
-from prompt_improver.shared.interfaces.protocols.cli import (
-    TrainingMetricsProtocol,
-    TrainingPersistenceProtocol,
-    TrainingValidatorProtocol,
 )
 
 
@@ -321,8 +321,9 @@ class TrainingOrchestrator:
         """Initialize analytics service for training metrics."""
         self.logger.info("Initializing training analytics")
 
-        analytics_factory = get_analytics_interface()
-        self._analytics = analytics_factory() if analytics_factory else None
+        # Use modern analytics service with database session
+        async with get_sessionmanager().session() as db_session:
+            self._analytics = await create_analytics_service(db_session)
 
         self.logger.info("Training analytics initialized")
 

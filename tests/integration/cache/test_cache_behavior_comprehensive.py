@@ -26,7 +26,7 @@ import time
 from typing import Any
 
 import pytest
-from tests.conftest import reset_test_caches
+from tests.fixtures.application.cache import reset_test_caches
 
 from prompt_improver.services.cache.cache_facade import CacheFacade
 from prompt_improver.services.cache.cache_factory import CacheFactory

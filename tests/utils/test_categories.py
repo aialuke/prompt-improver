@@ -202,7 +202,7 @@ class TestCategoryValidator:
 def skip_if_no_containers():
     """Skip test if test containers are not available."""
     try:
-        import testcontainers
+        import testcontainers  # noqa: F401
         return pytest.mark.skipif(False, reason="Test containers available")
     except ImportError:
         return pytest.mark.skipif(True, reason="Test containers not available")

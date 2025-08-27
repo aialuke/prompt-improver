@@ -225,7 +225,7 @@ class UnifiedAnalyticsVerifier:
 
             # Test core services integration
             try:
-                from prompt_improver.core.services import AnalyticsService
+                from prompt_improver.analytics import AnalyticsServiceFacade
                 logger.info("✅ Core services integration available")
             except ImportError as e:
                 logger.warning(f"⚠️  Core services integration: {e}")

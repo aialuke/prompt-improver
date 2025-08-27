@@ -5,7 +5,7 @@ including training data management, model lifecycle, optimization algorithms,
 and evaluation frameworks.
 """
 from .automl.orchestrator import AutoMLOrchestrator
-from .core import MLModelService  # Now points to facade
+from .core import MLModelServiceFacade
 from .core.training_data_loader import TrainingDataLoader, get_training_data_stats
 # Heavy ML imports moved to lazy loading and TYPE_CHECKING
 from typing import TYPE_CHECKING
@@ -49,4 +49,4 @@ from .learning.algorithms import (
     get_rule_analyzer as RuleAnalyzer
 )
 
-__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelService', 'ModelManager', 'ProductionModelRegistry', 'ContextLearner', 'InsightGenerationEngine', 'RuleAnalyzer', 'RuleOptimizer', 'MultiarmedBanditFramework', 'ClusteringOptimizer', 'DimensionalityReducer', 'AutoMLOrchestrator']
+__all__ = ['TrainingDataLoader', 'get_training_data_stats', 'MLModelServiceFacade', 'ModelManager', 'ProductionModelRegistry', 'ContextLearner', 'InsightGenerationEngine', 'RuleAnalyzer', 'RuleOptimizer', 'MultiarmedBanditFramework', 'ClusteringOptimizer', 'DimensionalityReducer', 'AutoMLOrchestrator']

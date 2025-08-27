@@ -1,16 +1,14 @@
 """Unified Database Health Monitoring Service.
 
 Provides a unified interface that combines all health monitoring components into
-a single, comprehensive service. This service maintains backward compatibility
-with the original DatabaseHealthMonitor while providing improved architecture
-and performance through focused service components.
+a single, comprehensive service. Modern clean architecture implementation with
+focused service components and optimal performance.
 
 Features:
 - Unified interface for all health monitoring capabilities
 - Parallel execution of health checks for optimal performance
 - Clean architecture with dependency injection
 - Protocol-based service composition
-- Backward compatibility with existing interfaces
 - Comprehensive health metrics collection and analysis
 """
 
@@ -70,7 +68,7 @@ class DatabaseHealthService:
         self.alerting_service = alerting_service or AlertingService()
         self.reporting_service = reporting_service or HealthReportingService()
 
-        # Utility components for backward compatibility
+        # Utility components for health analysis
         self.index_assessor = IndexHealthAssessor(None)  # Uses session manager internally
         self.bloat_detector = TableBloatDetector(None)   # Uses session manager internally
 
@@ -96,7 +94,7 @@ class DatabaseHealthService:
                 self.metrics_service.collect_storage_metrics(),
                 self.metrics_service.collect_replication_metrics(),
                 self.metrics_service.collect_lock_metrics(),
-                self.metrics_service.collect_cache_performance(),
+                self.metrics_service.analyze_cache_performance(),
                 self.metrics_service.collect_transaction_metrics(),
                 self._collect_utility_metrics(),
                 return_exceptions=True,
@@ -343,37 +341,6 @@ class DatabaseHealthService:
                 "hours_requested": hours,
             }
 
-    async def get_connection_pool_health_summary(self) -> dict[str, Any]:
-        """Get connection pool health summary (backward compatibility method).
-
-        Returns:
-            Connection pool health summary with status and metrics
-        """
-        try:
-            return await self.connection_service.get_pool_health_summary()
-        except Exception as e:
-            logger.exception(f"Failed to get connection pool health summary: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "summary": "Connection pool health check failed",
-            }
-
-    async def analyze_query_performance(self) -> dict[str, Any]:
-        """Analyze query performance (backward compatibility method).
-
-        Returns:
-            Query performance analysis results
-        """
-        try:
-            return await self.metrics_service.collect_query_performance_metrics()
-        except Exception as e:
-            logger.exception(f"Failed to analyze query performance: {e}")
-            return {
-                "error": str(e),
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-
     async def _collect_utility_metrics(self) -> dict[str, Any]:
         """Collect utility metrics from IndexHealthAssessor and TableBloatDetector.
 
@@ -425,32 +392,6 @@ class DatabaseHealthService:
         logger.warning(f"Unexpected result type in {component_name}: {type(result)}")
         return {"error": f"Unexpected result type: {type(result)}", "component": component_name}
 
-    # Backward compatibility methods for existing integrations
-
-    async def get_pool_metrics(self) -> dict[str, Any]:
-        """Get connection pool metrics (backward compatibility)."""
-        return await self.connection_service.collect_connection_metrics()
-
-    def calculate_health_score(self, metrics: dict[str, Any]) -> float:
-        """Calculate health score (backward compatibility)."""
-        return self.alerting_service.calculate_health_score(metrics)
-
-    def identify_health_issues(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
-        """Identify health issues (backward compatibility)."""
-        return self.alerting_service.identify_health_issues(metrics)
-
-    def generate_recommendations(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
-        """Generate recommendations (backward compatibility)."""
-        return self.alerting_service.generate_recommendations(metrics)
-
-    def add_to_history(self, metrics: dict[str, Any]) -> None:
-        """Add metrics to history (backward compatibility)."""
-        self.reporting_service.add_metrics_to_history(metrics)
-
-    def get_metrics_history(self) -> list[dict[str, Any]]:
-        """Get metrics history (backward compatibility)."""
-        return self.reporting_service.get_metrics_history()
-
 
 # Factory function for creating the unified health service
 def create_database_health_service(
@@ -465,28 +406,3 @@ def create_database_health_service(
         Configured DatabaseHealthService instance
     """
     return DatabaseHealthService(session_manager)
-
-
-# Global service instance for backward compatibility
-_global_health_service: DatabaseHealthService | None = None
-
-
-def get_database_health_service(
-    session_manager: SessionManagerProtocol | None = None
-) -> DatabaseHealthService:
-    """Get or create global database health service instance.
-
-    Args:
-        session_manager: Optional session manager (required for first call)
-
-    Returns:
-        Global DatabaseHealthService instance
-    """
-    global _global_health_service
-
-    if _global_health_service is None:
-        if session_manager is None:
-            raise ValueError("session_manager is required for first initialization")
-        _global_health_service = create_database_health_service(session_manager)
-
-    return _global_health_service

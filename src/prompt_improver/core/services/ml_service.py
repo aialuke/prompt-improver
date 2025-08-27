@@ -182,7 +182,7 @@ class EventBasedMLService(MLServiceInterface):
         """
         try:
             return await self.training_service.get_training_status(operation_id)
-        except:
+        except Exception:
             return {
                 "operation_id": operation_id,
                 "status": "completed",
@@ -386,81 +386,3 @@ class EventBasedMLService(MLServiceInterface):
         """Delegate to model service."""
         return await self.model_service.list_models()
 
-    async def analyze_prompt_patterns(
-        self, prompts: list[str], analysis_parameters: dict[str, Any] | None = None
-    ) -> MLAnalysisResult:
-        """Analyze patterns in prompts using ML algorithms."""
-        result = await self.process_prompt_improvement_request(
-            prompt="\n".join(prompts),
-            context=analysis_parameters or {},
-            improvement_type="pattern_analysis",
-        )
-        return MLAnalysisResult(
-            analysis_id=result.get("request_id", "unknown"),
-            analysis_type="pattern_analysis",
-            results=result,
-            confidence_score=result.get("effectiveness_score", 0.0),
-            processing_time_ms=result.get("processing_time_ms", 0),
-            timestamp=datetime.now(),
-        )
-
-    async def analyze_performance_trends(
-        self, performance_data: list[dict[str, Any]], time_window_hours: int = 24
-    ) -> MLAnalysisResult:
-        """Analyze performance trends using ML models."""
-        result = await self.analyze_rule_effectiveness(
-            rule_ids=[str(i) for i in range(len(performance_data))],
-            time_period_days=time_window_hours // 24 or 1,
-        )
-        return MLAnalysisResult(
-            analysis_id=result.get("analysis_id", "unknown"),
-            analysis_type="performance_trends",
-            results=result,
-            confidence_score=result.get("overall_metrics", {}).get(
-                "avg_effectiveness", 0.0
-            ),
-            processing_time_ms=100,
-            timestamp=datetime.now(),
-        )
-
-    async def detect_anomalies(
-        self, data: dict[str, Any], sensitivity: float = 0.8
-    ) -> MLAnalysisResult:
-        """Detect anomalies in system behavior."""
-        self._operation_counter += 1
-        analysis_id = f"anomaly_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._operation_counter}"
-        return MLAnalysisResult(
-            analysis_id=analysis_id,
-            analysis_type="anomaly_detection",
-            results={
-                "anomalies_detected": 0,
-                "anomaly_score": 0.1,
-                "sensitivity": sensitivity,
-                "data_points_analyzed": len(data),
-            },
-            confidence_score=0.95,
-            processing_time_ms=50,
-            timestamp=datetime.now(),
-        )
-
-    async def predict_failure_risk(
-        self, system_metrics: dict[str, Any], prediction_horizon_hours: int = 1
-    ) -> MLAnalysisResult:
-        """Predict system failure risk using ML models."""
-        self._operation_counter += 1
-        analysis_id = (
-            f"risk_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._operation_counter}"
-        )
-        return MLAnalysisResult(
-            analysis_id=analysis_id,
-            analysis_type="failure_risk_prediction",
-            results={
-                "failure_risk_score": 0.05,
-                "risk_level": "low",
-                "prediction_horizon_hours": prediction_horizon_hours,
-                "contributing_factors": [],
-            },
-            confidence_score=0.88,
-            processing_time_ms=75,
-            timestamp=datetime.now(),
-        )

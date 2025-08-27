@@ -46,17 +46,6 @@ class DatabaseConfig(BaseSettings):
         default=10, ge=1, le=120, description="Pool timeout in seconds"
     )
 
-    # Legacy pool settings for backward compatibility
-    database_pool_size: int = Field(
-        default=10, ge=1, le=100, description="Database connection pool size"
-    )
-    database_max_overflow: int = Field(
-        default=20, ge=0, le=200, description="Database max overflow connections"
-    )
-    database_pool_timeout: int = Field(
-        default=30, ge=1, le=300, description="Database pool timeout in seconds"
-    )
-
     # Connection Settings
     ssl_mode: str = Field(default="prefer", description="SSL connection mode")
     pool_recycle: int = Field(
@@ -116,9 +105,6 @@ class DatabaseConfig(BaseSettings):
             "pool_recycle": self.pool_recycle,
             "pool_pre_ping": True,
             # Legacy compatibility
-            "database_pool_size": self.database_pool_size,
-            "database_max_overflow": self.database_max_overflow,
-            "database_pool_timeout": self.database_pool_timeout,
         }
 
     def get_retry_config(self) -> dict[str, Any]:

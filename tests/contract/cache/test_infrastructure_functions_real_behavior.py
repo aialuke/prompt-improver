@@ -21,15 +21,15 @@ test infrastructure performance and explicit cache management.
 import time
 
 import pytest
-from tests.conftest import (
+from tests.contract.cache.test_lru_migration_real_behavior import RealBehaviorTestBase
+from tests.fixtures.application.cache import reset_test_caches
+from tests.fixtures.foundation.utils import (
     check_ml_libraries,
     detect_external_redis,
     get_cache_status,
     get_database_models,
     lazy_import,
-    reset_test_caches,
 )
-from tests.contract.cache.test_lru_migration_real_behavior import RealBehaviorTestBase
 
 
 @pytest.mark.real_behavior

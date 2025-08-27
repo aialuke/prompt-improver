@@ -10,16 +10,17 @@ from collections.abc import Callable
 from typing import Any
 
 import psutil
+
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 
 class PerformanceTestHarness:
     """Performance testing harness for ML pipeline benchmarking.
-    
+
     Provides comprehensive performance monitoring, profiling utilities,
     and benchmark comparison tools following 2025 best practices.
     """
-    
+
     def __init__(self):
         self.benchmark_results = []
         self.performance_baselines = {}
@@ -42,7 +43,7 @@ class PerformanceTestHarness:
                 func(*args, **kwargs)
         execution_times = []
         memory_usage = []
-        for i in range(iterations):
+        for _i in range(iterations):
             process = psutil.Process()
             mem_before = process.memory_info().rss / 1024 / 1024
             start_time = time.perf_counter()

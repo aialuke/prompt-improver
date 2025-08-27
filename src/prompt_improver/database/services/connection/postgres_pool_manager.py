@@ -1,17 +1,17 @@
 """PostgreSQL connection pool manager with advanced scaling and monitoring.
 
-Re-architected from monolithic design into clean architecture components:
+Clean architecture implementation with decomposed components:
 - ConnectionPoolCore: Core connection management and session creation
 - PoolScalingManager: Dynamic scaling and optimization logic
 - PoolMonitoringService: Health monitoring and metrics collection
-- PostgreSQLPoolManager: Unified facade maintaining backward compatibility
+- PostgreSQLPoolManager: Unified facade for orchestrated functionality
 
-This maintains identical functionality while following single responsibility
-principle and enabling better testability and maintainability.
+Follows single responsibility principle enabling better testability,
+maintainability, and performance optimization.
 """
 
-# Export the facade as the main interface for backward compatibility
-# Re-export supporting types and configurations for backward compatibility
+# Export the facade as the main interface
+# Re-export supporting types and configurations
 from prompt_improver.database.services.connection.pool_shared_context import (
     ConnectionInfo,
     ConnectionMode,

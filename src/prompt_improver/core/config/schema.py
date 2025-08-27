@@ -1,5 +1,5 @@
 """Configuration schema versioning system for future updates.
-Ensures backward compatibility and smooth transitions between configuration versions.
+Provides configuration schema management and validation for unified configuration system.
 """
 
 import json
@@ -87,7 +87,7 @@ class UnifiedConfigService:
     - Real-time configuration monitoring
 
     Replaces and consolidates:
-    - ConfigSchemaManager (schema management)
+    - UnifiedConfigService (schema management)
     - FeatureFlagService (feature flags)
     - ConfigValidator (validation)
     - EnvironmentConfigManager (environment config)
@@ -412,12 +412,8 @@ class UnifiedConfigService:
         return [f"Missing required V1.2 variable: {var}" for var in required_v1_2_vars if var not in config_data]
 
 
-# Create unified instance and backward compatibility alias
+# Create unified instance
 unified_config_manager = UnifiedConfigService()
-schema_manager = unified_config_manager  # Backward compatibility alias
-
-# Backward compatibility class alias - to be removed in future version
-ConfigSchemaManager = UnifiedConfigService
 
 
 def migrate_configuration(config_path: str, target_version: str | None = None) -> bool:
@@ -433,8 +429,8 @@ def migrate_configuration(config_path: str, target_version: str | None = None) -
     path = Path(config_path)
     if target_version:
         target = ConfigSchemaVersion.from_string(target_version)
-        return schema_manager.migrate_to_version(path, target)
-    return schema_manager.migrate_to_latest(path)
+        return unified_config_manager.migrate_to_version(path, target)
+    return unified_config_manager.migrate_to_latest(path)
 
 
 if __name__ == "__main__":
@@ -456,10 +452,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config_path = Path(args.config_file)
     if args.show_version:
-        version = schema_manager.get_schema_version(config_path)
+        version = unified_config_manager.get_schema_version(config_path)
         print(f"Schema version: {(version.value if version else 'unknown')}")
     if args.validate:
-        is_valid, issues = schema_manager.validate_schema_compliance(config_path)
+        is_valid, issues = unified_config_manager.validate_schema_compliance(config_path)
         if is_valid:
             print("✅ Schema validation passed")
         else:

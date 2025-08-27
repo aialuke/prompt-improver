@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 
 import pytest
-from tests.conftest import reset_test_caches
+from tests.fixtures.application.cache import reset_test_caches
 
 # Import all functions that should now use the new cache architecture
 from prompt_improver.core.common.config_utils import get_config_safely

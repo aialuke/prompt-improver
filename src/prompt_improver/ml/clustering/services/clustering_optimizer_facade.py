@@ -7,7 +7,7 @@ Replaces the monolithic ClusteringOptimizer with a facade that orchestrates:
 - ClusteringParameterService: Parameter optimization and tuning
 - ClusteringEvaluatorService: Quality evaluation and metrics
 
-Maintains backward compatibility while providing improved modularity and testability.
+Provides improved modularity and testability through focused service components.
 """
 
 import asyncio

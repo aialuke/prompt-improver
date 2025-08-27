@@ -1,7 +1,7 @@
 """ML Repository Facade providing unified access to specialized ML repositories.
 
 Implements the original MLRepositoryProtocol interface while delegating to specialized
-repositories following the facade pattern and maintaining backwards compatibility.
+repositories following the facade pattern and providing unified access.
 """
 
 import logging

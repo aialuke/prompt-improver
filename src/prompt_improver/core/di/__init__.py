@@ -4,7 +4,7 @@ This module provides the unified container orchestrator that delegates to
 specialized domain containers following clean architecture principles.
 """
 
-# Export the main orchestrator interface for backward compatibility
+# Export the main orchestrator interface
 from prompt_improver.core.di.cli_container import CLIContainer, get_cli_container
 from prompt_improver.core.di.container_orchestrator import (
     CircularDependencyError,

@@ -16,6 +16,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 if TYPE_CHECKING:
+    from prompt_improver.core.di.cli_container import CLIContainer
     from prompt_improver.core.di.ml_container import MLServiceContainer
     from prompt_improver.core.events.ml_event_bus import MLEventBus
 
@@ -416,7 +417,7 @@ class DIContainer:
 
         return results
 
-    # Original DIContainer interface for backward compatibility
+    # Unified container interface methods
     def register_singleton(
         self,
         interface: type[T],
@@ -526,7 +527,7 @@ class DIContainer:
         except KeyError:
             raise ServiceNotRegisteredError(interface)
 
-    # Original container factory methods for backward compatibility
+    # Container factory methods
     def register_metrics_collector_factory(
         self, collector_type: str = "opentelemetry"
     ) -> None:
@@ -719,7 +720,7 @@ class DIContainer:
         )
         return MLPipelineOrchestrator(**services)
 
-    # Health check methods for backward compatibility
+    # Health check methods
     async def _check_mlflow_health(self) -> dict[str, Any]:
         """Check MLflow service health."""
         try:
@@ -900,7 +901,7 @@ async def shutdown_container():
         _container = None
 
 
-# Legacy alias for backward compatibility
+# Container initialization utility
 async def initialize_container():
     """Initialize the global container (legacy support)."""
     container = await get_container()

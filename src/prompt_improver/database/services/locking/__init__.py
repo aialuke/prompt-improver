@@ -17,7 +17,6 @@ from prompt_improver.database.services.locking.lock_manager import (
     LockConfig,
     LockInfo,
     create_lock_manager,
-    create_lock_manager_legacy,
 )
 
 __all__ = [
@@ -25,5 +24,4 @@ __all__ = [
     "LockConfig",
     "LockInfo",
     "create_lock_manager",
-    "create_lock_manager_legacy",
 ]

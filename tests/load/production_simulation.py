@@ -28,7 +28,9 @@ import numpy as np
 import psutil
 import pytest
 
-from prompt_improver.services.cache.cache_facade import CacheFacade
+from prompt_improver.database.services.connection.postgres_pool_manager_facade import (
+    PostgresAsyncClient,
+)
 from prompt_improver.ml.optimization.batch.enhanced_batch_processor import (
     ChunkingStrategy,
     StreamingBatchConfig,
@@ -40,7 +42,7 @@ from prompt_improver.ml.orchestration.config.orchestrator_config import (
 from prompt_improver.ml.orchestration.core.ml_pipeline_orchestrator import (
     MLPipelineOrchestrator,
 )
-from prompt_improver.database.services.connection.postgres_pool_manager_facade import PostgresAsyncClient
+from prompt_improver.services.cache.cache_facade import CacheFacade
 
 logger = logging.getLogger(__name__)
 
@@ -339,7 +341,7 @@ class TestProductionSimulation:
                         "raw_text": f"sample_text_data_{sample_id}" * 10,
                     })
                 chunk_file = tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".jsonl", delete=False
+                    encoding="utf-8", mode="w", suffix=".jsonl", delete=False
                 )
                 for record in chunk_data:
                     chunk_file.write(json.dumps(record) + "\n")
@@ -822,7 +824,7 @@ class TestProductionSimulation:
                 for m in simulation_metrics.database_metrics
                 if m.get("operation_type") == "sustained_db_operation"
             ])
-            ml_operations = len([m for m in simulation_metrics.ml_operations])
+            ml_operations = len(list(simulation_metrics.ml_operations))
             total_errors = len(simulation_metrics.error_log)
             db_avg_response = (
                 sum(
@@ -893,7 +895,7 @@ class TestProductionSimulation:
         summary = simulation_metrics.calculate_simulation_summary()
         timestamp = int(time.time())
         report_path = Path(f"production_simulation_report_{timestamp}.md")
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(report_content)
         metrics_path = Path(f"production_simulation_metrics_{timestamp}.json")
         detailed_metrics = {
@@ -916,7 +918,7 @@ class TestProductionSimulation:
             return obj
 
         serializable_metrics = convert_timestamps(detailed_metrics)
-        with open(metrics_path, "w") as f:
+        with open(metrics_path, "w", encoding="utf-8") as f:
             json.dump(serializable_metrics, f, indent=2)
         print(f"✅ Production simulation report saved to: {report_path}")
         print(f"✅ Detailed metrics saved to: {metrics_path}")
@@ -988,7 +990,7 @@ class TestProductionSimulation:
                     return await db_client.fetch_raw(q, p)
 
                 result = await cache_layer.get(
-                    f"query_{hash(query)}_{hash(str(params))}", 
+                    f"query_{hash(query)}_{hash(str(params))}",
                     lambda q=query, p=params: execute_query(q, p)
                 )
                 was_cached = True  # For production simulation assume cached

@@ -16,7 +16,8 @@ from prompt_improver.cli.services import (
     TrainingValidator,
     create_training_system,
 )
-from prompt_improver.cli.services.training_system_facade import TrainingServiceFacade
+
+# TrainingServiceFacade eliminated - using direct services
 
 
 class TestDecomposedTrainingSystem:
@@ -54,17 +55,16 @@ class TestDecomposedTrainingSystem:
 
         assert isinstance(orchestrator, TrainingOrchestrator)
 
-    def test_facade_provides_backwards_compatibility(self):
-        """Test that the facade provides backwards compatibility interface."""
-        facade = TrainingServiceFacade()
+    def test_direct_orchestrator_provides_training_interface(self):
+        """Test that direct orchestrator provides complete training interface."""
+        orchestrator = create_training_system()
 
-        # Verify facade has all expected properties
-        assert hasattr(facade, 'training_status')
-        assert hasattr(facade, 'training_session_id')
-        assert hasattr(facade, 'orchestrator')
-        assert hasattr(facade, 'validator')
-        assert hasattr(facade, 'metrics')
-        assert hasattr(facade, 'persistence')
+        # Verify orchestrator has all expected properties
+        assert hasattr(orchestrator, 'training_status')
+        assert hasattr(orchestrator, 'training_session_id')
+        assert hasattr(orchestrator, 'validator')
+        assert hasattr(orchestrator, 'metrics')
+        assert hasattr(orchestrator, 'persistence')
 
     @pytest.mark.asyncio
     async def test_validator_ready_for_training_check(self):
@@ -149,21 +149,19 @@ class TestDecomposedTrainingSystem:
         assert hasattr(orchestrator, 'stop_training_system')
         assert hasattr(orchestrator, 'get_training_status')
 
-    def test_facade_delegation_setup(self):
-        """Test that facade properly delegates to internal services."""
-        facade = TrainingServiceFacade()
+    def test_orchestrator_direct_service_access(self):
+        """Test that orchestrator provides direct access to all services."""
+        orchestrator = create_training_system()
 
-        # Verify delegation setup
-        assert facade._orchestrator is not None
-        assert facade._validator is not None
-        assert facade._metrics is not None
-        assert facade._persistence is not None
+        # Verify direct service access
+        assert orchestrator.validator is not None
+        assert orchestrator.metrics is not None
+        assert orchestrator.persistence is not None
 
-        # Verify properties delegate correctly
-        assert facade.orchestrator is facade._orchestrator
-        assert facade.validator is facade._validator
-        assert facade.metrics is facade._metrics
-        assert facade.persistence is facade._persistence
+        # Verify services are properly injected
+        assert hasattr(orchestrator.validator, 'validate_ready_for_training')
+        assert hasattr(orchestrator.metrics, 'get_resource_usage')
+        assert hasattr(orchestrator.persistence, 'create_training_session')
 
     def test_service_line_count_compliance(self):
         """Test that services meet line count requirements (<500 lines each)."""
@@ -226,8 +224,8 @@ if __name__ == "__main__":
         test_suite.test_convenience_function_creates_training_system()
         print("✅ Convenience function test passed")
 
-        test_suite.test_facade_provides_backwards_compatibility()
-        print("✅ Facade backwards compatibility test passed")
+        test_suite.test_direct_orchestrator_provides_training_interface()
+        print("✅ Direct orchestrator interface test passed")
 
         test_suite.test_protocol_compliance()
         print("✅ Protocol compliance test passed")

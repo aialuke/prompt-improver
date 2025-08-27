@@ -14,7 +14,7 @@ from prompt_improver.mcp_server.middleware import (
 )
 from prompt_improver.security.output_validator import OutputValidator
 from prompt_improver.security.owasp_input_validator import OWASP2025InputValidator
-from prompt_improver.security.unified.security_service_facade import (
+from prompt_improver.security.services.security_service_facade import (
     get_security_service_facade,
 )
 
@@ -54,7 +54,7 @@ async def create_security_services(config: AppConfig) -> dict[str, Any]:
         # Initialize unified security facade
         security_facade = await get_security_service_facade()
 
-        # Get individual components from facade for backward compatibility
+        # Get individual components from facade
         authentication_component = await security_facade.authentication
         authorization_component = await security_facade.authorization
         validation_component = await security_facade.validation
@@ -80,11 +80,9 @@ async def create_security_services(config: AppConfig) -> dict[str, Any]:
 
         return {
             "security_facade": security_facade,
-            "security_manager": security_facade,  # For backward compatibility
             "validation_manager": validation_component,
             "authentication_manager": authentication_component,
             "authorization_manager": authorization_component,
-            # Security stack replaced by facade components
             "security_middleware_adapter": security_adapter,
             "input_validator": input_validator,
             "output_validator": output_validator,
@@ -131,7 +129,7 @@ async def validate_security_status(services: "ServerServices") -> dict[str, Any]
         Dictionary containing security validation results
     """
     try:
-        security_status = await services.security_manager.get_security_status()
+        security_status = await services.security_facade.get_security_status()
 
         validation_result = {
             "security_mode": security_status.get("mode", "unknown"),

@@ -12,6 +12,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from prompt_improver.core.domain.enums import HealthStatus
 from prompt_improver.database.composition import (
     DatabaseServices,
     create_database_services,

@@ -4,6 +4,13 @@
 
 This is the **Adaptive Prompt Enhancement System (APES)** - an intelligent prompt optimization system with ML-driven rule learning, built as a Python-based web service with FastAPI, PostgreSQL, Redis, and advanced observability.
 
+### COPILOT_OPTIMIZATION: Claude Sonnet 4 Integration Patterns
+
+**Deep Reasoning Activation**: Use `ARCHITECTURAL_CONTEXT` comments for complex design decisions
+**Agent Mode Triggers**: Implement `TOOL_COORDINATION` patterns for MCP server integration  
+**Vision Capabilities**: Leverage diagram analysis for system architecture understanding
+**Performance Context**: Reference 343x CacheFactory performance gains and 114x AnalyticsServiceFacade improvements
+
 ### Standard Development Flow
 
 1. **Development Environment**: Use containerized development with Docker Compose for services

@@ -18,7 +18,7 @@ from prompt_improver.cli.core.enhanced_workflow_manager import (
     WorkflowStopMode,
 )
 from prompt_improver.cli.services.training_orchestrator import (
-    TrainingOrchestrator as TrainingService,
+    TrainingOrchestrator,
 )
 from prompt_improver.core.services.ml_training_service import (
     EventBasedMLTrainingService as MLTrainingService,
@@ -62,7 +62,7 @@ class TrainingApplicationService:
         session_manager: SessionManagerProtocol,
         ml_repository: MLRepositoryProtocol,
         ml_training_service: MLTrainingService,
-        training_system_manager: TrainingService,
+        training_system_manager: TrainingOrchestrator,
         enhanced_workflow_manager: WorkflowService,
     ) -> None:
         self.session_manager = session_manager

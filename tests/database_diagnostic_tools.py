@@ -588,11 +588,11 @@ async def main():
     diagnostics = DatabaseDiagnostics()
     results = await diagnostics.run_comprehensive_check()
 
-    with open("database_diagnostic_results.json", "w") as f:
+    with open("database_diagnostic_results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     print("\n💾 Results saved to: database_diagnostic_results.json")
     return 0 if results["docker_status"]["docker_daemon"] else 1
 
 
 if __name__ == "__main__":
-    exit(asyncio.run(main()))
+    sys.exit(asyncio.run(main()))

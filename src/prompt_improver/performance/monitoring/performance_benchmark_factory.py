@@ -91,22 +91,6 @@ async def create_performance_benchmark_with_dependencies(
         return None
 
 
-def get_performance_benchmark_interface() -> Any | None:
-    """Get the performance benchmark class for direct instantiation.
-
-    DEPRECATED: Use create_performance_benchmark() for the unified service instead.
-    """
-    logger.warning("get_performance_benchmark_interface() is deprecated. Use create_performance_benchmark() instead.")
-    try:
-        from prompt_improver.performance.monitoring.performance_benchmark_enhanced import (
-            MCPPerformanceBenchmarkEnhanced,
-        )
-        return MCPPerformanceBenchmarkEnhanced
-    except ImportError as e:
-        logger.exception(f"Failed to import MCPPerformanceBenchmarkEnhanced: {e}")
-        return None
-
-
 async def create_performance_benchmark_from_container(container: Any) -> Any:
     """Create performance benchmark using DI container dependencies.
 

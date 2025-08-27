@@ -7,7 +7,9 @@ to maintain clean architecture and separation of concerns.
 import asyncio
 import logging
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
+
 from prompt_improver.utils.datetime_utils import aware_utc_now
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ class IntegrationTestCoordinator:
     Coordinates complex integration scenarios across multiple services,
     manages test data consistency, and validates end-to-end workflows.
     """
-    
+
     def __init__(self):
         self.test_scenarios = {}
         self.scenario_results = {}
@@ -45,7 +47,7 @@ class IntegrationTestCoordinator:
         self,
         scenario_name: str,
         service_container,
-        validation_steps: list[Callable] = None,
+        validation_steps: list[Callable] | None = None,
     ) -> dict[str, Any]:
         """Execute integration test scenario with validation."""
         if scenario_name not in self.test_scenarios:
@@ -191,7 +193,7 @@ class IntegrationTestCoordinator:
         failed_scenarios = [
             r
             for r in self.scenario_results.values()
-            if r["status"] in ["failed", "error"]
+            if r["status"] in {"failed", "error"}
         ]
         return {
             "total_scenarios": len(self.scenario_results),

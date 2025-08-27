@@ -5,8 +5,8 @@ with clean boundaries and protocol-based service registration.
 """
 
 from abc import abstractmethod
-from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, Protocol, TypeVar
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Any, Protocol, TypeVar
 
 T = TypeVar("T")
 
@@ -303,7 +303,7 @@ class ContainerFacadeProtocol(Protocol):
 
     @abstractmethod
     @asynccontextmanager
-    async def managed_lifecycle(self) -> AsyncContextManager["ContainerFacadeProtocol"]:
+    async def managed_lifecycle(self) -> AbstractAsyncContextManager["ContainerFacadeProtocol"]:
         """Managed lifecycle for all containers."""
         ...
 

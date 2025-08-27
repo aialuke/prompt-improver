@@ -5,21 +5,22 @@ This module contains event bus service implementations for testing,
 extracted from conftest.py to maintain clean architecture.
 """
 import asyncio
-from typing import Any, Dict, List, Optional
-from prompt_improver.utils.datetime_utils import aware_utc_now
+from typing import Any
+
 from prompt_improver.shared.interfaces.protocols.ml import ServiceStatus
+from prompt_improver.utils.datetime_utils import aware_utc_now
 
 
 class MockEventBus:
     """Mock event bus for testing event-driven behavior."""
-    
+
     def __init__(self):
         self._subscribers = {}
         self._published_events = []
         self._subscription_counter = 0
         self._is_healthy = True
 
-    async def publish(self, event_type: str, event_data: Dict[str, Any]) -> None:
+    async def publish(self, event_type: str, event_data: dict[str, Any]) -> None:
         """Publish an event to all subscribers."""
         event = {
             "type": event_type,
@@ -54,7 +55,7 @@ class MockEventBus:
 
     async def unsubscribe(self, subscription_id: str) -> None:
         """Unsubscribe from events."""
-        for event_type, subscribers in self._subscribers.items():
+        for subscribers in self._subscribers.values():
             if subscription_id in subscribers:
                 del subscribers[subscription_id]
                 break
@@ -67,11 +68,11 @@ class MockEventBus:
         """Test helper to control health status."""
         self._is_healthy = healthy
 
-    def get_published_events(self) -> List[Dict[str, Any]]:
+    def get_published_events(self) -> list[dict[str, Any]]:
         """Test helper to inspect published events."""
         return self._published_events.copy()
 
-    def get_subscription_count(self, event_type: Optional[str] = None) -> int:
+    def get_subscription_count(self, event_type: str | None = None) -> int:
         """Test helper to count active subscriptions."""
         if event_type:
             return len(self._subscribers.get(event_type, {}))

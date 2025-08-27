@@ -7,7 +7,7 @@ following clean architecture principles and dependency inversion.
 # Removed core.protocols imports that trigger DI container chain
 # Local definitions to maintain database layer isolation
 from enum import Enum
-from typing import Any, AsyncContextManager, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,13 +33,13 @@ class ConnectionPoolCoreProtocol(Protocol):
 
     async def get_session(
         self, mode: ConnectionMode = ConnectionMode.READ_WRITE
-    ) -> AsyncContextManager[AsyncSession]:
+    ) -> AbstractAsyncContextManager[AsyncSession]:
         """Get async SQLAlchemy session with automatic transaction management."""
         ...
 
     async def get_ha_connection(
         self, pool_name: str = "primary"
-    ) -> AsyncContextManager[asyncpg.Connection]:
+    ) -> AbstractAsyncContextManager[asyncpg.Connection]:
         """Get direct asyncpg connection from HA pools."""
         ...
 
@@ -160,7 +160,7 @@ class PoolManagerFacadeProtocol(Protocol):
     """Protocol for the unified pool manager facade.
 
     Combines all pool management components into a single interface
-    that maintains backward compatibility with the original god object.
+    that orchestrates clean architecture components efficiently.
     """
 
     async def initialize(self) -> bool:
@@ -169,13 +169,13 @@ class PoolManagerFacadeProtocol(Protocol):
 
     async def get_session(
         self, mode: ConnectionMode = ConnectionMode.READ_WRITE
-    ) -> AsyncContextManager[AsyncSession]:
+    ) -> AbstractAsyncContextManager[AsyncSession]:
         """Get async SQLAlchemy session with automatic transaction management."""
         ...
 
     async def get_ha_connection(
         self, pool_name: str = "primary"
-    ) -> AsyncContextManager[asyncpg.Connection]:
+    ) -> AbstractAsyncContextManager[asyncpg.Connection]:
         """Get direct asyncpg connection from HA pools."""
         ...
 

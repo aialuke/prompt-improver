@@ -209,7 +209,7 @@ class ContextAwareFeatureWeighter:
         return weights
     
     def calculate_feature_weights_sync(self, domain_features: DomainFeatures, feature_names: tuple[str]) -> get_numpy().ndarray:
-        """Synchronous version for backward compatibility.
+        """Synchronous version of weight calculation.
         
         Note: This version won't use unified cache and falls back to dictionary cache.
         For optimal performance, use the async version.
